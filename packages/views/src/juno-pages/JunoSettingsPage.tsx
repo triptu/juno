@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
 import { cell } from './cell'
@@ -7,7 +7,7 @@ import { fullTime, messageTime } from '../time'
 
 /**
  * A section whose work is not built yet is left out by leaving out its
- * callbacks: Codex (`onSignInCodex`), Rules (`onRuleChange`, `onRuleRemove`,
+ * callbacks: Rules (`onRuleChange`, `onRuleRemove`,
  * `onRuleAdd`), Backup (`onBackupFolder`, `onExportPhrase`) and This Mac
  * (`onMove`, `onRestore`, `onStopJob`).
  */
@@ -17,7 +17,7 @@ export interface JunoSettingsPageProps {
   readonly now: number
   /** The provider section (`ProviderSection`), from main's state rather than the agent's page. */
   readonly providers: ReactNode
-  /** A chat model: a family on OpenRouter, a model id on a custom endpoint, listed or typed. */
+  /** A listed modelChoiceKey, or a typed custom model id. */
   readonly onChatModel: (family: string) => void
   readonly onCompactionModel: (family: string) => void
   readonly onCap: (usd: number) => void
@@ -51,13 +51,13 @@ const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
 function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
-    value: model.family,
+    value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.
     label:
       model.resolved === undefined
         ? `${model.family} (not available)`
         : // The resolved name already names its family: "Claude Sonnet 5.5", not "Claude Sonnet · Claude Sonnet 5.5".
-          `${model.resolved}${model.price === undefined ? '' : ` · ${model.price}`}`,
+          `${model.resolved}${model.provider === 'codex' ? ' · Codex' : ''}${model.price === undefined ? '' : ` · ${model.price}`}`,
     disabled: model.resolved === undefined,
   }))
 }
@@ -98,7 +98,9 @@ export function JunoSettingsPage({
     )
   }
   const custom = page.provider === 'custom'
-  const chatSelected = page.chatModels.find((model) => model.selected)?.family ?? ''
+  const chatChoice = page.chatModels.find((model) => model.selected)
+  const customSelected = page.chatModels.find(model => model.provider === 'custom')?.family ?? ''
+  const chatSelected = chatChoice === undefined ? '' : modelChoiceKey(chatChoice)
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
   return (
     <Page width="settings">
@@ -126,11 +128,11 @@ export function JunoSettingsPage({
                   label={chatCopy.providers.modelId}
                   placeholder="llama3.2"
                   // Committed on blur or Enter, as the cap is.
-                  key={chatSelected}
-                  defaultValue={chatSelected}
-                  onBlur={(event) => commitModel(event.currentTarget.value, chatSelected, onChatModel)}
+                  key={customSelected}
+                  defaultValue={customSelected}
+                  onBlur={(event) => commitModel(event.currentTarget.value, customSelected, onChatModel)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') commitModel(event.currentTarget.value, chatSelected, onChatModel)
+                    if (event.key === 'Enter') commitModel(event.currentTarget.value, customSelected, onChatModel)
                   }}
                   width="keyword"
                 />
@@ -143,14 +145,15 @@ export function JunoSettingsPage({
                 </Text>
               </span>
             </ListRow>
-          ) : (
+          ) : null}
+          {page.modelTyped !== true || page.chatModels.some(model => model.provider === 'codex') ? (
             <ListRow
               divider={!custom}
               trailing={<Select size={30} label="Chat model" options={modelOptions(page.chatModels)} value={chatSelected} onChange={(event) => onChatModel(event.currentTarget.value)} />}
             >
               <Text variant="body">Chat</Text>
             </ListRow>
-          )}
+          ) : null}
           {custom ? null : (
             <ListRow divider={false} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
               <Text variant="body">Compaction</Text>
@@ -200,7 +203,7 @@ export function JunoSettingsPage({
               <span {...stylex.props(cell.lines)}>
                 <Text variant="body">Daily cap</Text>
                 <Text variant="meta" tone="muted" data-spend-untracked="">
-                  {chatCopy.providers.spendUntracked}
+                  {chatChoice?.provider === 'codex' ? 'Codex uses your ChatGPT plan. The daily cap applies to API models only.' : chatCopy.providers.spendUntracked}
                 </Text>
               </span>
             ) : (
@@ -210,7 +213,7 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      {onSignInCodex === undefined ? null : (
+      {(
         <Section heading="Codex">
           <Surface kind="group">
             <ListRow
@@ -221,7 +224,7 @@ export function JunoSettingsPage({
                   <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20}>
                     {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
                   </Chip>
-                  {page.codex._tag === 'signedOut' ? (
+                  {page.codex._tag === 'signedOut' && onSignInCodex !== undefined ? (
                     <Button variant="ghost" size="xs" tone="subtle" onClick={onSignInCodex}>
                       Sign in
                     </Button>

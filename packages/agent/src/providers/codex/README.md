@@ -5,7 +5,8 @@ The picker discovers the installed `codex` executable and checks sign-in in
 in, resolving the model through the shared daily catalogue. It never reads
 credentials, configuration, skills or MCP servers from the owner's Codex home.
 To set up that home, the owner runs `CODEX_HOME="<agentDir>/codex" codex login`
-in Terminal, then restarts Juno. There is no separate ChatGPT OAuth provider.
+in Terminal, then restarts Juno. That auth file lets main start local discovery
+even without an API key; the agent still verifies sign-in and CLI availability. There is no separate ChatGPT OAuth provider.
 
 The price line says “Uses your ChatGPT plan” and shows today's number of
 attempted Codex turns. Remaining ChatGPT quota is not reported by this SDK.

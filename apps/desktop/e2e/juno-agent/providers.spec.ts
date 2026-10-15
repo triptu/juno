@@ -168,3 +168,37 @@ test('a custom endpoint turns the agent on and answers through its model', async
     await rm(userData, { recursive: true, force: true })
   }
 })
+
+test('local Codex starts without an API key and answers through the shared picker', async () => {
+  const { startFakeCodex } = await import('@juno/agent-testing')
+  const { dirname, join } = await import('node:path')
+  const codex = startFakeCodex()
+  const openRouter = await startFakeOpenRouter()
+  const userData = await tempUserData()
+  codex.signIn(join(userData, 'agent', 'codex'))
+  codex.script([{ reply: '<say>Hello from local Codex.</say>' }])
+  const previousPath = process.env.PATH
+  process.env.PATH = `${dirname(codex.path)}:${previousPath ?? ''}`
+  let running: Awaited<ReturnType<typeof launchApp>> | undefined
+  try {
+    running = await launchApp(userData, { fakeOpenRouterUrl: openRouter.origin })
+    const { app, win } = running
+    expect(await win.evaluate(() => window.juno.agent.provider())).toEqual(NONE)
+    await expect.poll(() => hooks(app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+    const agent = await agentClient(win)
+    const settings = await agent.follow<Settings>('agent.settings.page')
+    await expect.poll(async () => (await settings.latest())?.chatModels.some(model => model.price?.startsWith('Uses your ChatGPT plan'))).toBe(true)
+    expect(await agent.command('agent.settings.change', { opId: 'codex-choice', change: { _tag: 'model', purpose: 'chat', provider: 'codex', family: 'GPT Sol' } })).toMatchObject({ _tag: 'Success' })
+    const answers = await bubbles(agent, 'Hello')
+    await expect.poll(answers, { timeout: 20_000 }).toEqual(['Hello from local Codex.'])
+    expect(codex.invocations().filter(call => call.command === 'exec')).toHaveLength(1)
+    expect(openRouter.requests).toHaveLength(0)
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH
+    else process.env.PATH = previousPath
+    await running?.close()
+    codex.close()
+    await openRouter.close()
+    await rm(userData, { recursive: true, force: true })
+  }
+})

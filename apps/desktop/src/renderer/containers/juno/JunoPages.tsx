@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { chatCopy, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type ConnectionId, type JunoPage, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { copyText, nowAtom, registry } from '@juno/state'
 import {
@@ -103,7 +103,10 @@ function Settings() {
       page={page}
       now={now}
       providers={providers}
-      onChatModel={(family) => change({ chat: family }, { _tag: 'model', purpose: 'chat', provider, family })}
+      onChatModel={(key) => {
+        const choice = page.chatModels.find(model => modelChoiceKey(model) === key)
+        change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
+      }}
       onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
       onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
@@ -192,7 +195,10 @@ interface Shown {
   readonly compaction?: string
 }
 
-const selectedFamily = (models: JunoSettingsPageModel['chatModels']) => models.find((model) => model.selected)?.family
+const selectedFamily = (models: JunoSettingsPageModel['chatModels']) => {
+  const selected = models.find(model => model.selected)
+  return selected === undefined ? undefined : modelChoiceKey(selected)
+}
 
 /** The changes the agent's page does not show yet; the same object when nothing was confirmed. */
 function unconfirmed(page: JunoSettingsPageModel, shown: Shown): Shown {
@@ -208,7 +214,7 @@ function unconfirmed(page: JunoSettingsPageModel, shown: Shown): Shown {
 }
 
 function withShown(page: JunoSettingsPageModel, shown: Shown): JunoSettingsPageModel {
-  const pick = (models: JunoSettingsPageModel['chatModels'], family: string | undefined) => (family === undefined ? models : models.map((model) => ({ ...model, selected: model.family === family })))
+  const pick = (models: JunoSettingsPageModel['chatModels'], family: string | undefined) => (family === undefined ? models : models.map((model) => ({ ...model, selected: modelChoiceKey(model) === family })))
   return {
     ...page,
     ...(shown.paused === undefined ? {} : { paused: shown.paused }),
