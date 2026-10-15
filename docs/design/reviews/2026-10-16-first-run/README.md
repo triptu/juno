@@ -90,7 +90,7 @@ At 1400 × 900 the appearance block sits at the window's bottom-left, outside th
 
 ### 11. The avatar menu shows the Slack handle and the diagnostics. Low. Question Q5.
 
-The menu's header reads "tushar", the handle, where the rest of the app says "Tushar". Under the items are Session ("Signed in to Juno Fake as tushar · Sign out") and Diagnostics ("Juno 0.1.0 on darwin, Electron 44.7.0", "Engine starting", Ping engine). During the first sync, "Engine starting" is the only sign of progress, and it reads like a fault (`before/03b-account-menu-boot-held-*`). The inventory keeps these until Sign out is an item.
+The menu's header reads "tushar", the handle, where the rest of the app says "Tushar". Under the items are Session ("Signed in to Juno Fake as tushar · Sign out") and Diagnostics ("Juno 0.1.0 on darwin, Electron 44.7.0", "Engine starting", Ping engine). During the first sync, "Engine starting" is the only sign of progress, and it reads like a fault (`before/03b-account-menu-boot-held-*`). The inventory keeps these until Sign out is an item. The avatar menu, its hover and Diagnostics belong to the `settings-one` work, so this review changes none of them.
 
 ### 12. Smaller observations. Low. Not changed.
 
@@ -108,11 +108,11 @@ Each has a recommendation. They are left open because each changes what a surfac
 
 | # | Question | Recommendation |
 | --- | --- | --- |
-| Q1 | Where does AI assist get turned off? | Build the avatar menu item the inventory proposes ("AI assist" with a switch), and also put it at the top of Settings › Juno. Point the AI-off line at the menu: "Juno is off. Turn on AI assist in the account menu." |
+| Q1 | Where does AI assist get turned off? | Build the avatar menu item the inventory proposes ("AI assist" with a switch), and also put it in the Juno section of the merged Settings page (`settings-one`). Point the AI-off line at the menu: "Juno is off. Turn on AI assist in the account menu." |
 | Q2 | During the first sync, show people before rows, or rows with a placeholder name? | Load the people list with the boot, before the first rows are written, so no row ever shows an id. If that cannot be done, show the row without its sender ("Booked 2–4pm…") rather than an id. |
 | Q3 | What does the empty Juno tab suggest? | In the tab: "Catch me up on today", "What needs me?", "Anything settled I can resolve?". Keep the topic suggestions for the panel beside a topic. |
 | Q4 | Keep Theme and Accent on the sign-in page? | Remove them. The window follows the system theme, and Preferences has both after sign-in. |
-| Q5 | When do Session and Diagnostics leave the avatar menu? | Now. Make Sign out the menu's last item, move the version to Preferences › About (it is already there), and keep Ping engine for development builds. Show the real name in the header. |
+| Q5 | When do Session and Diagnostics leave the avatar menu? (For the `settings-one` work, which owns the menu.) | Now. Make Sign out the menu's last item, move the version to Preferences › About (it is already there), and keep Ping engine for development builds. Show the real name in the header. |
 | Q6 | What does ⌘K offer when nothing matches? | "Search Slack for "…"" as the one row when Slack search is wired; until then "No matches. Try fewer words." |
 | Q7 | One page width for every settings-like page? | Yes, 760 for all of them, so the titles stay put when switching tabs. Juno's chat column stays 720. |
 | Q8 | Should Home say "Nothing is waiting on you" while the first sync is still catching up? | Home is ready once the boot is done, but older conversations still arrive after that (`series-cold.json`: "Nothing is waiting on you." at 2.3 s). Keep "Getting your conversations from Slack." until the engine is `live` on the first run, then show the items. |
