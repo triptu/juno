@@ -57,6 +57,7 @@ test('a 429 storm: the line says Slack asked us to slow down, every method waits
   await sidebar.expectNoSyncStatus(60_000)
   await expect(sidebar.row('#product').preview).toContainText('Pricing page copy is live.', { timeout: 30_000 })
 
+  await juno.expectEngineLive(60_000)
   const limited = fake.calls.filter((call) => call.kind === 'api' && call.status === 429)
   expect(new Set(limited.map((call) => call.method))).toEqual(new Set(methods))
   for (const call of limited) {
