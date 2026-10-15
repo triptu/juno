@@ -298,6 +298,19 @@ test.describe('settings forms', () => {
     expect(at.errorStart).toBe(at.fieldStart)
   })
 
+  test('Connections: a server with no tools is one row with no divider over the card’s bottom edge', async ({ page }) => {
+    await open(page, 'ConnectionsPage', 'connections/servers')
+    const lines = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-connection-id]')].map((card) => {
+        const rows = [...card.children]
+        const last = rows.at(-1)!
+        return { id: card.getAttribute('data-connection-id'), rows: rows.length, lastBorder: getComputedStyle(last).borderBottomWidth, lastShadow: getComputedStyle(last).boxShadow }
+      }),
+    )
+    expect(lines.find((card) => card.id === 'littlebird')?.rows).toBe(1)
+    for (const card of lines) expect({ id: card.id, border: card.lastBorder, shadow: card.lastShadow }).toEqual({ id: card.id, border: '0px', shadow: 'none' })
+  })
+
   test('Restore from backup: the folder box is drawn as the phrase field under it, its text on the same line', async ({ page }) => {
     await open(page, 'RestoreSheet', 'restore/ready')
     const at = await page.evaluate(() => {

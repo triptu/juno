@@ -70,7 +70,9 @@ function Connection({ row, error, onEnabled, onAction, onT3Address, onTier }: { 
   return (
     <Section heading={row.label} sub={row.detail}>
       <Surface kind="group" data-connection={row.state} data-connection-id={row.id}>
+        {/* A divider only when a row follows: a server with no tools yet is one row, with no line over the card's edge. */}
         <ListRow
+          divider={row.t3 !== undefined || row.tools.length > 0}
           trailing={
             <span {...stylex.props(cell.controls)}>
               <Chip variant={row.state === 'ready' ? 'filled' : 'outline'} size={20}>
