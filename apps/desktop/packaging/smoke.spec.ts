@@ -1,17 +1,27 @@
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses'
 import { test, expect, chromium } from '@playwright/test'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { startFakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 
 test('packaged app signs in and starts both utility processes @mac', async () => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   const executable = process.env.JUNO_PACKAGED_EXECUTABLE ?? resolve('release/mac-arm64/Juno.app/Contents/MacOS/Juno')
-  const fuses = await getCurrentFuseWire(resolve(executable, '../../..'))
+  const appPath = resolve(executable, '../../..')
+  let signature = ''
+  // codesign writes its description to stderr, even on success.
+  const inspection = spawn('codesign', ['-dvv', appPath], { stdio: ['ignore', 'ignore', 'pipe'] })
+  inspection.stderr.setEncoding('utf8').on('data', (chunk: string) => { signature += chunk })
+  await once(inspection, 'exit')
+  if (!signature.includes('Authority=Developer ID Application:')) {
+    execFileSync('codesign', ['-s', '-', '--force', '--deep', '--preserve-metadata=entitlements,requirements,flags,runtime', appPath], { stdio: 'pipe' })
+  }
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' })
+  const fuses = await getCurrentFuseWire(appPath)
   for (const fuse of [FuseV1Options.RunAsNode, FuseV1Options.EnableNodeOptionsEnvironmentVariable, FuseV1Options.EnableNodeCliInspectArguments]) {
     expect(fuses[fuse]).toBe('0'.charCodeAt(0))
   }
@@ -26,9 +36,10 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   delete env.ELECTRON_RUN_AS_NODE
   delete env.NODE_OPTIONS
   try {
-    for (const pass of ['sign-in', 'cached'] as const) {
+    const timings: number[] = []
+    for (let pass = 0; pass < 6; pass++) {
       await rm(join(userData, 'DevToolsActivePort'), { force: true })
-      const started = performance.now()
+      const started = performance.timeOrigin + performance.now()
       const child = spawn(executable, ['--remote-debugging-port=0'], { env, stdio: 'ignore' })
       let exited = false
       const closed = once(child, 'exit').then(([code, signal]) => { exited = true; return { code, signal } })
@@ -45,9 +56,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           await expect.poll(() => context.pages().find((candidate) => candidate.url().startsWith('juno://'))?.url()).toBeTruthy()
           const page = context.pages().find((candidate) => candidate.url().startsWith('juno://'))
           if (!page) throw new Error('Packaged app did not open its main window')
-          if (pass === 'sign-in') {
+          if (pass === 0) {
             await expect(page.getByRole('button', { name: 'Sign in to Slack', exact: true })).toBeVisible()
-            console.log(`Packaged launch to sign-in visible: ${Math.round(performance.now() - started)} ms`)
             const opened = context.waitForEvent('page')
             await page.getByRole('button', { name: 'Sign in to Slack', exact: true }).click()
             const signIn = await opened
@@ -56,7 +66,15 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
             await signIn.getByRole('button', { name: 'Sign in', exact: true }).click()
           }
           await expect(page.getByRole('complementary', { name: 'Sidebar' }).getByRole('listitem').first()).toBeVisible({ timeout: 20_000 })
-          if (pass === 'cached') console.log(`Packaged cached launch to sidebar visible: ${Math.round(performance.now() - started)} ms (includes CDP attachment)`)
+          if (pass > 0) {
+            await page.waitForFunction(() => performance.getEntriesByName('juno.sidebar-rows', 'measure').length > 0)
+            const painted = await page.evaluate(() => {
+              const entry = performance.getEntriesByName('juno.sidebar-rows', 'measure')[0]
+              if (!entry) throw new Error('Sidebar paint was not recorded')
+              return performance.timeOrigin + entry.startTime + entry.duration
+            })
+            timings.push(painted - started)
+          }
           await expect.poll(() => page.evaluate(() => window.juno.agent.requestPort())).toEqual('sent')
           await page.screenshot({ path: 'test-results/packaged-sidebar.png' })
         } finally {
@@ -67,6 +85,11 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
         await closed
       }
     }
+    expect(timings).toHaveLength(5)
+    const sorted = timings.toSorted((a, b) => a - b)
+    const report = { samplesMs: timings, medianMs: sorted[2], minMs: sorted[0], maxMs: sorted[4] }
+    console.log(`Packaged launch to first sidebar rows painted: ${JSON.stringify(report)}`)
+    await writeFile(test.info().outputPath('startup.json'), JSON.stringify(report, null, 2))
   } finally {
     await model.close()
     await fake.close()
