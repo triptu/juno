@@ -10,9 +10,7 @@ export {
 export type { Accept, InboxKind, InboxOp, InboxState } from './inbox/inbox'
 export type { Mode, Outcome } from './store/ledger'
 export { CORE_MIGRATIONS, type MigrationSet } from './store/schema'
-import { LOCAL_TABLES as CORE_LOCAL_TABLES } from './store/schema'
-import { PROVIDER_LOCAL_TABLES } from './spend/schema'
-export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES]
+export { LOCAL_TABLES } from './backup/schema'
 export { runJob, type CompactionModel, type MemoryView } from './store/memory'
 export { createSpend, Spend, dollars, DOLLAR, spendDay, SPEND_MIGRATIONS, PROVIDER_LOCAL_TABLES,
   type SpendLedger, type SpendSnapshot, type SpendPath, type Reservation } from './spend'
@@ -39,5 +37,7 @@ export { authorizeDecision, bindingMatches, mayAuthorize, mayMintGrant, toolDeci
   type Authority, type AuthorizeDecision, type AuthorizeInput, type CardOutcome, type GrantAuthority, type Invalid, type OpClass, type RunFacts, type ToolDecision } from './policy/policy'
 export { liveGrant, mintGrant, revokeAllGrants, revokeGrant, type Grant, type GrantClass, type Mint } from './grants/grants'
 
+export * from './backup'
+export * from './ownership'
 export * from './mcp'
 export * from './schedule'
