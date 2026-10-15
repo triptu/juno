@@ -245,7 +245,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
 | UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
 | Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, clamped to 1 or 2 lines |
-| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Home item titles, picker rows, Compact message body |
+| Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Picker rows, Compact message body |
 | Body | 14.5px | 400 | 1.6 | 0 | default | Message body (Comfortable), composer (lh 22px), rule rows, palette labels, textareas |
 | Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
 | Message name | 14.5px | 600 | | 0 | default | Flat message header |
@@ -254,6 +254,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Topic title | 20px | 600 | 1.3 | -0.01em | default | Unused since the floating header; the header title is 14px 600 (the Body small size at the semibold weight) |
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Notifications, Preferences, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
+| Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
 | Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |
@@ -339,6 +340,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--header-band` | 68px: the band behind the islands, solid `--background` to `--header-band-solid` 44px (the islands' bottom), then fading to transparent. Also the list's `scroll-padding-top` and the scrollbar track's top margin |
 | `--header-inset` | 56px top padding of a list that runs under the header (`ScrollArea underHeader`), so at scroll top its first row starts below the band. Replaced `--topic-header-height` (100px) |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
+| `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px (Preferences), 880px (Notifications) |

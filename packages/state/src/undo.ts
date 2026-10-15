@@ -114,5 +114,7 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, readsMarkRead, payloadOf(undo))
     case 'reads.markUnread':
       return runCommand(registry, readsMarkUnread, payloadOf(undo))
+    case 'topics.restoreAll':
+      return Promise.all(undo.restores.map((restore) => runCommand(registry, topicsRestore, restore)))
   }
 }

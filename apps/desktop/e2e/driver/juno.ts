@@ -432,6 +432,7 @@ export class Juno {
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
+  readonly home: HomePane
   readonly peek: PeekPopover
 
   constructor(app: ElectronApplication, win: Page) {
@@ -445,6 +446,7 @@ export class Juno {
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+    this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
   }
 
@@ -495,9 +497,9 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   }
 
-  /** The empty workspace shown when no tab is open. */
+  /** Home, which the workspace shows when no tab is open. */
   async expectNothingOpen(): Promise<void> {
-    await expect(this.win.getByText('Nothing open yet', { exact: true })).toBeVisible()
+    await this.home.expectShown()
   }
 
   /**
@@ -580,8 +582,12 @@ export class Juno {
   async waitForSync(): Promise<void> {
     await this.sidebar.expectRows()
     await this.expectEngineLive()
-    // Park the pointer and the focus on the empty workspace.
-    await this.win.mouse.click(900, 400)
+    // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
+    // where a blind click would land, so wait for it and click its greeting, which does nothing.
+    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
+    if (await this.home.greeting.isVisible()) await this.home.greeting.click()
+    else await this.win.mouse.click(900, 400)
   }
 
   /** Switches the theme from the account menu and waits for the page to follow. */
@@ -1344,5 +1350,65 @@ export class SidebarFrame {
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+  }
+}
+
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'tidyUp'
+
+/** Home (SPEC section 12): the greeting, the rows and the Ask Juno field, in the visible page. */
+export class HomePane {
+  constructor(readonly win: Page) {}
+
+  get root(): Locator {
+    return this.win.locator('[data-home]:not([data-home-waiting])').filter({ visible: true })
+  }
+
+  get greeting(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  async expectShown(): Promise<void> {
+    await expect(this.greeting).toBeVisible()
+  }
+
+  /** The sidebar's Home item. */
+  get navItem(): Locator {
+    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
+  }
+
+  /** Opens Home from the sidebar, which reads the items afresh. */
+  async open(): Promise<void> {
+    await this.navItem.click()
+    await this.expectShown()
+  }
+
+  item(kind: HomeItemKind): Locator {
+    return this.root.locator(`[data-home-item="${kind}"]`)
+  }
+
+  title(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-title]')
+  }
+
+  meta(kind: HomeItemKind): Locator {
+    return this.item(kind).locator('[data-home-meta]')
+  }
+
+  /** The kinds shown, top to bottom. */
+  kinds(): Promise<string[]> {
+    return this.root.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-home-item') ?? ''))
+  }
+
+  /** Clicks a row's link, which opens its topic. */
+  async openItem(kind: HomeItemKind): Promise<void> {
+    await this.item(kind).getByRole('link').click()
+  }
+
+  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all'): Locator {
+    return this.item(kind).getByRole('button', { name })
+  }
+
+  get ask(): Locator {
+    return this.root.getByRole('button', { name: 'Ask Juno' })
   }
 }
