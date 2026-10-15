@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { defineFixtures, scene } from '@juno/ui'
 import { AppearanceSettings } from './AppearanceSettings'
 import { NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
@@ -20,7 +21,8 @@ const workspaceTabs = [
 
 const nav = (hidden: boolean) => <TitlebarNav sidebarHidden={hidden} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
 
-function SignedIn({ width, hidden = false }: { readonly width?: number; readonly hidden?: boolean }) {
+/** The signed-in window with fixture rows. `peek` fills the shell's peek slot. */
+export function SignedIn({ width, hidden = false, peek }: { readonly width?: number; readonly hidden?: boolean; readonly peek?: ReactNode }) {
   return (
     <Shell
       {...(width === undefined ? {} : { sidebarWidth: width })}
@@ -28,6 +30,7 @@ function SignedIn({ width, hidden = false }: { readonly width?: number; readonly
       onSidebarResize={noop}
       onSidebarResetWidth={noop}
       onSidebarCollapse={noop}
+      peek={peek}
       sidebar={
         <Sidebar
           titlebarLeading={nav(false)}

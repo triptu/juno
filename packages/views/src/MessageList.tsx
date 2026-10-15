@@ -46,6 +46,8 @@ export interface MessageListProps {
   readonly older?: OlderStatus
   /** The scroll element, for the container's open position and stick-to-bottom. */
   readonly scrollRef?: Ref<HTMLElement>
+  /** The list runs under the topic's floating header (default). False where nothing floats over it, as in peek. */
+  readonly underHeader?: boolean
   /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
@@ -104,6 +106,7 @@ export function MessageList({
   dividerBefore,
   older = 'none',
   scrollRef,
+  underHeader = true,
   anchorRef,
   hueOf = hueForId,
   renderToolbar,
@@ -120,7 +123,7 @@ export function MessageList({
   const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
 
   return (
-    <ScrollArea scrollbar="hover" underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
+    <ScrollArea scrollbar="hover" underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
       <div
         role="list"
         aria-label="Messages"

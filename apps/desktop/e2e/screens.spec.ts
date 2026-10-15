@@ -31,6 +31,27 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
   await win.screenshot({ path: resolve(screens, 'sidebar-dark.png') })
 })
 
+test('peek, light and dark', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  const rina = juno.sidebar.row('Rina finished the onsite.')
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await juno.setTheme('Dark')
+      await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
+    }
+    await rina.peek()
+    await juno.peek.expectMessage('Strong systems design')
+    await win.evaluate(() => document.fonts.ready)
+    await win.waitForTimeout(300)
+    await win.screenshot({ path: resolve(screens, `peek-${theme}.png`) })
+    await juno.peek.release()
+    await juno.peek.expectClosed()
+  }
+})
+
 test('New chat with a destination and the thread list open, light and dark', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()

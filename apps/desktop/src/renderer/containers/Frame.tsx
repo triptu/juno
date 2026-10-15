@@ -7,10 +7,11 @@ import { Toasts } from './Toasts'
 
 /**
  * The signed-in window: the shell with the sidebar at its saved width, or
- * hidden. The panes come in as elements made by the parent, so a resize or
- * a hide re-renders this frame and not them.
+ * hidden, and the peek beside it. The panes and the peek come in as
+ * elements made by the parent, so a resize or a hide re-renders this frame
+ * and not them.
  */
-export function Frame({ sidebar, children }: { readonly sidebar: ReactNode; readonly children: ReactNode }) {
+export function Frame({ sidebar, peek, children }: { readonly sidebar: ReactNode; readonly peek: ReactNode; readonly children: ReactNode }) {
   const layout = useAtomValue(sidebarLayoutAtom)
   return (
     <Shell
@@ -20,6 +21,7 @@ export function Frame({ sidebar, children }: { readonly sidebar: ReactNode; read
       onSidebarResize={resizeSidebar}
       onSidebarResetWidth={resetSidebarWidth}
       onSidebarCollapse={collapseSidebar}
+      peek={peek}
       toast={<Toasts />}
     >
       {children}

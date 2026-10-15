@@ -245,11 +245,11 @@ function openThreadInNewTab(id: string): void {
  * and the same for peek (section 5). The list alone, with no header or
  * composer, in `readOnly` mode (see `TopicProps`).
  */
-export const TopicPreview = memo(function TopicPreview({ id }: { readonly id: string }) {
+export const TopicPreview = memo(function TopicPreview({ id, underHeader = true }: { readonly id: string; readonly underHeader?: boolean }) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   if (detail == null) return null
-  return <Topic key={id} id={id} detail={detail} readOnly />
+  return <Topic key={id} id={id} detail={detail} readOnly underHeader={underHeader} />
 })
 
 interface TopicProps {
@@ -262,9 +262,11 @@ interface TopicProps {
    * topic as a tab shows it, with its header and composer.
    */
   readonly readOnly?: boolean
+  /** The list runs under a floating header. Default true; peek has none. */
+  readonly underHeader?: boolean
 }
 
-function Topic({ id, detail, readOnly = false }: TopicProps) {
+function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps) {
   const list = useAtomValue(messageListAtom(id))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
@@ -520,6 +522,7 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
       older={list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
       scrollRef={scrollRef}
+      underHeader={underHeader}
       anchorRef={anchorRef}
       hueOf={hueOf}
       onOpenThread={readOnly ? openThreadInNewTab : openThread}

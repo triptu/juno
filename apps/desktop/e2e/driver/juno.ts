@@ -187,7 +187,16 @@ export class SidebarRow {
     await expect(this.root.getByText(name, { exact: true })).toBeVisible()
   }
 
+  /** Points at the row and holds the peek key. `juno.peek.release()` lets go. */
+  async peek(key: PeekKeyName = 'option'): Promise<void> {
+    await this.hover()
+    await this.win.keyboard.down(peekKeys[key])
+  }
 }
+
+export type PeekKeyName = 'option' | 'space'
+
+const peekKeys: Record<PeekKeyName, string> = { option: 'Alt', space: 'Space' }
 
 /** The left pane: filters, sections and rows. */
 export class Sidebar {
@@ -375,6 +384,42 @@ export class AccountMenu {
   themeRadio(name: 'Light' | 'Dark') {
     return this.root.getByRole('radio', { name })
   }
+
+  /** "Hold to peek": ⌥ Option or Space. */
+  async setPeekKey(key: PeekKeyName): Promise<void> {
+    await this.open()
+    const radio = this.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    await radio.click()
+    await expect(radio).toHaveAttribute('aria-checked', 'true')
+    await this.close()
+  }
+}
+
+/** The peek popover beside the sidebar, while the peek key is held over a row. */
+export class PeekPopover {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[role="dialog"][aria-roledescription="peek"]')
+  }
+
+  async expectShowing(title: string): Promise<void> {
+    await expect(this.root).toBeVisible()
+    await expect(this.root).toHaveAccessibleName(new RegExp(`^${escapeRegExp(title)}`))
+  }
+
+  async expectMessage(text: string): Promise<void> {
+    await expect(this.root.getByRole('list', { name: 'Messages' }).getByText(text, { exact: false }).first()).toBeVisible()
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Lets go of the peek key. */
+  async release(key: PeekKeyName = 'option'): Promise<void> {
+    await this.win.keyboard.up(peekKeys[key])
+  }
 }
 
 export class Juno {
@@ -387,6 +432,7 @@ export class Juno {
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
+  readonly peek: PeekPopover
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -399,6 +445,7 @@ export class Juno {
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+    this.peek = new PeekPopover(win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
