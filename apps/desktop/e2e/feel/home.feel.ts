@@ -1,7 +1,7 @@
 import { happened, switchesOnce } from './checks'
 import { expect, test } from './feel'
 
-test('Home replaces the topic whole after its subscription expires', async ({ juno, win, feel }) => {
+test('Home has its data when it replaces the topic after its subscription expires', async ({ juno, win, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.home.open()
@@ -12,7 +12,7 @@ test('Home replaces the topic whole after its subscription expires', async ({ ju
 
   await feel.run({
     name: 'home-after-idle',
-    title: 'Open Home after reading a topic: the topic gives way to the greeting and rows in one step',
+    title: 'Open Home after reading a topic: its data is ready before the entrance animation starts',
     probes: [
       { kind: 'count', within: 'main', name: 'topic', selector: '[data-topic-view]' },
       { kind: 'count', within: 'main', name: 'home', selector: '[data-home-item]' },
@@ -20,7 +20,7 @@ test('Home replaces the topic whole after its subscription expires', async ({ ju
     ],
     checks: [
       happened('Home showed its rows', (r) => r.frames.some((f) => Number(f.values['home']) > 0)),
-      happened('no empty intermediate page', (r) => r.frames.every((f) => Number(f.values['waiting']) === 0 && (Number(f.values['topic']) > 0 || Number(f.values['home']) > 0))),
+      happened('no loading placeholder between pages', (r) => r.frames.every((f) => Number(f.values['waiting']) === 0 && (Number(f.values['topic']) > 0 || Number(f.values['home']) > 0))),
       switchesOnce('topic to Home', (v) => Number(v['home']) > 0 ? 'home' : Number(v['topic']) > 0 ? 'topic' : 'empty'),
     ],
   }, async (rec) => {
