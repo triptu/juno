@@ -28,7 +28,7 @@ cache is not a persistent ordered index.
 
 ## Redaction hook
 
-WP16 should import `invalidateChatCaches` from `serve/chat`, then call
+WP16 (built) imports `invalidateChatCaches` from `serve/chat` and calls it right after a removal commits, before the change signal. The chat reads `removed_ops` and `removed_bubbles` (redaction's tables) for the Removed note and removed quotes, so a store the chat serves needs `REDACTION_MIGRATIONS`. The contract for any other caller: import `invalidateChatCaches` from `serve/chat`, then call
 `invalidateChatCaches(store)` after committing redaction and clearing affected
 live-run state. It clears every cache attached to that database, including cached
 quotes, raw text, row indexes and prior snapshots, and wakes their subscribers.

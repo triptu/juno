@@ -94,7 +94,7 @@ const dim = stylex.keyframes({
  * time on the first message of a run, the body, files, reactions and, in
  * Main, the thread link. A message that mentions you sits on the accent
  * tint. The hover toolbar sits at the top right of the row and shows by
- * opacity and visibility only, so showing it never forces a layout. On a row
+ * opacity and display only, absolutely placed, so showing it never forces a layout. On a row
  * with a toolbar the header keeps its end free, so the toolbar covers the end
  * of the first body line but never the name or the time; in a narrow row it
  * rises above the row's top edge instead. The header is the same height with
@@ -267,20 +267,24 @@ const styles = stylex.create({
     outlineColor: accent['--focus-ring'],
     // The toolbar and the gutter time read these: hidden until the pointer is
     // over the row, or keyboard focus is on the row or inside it. Only
-    // opacity and visibility change, so nothing moves. Visibility keeps a
-    // hidden toolbar from taking the pointer, which matters where it rises
-    // over the row before.
+    // opacity and display change on an absolutely placed toolbar, so nothing
+    // moves, and a hidden toolbar never takes the pointer, which matters where
+    // it rises over the row before.
     '--row-action-opacity': {
       default: '0',
       ':hover': { default: null, [HOVER]: '1' },
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
-    '--row-action-visibility': {
-      default: 'hidden',
-      ':hover': { default: null, [HOVER]: 'visible' },
-      ':focus-visible': 'visible',
-      ':has(:focus-visible)': 'visible',
+    // The toolbar is out of the layout until then too: every row has one, and
+    // laid out but transparent it was most of the list's style and layout work
+    // when a topic opened or the pane changed width (performance.md 8). It is
+    // absolutely placed in a reserved slot, so showing it moves nothing.
+    '--row-toolbar-display': {
+      default: 'none',
+      ':hover': { default: null, [HOVER]: 'block' },
+      ':focus-visible': 'block',
+      ':has(:focus-visible)': 'block',
     },
   },
   rowEager: {
@@ -290,7 +294,7 @@ const styles = stylex.create({
   rowHeld: {
     backgroundColor: colors['--surface-hover'],
     '--row-action-opacity': '1',
-    '--row-action-visibility': 'visible',
+    '--row-toolbar-display': 'block',
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
@@ -384,6 +388,7 @@ const styles = stylex.create({
   // the row's top edge, wholly above it: paint containment would clip it
   // there, so the row's overflow-clip-margin lets it paint.
   toolbar: {
+    display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: {
       default: spacing['--space-0-5'],
@@ -392,6 +397,5 @@ const styles = stylex.create({
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
-    visibility: 'var(--row-action-visibility)',
   },
 })

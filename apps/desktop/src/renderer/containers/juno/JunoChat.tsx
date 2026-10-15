@@ -44,6 +44,16 @@ const empty: ChatPage = { items: [], banner: { _tag: 'none' }, moreAbove: false,
 const off: ChatPage = { ...empty, banner: { _tag: 'aiOff' }, composerEnabled: false }
 
 /** A row's id the agent can anchor a window on. Separators and the status bubble have none. */
+function nextAnchor(items: ReadonlyArray<ChatItem>, index: number): string | undefined {
+  const next = items[index + 1]
+  return next === undefined ? undefined : anchorOf(next)
+}
+
+function bubbleAfterDivider(items: ReadonlyArray<ChatItem>): string | undefined {
+  const at = items.findIndex((item) => item._tag === 'newDivider')
+  return at < 0 ? undefined : nextAnchor(items, at)
+}
+
 function anchorOf(item: ChatItem): string | undefined {
   switch (item._tag) {
     case 'owner':
@@ -101,7 +111,8 @@ export interface JunoChatProps {
  * The one Juno chat (SPEC 13.1), as the Juno tab and the panel show it.
  *
  * - The window is the agent's page: the tab opens at the "New" divider when
- *   Juno has said something unread, the panel at the bottom. Near either
+ *   Juno has said something unread, the panel at the bottom. The divider
+ *   stays where it was when the chat showed. Near either
  *   edge it moves by `OVERLAP` rows; rows stay in flow, so scroll anchoring
  *   keeps the rows in view still. A window that reaches the newest row
  *   follows it (`latest`).
@@ -133,7 +144,12 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
   const bottomEdgeRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const items = page.items
+  // The "New" divider stays before the bubble it sat over when the chat showed, as a topic's does:
+  // an answer that arrives while the chat is open gets none. A hidden tab takes it again when shown.
+  const [dividerBefore, setDividerBefore] = useState<string | null | undefined>(undefined)
+  if (dividerBefore === undefined && current !== undefined) setDividerBefore(bubbleAfterDivider(current.items) ?? null)
+  useEffect(() => () => setDividerBefore(undefined), [])
+  const items = useMemo(() => page.items.filter((item, i) => item._tag !== 'newDivider' || (dividerBefore != null && nextAnchor(page.items, i) === dividerBefore)), [page.items, dividerBefore])
   const last = items.at(-1)
   const lastKey = last === undefined ? undefined : `${last._tag}:${anchorOf(last) ?? ''}`
   const pageRef = useRef(page)
