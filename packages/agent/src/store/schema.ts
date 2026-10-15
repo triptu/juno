@@ -25,11 +25,14 @@ export interface MigrationSet {
 /**
  * Tables that describe this device, not the owner's data. A backup never
  * captures them and a restore starts them fresh (plan v3 §14.4, G12): the
- * incarnations and their cursors (a restore starts a new incarnation), the
- * migration log and the run mode. Later sets add theirs (the export cursor,
- * the model catalogue cache).
+ * migration log (a snapshot keeps it as its schema), the run mode and the
+ * ownership row (the backup manifest carries ownership instead). Later sets
+ * add theirs (the export cursor, the model catalogue cache).
+ *
+ * `incarnations` is carried: archive messages and inbox ops reference it.
+ * A restore retires every carried incarnation and starts a new one.
  */
-export const LOCAL_TABLES: ReadonlyArray<string> = ['schema_migrations', 'incarnations', 'control']
+export const LOCAL_TABLES: ReadonlyArray<string> = ['schema_migrations', 'control', 'ownership']
 
 const core1 = [
   // Which migration steps this database has. `set` and `step` name a step in a MigrationSet.
