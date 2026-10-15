@@ -15,7 +15,8 @@
  * `SlackAuthRequired` and the engine ends the session. Any other boot
  * failure is logged and retried after `bootRetryMillis` with the phase at
  * `offline`; `force_reload` cuts that wait short. Any other catch-up failure
- * is logged and the phase settles. A store error is a bug; it is logged per event so one bad frame does not
+ * is logged, the phase settles, and the catch-up runs again after the rate
+ * limit that stopped it or after `bootRetryMillis`. A store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
  */
 import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
@@ -168,8 +169,32 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: follow pass failed', { tag: error._tag })),
     )
 
+    /**
+     * A failed catch-up is tried again while the socket stays up: after the
+     * rate limit that stopped it, else after `bootRetryMillis`. At most one
+     * retry waits; a reconnect in between catches up anyway.
+     */
+    let retryWaiting = false
+    const retryCatchUp = (error: { readonly _tag: string; readonly retryAfterMillis?: number }) =>
+      Effect.suspend(() => {
+        if (retryWaiting) return Effect.void
+        retryWaiting = true
+        const delay = error._tag === 'SlackRateLimited' && error.retryAfterMillis !== undefined ? error.retryAfterMillis : config.bootRetryMillis
+        return FiberSet.run(
+          background,
+          Effect.sleep(delay).pipe(
+            Effect.andThen(
+              Effect.suspend(() => {
+                retryWaiting = false
+                return state.connected ? reconcile : Effect.void
+              }),
+            ),
+          ),
+        ).pipe(Effect.asVoid)
+      })
+
     /** The catch-up after a reconnect, under the work permit, then the follow pass if it is due. */
-    const reconcile = cycle(Effect.gen(function* () {
+    const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(Effect.gen(function* () {
       const previous = state.lastBoot ?? (yield* bootState())
       if (previous === undefined) return
       yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshThreads: true })
@@ -179,7 +204,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       work.withPermit,
       Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
       Effect.andThen(settle),
-      Effect.catchIf(isNotAuth, () => settle()),
+      Effect.catchIf(isNotAuth, (error) => settle().pipe(Effect.andThen(retryCatchUp(error)))),
       Effect.andThen(followPassIfDue),
     ))
 
