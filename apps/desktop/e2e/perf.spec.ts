@@ -339,28 +339,38 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   within('send, p95', send.p95, 50)
 })
 
-test('send in Main: Enter through the checks on send to the pending row painted', async ({ juno }) => {
-  test.setTimeout(120_000)
+test('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
+  test.setTimeout(180_000)
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectTitle('Main')
-  const hidden = await countHidden(juno.win)
-  const measured: number[] = []
-  for (let i = 0; i < 9; i++) {
-    // Nothing for either check to find, so the wrong-place check asks the (fake) model and the message goes.
-    const text = `Perf main ${i} ${Date.now()}`
-    const before = (await juno.measures('juno.send')).length
-    await juno.topic.send(text)
-    await juno.topic.expectSent(text)
-    await expect.poll(async () => (await juno.measures('juno.send')).length, { timeout: 15_000 }).toBeGreaterThan(before)
-    measured.push((await juno.measures('juno.send')).at(-1)!)
-    await juno.win.waitForTimeout(300)
+  await running.close()
+  // The model takes a second; Enter comes while it is still answering the typing pause.
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
+  try {
+    const slow = new Juno(again.app, again.win)
+    await slow.sidebar.row('#eng').open()
+    await slow.topic.expectTitle('Main')
+    const hidden = await countHidden(slow.win)
+    const measured: number[] = []
+    for (let i = 0; i < 9; i++) {
+      const text = `Perf main ${i} ${Date.now()}`
+      const before = (await slow.measures('juno.send')).length
+      await slow.topic.composer.fill(text)
+      // Past the 400 ms pause, so the wrong-place question is with the model when Enter comes.
+      await slow.win.waitForTimeout(500)
+      await slow.topic.composer.press('Enter')
+      await slow.topic.expectSent(text)
+      await expect.poll(async () => (await slow.measures('juno.send')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+      measured.push((await slow.measures('juno.send')).at(-1)!)
+      await slow.win.waitForTimeout(300)
+    }
+    expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
+    // Enter reads the store only: the model's second is not part of it.
+    const send = stats('send in Main with a 1 s model, Enter through the checks to the pending row painted (juno.send)', measured)
+    within('send in Main, p95', send.p95, 50)
+  } finally {
+    await again.close()
   }
-  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
-  // A clean send pays for the round trip of both checks; with the fake model it stays inside the send budget.
-  const send = stats('send in Main, Enter through the checks to the pending row painted (juno.send)', measured)
-  within('send in Main, p95', send.p95, 50)
 })
 
 // The large-workspace scenarios share one synced user-data directory: the

@@ -172,7 +172,10 @@ test('the checks on send: the wrong-place bar, the clarity bar and the audience 
     await juno.setTheme(theme)
     await juno.sidebar.row('#eng').open()
     await topic.expectTitle('Main')
-    await topic.send('the preview environments reaper should cut the staging bill')
+    await topic.composer.fill('the preview environments reaper should cut the staging bill')
+    // The wrong-place question is asked while typing pauses; the fake model answers at once.
+    await win.waitForTimeout(1000)
+    await topic.composer.press('Enter')
     await expect(topic.checkBar.bar).toBeVisible()
     await shot(`send-check-route-${theme.toLowerCase()}.png`)
     await topic.composer.press('Escape')
