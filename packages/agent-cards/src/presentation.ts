@@ -292,6 +292,28 @@ export const ChangeField = Schema.Struct({
 })
 export type ChangeField = typeof ChangeField.Type
 
+/**
+ * The auto-review of one connection call (SPEC 13.9). `rule` is the owner's
+ * rule that applied. `intent` and `risk` are the reviewer's two answers; both
+ * are absent when no review ran (Always ask, or Never ask in a clean run) and
+ * `failed` is set when the review call failed or timed out. `line` is fixed
+ * copy saying why Juno asked, or why it ran without asking.
+ */
+export const ReviewRule = Schema.Literals(['auto', 'always', 'never'])
+export type ReviewRule = typeof ReviewRule.Type
+export const ReviewIntent = Schema.Literals(['explicit', 'implied', 'notAsked'])
+export type ReviewIntent = typeof ReviewIntent.Type
+export const ReviewRisk = Schema.Literals(['reversible', 'write', 'delete', 'send'])
+export type ReviewRisk = typeof ReviewRisk.Type
+export const ToolReview = Schema.Struct({
+  rule: ReviewRule,
+  intent: Schema.optionalKey(ReviewIntent),
+  risk: Schema.optionalKey(ReviewRisk),
+  failed: Schema.optionalKey(Schema.Literal(true)),
+  line: Schema.String,
+})
+export type ToolReview = typeof ToolReview.Type
+
 export const ChangeCard = Schema.TaggedStruct('change', {
   ...base,
   server: Schema.String,
@@ -300,6 +322,8 @@ export const ChangeCard = Schema.TaggedStruct('change', {
   fields: Schema.Array(ChangeField).check(Schema.isMinLength(1)),
   /** The model's one-line caption. Never the thing the owner approves. */
   caption: Schema.optionalKey(Schema.String),
+  /** Why Juno asked: the auto-review of a connection call. */
+  review: Schema.optionalKey(ToolReview),
 })
 export type ChangeCard = typeof ChangeCard.Type
 

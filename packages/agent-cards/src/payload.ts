@@ -47,6 +47,8 @@ export const ConnectPayload = Schema.TaggedStruct('connect', {
 /** The preview is always the complete stored args. A model cannot supply preview fields. */
 export const ChangePayload = Schema.TaggedStruct('change', {
   ...action, server: Schema.String, target: Schema.String, caption: Schema.optionalKey(Schema.String),
+  /** The auto-review that led here, set by the trusted side, never by the model. */
+  review: Schema.optionalKey(P.ToolReview),
 })
 export const RemovePayload = Schema.TaggedStruct('remove', {
   ...action, messages: P.RemoveCard.fields.messages, offerReply: Schema.optionalKey(P.ChatMessageId),

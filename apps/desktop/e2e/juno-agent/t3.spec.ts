@@ -7,7 +7,7 @@ import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/open
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
-import { card, openChat, openPage, ready } from './agent'
+import { card, configure, openChat, openPage, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 // The shape of `FAKE_SECRET` in agent-testing's hostile fixtures: an invented OpenRouter key.
@@ -58,15 +58,17 @@ const POLL = 25_000
 
 test.describe.configure({ timeout: 150_000 })
 
-/** Points the T3 Code row at `url` and connects it. */
+/** Points T3 Code at `url` in its Configure sheet and connects it. */
 async function connectT3(juno: Juno, url: string): Promise<void> {
   const page = await openPage(juno, 'Connections')
-  const field = page.getByLabel('T3 Code address')
+  const row = page.locator('[data-connection-id="t3"]')
+  const sheet = await configure(juno, row)
+  const field = sheet.getByLabel('T3 Code address')
   await field.fill(url)
   await field.press('Enter')
-  // The row is keyed by the saved address, so the field shows it again once main has kept it.
-  await expect(page.getByLabel('T3 Code address')).toHaveValue(url)
-  const row = page.locator('[data-connection-id="t3"]')
+  // The address row is keyed by the saved address, so the field shows it again once main has kept it.
+  await expect(sheet.getByLabel('T3 Code address')).toHaveValue(url)
+  await sheet.getByRole('button', { name: 'Done' }).click()
   await row.getByRole('button', { name: 'Connect' }).click()
   await expect(row).toHaveAttribute('data-connection', 'ready', { timeout: 20_000 })
 }
@@ -184,8 +186,10 @@ test('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) 
   await ready(juno)
   const page = await openPage(juno, 'Connections')
   const row = page.locator('[data-connection-id="t3"]')
-  await row.getByLabel('Allow T3 Code over the local network').click()
-  await expect(row.getByLabel('Allow T3 Code over the local network')).toBeChecked()
+  const sheet = await configure(juno, row)
+  await sheet.getByLabel('Allow T3 Code over the local network').click()
+  await expect(sheet.getByLabel('Allow T3 Code over the local network')).toBeChecked()
+  await sheet.getByRole('button', { name: 'Done' }).click()
   await connectT3(juno, t3.lanUrl)
   // The row shows the address in use.
   await expect(row).toContainText(t3.loopbackUrl)

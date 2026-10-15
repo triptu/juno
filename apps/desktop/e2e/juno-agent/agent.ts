@@ -66,8 +66,8 @@ export async function addServer(juno: Juno, name: string, url: string): Promise<
   await add.getByLabel('Name').fill(name)
   await add.getByLabel('Address').fill(url)
   await add.getByRole('button', { name: 'Add' }).click()
-  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
   const row = page.locator('[data-connection-id^="server-"]').filter({ hasText: url })
+  await expect(row.locator('[data-connection-name]')).toHaveText(name)
   const id = await row.getAttribute('data-connection-id')
   if (id === null) throw new Error(`No connection id for ${name}`)
   await row.getByRole('button', { name: 'Connect' }).click()
@@ -75,11 +75,12 @@ export async function addServer(juno: Juno, name: string, url: string): Promise<
   return { id, row }
 }
 
-/** Moves one of a server's tools to Read ("Runs without asking") and waits for the agent to keep it. */
-export async function makeRead(row: Locator, tool: string): Promise<void> {
-  const item = row.locator(`[data-tool="${tool}"]`)
-  await item.getByLabel('Runs without asking').click()
-  await expect(item).toHaveAttribute('data-tool-tier', '0')
+/** Opens Configure on a connection's row and returns its sheet: the tools, their Enabled switches and rules. */
+export async function configure(juno: Juno, row: Locator): Promise<Locator> {
+  await row.getByRole('button', { name: 'Configure' }).click()
+  const sheet = juno.win.locator('[data-sheet="tools"]')
+  await expect(sheet).toBeVisible()
+  return sheet
 }
 
 /**

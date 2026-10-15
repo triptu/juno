@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process'
 import { hostname } from 'node:os'
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
+import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, reviewModel, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -130,7 +130,8 @@ parent.on('message', (event) => {
               onReport: (cause) => console.error('agent:', describeFailure(cause)),
             },
             renderer: renderers,
-            mcp: { credentials: mcp.credentials },
+            // The auto-review of connection calls asks the decision model on the owner's OpenRouter key.
+            mcp: { credentials: mcp.credentials, review: reviewModel(connection, config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }) },
           }),
         )
         .then(

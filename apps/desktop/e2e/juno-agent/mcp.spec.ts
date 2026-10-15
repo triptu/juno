@@ -1,10 +1,11 @@
-// Notion and Littlebird on Connections (plan v3 §16, flow 7): a tool Juno has never heard of is
-// Tier 3, so a call to it only proposes a Change card, until the owner moves it to "Runs without asking".
+// Notion and Littlebird on Connections (plan v3 §16, flow 7): a tool on no read list that the
+// server marked read-only when Juno first saw it is a read and runs at once; once its schema
+// changes the claim no longer counts, and a call the owner did not ask for in so many words asks.
 // The offered rows cannot point at a fake, so both fakes are added by address on loopback.
 import type { FakeLittlebird, FakeNotion } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { card, addServer, makeRead, openChat, openPage, ready } from './agent'
+import { card, addServer, configure, openChat, openPage, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 /** "export everything on <id>" calls the unknown tool; the rest is echoed. */
@@ -48,29 +49,35 @@ test.describe.configure({ timeout: 150_000 })
 
 const exports = (littlebird: FakeLittlebird) => littlebird.calls.filter((call) => call.name === 'export_everything')
 
-test('an unknown tool is Tier 3 and proposes a card until it is moved to Runs without asking', async ({ juno, notion, littlebird }) => {
+test('a tool marked read-only at first sight runs at once, and asks once its schema changes', async ({ juno, notion, littlebird }) => {
   await ready(juno)
   const docs = await addServer(juno, 'Docs', notion.url)
-  for (const tool of ['notion-search', 'notion-fetch', 'notion-create-pages']) await expect(docs.row.locator(`[data-tool="${tool}"]`)).toBeVisible()
+  const tools = await configure(juno, docs.row)
+  for (const tool of ['notion-search', 'notion-fetch', 'notion-create-pages']) await expect(tools.locator(`[data-tool="${tool}"]`)).toBeVisible()
+  await tools.getByRole('button', { name: 'Done' }).click()
 
   const { id, row } = await addServer(juno, 'Meetings', littlebird.url)
-  const unknown = row.locator('[data-tool="export_everything"]')
-  // It says it only reads, but nothing on Juno's side has said so.
-  await expect(unknown).toHaveAttribute('data-tool-tier', '3')
+  const sheet = await configure(juno, row)
+  await expect(sheet.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-review', 'read')
+  await sheet.getByRole('button', { name: 'Done' }).click()
 
   const pane = await openChat(juno)
   await pane.send(`export everything on ${id}`)
-  await pane.expectJuno('The export is ready for you to review.')
-  await expect(card(pane, 'change')).toBeVisible()
-  expect(exports(littlebird)).toHaveLength(0)
-
-  await openPage(juno, 'Connections')
-  await makeRead(row, 'export_everything')
-  const after = await openChat(juno)
-  await after.send(`export everything on ${id} again`)
-  await after.expectJuno('Exported everything.')
+  await pane.expectJuno('Exported everything.')
   expect(exports(littlebird)).toHaveLength(1)
   expect(exports(littlebird)[0]?.args).toEqual({ format: 'csv' })
-  // The second call ran with no click: still only the first card.
+  await expect(card(pane, 'change')).toHaveCount(0)
+
+  // The server changes the tool: its read-only claim no longer counts, and "export" is not an action the
+  // owner named, so the review finds the intent only implied and Juno asks.
+  littlebird.changeSchema('export_everything', { type: 'object', properties: { format: { type: 'string' }, since: { type: 'string' } } })
+  const page = await openPage(juno, 'Connections')
+  const changed = await configure(juno, page.locator(`[data-connection-id="${id}"]`))
+  await expect(changed.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-review', 'auto')
+  await changed.getByRole('button', { name: 'Done' }).click()
+  const after = await openChat(juno)
+  await after.send(`export everything on ${id} again`)
+  await after.expectJuno('The export is ready for you to review.')
   await expect(card(after, 'change')).toHaveCount(1)
+  expect(exports(littlebird)).toHaveLength(1)
 })

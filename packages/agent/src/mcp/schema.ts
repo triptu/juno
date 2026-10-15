@@ -11,5 +11,16 @@ export const MCP_MIGRATIONS: MigrationSet = {
     `UPDATE mcp_tools SET tier = 0 WHERE connection_id = 't3' AND name = 't3_pending_request_read' AND changed = 0`,
   ], [
     'ALTER TABLE mcp_connections ADD COLUMN active_url TEXT',
+  ], [
+    // Auto-review (10-16): every tool is on until the owner turns it off, each tool and each
+    // connection has a rule (auto, always ask, never ask), and a tool the server marked read-only
+    // when Juno first saw it is a read while its schema is unchanged. `tier` is derived from now on.
+    'ALTER TABLE mcp_tools ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1',
+    "ALTER TABLE mcp_tools ADD COLUMN review TEXT NOT NULL DEFAULT 'auto' CHECK(review IN ('auto','always','never'))",
+    'ALTER TABLE mcp_tools ADD COLUMN read_hint INTEGER NOT NULL DEFAULT 0',
+    "UPDATE mcp_tools SET read_hint = 1 WHERE changed = 0 AND json_extract(definition, '$.annotations.readOnlyHint') = 1",
+    "ALTER TABLE mcp_connections ADD COLUMN review TEXT NOT NULL DEFAULT 'auto' CHECK(review IN ('auto','always','never'))",
+    // The authority for a connection call the review let run with no click: one row per call, bound to its card.
+    'CREATE TABLE mcp_reviews (id TEXT PRIMARY KEY, card_id TEXT NOT NULL UNIQUE, source_op TEXT NOT NULL, at INTEGER NOT NULL) STRICT',
   ]],
 }

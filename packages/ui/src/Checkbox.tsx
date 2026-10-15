@@ -9,10 +9,19 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   readonly description?: ReactNode
   /** Larger label (14px) for settings rows; default 13.5px. */
   readonly size?: 'md' | 'lg'
+  /** In a table whose column header names it: the label is only the accessible name. */
+  readonly labelHidden?: boolean
 }
 
 /** A native 15px checkbox with a label and an optional description. */
-export function Checkbox({ label, description, size = 'md', disabled, ...rest }: CheckboxProps) {
+export function Checkbox({ label, description, size = 'md', labelHidden = false, disabled, ...rest }: CheckboxProps) {
+  if (labelHidden) {
+    return (
+      <span {...stylex.props(styles.bare, disabled && interactive.dimmed)}>
+        <input type="checkbox" aria-label={typeof label === 'string' ? label : undefined} disabled={disabled} {...rest} {...stylex.props(styles.input, styles.bareInput)} />
+      </span>
+    )
+  }
   return (
     <label {...stylex.props(styles.root, disabled && interactive.dimmed)}>
       <input type="checkbox" disabled={disabled} {...rest} {...stylex.props(styles.input)} />
@@ -37,6 +46,13 @@ const styles = stylex.create({
     gap: spacing['--space-2-5'],
     userSelect: 'none',
     minWidth: 0,
+  },
+  bare: {
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
+  bareInput: {
+    marginTop: 0,
   },
   input: {
     appearance: 'auto',

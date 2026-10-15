@@ -52,6 +52,10 @@ export const actionCases = [
   ['resumeGrant', 'pauseRevokesGrants'],
   ['redactExposed', 'redactionRevokesExposed'],
   ['redactUnrelated', 'redactionKeepsUnrelated'],
+  ['untrustedIntent', 'untrustedNeverAuthorizes'],
+  ['neverTaint', 'untrustedNeverAuthorizes'],
+  ['reviewFailure', 'reviewGated'],
+  ['alwaysAsk', 'reviewGated'],
 ]
 
 export const recoveryCases = [

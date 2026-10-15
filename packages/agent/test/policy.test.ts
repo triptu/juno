@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import {
-  authorizeDecision, bindingMatches, mayMintGrant, toolDecision,
-  type Authority, type AuthorizeInput, type OpClass, type RunFacts,
+  authorizeDecision, bindingMatches, floorRisk, mayMintGrant, needsReview, reviewDecision, toolDecision,
+  type Authority, type AuthorizeInput, type OpClass, type Review, type RunFacts,
 } from '../src/policy/policy'
 
 const ON: Authority = { mode: 'on', owner: 'active' }
@@ -172,5 +172,70 @@ describe('a click binds the card the owner saw', () => {
     expect(bindingMatches(stored, { ...stored, children: children.toReversed() })).toBe(false)
     expect(bindingMatches(stored, { ...stored, children: [children[0]!] })).toBe(false)
     expect(bindingMatches(stored, { ...stored, children: [children[0]!, { ...children[1]!, revision: 1 }] })).toBe(false)
+  })
+})
+
+// The auto-review of a connection call (SPEC 13.9; spec `reviewAllows`, `reviewGated`, `untrustedNeverAuthorizes`).
+describe('the auto-review of a connection call', () => {
+  const rule = fc.constantFrom('auto', 'always', 'never') as fc.Arbitrary<'auto' | 'always' | 'never'>
+  const review: fc.Arbitrary<Review> = fc.oneof(
+    fc.constant({ _tag: 'failed' } as const),
+    fc.constant({ _tag: 'skipped' } as const),
+    fc.record({ _tag: fc.constant('answered' as const), intent: fc.constantFrom('explicit', 'implied', 'notAsked'), risk: fc.constantFrom('reversible', 'write', 'delete', 'send') }) as fc.Arbitrary<Review>,
+  )
+  const answered = (intent: 'explicit' | 'implied' | 'notAsked', risk: 'reversible' | 'write' | 'delete' | 'send'): Review => ({ _tag: 'answered', intent, risk })
+
+  it('runs under Auto only what the owner asked for exactly and can be undone', () => {
+    expect(reviewDecision('auto', false, answered('explicit', 'reversible'))).toEqual({ _tag: 'run', line: 'ranExplicit' })
+    expect(reviewDecision('auto', true, answered('implied', 'reversible'))).toEqual({ _tag: 'card', line: 'implied' })
+    expect(reviewDecision('auto', true, answered('explicit', 'delete'))).toEqual({ _tag: 'card', line: 'delete' })
+    expect(reviewDecision('auto', true, answered('explicit', 'send'))).toEqual({ _tag: 'card', line: 'send' })
+    expect(reviewDecision('auto', true, answered('implied', 'write'))).toEqual({ _tag: 'card', line: 'write' })
+    expect(reviewDecision('auto', true, answered('notAsked', 'delete'))).toEqual({ _tag: 'card', line: 'notAsked' })
+  })
+
+  it('never takes a call that looks like a delete as reversible', () => {
+    expect(floorRisk(answered('explicit', 'reversible'), true)).toEqual(answered('explicit', 'delete'))
+    expect(floorRisk(answered('explicit', 'send'), true)).toEqual(answered('explicit', 'send'))
+    expect(floorRisk(answered('explicit', 'reversible'), false)).toEqual(answered('explicit', 'reversible'))
+    expect(reviewDecision('auto', true, floorRisk(answered('explicit', 'reversible'), true))).toEqual({ _tag: 'card', line: 'delete' })
+  })
+
+  it('asks when the review failed or timed out', () => {
+    expect(reviewDecision('auto', true, { _tag: 'failed' })).toEqual({ _tag: 'card', line: 'failed' })
+    expect(reviewDecision('never', false, { _tag: 'failed' })).toEqual({ _tag: 'card', line: 'failed' })
+  })
+
+  it('lets the owner\'s rule override the review', () => {
+    expect(reviewDecision('always', true, answered('explicit', 'reversible'))).toEqual({ _tag: 'card', line: 'always' })
+    expect(reviewDecision('never', true, { _tag: 'skipped' })).toEqual({ _tag: 'run', line: 'ranNever' })
+    expect(reviewDecision('never', false, answered('implied', 'delete'))).toEqual({ _tag: 'run', line: 'ranNever' })
+    expect(needsReview('always', false)).toBe(false)
+    expect(needsReview('never', true)).toBe(false)
+    expect(needsReview('never', false)).toBe(true)
+    expect(needsReview('auto', true)).toBe(true)
+  })
+
+  it('never lets a call only untrusted text asked for run, under any rule', () => {
+    // The reviewer sees only the owner's words, so such a call is answered notAsked; a run that read nothing cannot hold one.
+    fc.assert(fc.property(rule, fc.constantFrom('reversible', 'write', 'delete', 'send'), (r, risk) =>
+      reviewDecision(r, false, answered('notAsked', risk as 'reversible'))._tag === 'card'))
+  })
+
+  it('runs with no click only as the spec allows', () => {
+    fc.assert(fc.property(rule, fc.boolean(), review, (r, clean, rv) => {
+      const decision = reviewDecision(r, clean, rv)
+      if (decision._tag === 'card') return true
+      if (r === 'always') return false
+      if (r === 'never') return clean || (rv._tag === 'answered' && rv.intent !== 'notAsked')
+      return rv._tag === 'answered' && rv.intent === 'explicit' && rv.risk === 'reversible'
+    }))
+  })
+
+  it('authorizes a reviewed call only for a Tier 3 connection intent, and never past Pause', () => {
+    expect(authorizeDecision({ ...base, approval: undefined, review: true })).toEqual({ _tag: 'authorize', via: 'review' })
+    expect(authorizeDecision({ ...base, approval: undefined, review: true, intent: { ...intent, tier: 2 } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
+    expect(authorizeDecision({ ...base, approval: undefined, review: true, authority: { mode: 'paused', owner: 'active' } })).toEqual({ _tag: 'refused', reason: 'paused' })
+    expect(authorizeDecision({ ...base, approval: undefined, review: true, prior: ['d2'] })).toEqual({ _tag: 'refused', reason: 'alreadyAuthorized' })
   })
 })

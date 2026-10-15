@@ -58,6 +58,7 @@ import BackupSection from './juno-pages/BackupSections.fixtures'
 import { moveSheet, phraseSheet, restoreSheet } from './juno-pages/BackupSheets.fixtures'
 import ThisMacSection from './juno-pages/ThisMacSection.fixtures'
 import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
+import ConnectionToolsSheet from './juno-pages/ConnectionToolsSheet.fixtures'
 import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
 import ProviderSection from './juno-pages/ProviderSection.fixtures'
@@ -85,6 +86,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ComposerSlot,
   ConnectCard: connectCard,
   ConnectionsPage,
+  ConnectionToolsSheet,
   EmojiPicker,
   EngineNotice: engineNoticeFixtures,
   SyncProgress: syncProgressFixtures,

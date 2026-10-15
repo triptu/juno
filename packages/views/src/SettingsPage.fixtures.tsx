@@ -47,7 +47,7 @@ export default defineFixtures(
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
       juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />),
-      connections: at('connections', <ConnectionsPage page={connections} onEnabled={noop} onAction={noop} onT3Address={noop} onTier={noop} onAdd={noop} />),
+      connections: at('connections', <ConnectionsPage page={connections} onAction={noop} onConfigure={noop} onAdd={noop} />),
       backup: at('backup', <JunoBackupPage {...backup} page={settings} />),
       about: at('about', about),
     },

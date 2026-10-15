@@ -32,6 +32,13 @@ export interface ToolRun {
   /** The run has read no untrusted content yet (§6.4). */
   readonly clean: boolean
   /**
+   * The run had read no untrusted content when the model wrote this call. It
+   * differs from `clean` only when another call in the same response tainted
+   * the run, or this one did as it started (`taints`), which the model had not
+   * read. The auto-review uses it; other rules keep the stricter `clean`.
+   */
+  readonly cleanAtRequest?: boolean
+  /**
    * The journal's last commit, read when the tool asked for the run: inside
    * `execute()`, after pi committed the call's execute intent. A tool that
    * authorizes an action passes it to `authorize` and keeps `replay: 'unsafe'`

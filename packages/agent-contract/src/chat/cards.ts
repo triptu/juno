@@ -17,6 +17,8 @@ export {
   ConnectCard,
   ChangeField,
   ChangeCard,
+  ToolReview,
+  ReviewRule,
   RemoveCard,
   BudgetCard,
   ProviderCard,

@@ -12,7 +12,7 @@ const tools: FakeTool[] = [
     workspaceStrategy: { type: 'object', properties: { type: { const: 'worktree' }, baseRef: str, startFromOrigin: { type: 'boolean' } }, required: ['type', 'baseRef', 'startFromOrigin'] },
   }, required: ['title', 'message', 'projectId', 'runtimeMode', 'workspaceStrategy'] }, call: () => json({ threadId: 'thread-eval' }) },
   { name: 't3_thread_read', inputSchema: { type: 'object', properties: { threadId: str }, required: ['threadId'] }, call: () => json({ threadId: 'thread-eval', status: 'completed', text: INJECTION }) },
-  { name: 'context_search', description: 'Search meeting notes and context.', inputSchema: { type: 'object', properties: { query: str }, required: ['query'] }, call: () => json({ text: INJECTION }) },
+  { name: 'context_search', description: 'Search meeting notes and context.', annotations: { readOnlyHint: true }, inputSchema: { type: 'object', properties: { query: str }, required: ['query'] }, call: () => json({ text: INJECTION }) },
 ]
 
 /** Real MCP manager and T3 adapter; only the remote servers are synthetic. */
@@ -26,7 +26,7 @@ export async function connections() {
     tools: (context) => {
       manager = createMcpManager({ store: context.store, credentials, defaults: [T3, LITTLEBIRD].map((preset) => ({ ...preset, url: server.url, auth: { kind: 'none' } })) })
       t3 = createT3Adapter(manager)
-      return [...mcpTools(manager, { current: context.current, propose: context.actions.propose }), ...t3.tools(context)]
+      return [...mcpTools(manager, { current: context.current, actions: context.actions }), ...t3.tools(context)]
     },
     jobDrivers: () => t3 ? [t3.driver] : [],
   } satisfies Partial<TurnsOptions>
@@ -36,9 +36,8 @@ export async function connections() {
     connect: async () => {
       if (!manager) throw new Error('Missing eval MCP manager')
       await manager.connect('t3')
+      // context_search is a read: the server marked it read-only when Juno first saw it.
       await manager.connect('littlebird')
-      const read = manager.tool('littlebird', 'context_search')
-      manager.setTier('littlebird', read.name, read.hash, 0)
     },
     calls: server.calls,
     close: async () => { await manager?.close(); await server.close() },

@@ -59,6 +59,7 @@ export interface CardRow {
   readonly dismissed_at: number | null
   readonly replaced_by: string | null
   readonly expired_at: number | null
+  readonly quiet: 0 | 1
 }
 
 export interface IntentRow {
@@ -126,6 +127,8 @@ export interface Proposal {
   readonly payload: CardPayload
   /** An open card this one corrects; it expires (§19.6). */
   readonly replaces?: string
+  /** A call the auto-review runs with no click: kept for the ledger and Activity, never shown in the chat. */
+  readonly quiet?: true
 }
 
 /** Stores a proposal and its intents. Returns the card's id: the existing one for a call seen before. */
@@ -135,8 +138,8 @@ export function proposeCard(store: Store, proposal: Proposal, onProposed?: (id: 
     if (existing !== undefined) return existing.id
     const id = uuidv7(store.now())
     store.db
-      .prepare('INSERT INTO cards (id, run_id, call_id, kind, revision, created_at, source_gen) VALUES (?, ?, ?, ?, 1, ?, ?)')
-      .run(id, proposal.runId, proposal.callId, proposal.payload._tag, store.now(), memoryGen(store))
+      .prepare('INSERT INTO cards (id, run_id, call_id, kind, revision, created_at, source_gen, quiet) VALUES (?, ?, ?, ?, 1, ?, ?, ?)')
+      .run(id, proposal.runId, proposal.callId, proposal.payload._tag, store.now(), memoryGen(store), proposal.quiet ? 1 : 0)
     insertRevision(store, { id, revision: 1 }, proposal.payload)
     onProposed?.(id, proposal)
     if (proposal.replaces !== undefined) {
@@ -151,7 +154,7 @@ export type Refused = { readonly _tag: 'refused'; readonly reason: 'stale' | 'ex
 /** The card the owner is looking at, if it is still exactly `identity` and still takes a click. */
 function openCard(store: Store, identity: Binding['identity']): { card: CardRow; payload: CardPayload } | Refused {
   const card = cardRow(store, identity.cardId)
-  if (card === undefined) return { _tag: 'refused', reason: 'invalid' }
+  if (card === undefined || card.quiet === 1) return { _tag: 'refused', reason: 'invalid' }
   const payload = payloadOf(store, card)
   if (card.revision !== identity.revision || payloadDigest(payload) !== identity.digest) return { _tag: 'refused', reason: 'stale' }
   if (card.dismissed_at !== null || clicked(store, card.id) !== undefined || store.db.prepare('SELECT 1 FROM authorizations JOIN intents ON intents.id = authorizations.intent_id WHERE intents.card_id = ?').get(card.id) !== undefined) return { _tag: 'refused', reason: 'stale' }
@@ -286,7 +289,7 @@ export function carryOutcomes(store: Store, opId: string): string {
     const now = store.now()
     const open = store.db
       .prepare(
-        `SELECT * FROM cards WHERE dismissed_at IS NULL AND kind NOT IN ('topics', 'task')
+        `SELECT * FROM cards WHERE dismissed_at IS NULL AND quiet = 0 AND kind NOT IN ('topics', 'task')
          AND NOT EXISTS (SELECT 1 FROM approvals WHERE approvals.card_id = cards.id)
          AND NOT EXISTS (SELECT 1 FROM card_outcomes WHERE card_outcomes.card_id = cards.id)`,
       )
@@ -474,7 +477,8 @@ function receiptOf(store: Store, child: ChildEvidence | undefined): unknown {
 /** Records the card's outcome for the model once every child has settled (§19.5). */
 export function settleCardOutcome(store: Store, cardId: string): void {
   const card = cardRow(store, cardId)
-  if (card === undefined) return
+  // A quiet call's result went to the model as its tool result.
+  if (card === undefined || card.quiet === 1) return
   const view = viewOf(store, card, store.now()).card
   if (!('status' in view)) return
   const status = view.status._tag
@@ -484,6 +488,6 @@ export function settleCardOutcome(store: Store, cardId: string): void {
 
 /** Every card Juno proposed, oldest first, as the chat shows it. */
 export function cardViews(store: Store, now: number): ReadonlyArray<CardView> {
-  const rows = store.db.prepare("SELECT * FROM cards WHERE kind != 'task' ORDER BY created_at, id").all() as unknown as CardRow[]
+  const rows = store.db.prepare("SELECT * FROM cards WHERE kind != 'task' AND quiet = 0 ORDER BY created_at, id").all() as unknown as CardRow[]
   return rows.map((row) => viewOf(store, row, now))
 }

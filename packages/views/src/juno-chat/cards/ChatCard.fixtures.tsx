@@ -191,6 +191,9 @@ export const changeCard = defineFixtures(
       'long-field': card(change('c2', open, true)),
       applied: card(change('c3', done('Applied', { open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }))),
       failed: card(change('c4', failed('Failed'))),
+      // The auto-review asked (SPEC 13.9): one fixed line says why.
+      'asked-delete': card(change('c5', open, false, { rule: 'auto', intent: 'explicit', risk: 'delete', line: "Asked because deleting can't be undone." })),
+      'asked-implied': card(change('c6', open, false, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because you didn't ask for exactly this." })),
     },
   },
   frame,

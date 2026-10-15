@@ -1,5 +1,5 @@
 import { Effect, Queue, Stream } from 'effect'
-import { AgentCommandError, type OpId, type T3Address } from '@juno/agent-contract'
+import { AgentCommandError, type OpId, type ReviewRule, type T3Address } from '@juno/agent-contract'
 import type { McpManagerApi } from './manager'
 import { McpError } from './types'
 
@@ -31,7 +31,8 @@ export function connectionHandlers(manager: McpManagerApi) {
     }),
     add: ({ opId, label, url }: { opId: OpId; label: string; url: string }) => command(opId, () => manager.add(label, url)),
     address: ({ opId, address }: { opId: OpId; address: T3Address }) => command(opId, () => manager.address(address.url, address.allowNetwork)),
-    tier: ({ opId, id, tool, schemaHash, tier }: { opId: OpId; id: string; tool: string; schemaHash: string; tier: 0 | 3 }) =>
-      command(opId, () => manager.setTier(id, tool, schemaHash, tier)),
+    tool: ({ opId, id, tool, enabled, review }: { opId: OpId; id: string; tool: string; enabled?: boolean; review?: ReviewRule }) =>
+      command(opId, () => manager.setTool(id, tool, { ...(enabled === undefined ? {} : { enabled }), ...(review === undefined ? {} : { review }) })),
+    rule: ({ opId, id, review }: { opId: OpId; id: string; review: ReviewRule }) => command(opId, () => manager.setRule(id, review)),
   }
 }

@@ -114,6 +114,12 @@ function Run({ run, now, onCopyDetails }: { readonly run: ActivityRun; readonly 
                     {action.label}
                   </Text>
                 </span>
+                {/* A connection call's auto-review: why Juno asked, or why it ran without asking. */}
+                {action.review !== undefined ? (
+                  <Text variant="meta" tone="muted" sx={cell.wrap} data-activity-review={action.review.intent ?? (action.review.failed ? 'failed' : 'none')}>
+                    {action.review.line}
+                  </Text>
+                ) : null}
                 {action.failure !== undefined ? (
                   <span {...stylex.props(cell.line)}>
                     <Text variant="meta" tone="muted" sx={cell.wrap}>

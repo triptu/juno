@@ -15,6 +15,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { COMPACTION_MODELS, fakeCatalogue } from './catalogue'
 import { compactorText } from './compactor'
+import { choice, fakeReview, type FakeReviewAnswers, type FakeReviewRequest } from './review'
 
 export interface OpenRouterRequest {
   readonly path: string
@@ -39,6 +40,8 @@ export interface FakeOpenRouterOptions {
   readonly key?: string
   /** What a chat request answers: fixed text, or text from the request. Default: one bubble. */
   readonly answer?: string | ((request: OpenRouterRequest) => string | ToolCallAnswer)
+  /** How the decision model (System One, `/api/v1/systemone`) answers an auto-review. Default: `fakeReview`. */
+  readonly review?: (request: FakeReviewRequest) => FakeReviewAnswers
 }
 
 export interface FakeOpenRouter {
@@ -48,6 +51,8 @@ export interface FakeOpenRouter {
   /** The chat requests' inputs, in order. */
   readonly inputs: () => ReadonlyArray<string>
   readonly catalogueReads: () => number
+  /** The auto-reviews the decision model was asked for, in order. */
+  readonly reviews: ReadonlyArray<FakeReviewRequest>
   readonly close: () => Promise<void>
 }
 
@@ -147,6 +152,7 @@ function completions(res: ServerResponse, model: string, answer: string | ToolCa
 
 export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): Promise<FakeOpenRouter> {
   const requests: OpenRouterRequest[] = []
+  const reviews: FakeReviewRequest[] = []
   let catalogueReads = 0
   const answer = options.answer ?? '<say>Hello from the fake.</say>'
   let compactions = 0
@@ -156,6 +162,16 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
       if (req.method === 'GET' && path === '/api/v1/models') {
         catalogueReads++
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(openRouterCatalogue()))
+        return
+      }
+      if (req.method === 'POST' && path === '/api/v1/systemone') {
+        const review = JSON.parse(await read(req)) as FakeReviewRequest
+        reviews.push(review)
+        const answers = (options.review ?? fakeReview)(review)
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answers: {
+          intent: { type: 'choice', ...choice(answers.intent, ['explicit', 'implied', 'notAsked']) },
+          risk: { type: 'choice', ...choice(answers.risk, ['reversible', 'write', 'delete', 'send']) },
+        } }))
         return
       }
       if (req.method !== 'POST' || (path !== '/api/v1/messages' && path !== '/api/v1/chat/completions')) {
@@ -190,6 +206,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
     requests,
     inputs: () => requests.filter((request) => !request.compaction).map((request) => request.input),
     catalogueReads: () => catalogueReads,
+    reviews,
     close: () =>
       new Promise((resolve) => {
         server.closeAllConnections()

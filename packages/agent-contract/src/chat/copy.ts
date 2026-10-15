@@ -195,7 +195,21 @@ export const chatCopy = {
       delivers: { now: 'Delivers: Now', digest: 'Delivers: Digest', silent: 'Delivers: Silent' },
     },
     connect: { connect: 'Connect', skip: 'Skip', connected: 'Connected' },
-    change: { apply: 'Apply', applied: 'Applied', showAll: 'Show all' },
+    change: {
+      apply: 'Apply',
+      applied: 'Applied',
+      showAll: 'Show all',
+      /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
+      review: {
+        always: 'Asked because your rule for this tool is Always ask.', failed: "Asked because Juno couldn't review this call.",
+        notAsked: "Asked because you didn't ask for this.", untrusted: 'Asked because only something Juno read asked for this.',
+        implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
+        send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
+        ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
+        ranNever: 'Ran without asking because your rule for this tool is Never ask.',
+      },
+
+    },
     remove: {
       remove: 'Remove',
       keep: 'Keep',
@@ -351,6 +365,17 @@ export const chatCopy = {
       allowNetworkNote: 'Tries this Mac first. Network sign-in may require https.',
     },
     connections: {
+      intro: "Where Juno can read and act. Reads run on their own. Before anything else, Juno checks how clearly you asked and whether it can be undone, and asks you when it can't tell.",
+      configure: 'Configure',
+      /** The Configure sheet's title. */
+      tools: (label: string) => `${label} tools`,
+      search: 'Search tools',
+      tool: 'Tool', enabled: 'Enabled', autoReview: 'Auto-review', read: 'Read',
+      rules: { auto: 'Auto', always: 'Always ask', never: 'Never ask' },
+      connectionRule: 'Auto-review for all tools',
+      connectionRuleNote: "A tool's own rule comes first. Never ask still asks when only something Juno read asked for the call.",
+      changed: 'Changed since Juno first saw it',
+      noTools: 'Connect to see its tools.', noMatch: 'No tools match.', done: 'Done',
       connect: 'Connect',
       signIn: 'Sign in',
       cancel: 'Cancel',

@@ -20,6 +20,7 @@ import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, Memory
 import { openSettings } from '../navigation'
 import { junoCommands, openJunoTab } from './actions'
 import { useBackupSettings } from './BackupSettings'
+import { ConnectionConfigure } from './ConnectionConfigure'
 import { useNoProvider } from './NoProviderFrame'
 
 /** The pages' RPC-backed commands, one set for the app. */
@@ -310,30 +311,27 @@ function Scheduled() {
 export function JunoConnections() {
   const result = useAtomValue(connectionsPageAtom)
   const [error, setError] = useState<{ readonly id: ConnectionId | 'new'; readonly message: string } | undefined>(undefined)
+  const [configuring, setConfiguring] = useState<ConnectionId | undefined>(undefined)
   if (result._tag !== 'Success') return null
   const page = result.value
   const copy = chatCopy.pages.connections
   // An address the agent refused says so; anything else is one plain line.
   const report = (id: ConnectionId | 'new') => (outcome: string) =>
     setError(outcome === 'ok' ? undefined : { id, message: outcome === 'invalid' && (id === 'new' || page.connections.some((row) => row.id === id && row.t3 !== undefined)) ? copy.invalidAddress : copy.failed })
-  // A tier change binds the tool's current schema; a tool listed without one cannot be moved yet.
-  const schemaOf = (id: string, tool: string) => page.connections.find((row) => row.id === id)?.tools.find((entry) => entry.name === tool)?.schemaHash
   return (
-    <ConnectionsPage
-      page={page}
-      {...(error === undefined ? {} : { error })}
-      onEnabled={(id, enabled) => void actions.connection(id, enabled ? 'enable' : 'disable').then(report(id))}
-      onAction={(id, action) => {
-        setError(undefined)
-        void actions.connection(id, action).then(report(id))
-      }}
-      onT3Address={(id, address) => void actions.t3Address(address).then(report(id))}
-      onTier={(id, tool, tier) => {
-        const schemaHash = schemaOf(id, tool)
-        if (schemaHash !== undefined) void actions.tier(id, tool, schemaHash, tier).then(report(id))
-      }}
-      onAdd={(label, url) => void actions.addConnection(label, url).then(report('new'))}
-    />
+    <>
+      <ConnectionsPage
+        page={page}
+        {...(error === undefined ? {} : { error })}
+        onAction={(id, action) => {
+          setError(undefined)
+          void actions.connection(id, action).then(report(id))
+        }}
+        onConfigure={setConfiguring}
+        onAdd={(label, url) => void actions.addConnection(label, url).then(report('new'))}
+      />
+      {configuring === undefined ? null : <ConnectionConfigure id={configuring} onClose={() => setConfiguring(undefined)} />}
+    </>
   )
 }
 
