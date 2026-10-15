@@ -9,7 +9,7 @@ import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision } from
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
-import { fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
+import { fakeAutomatedChannel, fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
@@ -20,6 +20,7 @@ const structuredRules: Record<string, (input: never) => unknown> = {
   parseCommand: fakeParseCommand,
   followUps: fakeFollowUps,
   homeTitle: fakeHomeTitle,
+  automatedChannel: fakeAutomatedChannel,
 }
 
 const textRules: Record<string, (input: never) => string> = {

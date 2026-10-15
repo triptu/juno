@@ -28,6 +28,14 @@ describe('output validation', () => {
     expect(validateOutput(tasks.settledScore, input, { reason: 'closed' }).ok).toBe(false)
   })
 
+  it('automatedChannel takes a probability between 0 and 1', () => {
+    const input = { channelId: 'C0CI', channel: '#ci', messages: [] }
+    expect(validateOutput(tasks.automatedChannel, input, { probability: 0.9, reason: 'only an app posts' }).ok).toBe(true)
+    expect(validateOutput(tasks.automatedChannel, input, { probability: 0.4 }).ok).toBe(true)
+    expect(validateOutput(tasks.automatedChannel, input, { probability: 1.2 }).ok).toBe(false)
+    expect(validateOutput(tasks.automatedChannel, input, { reason: 'bots' }).ok).toBe(false)
+  })
+
   it('urgencyGate takes a decision and a reason', () => {
     const input = { messageTs: '1', channel: '#eng', channelKind: 'public' as const, sender: 's', text: 't', mentionsMe: false, now: 'now' }
     expect(validateOutput(tasks.urgencyGate, input, { notify: true, reason: 'An incident' }).ok).toBe(true)
