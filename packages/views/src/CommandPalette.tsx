@@ -46,7 +46,7 @@ export interface PaletteItem {
   readonly snippet?: { readonly sender: string; readonly text: string }
   /** A command's confidence, "95%". */
   readonly badge?: string
-  /** The key hint on the active row; "⌘ Enter for new tab" by default when `opensTab`. */
+  /** The key hint on the active row; a ⌘↵ keycap and "New tab" by default when `opensTab`. */
   readonly hint?: string
   /** ⌘Enter and ⌘-click open it in a new tab. */
   readonly opensTab?: boolean
@@ -227,7 +227,12 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
         </span>
       </>
     )
-  const hint = item.hint ?? (item.opensTab === true ? '⌘ Enter for new tab' : '↵')
+  const hint = item.hint === undefined && item.opensTab === true ? (
+    <span {...stylex.props(styles.tabHint)}>
+      <Kbd look="key">⌘↵</Kbd>
+      <Text variant="tagSmall" tone="muted">New tab</Text>
+    </span>
+  ) : <Kbd>{item.hint ?? '↵'}</Kbd>
   return (
     <OptionRow
       id={rowDomId(item.id)}
@@ -239,7 +244,7 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
           {/* Laid over the row's end: moving the active row must not reflow any row's text. */}
           {active && item.badge === undefined ? (
             <span aria-hidden="true" {...stylex.props(styles.hintOver)}>
-              <Kbd>{hint}</Kbd>
+              {hint}
             </span>
           ) : null}
         </>
@@ -254,7 +259,7 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
               {item.badge}
             </Chip>
             <span aria-hidden="true" {...stylex.props(!active && styles.hintHidden)}>
-              <Kbd>{hint}</Kbd>
+              {hint}
             </span>
           </>
         )
@@ -330,6 +335,11 @@ const styles = stylex.create({
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
+  },
+  tabHint: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1'],
   },
   hintHidden: {
     visibility: 'hidden',
