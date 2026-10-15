@@ -707,7 +707,7 @@ export const layout = stylex.defineVars({
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',
-  '--thumb-max-height': '280px',
+  '--thumb-max-height': '240px',
   '--search-field-width': '260px',
   // The All topics table (inventory 10): topic, where, status, messages,
   // updated. Under the minimum width (the columns' minimums, their gaps and
