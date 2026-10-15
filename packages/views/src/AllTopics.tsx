@@ -258,6 +258,69 @@ export function AllTopics({
   listKey,
   onClearFilters,
 }: AllTopicsProps) {
+  return (
+    <div {...stylex.props(styles.page)}>
+      <div {...stylex.props(styles.head)}>
+        <PageHeader
+          title="All topics"
+          size="compact"
+          subtitle="Everything you're part of, including quiet, resolved and unfollowed topics."
+          trailing={
+            <TextField
+              size={34}
+              leadingIcon={MagnifyingGlass}
+              placeholder="Filter by title or message"
+              width="search"
+              label="Filter topics"
+              value={query}
+              onChange={(event) => onQueryChange(event.currentTarget.value)}
+            />
+          }
+        />
+        <div {...stylex.props(styles.filters)}>
+          {/* Chips switch on mouse down, like the sidebar's filters (performance 4.1). */}
+          <div role="group" aria-label="Status" {...stylex.props(styles.chips)}>
+            {CHIPS.map((chip) => (
+              <Button
+                key={chip.id}
+                variant="filter"
+                pressed={filter.status === chip.id}
+                aria-label={`${chip.label} ${counts[chip.id]}`}
+                {...activateHandlers<HTMLButtonElement>(() => onStatus(chip.id))}
+              >
+                {chip.label}
+                <Text variant="ui" tone="muted" weight="regular" numeric sx={styles.count}>
+                  {counts[chip.id]}
+                </Text>
+              </Button>
+            ))}
+          </div>
+          <div {...stylex.props(styles.selects)}>
+            <Select size={30} label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={(event) => onKind(event.currentTarget.value as KindFilter)} />
+            <Select
+              size={30}
+              label="Where"
+              value={filter.scope ?? ANYWHERE}
+              options={[{ value: ANYWHERE, label: 'Anywhere' }, ...places.map((place) => ({ value: place.id, label: place.label }))]}
+              onChange={(event) => onScope(event.currentTarget.value === ANYWHERE ? undefined : event.currentTarget.value)}
+            />
+            <Select size={30} label="Sort" value={filter.sort} options={SORT_OPTIONS} onChange={(event) => onSort(event.currentTarget.value as AllTopicsSort)} />
+          </div>
+        </div>
+      </div>
+      <Table ready={ready} total={total} rowKey={rowKey} renderRow={renderRow} onVisibleRange={onVisibleRange} listKey={listKey} onClearFilters={onClearFilters} />
+    </div>
+  )
+}
+
+type TableProps = Pick<AllTopicsProps, 'ready' | 'total' | 'rowKey' | 'renderRow' | 'onVisibleRange' | 'listKey' | 'onClearFilters'>
+
+/**
+ * The table, on its own so that a scroll, which re-renders the component
+ * that holds the virtualizer, re-renders only the table and not the chips
+ * and selects above it.
+ */
+const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRange, listKey, onClearFilters }: TableProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const rowsBox = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(0)
@@ -309,98 +372,48 @@ export function AllTopics({
   const items = virtualizer.getVirtualItems()
 
   return (
-    <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.head)}>
-        <PageHeader
-          title="All topics"
-          size="compact"
-          subtitle="Everything you're part of, including quiet, resolved and unfollowed topics."
-          trailing={
-            <TextField
-              size={34}
-              leadingIcon={MagnifyingGlass}
-              placeholder="Filter by title or message"
-              width="search"
-              label="Filter topics"
-              value={query}
-              onChange={(event) => onQueryChange(event.currentTarget.value)}
-            />
-          }
-        />
-        <div {...stylex.props(styles.filters)}>
-          {/* Chips switch on mouse down, like the sidebar's filters (performance 4.1). */}
-          <div role="group" aria-label="Status" {...stylex.props(styles.chips)}>
-            {CHIPS.map((chip) => (
-              <Button
-                key={chip.id}
-                variant="filter"
-                pressed={filter.status === chip.id}
-                aria-label={`${chip.label} ${counts[chip.id]}`}
-                {...activateHandlers<HTMLButtonElement>(() => onStatus(chip.id))}
-              >
-                {chip.label}
-                <Text variant="ui" tone="muted" weight="regular" numeric sx={styles.count}>
-                  {counts[chip.id]}
-                </Text>
+    <div ref={scroller} role="grid" aria-label="All topics" aria-rowcount={total + 1} data-all-topics-table="" onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
+      <div {...stylex.props(styles.table)}>
+        <div role="row" aria-rowindex={1} {...stylex.props(styles.grid, styles.header)}>
+          <Text variant="tableHeader" tone="muted" role="columnheader">
+            Topic
+          </Text>
+          <Text variant="tableHeader" tone="muted" role="columnheader">
+            Where
+          </Text>
+          <Text variant="tableHeader" tone="muted" role="columnheader">
+            Status
+          </Text>
+          <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
+            Msgs
+          </Text>
+          <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
+            Updated
+          </Text>
+        </div>
+        {empty ? (
+          <EmptyState
+            illustration="nothing-here"
+            title="No topics match these filters."
+            action={
+              <Button variant="secondary" size="md" onClick={onClearFilters}>
+                Clear filters
               </Button>
+            }
+          />
+        ) : (
+          <div ref={rowsBox} {...stylex.props(styles.rows, rowsHeight(virtualizer.getTotalSize()))}>
+            {items.map((item) => (
+              <div key={item.key} data-row-index={item.index} {...stylex.props(styles.slot, slotAt(item.start - margin))}>
+                {renderRow(item.index, item.index === tabbable)}
+              </div>
             ))}
           </div>
-          <div {...stylex.props(styles.selects)}>
-            <Select size={30} label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={(event) => onKind(event.currentTarget.value as KindFilter)} />
-            <Select
-              size={30}
-              label="Where"
-              value={filter.scope ?? ANYWHERE}
-              options={[{ value: ANYWHERE, label: 'Anywhere' }, ...places.map((place) => ({ value: place.id, label: place.label }))]}
-              onChange={(event) => onScope(event.currentTarget.value === ANYWHERE ? undefined : event.currentTarget.value)}
-            />
-            <Select size={30} label="Sort" value={filter.sort} options={SORT_OPTIONS} onChange={(event) => onSort(event.currentTarget.value as AllTopicsSort)} />
-          </div>
-        </div>
-      </div>
-      <div ref={scroller} role="grid" aria-label="All topics" aria-rowcount={total + 1} data-all-topics-table="" onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
-        <div {...stylex.props(styles.table)}>
-          <div role="row" aria-rowindex={1} {...stylex.props(styles.grid, styles.header)}>
-            <Text variant="tableHeader" tone="muted" role="columnheader">
-              Topic
-            </Text>
-            <Text variant="tableHeader" tone="muted" role="columnheader">
-              Where
-            </Text>
-            <Text variant="tableHeader" tone="muted" role="columnheader">
-              Status
-            </Text>
-            <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
-              Msgs
-            </Text>
-            <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
-              Updated
-            </Text>
-          </div>
-          {empty ? (
-            <EmptyState
-              illustration="nothing-here"
-              title="No topics match these filters."
-              action={
-                <Button variant="secondary" size="md" onClick={onClearFilters}>
-                  Clear filters
-                </Button>
-              }
-            />
-          ) : (
-            <div ref={rowsBox} {...stylex.props(styles.rows, rowsHeight(virtualizer.getTotalSize()))}>
-              {items.map((item) => (
-                <div key={item.key} data-row-index={item.index} {...stylex.props(styles.slot, slotAt(item.start - margin))}>
-                  {renderRow(item.index, item.index === tabbable)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
-}
+})
 
 const rowsHeight = stylex.create({ is: (px: number) => ({ height: px }) }).is
 const slotAt = stylex.create({ at: (px: number) => ({ transform: `translateY(${px}px)` }) }).at
