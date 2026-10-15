@@ -28,8 +28,8 @@ const styles = stylex.create({
   content: { display: 'flex', flexDirection: 'column', gap: spacing['--space-2'], minWidth: 0 },
   collapsed: { maxHeight: layout['--thumb-max-height'], overflow: 'hidden' },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
-  imageBox: (ratio: number) => ({ width: `min(100%, ${layout['--thumb-max-width']}, calc(${layout['--thumb-max-height']} * ${ratio}))`, aspectRatio: ratio, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
-  image: { display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
+  imageBox: (ratio: number) => ({ position: 'relative', flexShrink: 0, width: `min(100%, ${layout['--thumb-max-width']}, calc(${layout['--thumb-max-height']} * ${ratio}))`, aspectRatio: ratio, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
+  image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
 })
 const tintStyles = stylex.create({
   neutral: { borderInlineStartColor: colors['--border-strongest'] },

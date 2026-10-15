@@ -270,7 +270,7 @@ describe('rich_text blocks', () => {
         ],
       },
       { kind: 'divider' },
-      { kind: 'paragraph', children: [{ kind: 'text', text: 'by ' }, { kind: 'user', id: 'U0LEO', name: 'Leo Park', isMe: false }] },
+      { kind: 'context', children: [{ kind: 'text', text: 'avatar by ' }, { kind: 'user', id: 'U0LEO', name: 'Leo Park', isMe: false }] },
     ])
   })
 
