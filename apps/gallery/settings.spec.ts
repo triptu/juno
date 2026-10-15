@@ -95,3 +95,18 @@ test('every card in General, Appearance, Ignored and About starts its rows 15px 
     for (const inset of insets) expect(inset, id).toBe(juno)
   }
 })
+
+test('General and Appearance put each control at the trailing edge, 15px from the card, as the Juno rows do', async ({ page }) => {
+  for (const id of ['sections/general', 'sections/appearance']) {
+    await open(page, 'SettingsPage', id)
+    const ends = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-fixture-frame] [role="radiogroup"], [data-fixture-frame] [role="group"]')].map((control) => {
+        let card = control.parentElement!
+        while (getComputedStyle(card).borderTopLeftRadius === '0px') card = card.parentElement!
+        return Math.round(card.getBoundingClientRect().right - control.getBoundingClientRect().right)
+      }),
+    )
+    expect(ends.length, id).toBeGreaterThan(0)
+    for (const end of ends) expect(end, id).toBe(15)
+  }
+})

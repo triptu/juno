@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { spacing } from '@juno/tokens/tokens.stylex'
 import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 
 export interface AppearanceSettingsProps {
@@ -76,9 +76,11 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-3-5'],
   },
+  // The label at the start, the control at the trailing edge, as System Settings.
   row: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing['--space-6'],
     minHeight: spacing['--space-8'],
   },
@@ -91,14 +93,12 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
-    width: layout['--settings-label-width'],
     flexShrink: 0,
   },
   labelStacked: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing['--space-2'],
-    width: 'auto',
   },
   swatches: {
     display: 'flex',

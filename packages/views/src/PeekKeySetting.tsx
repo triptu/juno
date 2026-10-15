@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { spacing } from '@juno/tokens/tokens.stylex'
 import { Segmented, Text } from '@juno/ui'
 
 /** ⌥ Option, the default, or Space. Fn is not offered: macOS does not report it to apps reliably. */
@@ -28,15 +28,15 @@ export function PeekKeySetting({ value, onChange }: PeekKeySettingProps) {
 }
 
 const styles = stylex.create({
-  // The same row as Appearance's Theme and Density, so the controls share one edge.
+  // The same row as Appearance's Theme and Density: the label at the start, the control at the trailing edge, as System Settings.
   row: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing['--space-6'],
     minHeight: spacing['--space-8'],
   },
   label: {
-    width: layout['--settings-label-width'],
     flexShrink: 0,
   },
 })

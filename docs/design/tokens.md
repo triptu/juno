@@ -353,7 +353,6 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
-| `--settings-label-width` | 104px: the label column of Settings' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |

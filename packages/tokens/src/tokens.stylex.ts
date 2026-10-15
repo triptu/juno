@@ -752,7 +752,6 @@ export const layout = stylex.defineVars({
   '--page-width': '720px',
   '--page-width-settings': '760px',
   // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
-  '--settings-label-width': '104px',
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
   '--palette-width': '560px',
