@@ -1,11 +1,21 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { AudienceWarning, Composer, ComposerSlot, SendCheckBar } from '@juno/views'
+import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import type { ComposerHandle } from './messageActions'
-import { afterCheck, choose, findingOf, type CheckBar, type Destination, type Outcome } from './sendChecks'
+import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 import { cancelSendMark, markSend } from './sendMark'
+
+const SendCheckPanel = lazy(() => import('./SendCheckPanel'))
+
+/** Fetch the bar's chunk once a composer has mounted, so the first bar does not wait for it. */
+let barLoaded = false
+function preloadBar(): void {
+  if (barLoaded) return
+  barLoaded = true
+  window.requestIdleCallback(() => void import('./SendCheckPanel'))
+}
 
 /** Typing pauses this long before the draft is written. */
 const DRAFT_SAVE_MS = 400
@@ -96,6 +106,7 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
   useEffect(() => () => flushRef.current(), [])
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
+    preloadBar()
     if (aiAssist && detail.kind === 'main' && initial.trim() !== '') precheckMessage(registry, detail.channel.id, initial)
     // Once per mount: later drafts are asked about as typing pauses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,7 +186,11 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     audience === undefined && bar === undefined ? undefined : (
       <>
         {audience === undefined ? null : <AudienceWarning message={audience.message} />}
-        {bar === undefined ? null : <SendCheckBar {...findingOf(bar)} onPrimary={() => pick('primary')} onSecondary={() => pick('secondary')} />}
+        {bar === undefined ? null : (
+          <Suspense fallback={null}>
+            <SendCheckPanel bar={bar} onPick={pick} />
+          </Suspense>
+        )}
       </>
     )
 
