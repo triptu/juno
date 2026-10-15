@@ -1,3 +1,4 @@
+import { junoNavAtom, watchReply } from '@juno/state/agent'
 /**
  * The topic actions (SPEC 5 "Row actions", inventory 15.1 and 16), for
  * every place that offers them: a sidebar row's check and menu, the
@@ -226,13 +227,15 @@ export async function showMessageMenu(
   const items: ContextMenuItem[] = [
     ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }, { separator: true } as const] : []),
     ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: 'Reply in thread' }, { separator: true } as const] : []),
+    ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
     { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
     { id: 'open-in-slack', label: 'Open in Slack' },
     ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
   ]
   const chosen = await popupContextMenu(items, at)
   if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply') return chosen
-  if (chosen === 'open-in-slack') openTopicInSlack(topic)
+  if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })
+  else if (chosen === 'open-in-slack') openTopicInSlack(topic)
   else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)
   else if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
   return undefined

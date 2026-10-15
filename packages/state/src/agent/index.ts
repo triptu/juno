@@ -28,6 +28,7 @@ export {
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
+  watchReply,
   type CommandAnswer,
   type JunoPageActions,
   type JunoSettingsChange,

@@ -11,8 +11,9 @@
  * Commands on a pin or a schedule carry the revision the page was built
  * from, so an edit made over a newer version answers `stale`.
  */
-import { Exit, Stream } from 'effect'
+import { Effect, Exit, Stream } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
+import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import type {
   CardBinding,
   ActivityPage,
@@ -32,6 +33,7 @@ import type { Registry } from '../client'
 import { call, live, rememberCards } from './chat'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
+import { showToast } from '../undo'
 
 const IDLE_TTL = '30 seconds'
 
@@ -119,3 +121,21 @@ export function junoPageActions(registry: Registry) {
 }
 
 export type JunoPageActions = ReturnType<typeof junoPageActions>
+
+/** The owner's menu click sets a watch without starting a model run. */
+export async function watchReply(registry: Registry, message: { readonly channelId: string; readonly ts: string; readonly threadTs?: string }): Promise<void> {
+  const result = await call<{ readonly id: ScheduleId; readonly at: number }>(registry, 'agent.schedule.watchReply', { opId: uuidv7(), ...message })
+  if (Exit.isFailure(result)) {
+    showToast(registry, { text: 'Could not watch for a reply.' })
+    return
+  }
+  const { id, at } = result.value
+  const until = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(at)
+  showToast(registry, { text: `Watching for a reply until ${until}`, onUndo: async () => {
+    const unmount = registry.mount(scheduledPageAtom)
+    const snapshot = await Effect.runPromiseExit(AtomRegistry.getResult(registry, scheduledPageAtom, { suspendOnWaiting: true })).finally(unmount)
+    if (Exit.isFailure(snapshot)) return false
+    const row = snapshot.value.revisions.find((candidate) => candidate.id === id)
+    return row !== undefined && await junoPageActions(registry).schedule(id, row.revision, 'delete') === 'ok'
+  } }, true)
+}

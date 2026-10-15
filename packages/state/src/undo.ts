@@ -42,6 +42,7 @@ export interface ToastContent {
   readonly text: string
   /** The resolve toast's check. */
   readonly check?: boolean
+  readonly onUndo?: () => Promise<boolean>
 }
 
 export interface Toast extends ToastContent {
@@ -88,6 +89,11 @@ export async function runAction<R extends Rpc.Any>(
 
 /** Replays the newest undo and hides the toast. Resolves with false when there was nothing to undo. */
 export async function undoLast(registry: Registry): Promise<boolean> {
+  const currentToast = registry.get(toastAtom)
+  if (currentToast?.onUndo) {
+    registry.set(toastAtom, undefined)
+    return currentToast.onUndo()
+  }
   const stack = registry.get(undoStackAtom)
   const undo = stack.at(-1)
   if (undo === undefined) return false
