@@ -40,7 +40,8 @@
     "test:agent-testing": "node scripts/heavy.mjs pnpm --filter @juno/agent-testing test",
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
     "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
-    "flake": "node scripts/flake.mjs"
+    "flake": "node scripts/flake.mjs",
+    "test:remote-pool": "node scripts/heavy.mjs node --test scripts/remote/pool-decisions.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",
