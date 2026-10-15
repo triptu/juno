@@ -128,7 +128,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
         ? {}
         : {
             wrapLeft: (island: ReactNode) => (
-              <Popover open={switcher.open} onClose={() => switcher.onOpen(false)} anchor={island} placement="bottom-start" width="browse" padding="none" label="Topics in this channel">
+              <Popover open={switcher.open} onClose={() => switcher.onOpen(false)} anchor={island} placement="bottom-start" width="browse" padding="none" label="Topics in this channel" returnFocusTo='[aria-haspopup="dialog"]'>
                 {switcher.content}
               </Popover>
             ),

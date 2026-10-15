@@ -25,6 +25,8 @@ export interface PopoverProps {
   readonly label?: string
   /** Keep open while a pointer is down inside an input that owns it. */
   readonly closeOnBlur?: boolean
+  /** Where focus goes back after Escape, as a selector inside the anchor: for an anchor with several controls. Default its first focusable. */
+  readonly returnFocusTo?: string
   readonly children?: ReactNode
 }
 
@@ -83,6 +85,7 @@ export function Popover({
   role = 'dialog',
   label,
   closeOnBlur = true,
+  returnFocusTo = FOCUSABLE,
   children,
 }: PopoverProps) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -97,8 +100,8 @@ export function Popover({
   useLayoutEffect(() => {
     if (open || !restoreFocus.current) return
     restoreFocus.current = false
-    rootRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
-  }, [open])
+    rootRef.current?.querySelector<HTMLElement>(returnFocusTo)?.focus()
+  }, [open, returnFocusTo])
 
   useEffect(() => {
     if (!open) return
