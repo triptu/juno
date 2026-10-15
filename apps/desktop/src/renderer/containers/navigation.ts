@@ -13,9 +13,11 @@
  * itself.
  */
 import {
+  MESSAGE_WINDOW_BEFORE,
   MESSAGE_WINDOW_DEFAULT,
   MESSAGE_WINDOW_MAX,
   type MenuCommand,
+  type PickConversation,
   type TopicDetail,
 } from '@juno/contract'
 import {
@@ -48,6 +50,7 @@ import {
   emptyNewChat,
   openInSlack,
   openPlace,
+  pickConversation,
   popupContextMenu,
   prefetchTopic,
   registry,
@@ -127,12 +130,15 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
  * `READY_WAIT_MS`, once the header is. Showing the tab without its header
  * would paint an empty pane and an empty tab title. A fresh open also
  * picks the window (`openWindow`); a topic coming back keeps the one it had.
+ * A fresh open at `target`, a message older than that window, then takes
+ * the window around the message instead.
  */
-function whenReady(id: string, fresh: boolean): Promise<void> {
+function whenReady(id: string, fresh: boolean, target?: string): Promise<void> {
   return new Promise((resolve) => {
     const releases: Array<() => void> = []
     let done = false
     let specSet = false
+    let anchored = false
     let waited = false
     const finish = () => {
       if (done) return
@@ -158,7 +164,16 @@ function whenReady(id: string, fresh: boolean): Promise<void> {
         if (fresh) registry.set(messageWindowSpecAtom(id), openWindow(detail))
         releases.push(registry.subscribe(messageListAtom(id), check, { immediate: false }))
       }
-      if (waited || registry.get(messageListAtom(id)).ready) finish()
+      const list = registry.get(messageListAtom(id))
+      if (fresh && target !== undefined && !anchored && list.ready && !waited) {
+        const first = list.order[0]
+        if (first !== undefined && target < first && !list.order.includes(target)) {
+          anchored = true
+          registry.set(messageWindowSpecAtom(id), { anchor: target, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+          return
+        }
+      }
+      if (waited || (list.ready && (!anchored || list.spec.anchor === target))) finish()
     }
     releases.push(registry.subscribe(topicAtom(id), check, { immediate: false }))
     check()
@@ -175,7 +190,11 @@ let currentTicket = 0
  * paint, unless something newer replaced it meanwhile. With no topic to
  * wait for, it applies now.
  */
-function show(change: (tabs: Tabs) => Tabs, topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch' } | undefined, replaceable = true): void {
+function show(
+  change: (tabs: Tabs) => Tabs,
+  topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch'; readonly target?: string } | undefined,
+  replaceable = true,
+): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
   if (topic === undefined) {
@@ -186,7 +205,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: { readonly id: string; readon
   }
   registry.set(selectedTopicAtom, topic.id)
   pending = { id: topic.id, at, name: topic.name }
-  const ready = whenReady(topic.id, topic.fresh)
+  const ready = whenReady(topic.id, topic.fresh, topic.target)
   queue = queue
     .then(() => ready)
     .then(() => {
@@ -196,6 +215,10 @@ function show(change: (tabs: Tabs) => Tabs, topic: { readonly id: string; readon
 
 /** Opens a topic: in the current tab, a new tab with `newTab`, or the tab that already shows it. */
 export function openTopic(id: string, options: OpenOptions = {}): void {
+  openTopicFresh(id, options, undefined)
+}
+
+function openTopicFresh(id: string, options: OpenOptions, target: string | undefined): void {
   const showing = tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
     switchToTab(showing.id)
@@ -204,7 +227,7 @@ export function openTopic(id: string, options: OpenOptions = {}): void {
   // A fresh open starts at the divider or the bottom, not where it was left.
   registry.set(scrollSnapshotAtom(id), undefined)
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
-  show((tabs) => openPlace(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open' }, options.newTab !== true)
+  show((tabs) => openPlace(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
 }
 
 /**
@@ -218,6 +241,16 @@ export function openNewTab(): void {
     return
   }
   show((tabs) => openPlace(tabs, newChatPlace, { newTab: true }), undefined)
+}
+
+/** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
+export function openNewChatTo(conversation: PickConversation): void {
+  show((tabs) => {
+    const blank = tabs.tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
+    const next = blank === undefined ? openPlace(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
+    if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
+    return next
+  }, undefined)
 }
 
 /** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
@@ -250,14 +283,14 @@ const MESSAGE_TOP = 80
 
 /**
  * Opens a topic at one message, as a clicked notification does: a fresh
- * open lands with that message near the top when it is in the first
- * window, else at the divider or the bottom. A tab that already shows the
+ * open lands with that message near the top, taking the window around it
+ * when it is older than the first window. A tab that already shows the
  * topic is focused as it is. With `flash`, the message flashes once shown.
  */
 export function openTopicAt(id: string, ts: string, options: OpenOptions & { readonly flash?: boolean } = {}): void {
   if (options.flash === true) flashMessage(registry, id, ts)
   if (tabShowing(registry.get(tabsAtom), id) !== undefined) return openTopic(id)
-  openTopic(id, options.newTab === true ? { newTab: true } : {})
+  openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts)
   registry.set(scrollSnapshotAtom(id), { anchorKey: ts, offset: MESSAGE_TOP })
 }
 
@@ -442,6 +475,9 @@ export function runMenuCommand(command: MenuCommand): void {
       return
     case 'edit.undo':
       // `topicActions.ts` handles it.
+      return
+    case 'palette.toggle':
+      // `Palette.tsx` handles it.
       return
     case 'preferences.open':
       return openPreferences()
