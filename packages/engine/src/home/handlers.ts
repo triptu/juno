@@ -6,7 +6,8 @@
  * shows an item with no current title rewrite asks the assistant for one
  * in the background (`homeTitle`, once per item and activity, inside
  * Home's budget); the answer lands in `ai_cache`, which re-runs the query.
- * So rewrites are asked for only while Home is on screen.
+ * So rewrites are asked for only while Home is on screen, and only after
+ * the first sync, when the people they name are known.
  *
  * `home.visit` and `home.markDone` are small local writes.
  */
@@ -33,6 +34,7 @@ const KEYS: InvalidationKeys = [
   'ai_cache',
   'follow_ups',
   'topic_visits',
+  'sync_state',
 ]
 
 /** Visits kept; Home reads only the newest. */
@@ -88,7 +90,7 @@ export const HomeHandlers = HomeRoutes.toLayer(
             ? Stream.empty
             : liveQuery(
                 KEYS,
-                timed(readHome().pipe(Effect.tap((run) => (run.aiAssist ? rewrite(open, run) : Effect.void)))).pipe(
+                timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run) : Effect.void)))).pipe(
                   Effect.map((timedRun) => ({ value: timedRun.value.view, queryMs: timedRun.queryMs })),
                 ),
               ).pipe(Stream.provide(open.context)),

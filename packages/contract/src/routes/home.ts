@@ -56,6 +56,11 @@ export const HomeView = Schema.Struct({
   items: Schema.Array(HomeItem),
   /** A followed topic has unread messages. With no items and none of these, the user is caught up. */
   unread: Schema.Boolean,
+  /**
+   * The workspace has finished a first sync, so the cache can say what
+   * waits. Until then Home shows nothing rather than "All caught up".
+   */
+  ready: Schema.Boolean,
 })
 export type HomeView = typeof HomeView.Type
 

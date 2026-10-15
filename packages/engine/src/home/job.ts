@@ -3,9 +3,10 @@
  * architecture 10, "Home items"): settled scores for Tidy up, and the
  * user's promises for Follow-up.
  *
- * A pass runs when the workspace opens and its topics change (debounced, so
- * a burst of sync writes is one pass), and every 15 minutes, so a topic
- * that went quiet gets scored. Each pass asks only about topics whose
+ * A pass runs when the workspace opens and its topics change (changes in
+ * a 3 second window are one pass, and a steady stream of them cannot hold
+ * passes off), and every 15 minutes, so a topic that went quiet gets
+ * scored. Each pass asks only about topics whose
  * stored answer is older than their latest activity, newest first, a few at
  * a time, inside Home's daily budget (`assist.ts`). A call that did not
  * answer defers that topic with backoff in memory. Nothing runs while AI
@@ -19,7 +20,8 @@
  */
 import { AiProvider, tasks } from '@juno/ai'
 import { channelLabel, resolveTitle, type TopicId } from '@juno/domain'
-import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
+import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, syncState, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
+import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
 import { channelInfoOf, parseColumns, topicFrom, userIdsOf, userName, type UserRow } from '../topicRows'
@@ -27,8 +29,9 @@ import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
 import { FOLLOWED, HOME_SELECT, OPEN, type HomeRow } from './query'
 
-const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'prefs']
-const DEBOUNCE = '3 seconds'
+const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'prefs', 'sync_state']
+/** Changes in this window are one pass; a steady stream of changes still gets a pass per window. */
+const WINDOW = '3 seconds'
 const TICK = '15 minutes'
 const CONCURRENCY = 2
 /** Topics one pass asks about, per task. */
@@ -76,6 +79,8 @@ const describe = (row: HomeRow, selfId: string | undefined, users: ReadonlyMap<s
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>
   Effect.gen(function* () {
     if (!(yield* aiAssistOn)) return
+    // Before the first sync finishes, a topic's messages are not all here yet.
+    if ((yield* syncState.get(BOOT_KEY)) === undefined) return
     const sql = yield* StoreReader
     const now = yield* Clock.currentTimeMillis
     let budget = HOME_DAILY_BUDGET - (yield* usedToday(now))
@@ -157,7 +162,7 @@ export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider> = Layer.
       Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
         const memory: Memory = { deferred: new Map() }
-        const triggers = Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), Stream.tick(TICK))
+        const triggers = Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK))
         return triggers.pipe(
           Stream.mapEffect(() =>
             runPass(memory).pipe(

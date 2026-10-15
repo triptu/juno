@@ -35,7 +35,8 @@ import {
   type HomeCandidate,
   type Ts,
 } from '@juno/domain'
-import { StoreReader, type SqlError } from '@juno/store'
+import { StoreReader, syncState, type SqlError } from '@juno/store'
+import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
 import { artRefOf, channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
@@ -259,10 +260,11 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       return item
     })
 
+    const booted = yield* syncState.get(BOOT_KEY)
     const self = selfId === undefined ? undefined : users.get(selfId)
     const name = self === undefined ? '' : firstName(self.real_name ?? self.display_name ?? self.name ?? '')
     return {
-      view: { ...(name === '' ? {} : { firstName: name }), items, unread: unread.length > 0 },
+      view: { ...(name === '' ? {} : { firstName: name }), items, unread: unread.length > 0, ready: booted !== undefined },
       aiAssist,
       rewritable,
     }
