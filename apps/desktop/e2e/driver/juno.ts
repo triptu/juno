@@ -625,9 +625,18 @@ export class Juno {
     this.palette = new PaletteDriver(app, win)
   }
 
-  /** Makes the next native context menu pick `id` without showing it. */
-  chooseNextMenuItem(id: string): Promise<void> {
-    return chooseNextMenuItem(this.win, id)
+  /**
+   * Makes the next native context menu pick `id` without showing it. With
+   * `hold`, the menu stays open until `releaseMenu`, so a test can change
+   * things under it.
+   */
+  chooseNextMenuItem(id: string, options: { readonly hold?: boolean } = {}): Promise<void> {
+    return chooseNextMenuItem(this.win, id, options)
+  }
+
+  /** Picks the item of the menu `chooseNextMenuItem` held open. */
+  releaseMenu(): Promise<void> {
+    return releaseMenu(this.app)
   }
 
   /** The toast that says `text` (inventory 16). */
@@ -927,12 +936,25 @@ async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonl
   })
 }
 
-async function chooseNextMenuItem(win: Page, id: string): Promise<void> {
+async function chooseNextMenuItem(win: Page, id: string, options: { readonly hold?: boolean } = {}): Promise<void> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
-  await app.evaluate((_electron, choice) => {
-    ;(globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu.next = choice
-  }, id)
+  await app.evaluate(
+    (_electron, { choice, hold }) => {
+      const menu = (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined; hold: boolean } } }).junoTest.contextMenu
+      menu.next = choice
+      menu.hold = hold
+    },
+    { choice: id, hold: options.hold === true },
+  )
+}
+
+/** Chooses the item of a menu opened with `hold`, which stayed open until now. */
+async function releaseMenu(app: ElectronApplication): Promise<void> {
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { release: (() => void) | undefined } } }).junoTest.contextMenu.release !== undefined))
+    .toBe(true)
+  await app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { release: () => void } } }).junoTest.contextMenu.release())
 }
 
 const BOTTOM_SLACK = 2

@@ -193,26 +193,27 @@ let currentTicket = 0
 /**
  * Applies `change` once `topic` (the topic the change brings on screen) can
  * paint, unless something newer replaced it meanwhile. With no topic to
- * wait for, it applies now.
+ * wait for, it applies after the supplied readiness wait, or now.
  */
 function show(
   change: (tabs: Tabs) => Tabs,
   topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch'; readonly target?: string } | undefined,
   replaceable = true,
+  ready?: Promise<void>,
 ): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
   if (topic === undefined) {
-    queue = queue.then(() => {
+    queue = queue.then(() => ready).then(() => {
       if (ticket === currentTicket) apply(change)
     })
     return
   }
   registry.set(selectedTopicAtom, topic.id)
   pending = { id: topic.id, at, name: topic.name }
-  const ready = whenReady(topic.id, topic.fresh, topic.target)
+  const topicReady = whenReady(topic.id, topic.fresh, topic.target)
   queue = queue
-    .then(() => ready)
+    .then(() => topicReady)
     .then(() => {
       if (!replaceable || ticket === currentTicket) apply(change)
     })
@@ -232,7 +233,17 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
   // A fresh open starts at the divider or the bottom, not where it was left.
   registry.set(scrollSnapshotAtom(id), undefined)
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
-  show((tabs) => openPlace(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
+  show((tabs) => openHere(tabs, topicPlace(id), options), { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }) }, options.newTab !== true)
+}
+
+/**
+ * Opens `place` (`openPlace`). A New chat with a draft or a destination in
+ * the current tab stays in its history, so Back returns to what was written.
+ */
+function openHere(tabs: Tabs, place: Place, options: OpenOptions = {}): Tabs {
+  const tab = tabs.tabs.find((each) => each.id === tabs.active)
+  const keepNewChat = tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
+  return openPlace(tabs, place, { ...options, keepNewChat })
 }
 
 /**
@@ -245,14 +256,14 @@ export function openNewTab(): void {
     switchToTab(blank.id)
     return
   }
-  show((tabs) => openPlace(tabs, newChatPlace, { newTab: true }), undefined)
+  show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
 }
 
 /** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
 export function openNewChatTo(conversation: PickConversation): void {
   show((tabs) => {
     const blank = tabs.tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
-    const next = blank === undefined ? openPlace(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
+    const next = blank === undefined ? openHere(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
     if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
     return next
   }, undefined)
@@ -265,7 +276,6 @@ export function openNewChatTo(conversation: PickConversation): void {
  * and then Home in separate frames. The wait is bounded as for All topics.
  */
 export function openHome(options: OpenOptions = {}): void {
-  const ticket = ++currentTicket
   const ready = new Promise<void>((resolve) => {
     const release = registry.mount(homeViewAtom)
     let done = false
@@ -285,29 +295,27 @@ export function openHome(options: OpenOptions = {}): void {
     const off = registry.subscribe(homeViewAtom, check, { immediate: false })
     check()
   })
-  queue = queue.then(() => ready).then(() => {
-    if (ticket === currentTicket) apply((tabs) => openPlace(tabs, homePlace, options))
-  })
+  show((tabs) => openHere(tabs, homePlace, options), undefined, true, ready)
 }
 
 /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */
 export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
+  show((tabs) => openHere(tabs, junoPagePlace(page), options), undefined)
 }
 
 /** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
 export function openJuno(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, junoPlace, options), undefined)
+  show((tabs) => openHere(tabs, junoPlace, options), undefined)
 }
 
 /** The Notifications page (SPEC 14), a singleton like Home. */
 export function openNotifications(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, notificationsPlace, options), undefined)
+  show((tabs) => openHere(tabs, notificationsPlace, options), undefined)
 }
 
 /** Preferences (SPEC 14), a singleton like Home. */
 export function openPreferences(options: OpenOptions = {}): void {
-  show((tabs) => openPlace(tabs, preferencesPlace, options), undefined)
+  show((tabs) => openHere(tabs, preferencesPlace, options), undefined)
 }
 
 /** Below the header band, where a message a notification opens lands. */
@@ -385,7 +393,7 @@ function whenAllTopicsReady(): Promise<void> {
 /** The sidebar's All topics item and the "View all topics" empty states. All topics is a singleton, like Home. */
 export function openAllTopics(options: OpenOptions = {}): void {
   if (allTopicsTab(registry.get(tabsAtom)) !== undefined) {
-    show((tabs) => openPlace(tabs, allTopicsPlace, options), undefined)
+    show((tabs) => openHere(tabs, allTopicsPlace, options), undefined)
     return
   }
   const ticket = ++currentTicket
@@ -394,22 +402,23 @@ export function openAllTopics(options: OpenOptions = {}): void {
   queue = queue
     .then(() => ready)
     .then(() => {
-      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
+      if (ticket === currentTicket) apply((tabs) => openHere(tabs, allTopicsPlace, options))
     })
 }
 
 /**
  * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
  * topic can paint, or closes when another tab shows it (`settleNewChat`).
- * Never replaced by a later open, so the sent message always shows.
+ * Never replaced by a later open, so the sent message always shows. The
+ * draft is cleared even when the tab was closed during the send, so
+ * reopening it can never send the message again.
  */
 export function settleSentChat(tabId: string, topicId: string): void {
   registry.set(scrollSnapshotAtom(topicId), undefined)
   show(
     (tabs) => {
-      const next = settleNewChat(tabs, tabId, topicId)
-      if (next !== tabs) registry.set(newChatAtom(tabId), emptyNewChat)
-      return next
+      registry.set(newChatAtom(tabId), emptyNewChat)
+      return settleNewChat(tabs, tabId, topicId)
     },
     { id: topicId, fresh: true, name: 'juno.topic-open' },
     false,
@@ -464,23 +473,44 @@ export function goToTabEntry(index: number): void {
   show((current) => goToEntry(current, index), topic)
 }
 
+/**
+ * The last tab change still waiting for its topic. A tab change that comes
+ * before it applies (⌘W held down, ⌘⇧T twice) builds on it rather than
+ * replacing it, so each press counts.
+ */
+let waitingTabChange: { readonly ticket: number; readonly change: (tabs: Tabs) => Tabs } | undefined
+
 /** Brings the tab that is active after `change` on screen, waiting for its topic when it was not mounted. */
 function changeTabs(change: (tabs: Tabs) => Tabs): void {
+  const waiting = waitingTabChange?.ticket === currentTicket ? waitingTabChange.change : undefined
+  waitingTabChange = undefined
   const tabs = registry.get(tabsAtom)
-  const next = change(tabs)
-  if (next === tabs) return
+  const base = waiting === undefined ? tabs : waiting(tabs)
+  if (change(base) === base && waiting === undefined) return
+  const both = waiting === undefined ? change : (current: Tabs) => change(waiting(current))
+  const next = both(tabs)
   const tab = activeTab(next)
   const topic = tab === undefined || tab.id === tabs.active ? undefined : arriving(tabs, tab.id, currentPlace(tab), false)
   if (topic === undefined) {
     ++currentTicket
-    apply(change)
+    apply(both)
     return
   }
-  show(change, topic)
+  const applying = (current: Tabs) => {
+    if (waitingTabChange?.change === applying) waitingTabChange = undefined
+    return both(current)
+  }
+  show(applying, topic)
+  waitingTabChange = { ticket: currentTicket, change: applying }
 }
 
 export function closeTabById(tabId: string): void {
   changeTabs((tabs) => closeTab(tabs, tabId))
+}
+
+/** ⌘W: closes whichever tab is active once the changes before it apply. */
+function closeActiveTab(): void {
+  changeTabs((tabs) => (tabs.active === undefined ? tabs : closeTab(tabs, tabs.active)))
 }
 
 /** The app menu and the three-finger swipe. */
@@ -490,8 +520,7 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'tab.new':
       return openNewTab()
     case 'tab.close':
-      if (tabs.active !== undefined) closeTabById(tabs.active)
-      return
+      return closeActiveTab()
     case 'tab.reopen':
       return changeTabs(reopenClosedTab)
     case 'tab.next':

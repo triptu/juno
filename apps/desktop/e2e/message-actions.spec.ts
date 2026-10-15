@@ -130,6 +130,41 @@ test('Edit and Delete from the toolbar’s More menu and from a right-click', as
   await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
 })
 
+test('a message edited elsewhere while its menu is open: Edit starts from the new text', async ({ juno, fake }) => {
+  await openMain(juno)
+  const { topic } = juno
+  const ts = await sendOwn(juno, fake, 'Standup at 10')
+
+  await juno.chooseNextMenuItem('edit', { hold: true })
+  await topic.message('Standup at 10').click({ button: 'right' })
+  fake.editMessage({ channel: 'C0ENG', ts, text: 'Standup at 11' })
+  await expect(topic.message('Standup at 11')).toBeVisible()
+  await juno.releaseMenu()
+
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+  await expect(field).toHaveValue('Standup at 11')
+})
+
+test('an edit started while the message is sending stays open, with what was typed, when Slack takes the message', async ({ juno, fake }) => {
+  await openMain(juno)
+  const { topic } = juno
+  fake.holdNext({ method: 'chat.postMessage', before: true })
+  await topic.send('Typo in thsi one')
+  await expect(topic.message('Typo in thsi one')).toHaveAttribute('data-pending', 'sending')
+  await topic.composer.press('ArrowUp')
+  await topic.message('Typo in thsi one').press('e')
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+  await field.fill('Typo in this one, still typing')
+
+  fake.release()
+  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in thsi one')).toBe(true)
+  await expect(topic.list.locator('[data-message-row][data-pending]')).toHaveCount(0)
+  await expect(field).toHaveValue('Typo in this one, still typing')
+  await expect(field).toBeFocused()
+  await field.press('Enter')
+  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in this one, still typing')).toBe(true)
+})
+
 test('an edit made while the message is still sending reaches Slack once it has the message', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
