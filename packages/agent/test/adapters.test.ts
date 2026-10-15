@@ -418,6 +418,11 @@ it('a T3 Stop that cannot be built leaves the job running instead of failing the
   await manager.refresh('t3')
   await expect(turns.jobs.stop(job.id, 'stop-test')).resolves.toBeUndefined()
   expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
+  expect(turns.jobs.list()[0]?.stopFailed).toBe(true)
+  server.setTools(t3Tools)
+  await manager.refresh('t3')
+  await turns.jobs.stop(job.id, 'stop-again')
+  expect(turns.jobs.list()[0]?.phase).toBe('stopped')
 })
 
 it('shows a session T3 Code started even when the account changed during the launch, without a grant', async () => {
@@ -502,12 +507,13 @@ it('writes a job only when its phase or line changes', async () => {
   expect((turns.store.db.prepare('SELECT count(*) AS n FROM job_writes').get() as { n: number }).n).toBe(2)
 })
 
-it('posts a report when a T3 session waits on a question, so Juno hears it', async () => {
+it('reports each new T3 question even while the session already waits', async () => {
+  const requestIds = ['request-test']
   const tools: FakeTool[] = [launch,
     { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
     t3Tools[2]!,
-    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: ['request-test'] }) },
-    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: (args) => json({ requestId: args.requestId, questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
     { name: 't3_pending_request_respond', inputSchema: { type: 'object', properties: { threadId: str, requestId: str, answers: { type: 'object' } }, required: ['threadId', 'requestId', 'answers'] }, call: () => json({}) },
   ]
   const { turns, call, click, fake } = await fixture('t3', tools)
@@ -517,4 +523,13 @@ it('posts a report when a T3 session waits on a question, so Juno hears it', asy
   await expect.poll(() => turns.store.db.prepare("SELECT text FROM inbox WHERE kind = 'report' AND op_id LIKE 'report:%:needsYou'").all()).toEqual([
     { text: 'T3 Code is waiting for an answer in Fix test. The question is on a Question card.' },
   ])
+  fake.script([reply('<say>T3 Code has another question.</say>')])
+  requestIds.push('request-second')
+  const reports = () => turns.store.db.prepare("SELECT op_id FROM inbox WHERE kind = 'report' AND op_id LIKE 'report:%:needsYou'").all()
+  await expect.poll(reports, { timeout: 15_000 }).toHaveLength(2)
+  expect(turns.jobs.list()[0]?.phase).toBe('needsYou')
+  expect(turns.actions.views().filter((view) => view.card._tag === 'question')).toHaveLength(2)
+  // Repeated observations of the same pending requests produce no new inbox reports.
+  await new Promise((resolve) => setTimeout(resolve, 11_000))
+  expect(reports()).toHaveLength(2)
 })

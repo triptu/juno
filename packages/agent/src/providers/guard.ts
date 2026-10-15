@@ -31,12 +31,12 @@ export class AdmissionError extends Error {
 type Reason = Exclude<Ending, { _tag: 'complete' }>
 /** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
 const code = (ending: Ending, rateLimited = false) => `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${rateLimited ? ':429' : ''}`
-const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|keyRejected|codexSignedOut|codexMissing|codexQuota|codexCrash|offline))(:429)?$/
+const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|missingKey|rateLimited|keyRejected|codexSignedOut|codexMissing|codexQuota|codexCrash|offline))(:429)?$/
 function decode(match: string): Reason {
   const [tag, reason] = match.split(':')
   if (tag === 'interrupted') return { _tag: 'interrupted' }
   if (tag === 'blocked') return { _tag: 'blocked', reason: reason === 'budget' ? 'budget' : 'tooLarge' }
-  return { _tag: 'failed', reason: reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'codexMissing' || reason === 'codexQuota' || reason === 'codexCrash' || reason === 'offline' ? reason : 'provider' }
+  return { _tag: 'failed', reason: reason === 'missingKey' || reason === 'rateLimited' || reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'codexMissing' || reason === 'codexQuota' || reason === 'codexCrash' || reason === 'offline' ? reason : 'provider' }
 }
 /** SDK errors start with the status ("401 …", "429: {…}"); pi's prefixed form is "Provider (503): …". */
 const httpStatus = (text: string): number | undefined => {
@@ -53,16 +53,17 @@ export function providerFailure(error: unknown): ProviderFailure {
   const own = CODE.exec(text)
   if (own) return { ending: decode(own[1]!), rateLimited: own[2] !== undefined }
   const status = httpStatus(text)
-  if (status === 429 || /rate.?limit/i.test(text)) return failed('provider', true)
+  if (status === 429 || /rate.?limit/i.test(text)) return failed('rateLimited', true)
   if (/not logged in|signed out/i.test(text)) return failed('codexSignedOut')
-  if (status === 401 || status === 403 || /no api key|missing .*key|api key auth (?:check )?failed/i.test(text)) return failed('keyRejected')
+  if (/no api key|missing .*key/i.test(text)) return failed('missingKey')
+  if (status === 401 || status === 403 || /api key auth (?:check )?failed/i.test(text)) return failed('keyRejected')
   if (status !== undefined) return failed('provider')
   if (/terminated|fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|offline|socket|timed? ?out/i.test(text)) return failed('offline')
   return failed('provider')
 }
 /** The provider refused the request before doing any work, so it billed nothing. */
 const refused = (failure: ProviderFailure) => failure.rateLimited ||
-  (failure.ending._tag === 'failed' && failure.ending.reason === 'keyRejected')
+  (failure.ending._tag === 'failed' && (failure.ending.reason === 'keyRejected' || failure.ending.reason === 'missingKey'))
 export function readRevision(store: Store): Revision {
   const row = store.db.prepare('SELECT gen, pin_rev FROM memory_head WHERE singleton = 1').get()!
   return { gen: Number(row.gen), pinRev: Number(row.pin_rev) }
