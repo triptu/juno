@@ -48,6 +48,7 @@ import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
 import type { PinResult } from '../pins/pins'
 import type { UpdateNeeded } from '../runtime/core'
+import { backupFailure } from '../backup/errors'
 import { connectionHandlers } from '../mcp/pages'
 import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
@@ -64,14 +65,25 @@ export interface ChatHost {
   readonly settings?: JunoSettings
   readonly connections?: McpManagerApi
   readonly schedule?: { readonly scheduler: Scheduler; readonly host: WatchHost }
+  /** Errors the owner sees only as a plain line; the log keeps them. */
+  readonly report?: (error: unknown) => void
 }
 
 const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
 const notYet = (what: string) => () => unavailable(`${what} is not available yet.`)
 const readOnly = () => Effect.fail(new AgentCommandError({ reason: 'readOnly', message: chatCopy.banner.otherDevice.line }))
-/** Backup folder work; a folder Juno cannot read or write is the command's error, not a defect. */
-const folderWork = <A>(f: () => Promise<A>) =>
-  Effect.tryPromise({ try: f, catch: () => new AgentCommandError({ reason: 'unavailable', message: 'Juno could not use the backup folder. Check that it is available and try again.' }) })
+/**
+ * Backup folder work; a folder Juno cannot read or write is the command's error, not a defect. The owner
+ * reads what to do; `report` gets the original error.
+ */
+const folderWork = <A>(f: () => Promise<A>, report?: (error: unknown) => void) =>
+  Effect.tryPromise({
+    try: f,
+    catch: (error) => {
+      report?.(error)
+      return new AgentCommandError(backupFailure(error))
+    },
+  })
 /** An ownership command's refusal as the RPC's error. */
 const ownershipAnswer = (opId: OpId, result: { readonly _tag: string } | { readonly _tag: 'refused'; readonly reason: 'unavailable' | 'readOnly' | 'invalid' | 'stale'; readonly message: string }) =>
   'reason' in result ? Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message })) : Effect.succeed({ opId })
@@ -443,9 +455,11 @@ export function agentHandlers(host: ChatHost) {
         'agent.settings.change': ({ opId, change }) =>
           changed(
             Effect.suspend(() => {
-              if (host.settings === undefined) return unavailable('Juno is not running.')
-              const result = host.settings.change(change)
-              return result._tag === 'done' ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message }))
+              const settings = host.settings
+              if (settings === undefined) return unavailable('Juno is not running.')
+              return Effect.promise(async () => settings.change(change)).pipe(
+                Effect.flatMap((result) => (result._tag === 'done' ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message })))),
+              )
             }),
           ),
         'agent.settings.credentials': notYet('Signing in to Codex'),
@@ -458,11 +472,11 @@ export function agentHandlers(host: ChatHost) {
                 case 'exportPhrase':
                   return turns.backup === undefined
                     ? unavailable('Backup is not available on this Mac.')
-                    : folderWork(() => turns.backup!.exportPhrase()).pipe(Effect.as({ opId }))
+                    : folderWork(() => turns.backup!.exportPhrase(), host.report).pipe(Effect.as({ opId }))
                 case 'move':
-                  return folderWork(() => turns.ownership.move()).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
+                  return folderWork(() => turns.ownership.move(), host.report).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
                 case 'restore':
-                  return folderWork(() => turns.ownership.restore(action.backupPath)).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
+                  return folderWork(() => turns.ownership.restore(action.backupPath), host.report).pipe(Effect.flatMap((result) => ownershipAnswer(opId, result)))
               }
             }),
           ),

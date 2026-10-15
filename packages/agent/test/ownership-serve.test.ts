@@ -1,6 +1,6 @@
 // Settings › Juno's Backup and This Mac rows, the chat's ownership banners and the Review page as the
 // renderer reads them (SPEC 13.7, 13.8, 13.10), on two Macs sharing a backup folder.
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -82,4 +82,27 @@ it('Restore from Settings opens in recovery: the banner, waiting sends and the R
   await pageWhere((p) => p.banner._tag === 'none' && of(p, 'juno').length === 1, 'the answer after Activate')
   await settings.where((p) => p.ownership._tag === 'active' && p.ownership.epoch === 2, 'this Mac owns Juno')
   await review.where((p) => p.page.backupAt === undefined && p.page.pending.length === 0, 'the review page empty')
+})
+
+it('A folder Juno cannot use says why, and the backup stays where it was', async () => {
+  const { client, follow } = await mac('Studio', fakeKeychain())
+  const settings = follow(client['agent.settings.page']())
+  const before = await settings.where((p) => p.ownership._tag === 'active', 'the page')
+  // A path under a file: the folder can never be made.
+  const file = join(tempDir(), 'notes.txt')
+  writeFileSync(file, 'not a folder')
+  expect(await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'backupFolder', path: join(file, 'Juno') } }))).toMatchObject({
+    _tag: 'Failure',
+    failure: { reason: 'invalid', message: "Juno can't write to that folder. Choose another one." },
+  })
+
+  // Another Mac's backup: writing would delete it.
+  const theirs = tempDir()
+  const other = await mac('Laptop', fakeKeychain())
+  await run(other.client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'backupFolder', path: theirs } }))
+  expect(await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'backupFolder', path: theirs } }))).toMatchObject({
+    _tag: 'Failure',
+    failure: { reason: 'invalid', message: 'That folder holds a Juno backup from another Mac. Restore from it, or choose another folder.' },
+  })
+  expect((await settings.where((p) => p.ownership._tag === 'active', 'the page')).backupFolder).toBe(before.backupFolder)
 })
