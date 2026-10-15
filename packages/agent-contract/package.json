@@ -17,7 +17,7 @@
     "@juno/agent-cards": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "5.0.4",
     "fast-check": "4.3.0"
   },
