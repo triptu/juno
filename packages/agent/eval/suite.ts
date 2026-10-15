@@ -10,7 +10,7 @@ import { grade, type CaseResult } from './grade'
 import type { Judge } from './judge'
 
 /** A model as pi-ai's catalogue describes it (only `src/providers` imports pi-ai). */
-export type CatalogueModel = Parameters<typeof createOpenRouter>[0]['models'][number]
+export type CatalogueModel = ReturnType<Parameters<typeof createOpenRouter>[0]['models']>[number]
 
 const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -28,7 +28,7 @@ export function openRouterBackend(chat: CatalogueModel, helper: CatalogueModel, 
   return {
     model: { provider: chat.provider, modelId: chat.id },
     helper: { provider: helper.provider, modelId: helper.id },
-    provider: (store) => createOpenRouter({ store, models, apiKey }),
+    provider: (store) => createOpenRouter({ store, models: () => models, apiKey }),
   }
 }
 
