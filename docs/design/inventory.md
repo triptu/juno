@@ -755,3 +755,13 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 - Main labels: "#eng · Main", "Maya Chen · Main"; tab shows "eng"; row shows "#eng" + Main tag; header sub "Messages posted outside threads".
 - "#" is never repeated next to a hash icon (pills, tabs, row line 3, table Where column).
 - Never emoji in chrome; reactions and user text are the user's own.
+
+### Integration attachments
+
+Message attachments use a thin token-tinted bar, linked title, mrkdwn body,
+two-column fields and a small muted footer with time. URL actions are quiet
+links; callback-only actions are plain text. Long bodies have Show more and
+Show less. Images reserve their aspect ratio within the existing thumbnail
+caps; missing dimensions reserve a 3:2 box. Integration event summaries use
+the attachment or header title for the topic fallback. Previews and search
+include structured content, under the existing preview privacy treatment.

@@ -8,6 +8,7 @@ import AllTopics from './AllTopics.fixtures'
 import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
+import AttachmentCard from './AttachmentCard.fixtures'
 import AttachmentChips from './AttachmentChips.fixtures'
 import AudienceWarning from './AudienceWarning.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
@@ -73,6 +74,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   AttachmentChips,
+  AttachmentCard,
   BackupSection,
   ChannelIconPicker,
   BudgetCard: budgetCard,
