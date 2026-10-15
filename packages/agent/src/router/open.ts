@@ -46,7 +46,7 @@ import { rememberTool } from '../memory-tools/remember'
 import { activePins, editPin, pinMessage, undoPin, type PinResult } from '../pins/pins'
 import { createRequestBuilder } from '../request/builder'
 import { instructions, JUNO_INSTRUCTIONS } from '../request/prompt'
-import { declaration } from '../request/tool'
+import { declaration, type JunoTool, type ToolRun } from '../request/tool'
 import { uuidv7 } from '../store/store'
 import type { Pins } from '@juno/agent-memory'
 import type { RunState, TurnEvent } from './events'
@@ -93,6 +93,8 @@ export interface TurnsOptions {
   readonly host?: HostReads
   /** The host's actions and other folders' executors (WP15). No Slack send without `actions.host`. */
   readonly actions?: ActionsOptions
+  /** Fixed tools supplied by a connection adapter; called before the journal resumes. */
+  readonly tools?: (context: { readonly store: Store; readonly actions: Actions; readonly current: () => Promise<ToolRun | undefined> }) => ReadonlyArray<JunoTool & { readonly taints?: boolean }>
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly now?: () => number
@@ -225,7 +227,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...extraTools]
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))
@@ -294,6 +296,7 @@ async function start(
   }
   const slackTools = options.host ? hostTools(options.host, handles) : []
   const actionHost = options.actions?.host
+  const extraTools = options.tools?.({ store, actions, current: () => router.toolRun() }) ?? []
   const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
