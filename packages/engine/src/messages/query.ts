@@ -22,7 +22,7 @@
  * name or photo changes no row.
  */
 import { Effect } from 'effect'
-import type { FileView, MessageView, Person, ReactionView, ThreadLink } from '@juno/contract'
+import { pendingRowId, type FileView, type MessageView, type Person, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
   hashId,
   messageMentionsMe,
@@ -42,7 +42,7 @@ import { emojiUnicode, messageBody, splitEmojiName, type MessageBody, type Messa
 import { StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -123,16 +123,28 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const olderCount = statements.length === 1 ? range.limit : Math.min(range.before, range.limit)
     const beforeWindow = older[olderCount]
     const shown = older.slice(0, olderCount).toReversed()
-    let rows: ReadonlyArray<WindowMessage>
+    let stored: ReadonlyArray<WindowMessage>
+    let atNewest = true
     if (statements.length === 1) {
-      rows = shown
+      stored = shown
     } else {
       const newer = yield* sql.unsafe<WindowMessage>(statements[1]!.sql, statements[1]!.params)
-      rows = [...shown, ...newer.slice(0, Math.max(0, range.limit - shown.length))]
+      const room = Math.max(0, range.limit - shown.length)
+      atNewest = newer.length <= room
+      stored = [...shown, ...newer.slice(0, room)]
     }
 
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const selfId = team[0]?.self_user_id ?? undefined
+
+    // Juno's own messages Slack does not hold yet come after the newest stored one (architecture 5.7).
+    const pending = new Map<string, PendingRow>()
+    if (atNewest) {
+      const statement = pendingStatement(target)
+      for (const row of yield* sql.unsafe<PendingRow>(statement.sql, statement.params)) pending.set(pendingRowId(row.client_msg_id), row)
+    }
+    const rows: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+
     if (cache.selfId !== selfId) {
       cache.selfId = selfId
       cache.rows = new Map()
@@ -142,7 +154,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // Reactions, in Slack's order.
     const reactions = new Map<string, Array<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>>()
     if (rows.length > 0) {
-      const statement = reactionsStatement(target.channel, rows.map((row) => row.ts))
+      const statement = reactionsStatement(target.channel, stored.map((row) => row.ts))
       for (const reaction of yield* sql.unsafe<{ ts: string; name: string; count: number; me: 0 | 1 }>(statement.sql, statement.params)) {
         let list = reactions.get(reaction.ts)
         if (list === undefined) reactions.set(reaction.ts, (list = []))
@@ -243,6 +255,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         title?.manual_title,
         title?.ai_title,
         conversation?.name,
+        pending.get(row.ts)?.state,
         ...own.flatMap((r) => [r.name, r.count, r.me]),
       ].join('\u0001')
       const held = cache.rows.get(row.ts)
@@ -251,7 +264,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         view = held.row
       } else {
         const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation)
-        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, thread, cache })
+        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, thread, cache, pending: pending.get(row.ts) })
       }
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
@@ -349,6 +362,7 @@ interface ShapeInput {
   readonly reactions: ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>
   readonly thread: ThreadLink | undefined
   readonly cache: MessageCache
+  readonly pending: PendingRow | undefined
 }
 
 function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): MessageView {
@@ -367,7 +381,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
   const fields: Omit<MessageView, 'rev'> = {
     id: row.ts,
     ts: row.ts,
-    at: tsToMillis(row.ts as Ts),
+    at: input.pending === undefined ? tsToMillis(row.ts as Ts) : Number(input.pending.created_at),
     kind,
     ...(row.user_id === null || kind === 'unloaded' ? {} : { senderId: row.user_id }),
     fromMe: input.selfId !== undefined && row.user_id === input.selfId,
@@ -380,9 +394,44 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     reactions: kind === 'message' ? reactions : [],
     files: kind === 'message' ? filesOf(row) : [],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
+    ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
+    ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
   }
   return { ...fields, rev: hashId(JSON.stringify(fields)) } as MessageView
 }
+
+// Pending messages
+
+interface PendingRow {
+  readonly client_msg_id: string
+  readonly channel: string
+  readonly thread_ts: string | null
+  readonly text: string
+  readonly blocks_json: string | null
+  readonly created_at: string
+  readonly state: 'queued' | 'sending' | 'unknown' | 'failed'
+}
+
+
+/** A pending message as the window's other rows are read, from the signed-in user, so it groups and parses like the message it becomes. */
+const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMessage => ({
+  channel: row.channel,
+  ts: pendingRowId(row.client_msg_id),
+  thread_ts: row.thread_ts,
+  user_id: selfId ?? null,
+  subtype: null,
+  text: row.text,
+  blocks_json: row.blocks_json,
+  files_json: null,
+  attachments_json: null,
+  edited_ts: null,
+  deleted: 0,
+  client_msg_id: row.client_msg_id,
+  reply_count: 0,
+  latest_reply: null,
+  version: 0,
+  last_event_ts: null,
+})
 
 // Files
 

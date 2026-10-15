@@ -4,7 +4,7 @@
  * `ThreadSummary`, modelled on the fake Slack seed. Everything is invented.
  * Times are relative to `NOW` so the fixtures hold still.
  */
-import type { BodyBlock, BodyInline, FileView, MessageView, Person, ReactionView, ThreadLink, ThreadSummary, TopicDetail } from '@juno/contract'
+import { pendingRowId, type BodyBlock, type BodyInline, type FileView, type MessageView, type PendingState, type Person, type ReactionView, type ThreadLink, type ThreadSummary, type TopicDetail } from '@juno/contract'
 import type { MessageListItem } from '../MessageList'
 import { channels, NOW, people } from './topics'
 
@@ -100,6 +100,8 @@ interface MessageInput {
   readonly groupStart?: boolean
   /** Keeps `ts` unique for two messages in the same minute. */
   readonly seq?: number
+  /** A message Juno is still sending, or failed to send. */
+  readonly pending?: PendingState
 }
 
 let counter = 0
@@ -109,7 +111,7 @@ export function message(input: MessageInput, previous?: MessageListItem): Messag
   counter += 1
   const at = NOW - input.ago * MINUTE
   const seq = input.seq ?? counter
-  const ts = `${Math.floor(at / 1000)}.${String(seq).padStart(6, '0')}`
+  const ts = input.pending === undefined ? `${Math.floor(at / 1000)}.${String(seq).padStart(6, '0')}` : pendingRowId(`fixture-${seq}`)
   const blocks = input.blocks ?? (input.text === undefined ? [] : [p(input.text)])
   const hasQuote = blocks.some((block) => block.kind === 'quote')
   const groupStart = input.groupStart ?? (previous === undefined || previous.message.senderId !== input.from?.id || input.root === true || hasQuote)
@@ -130,6 +132,7 @@ export function message(input: MessageInput, previous?: MessageListItem): Messag
     reactions: input.reactions ?? [],
     files: input.files ?? [],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
+    ...(input.pending === undefined ? {} : { clientMsgId: `fixture-${seq}`, pending: input.pending }),
   }
   return { message: view, sender: input.from }
 }
@@ -140,6 +143,15 @@ export function window(inputs: ReadonlyArray<MessageInput>): ReadonlyArray<Messa
   for (const input of inputs) items.push(message(input, items[items.length - 1]))
   return items
 }
+
+/** The end of a thread where the owner's last message is still sending, and one where it failed. */
+const sendInputs = (state: PendingState): ReadonlyArray<MessageInput> => [
+  { ago: 12, from: people.maya, text: 'Can someone own the rollback test before Thursday?' },
+  { ago: 3, from: me, text: 'I can take it.' },
+  { ago: 0, from: me, text: 'I will run it against the replica tonight and post the numbers here.', pending: state },
+]
+export const sending = window(sendInputs('sending'))
+export const failedSend = window(sendInputs('failed'))
 
 /** A person the store does not know: the row shows the raw id. */
 export const unknownUser: Person = { id: 'U0ZZ9XK2Q', name: 'U0ZZ9XK2Q', color: 'rose' }

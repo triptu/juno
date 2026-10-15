@@ -9,7 +9,8 @@
  * recovery, the guarded provider, pi, the router, the jobs and the
  * compactor (`router/open.ts`). Given `renderer`, it serves the
  * renderer's RPCs (`AgentRpcs`) on the ports that transport gives
- * (`serve/server.ts`). `stop` closes the renderer server, then the engine,
+ * (`serve/server.ts`), with Settings › Juno when `turns` brings a model
+ * picker (`openRouterTurns`). `stop` closes the renderer server, then the engine,
  * then the host client, so the owner lock is released last of the engine's
  * resources.
  */
@@ -20,11 +21,13 @@ import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
+import type { ModelPicker, OpenRouterKey } from './providers/openrouter'
 import type { Turns, TurnsOptions } from './router/open'
 import { open } from './router/service'
 import type { RendererTransport } from './serve/runner'
 import { rendererServer } from './serve/server'
 import { CHAT_MIGRATIONS } from './serve/schema'
+import { createJunoSettings } from './settings/settings'
 import type { UpdateNeeded } from './runtime/core'
 
 export interface AgentHandle {
@@ -41,10 +44,17 @@ export interface AgentHandle {
   readonly stop: () => Promise<void>
 }
 
-/** What the engine needs beside the agent directory, which comes from `config`, and the host reads, which come from the port. */
+/**
+ * What the engine needs beside the agent directory, which comes from
+ * `config`, and the host reads and sends, which come from the port. With a
+ * picker, the renderer gets Settings › Juno; with a key, the page shows its
+ * state.
+ */
 export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions'> & {
   /** Executors other folders own. The host's sends come from the port. */
   readonly actions?: Omit<NonNullable<TurnsOptions['actions']>, 'host'>
+  readonly picker?: ModelPicker
+  readonly key?: OpenRouterKey
 }
 
 export interface AgentOptions {
@@ -92,8 +102,25 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             Scope.provide(scope),
           )
         }
+        const picker = turns?.picker
+        const settings =
+          engine?._tag === 'running' && picker !== undefined
+            ? yield* Effect.acquireRelease(
+                Effect.sync(() =>
+                  createJunoSettings({
+                    turns: engine, picker, agentDir: config.agentDir,
+                    ...(turns?.key ? { key: turns.key } : {}),
+                    ...(turns?.onReport ? { onReport: turns.onReport } : {}),
+                  }),
+                ),
+                (opened) => Effect.sync(opened.close),
+              ).pipe(Scope.provide(scope))
+            : undefined
         if (renderer !== undefined) {
-          yield* Layer.buildWithScope(rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges }), scope)
+          yield* Layer.buildWithScope(
+            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(settings ? { settings } : {}) }),
+            scope,
+          )
         }
         return { hello, engine, bound }
       }).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))

@@ -32,6 +32,7 @@ import { AGENT_DATABASE_FILE, ROTATION_AGE_MS, type UpdateNeeded } from '../runt
 import { crashPoint } from '../runtime/crash'
 import { openJournalFile, type Extension, type Journal, type JournalSettings } from '../runtime/journal'
 import { acquireOwnerLock } from '../runtime/lock'
+import { SETTINGS_MIGRATIONS } from '../settings/schema'
 import { SPEND_MIGRATIONS } from '../spend'
 import { openDatabase, StoreTooNew, type Database } from '../store/database'
 import type { MigrationSet } from '../store/schema'
@@ -53,7 +54,7 @@ import { hostTools, type HostReads } from './host-tools'
 import { createRouter, type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
 import { find, type InboxState } from '../inbox/inbox'
-import { view, type MemoryView } from '../store/memory'
+import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
 import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
 import { mintGrant } from '../grants/grants'
@@ -80,10 +81,10 @@ export interface TurnsOptions {
    * starts. Only its models reach pi.
    */
   readonly provider: (store: Store) => ProviderGuardApi
-  /** The chat model. A change applies when the engine next opens. */
-  readonly model: ModelRef
-  /** The compaction model. No compaction runs without one. */
-  readonly compaction?: ModelRef
+  /** The chat model, or how to read it from the opened store (the owner's saved choice). `setModels` changes it. */
+  readonly model: ModelRef | ((store: Store) => ModelRef)
+  /** The compaction model. No compaction runs without one at open. */
+  readonly compaction?: ModelRef | ((store: Store) => ModelRef | undefined)
   /** The subagents' cheaper model. Default: the compaction model; no `delegate` tool without either. */
   readonly subagent?: ModelRef
   /** Slack reads through the AgentHost port. No Slack tools without it. */
@@ -111,6 +112,14 @@ export interface Turns {
   readonly retry: (input: { readonly opId: string; readonly interruptedOpId: string }) => Retry
   readonly mode: () => Mode
   readonly setMode: (next: Mode) => void
+  /** The models runs use now. */
+  readonly models: () => { readonly chat: ModelRef; readonly compaction: ModelRef | undefined }
+  /**
+   * A model change from Settings. The chat model applies from the next run
+   * (a run keeps its model); the compaction model from the next compaction
+   * job. A model the guard does not serve is ignored.
+   */
+  readonly setModels: (next: { readonly chat?: ModelRef; readonly compaction?: ModelRef }) => void
   /** The live run, or undefined. */
   readonly run: () => RunState | undefined
   /** An inbox op's state: the owner bubble's delivery line and a run's settled inputs. */
@@ -155,7 +164,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     try {
       db = openDatabase(
         join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, ACTIONS_MIGRATIONS, ...(options.migrations ?? [])],
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, ...(options.migrations ?? [])],
         now,
       )
     } catch (error) {
@@ -170,7 +179,11 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
       return updateNeeded(lock.release)
     }
     const guard = options.provider(store)
-    return await start(store, guard, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, () => {
+    const models = {
+      chat: typeof options.model === 'function' ? options.model(store) : options.model,
+      compaction: typeof options.compaction === 'function' ? options.compaction(store) : options.compaction,
+    }
+    return await start(store, guard, models, recovery.file, recovery._tag === 'resume' ? 'resumed' : 'rotated', options, () => {
       store.db.close()
       lock.release()
     })
@@ -190,9 +203,12 @@ function updateNeeded(release: () => void): UpdateNeeded {
   return { _tag: 'updateNeeded', close: async () => release() }
 }
 
+const sameRef = (a: ModelRef | undefined, b: ModelRef | undefined) => a?.provider === b?.provider && a?.modelId === b?.modelId
+
 async function start(
   store: Store,
   guard: ProviderGuardApi,
+  initial: { readonly chat: ModelRef; readonly compaction: ModelRef | undefined },
   file: { readonly start: (settings: JournalSettings) => Promise<Journal> },
   opened: 'resumed' | 'rotated',
   options: TurnsOptions,
@@ -210,9 +226,19 @@ async function start(
   const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools]
   const section = () => instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
   const builder = createRequestBuilder({ store, guard, systemAndTools: () => [`<juno>\n${section()}\n</juno>`, ...tools().map((t) => declaration(t.registration))] })
+  // The chat model pi runs with (`running`) and the one Settings chose (`wanted`). They meet between runs.
+  let wanted = initial.chat
+  let running = initial.chat
+  const applyModel = async () => {
+    if (sameRef(running, wanted)) return
+    const next = wanted
+    await journal!.setModel(next)
+    running = next
+  }
   const router = createRouter({
-    store, session, builder, model: options.model, tools,
+    store, session, builder, model: () => running, tools,
     rotate: () => rotateNow(),
+    beforeRun: applyModel,
     rotationDue: () => {
       const row = store.db.prepare('SELECT created_at AS at FROM incarnations WHERE id = ?').get(journal!.incarnation) as { at: number }
       return store.now() - row.at >= ROTATION_AGE_MS
@@ -221,7 +247,7 @@ async function start(
     cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
-  const subagentModel = options.subagent ?? options.compaction
+  const subagentModel = options.subagent ?? initial.compaction
   const jobs = createJobs({
     store,
     drivers: subagentModel ? [subagentDriver({ store, guard, builder, model: subagentModel })] : [],
@@ -276,7 +302,7 @@ async function start(
     ],
   } as Extension
   const settings: JournalSettings = {
-    models: guard.models, model: options.model, extensions: [extension],
+    models: guard.models, model: initial.chat, extensions: [extension],
     ...(options.onReport ? { onReport: options.onReport } : {}),
   }
 
@@ -299,24 +325,39 @@ async function start(
     deleteRetiredJournals(options.agentDir, incarnation)
     const next = await openJournalFile(options.agentDir, incarnation)
     if (next._tag !== 'opened') throw new Error(`a new journal could not be opened (${next._tag})`)
-    attach(await next.file.start(settings))
+    attach(await next.file.start({ ...settings, model: running }))
     journal!.resume()
   }
 
   attach(await file.start(settings))
-  if (options.compaction) {
-    const model = guard.models.getModel(options.compaction.provider, options.compaction.modelId)
-    if (model !== undefined) {
-      compactor = createCompactor({
-        store, spend: guard.spend, cutoff: () => router.cutoff(),
-        // Declared, never called: the same tool block as a turn, as plain data (the guard copies the context).
-        model: createCompactionProvider({
-          store, guard, model, system: JUNO_INSTRUCTIONS, sessionId: 'juno-compaction',
-          tools: tools().map(({ registration: { name, description, parameters } }) => ({ name, description, parameters })),
-        }),
-        ...(options.onReport ? { onReport: options.onReport } : {}),
-      })
-    }
+  // pi keeps the model of its last configure: a run it resumes uses that one.
+  running = (await journal!.model()) ?? running
+
+  // The compaction model: one provider per model, built when first used.
+  let compaction = initial.compaction
+  const compactionProviders = new Map<string, CompactionModel>()
+  const compactionModel = (ref: ModelRef): CompactionModel | undefined => {
+    const key = `${ref.provider}/${ref.modelId}`
+    const known = compactionProviders.get(key)
+    if (known !== undefined) return known
+    const model = guard.models.getModel(ref.provider, ref.modelId)
+    if (model === undefined) return undefined
+    const built = createCompactionProvider({
+      store, guard, model, system: JUNO_INSTRUCTIONS, sessionId: 'juno-compaction',
+      // Declared, never called: the same tool block as a turn, as plain data (the guard copies the context).
+      tools: tools().map(({ registration: { name, description, parameters } }) => ({ name, description, parameters })),
+    })
+    compactionProviders.set(key, built)
+    return built
+  }
+  const firstCompaction = compaction === undefined ? undefined : compactionModel(compaction)
+  if (firstCompaction !== undefined) {
+    const current = () => (compaction === undefined ? undefined : compactionModel(compaction)) ?? firstCompaction
+    compactor = createCompactor({
+      store, spend: guard.spend, cutoff: () => router.cutoff(),
+      model: { get id() { return current().id }, summarize: (task) => current().summarize(task) },
+      ...(options.onReport ? { onReport: options.onReport } : {}),
+    })
   }
   router.restore()
   journal!.resume()
@@ -341,6 +382,18 @@ async function start(
       router.setMode(next)
       actions.afterMode(next)
       compactor?.poke()
+    },
+    models: () => ({ chat: wanted, compaction }),
+    setModels: (next) => {
+      if (next.chat !== undefined && guard.models.getModel(next.chat.provider, next.chat.modelId) !== undefined) wanted = next.chat
+      if (next.compaction !== undefined) {
+        try {
+          if (compactionModel(next.compaction) !== undefined) compaction = next.compaction
+        } catch (error) {
+          // A window below the compaction minimum: keep the model in use.
+          options.onReport?.(error)
+        }
+      }
     },
     run: router.state,
     op: (opId) => {

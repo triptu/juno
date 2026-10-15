@@ -235,6 +235,25 @@ test('live update: a reply from another client to pixels', async ({ juno, fake }
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
 
+test('send: Enter to the pending row painted', async ({ juno }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const measured: number[] = []
+  for (let i = 0; i < 9; i++) {
+    const text = `Perf send ${i} ${Date.now()}`
+    await juno.topic.send(text)
+    await juno.topic.expectSent(text)
+    measured.push((await juno.measure('juno.send'))!)
+    await juno.win.waitForTimeout(300)
+  }
+  // A local transaction, the delta and the paint; the Slack call is not part of it.
+  const send = stats('send, Enter to the pending row painted (juno.send)', measured)
+  within('send, p95', send.p95, 50)
+})
+
 // The large-workspace scenarios share one synced user-data directory: the
 // fake's 1,200-topic seed fills the 300-row window, and syncing it once
 // keeps the run short. Every scenario launches the app warm on it.
@@ -612,6 +631,32 @@ test.describe.serial('topic view', () => {
         }
       })
       within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
+    } finally {
+      await running.close()
+    }
+  })
+
+  // Peek reads the query the row's hover warmed, so it is a prefetched open: one frame.
+  test('peek: the peek key over a hovered row to the peeked messages painted', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      const samples: number[] = []
+      await traced(running.win, 'peek-open', async () => {
+        for (let i = 0; i < 10; i++) {
+          for (const title of [THREAD, MAIN]) {
+            await juno.sidebar.row(title).hover()
+            await running.win.waitForTimeout(300)
+            const before = (await juno.measures('juno.peek-open')).length
+            await running.win.keyboard.down('Alt')
+            samples.push(await nextMeasure(juno, 'juno.peek-open', before))
+            await juno.peek.expectShowing(title)
+            await juno.peek.release()
+            await juno.peek.expectClosed()
+          }
+        }
+      })
+      within('peek open, p95', stats('peek open, key down to the peeked rows painted (juno.peek-open)', samples).p95, oneFrameBudget(await refreshInterval(running.win)))
     } finally {
       await running.close()
     }

@@ -12,6 +12,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | --- | --- |
 | A chat run, the guard, spend, a provider failure line | `fakeProvider()` with a script |
 | Compaction jobs and node text | `fakeProvider()`; requests to Haiku or Flash go to the compactor |
+| The app's agent end to end: the model picker, the OpenRouter key | `startFakeOpenRouter()` over HTTP |
 | The Codex harness (WP20) | `startFakeCodex()` as `codexPathOverride` |
 | MCP manager logic without HTTP | any fake's `connectInMemory()` |
 | Connect, sign-in, token expiry, `list_changed`, schema hashes | `startFakeNotion()`, `startFakeLittlebird()`, `startFakeT3()` over HTTP |
@@ -30,6 +31,15 @@ A provider registered as `openrouter` with today's resolved slugs, their real co
   - `serverError(500 | 502 | 503)`, `rejectedKey()` (401), `rateLimited()` (429), `httpError(status, message)`: one `error` event before any `start`, with `errorMessage` `"<status>: <body JSON>"` as pi-ai formats OpenAI-compatible errors.
 - Requests to a model in `compactionModels` (default Haiku 5.5 and Gemini 3.8 Flash) never use the script. The compactor answers `Summary of messages a–b: <input>` cut to 512 bytes, from the `<input>` block of `@juno/agent-memory`'s compaction task. `compactor: { oversizedAnswers: n }` makes the first `n` answers too long.
 - `requests` lists every request (model, context, options). `pending()` counts unused steps. A chat request with no step left fails with "No more faux responses queued".
+
+## OpenRouter over HTTP: `startFakeOpenRouter(options?)`
+
+For the e2e tests, where the agent runs in its own process with the real OpenRouter provider. Import it from `@juno/agent-testing/openrouter`, which loads nothing else. Give the agent `origin` in place of `https://openrouter.ai` (main does so from `JUNO_FAKE_OPENROUTER_URL` under `JUNO_E2E`).
+
+- `GET /api/v1/models` answers `openRouterCatalogue()`: `fakeCatalogue` in OpenRouter's shape, with names such as "Anthropic: Claude Opus 5.5".
+- `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble.
+- `key`: a request carrying another key gets 401, as a rejected key does.
+- `requests` records each chat request's path, model and key; `catalogueReads()` counts list reads.
 
 ## Codex: `startFakeCodex(options?)`
 

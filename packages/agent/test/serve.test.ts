@@ -1,103 +1,12 @@
 // The chat as the renderer sees it (plan v3 §12, §13): the agent's renderer RPCs over a port, on the
-// real turn engine with the scripted fake provider, read through an RPC client of `AgentRpcs` on a
-// Node MessageChannel, the same structured-clone port main brokers.
-import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { afterEach, expect, it } from 'vitest'
-import { Effect, Exit, Layer, Scope, Stream, SubscriptionRef } from 'effect'
-import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
+// real turn engine with the scripted fake provider (`serve-harness.ts`).
+import { expect, it } from 'vitest'
+import { Effect, Stream } from 'effect'
 import { fakeActionHost, rateLimited, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Digest, Revision } from '@juno/agent-cards'
-import { AgentRpcs, type CardId, type ChatItem, type ChatPage, type HostPresence, type OpId } from '@juno/agent-contract'
-import { CHAT_MIGRATIONS, hostProtocol, rendererPorts, type ActionsOptions, type HostPort } from '../src/index'
-import { rendererServer } from '../src/serve/server'
-import { deferred, say, turnsHarness } from './turns-harness'
-
-type Client = RpcClient.RpcClient<RpcGroup.Rpcs<typeof AgentRpcs>, RpcClientError.RpcClientError>
-type Presence = typeof HostPresence.Type
-
-const cleanups: Array<() => Promise<void>> = []
-afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).toReversed()) await cleanup()
-})
-
-const nodePort = (port: MessagePort): HostPort => ({
-  postMessage: (message) => port.postMessage(message),
-  onMessage: (f) => {
-    port.on('message', f)
-  },
-  onClose: (f) => {
-    port.on('close', f)
-  },
-  close: () => port.close(),
-})
-
-const ONLINE: Presence = { online: true, aiEnabled: true, quietHours: false, ownerActive: true, accountId: null, thisTopic: null }
-
-/** The engine, served to one renderer client. */
-async function chat(options: { readonly actions?: ActionsOptions } = {}) {
-  const h = await turnsHarness({ compaction: false, migrations: [CHAT_MIGRATIONS], ...options })
-  cleanups.push(h.close)
-  const presence = await Effect.runPromise(SubscriptionRef.make<Presence | undefined>(ONLINE))
-  let current: Presence | undefined = ONLINE
-  const setPresence = (next: Presence) => {
-    current = next
-    return Effect.runPromise(SubscriptionRef.set(presence, next))
-  }
-  const transport = rendererPorts()
-  const scope = Effect.runSync(Scope.make())
-  cleanups.push(() => Effect.runPromise(Scope.close(scope, Exit.void)))
-  await Effect.runPromise(
-    Layer.buildWithScope(rendererServer(transport, { turns: h.turns, presence: () => current, presenceChanges: SubscriptionRef.changes(presence) }), scope),
-  )
-  const client = (await Effect.runPromise(
-    Effect.gen(function* () {
-      const context = yield* Layer.buildWithScope(
-        hostProtocol({
-          acquire: async () => {
-            const { port1, port2 } = new MessageChannel()
-            transport.add(nodePort(port2))
-            return nodePort(port1)
-          },
-        }),
-        scope,
-      )
-      return yield* RpcClient.make(AgentRpcs).pipe(Effect.provide(context), Scope.provide(scope))
-    }),
-  )) as unknown as Client
-
-  // The latest page, followed for the whole test.
-  let page: ChatPage | undefined
-  const waiters = new Set<() => void>()
-  Effect.runFork(
-    client['agent.chat.page']({ window: { _tag: 'latest', limit: 50 } }).pipe(
-      Stream.runForEach((snapshot) =>
-        Effect.sync(() => {
-          page = snapshot.page
-          for (const wake of waiters) wake()
-        }),
-      ),
-      Effect.ignore,
-      Scope.provide(scope),
-    ),
-  )
-  /** The first page that passes `test`. */
-  const pageWhere = (test: (page: ChatPage) => boolean, what: string) =>
-    new Promise<ChatPage>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`no page with ${what}; last: ${JSON.stringify(page?.items)}`)), 15_000)
-      const check = () => {
-        if (page === undefined || !test(page)) return
-        clearTimeout(timer)
-        waiters.delete(check)
-        resolve(page)
-      }
-      waiters.add(check)
-      check()
-    })
-
-  return { h, client, run, pageWhere, setPresence }
-}
-
-const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(Effect.result(effect))
+import type { CardId, ChatItem, ChatPage, OpId } from '@juno/agent-contract'
+import { ONLINE, run, served as chat } from './serve-harness'
+import { deferred, say } from './turns-harness'
 
 const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
 

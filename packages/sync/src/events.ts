@@ -232,6 +232,15 @@ export const applySent = (ctx: SyncContext, sent: { readonly opened?: Channel | 
     )
   })
 
+/** A DM Juno opened for a send (`conversations.open`), stored as the socket's `im_created` would store it. */
+export const applyOpened = (channel: Channel): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  transaction(
+    Effect.gen(function* () {
+      yield* upsertConversations([toConversationRow(channel)])
+      yield* patchConversation(channel.id, { is_member: 1 })
+    }),
+  )
+
 const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {
   if (isMessagePosted(frame)) {
     const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
