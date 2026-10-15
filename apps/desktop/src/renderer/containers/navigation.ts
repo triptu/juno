@@ -307,9 +307,22 @@ export function openNewChat(): void {
   const blank = registry.get(tabsAtom).tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
   if (blank !== undefined) {
     switchToTab(blank.id)
+    // Already on screen, its composer may have lost focus: ask for it again.
+    afterPaint(() => newChatFocus.forEach((focus) => focus(blank.id)))
     return
   }
   show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
+}
+
+/** New chat tabs listening for "focus your composer", by tab id. */
+const newChatFocus = new Set<(tabId: string) => void>()
+
+/** A New chat tab's composer takes focus when ⌘N, ⌘T or "+" lands on that tab. Returns the unsubscribe. */
+export function onNewChatFocus(focus: (tabId: string) => void): () => void {
+  newChatFocus.add(focus)
+  return () => {
+    newChatFocus.delete(focus)
+  }
 }
 
 /** ⌘T and the strip's "+": a new tab with what Settings › General chooses, a New chat (the default) or Home. */
