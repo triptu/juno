@@ -55,6 +55,8 @@ import { TURNS_MIGRATIONS } from './schema'
 import { find, type InboxState } from '../inbox/inbox'
 import { view, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
+import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
+import { mintGrant } from '../grants/grants'
 
 /** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
 export interface ArchiveMessage {
@@ -86,6 +88,8 @@ export interface TurnsOptions {
   readonly subagent?: ModelRef
   /** Slack reads through the AgentHost port. No Slack tools without it. */
   readonly host?: HostReads
+  /** The host's actions and other folders' executors (WP15). No Slack send without `actions.host`. */
+  readonly actions?: ActionsOptions
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   readonly now?: () => number
@@ -126,6 +130,8 @@ export interface Turns {
     readonly edit: (expected: { readonly id: string; readonly version: number }, text: string) => PinResult
     readonly undo: (expected: { readonly id: string; readonly version: number }) => PinResult
   }
+  /** Cards, clicks and dispatch (WP15). */
+  readonly actions: Actions
   readonly jobs: {
     readonly list: () => ReadonlyArray<Job>
     readonly active: () => ReadonlyArray<Job>
@@ -147,7 +153,11 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   let db: Database | undefined
   try {
     try {
-      db = openDatabase(join(options.agentDir, AGENT_DATABASE_FILE), [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, ...(options.migrations ?? [])], now)
+      db = openDatabase(
+        join(options.agentDir, AGENT_DATABASE_FILE),
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, ACTIONS_MIGRATIONS, ...(options.migrations ?? [])],
+        now,
+      )
     } catch (error) {
       if (error instanceof StoreTooNew) return updateNeeded(lock.release)
       throw error
@@ -173,6 +183,9 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
 
 const noop = () => {}
 
+/** The Because line of a card Juno proposes after reading untrusted content (SPEC 13.3). */
+const UNTRUSTED_BECAUSE = 'Juno read Slack or a report in this reply'
+
 function updateNeeded(release: () => void): UpdateNeeded {
   return { _tag: 'updateNeeded', close: async () => release() }
 }
@@ -194,7 +207,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools]
   const section = () => instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
   const builder = createRequestBuilder({ store, guard, systemAndTools: () => [`<juno>\n${section()}\n</juno>`, ...tools().map((t) => declaration(t.registration))] })
   const router = createRouter({
@@ -205,6 +218,7 @@ async function start(
       return store.now() - row.at >= ROTATION_AGE_MS
     },
     onRunEnded: () => compactor?.poke(),
+    cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const subagentModel = options.subagent ?? options.compaction
@@ -221,8 +235,36 @@ async function start(
       remembered: (runId, pin) => router.emit({ _tag: 'remembered', runId, pinId: pin.id, version: pin.version, text: pin.text }),
     }),
   ]
-  const jobTools = subagentModel ? [delegateTool({ jobs, current: () => router.toolRun(), place: subagentModel.modelId })] : []
+  const position = async (): Promise<JournalPosition> => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() })
+  const actions = createActions({
+    ...options.actions,
+    store, position, jobs, spend: guard.spend, place: subagentModel?.modelId ?? '',
+    accept: (input) => router.message(input),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  const jobTools = subagentModel
+    ? [
+        delegateTool({
+          jobs, current: () => router.toolRun(), place: subagentModel.modelId,
+          actions: {
+            propose: (run, callId, task) =>
+              actions.propose({ runId: run.runId, callId, payload: proposedTask(store, { ...task, place: subagentModel.modelId, because: UNTRUSTED_BECAUSE }) }),
+            granted: (job, run) => {
+              mintGrant(store, { opClass: 'job', target: job.id, authority: { _tag: 'cleanRun', run, sourceInRun: true }, sourceOp: run.opId })
+            },
+          },
+        }),
+      ]
+    : []
   const slackTools = options.host ? hostTools(options.host) : []
+  const actionHost = options.actions?.host
+  const actionTools = actionHost ? [sendMessageTool({ store, current: () => router.toolRun(), propose: actions.propose, host: actionHost })] : []
+  // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
+  router.subscribe((event) => {
+    if (event._tag !== 'ended' || event.ending._tag !== 'blocked' || event.ending.reason !== 'budget') return
+    const today = guard.spend.snapshot()
+    actions.propose({ runId: event.runId, callId: `budget:${today.day}:${today.raises}`, payload: budgetCard(store, guard.spend) })
+  })
 
   const extension = {
     name: 'juno',
@@ -280,6 +322,7 @@ async function start(
   journal!.resume()
   jobs.resume()
   router.start()
+  actions.start()
   compactor?.poke()
 
   let closed: Promise<void> | undefined
@@ -289,12 +332,14 @@ async function start(
     guard,
     opened,
     incarnation: () => currentIncarnation(store)!,
-    position: async () => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }),
+    position,
     accept: router.accept,
     retry: router.retry,
     mode: router.mode,
     setMode: (next) => {
+      actions.beforeMode(next)
       router.setMode(next)
+      actions.afterMode(next)
       compactor?.poke()
     },
     run: router.state,
@@ -316,13 +361,23 @@ async function start(
       edit: (expected, text) => editPin(store, expected, text),
       undo: (expected) => undoPin(store, expected),
     },
-    jobs: { list: jobs.list, active: jobs.active, stop: jobs.stop, idle: jobs.idle },
+    actions,
+    jobs: {
+      list: jobs.list,
+      active: jobs.active,
+      stop: (jobId) => {
+        actions.jobStopped(jobId)
+        return jobs.stop(jobId)
+      },
+      idle: jobs.idle,
+    },
     compaction: {
       state: () => compactor?.state() ?? 'idle',
       idle: () => compactor?.idle() ?? Promise.resolve(),
     },
     close: () =>
       (closed ??= (async () => {
+        await actions.close()
         await jobs.close()
         await compactor?.close()
         const stopped = router.close()

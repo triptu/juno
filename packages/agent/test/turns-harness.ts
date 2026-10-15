@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
 import type { BubbleId, ReplyTarget } from '@juno/agent-contract'
-import { createProviderGuard, openTurns, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
+import { createProviderGuard, openTurns, type ActionsOptions, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 export const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -24,10 +24,14 @@ export interface HarnessOptions {
   /** Wraps the fake's models, for example to hold compaction requests. */
   readonly transport?: (fake: Fake) => Fake['models']
   readonly migrations?: ReadonlyArray<MigrationSet>
+  /** The host's actions and extra executors. */
+  readonly actions?: ActionsOptions
+  /** Open on an existing agent directory, as a restart does. */
+  readonly dir?: string
 }
 
 export async function turnsHarness(options: HarnessOptions = {}) {
-  const dir = await mkdtemp(join(tmpdir(), 'juno-turns-'))
+  const dir = options.dir ?? (await mkdtemp(join(tmpdir(), 'juno-turns-')))
   const fake = fakeProvider(options.fake)
   const reports: unknown[] = []
   const opened = await openTurns({
@@ -38,6 +42,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     ...(options.subagent ? { subagent: options.subagent } : {}),
     ...(options.host ? { host: options.host } : {}),
     ...(options.migrations ? { migrations: options.migrations } : {}),
+    ...(options.actions ? { actions: options.actions } : {}),
     onReport: (error) => reports.push(error),
   })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
@@ -81,6 +86,8 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     /** The events of one run, by tag. */
     tags: (runId: string) => events.filter((e) => 'runId' in e && e.runId === runId).map((e) => e._tag),
     chatRequests: () => fake.requests.filter((r) => r.model !== HAIKU.modelId),
+    /** Closes the engine and keeps its directory, for a restart. */
+    stop: () => turns.close(),
     close: async () => {
       await turns.close()
       await rm(dir, { recursive: true, force: true })

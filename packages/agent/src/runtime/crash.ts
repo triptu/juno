@@ -30,6 +30,10 @@ export const CRASH_POINTS = {
     spec: 'agent-recovery.qnt', after: 'submit', before: 'submitted', scenarios: ['bridgeReplay', 'journalAheadStep'],
     expect: '§3: the journal is ahead of the inbox and the archive; recovery resumes and projection catches up.',
   },
+  'approval.committed': {
+    spec: 'agent-actions.qnt', after: 'click', before: 'authorize', scenarios: ['approvedEventuallyAttempted'],
+    expect: '§6.3: the click is durable and nothing is authorized; the restarted agent authorizes it once and dispatches it.',
+  },
   'authorization.consumed': {
     spec: 'agent-actions.qnt', after: 'authorize', before: 'send', scenarios: ['startupAttempt', 'authorityCrash (agent-recovery.qnt)'],
     expect: '§6.5: the consumed authorization has no receipt, so it is unknown before resume() and is never dispatched again.',

@@ -17,6 +17,7 @@ pi packages and the Codex SDK may be imported anywhere in this package (`check-d
 | Connect, sign-in, token expiry, `list_changed`, schema hashes | `startFakeNotion()`, `startFakeLittlebird()`, `startFakeT3()` over HTTP |
 | Juno's own loopback MCP server's client, or a one-off server | `startFakeMcpServer()` |
 | Taint, the secret filter, Slack reconcile | `hostileMessages`, `forgedSendReceipt()` |
+| Cards that send or resolve through the host (WP15) | `fakeActionHost()` |
 | Recovery after a kill or power loss (WP8, WP15, WP21, WP22) | `crashAt()`, `snapshotFiles()` |
 
 ## Model: `fakeProvider(options?)`
@@ -54,6 +55,10 @@ OAuth servers do discovery, dynamic registration, the authorization code grant w
 
 `hostileMessages` is a list of `{ name, why, message }`, each message a `HostMessage` decoded through the AgentHost contract. They cover injections, fake system tags, fake approvals, impersonation of Juno, a schedule request, a secret in a brief (`FAKE_SECRET`, shaped like an OpenRouter key), a misleading link, hidden control characters, a lone surrogate, content shaped like a tool call, a message over 30,000 characters and a hostile thread reply. `hostile(name)` gets one, `hostilePage()` returns all as one history page, `forgedSendReceipt(actionId)` is someone else's message with Juno's `client_msg_id`, and `hostilePerson` copies Juno's name. All content is invented.
 
+## Host actions: `fakeActionHost(options?)`
+
+The host's action RPCs as the agent's `ActionHost` takes them (`openTurns({ actions: { host } })`), with Slack behind them scripted. It keeps the host's single-attempt rules: a send is recorded by its authorization before Slack sees it, a repeat is answered from the record, and a refusal before recording (writes off) is an `AgentHostError`. `next(...outcomes)` scripts the next sends: `done`, `failed` (Slack refuses), `unknown` (Slack took it, the answer was lost), `lostBefore` (lost, and Slack never got it), `refused` and `dropped` (the RPC fails after Slack took it). `topic(id)` answers any `m:<channel>` or `t:<channel>:<ts>` with an invented place. `calls`, `messages()` and `resolved()` show what happened; `plant(message)` adds someone else's message; `onSend(listener)` runs after each send Slack saw; `signOut()` and `signIn()`. With `file`, the record and Slack persist across agent processes, for the crash tests.
+
 ## Crash harness
 
 `CRASH_POINTS` names each point after the two spec transitions it sits between (the `label` the Quint state carries), with the spec scenarios to replay and what recovery must do:
@@ -63,6 +68,7 @@ OAuth servers do discovery, dynamic registration, the authorization code grant w
 | `inbox.committed` | recovery | `inbox` | `ack` | `inboxPowerLoss` |
 | `bridge.reset` | recovery | `reset` | `submit` | `bridgeReplay` |
 | `bridge.submitted` | recovery | `submit` | `submitted` | `bridgeReplay`, `journalAheadStep` |
+| `approval.committed` | actions | `click` | `authorize` | `approvedEventuallyAttempted` |
 | `authorization.consumed` | actions | `authorize` | `send` | `startupAttempt`, recovery `authorityCrash` |
 | `attempt.beforeReceipt` | actions | `accept` | `receipt` | `negativeLookup`, `unknownRetry` |
 | `rotation.drained` | recovery | `project` | `rotate` | `rotationIdentity` |

@@ -21,3 +21,4 @@ export {
 export { CRASH_ENV, CRASH_POINTS, crashPoint, type CrashPoint, type CrashPointSpec } from './crash/points'
 export { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles, type AgentRun, type FileSnapshot, type RunOptions } from './crash/harness'
 export { testTool, type TestToolOptions } from './crash/tool'
+export { TEST_ACCOUNT, TEST_CHANNEL, fakeActionHost, type FakeActionHost, type FakeActionHostOptions, type SendOutcome } from './host/actions'
