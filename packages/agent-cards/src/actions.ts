@@ -2,6 +2,13 @@ import { Schema } from 'effect'
 import { ActionId, AttemptId, ChildAction, DestinationId, Digest, Revision, actionDigest } from './identity'
 import type { CardPayload } from './payload'
 
+/**
+ * The tool a Slack send carries, as the AgentHost serves it (`host.outbox.send`): `args` is
+ * `{ channelId, text, threadTs? }` and `destination_ids` is `[channelId]`. The action id travels
+ * beside the payload and becomes the message's `client_msg_id`.
+ */
+export const SLACK_SEND_TOOL = 'slack_send'
+
 /** Caller-minted UUIDv7 ids survive expansion, restart and retry. Never mint on expansion. */
 export function expandChildActions(payload: CardPayload): ReadonlyArray<ChildAction> {
   if (payload._tag === 'sendMessage') return payload.messages.map((message) => ({
@@ -14,13 +21,12 @@ export function expandChildActions(payload: CardPayload): ReadonlyArray<ChildAct
       connection_id: message.connectionId,
       account_id: message.accountId,
       destination_ids: [DestinationId.make(message.target.channelId)],
-      tool: 'slack.send',
+      tool: SLACK_SEND_TOOL,
       schema_hash: message.schemaHash,
       args: {
-        channel_id: message.target.channelId,
+        channelId: message.target.channelId,
         text: message.text,
-        client_msg_id: message.actionId,
-        ...(message.threadTs === undefined ? {} : { thread_ts: message.threadTs }),
+        ...(message.threadTs === undefined ? {} : { threadTs: message.threadTs }),
       },
       preconditions: message.preconditions,
       ops: [],

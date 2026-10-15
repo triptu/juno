@@ -19,7 +19,8 @@ describe('child actions and card status', () => {
       const evidence = children.map((child, i) => evidenceFor(child, rows[i]?.[1] ?? 'pending'))
       children.forEach((child, i) => {
         expect(child.id).toBe(`action-${i}`)
-        expect(child.payload.args).toEqual({ channel_id: 'C_TEST', text: rows[i]?.[0], client_msg_id: child.id })
+        expect(child.payload.args).toEqual({ channelId: 'C_TEST', text: rows[i]?.[0] })
+        expect(child.payload.tool).toBe('slack_send')
         expect(child.payload.destination_ids).toEqual(['C_TEST'])
         expect(child.payload.connection_id).toBe(message.connectionId)
         expect(child.payload.account_id).toBe(message.accountId)

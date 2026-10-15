@@ -50,7 +50,7 @@ import { mode, setMode, type Mode } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
 import { THUMBS_UP, type ReplyTarget } from '@juno/agent-contract'
 import type { Origin, RunState, TurnEvent } from './events'
-import { archivedBubble, modelText, ownerOpOf, readsTopic, runText } from './input'
+import { archivedBubble, modelText, ownerOpOf, readsTopic, runText, type CardText } from './input'
 import { parseOutput } from './output'
 import { resolveSpans, sourceTable } from './sources'
 
@@ -73,6 +73,8 @@ export interface RouterOptions {
   /** Called with no run live, before the next one begins: a model change applies here. */
   readonly beforeRun?: () => Promise<void>
   readonly onRunEnded?: () => void
+  /** Card outcomes the model has not read, and a reply's quote of a card (WP15). */
+  readonly cards?: CardText
   readonly onReport?: (error: unknown) => void
 }
 
@@ -270,7 +272,7 @@ export function createRouter(options: RouterOptions) {
     const journal = session.journal()
     const input = find(store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false, text: inputText(input) }))
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false, text: () => inputText(input) }))
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
       const pending = [...run.inputs].filter(([opId]) => !results.has(opId))
@@ -291,7 +293,7 @@ export function createRouter(options: RouterOptions) {
 
   /** A bubble's text: from the live run, or from the archive. */
   const bubbleText = (id: string) => current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(store, id)
-  const inputText = (op: InboxOp) => modelText(store, op, bubbleText)
+  const inputText = (op: InboxOp) => modelText(store, op, bubbleText, options.cards)
 
   const recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
     const added = transaction(store.db, () =>
@@ -364,7 +366,7 @@ export function createRouter(options: RouterOptions) {
         transaction(store.db, () => {
           store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })
-        run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true, text: inputText(op) }))
+        run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true, text: () => inputText(op) }))
         emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
     })()
@@ -521,7 +523,7 @@ export function createRouter(options: RouterOptions) {
       const journal = session.journal()
       const position = { incarnation: journal.incarnation, seq: await journal.lastCommitted() }
       await session.catchUp()
-      return { runId: run.runId, opId: run.opId, h: run.h, cutoff: archiveLength(), clean: run.clean, position }
+      return { runId: run.runId, opId: run.opId, h: run.h, origin: run.origin, cutoff: archiveLength(), clean: run.clean, position }
     },
     emit,
     subscribe: (listener: (event: TurnEvent) => void) => {

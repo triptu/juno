@@ -2,7 +2,7 @@
 // on the real turn engine with the scripted fake provider and the fake OpenRouter catalogue.
 import { expect, it } from 'vitest'
 import { Effect, Stream } from 'effect'
-import { rejectedKey, reply } from '@juno/agent-testing'
+import { fakeActionHost, rejectedKey, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Revision } from '@juno/agent-cards'
 import type { ChatItem, ChatPage, JunoSettingsPage, OpId, PinId, ScheduleId } from '@juno/agent-contract'
 import { openRouterTurns } from '../src/index'
@@ -204,8 +204,44 @@ it('Scheduled, Connections and Review are empty until their records exist, and t
   expect(await first(client['agent.review.page']())).toEqual({ page: { pending: [] }, cards: [] })
   const pause = await run(client['agent.scheduled.action']({ opId: 'op-1' as OpId, id: 's1' as ScheduleId, revision: Revision.make(1), action: 'pause' }))
   expect(pause).toMatchObject({ _tag: 'Failure', failure: { reason: 'unavailable' } })
-  const rules = await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'rules', rules: [] } }))
-  expect(rules).toMatchObject({ _tag: 'Failure', failure: { reason: 'unavailable' } })
   const removed = await run(client['agent.remembers.remove']({ opId: 'op-3' as OpId, id: 'nope' as PinId, revision: Revision.make(1) }))
   expect(removed).toMatchObject({ _tag: 'Failure', failure: { reason: 'stale' } })
+})
+
+it('Rules: the owner sets them in Settings, the page lists them, and the next request carries them', async () => {
+  const { h, client, follow } = await served()
+  const settings = follow(client['agent.settings.page']())
+  const rules = [{ id: 'r1', text: 'Ask before writing to #general.' }, { id: 'r2', text: 'Never message Sam on weekends.' }] as never as ReadonlyArray<{ id: never; text: string }>
+  expect(await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'rules', rules } }))).toMatchObject({ _tag: 'Success' })
+  await settings.where((p) => p.rules.length === 2, 'two rules')
+  expect((await settings.where((p) => p.rules.length === 2, 'two rules')).rules).toEqual(rules)
+  const multiLine = await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'rules', rules: [{ id: 'r3' as never, text: 'one\ntwo' }] } }))
+  expect(multiLine).toMatchObject({ _tag: 'Failure', failure: { reason: 'invalid' } })
+
+  h.fake.script([reply(say('Noted.'))])
+  await run(client['agent.chat.send']({ opId: 'op-3' as OpId, text: 'hi' }))
+  await h.ended('op-3')
+  const system = JSON.stringify(h.chatRequests().at(-1)!.context)
+  expect(system).toContain('- Ask before writing to #general.')
+  expect(system).toContain('- Never message Sam on weekends.')
+})
+
+const send = (id: string) => reply({ type: 'toolCall', id, name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text: `Text ${id}` }] } })
+
+it('Activity lists each run\'s actions with the decision and outcome', async () => {
+  const slack = fakeActionHost()
+  const { h, client, follow } = await served({ actions: { host: slack.host } })
+  h.fake.script([send('call-a'), send('call-b'), reply(say('Two drafts.'))])
+  await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'draft two messages' }))
+  await h.ended('op-1')
+  const [kept, dropped] = h.turns.actions.views()
+  slack.next('unknown')
+  h.turns.actions.approve('click-1', kept!.binding!.identity, kept!.binding!.children)
+  h.turns.actions.dismiss(dropped!.binding!.identity)
+  await h.turns.actions.idle()
+  const page = await follow(client['agent.activity.page']({ window: { limit: 50 } })).where((p) => p.runs[0]?.actions.length === 2, 'two actions')
+  expect(page.runs[0]!.actions.map((a) => [a.label, a.tier, a.decision, a.outcome, a.failure?.text])).toEqual([
+    ['Message to #test-0001', 3, 'approved', 'unknown', 'Juno could not confirm it went through.'],
+    ['Message to #test-0001', 3, 'dismissed', 'none', undefined],
+  ])
 })
