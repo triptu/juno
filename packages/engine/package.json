@@ -18,13 +18,14 @@
     "@juno/ai": "workspace:*",
     "@juno/contract": "workspace:*",
     "@juno/domain": "workspace:*",
+    "@juno/notifications": "workspace:*",
     "@juno/richtext": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
     "@juno/topic-art": "workspace:*",
     "effect": "4.0.3",
-    "@juno/notifications": "workspace:*"
+    "https-proxy-agent": "9.1.0"
   },
   "devDependencies": {
     "@effect/vitest": "4.0.3",

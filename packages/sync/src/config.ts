@@ -34,6 +34,13 @@ export interface SyncConfigShape {
   readonly catchUpPages: number
   /** Wait before a failed boot is tried again. */
   readonly bootRetryMillis: number
+  /**
+   * The recheck after a drop or a restart (`recheck.ts`): at most this many
+   * topics, the ones on screen first, then the most recently active, each
+   * read back to `recheckLookbackMillis` before the gap began.
+   */
+  readonly recheckTopics: number
+  readonly recheckLookbackMillis: number
 }
 
 export const defaultSyncConfig: SyncConfigShape = {
@@ -49,6 +56,8 @@ export const defaultSyncConfig: SyncConfigShape = {
   searchMaxPages: 3,
   catchUpPages: 5,
   bootRetryMillis: 30_000,
+  recheckTopics: 10,
+  recheckLookbackMillis: 24 * 60 * 60_000,
 }
 
 export const SyncConfig = Context.Reference<SyncConfigShape>('juno/sync/SyncConfig', {

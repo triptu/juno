@@ -35,15 +35,24 @@ import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
 import { ViewsHandlers } from './sidebarViews/handlers'
 import { Workspace } from './workspace'
 
+interface PhaseInputs {
+  readonly session: SessionStatus
+  readonly sync: SyncPhase | undefined
+  readonly slowedUntil: number | undefined
+}
+
 /**
  * The engine phase (architecture 2.5 and 11) from the session and the sync:
  * no session is `first-run`, a rejected one `session-expired`; a ready one
- * reports the sync's phase, or `offline` until the sync has started.
+ * reports the sync's phase, or `offline` until the sync has started. While
+ * a rate limit holds the client back, a sync that is not offline reports
+ * `rate-limited` until the pause ends.
  */
-const phaseOf = (session: SessionStatus, sync: SyncPhase | undefined): EnginePhase => {
+const phaseOf = ({ session, sync, slowedUntil }: PhaseInputs): EnginePhase => {
   if (session._tag === 'authRequired') return { _tag: 'session-expired' }
   if (session._tag !== 'ready') return { _tag: 'first-run' }
-  return sync ?? { _tag: 'offline' }
+  if (sync === undefined || sync._tag === 'offline') return { _tag: 'offline' }
+  return slowedUntil === undefined ? sync : { _tag: 'rate-limited', until: slowedUntil }
 }
 
 /** Keeps `engine.status` in step with the session and the sync for the life of the app. */
@@ -52,14 +61,15 @@ const EnginePhases = Layer.effectDiscard(
     const session = yield* Session
     const sync = yield* SyncRunner
     const status = yield* Status
-    const latest = yield* Ref.make<{ session: SessionStatus; sync: SyncPhase | undefined }>({ session: yield* session.status, sync: yield* sync.current })
-    const update = (change: Partial<{ session: SessionStatus; sync: SyncPhase | undefined }>) =>
+    const latest = yield* Ref.make<PhaseInputs>({ session: yield* session.status, sync: yield* sync.current, slowedUntil: undefined })
+    const update = (change: Partial<PhaseInputs>) =>
       Effect.gen(function* () {
         const next = yield* Ref.updateAndGet(latest, (current) => ({ ...current, ...change }))
-        yield* status.setPhase(phaseOf(next.session, next.sync))
+        yield* status.setPhase(phaseOf(next))
       })
     yield* Effect.forkScoped(Stream.runForEach(session.statuses, (value) => update({ session: value })))
     yield* Effect.forkScoped(Stream.runForEach(sync.phases, (value) => update({ sync: value })))
+    yield* Effect.forkScoped(Stream.runForEach(sync.slowedUntil, (value) => update({ slowedUntil: value })))
     yield* Effect.forkScoped(Stream.runForEach(sync.syncing, status.setSyncing))
   }),
 )

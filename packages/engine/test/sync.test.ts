@@ -18,6 +18,7 @@ import {
   callMap,
   DAY,
   errorOf,
+  notRecheck,
   quiet,
   readDb,
   restart,
@@ -277,8 +278,10 @@ describe('warm boot', () => {
 
     // Only the conversation whose latest moved was fetched; the thread reply came from the discovery search.
     await quiet(second)
-    expect(apiCalls(second, 'conversations.history').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
-    expect(callMap(second)).toEqual({
+    expect(apiCalls(second, 'conversations.history').filter(notRecheck).map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
+    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = callMap(second)
+    const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
+    expect(budget).toEqual({
       'api:presence.set': 1,
       'api:auth.test': 1,
       'api:api.getFlannelHttpUrl': 1,
@@ -293,6 +296,8 @@ describe('warm boot', () => {
       // The searched reply is newer than its root's counters, so the root is fetched for Slack's reply_count.
       'api:conversations.replies': 1,
     })
+    // The recheck for the time the app was closed: the ten most recently active topics, one page each.
+    expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBe(10)
 
     await second.stop()
     engines.splice(engines.indexOf(second), 1)
@@ -477,7 +482,7 @@ describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
     await second.rowsUntil((rows) => rows.length >= 20 && !rows.some((r) => r.id === id), 'the unfollowed thread gone')
     expect(storedFollow(second, 'C0ENG', tsOf(id))).toBe(0)
     // The thread was missing from the complete getView list, so its root was asked; nothing else was.
-    expect(apiCalls(second, 'conversations.replies').map((c) => c.args['ts'])).toEqual([tsOf(id)])
+    expect(apiCalls(second, 'conversations.replies').filter(notRecheck).map((c) => c.args['ts'])).toEqual([tsOf(id)])
 
     const third = await restart(engines, second, (fake) => fake.followThread({ channel: 'C0ENG', threadTs: tsOf(id) }))
     await third.rowsUntil((rows) => rows.some((r) => r.id === id), 'the thread followed again')

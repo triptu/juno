@@ -9,7 +9,9 @@
  * messages handlers mark a topic as shown while its header is subscribed,
  * and the sync fetches those topics again after a reconnect. The runner
  * also says when a boot or catch-up has finished, which is when the send
- * outbox flushes (architecture 5.8).
+ * outbox flushes (architecture 5.8), and whether the sync's socket is
+ * connected: the outbox workers send nothing while it is not, so a send
+ * made offline waits for the connection instead of failing into a lookup.
  */
 import { Context, Effect, Layer, PubSub, Ref, Stream, SubscriptionRef, type Scope } from 'effect'
 import type { TopicFetcher } from '@juno/sync'
@@ -30,6 +32,11 @@ export class SyncLink extends Context.Service<
     readonly caughtUp: Effect.Effect<void>
     /** One element each time `caughtUp` is called after subscribing. */
     readonly caughtUps: Stream.Stream<void>
+    /** Whether a sync runs and its socket is connected. */
+    readonly online: Effect.Effect<boolean>
+    readonly setOnline: (online: boolean) => Effect.Effect<void>
+    /** `online` at subscribe time, then every change. */
+    readonly onlineChanges: Stream.Stream<boolean>
   }
 >()('juno/engine/SyncLink') {
   static readonly layer: Layer.Layer<SyncLink> = Layer.effect(
@@ -41,6 +48,7 @@ export class SyncLink extends Context.Service<
       const listed = () => [...counts.keys()].toReversed()
       const changes = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
       const cycles = yield* PubSub.sliding<void>(1)
+      const online = yield* SubscriptionRef.make(false)
       const publish = Effect.suspend(() => SubscriptionRef.set(changes, listed()))
       const showing = (topicId: string) =>
         Effect.acquireRelease(
@@ -64,6 +72,9 @@ export class SyncLink extends Context.Service<
         shownChanges: SubscriptionRef.changes(changes),
         caughtUp: Effect.asVoid(PubSub.publish(cycles, undefined)),
         caughtUps: Stream.fromPubSub(cycles),
+        online: SubscriptionRef.get(online),
+        setOnline: (next) => SubscriptionRef.set(online, next),
+        onlineChanges: Stream.changes(SubscriptionRef.changes(online)),
       })
     }),
   )
