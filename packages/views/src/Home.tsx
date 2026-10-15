@@ -30,7 +30,8 @@ export interface HomeProps {
   readonly onResolveAll: (itemId: string) => void
   /** Opens the Juno chat. */
   readonly onAsk: () => void
-  readonly onBrowseAll?: () => void
+  /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
+  readonly onBrowseAll?: (event: ActivateEvent) => void
 }
 
 /**
@@ -70,7 +71,7 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
           <Kbd look="key">⌘J</Kbd>
         </button>
         {caughtUp && onBrowseAll !== undefined ? (
-          <button type="button" onClick={onBrowseAll} {...stylex.props(styles.quietLink, ...part())}>
+          <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, ...part())}>
             Browse all topics
           </button>
         ) : null}
