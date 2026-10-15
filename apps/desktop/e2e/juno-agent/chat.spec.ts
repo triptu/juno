@@ -104,10 +104,7 @@ test('a message sent from the panel is about the topic, with the selection, and 
   await setWindowWidth(juno, 1400)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
-  await juno.tabs.menu('juno')
-  const panel = JunoChatPane.panel(juno.win)
-
-  // Select words in the topic: the quote shows above the panel's composer.
+  // Select words in the topic, then open the panel: the quote shows above its composer.
   await juno.topic.message('logical replication').evaluate((el) => {
     const text = [...el.querySelectorAll('*')].map((node) => node.firstChild).find((node) => node?.nodeType === Node.TEXT_NODE && node.textContent?.includes('logical replication'))!
     const at = text.textContent!.indexOf('logical replication')
@@ -117,6 +114,8 @@ test('a message sent from the panel is about the topic, with the selection, and 
     document.getSelection()!.removeAllRanges()
     document.getSelection()!.addRange(range)
   })
+  await juno.tabs.menu('juno')
+  const panel = JunoChatPane.panel(juno.win)
   await expect(juno.win.locator('[data-panel-selection]')).toContainText('logical replication')
   await expect(juno.win.locator('[data-panel-selection]')).toContainText('Leo')
 

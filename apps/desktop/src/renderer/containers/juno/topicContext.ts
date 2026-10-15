@@ -28,7 +28,8 @@ function senderOf(row: Element): string | undefined {
 /**
  * The owner's selection in the topic's messages. A new selection replaces
  * the last; a selection that collapses (a click into the panel's composer)
- * keeps it, so it stays until sent or removed. A new topic starts empty.
+ * keeps it, so it stays until sent or removed. A selection made before the
+ * panel opened is taken when it opens. A new topic starts empty.
  */
 export function useTopicSelection(topicId: string | undefined): readonly [Selection | undefined, () => void] {
   // Kept with the topic it came from, so another topic starts with none.
@@ -48,6 +49,8 @@ export function useTopicSelection(topicId: string | undefined): readonly [Select
         before?.topicId === topicId && before.selection.text === text && before.selection.sender === sender ? before : { topicId, selection: { text, ...(sender === undefined ? {} : { sender }) } },
       )
     }
+    // Text selected before the panel opened counts too.
+    onChange()
     document.addEventListener('selectionchange', onChange)
     return () => document.removeEventListener('selectionchange', onChange)
   }, [topicId])
