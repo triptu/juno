@@ -19,7 +19,7 @@ import { reindexAll } from '@juno/sync'
 import { UserId } from '@juno/domain'
 import { sendMessage } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
-import { DAY, quiet, seedThread, storedFollow, subscribe, unsubscribe, valueOf } from './scenario'
+import { DAY, quiet, readDb, seedThread, storedFollow, subscribe, unsubscribe, valueOf } from './scenario'
 
 let engine: RunningEngine | undefined
 afterEach(async () => {
@@ -114,7 +114,10 @@ describe('convergence', () => {
       const before = new Set(fake.calls.filter((c) => c.method === 'chat.postMessage').map((c) => c.args['client_msg_id']))
       const exit = await sendMessage(engine!.registry, { kind: 'channel', channelId: channel, ...(inThread === undefined ? {} : { threadTs: inThread.message.ts }) }, `sent ${round}`)
       valueOf(exit)
-      const id = await waitFor(() => fake.calls.find((c) => c.method === 'chat.postMessage' && !before.has(c.args['client_msg_id']))?.args['client_msg_id'] as string | undefined, 30_000, 'the post')
+      // Offline the post waits for the socket; its id is the pending row's.
+      const id = connected
+        ? await waitFor(() => fake.calls.find((c) => c.method === 'chat.postMessage' && !before.has(c.args['client_msg_id']))?.args['client_msg_id'] as string | undefined, 30_000, 'the post')
+        : (readDb(engine!, 'user.db', (db) => db.prepare('SELECT client_msg_id FROM pending_messages WHERE text = ?').get(`sent ${round}`)) as { client_msg_id: string }).client_msg_id
       sent.push(id)
     }
 

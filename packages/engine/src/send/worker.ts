@@ -24,7 +24,8 @@
  * A row still `sending` when a pass starts was cut off (a restart, a store
  * failure) and becomes `unknown`, and the end of each boot
  * or catch-up makes every row due (the flush, architecture 5.8). Nothing is
- * sent while no sync runs.
+ * sent while no sync runs or its socket is down, so a send made offline
+ * stays `queued` and goes when the socket is back.
  */
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
@@ -153,8 +154,8 @@ export class PostWorker extends Context.Service<
         Effect.gen(function* () {
           const local = inStore(open)
           const fetcher = yield* link.fetcher
-          // No sync, no session: rows wait for the next catch-up.
-          if (fetcher === undefined) return undefined
+          // No sync, no session, or offline: rows wait for the connection.
+          if (fetcher === undefined || !(yield* link.online)) return undefined
           const now = yield* Clock.currentTimeMillis
           // One pass posts at a time, so a row still `sending` here was cut off (a restart, a store failure) and may be in Slack.
           yield* local(transaction(recoverPosts(now)))
@@ -190,6 +191,7 @@ export class PostWorker extends Context.Service<
       // A workspace that opens (a sign-in, a restart) may hold posts from before.
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
+      yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
       yield* Effect.forkScoped(loop)
       return PostWorker.of({ wake })
     }),

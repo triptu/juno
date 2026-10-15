@@ -63,7 +63,7 @@ The follow drain covers three pending calls and their refreshes, eight events, t
 - **Assumption:** action calls are idempotent as Juno uses them. An edit sets the text. A delete of a missing message answers `message_not_found`, which counts as done. `already_reacted` and `no_reaction` count as done. So `actFail` (a lost answer, timeout or rate limit, before or after Slack applied the call) returns the row to `waiting` and the call goes out again, unlike a post. `crash` does the same for action calls in flight; the rows persist. `actRefuse` ends the row, and the view shows the stored message again.
 - `actAnswer` stores Slack's answer as the socket event would and ends the row in the same transaction. The model does not track message text or reaction counts. It tracks only which messages had calls sent (`actSent`) and which Slack applied (`acted`).
 - Outside this model: edits, deletes and reactions by other clients, reactions on other people's messages, the reaction row's `want` and `base` fields (an add and remove pair that cancels is a row that ends with no call), attachment uploads and other outbox kinds.
-- Socket connectivity and HTTP availability are separate. `goOffline` also disconnects the socket; `goOnline` restores HTTP access. `reconnect` starts catch-up pages for the created IDs. `catchUp` ends that pass and makes every remaining `queued` or `unknown` row due. This models the catch-up's outbox flush. It does not infer absence from a catch-up page.
+- Socket connectivity and HTTP availability are separate. `goOffline` also disconnects the socket; `goOnline` restores HTTP access. The workers claim a post, start a lookup and run an action only while Juno sees the socket connected (`connected`), so a send made while it is down stays `queued` even when HTTP happens to work, and goes after `reconnect`. `claimWith(k, false)` is the bug mode that claims anyway. `reconnect` starts catch-up pages for the created IDs. `catchUp` ends that pass and makes every remaining `queued` or `unknown` row due. This models the catch-up's outbox flush. It does not infer absence from a catch-up page.
 - `seal` stops new drafts, user actions, failures, crashes and disconnects. Already decided refusals and dropped calls still finish. Connectivity recovers, backoff ends, and workers and deliveries run. New requests succeed after sealing. With two drafts, two action rows and two response slots, this drain has a 48-transition budget. A random run with a 24-transition budget also passed. The bound counts productive model transitions, not wall-clock time or idle scheduler steps.
 
 ### Outbox properties
@@ -78,8 +78,9 @@ The follow drain covers three pending calls and their refreshes, eight events, t
 | `actionNeedsMessage` | An edit, delete or reaction call goes out, and Slack applies one, only for a message Juno has stored. No call is sent before Slack holds the post or with a guessed ts. |
 | `noActionOnDiscarded` | A discarded draft never gets an action call. |
 | `actionsDrain` | After sealing, every action row ends, done or dropped, within the drain budget. `quietAgreement` also requires that a done action was applied on Slack. |
+| `sendsWaitOffline` | No post is claimed while Juno sees the socket down (SPEC 8, "Sending": sends wait out a lost connection). |
 | `reachedAgreement` | A trace reached sealed, drained agreement. The runner requires this witness for every corrected directed schedule and at least one random trace. |
-| `invariants` | All eight safety and finite-drain properties above. |
+| `invariants` | All nine safety and finite-drain properties above. |
 
 ### Outbox bug schedules
 
@@ -93,6 +94,7 @@ Each `<name>Step` checks `invariants` and must finish its drain. Each `<name>Bug
 | `answerAfterEcho` | Deliver the echo, then the answer. The bug writes the worker's old sending row back after reconciliation. The guarded answer leaves a deleted row gone. | `noDoubleShow` |
 | `actionBeforeStore` | Queue an edit while the post is sending. The guarded edit waits until the answer stores the message, then runs. The bug calls at once with a guessed ts. | `actionNeedsMessage` |
 | `actionOnDiscarded` | Queue an edit while the post is sending, then the post is refused and discarded. The guarded edit ends without a call. The bug calls anyway. | `noActionOnDiscarded` |
+| `offlineSend` | The socket drops, then a send. The guarded worker waits for `reconnect`, then posts once. The bug claims the row while the socket is down. | `sendsWaitOffline` |
 
 The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before answer. Corrected `blindRetry` covers a lost answer followed by a found lookup. Five additional corrected schedules cover `answerBeforeEcho`, `lostLookupAbsent`, `reconnectPage`, `dependentDelete` and `actionRetry`. The absent case drops the first call, loses its answer, confirms absence, and posts once. `reconnectPage` accepts, loses the answer, disconnects, then reconnects and holds a lookup answer. A catch-up page reconciles first, the catch-up flushes, and the lookup answer safely writes the message again. The seven post schedules cover all five delivery and recovery orderings. `dependentDelete` queues a delete while the post is sending; the post is refused and the delete discards the failed row. `actionRetry` edits a stored message; Slack applies it, a newer edit arrives while the call is out, and the answer is lost. The worker sends again and the row ends.
 

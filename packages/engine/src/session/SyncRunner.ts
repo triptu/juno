@@ -64,6 +64,7 @@ export class SyncRunner extends Context.Service<
         running = undefined
         if (current !== undefined) yield* Fiber.interrupt(current.fiber)
         yield* link.setFetcher(undefined)
+        yield* link.setOnline(false)
         yield* SubscriptionRef.set(phase, undefined)
         yield* SubscriptionRef.set(syncing, false)
         yield* SubscriptionRef.set(slowed, undefined)
@@ -95,6 +96,7 @@ export class SyncRunner extends Context.Service<
                   Effect.andThen(Effect.sync(() => control.onCycle?.(event))),
                 ),
               onPhase: (next) => SubscriptionRef.set(phase, next),
+              onConnection: link.setOnline,
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
@@ -125,6 +127,7 @@ export class SyncRunner extends Context.Service<
               if (running?.fiber === fiber) {
                 running = undefined
                 yield* link.setFetcher(undefined)
+                yield* link.setOnline(false)
                 yield* SubscriptionRef.set(syncing, false)
               }
               if (exit._tag === 'Failure') {

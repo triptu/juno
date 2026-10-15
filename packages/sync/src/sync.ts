@@ -48,6 +48,8 @@ export interface RunSyncOptions {
   readonly onCycle?: (event: 'started' | 'finished') => Effect.Effect<void>
   /** Called on every phase change. */
   readonly onPhase: (phase: SyncPhase) => Effect.Effect<void>
+  /** Called when the socket says hello (true) and when it drops (false): whether Slack can be reached now. */
+  readonly onConnection?: (connected: boolean) => Effect.Effect<void>
   /** Called once, before the sync connects, with the fetcher the engine's topic commands use while this sync runs. */
   readonly onFetcher?: (fetcher: TopicFetcher) => Effect.Effect<void>
   /** The topics open in a tab the user can see. They are fetched again after a reconnect and with each sweep (architecture 5.8). */
@@ -212,11 +214,14 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       switch (event._tag) {
         case 'Connected':
           state.connected = true
-          return state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void
+          return (options.onConnection?.(true) ?? Effect.void).pipe(
+            Effect.andThen(state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void),
+          )
         case 'Disconnected':
           state.connected = false
-          if (!state.booted) return Effect.void
-          return transaction(endEventCoverage).pipe(
+          if (!state.booted) return options.onConnection?.(false) ?? Effect.void
+          return (options.onConnection?.(false) ?? Effect.void).pipe(
+            Effect.andThen(transaction(endEventCoverage)),
             Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
             Effect.andThen(phase({ _tag: 'offline' })),
           )

@@ -315,6 +315,7 @@ const regressions = [
   ['outbox', 'answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
   ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
   ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
+  ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
 ]
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
