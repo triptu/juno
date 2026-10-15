@@ -32,7 +32,7 @@ import { acquire, destroy, forget, reap, release, status } from './remote/pool.m
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
+const remoteScripts = ['typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
@@ -204,17 +204,19 @@ try {
 const { files, bytes } = snapshotted
 const runId = `${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${process.pid}`
 
-// Spec checks take the Mac's cache of passing Quint runs along (staged in the
-// ignored .remote/ folder) and bring back what they add, so a check that passed
-// anywhere is not run again.
-const specCache = join(tmpdir(), 'juno-cache', 'specs')
-const stagedCache = `.remote/cache-${runId}/specs`
-const carriesCache = options.script.startsWith('specs:') && process.env.SPECS_CACHE !== 'off' && !options.args.includes('--no-cache')
+// Spec checks and typechecks take the Mac's cache of passing results along
+// (staged in the ignored .remote/ folder) and bring back what they add, so a
+// check that passed anywhere is not run again.
+const carried = { 'specs:': { name: 'specs', env: 'SPECS_CACHE_DIR' }, typecheck: { name: 'typecheck', env: 'JUNO_TYPECHECK_CACHE_DIR' } }
+const carry = Object.entries(carried).find(([prefix]) => options.script.startsWith(prefix))?.[1]
+const specCache = carry && join(tmpdir(), 'juno-cache', carry.name)
+const stagedCache = carry && `.remote/cache-${runId}/${carry.name}`
+const carriesCache = carry !== undefined && process.env.SPECS_CACHE !== 'off' && !options.args.includes('--no-cache')
 if (carriesCache && !options.dryRun) {
   mkdirSync(join(root, stagedCache), { recursive: true })
   if (existsSync(specCache)) cpSync(specCache, join(root, stagedCache), { recursive: true })
   for (const name of readdirSync(join(root, stagedCache))) files.push(`${stagedCache}/${name}`)
-  options.env.push(`SPECS_CACHE_DIR=/work/${stagedCache}`)
+  options.env.push(`${carry.env}=/work/${stagedCache}`)
 }
 const reportDir = join(root, '.remote', runId)
 const exitMarker = `__juno_remote_exit_${runId}=`
@@ -342,7 +344,7 @@ try {
       mkdirSync(specCache, { recursive: true })
       const before = existsSync(specCache) ? readdirSync(specCache).length : 0
       cpSync(returned, specCache, { recursive: true, force: false })
-      console.error(`remote: spec cache ${before} -> ${readdirSync(specCache).length} entries`)
+      console.error(`remote: ${carry.name} cache ${before} -> ${readdirSync(specCache).length} entries`)
       rmSync(join(reportDir, '.remote'), { recursive: true, force: true })
     }
     console.error(`remote: reports in ${relative(root, reportDir)}/`)
