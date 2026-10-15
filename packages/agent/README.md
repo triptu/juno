@@ -19,7 +19,7 @@ Files in the agent directory (plan v3 §2.2):
 | File | What |
 | --- | --- |
 | `owner.lock` | The single-writer lock: an SQLite file held with `locking_mode = EXCLUSIVE`. Its connection is referenced from module scope and closed last (G9). A second process fails with `OwnerLockHeld` |
-| `agent.sqlite` | Juno's own records, WAL with `synchronous = FULL`, `fullfsync` and `checkpoint_fullfsync` |
+| `agent.sqlite` | Juno's own records, WAL with `synchronous = FULL`, `fullfsync` and `checkpoint_fullfsync`, and `secure_delete = ON` (WP16) |
 | `pi-<incarnation>.sqlite` | The pi-durable journal, opened through pi's Node adapter with the same settings |
 
 What each folder does, and the spec transitions it implements (`specs/agent-recovery.qnt`, `specs/agent-memory.qnt`):
@@ -198,16 +198,19 @@ startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─
 1. The backup's `raiseDeletion(gen + 1)`, before anything else (G13). A crash here leaves the record ahead and nothing removed (`redaction.deletionRaised`).
 2. One transaction: `redactMemory` (in `store/memory.ts`) tombstones the messages (text cleared, ids kept, `redactions` rows), masks every view line whose node depends on them, moves `gen` and queues rebuilds. Then the attachments go, the inbox ops' text is cleared, pins sourced from them are deactivated and every version's text cleared (bumping `pin_rev`), quotes of them in later replies and reactions become `<quote from="…" removed="true"></quote>` in the archive (`quotes.ts`: the quoting message's version moves, its summaries are deleted and rebuilt, and its pins find their words again), removed Juno bubbles are recorded in `removed_bubbles` so later quotes of them render the placeholder too, remove cards that name them lose their preview line, `revokeExposedGrants` revokes the grants minted by runs that saw them and carries the rest into the new generation, and reports waiting in the inbox from jobs started in runs that saw them are failed with `removed`. The moved `gen` expires every open card, refuses a waiting click (`sourceChanged`), refuses a request built before it at the guard, and makes a running compaction job's publication stale (`redaction.committed`).
 3. Jobs started in runs that saw the messages are stopped, as their Task card's Stop does.
-4. The purge, one durable step at a time, in order, retried on the memory queue's delays: `purgeNodes` (node versions that depend on a removed message), `purgeCodexThreads` (`providers/codex-purge.ts`: the session files of every recorded Codex thread), the journal (the router rotates between runs, which deletes the old file), then the backup's `regenerate(gen)`. One run of a step settles every removal waiting on it. Startup resumes it (`redaction.purged`).
+4. The purge, one durable step at a time, in order, retried on the memory queue's delays: `purgeNodes` (node versions that depend on a removed message) and a truncating checkpoint, `purgeCodexThreads` (`providers/codex-purge.ts`: the session files of every recorded Codex thread), the journal (the router rotates between runs, which deletes the old file), then the backup's `regenerate(gen)`. One run of a step settles every removal waiting on it. Startup resumes it (`redaction.purged`).
 
 The same op again is the same removal; a removal of messages already gone changes nothing. Removals run one at a time.
 
 **The `remove` card.** `remove_messages({ messages: ['n12'] })` names owner messages by handle; the trusted side builds the card with each message's first line and time, and `offerReply` when Juno's reply follows the first. Its child is Tier 3 and deduplicated; the click runs the removal under `card:<action id>` with `args.choice.alsoRemoveReply`, and reconcile finds it by that op.
 
+**Free space.** `agent.sqlite` runs with `secure_delete = ON`: SQLite zeroes deleted content, freed pages included. FAST mode is not enough. A message over one page (4 KB) lives on overflow pages that are freed whole, and FAST leaves freed pages as they were; a probe found a cleared 16 KB message still in the file under FAST, and none under ON. The zeroed pages reach the main file only at a checkpoint, so the purge's first step ends with `wal_checkpoint(TRUNCATE)`, which also empties the WAL. The flow tests scan `agent.sqlite` and its WAL for the removed words, and fail with `secure_delete` off. The filesystem and the SSD may still keep old blocks; forensic erasure is not promised.
+
+**Cost** (`bench/commit-cost.ts`, 2026-10-15, three runs on the Mac at load 2 to 4, minimum per commit). At FULL with `fullfsync`, every commit takes 1.5 to 3.5 ms either way, and `secure_delete` is inside that noise. Without `fullfsync`, which shows its own cost: clearing a 16 KB message 0.050 to 0.054 ms without it, 0.081 to 0.082 ms with it (it writes the freed overflow pages as zeros); projecting a 16 KB message 0.55 to 0.58 against 0.58 to 0.65 ms; small rows (accept, project, clear) within 0.01 ms. So it adds at most about 0.07 ms to a commit that costs about 2 ms at FULL.
+
 **Not covered yet.**
 
 - Payloads of other cards proposed in runs that saw the message: they expire, and their text stays in the ledger.
-- `agent.sqlite` is not written with `secure_delete`, so cleared text can stay in free pages and the WAL until SQLite reuses them. Plan v3 §4.5 does not promise forensic erasure.
 - The Settings line "Removal pending · 1 copy in a running job" is not shown: jobs are stopped at the removal, and the journal rotates at the next run boundary.
 
 `test/redaction-scope.test.ts` checks the pure rules with properties; `test/redaction.test.ts` runs removals on the engine (every place the words lived, a removal racing a running compaction, stale work refused, the Remove card, the owner's sheet through the renderer); `test/redaction-crash.test.ts` kills the agent at `redaction.deletionRaised`, `redaction.committed` and after each purge step.
