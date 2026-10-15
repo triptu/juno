@@ -14,6 +14,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('profile topics.list', () => 
       await engine.status('ready')
       await engine.phase('live', 600_000)
       await engine.topics()
+      await engine.syncIdle()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const now = Date.now()
       const cutoff = `${Math.floor((now - 7 * 24 * 3600 * 1000) / 1000)}.000000`

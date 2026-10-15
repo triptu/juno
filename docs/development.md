@@ -716,3 +716,7 @@ strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
 Electron. Playwright's Electron launcher needs Node inspection and cannot drive
 the hardened package; the packaged smoke instead uses Chromium CDP. The
 `JUNO_E2E` fake-server seams remain available independently of the Node fuses.
+
+### Engine and sync benchmarks
+
+`pnpm bench:engine` runs `packages/engine/test/bench` with one worker and serial files, through the exclusive machine lock. `pnpm bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `pnpm remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.

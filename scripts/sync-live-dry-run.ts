@@ -284,7 +284,7 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
         SocketHandshake.fixed({ cookie: cached.cookie, userAgent: 'Juno sync dry run' }),
         slackConfigLayer({
           socket: { allowedHosts: [...target.allowedHosts], onDiagnostic: (line) => console.log(`  socket: ${line}`) },
-          // The fake has no rate limits, as in the engine tests; live keeps the 1.5 s background spacing.
+          // The fake normally skips pacing; --paced retains the production method budgets.
           ...(useFake && !process.argv.includes('--paced') ? { lanes: { backgroundMinIntervalMillis: 0 } } : {}),
         }),
       ),
@@ -328,6 +328,7 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
     yield* Scope.close(scope, Exit.void)
     yield* Fiber.interrupt(sync)
     yield* report(bootTime, phases)
+    if (outcome._tag === 'None') return yield* Effect.fail(new Error('sync did not reach live before the time limit'))
   })
 
   const exit = await Effect.runPromiseExit(program.pipe(Effect.provide(layer), Effect.scoped))

@@ -63,7 +63,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       const latencies: Array<number> = []
       // Channels with a shown Main row, so each message changes the window and reaches the renderer as a delta.
       const channels = [...new Set(rows.filter((row) => row.kind === 'main').map((row) => row.channel.id))]
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 50; i++) {
         const before = engine.registry.get(engine.topicsAtom())
         const beforeSeq = before._tag === 'Success' ? before.value.meta.seq : 0
         const channel = channels[(i * 37) % channels.length]!
@@ -91,6 +91,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       // A command has committed when it returns.
       if (!Exit.isSuccess(bots) || !Exit.isSuccess(wide)) throw new Error('views.save failed')
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
+      await engine.syncIdle()
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
         Effect.gen(function* () {
@@ -159,6 +160,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         countsMsMedian: median(isolated.counts),
         countsMsP95: p95(isolated.counts),
         firstQueryMs: Number(window.meta.queryMs.toFixed(2)),
+        querySamples: samples.length,
         queryMsMedian: median(samples),
         queryMsP95: p95(samples),
         snapshotBytes,
