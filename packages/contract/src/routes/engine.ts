@@ -11,8 +11,9 @@ import { liveValueRoute } from '../live'
 
 export const EnginePhase = Schema.Union([
   Schema.TaggedStruct('first-run', {}),
-  Schema.TaggedStruct('booting', {}),
-  Schema.TaggedStruct('catching-up', { done: Schema.Int, total: Schema.Int }),
+  /** `first`: the first sync of this workspace (a cold boot); the sidebar shows its progress. */
+  Schema.TaggedStruct('booting', { first: Schema.optionalKey(Schema.Boolean) }),
+  Schema.TaggedStruct('catching-up', { done: Schema.Int, total: Schema.Int, first: Schema.optionalKey(Schema.Boolean) }),
   Schema.TaggedStruct('live', {}),
   Schema.TaggedStruct('offline', {}),
   Schema.TaggedStruct('rate-limited', { until: Schema.Number }),

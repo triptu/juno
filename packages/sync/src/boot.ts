@@ -65,7 +65,7 @@ export interface BootState {
   readonly lastSyncAt: number
 }
 
-export type Phase = (phase: { _tag: 'booting' } | { _tag: 'catching-up'; done: number; total: number }) => Effect.Effect<void>
+export type Phase = (phase: { _tag: 'booting'; first?: boolean } | { _tag: 'catching-up'; done: number; total: number; first?: boolean }) => Effect.Effect<void>
 
 export type BootError = SlackApiError | SqlError
 export type BootServices = SlackApi | SlackEdge | SlackSession | StoreWriter | Invalidation
@@ -448,7 +448,7 @@ const covered = (channel: string, start: Ts, latest: Ts): Effect.Effect<boolean,
 /** Everything Slack knows about the workspace, into an empty cache (architecture 5.2). */
 export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
-    yield* phase({ _tag: 'booting' })
+    yield* phase({ _tag: 'booting', first: true })
     const startedAt = yield* Clock.currentTimeMillis
     // Unfollowed threads count as read up to here; a reply during the boot stays unread.
     const bootTs = millisToTs(startedAt)
@@ -460,12 +460,12 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     yield* fillUsers(ctx, 'interactive')
     yield* loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive' })
     const active = yield* activeConversations(counts.entries, start)
-    yield* phase({ _tag: 'catching-up', done: 0, total: active.length })
+    yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
     let done = 0
     for (const conversation of active) {
       // A boot that failed half way left ranges behind; what they cover is not fetched again.
       if (!(yield* covered(conversation.id, start, conversation.latest))) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
-      yield* phase({ _tag: 'catching-up', done: ++done, total: active.length })
+      yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
       yield* Effect.yieldNow
     }
     yield* fillUsers(ctx)

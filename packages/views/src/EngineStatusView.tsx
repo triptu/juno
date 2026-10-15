@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { HourglassMedium } from '@phosphor-icons/react/dist/icons/HourglassMedium'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { WifiSlash } from '@phosphor-icons/react/dist/icons/WifiSlash'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, motion, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Icon, Text, type PhosphorIcon } from '@juno/ui'
 
 export interface EngineStatusViewProps {
@@ -78,7 +78,63 @@ export function EngineNotice({ kind, onRestart }: EngineNoticeProps) {
   )
 }
 
+export interface SyncProgressProps {
+  /** Conversations read so far, out of `total`. Both absent while the sync is still listing them. */
+  readonly done?: number
+  readonly total?: number
+}
+
+/**
+ * The first sync's progress, in the same place as the notices: a thin line
+ * that fills as conversations land and "Syncing 30 of 143" under it. Shown
+ * only until the first sync is done; later catch-ups are silent.
+ */
+export function SyncProgress({ done, total }: SyncProgressProps) {
+  const counted = done !== undefined && total !== undefined && total > 0
+  const fraction = counted ? Math.min(1, done / total) : 0
+  const label = counted ? `Syncing ${done} of ${total}` : 'Syncing'
+  return (
+    <section aria-label="Sync" data-sync-progress="" {...stylex.props(styles.progress)}>
+      <div
+        role="progressbar"
+        aria-label="Sync progress"
+        aria-valuemin={0}
+        aria-valuemax={counted ? total : undefined}
+        aria-valuenow={counted ? done : undefined}
+        {...stylex.props(styles.track)}
+      >
+        <div {...stylex.props(styles.fill, styles.fraction(fraction))} />
+      </div>
+      <Text variant="meta" tone="muted" numeric role="status" aria-label="Sync status">
+        {label}
+      </Text>
+    </section>
+  )
+}
+
 const styles = stylex.create({
+  progress: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-1'],
+    paddingInline: spacing['--space-4'],
+    paddingBottom: spacing['--space-2-5'],
+  },
+  track: {
+    height: spacing['--space-0-5'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--border-subtle'],
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    backgroundColor: colors['--foreground-subtle'],
+    transformOrigin: 'left',
+    transitionProperty: 'transform',
+    transitionDuration: { default: motion['--duration-appear'], '@media (prefers-reduced-motion: reduce)': '0ms' },
+    transitionTimingFunction: motion['--ease-out'],
+  },
+  fraction: (value: number) => ({ transform: `scaleX(${value})` }),
   notice: {
     display: 'flex',
     alignItems: 'flex-start',

@@ -35,9 +35,10 @@ import { reindexTopics } from './reindex'
 import { nameUsers, wantUsers } from './users'
 import { clearPendingFollows, endEventCoverage, observeRead } from './write'
 
+/** `first`: the cold boot of an empty store, the first sync the user waits through. */
 export type SyncPhase =
-  | { readonly _tag: 'booting' }
-  | { readonly _tag: 'catching-up'; readonly done: number; readonly total: number }
+  | { readonly _tag: 'booting'; readonly first?: boolean }
+  | { readonly _tag: 'catching-up'; readonly done: number; readonly total: number; readonly first?: boolean }
   | { readonly _tag: 'live' }
   | { readonly _tag: 'offline' }
 

@@ -23,6 +23,26 @@ const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
+test('During the first sync Home greets and says it is syncing, and the sidebar shows how far it got', async ({ juno, slack, win }) => {
+  // The first conversation's history waits, as a real workspace's backfill takes minutes.
+  slack.fake.holdNext({ method: 'conversations.history' })
+  await juno.signIn()
+  const syncing = win.locator('[data-home][data-home-loading]')
+  await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
+  await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
+  await expect(syncing.getByText('All caught up.')).toHaveCount(0)
+  const progress = juno.sidebar.root.getByRole('status', { name: 'Sync status' })
+  await expect(progress).toHaveText(/^Syncing 0 of \d+$/)
+  await expect(juno.sidebar.root.getByRole('progressbar', { name: 'Sync progress' })).toBeVisible()
+
+  // Once the history lands the first sync finishes: Home shows what waits and the line goes.
+  slack.fake.release()
+  await juno.waitForSync()
+  await juno.home.expectShown()
+  await expect(juno.home.greeting).toHaveText(/Tushar\.$/)
+  await expect(progress).toHaveCount(0)
+})
+
 test('Home shows what waits with no tab open and from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
   await juno.signIn()
   await juno.waitForSync()

@@ -1,5 +1,5 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { EngineNotice, EngineStatusView } from './EngineStatusView'
+import { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 
 const onPing = () => {}
 
@@ -38,6 +38,20 @@ export const engineNoticeFixtures = defineFixtures(
       offline: fixture({ kind: 'offline' }),
       'rate-limited': fixture({ kind: 'rate-limited' }),
       stopped: fixture({ kind: 'stopped', onRestart }),
+    },
+  },
+  { width: 384, padded: false, surface: 'subtle' },
+)
+
+// The first sync's progress, in the same place, until the sidebar is complete.
+export const syncProgressFixtures = defineFixtures(
+  SyncProgress,
+  {
+    'First sync': {
+      listing: fixture({}),
+      started: fixture({ done: 0, total: 143 }),
+      'part way': fixture({ done: 30, total: 143 }),
+      done: fixture({ done: 143, total: 143 }),
     },
   },
   { width: 384, padded: false, surface: 'subtle' },
