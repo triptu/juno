@@ -10,6 +10,7 @@ import {
   junoAgentOnAtom,
   junoPanelOpenAtom,
   loadOlderMessages,
+  messageFlashAtom,
   messageListAtom,
   messageWindowSpecAtom,
   nowAtom,
@@ -29,6 +30,7 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
   ActiveThreads,
+  flashChatRow,
   hueFor,
   MessageList,
   NewMessagesPill,
@@ -42,11 +44,12 @@ import {
 } from '@juno/views'
 import { toggleJunoPanel } from './juno/actions'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { useMessageActions, type ComposerHandle } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { takeSendMark } from './sendMark'
 import { TopicComposer } from './TopicComposer'
-import { cancelRename, renameTopic, showMessageMenu, showTopicMenu, toggleResolved } from './topicActions'
+import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from './topicActions'
 
 /**
  * The divider's offset from the scroller's top on open: 80px below the
@@ -341,6 +344,21 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
     setPositioned(true)
   }, [id, readOnly, positioned, list.ready, last, atEnd])
 
+  // A Juno source link asked for a message: once the topic is positioned, it is scrolled into view if it is not, and flashes.
+  const flash = useAtomValue(messageFlashAtom(id))
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (readOnly || flash === undefined || !positioned || scroller === null) return
+    afterPaint(() => {
+      const row = scroller.querySelector(rowSelector(flash.ts))
+      if (row === null) return
+      const box = row.getBoundingClientRect()
+      const view = scroller.getBoundingClientRect()
+      if (box.top < view.top || box.bottom > view.bottom) row.scrollIntoView({ block: 'center', behavior: 'instant' })
+      flashChatRow(row)
+    })
+  }, [readOnly, flash, positioned])
+
   // Rows added above the ones in view (the rest of the window after the first frame, an older page):
   // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
   useLayoutEffect(() => {
@@ -513,6 +531,9 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
   // popover opens with its rows in the first frame instead of "Loading threads".
   useEffect(() => (main && drawnAll && !readOnly ? registry.mount(channelThreadsAtom(channel)) : undefined), [main, drawnAll, readOnly, channel])
 
+  const composer = useRef<ComposerHandle>(null)
+  const messageActions = useMessageActions({ detail, list, scrollRef, composer })
+
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
 
@@ -554,11 +575,12 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         : {
             onRetry: retry,
             onDiscard: discard,
-            onMessageMenu: (ts: string, event: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
-              const senderId = list.rows.get(ts)?.senderId
-              const sender = senderId === undefined ? undefined : { id: senderId, name: people.get(senderId)?.name ?? senderId }
-              void showMessageMenu(detail, ts, { x: event.clientX, y: event.clientY }, sender, onSender)
-            },
+            onMessageMenu: messageActions.onMessageMenu,
+            actions: messageActions.actions,
+            confirmingDelete: messageActions.confirmingDelete,
+            editing: messageActions.editing,
+            onRowKey: messageActions.onRowKey,
+            onToggleReaction: messageActions.onToggleReaction,
             onPersonMenu: personMenu,
             onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
               const known = list.refs.channels.get(chip.id)
@@ -592,7 +614,8 @@ function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps)
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
-      composer={<TopicComposer key={id} detail={detail} onSent={sent} />}
+      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} />}
+      floating={messageActions.floating}
     >
       {messages}
     </TopicViewFrame>

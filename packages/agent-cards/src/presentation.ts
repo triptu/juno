@@ -54,6 +54,7 @@ export type JunoPage = typeof JunoPage.Type
 export const OpenTarget = Schema.Union([
   Schema.TaggedStruct('topic', { topicId: Schema.String }),
   Schema.TaggedStruct('chatMessage', { messageId: ChatMessageId }),
+  Schema.TaggedStruct('message', { channelId: Schema.String, ts: Schema.String }),
   Schema.TaggedStruct('url', { url: OpenableUrl, label: Schema.String }),
   Schema.TaggedStruct('page', { page: JunoPage }),
 ])

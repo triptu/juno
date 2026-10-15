@@ -98,6 +98,14 @@ export const quoteOf = (target: Quote['target'], preview: string, removed = fals
 
 export const text = (value: string): JunoInline => ({ _tag: 'text', text: value })
 export const cite = (value: string, id: string): JunoInline => ({ _tag: 'cite', text: value, messageId: messageId(id) })
+/** Words from a Slack message in `place`, sent `minutesAgo` before NOW. */
+export const source = (value: string, place: string, minutesAgo: number): JunoInline => ({
+  _tag: 'source',
+  text: value,
+  channelId: `C0${place.replace('#', '').toUpperCase()}`,
+  ts: `${Math.floor((NOW - minutesAgo * MINUTE) / 1000)}.000100`,
+  place,
+})
 
 export interface JunoOptions {
   readonly group?: GroupPosition
@@ -451,6 +459,25 @@ export const bubbles: ReadonlyArray<ChatItem> = [
   ...juno('m-103', 'And the CI flake on the sidebar test is back.', { group: 'last', at: NOW - MINUTE }),
   status('m-101', 'Looking back through March'),
 ]
+
+/**
+ * A catch-up with sources: words taken from Slack messages, one of them
+ * from yesterday, one long enough to wrap, and words with no source.
+ */
+export const sourced = (linked: boolean): ReadonlyArray<ChatItem> => {
+  const link = (value: string, place: string, minutesAgo: number) => (linked ? source(value, place, minutesAgo) : text(value))
+  return [
+    day(0),
+    owner('m-120', 'What did I miss in #eng?', 'single', { _tag: 'sent' }, NOW - 4 * MINUTE),
+    ...juno('m-121', [text('Maya '), link('posted the Postgres 16 migration plan and wants a reviewer before Thursday', '#eng', 40), text('.')], { group: 'first', at: NOW - 3 * MINUTE }),
+    ...juno(
+      'm-122',
+      [link('The CI flake on the sidebar test is back', '#eng', 25), text(', and Leo says '), link('the fake server answers the second page before the first, so the test sees them out of order', '#eng', 26 * 60), text('.')],
+      { group: 'middle', at: NOW - 3 * MINUTE },
+    ),
+    ...juno('m-123', [text('Nothing else needs you today.')], { group: 'last', at: NOW - 3 * MINUTE }),
+  ]
+}
 
 /** Reactions both ways: the owner's on a bubble and a card, Juno's on the owner's message instead of a reply. */
 export const reactions: ReadonlyArray<ChatItem> = [

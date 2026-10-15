@@ -3,7 +3,7 @@ import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref
 import type { MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { Message } from './Message'
+import { Message, type MessageActions } from './Message'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -52,8 +52,18 @@ export interface MessageListProps {
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
   readonly hueOf?: (id: string) => HueName
-  /** The hover toolbar for a row. M4 passes none in the app; the gallery shows it. */
-  readonly renderToolbar?: (message: MessageView) => ReactNode
+  /** The hover toolbar's actions, created once. Without them rows have no toolbar (a preview). */
+  readonly actions?: MessageActions
+  /** The row whose toolbar asks to confirm a delete. */
+  readonly confirmingDelete?: string | undefined
+  /** The row being edited, and its inline edit field. */
+  readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
+  /**
+   * A key on a selected row that the list does not use itself (it moves the
+   * selection with ↑ and ↓): E, Delete, Backspace, Enter, Esc. The
+   * container acts on the row's message.
+   */
+  readonly onRowKey?: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
@@ -72,11 +82,15 @@ export interface MessageListProps {
 
 const ROW = '[data-message-row]'
 
-/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. */
-function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
+function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+    const ts = target.dataset['messageRow']
+    if (ts !== undefined && !event.metaKey && !event.ctrlKey && !event.altKey) onRowKey?.(ts, event)
+    return
+  }
   const rows = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(ROW))
   const index = rows.indexOf(target)
   const next = rows[event.key === 'ArrowDown' ? index + 1 : index - 1]
@@ -140,7 +154,10 @@ export function MessageList({
   underHeader = true,
   anchorRef,
   hueOf = hueForId,
-  renderToolbar,
+  actions,
+  confirmingDelete,
+  editing,
+  onRowKey,
   onOpenThread,
   onChannel,
   onLink,
@@ -163,7 +180,7 @@ export function MessageList({
         role="list"
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
-        onKeyDown={onKeyDown}
+        onKeyDown={(event) => onKeyDown(event, onRowKey)}
         onContextMenu={
           onMessageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onPersonMenu, onChannelMenu })
         }
@@ -199,7 +216,9 @@ export function MessageList({
                 flush={first || atDivider}
                 tabbable={item.message.ts === tabbable}
                 hueOf={hueOf}
-                toolbar={renderToolbar?.(item.message)}
+                actions={actions}
+                confirmingDelete={confirmingDelete === item.message.ts}
+                editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}
                 onChannel={onChannel}
                 onLink={onLink}

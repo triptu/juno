@@ -313,6 +313,8 @@ const regressions = [
   ['outbox', 'crashResend', 'atMostOnce', 'outbox-crash-resend'],
   ['outbox', 'echoKeepsRow', 'noDoubleShow', 'outbox-echo-keeps-row'],
   ['outbox', 'answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
+  ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
+  ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
 ]
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
@@ -330,7 +332,7 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       file === 'outbox' ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage']) {
+  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }

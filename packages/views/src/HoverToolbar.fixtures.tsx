@@ -1,15 +1,23 @@
 import { defineFixtures, fixture } from '@juno/ui'
 import { HoverToolbar } from './HoverToolbar'
 
+const noop = () => {}
+
 export default defineFixtures(HoverToolbar, {
   Where: {
-    thread: fixture({}),
-    main: fixture({ main: true }),
+    thread: fixture({ onMore: noop }),
+    main: fixture({ main: true, onMore: noop }),
+  },
+  // Delete on your own message asks once, in the toolbar's place (ADR 0010).
+  Confirm: {
+    'confirm-delete': fixture({ confirmDelete: { onConfirm: noop, onCancel: noop } }),
+    'hover-delete': fixture({ confirmDelete: { onConfirm: noop, onCancel: noop } }, { hover: 'button:last-of-type' }),
   },
   Interaction: {
-    'hover-reaction': fixture({ main: true }, { hover: 'button' }),
-    'hover-quote': fixture({ main: true }, { hover: '[aria-label="Quote"]' }),
-    'press-reaction': fixture({ main: true }, { press: 'button' }),
-    'focus-reply': fixture({ main: true }, { focus: '[aria-label="Reply in thread"]' }),
+    'hover-reaction': fixture({ main: true, onMore: noop }, { hover: 'button' }),
+    'hover-quote': fixture({ main: true, onMore: noop }, { hover: '[aria-label="Quote"]' }),
+    'hover-more': fixture({ main: true, onMore: noop }, { hover: '[aria-label="More"]' }),
+    'press-reaction': fixture({ main: true, onMore: noop }, { press: 'button' }),
+    'focus-reply': fixture({ main: true, onMore: noop }, { focus: '[aria-label="Reply in thread"]' }),
   },
 })
