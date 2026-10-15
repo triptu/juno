@@ -306,6 +306,23 @@ test.describe('Composer notices', () => {
     }
     expect((await field.boundingBox())!.height).toBe(before.height)
   })
+
+  test('with file chips, the check bar sits above them and the text does not move', async ({ page }) => {
+    await openState(page, { component: 'Composer', id: 'shift/notices-over-chips', route: 'Composer/shift/notices-over-chips', group: '', groupId: '', state: '', frame: {} })
+    const text = page.locator('[data-composer] textarea')
+    const chip = page.getByRole('button', { name: /^Remove / }).first()
+    const before = { text: await text.boundingBox(), chip: await chip.boundingBox() }
+    for (const notices of ['bar', 'both', 'none'] as const) {
+      await step(page, notices)
+      await expect(page.locator('[data-send-check]')).toHaveCount(notices === 'none' ? 0 : 1)
+      expect(await text.boundingBox(), notices).toEqual(before.text)
+      expect(await chip.boundingBox(), notices).toEqual(before.chip)
+      if (notices !== 'none') {
+        const bar = (await page.locator('[data-send-check]').boundingBox())!
+        expect(bar.y + bar.height, notices).toBeLessThanOrEqual(before.chip!.y)
+      }
+    }
+  })
 })
 
 test.describe('Message actions', () => {

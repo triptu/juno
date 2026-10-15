@@ -46,7 +46,7 @@ const audience = <AudienceWarning message="This reads like hiring or people deta
  * through `window.__fixtureControls` and checks that the text row and the
  * field's bottom edge never move.
  */
-function NoticesComeAndGo() {
+function NoticesComeAndGo({ withChips = false }: { readonly withChips?: boolean }) {
   const [notices, setNotices] = useState<'none' | 'audience' | 'bar' | 'both'>('none')
   useFixtureControl('audience', () => setNotices('audience'))
   useFixtureControl('bar', () => setNotices('bar'))
@@ -58,6 +58,7 @@ function NoticesComeAndGo() {
         {...base}
         value="the preview environments reaper should cut the staging bill"
         placeholder="Message #eng"
+        {...(withChips ? { ...attach, attachments: <AttachmentChips files={[chips.image, chips.pdf]} onRemove={noop} /> } : {})}
         notices={
           notices === 'none' ? undefined : (
             <>
@@ -132,6 +133,7 @@ export default defineFixtures(
     },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),
+      'notices-over-chips': scene(() => <NoticesComeAndGo withChips />, { height: 400 }),
     },
   },
   { width: 816, padded: false },
