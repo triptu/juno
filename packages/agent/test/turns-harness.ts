@@ -32,6 +32,8 @@ export interface HarnessOptions {
   readonly actions?: ActionsOptions
   /** Open on an existing agent directory, as a restart does. */
   readonly dir?: string
+  /** The encrypted backup, move and restore. */
+  readonly backup?: TurnsOptions['backup']
   /** The app's provider and models (`providerTurns`) in place of the scripted fake. */
   readonly app?: Pick<TurnsOptions, 'provider' | 'model' | 'compaction'>
 }
@@ -52,6 +54,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     ...(options.host ? { host: options.host } : {}),
     ...(options.migrations ? { migrations: options.migrations } : {}),
     ...(options.actions ? { actions: options.actions } : {}),
+    ...(options.backup ? { backup: options.backup } : {}),
     onReport: (error) => reports.push(error),
   })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
