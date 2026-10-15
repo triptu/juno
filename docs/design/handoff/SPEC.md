@@ -102,6 +102,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 - **Context menu** (right-click, or the context-menu key):
   - Open in new tab (⌘-click)
   - Rename
+  - Redraw (a new drawing for the topic's art, with Undo; only while AI assist is on, and not on a DM's Main)
   - Mark as read or unread
   - Pin
   - Notify me: Every message, When it matters or Never

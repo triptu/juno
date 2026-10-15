@@ -8,6 +8,7 @@
  * in a text field that has text, and otherwise Juno's last action.
  */
 import {
+  artRedraw,
   channelsIgnore,
   isViewMenuAction,
   notifyChoiceOf,
@@ -23,6 +24,7 @@ import {
   type ContextMenuAt,
   type ContextMenuItem,
   type MenuCommand,
+  type MessageView,
   type NotifyTargetView,
   type TopicDetail,
   type TopicMenuAction,
@@ -40,6 +42,7 @@ import {
   registry,
   renamingAtom,
   runAction,
+  showToast,
   sidebarRowAtom,
   signedInAtom,
   slackLink,
@@ -91,6 +94,12 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
+/** Redraw: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
+async function redrawArt(topic: ActionTopic): Promise<void> {
+  const done = await runAction(registry, artRedraw, { id: topic.id }, said('Redrawn', topic))
+  if (!done) showToast(registry, said('Could not redraw', topic))
+}
+
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */
 export function renameTopic(id: string, title: string): void {
   registry.set(renamingAtom, undefined)
@@ -126,6 +135,7 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     pinned: topic.pinned,
     resolved: topic.resolved,
     notify: choiceFor(settings, notify.target, topic.subscribed),
+    aiAssist: settings?.aiAssist === true,
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
   }
@@ -138,6 +148,8 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
       return openTopic(id, { newTab: true })
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
+    case 'redraw':
+      return redrawArt(topic)
     case 'mark-read':
       return void runAction(registry, readsMarkRead, { id }, said('Marked as read', topic))
     case 'mark-unread':
@@ -183,27 +195,47 @@ function openTopicInSlack(topic: ActionTopic): void {
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
 
+/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread. */
+export type MessageMenuChoice = 'edit' | 'delete' | 'reply'
+
 /**
- * The message menu (SPEC 7, inventory 15.4): Copy Slack link, Open in
- * Slack, and, on someone else's message, why it did or did not notify. A
- * reply's link carries its thread. On the sender's name or avatar it is
- * the person menu (inventory 15.6). The other items come with their
- * features (M6).
+ * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
+ * toolbar's More and from a right-click: Edit and Delete on your own
+ * messages, Reply in thread in Main, Copy Slack link and Open in Slack,
+ * and, on someone else's message, why it did or did not notify. A reply's
+ * link carries its thread; a message Slack does not have yet has none. On
+ * the sender's name or avatar it is the person menu.
  */
-export async function showMessageMenu(topic: ActionTopic, ts: string, at: ContextMenuAt, sender: { readonly id: string; readonly name: string } | undefined, onSender: boolean): Promise<void> {
+export async function showMessageMenu(
+  topic: ActionTopic,
+  message: Pick<MessageView, 'ts' | 'pending'>,
+  editable: boolean,
+  at: ContextMenuAt,
+  sender: { readonly id: string; readonly name: string } | undefined,
+  onSender: boolean,
+): Promise<MessageMenuChoice | undefined> {
   const session = registry.get(signedInAtom)
   const own = sender !== undefined && sender.id === session?.userId
-  if (onSender && sender !== undefined && !own) return showPersonMenu(sender, at)
-  const why = own ? undefined : await loadWhy(registry, topic.id, ts)
+  if (onSender && sender !== undefined && !own) {
+    await showPersonMenu(sender, at)
+    return undefined
+  }
+  const { ts } = message
+  const linkable = message.pending === undefined
+  const why = own || !linkable ? undefined : await loadWhy(registry, topic.id, ts)
   const items: ContextMenuItem[] = [
-    { id: 'copy-link', label: 'Copy Slack link' },
+    ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }, { separator: true } as const] : []),
+    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: 'Reply in thread' }, { separator: true } as const] : []),
+    { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
     { id: 'open-in-slack', label: 'Open in Slack' },
     ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
   ]
   const chosen = await popupContextMenu(items, at)
-  if (chosen === 'open-in-slack') return openTopicInSlack(topic)
-  if (chosen === 'why' && why !== undefined) return showWhy(topic.id, ts, why, at)
-  if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
+  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply') return chosen
+  if (chosen === 'open-in-slack') openTopicInSlack(topic)
+  else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)
+  else if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
+  return undefined
 }
 
 /** Whether focus is in a text field that has text, where ⌘Z undoes typing. */

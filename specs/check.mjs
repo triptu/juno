@@ -221,7 +221,8 @@ async function runAll() {
     await simulations()
     await checks()
   }
-  for (const server of servers) (await server.catch(() => ({ stop: () => {} }))).stop()
+  // A lane whose checks were all cached never started a server, so the array can have holes.
+  for (const server of servers) if (server !== undefined) (await server.catch(() => ({ stop: () => {} }))).stop()
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
@@ -312,6 +313,8 @@ const regressions = [
   ['outbox', 'crashResend', 'atMostOnce', 'outbox-crash-resend'],
   ['outbox', 'echoKeepsRow', 'noDoubleShow', 'outbox-echo-keeps-row'],
   ['outbox', 'answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
+  ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
+  ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
 ]
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
@@ -329,7 +332,7 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       file === 'outbox' ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage']) {
+  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
@@ -403,6 +406,8 @@ if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
     { ...options, samples: 1, witnesses: ['reachedAgreement', 'clickedScheduleCreated'], requireCompletion: true })
   simulate('agent-actions', 'menuScheduleWitnessStep', 'invariants', 'actions-menu-schedule.itf.json', false, true,
     { ...options, samples: 1, witnesses: ['reachedAgreement', 'menuScheduleCreated'], requireCompletion: true })
+  simulate('agent-actions', 'resumedClickWitnessStep', 'invariants', 'actions-resumed-click.itf.json', false, true,
+    { ...options, samples: 1, witnesses: ['reachedAgreement', 'resumedClickSent'], requireCompletion: true })
   for (const [schedule, invariant] of actionCases) {
     simulate('agent-actions', `${schedule}BugStep`, invariant, `actions-${schedule}-bug.itf.json`, true, false, options)
   }

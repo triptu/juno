@@ -5,7 +5,11 @@
  * The chat group is served over the turn engine: the page and summary are
  * rebuilt from the agent's records (`chat.ts`) whenever a run moves, a
  * command lands or presence changes; send, react and retry go to the
- * engine's inbox, and each answers only after the inbox commit.
+ * engine's inbox, and each answers only after the inbox commit. The card
+ * group goes to the engine's actions (WP15): a click, a dismissal or an
+ * edit answers after its FULL commit, and dispatch follows in the
+ * background. The page lists every card, with the binding a click must
+ * return for each card still open.
  *
  * The Juno menu's pages (`pages.ts`) and Settings › Juno
  * (`settings/settings.ts`) are rebuilt on the same signal, and on their own
@@ -28,16 +32,22 @@ import {
   AgentRpcs,
   ChatMessageId,
   chatCopy,
+  type CardChoice,
   type Banner,
   type ChatItem,
   type ChatPage,
   type OpId,
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
+import { watchReplyCommand, type WatchHost } from '../schedule/commands'
+import type { Scheduler } from '../schedule/scheduler'
+import type { Choice } from '../actions/cards'
 import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
 import type { PinResult } from '../pins/pins'
 import type { UpdateNeeded } from '../runtime/core'
+import { connectionHandlers } from '../mcp/pages'
+import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
 import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
@@ -50,12 +60,43 @@ export interface ChatHost {
   readonly presenceChanges: Stream.Stream<Presence | undefined>
   /** Settings › Juno, when the engine runs on a model picker. */
   readonly settings?: JunoSettings
+  readonly connections?: McpManagerApi
+  readonly schedule?: { readonly scheduler: Scheduler; readonly host: WatchHost }
 }
 
 const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
 const notYet = (what: string) => () => unavailable(`${what} is not available yet.`)
 /** How often the Memory page looks for a newly published view: compaction moves it between runs. */
 const MEMORY_RECHECK = '2 seconds'
+
+/** A card command the ledger refused, as the RPC's error. */
+const refused = (result: { readonly _tag: 'refused'; readonly reason: 'stale' | 'expired' | 'invalid' }) =>
+  Effect.fail(
+    new AgentCommandError({
+      reason: result.reason,
+      message: result.reason === 'expired' ? 'This card has expired.' : result.reason === 'stale' ? 'This card has changed.' : 'This card does not take that.',
+    }),
+  )
+
+/** The data a button carries into the payload, or undefined for a button that approves the card as it is. */
+function choiceOf(choice: typeof CardChoice.Type): Choice | undefined {
+  switch (choice._tag) {
+    case 'answer':
+      return { _tag: 'answer', answer: choice.answer }
+    case 'keep':
+      return { _tag: 'schedule', action: 'keep' }
+    case 'pause':
+      return { _tag: 'schedule', action: 'pause' }
+    case 'deleteSchedule':
+      return { _tag: 'schedule', action: 'delete' }
+    case 'remove':
+      return { _tag: 'remove', alsoRemoveReply: choice.alsoRemoveReply }
+    case 'provider':
+      return { _tag: 'provider', provider: choice.provider }
+    default:
+      return undefined
+  }
+}
 
 const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
 
@@ -75,6 +116,7 @@ function chatState(host: ChatHost) {
     if (event._tag === 'bubble') shown(event.id, Date.now())
     changed()
   })
+  const unsubscribeCards = turns?.actions.subscribe(changed)
 
   /** Emits now, then on every change. */
   const changes: Stream.Stream<void> = Stream.merge(
@@ -92,7 +134,7 @@ function chatState(host: ChatHost) {
     host.presenceChanges.pipe(Stream.drop(1), Stream.map(() => undefined)),
   )
 
-  const items = (): ReadonlyArray<ChatItem> => {
+  const items = (cards = turns?.actions.views() ?? []): ReadonlyArray<ChatItem> => {
     if (turns === undefined) return []
     const presence = host.presence()
     const mode = turns.mode()
@@ -106,6 +148,7 @@ function chatState(host: ChatHost) {
         return fallback
       },
       jobs: turns.jobs.list(),
+      cards,
       readAt: readAt(turns.store),
       waiting: mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
       dayOf,
@@ -122,7 +165,8 @@ function chatState(host: ChatHost) {
   }
 
   const page = (window: ChatWindow) => {
-    const all = items()
+    const cards = turns?.actions.views() ?? []
+    const all = items(cards)
     const slice = windowOf(all, window)
     const current = banner()
     const view: ChatPage = {
@@ -138,12 +182,18 @@ function chatState(host: ChatHost) {
       : (turns.store.db.prepare(`SELECT id, version FROM messages WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids) as Array<{ id: number; version: number }>)
     return {
       page: view,
-      cards: [],
+      cards: cards.flatMap((card) => (card.binding !== undefined && slice.items.some((item) => item._tag === 'card' && item.card.id === card.card.id) ? [card.binding] : [])),
       messages: versions.map((row) => ({ id: ChatMessageId.make(String(row.id)), revision: Revision.make(row.version) })),
     }
   }
 
-  return { turns, changed, changes, items, page, close: () => unsubscribe?.() }
+  return {
+    turns, changed, changes, items, page,
+    close: () => {
+      unsubscribe?.()
+      unsubscribeCards?.()
+    },
+  }
 }
 
 /** `build` on every change, emitting only what differs from the last. */
@@ -249,18 +299,66 @@ export function agentHandlers(host: ChatHost) {
           }),
         'agent.chat.remove': notYet('Removing a message'),
 
-        'agent.cards.prepare': notYet('This card'),
-        'agent.cards.approve': notYet('This card'),
-        'agent.cards.dismiss': notYet('This card'),
-        'agent.cards.askAgain': notYet('This card'),
-        'agent.cards.editMessage': notYet('This card'),
-        'agent.cards.undo': notYet('This card'),
+        'agent.cards.prepare': ({ identity, choice }) =>
+          Effect.flatMap(engine(state, host), (turns) => {
+            const prepared = choiceOf(choice)
+            if (prepared === undefined) {
+              // A button with no data approves the card as it is.
+              const view = turns.actions.views().find((v) => v.card.id === identity.cardId)
+              if (view?.binding === undefined) return refused({ _tag: 'refused', reason: view === undefined ? 'invalid' : 'stale' })
+              return Effect.succeed({ card: view.card, identity: view.binding.identity, children: view.binding.children })
+            }
+            const result = turns.actions.prepare(identity, prepared)
+            if ('_tag' in result) return refused(result)
+            const view = turns.actions.views().find((v) => v.card.id === identity.cardId)!
+            return Effect.succeed({ card: view.card, identity: result.identity, children: result.children })
+          }),
+        'agent.cards.approve': ({ opId, identity, children }) =>
+          Effect.flatMap(engine(state, host), (turns) => {
+            const result = turns.actions.approve(opId, identity, children)
+            return result._tag === 'accepted' ? Effect.succeed({ opId }) : refused(result)
+          }),
+        'agent.cards.dismiss': ({ opId, identity }) =>
+          Effect.flatMap(engine(state, host), (turns) => {
+            const result = turns.actions.dismiss(identity)
+            return result._tag === 'accepted' ? Effect.succeed({ opId }) : refused(result)
+          }),
+        'agent.cards.askAgain': ({ opId, identity }) =>
+          Effect.flatMap(engine(state, host), (turns) => {
+            const view = turns.actions.views().find((v) => v.card.id === identity.cardId)
+            if (view === undefined || !('status' in view.card) || view.card.status._tag !== 'expired') return refused({ _tag: 'refused', reason: 'invalid' })
+            // A message from the owner that quotes the card: a fresh read brings a fresh card.
+            return changed(answer(opId, () => turns.accept({ opId, kind: 'send', text: chatCopy.card.askAgain, replyTo: { _tag: 'card', id: identity.cardId } })))
+          }),
+        'agent.cards.editMessage': ({ identity, messageId, text }) =>
+          Effect.flatMap(engine(state, host), (turns) => {
+            const result = turns.actions.editMessage(identity, messageId, text)
+            if ('_tag' in result) return refused(result)
+            const view = turns.actions.views().find((v) => v.card.id === identity.cardId)!
+            return Effect.succeed({ card: view.card, identity: result.identity })
+          }),
+        'agent.cards.undo': notYet('Undo on this card'),
         'agent.jobs.stop': ({ opId, jobId }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
 
-        'agent.scheduled.page': () => Stream.make({ page: { schedules: [] }, revisions: [] }),
-        'agent.scheduled.edit': notYet('Scheduled'),
-        'agent.scheduled.action': notYet('Scheduled'),
+        'agent.scheduled.page': () => host.schedule === undefined ? Stream.make({ page: { schedules: [] }, revisions: [] }) : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), host.schedule.scheduler.page),
+        'agent.schedule.watchReply': (input) => {
+          const turns = state.turns
+          return host.schedule === undefined || turns === undefined ? unavailable('Reply watches are not available yet.') : watchReplyCommand({ store: turns.store, scheduler: host.schedule.scheduler, propose: turns.actions.propose }, host.schedule.host, input)
+        },
+        'agent.scheduled.edit': ({ opId, id, revision, what, schedule, deliver }) => Effect.suspend(() => {
+          const scheduler = host.schedule?.scheduler
+          if (scheduler === undefined) return unavailable('Scheduled is not available yet.')
+          const row = scheduler.get(id)
+          const done = scheduler.command(opId, () => row !== undefined && scheduler.edit(id, revision, opId, { ...row.definition, what, schedule, deliver }))
+          return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
+        }),
+        'agent.scheduled.action': ({ opId, id, revision, action }) => Effect.suspend(() => {
+          if (host.schedule === undefined) return unavailable('Scheduled is not available yet.')
+          const scheduler = host.schedule.scheduler
+          const done = scheduler.command(opId, () => action === 'resume' ? scheduler.resume(id, revision, opId) : scheduler.cancel(id, revision, action === 'pause' ? 'paused' : 'deleted'))
+          return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
+        }),
         'agent.remembers.page': () => (state.turns === undefined ? Stream.make(emptyRemembers) : live(state.changes, () => remembersPage(state.turns!.store))),
         'agent.remembers.edit': ({ opId, id, revision, text }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.suspend(() => pinAnswer(opId, turns.pins.edit({ id, version: revision }, text))))),
@@ -282,9 +380,9 @@ export function agentHandlers(host: ChatHost) {
             : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), () => memoryPage(state.turns!.store, window)),
         'agent.activity.page': ({ window }) =>
           state.turns === undefined ? Stream.make({ runs: [], moreAbove: false }) : live(state.changes, () => activityPage(state.turns!.store, window)),
-        'agent.connections.page': () => Stream.make({ connections: [] }),
-        'agent.connections.action': notYet('Connections'),
-        'agent.connections.tier': notYet('Connections'),
+        'agent.connections.page': () => host.connections ? connectionHandlers(host.connections).page() : Stream.make({ connections: [] }),
+        'agent.connections.action': (input) => host.connections ? connectionHandlers(host.connections).action(input) : notYet('Connections')(),
+        'agent.connections.tier': (input) => host.connections ? connectionHandlers(host.connections).tier(input) : notYet('Connections')(),
         'agent.connections.address': notYet('Connections'),
         'agent.review.page': () => Stream.make(reviewPage()),
         'agent.review.activate': notYet('Review'),

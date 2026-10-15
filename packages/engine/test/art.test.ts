@@ -1,11 +1,12 @@
 // Topic art end to end against the fake Slack and the fake AI provider: the
 // sidebar rows and the header carry a recipe once the background job has
 // drawn a topic, the drawing is kept in user.db, AI assist off hides every
-// drawing and draws nothing new, Redraw replaces a drawing, and a model
-// answer outside the vocabulary leaves the placeholder.
+// drawing and draws nothing new, Redraw replaces a drawing and its undo puts
+// the old one back, and a model answer outside the vocabulary leaves the
+// placeholder.
 import { afterEach, describe, expect, it } from 'vitest'
-import { prefsSet, type TopicRow } from '@juno/contract'
-import { redrawTopic, runCommand, topicAtom } from '@juno/state'
+import { artRedraw, prefsSet, type TopicRow } from '@juno/contract'
+import { redrawTopic, runAction, runCommand, topicAtom, undoLast } from '@juno/state'
 import { parseRecipe } from '@juno/topic-art'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { SELF_ID } from '@juno/fake-slack'
@@ -115,6 +116,18 @@ describe('topic art', () => {
     expect(storedArt(engine).find((row) => row.topic_id === target.id)).toMatchObject({ source: 'redraw', status: 'ok', recipe: redrawn.art })
     // Every other row kept its drawing and its object.
     for (const row of rows) if (row.id !== target.id) expect(after.find((candidate) => candidate.id === row.id)).toBe(row)
+  })
+
+  it('Undo after Redraw puts the previous drawing back, in the rows and in the store', async () => {
+    const engine = await bootedEngine()
+    const rows = await drawnRows(engine)
+    const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
+    const before = storedArt(engine).find((row) => row.topic_id === target.id)
+    expect(await runAction(engine.registry, artRedraw, { id: target.id }, { text: 'Redrawn' })).toBe(true)
+    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && hasArt(row) && row.art !== target.art), 'the redrawn row')
+    expect(await undoLast(engine.registry)).toBe(true)
+    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && row.art === target.art), 'the previous drawing back')
+    expect(storedArt(engine).find((row) => row.topic_id === target.id)).toEqual(before)
   })
 
   it('keeps the placeholder for a topic the model cannot draw within the vocabulary, and does not ask again', async () => {

@@ -86,6 +86,7 @@ test('the title opens the topic menu under the left island, and Notify me follow
     'Open in new tab',
     '-',
     'Rename',
+    'Redraw',
     'Mark as unread',
     'Pin',
     'Resolve',

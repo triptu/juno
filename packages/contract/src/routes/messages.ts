@@ -41,7 +41,7 @@ export const THREADS_WINDOW_MAX = 100
 
 // Message rows
 
-/** One reaction under a message. Read-only in M4. */
+/** One reaction under a message. Its chip toggles the user's own (`messages.react`). */
 export const ReactionView = Schema.Struct({
   /** Slack's name, for example `+1` or a custom emoji's name. */
   name: Schema.String,
@@ -171,6 +171,12 @@ export const MessageView = Schema.Struct({
    * a read pointer.
    */
   pending: Schema.optionalKey(PendingState),
+  /**
+   * The user's own message as composer text ("@Maya Chen", "> " quote
+   * lines), what the inline edit field starts with. Only on the user's own
+   * messages that can be edited.
+   */
+  editText: Schema.optionalKey(Schema.String),
 })
 export type MessageView = typeof MessageView.Type
 

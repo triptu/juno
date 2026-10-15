@@ -2,7 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import { HoverToolbar } from './HoverToolbar'
+import { noopActions } from './fixtures/actions'
+import { InlineEdit } from './InlineEdit'
 import { Message, type MessageProps } from './Message'
 import type { MessageListItem } from './MessageList'
 import { messageTime } from './time'
@@ -49,6 +50,10 @@ const longLine = longFirstLine[0]!
 const longLineContinuation = longFirstLine[1]!
 const pendingRow = sending[2]!
 const failedRow = failedSend[2]!
+// Your own message as Slack stored it: the sending fixture, settled.
+const { pending: _pending, ...ownStored } = pendingRow.message
+const ownText = 'Postgres 16 is on staging. I will move prod on Thursday.'
+const ownMessage: MessageListItem = { ...pendingRow, message: { ...ownStored, editText: ownText } }
 
 export default defineFixtures(
   Message,
@@ -74,12 +79,24 @@ export default defineFixtures(
     Interaction: {
       hover: one(first, {}, { hover: '[data-message-row]' }),
       'hover-continuation': one(grouped, {}, { hover: '[data-message-row]' }),
-      'hover-toolbar': one(first, { toolbar: <HoverToolbar /> }, { hover: '[data-message-row]' }),
-      'hover-toolbar-main': one(withThread, { main: true, toolbar: <HoverToolbar main /> }, { hover: '[data-message-row]' }),
+      'hover-toolbar': one(first, { actions: noopActions }, { hover: '[data-message-row]' }),
+      'hover-toolbar-main': one(withThread, { main: true, actions: noopActions }, { hover: '[data-message-row]' }),
       // The header keeps the toolbar's footprint free, so the name and the first body line stay clear of it.
-      'hover-toolbar-long-line': one(longLine, { startsGroup: true, toolbar: <HoverToolbar main /> }, { hover: '[data-message-row]' }),
-      'hover-toolbar-continuation': one(longLineContinuation, { toolbar: <HoverToolbar main /> }, { hover: '[data-message-row]' }),
-      focus: one(first, { toolbar: <HoverToolbar /> }, { focus: '[data-message-row]' }),
+      'hover-toolbar-long-line': one(longLine, { startsGroup: true, actions: noopActions }, { hover: '[data-message-row]' }),
+      'hover-toolbar-continuation': one(longLineContinuation, { actions: noopActions }, { hover: '[data-message-row]' }),
+      focus: one(first, { actions: noopActions }, { focus: '[data-message-row]' }),
+    },
+    // Your own message: the delete confirm in the toolbar's place, and the inline edit field in the body's.
+    Own: {
+      'confirm-delete': one(ownMessage, { startsGroup: true, actions: noopActions, confirmingDelete: true }),
+      'confirm-delete-continuation': one(ownMessage, { actions: noopActions, confirmingDelete: true }),
+      editing: one(ownMessage, { startsGroup: true, actions: noopActions, editor: <InlineEdit value={ownText} onChange={noop} onSave={noop} onCancel={noop} /> }),
+      'editing-long': one(ownMessage, {
+        startsGroup: true,
+        actions: noopActions,
+        editor: <InlineEdit value={`${ownText}\n\nAlso: the staging bill doubled since August, so the migration plan has to land before the next billing cycle closes.`} onChange={noop} onSave={noop} onCancel={noop} />,
+      }),
+      'editing-empty': one(ownMessage, { startsGroup: true, actions: noopActions, editor: <InlineEdit value="" onChange={noop} onSave={noop} onCancel={noop} /> }),
     },
   },
   { width: 640 },

@@ -54,7 +54,7 @@ Each folder has one owner (plan v3 §17). Only that folder imports its library (
 | `src/runtime/`, `src/store/`, `src/inbox/`, `src/projection/`, `src/recovery/` | WP8 | `src/runtime/` is the only importer of `@earendil-works/pi-durable` and `@earendil-works/chord` |
 | `src/providers/`, `src/spend/` | WP9, WP20 | `src/providers/` is the only importer of `@earendil-works/pi-ai` and `@openai/codex-sdk` |
 | `src/request/`, `src/compactor/`, `src/router/`, `src/jobs/`, `src/memory-tools/`, `src/pins/` | WP11 | |
-| `src/actions/`, `src/grants/`, `src/policy/` | WP15 | |
+| `src/actions/`, `src/grants/`, `src/policy/` | WP15 (built; see "Actions") | |
 | `src/redaction/` | WP16 | |
 | `src/mcp/` | WP17 | the only importer of `@earendil-works/pi-mcp` |
 | `src/t3/`, `src/littlebird/` | WP18 | |
@@ -136,6 +136,49 @@ The router parses the stream and publishes each block once it closes: a bubble a
 
 **Testing.** `test/turns.test.ts` runs the engine in-process with `fakeProvider`; `test/turns-crash.test.ts` kills it mid-turn under the crash harness.
 
+## Actions (WP15)
+
+Cards, clicks, dispatch and grants (plan v3 §6, §9, §12, §19.5; SPEC 13.3, 13.9; `specs/agent-actions.qnt`). `openTurns({ actions: { host, executors } })` opens them with the engine; `Turns.actions` is the service, and `startAgent` binds `host` to the AgentHost port.
+
+| Folder | Does | Spec |
+| --- | --- | --- |
+| `policy/` | Pure rules: `authorizeDecision`, `toolDecision` (the tier table with the clean-run rule), `mayMintGrant`, `bindingMatches` | the guards of `authorizeWith`, `grantWith`, `grantClick`, `scheduleFromClick`, `scheduleFromMenu` |
+| `grants/` | Mint a grant under one owner authority (a clean run, a current click, the message menu), find the live one, revoke | `grantWith`, `grantClick`, `scheduleFromMenu`, `pause`, `deleteSchedule`, `invalidate("redact")` |
+| `actions/` | The card ledger (`cards.ts`), the dispatcher, the executors (the host's in `host.ts`, Juno's own in `proposals.ts`), the proposing tools, the migration set `actions` | `propose`, `click`, `authorizeDispatch`, `transportSend`, `recordReceipt`, `reject`, `lose`, `reconcile`, `resume` |
+
+**A card's life.**
+
+```text
+tool call ─▶ proposal (payload, one intent per child) ─▶ click: approvals of the exact revision, digest and ordered children
+  ─▶ dispatcher: policy check ─▶ authorize (consume) ─▶ attempt ─▶ executor ─▶ receipt: done | definite rejection: failed | unknown
+startup: open authorizations ─▶ unknown (recovery) ─▶ reconcile once ─▶ done on positive evidence, else unknown (shows "Failed")
+```
+
+- **The model never writes a payload.** A tool names what it wants in plain arguments; the trusted side looks up places, mints UUIDv7 action ids and builds the exact `CardPayload` the card renders. The same tool call is the same card (`cards.call_id`).
+- **A click** approves the stored revision, digest and every child in order (`bindingMatches`), under its op id: the same op again is the same click. A card takes one click, and a dismissed, expired or clicked card takes none. It is durable before the RPC answers (`approval.committed`), and dispatch follows in the background.
+- **The dispatcher** drains approved children in click order, one at a time. It reads the facts and commits `authorize` in one synchronous step, so the policy decides on what is committed. Paused, off, not the owner, or no Slack account known yet: the click waits, and Resume, a presence change or `actions.kick()` (WP21, when this Mac becomes the owner) runs it. Anything else that fails the policy (stale, expired, source changed by a redaction, account changed, no executor, already authorized) is written on the approval and the click never runs; the card reads "Expired" or "Failed". One authorization is one attempt, executors never retry, and a child whose destination does not deduplicate is never authorized twice (`noRepeatAuthorization`). There is no retry button.
+- **Executors** run one child by its tool (`Executor`): `slack_send` and `topics_resolve` through the host's single-attempt RPCs; `delegate` (a Proposed task's Start, which also mints the job's grant), `spend_raise` (Allow $1 more today) and `juno_answer` (a question's answer goes to the model as a `click` op). A host error means the host refused before recording anything: failed. A lost answer is unknown. Reconcile looks for positive evidence once per start and never makes a second attempt.
+- **Grants**: a `delegate` in a clean owner run mints the job's grant under `cleanRun`; a Start click under `click`; the menu's reply watch under `menu` (WP19 calls `mintGrant`). Pause and AI off revoke every grant before the mode changes; a job's Stop revokes its own; WP16's removal calls `revokeAllGrants(store, 'redaction')` inside its transaction. Resume restores none, and one authority op mints a target's grant once, so a replayed call cannot restore a revoked grant.
+- **Untrusted content forces a card.** `toolDecision` turns a no-click call into a card once the run has read Slack, a connection or a report; `delegate` then proposes a Proposed task with the Because line "Juno read Slack or a report in this reply". Sending to Slack is a card in every run.
+- **What the model learns** (§19.5). A dismissal, an expiry and a settled click leave one outcome per card. The next input the model reads, of any kind, carries them first: `<card-outcome card="…" kind="sendMessage" outcome="declined|expired|done|failed">summary</card-outcome>`. It starts no run. The text is escaped, so it cannot close the tag, and a pin never covers it (`ownerWords`). A reply to a card quotes its summary.
+- **A batch** settles row by row: a row refused after another row ran reads Failed ("Sent 1 of 2"); a card whose click never ran because it expired reads Expired.
+- **Activity** lists a run's settled cards and no-click job starts (`activityActions`); an open card has no decision yet and is not listed.
+- **The Budget card** follows a run that ended `blocked: budget`, one per day and raise.
+- **Spend**: Allow $1 more today is `spend.allowDollar(clickOpId)`, keyed by the click.
+
+**Writes in the app.** The host still refuses Slack sends while its writes are disabled (`agentHostHandlers({ writes: 'disabled' })`, WP13a), so a click in the app shows "Failed" and nothing reaches Slack. Tests turn writes on with `fakeActionHost` (`@juno/agent-testing`).
+
+**Tables** (`ACTIONS_MIGRATIONS`, replicated): `cards`, `card_revisions`, `intents`, `approvals`, `grants`, `action_results` (Activity's detail for a failed or unknown authorization) and `card_outcomes`. The core's `authorizations`, `attempts` and `receipts` hold the rest; `authorizations.intent_id` names an `intents` row.
+
+**For the next packages.**
+
+- WP16 (redaction): call `revokeAllGrants(store, 'redaction')` in the removal's transaction and bump `memory_head.gen`; open cards proposed in the old generation expire and a waiting click is refused (`sourceChanged`). Register an executor for the `remove` card's child (the card's choice is in `args.choice.alsoRemoveReply`).
+- WP17 (MCP): register one `Executor` per write tool through `openTurns({ actions: { executors } })` with `deduped: false` unless the server keeps a key, a `check` for the schema hash and preconditions, and a `reconcile` that reads back. Propose `change` and `connect` cards with `actions.propose`; `toolDecision('outward', run)` is always a card, and `toolDecision('read', run)` never is. Use `policy.toolDecision` for the allowlist's Tier 0 versus Tier 3.
+- WP18 (T3): register `t3_start` (deduped: false; reconcile by the tag `juno:<action id>`), mint the job's grant on Start with `mintGrant({ authority: { _tag: 'click', current: true } })`, and decide `t3_send` and `t3_stop` with `toolDecision('steer' | 'stopJob', run, { liveGrant })`.
+- WP19 (schedules): `toolDecision('scheduleCreate', run)` gives run or card; mint the schedule grant with `mintGrant({ opClass: 'schedule', authority })` for a clean run, a `proposedSchedule` click (register its executor) or the menu (`{ _tag: 'menu' }`), revoke it with `revokeGrant(store, 'schedule', id, 'delete')`, and register the `schedule` card's executor (its choice is `args.choice.action`).
+
+`test/policy.test.ts` checks the pure rules with properties; `test/actions.test.ts` runs every card kind on the engine (click, consume, send, receipt, unknown, dismiss); `test/actions-crash.test.ts` kills the agent at `approval.committed`, `authorization.consumed` and `attempt.beforeReceipt`.
+
 ## Settings › Juno
 
 `src/settings/settings.ts` serves the page and the owner's changes over the running engine (SPEC 13.10, plan v3 §7.1, §5.4). The owner's choices are one row of `juno_settings` (`SETTINGS_MIGRATIONS`, replicated): the chat family, the compaction family and the cap for days not yet started.
@@ -144,7 +187,8 @@ The router parses the stream and publishes each block once it closes: a bubble a
 - **Spend.** Today's spend is the ledger's actual plus unknown spend; the cap is today's. A new cap applies today (`setCap`, refused below what today has committed) and is saved for later days.
 - **The key.** Only `missing`, `set` or `rejected`: a run that ends `failed: keyRejected` marks the current key, and a new key clears the mark.
 - **Pause** sets the run mode and asks every running job to stop. It is refused while the mode is `off`. Settings change with AI assist off too.
-- **Not served yet**: Codex status (shown `missing`), rules (WP15), the backup folder (the default `agentDir/backup`, with no backup taken; WP21) and ownership changes (WP21).
+- **Rules** are the owner's lines (`actions/rules.ts`, the `owner_rules` table): replaced as one list, each one line of at most 280 bytes, at most 20. The model reads them with Juno's instructions. They can only make Juno ask more; tiers and cards are enforced in code.
+- **Not served yet**: Codex status (shown `missing`), the backup folder (the default `agentDir/backup`, with no backup taken; WP21) and ownership changes (WP21).
 
 ## The chat server (WP13b)
 
@@ -154,9 +198,26 @@ The router parses the stream and publishes each block once it closes: a bubble a
 - **Read state** is one mark in `chat_read` (`CHAT_MIGRATIONS`, replicated tables): Juno's bubbles at or before it are read. `agent.chat.read` takes a bubble or an archive message and only moves the mark forward.
 - **The banner**: `updateNeeded`, then `aiOff` (AI assist off in Juno, or the mode is off), `paused`, `offline` (the host is not live), else `none`. The composer is off for `updateNeeded` and `aiOff`.
 - **Commands**: send, react and retry go to the engine's inbox and answer after the commit; a second Try again for the same failure names the retry already queued; `tooLong` and a failed write (`notDelivered`) come back as errors. With AI assist off they answer `unavailable`.
-- **The Juno menu's pages** (`pages.ts`) are rebuilt on the same signal. What Juno remembers lists the active pins with their source message; edit, remove and "Remember this" check the pin's (or the message's) version and answer `stale` when it moved. Memory of this chat is the published view as a timeline, each line dated from its messages' earliest to latest time, and rechecked every 2 s because compaction publishes between runs. Activity lists each finished run: who asked ("You", a job's title, "A schedule"), when, the outcome (`stayedQuiet` when a complete run said nothing), and whether it read untrusted content. Scheduled, Connections and Review stream empty pages. Memory and Activity page with `{ cursor?, limit }`: the newest `limit` rows before the cursor, oldest first, and `moreAbove`.
-- **Not served yet**: cards (WP15), Remove (WP16), the actions and read line under an Activity run (WP15), schedules (WP19), connections (WP17), review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
-- **Not listed yet**: cards and notes ("Remembered"), and schedule origins (a wake shows as Juno's own run). A message's `context` (the topic or the person it was sent about) is stored with the op but not yet shown to the model; that is the request builder's (WP11).
+- **Cards** (WP15): the page lists every card at the time Juno proposed it, and each job's Task card at the time it started; `cards` carries the `CardBinding` of each open card in the window. `agent.cards.approve`, `dismiss` and `editMessage` answer after their commit; a click or edit on a card the owner no longer sees is `stale`, on an expired card `expired`, on a card that does not take it `invalid`. `prepare` writes a button's data (an option, a reply, Keep, Pause or Delete on a schedule) into a new revision and returns the binding to approve; a button with no data returns the card's current binding. `askAgain` on an expired card sends the owner message "Ask again", replying to the card. `undo` answers `unavailable`.
+- **The Juno menu's pages** (`pages.ts`) are rebuilt on the same signal. What Juno remembers lists the active pins with their source message; edit, remove and "Remember this" check the pin's (or the message's) version and answer `stale` when it moved. Memory of this chat is the published view as a timeline, each line dated from its messages' earliest to latest time, and rechecked every 2 s because compaction publishes between runs. Activity lists each finished run: who asked ("You", a job's title, "A schedule"), when, the outcome (`stayedQuiet` when a complete run said nothing), whether it read untrusted content, and its actions (`actions/activity.ts`): each card the run proposed with its decision (approved, dismissed, expired, refused), outcome and a plain failure line with the detail behind Copy details, and each job it started with no click. The folded read line is not built. Scheduled and Review stream empty pages. Connections streams the MCP manager when `ChatHost.connections` is supplied. Memory and Activity page with `{ cursor?, limit }`: the newest `limit` rows before the cursor, oldest first, and `moreAbove`.
+- **Not served yet**: Remove (WP16), schedules (WP19), review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
+- **Not listed yet**: notes ("Remembered"), and schedule origins (a wake shows as Juno's own run). A message's `context` (the topic or the person it was sent about) is stored with the op but not yet shown to the model; that is the request builder's (WP11).
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
 
 `test/serve.test.ts` and `test/juno-pages.test.ts` run the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel` (`test/serve-harness.ts`). `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.
+
+## MCP connections (WP17)
+
+`src/mcp/` owns HTTP connections, loopback OAuth sign-in, tool discovery and tier decisions, the two fixed model tools, Notion's version checks and read-back, and the per-turn MCP endpoint for WP20. See [the MCP hand-off](src/mcp/README.md) for bootstrap, credential bridge and WP14 wiring, tests and the owner-only live check.
+
+Contract additions: `ActionsOptions.executors` accepts a callback for discovered tools; `TurnsOptions.tools` registers fixed adapter tools before resume; `ChatHost.connections` serves the Connections routes; discovered rows carry an optional `schemaHash` (always present from the manager). The request builder pages MCP results over 20 KB using ordinary archive attachments. No action protocol changed.
+
+## Scheduler (WP19)
+
+`src/schedule/` implements persisted occurrences, grant checks at admission and
+start, reply watches, schedule tools and card executors. Its page and commands
+are served when `ChatHost.schedule` is supplied. See
+[`src/schedule/README.md`](src/schedule/README.md) for the router and host
+integration contract, the message-menu RPC and the remaining startup wiring.
+`mintGrant` now joins a caller's transaction so a schedule and its grant commit
+together.

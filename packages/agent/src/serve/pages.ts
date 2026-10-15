@@ -8,11 +8,11 @@
  *
  * - What Juno remembers: the active pins, with their source message.
  * - Memory of this chat: the published memory view as a dated timeline.
- * - Activity: one row per run: who asked, when, how it ended, and whether it
- *   read untrusted content. Actions under a run come with the ledger's
- *   cards (WP15), and the folded read line with them.
- * - Scheduled (WP19), Connections (WP17) and Review (WP21: there is no
- *   restore yet, so never recovery) are empty.
+ * - Activity: one row per run: who asked, when, how it ended, whether it
+ *   read untrusted content, and its actions (`actions/activity.ts`). The
+ *   folded read line is not built yet.
+ * - Scheduled (WP19) and Review (WP21) are empty. Connections is served
+ *   separately by mcp/pages.ts when its manager is supplied.
  */
 import { limits, utf8Bytes } from '@juno/agent-memory'
 import {
@@ -30,6 +30,7 @@ import {
   type RunOutcome,
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
+import { activityActions } from '../actions/activity'
 import type { Origin } from '../router/events'
 import { parseOutput } from '../router/output'
 import { view } from '../store/memory'
@@ -133,7 +134,7 @@ export function activityPage(store: Store, window: PageWindow): ActivityPage {
         who: whoOf(store, run.origin, run.opId),
         at: run.at,
         outcome: outcomeOf(JSON.parse(run.ending) as Ending, parseOutput(text).bubbles.length === 0),
-        actions: [],
+        actions: activityActions(store, run.id),
         tainted: run.clean === 0,
       }
     }),

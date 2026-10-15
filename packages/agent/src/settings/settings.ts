@@ -15,10 +15,12 @@
  *   rejected it. The key itself stays with main and the provider.
  * - Pause: the run mode. Pausing asks every running job to stop (SPEC
  *   13.9). With AI assist off the mode stays `off`.
+ * - Rules: the owner's rules (`actions/rules.ts`), replaced as a whole list.
+ *   The model reads them with Juno's instructions from the next request.
  *
  * Not yet served, each with its work package: Codex (WP20; shown as not
- * installed), rules (WP15; none), the backup folder (WP21; the default
- * folder, with no backup taken) and ownership changes (WP21; read only).
+ * installed), the backup folder (WP21; the default folder, with no backup
+ * taken) and ownership changes (WP21; read only).
  */
 import { join } from 'node:path'
 import type { JunoSettingsPage, ModelChoice, Ownership, SettingsChange } from '@juno/agent-contract'
@@ -26,6 +28,7 @@ import { pickerFamilies, type PickerModel } from '../providers/catalog'
 import type { ModelPicker, OpenRouterKey } from '../providers/openrouter'
 import type { Turns } from '../router/open'
 import { DOLLAR, dollars } from '../spend'
+import { ownerRules, setOwnerRules } from '../actions/rules'
 import { modelFor, save, type Purpose } from './store'
 
 /** How often the catalogue is checked; it is read at most once a day. */
@@ -130,7 +133,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       capUsd: spend.cap / DOLLAR,
       codex: { _tag: 'missing' },
       openRouterKey: options.key?.status() ?? 'missing',
-      rules: [],
+      rules: ownerRules(store),
       paused: turns.mode() === 'paused',
       backupFolder: join(options.agentDir, 'backup'),
       ownership: ownership(),
@@ -161,7 +164,8 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
         break
       }
       case 'rules':
-        return { _tag: 'refused', reason: 'unavailable', message: 'Rules are not available yet.' }
+        if (setOwnerRules(store, next.rules) === 'invalid') return { _tag: 'refused', reason: 'invalid', message: 'Each rule is one line of up to 280 bytes, and there are at most 20.' }
+        break
       case 'backupFolder':
         return { _tag: 'refused', reason: 'unavailable', message: 'Backup is not available yet.' }
     }

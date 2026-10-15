@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { accent, colors, motion, sizes } from '@juno/tokens/tokens.stylex'
 
-export type TextButtonTone = 'default' | 'subtle' | 'muted' | 'danger'
+export type TextButtonTone = 'default' | 'muted' | 'danger'
 
 export interface TextButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className'> {
   /** `default` reads as a link in `--foreground-default`; `muted` follows the line it sits in. */
@@ -63,14 +63,6 @@ const tones = stylex.create({
     color: colors['--foreground-default'],
     textDecorationColor: {
       default: colors['--border-strongest'],
-      ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
-    },
-  },
-  // A citation inside a Juno bubble: subtle text, underlined in the muted grey.
-  subtle: {
-    color: colors['--foreground-subtle'],
-    textDecorationColor: {
-      default: colors['--foreground-muted'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
   },

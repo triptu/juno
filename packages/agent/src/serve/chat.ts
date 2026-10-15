@@ -16,11 +16,14 @@
  *   separator, an ending or a group label ends a group.
  * - A Juno bubble is unread when it is newer than the read mark.
  *
- * Cards come with the actions (WP15) and notes with the pin events; neither
- * is listed yet.
+ * - Cards (WP15) sit at the time Juno proposed them, under their run; a
+ *   Task card at the time its job started. A card is unread like a bubble.
+ *
+ * Notes come with the pin events; they are not listed yet.
  */
 import type {
   BubbleId,
+  CardId,
   ChatItem,
   ChatMessageId,
   ChatSummary,
@@ -28,6 +31,7 @@ import type {
   Ending,
   GroupPosition,
   JobId,
+  JunoInline,
   OpId,
   Origin,
   Quote,
@@ -36,11 +40,13 @@ import type {
   RunId,
   SendContext,
 } from '@juno/agent-contract'
+import type { CardView } from '../actions/cards'
 import { aboutOf } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import { ownerOpOf } from '../router/input'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
+import { resolveSpans, sourceTable, type BubbleSpan } from '../router/sources'
 import type { Store } from '../store/store'
 
 const GROUP_GAP_MS = 2 * 60_000
@@ -52,6 +58,8 @@ export interface ChatSource {
   /** When a bubble was first shown; `fallback` is stored for a bubble not seen before. */
   readonly seen: (bubbleId: string, fallback: number) => number
   readonly jobs: ReadonlyArray<Job>
+  /** Every card Juno proposed (`actions.views`). */
+  readonly cards: ReadonlyArray<CardView>
   /** Juno items at or before this time are read. */
   readonly readAt: number
   /** Why accepted messages wait, if they do. */
@@ -173,7 +181,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
     const live = source.live?.runId === run.id ? source.live : undefined
     const origin = originOf(run, source.jobs)
     const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
-    let bubbles: ReadonlyArray<{ id: string; text: string; replyTo?: string; at: number }>
+    let bubbles: ReadonlyArray<{ id: string; text: string; body: ReadonlyArray<BubbleSpan>; replyTo?: string; at: number }>
     if (live !== undefined) {
       bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
     } else {
@@ -193,7 +201,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
           _tag: 'juno',
           id: bubble.id as BubbleId,
           runId: run.id as RunId,
-          body: [{ _tag: 'text', text: bubble.text }],
+          body: bubble.body.map(inlineOf),
           at: bubble.at,
           origin,
           ...(replyTo ? { replyTo: quoteOf(replyTo) } : {}),
@@ -232,6 +240,20 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
     })
   }
   entries.push(...junoEntries)
+  for (const view of source.cards) {
+    entries.push({ by: 'line', at: view.at, item: { _tag: 'card', runId: view.runId as RunId, card: view.card, reactions: reactionsOf('card', view.card.id), unread: view.at > source.readAt } })
+  }
+  const started = new Map(
+    (store.db.prepare('SELECT id, created_at AS at FROM jobs').all() as Array<{ id: string; at: number }>).map((row) => [row.id, row.at]),
+  )
+  for (const job of source.jobs) {
+    const at = started.get(job.id) ?? job.stepAt
+    const card = {
+      _tag: 'task' as const, id: `task:${job.id}` as CardId, jobId: job.id as JobId, kind: job.kind, title: job.title, where: job.place,
+      phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
+    }
+    entries.push({ by: 'line', at, item: { _tag: 'card', runId: job.runId as RunId, card, reactions: reactionsOf('card', card.id), unread: at > source.readAt } })
+  }
   // Stable: at the same time an owner message comes before what answers it.
   entries.sort((a, b) => a.at - b.at)
   return layout(entries, source)
@@ -250,11 +272,19 @@ function archivedBubbles(store: Store, runId: string, rows: ReadonlyArray<{ text
   // How many bubbles each entry closed, to time each bubble by its entry.
   const times: number[] = []
   for (const entry of entries) for (let n = parseOutput(entry.text).bubbles.length; n > 0; n--) times.push(entry.at)
+  const sources = sourceTable(store, runId)
   return output.bubbles.map((bubble, n) => {
     const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
-    return { id: `${runId}:${n}`, text: bubble.text, at: times[n] ?? entries.at(-1)?.at ?? startedAt, ...(replyTo ? { replyTo } : {}) }
+    const body = resolveSpans(bubble.spans, sources)
+    return { id: `${runId}:${n}`, text: bubble.text, body, at: times[n] ?? entries.at(-1)?.at ?? startedAt, ...(replyTo ? { replyTo } : {}) }
   })
 }
+
+/** A span of a bubble as the chat shows it. A source the host did not name a channel for shows its channel id as the place. */
+const inlineOf = (span: BubbleSpan): JunoInline =>
+  'source' in span
+    ? { _tag: 'source', text: span.text, channelId: span.source.channelId, ts: span.source.ts, place: span.source.place ?? span.source.channelId }
+    : { _tag: 'text', text: span.text }
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 

@@ -266,7 +266,7 @@ unknown ─reconcile─▶ done (positive evidence) | unknown (kept; the card sh
 
 ### 6.5 Startup and Pause (R12)
 - At startup, every `attempt` without a receipt becomes `unknown` before `resume()`. A reconcile fiber works through them in the background. Unrelated chat runs at once. Resumed runs see unresolved outcomes in turn state.
-- Pause and AI off **stop new authorizations** and ask jobs to cancel. Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Pause does not end the current run: it finishes without acting. There is no Stop (O1).
+- Pause and AI off **stop new authorizations**, revoke every grant, and ask jobs to cancel. Resume restores no grant; a click that waited through Pause runs once after Resume if it is still current (WP15; spec `pauseRevokesGrants`, `resumedClickWitnessStep`). Authorizations already consumed may still land. States distinguish `cancel-requested`, `cancelled`, `unknown` and `done`, and earlier evidence is never overwritten. Pause does not end the current run: it finishes without acting. There is no Stop (O1).
 
 ## 7. Providers and the model picker
 
@@ -646,8 +646,8 @@ The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (
 
 - **Output.** Every message in a Slack read result (`slack_search`, `slack_history`, `slack_replies`, `slack_topics`) gets a short handle (`m3`) that the run maps to `{ channelId, ts }`. Inside a `<say>` block the model wraps the words of a claim in `<src m="m3">words</src>`. Handles keep the prompt small, and an invented id cannot resolve.
 - **Check.** The router resolves each handle against the handle table of the current run only. An unknown handle renders as plain text. Nothing calls Slack at render time.
-- **Contract (WP7).** `JunoInline` gains `source { text, channelId, ts, label }`, where `label` is the place and time for the tooltip ("#eng · 14:02"). `OpenTarget` gains `message { channelId, ts }`.
-- **View (WP12).** `JunoBubble`'s inline renders `source` as the citation `TextButton` (`data-source`), with the label as its tooltip.
+- **Contract (WP7).** `JunoInline` gains `source { text, channelId, ts, place }`, where `place` is the channel as the owner sees it ("#eng"). `OpenTarget` gains `message { channelId, ts }`. The time is not sent as text: the view formats it from `ts`, so it stays current ("14:02", then "Yesterday").
+- **View (WP12).** `JunoBubble`'s inline renders `source` as the citation `TextButton` (`data-source`), with "#eng · 14:02" (the place and the message's time) as its tooltip. A click calls `onOpen` with the `message` target.
 - **Open (WP14).** `message` opens the topic that holds the message (its thread, or Main) at that message, in the current tab or a new one with ⌘, and flashes it. It reuses the open-topic path with a target `ts`.
 - **Prompt and eval.** The prompt says that claims about Slack carry a source. The eval adds the share of Slack claims with a source, and checks that no unresolved handle renders as a link.
 - **Hours-start summary** (decided 10-14 23:25). The engine's `hoursStartSummary` (M10) also hands its list to the agent through the host port (WP13). The agent appends one Juno message with origin `summary` and one `source` inline per message, with no run and no model call, so it costs no spend. Clicking the OS notification opens the Juno tab at that message. Contract (WP7): `Origin` gains `summary { at }`, labelled "Summary". With AI assist off there is no chat, and the click opens the first message.
@@ -689,7 +689,7 @@ The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (
 
 **Belongs to** WP15 (record) and WP11 (request). No view change.
 
-- **Record (WP15).** Dismiss, Skip, Keep on a `remove` card, and expiry write a card outcome to the archive: `{ cardId, kind, outcome: declined | expired, summary }`. It is Juno-internal state, so it does not taint a run.
+- **Record (WP15).** Dismiss, Skip, Keep on a `remove` card, and expiry write a card outcome: `{ cardId, kind, outcome: declined | expired, summary }`. A settled click writes `done` or `failed` the same way, so the model neither proposes a sent message again nor claims a failed one landed (WP15 added this). It is Juno-internal state, so it does not taint a run. As built, the outcome waits in `card_outcomes` and reaches the archive inside the next input pi reads.
 - **Request (WP11).** The next request carries it at its place in the chat, as `<card-outcome card="c7" outcome="declined">Send message to #eng</card-outcome>`. It starts no run; it waits for the next input. Compaction keeps it like a message, so a no is remembered.
 - **Eval (WP23).** After a dismissal, Juno does not propose the same card again unless the owner asks or its source changed.
 - **Specs.** None. To `agent-memory.qnt` the outcome is one more archive entry with an opaque payload.

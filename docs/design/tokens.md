@@ -206,6 +206,8 @@ The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, 
 
 The dark Tide tones sit 0.045 above the study's (base 0.285 there): on the near-black sidebar (L 0.19) the study's pebbles read too dim. In dark they stay near neutral on purpose (chroma 0.012 to 0.026): at low lightness amber, olive and coral turn to mud at any real chroma, so the bands step in lightness instead.
 
+Checked again on 10-15 against the row's text (gallery `TopicRow/Tile/art-and-pebbles`, light and dark). On the sidebar, the title is 15.2:1 in light and 15.5:1 in dark, and the preview 4.8:1 and 6.9:1. The art's ink is 7.6 to 7.8:1 in light and 9.1 to 9.3:1 in dark, the same lightness step from the sidebar in both themes. The pebble bands are 1.25 to 2.15:1 in light and 1.5 to 2.9:1 in dark: further from the sidebar in lightness than in light, but still clearly quieter than the drawings and the text. Lower dark ramps (ground at 0.27 to 0.30) were tried side by side and only read murkier, so the values stay.
+
 ## 2. Typography
 
 ### 2.1 Families
@@ -352,12 +354,13 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--toast-max-width` | 352px |
 | `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
+| `--emoji-picker-width` / `--emoji-picker-height` | 314px / 360px. The full emoji picker (`EmojiPicker`): nine 32px cells, 12px and 2px padding, the 10px scrollbar gutter and a 1px border each side, so the search field and the grid share edges. Fixed height; the grid scrolls inside |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
-| `--toolbar-height` / `--toolbar-reserve` | 36px / 213px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 193px, plus a 20px gap |
+| `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 280px. An image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). File cards are `--thumb-max-width` wide |
 
 ### Controls

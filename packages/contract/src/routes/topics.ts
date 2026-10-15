@@ -186,6 +186,25 @@ export const NotifyTargetSchema = Schema.Struct({ kind: Schema.Literals(['thread
 export type NotifyTargetView = typeof NotifyTargetSchema.Type
 export const NotifyChoiceSchema = Schema.Literals(['every', 'matters', 'never'])
 
+/**
+ * A topic's stored drawing as `art.restore` writes it back: the `topic_art`
+ * row, less the hash derived from the recipe.
+ */
+export const StoredArt = Schema.Struct({
+  recipe: Schema.String,
+  inputHash: Schema.String,
+  model: Schema.String,
+  status: Schema.String,
+  hue: Schema.String,
+  titleSource: Schema.String,
+  source: Schema.String,
+  createdAt: Schema.String,
+})
+export type StoredArt = typeof StoredArt.Type
+
+/** The undo of a redraw: the drawing before it, or `null` when the topic had none. */
+export const artRestorePayload = { id: Schema.String, previous: Schema.NullOr(StoredArt) }
+
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.restore', restorePayload),
   Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
@@ -197,6 +216,7 @@ export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('notifications.setLevel', { target: NotifyTargetSchema, choice: NotifyChoiceSchema }),
   // Several resolves undone together (Home's Resolve all): `topics.restore` for each.
   Schema.TaggedStruct('topics.restoreAll', { restores: Schema.Array(Schema.Struct(restorePayload)) }),
+  Schema.TaggedStruct('art.restore', artRestorePayload),
   // A deleted view, put back whole; and a conversation added to or removed from a view.
   Schema.TaggedStruct('views.restore', { view: SavedView }),
   Schema.TaggedStruct('views.addChannel', { id: Schema.String, channel: Schema.String }),

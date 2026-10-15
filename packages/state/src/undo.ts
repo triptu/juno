@@ -13,6 +13,7 @@ import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import type { Rpc } from 'effect/rpc'
 import {
+  artRestore,
   channelsIgnore,
   channelsUnignore,
   notificationsSetLevel,
@@ -122,6 +123,8 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, notificationsSetLevel, payloadOf(undo))
     case 'topics.restoreAll':
       return Promise.all(undo.restores.map((restore) => runCommand(registry, topicsRestore, restore)))
+    case 'art.restore':
+      return runCommand(registry, artRestore, payloadOf(undo))
     case 'views.restore':
       return runCommand(registry, viewsRestore, payloadOf(undo))
     case 'views.addChannel':
