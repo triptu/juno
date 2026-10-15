@@ -46,6 +46,8 @@ export interface MessageListProps {
   readonly older?: OlderStatus
   /** The scroll element, for the container's open position and stick-to-bottom. */
   readonly scrollRef?: Ref<HTMLElement>
+  /** The list runs under the topic's floating header (default). False where nothing floats over it, as in peek. */
+  readonly underHeader?: boolean
   /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
@@ -56,6 +58,10 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry on a failed send. */
+  readonly onRetry?: (clientMsgId: string) => void
+  /** Delete draft on a failed send. */
+  readonly onDiscard?: (clientMsgId: string) => void
   /** Right-click or the context-menu key on a message: its menu, at the pointer. */
   readonly onMessageMenu?: (ts: string, event: MouseEvent) => void
 }
@@ -104,6 +110,7 @@ export function MessageList({
   dividerBefore,
   older = 'none',
   scrollRef,
+  underHeader = true,
   anchorRef,
   hueOf = hueForId,
   renderToolbar,
@@ -111,6 +118,8 @@ export function MessageList({
   onChannel,
   onLink,
   onToggleReaction,
+  onRetry,
+  onDiscard,
   onMessageMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
@@ -120,7 +129,7 @@ export function MessageList({
   const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
 
   return (
-    <ScrollArea scrollbar="hover" underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
+    <ScrollArea scrollbar="hover" underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
       <div
         role="list"
         aria-label="Messages"
@@ -146,7 +155,8 @@ export function MessageList({
           // changes no row's height. Only the topic's first message, with nothing that can arrive above it, sits flush.
           const first = index === 0 && notDrawnAbove === 0 && older === 'none'
           return (
-            <Row key={item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
+            // A message's client_msg_id outlives its pending row, so the row becomes the stored message in place.
+            <Row key={item.message.clientMsgId ?? item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
               <Message
                 message={item.message}
                 sender={item.sender}
@@ -163,6 +173,8 @@ export function MessageList({
                 onChannel={onChannel}
                 onLink={onLink}
                 onToggleReaction={onToggleReaction}
+                onRetry={onRetry}
+                onDiscard={onDiscard}
                 onFocus={setFocusedTs}
               />
             </Row>

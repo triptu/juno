@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
-import { hostile, longFirstLine, main, mentions, thread } from './fixtures/messages'
+import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { HoverToolbar } from './HoverToolbar'
 import { Message, type MessageProps } from './Message'
@@ -47,6 +47,8 @@ const edited = thread[9]!
 const broadcast = main[8]!
 const longLine = longFirstLine[0]!
 const longLineContinuation = longFirstLine[1]!
+const pendingRow = sending[2]!
+const failedRow = failedSend[2]!
 
 export default defineFixtures(
   Message,
@@ -62,6 +64,12 @@ export default defineFixtures(
       unloaded: one(unloaded),
       // The name is cut off: hovering it shows the full name as the tooltip.
       'long-name': one(longLine, { startsGroup: true }, { width: 420 }),
+    },
+    // A send still on its way looks like the message it becomes; past --delay-pending it dims.
+    Send: {
+      sending: one(pendingRow, { startsGroup: true }),
+      failed: one(failedRow, { startsGroup: true, onRetry: noop, onDiscard: noop }),
+      'failed-continuation': one(failedRow, { onRetry: noop, onDiscard: noop }),
     },
     Interaction: {
       hover: one(first, {}, { hover: '[data-message-row]' }),

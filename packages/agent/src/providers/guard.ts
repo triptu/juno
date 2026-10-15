@@ -192,15 +192,20 @@ export function createProviderGuard(options: GuardOptions) {
     })()
     return outer
   }
-  for (const provider of transport.getProviders()) models.setProvider(createProvider({
-    id: provider.id,
-    auth: { apiKey: { name: provider.name, resolve: async () => ({ auth: {} }) } },
-    models: [...provider.getModels()],
-    api: { stream, streamSimple: stream },
-  }))
+  const register = () => {
+    for (const provider of transport.getProviders()) models.setProvider(createProvider({
+      id: provider.id,
+      auth: { apiKey: { name: provider.name, resolve: async () => ({ auth: {} }) } },
+      models: [...provider.getModels()],
+      api: { stream, streamSimple: stream },
+    }))
+  }
+  register()
   const publicModels: Models = models
   return {
     models: publicModels,
+    /** Takes the transport's model list again, after the picker's catalogue changed. */
+    refreshModels: register,
     spend,
     /**
      * Called only by the trusted builder hook, after persisting any emergency

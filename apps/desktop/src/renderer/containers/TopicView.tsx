@@ -3,6 +3,7 @@ import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail }
 import {
   bottomWindow,
   channelThreadsAtom,
+  discardMessage,
   dividerIndex,
   headerRenamingAtom,
   loadOlderMessages,
@@ -12,6 +13,7 @@ import {
   openExternal,
   openTopic as fetchTopic,
   registry,
+  retryMessage,
   runCommand,
   scrollSnapshotAtom,
   shouldMarkRead,
@@ -24,7 +26,6 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
   ActiveThreads,
-  ComposerSlot,
   hueFor,
   MessageList,
   NewMessagesPill,
@@ -38,6 +39,8 @@ import {
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { takeSendMark } from './sendMark'
+import { TopicComposer } from './TopicComposer'
 import { cancelRename, renameTopic, showMessageMenu, showTopicMenu, toggleResolved } from './topicActions'
 
 /**
@@ -88,6 +91,8 @@ function scopeToChannel(channel: string): void {
 }
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
+const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
+const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
@@ -245,11 +250,11 @@ function openThreadInNewTab(id: string): void {
  * and the same for peek (section 5). The list alone, with no header or
  * composer, in `readOnly` mode (see `TopicProps`).
  */
-export const TopicPreview = memo(function TopicPreview({ id }: { readonly id: string }) {
+export const TopicPreview = memo(function TopicPreview({ id, underHeader = true }: { readonly id: string; readonly underHeader?: boolean }) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   if (detail == null) return null
-  return <Topic key={id} id={id} detail={detail} readOnly />
+  return <Topic key={id} id={id} detail={detail} readOnly underHeader={underHeader} />
 })
 
 interface TopicProps {
@@ -262,9 +267,11 @@ interface TopicProps {
    * topic as a tab shows it, with its header and composer.
    */
   readonly readOnly?: boolean
+  /** The list runs under a floating header. Default true; peek has none. */
+  readonly underHeader?: boolean
 }
 
-function Topic({ id, detail, readOnly = false }: TopicProps) {
+function Topic({ id, detail, readOnly = false, underHeader = true }: TopicProps) {
   const list = useAtomValue(messageListAtom(id))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
@@ -273,7 +280,7 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
 
   // The read pointer when this tab first showed the topic, for the divider.
   const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
-  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs)
+  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
   const [positioned, setPositioned] = useState(false)
@@ -366,6 +373,11 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
     hold(scroller, pin, pinnedTop)
     setSeenTs(last)
   }, [positioned, last, atEnd])
+
+  // `juno.send`: from Enter to the frame that shows the message, pending or, after a very quick answer, settled.
+  useLayoutEffect(() => {
+    if (last !== undefined && list.rows.get(last)?.fromMe === true && takeSendMark()) afterPaint(() => measure('juno.send', 'juno.send'))
+  }, [last, list.rows])
 
   // The user's own scrolling lets go of the pin; where the list comes to rest decides the next one.
   useEffect(() => {
@@ -502,7 +514,8 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
   const eager = eagerRows(list.order, openAt, rows)
 
   const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
-  const newCount = seenAt < 0 ? 0 : list.order.length - seenAt - 1
+  // The user's own messages, sent or still sending, are never new to them.
+  const newCount = seenAt < 0 ? 0 : list.order.slice(seenAt + 1).filter((ts) => list.rows.get(ts)?.fromMe !== true).length
   const showPill = positioned && !atBottom && (newCount > 0 || far || !atEnd)
 
   // An empty list says nothing until Slack has answered or 300 ms have passed.
@@ -520,15 +533,21 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
       older={list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
       scrollRef={scrollRef}
+      underHeader={underHeader}
       anchorRef={anchorRef}
       hueOf={hueOf}
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
-      {...(readOnly ? {} : { onMessageMenu: (ts: string) => void showMessageMenu(detail, ts) })}
+      {...(readOnly ? {} : { onRetry: retry, onDiscard: discard, onMessageMenu: (ts: string) => void showMessageMenu(detail, ts) })}
     />
   )
   if (readOnly) return messages
+
+  const sent = () => {
+    jumpToLatest()
+    void markRead(id)
+  }
 
   return (
     <TopicViewFrame
@@ -546,7 +565,7 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
-      composer={<ComposerSlot placeholder={main ? `Message ${detail.channel.label}` : 'Reply'} />}
+      composer={<TopicComposer key={id} detail={detail} onSent={sent} />}
     >
       {messages}
     </TopicViewFrame>

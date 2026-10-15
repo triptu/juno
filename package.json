@@ -33,6 +33,7 @@
     "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
     "remote": "node scripts/remote.mjs",
     "affected": "node scripts/affected.mjs",
+    "verify:main": "node scripts/verify-main.mjs",
     "specs:check": "node scripts/heavy.mjs node specs/check.mjs",
     "specs:traces": "node scripts/heavy.mjs node specs/check.mjs --traces",
     "test:agent-contracts": "node scripts/heavy.mjs pnpm --filter @juno/agent-cards --filter @juno/agent-contract test",

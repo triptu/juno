@@ -17,6 +17,8 @@ export const Channels = {
   engineRestart: 'engine.restart',
   /** Renderer asks main for a fresh port to the Juno Agent. The port arrives on `Events.agentPort`. */
   agentRequestPort: 'agent.requestPort',
+  /** Stores the OpenRouter key in the keychain and hands it to the agent; null removes it. */
+  agentSetOpenRouterKey: 'agent.setOpenRouterKey',
   /** Remember the theme so the next launch paints the window in it. */
   launchSetTheme: 'launch.setTheme',
   /** Remember the accent so the next launch's first render already uses it. */
@@ -124,6 +126,13 @@ export interface JunoBridge {
      * AGENT_PORT_HANDOFF_TAG.
      */
     readonly requestPort: () => Promise<unknown>
+    /**
+     * Stores the OpenRouter key in the macOS keychain through main and hands
+     * it to the agent; `null` removes it. Resolves with `saved`, `removed`,
+     * `invalid` (not a key: nothing was stored) or `failed` (the keychain
+     * refused). Settings › Juno shows the result through its own stream.
+     */
+    readonly setOpenRouterKey: (key: string | null) => Promise<unknown>
   }
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>

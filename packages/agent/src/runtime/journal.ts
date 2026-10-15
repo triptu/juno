@@ -133,6 +133,10 @@ export interface Journal {
   readonly lastCommitted: () => Promise<number>
   /** Starts a new context for the next run (spec `reset`). Only when the conversation is idle. */
   readonly reset: () => Promise<void>
+  /** The chat model pi's root conversation uses now: the stored one, else the settings'. */
+  readonly model: () => Promise<{ readonly provider: string; readonly modelId: string } | undefined>
+  /** Changes the root conversation's model, in its own commit. Only between runs: a run keeps its model. */
+  readonly setModel: (model: { readonly provider: string; readonly modelId: string }) => Promise<void>
   /**
    * Admits input with `requestId = opId` (spec `submit`). pi returns the existing submission for
    * an op it already has, so a resubmit after a crash adds nothing. `steer` joins the running run.
@@ -177,6 +181,8 @@ async function startJournal(db: NodeSqliteDatabase, incarnation: string, setting
     resume: () => harness.resume(),
     lastCommitted: async () => Number((await db.get<{ next_seq: number }>('SELECT next_seq FROM durable_metadata WHERE singleton = 1'))?.next_seq ?? 1) - 1,
     reset: () => root.reset(undefined, ctx),
+    model: async () => (await root.agent(ctx)).model,
+    setModel: (model) => root.configure({ model }, ctx),
     submit: async ({ opId, text, kind, steer }) => {
       const submission = await root.submit(
         { type: 'input', content: text, requestId: opId, entry: { kind: INPUT_ENTRY, data: { opId, kind } }, ...(steer ? { whenBusy: 'steer' as const } : {}) },
