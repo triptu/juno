@@ -5,3 +5,5 @@ date	commit	mode	model	judge	cases	checks	answers	sources	cards	say	reactions	in
 2026-10-15	e10c6c0	live	anthropic/claude-haiku-5.5	anthropic/claude-opus-5.5	6/14	59/67	6/6	19/26	3/3	15/15	5/6	7/7	3/3	1/1	26/42
 2026-10-15	eebcdea	live	anthropic/claude-sonnet-5.5	anthropic/claude-opus-5.5	8/14	64/70	6/6	21/27	5/5	15/15	6/6	7/7	3/3	1/1	35/45
 2026-10-15	eebcdea	live	anthropic/claude-haiku-5.5	anthropic/claude-opus-5.5	5/14	60/70	6/6	18/27	5/5	15/15	6/6	7/7	2/3	1/1	31/49
+2026-10-15	9777fd7	live	anthropic/claude-sonnet-5.5	anthropic/claude-opus-5.5	11/14	66/70	6/6	24/27	5/5	15/15	5/6	7/7	3/3	1/1	35/40
+2026-10-15	9777fd7	live	anthropic/claude-haiku-5.5	anthropic/claude-opus-5.5	8/14	64/70	6/6	21/27	5/5	15/15	6/6	7/7	3/3	1/1	29/38
