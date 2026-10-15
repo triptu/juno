@@ -59,6 +59,8 @@ const styles = stylex.create({
   root: {
     display: 'flex',
     flexGrow: 1,
+    alignSelf: 'stretch',
+    width: '100%',
     minHeight: 0,
     minWidth: 0,
   },
@@ -77,10 +79,12 @@ const styles = stylex.create({
     borderRightColor: colors['--border-subtle'],
     userSelect: 'none',
   },
+  // A zero basis, so the page takes the room beside the list whatever its content's width.
   page: {
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
+    flexBasis: 0,
     minWidth: 0,
     minHeight: 0,
   },
