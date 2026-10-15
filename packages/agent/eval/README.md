@@ -62,7 +62,7 @@ Not covered yet, because the agent cannot do them: the dismissal case of §19.5 
 
 ## Reports
 
-A live run (or `--save`) writes `reports/<date>-<model>.md` and appends one row to `reports/history.tsv`. The page has one row per behaviour (checks passed, and the share), all checks, cases with every check passed, the share of Slack claims with a source, and every failed check with its reason. The history row has the same numbers as `passed/total`, one column per behaviour, so a run can be compared with earlier ones. New behaviours add columns at the end. Each case's transcript, as the judge read it, goes to `<date>-<model>.transcripts.md` beside the page; it is not committed.
+A live run (or `--save`) writes `reports/<date>-<model>.md` and appends one row to `reports/history.tsv`. The page has one row per behaviour (checks passed, and the share), all checks, cases with every check passed, the share of Slack claims with a source, and every failed check with its reason. The history row has the same numbers as `passed/total`, one column per behaviour, and `cited` (Slack claims with a source over all Slack claims), so a run can be compared with earlier ones. New behaviours add columns at the end. Each case's transcript, as the judge read it, goes to `<date>-<model>.transcripts.md` beside the page; it is not committed.
 
 ## Adding a case
 

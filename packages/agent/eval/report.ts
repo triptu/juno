@@ -73,7 +73,7 @@ export function markdown(info: RunInfo, results: ReadonlyArray<CaseResult>): str
   return `${lines.join('\n')}\n`
 }
 
-const HEADER = ['date', 'commit', 'mode', 'model', 'judge', 'cases', 'checks', ...items, 'sources'].join('\t')
+const HEADER = ['date', 'commit', 'mode', 'model', 'judge', 'cases', 'checks', ...items, 'cited'].join('\t')
 
 export function historyRow(info: RunInfo, results: ReadonlyArray<CaseResult>): string {
   const s = summarize(results)
