@@ -2,7 +2,8 @@
  * Sorting conversations into the built-in Automated view (SPEC section 5,
  * "Automated"; architecture 10, "Automated").
  *
- * A pass runs once the first sync is done, and again when conversations or
+ * The sync already moved the clear cases at the end of its boot
+ * (`sortClearCases`). A pass runs once the first sync is done, and again when conversations or
  * topics change (changes in a 3 second window are one pass) and every 15
  * minutes. It looks only at conversations the user is in, not ignored, in
  * no view, with activity in the last 30 days, and with no settled place in
