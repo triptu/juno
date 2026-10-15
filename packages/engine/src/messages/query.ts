@@ -46,7 +46,7 @@ import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { actionsStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -151,7 +151,11 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const statement = pendingStatement(target)
       for (const row of yield* sql.unsafe<PendingRow>(statement.sql, statement.params)) pending.set(pendingRowId(row.client_msg_id), row)
     }
-    const listed: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+    const withPending: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+    // A network copy of a post that shares files is hidden but not deleted (ADR 0014).
+    const hiddenCopies = withPending.length === 0 ? [] : yield* sql.unsafe<{ ts: string }>(hiddenCopiesStatement(target.channel).sql, hiddenCopiesStatement(target.channel).params)
+    const hidden = new Set(hiddenCopies.map((row) => row.ts))
+    const listed = hidden.size === 0 ? withPending : withPending.filter((row) => !hidden.has(row.ts))
 
     // Juno's own edits, deletes and reactions show over the stored message until Slack has them (architecture 5.7).
     const actions = listed.length === 0 ? emptyIntents : intentsOf(yield* sql.unsafe<ActionRow>(actionsStatement(target.channel).sql, actionsStatement(target.channel).params))

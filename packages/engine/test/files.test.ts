@@ -137,3 +137,24 @@ describe('files', () => {
     await waitFor(() => (progress() !== undefined && Object.keys(progress()!).length === 0 ? true : undefined), WAIT_MS, 'progress cleared')
   })
 })
+
+describe('files: a copy the network made', () => {
+  it('hides a copy of a post with files and keeps it in Slack, since deleting it may remove the file', async () => {
+    const engine = await booted()
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    const ids = await attach(engine, [notes()])
+    engine.fake.loseResponse({ method: 'files.share' })
+    valueOf(await sendMessage(engine.registry, eng, 'Notes for the freeze', MAIN, ids))
+    const id = await waitFor(() => apiCalls(engine, 'files.share')[0]?.args['client_msg_id'] as string | undefined, WAIT_MS, 'the share')
+    const stored = () => readDb(engine, 'cache.db', (db) => (db.prepare('SELECT count(*) AS n FROM messages WHERE client_msg_id = ?').get(id) as { n: number }).n)
+    await waitFor(() => (stored() === 2 ? true : undefined), WAIT_MS, 'both copies stored')
+    await quiet(engine)
+    const shown = await rows((list) => list.some((row) => row.clientMsgId === id && row.pending === undefined), 'the message shown')
+    expect(shown.filter((row) => row.clientMsgId === id)).toHaveLength(1)
+    expect(readDb(engine, 'user.db', (db) => db.prepare('SELECT reason, hidden FROM kept_copies').all())).toEqual([{ reason: 'file copy kept until verified', hidden: 1 }])
+    expect(apiCalls(engine, 'chat.delete')).toEqual([])
+    expect(engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === id)).toHaveLength(2)
+  })
+})
