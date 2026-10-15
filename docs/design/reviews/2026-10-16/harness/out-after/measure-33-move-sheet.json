@@ -1,0 +1,77 @@
+[
+  {
+    "tag": "section",
+    "label": "Move to another Mac",
+    "rect": [
+      420,
+      338,
+      560,
+      156
+    ],
+    "padding": "0px",
+    "radius": "13px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "h2",
+    "label": "Move to another Mac",
+    "rect": [
+      441,
+      359,
+      518,
+      21
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "15.5px/20.925px 600",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "p",
+    "label": "Juno finishes what is running, makes thi",
+    "rect": [
+      441,
+      384,
+      518,
+      43
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14px/21.7px 400",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "button",
+    "label": "Cancel",
+    "rect": [
+      825,
+      444,
+      68,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(241, 238, 228)"
+  },
+  {
+    "tag": "button",
+    "label": "Move",
+    "rect": [
+      900,
+      444,
+      59,
+      30
+    ],
+    "padding": "0px 12px",
+    "radius": "12px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)",
+    "bg": "rgb(204, 70, 40)"
+  }
+]

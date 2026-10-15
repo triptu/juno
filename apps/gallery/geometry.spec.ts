@@ -190,6 +190,23 @@ test.describe('composer attachments', () => {
     expect(at.chips[0]!.top - at.bar.bottom).toBe(6)
   })
 
+  for (const id of ['checks/narrow-audience-and-check', 'checks/narrow-wrong-place']) {
+    test(`${id}: in a 336px field the choices move under the finding and keep the bar's insets`, async ({ page }) => {
+      await open(page, 'Composer', id)
+      const at = await page.evaluate(() => {
+        const bar = document.querySelector('[data-send-check]')!
+        const box = bar.getBoundingClientRect()
+        const [, text, choices] = [...bar.children].map((child) => child.getBoundingClientRect())
+        return { textWidth: text!.width, textBottom: text!.bottom, choicesTop: choices!.top, end: box.right - choices!.right, bottom: box.bottom - choices!.bottom, top: text!.top - box.top }
+      })
+      // The finding keeps a readable width rather than a word per line.
+      expect(at.textWidth).toBeGreaterThanOrEqual(200)
+      expect(at.choicesTop).toBeGreaterThan(at.textBottom)
+      expect(at.end).toBe(8)
+      expect(at.bottom).toBe(at.top)
+    })
+  }
+
   test('image and file chips are the same 44px frame, with the remove button 4px from the top and end', async ({ page }) => {
     await open(page, 'AttachmentChips', 'state/ready')
     const chips = await page.evaluate(() =>
@@ -263,5 +280,56 @@ test.describe('settings chips', () => {
   test('Codex: with no text button in its card, the ready chip ends at the 15px inset', async ({ page }) => {
     await open(page, 'JunoSettingsPage', 'settings/ready')
     expect((await ends(page, '[data-codex-chip]', '[data-codex]')).chip).toBe(15)
+  })
+})
+
+test.describe('settings forms', () => {
+  test('Add a server: Add ends at the fields’ trailing edge, 15px from the card, and a refusal starts at the leading one', async ({ page }) => {
+    await open(page, 'ConnectionsPage', 'connections/badaddress')
+    const at = await page.evaluate(() => {
+      const card = document.querySelector('[data-add-server]')!.getBoundingClientRect()
+      const field = document.querySelector('[data-add-server] input')!.parentElement!.getBoundingClientRect()
+      const add = [...document.querySelectorAll('[data-add-server] button')].at(-1)!.getBoundingClientRect()
+      const error = document.querySelector('[data-add-server] [data-connection-error]')!.getBoundingClientRect()
+      return { fieldStart: field.left - card.left, fieldEnd: card.right - field.right, addEnd: card.right - add.right, errorStart: error.left - card.left }
+    })
+    expect(at.fieldEnd).toBe(15)
+    expect(at.addEnd).toBe(at.fieldEnd)
+    expect(at.errorStart).toBe(at.fieldStart)
+  })
+
+  test('Connections: a server with no tools is one row with no divider over the card’s bottom edge', async ({ page }) => {
+    await open(page, 'ConnectionsPage', 'connections/servers')
+    const lines = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-connection-id]')].map((card) => {
+        const rows = [...card.children]
+        const last = rows.at(-1)!
+        return { id: card.getAttribute('data-connection-id'), rows: rows.length, lastBorder: getComputedStyle(last).borderBottomWidth, lastShadow: getComputedStyle(last).boxShadow }
+      }),
+    )
+    expect(lines.find((card) => card.id === 'littlebird')?.rows).toBe(1)
+    for (const card of lines) expect({ id: card.id, border: card.lastBorder, shadow: card.lastShadow }).toEqual({ id: card.id, border: '0px', shadow: 'none' })
+  })
+
+  test('Restore from backup: the folder box is drawn as the phrase field under it, its text on the same line', async ({ page }) => {
+    await open(page, 'RestoreSheet', 'restore/ready')
+    const at = await page.evaluate(() => {
+      const folderText = document.querySelector('[data-restore-folder]')!
+      const folder = folderText.parentElement!
+      const input = document.querySelector('[data-sheet] input')!
+      const field = input.parentElement!
+      const look = (element: Element) => {
+        const style = getComputedStyle(element)
+        return { height: element.getBoundingClientRect().height, radius: style.borderRadius, border: style.borderTopColor, fill: style.backgroundColor }
+      }
+      const button = folder.querySelector('button')!.getBoundingClientRect()
+      const box = folder.getBoundingClientRect()
+      return { folder: look(folder), field: look(field), folderText: folderText.getBoundingClientRect().left, inputText: input.getBoundingClientRect().left, buttonEnd: box.right - button.right, buttonTop: button.top - box.top, buttonBottom: box.bottom - button.bottom }
+    })
+    expect(at.folder).toEqual(at.field)
+    expect(at.folderText).toBe(at.inputText)
+    // Choose folder sits evenly in the box: as far from the end as from the top and bottom.
+    expect(at.buttonEnd).toBe(at.buttonTop)
+    expect(at.buttonTop).toBe(at.buttonBottom)
   })
 })

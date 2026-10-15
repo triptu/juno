@@ -1,0 +1,106 @@
+[
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Hide sidebar ⌃⌘S",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      78,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Back ⌘[",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      110,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Search ⌘K",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      275,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "New chat ⌘N",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      307,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Account and preferences",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      343,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "Home",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      10,
+      48,
+      363,
+      32
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "All topics",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      10,
+      82,
+      363,
+      32
+    ]
+  },
+  {
+    "tag": "div",
+    "role": "button",
+    "name": "Juno⌘J",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      10,
+      116,
+      363,
+      32
+    ]
+  }
+]

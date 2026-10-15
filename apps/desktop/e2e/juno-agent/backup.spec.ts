@@ -85,8 +85,20 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   expect(phrase).toMatch(/^([0-9A-Z]{4}-){7}[0-9A-Z]{4}$/)
   await sheet.getByRole('button', { name: 'Copy' }).click()
   await expect(sheet.getByRole('button', { name: 'Copied' })).toBeVisible()
+  // The sheet holds the keyboard: Tab goes round its two buttons, never to the page under the dim.
+  for (const name of ['Done', 'Copied', 'Done']) {
+    await juno.win.keyboard.press('Tab')
+    await expect(sheet.getByRole('button', { name })).toBeFocused()
+  }
   await sheet.getByRole('button', { name: 'Done' }).click()
   await expect(sheet).toHaveCount(0)
+  // A sheet opened from the keyboard gives focus back to its button when it closes (a click on macOS focuses no button).
+  await studio.getByRole('button', { name: 'Restore', exact: true }).focus()
+  await juno.win.keyboard.press('Enter')
+  await expect(juno.win.getByRole('dialog', { name: 'Restore from backup' })).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+  await expect(juno.win.getByRole('dialog', { name: 'Restore from backup' })).toHaveCount(0)
+  await expect(studio.getByRole('button', { name: 'Restore', exact: true })).toBeFocused()
   await expect(studio.locator('[data-phrase-exported]')).toHaveAttribute('data-phrase-exported', 'yes')
   // Main hands the phrase over once.
   expect(await juno.win.evaluate(() => (window as unknown as { juno: { agent: { recoveryPhrase: () => Promise<unknown> } } }).juno.agent.recoveryPhrase())).toBeNull()

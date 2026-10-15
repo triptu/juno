@@ -1,0 +1,26 @@
+{
+  "light": [
+    {
+      "text": "Restore",
+      "fg": "rgb(255, 255, 255)",
+      "bg": "204,70,40,1",
+      "ratio": 1.8,
+      "opacity": 0.4,
+      "size": "13.5px",
+      "weight": "500",
+      "path": "span<button<div<div<section[dialog]<div"
+    }
+  ],
+  "dark": [
+    {
+      "text": "Restore",
+      "fg": "rgb(42, 13, 6)",
+      "bg": "255,138,115,1",
+      "ratio": 2.32,
+      "opacity": 0.4,
+      "size": "13.5px",
+      "weight": "500",
+      "path": "span<button<div<div<section[dialog]<div"
+    }
+  ]
+}

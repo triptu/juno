@@ -1,0 +1,13 @@
+{
+  "tag": "button",
+  "role": null,
+  "name": "Search ⌘K",
+  "inDialog": null,
+  "ring": "solid 2px rgb(180, 53, 31)",
+  "rect": [
+    275,
+    7,
+    30,
+    30
+  ]
+}

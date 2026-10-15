@@ -54,22 +54,32 @@ export function SendCheckBar({ finding, confidence, onPrimary, onSecondary }: Se
           </>
         )}
       </Text>
-      <Text variant="kbd" tone="muted" sx={styles.confidence}>
-        {`${Math.round(confidence * 100)}%`}
-      </Text>
-      <Button variant="raised" size="sm" kbd="↵" onClick={onPrimary}>
-        {primary}
-      </Button>
-      <Button variant="ghost" size="sm" tone="subtle" onClick={onSecondary}>
-        {secondary}
-      </Button>
+      <span {...stylex.props(styles.choices)}>
+        <Text variant="kbd" tone="muted">
+          {`${Math.round(confidence * 100)}%`}
+        </Text>
+        <Button variant="raised" size="sm" kbd="↵" onClick={onPrimary}>
+          {primary}
+        </Button>
+        <Button variant="ghost" size="sm" tone="subtle" onClick={onSecondary}>
+          {secondary}
+        </Button>
+      </span>
     </div>
   )
 }
 
+/**
+ * The narrowest the finding may get beside the choices. Below it (a narrow
+ * topic column) the choices move to a line of their own, at the end, rather
+ * than squeezing the text to a word per line.
+ */
+const TEXT_MIN_WIDTH = 'min(200px, 100%)'
+
 const styles = stylex.create({
   bar: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing['--space-2-5'],
     marginTop: spacing['--space-1-5'],
@@ -89,7 +99,8 @@ const styles = stylex.create({
   },
   text: {
     flexGrow: 1,
-    minWidth: 0,
+    flexBasis: 0,
+    minWidth: TEXT_MIN_WIDTH,
   },
   strong: {
     fontWeight: weights['--weight-semibold'],
@@ -97,7 +108,13 @@ const styles = stylex.create({
   note: {
     color: colors['--foreground-muted'],
   },
-  confidence: {
-    flexShrink: 0,
+  // At the end of the text's line, or of a line of their own. They wrap only in a field too narrow for all three.
+  choices: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    marginInlineStart: 'auto',
   },
 })

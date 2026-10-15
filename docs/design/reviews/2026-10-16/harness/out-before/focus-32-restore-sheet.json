@@ -1,0 +1,13 @@
+{
+  "tag": "button",
+  "role": null,
+  "name": "Cancel",
+  "inDialog": "Restore from backup",
+  "ring": "none 2px rgb(180, 53, 31)",
+  "rect": [
+    812,
+    568,
+    68,
+    30
+  ]
+}

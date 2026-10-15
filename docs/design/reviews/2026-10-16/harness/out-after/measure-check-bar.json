@@ -1,0 +1,92 @@
+[
+  {
+    "tag": "div",
+    "label": "This reads like hiring or people detail.",
+    "rect": [
+      516,
+      690,
+      752,
+      123
+    ],
+    "padding": "0px",
+    "radius": "20px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)"
+  },
+  {
+    "tag": "div",
+    "label": "This reads like hiring or people detail.",
+    "rect": [
+      523,
+      697,
+      738,
+      27
+    ],
+    "padding": "6px 10px",
+    "radius": "14px",
+    "font": "14.5px/21.75px 400",
+    "color": "oklch(0.476905 0.0773261 82.712)",
+    "bg": "oklch(0.955058 0.0252181 82.712)"
+  },
+  {
+    "tag": "div",
+    "label": "2 fixes: recieve → receive, the the → th",
+    "rect": [
+      523,
+      730,
+      738,
+      44
+    ],
+    "padding": "8px 8px 8px 12px",
+    "radius": "14px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(244, 242, 235)"
+  },
+  {
+    "tag": "span",
+    "label": "",
+    "rect": [
+      535,
+      745,
+      14,
+      14
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "span",
+    "label": "2 fixes: recieve → receive, the the → th",
+    "rect": [
+      559,
+      742,
+      460,
+      20
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "13.5px/20.25px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "span",
+    "label": "90%Fix and send↵Send as is",
+    "rect": [
+      1029,
+      738,
+      224,
+      28
+    ],
+    "padding": "0px",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  }
+]

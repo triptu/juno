@@ -1,0 +1,54 @@
+[
+  {
+    "tag": "input",
+    "role": null,
+    "name": "Address",
+    "inDialog": null,
+    "ring": "none 3px rgb(35, 33, 26)",
+    "rect": [
+      585,
+      756,
+      604,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Hide sidebar ⌃⌘S",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      78,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Back ⌘[",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      110,
+      7,
+      30,
+      30
+    ]
+  },
+  {
+    "tag": "button",
+    "role": null,
+    "name": "Search ⌘K",
+    "inDialog": null,
+    "ring": "solid 2px rgb(180, 53, 31)",
+    "rect": [
+      275,
+      7,
+      30,
+      30
+    ]
+  }
+]

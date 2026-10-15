@@ -1,0 +1,62 @@
+[
+  {
+    "tag": "div",
+    "label": "Set yourself active",
+    "rect": [
+      80,
+      110,
+      276,
+      32
+    ],
+    "padding": "0px 8px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "div",
+    "label": "Hide message text⌃⌘H",
+    "rect": [
+      80,
+      142,
+      276,
+      32
+    ],
+    "padding": "0px 8px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "div",
+    "label": "NotificationsPaused until tomorrow 9am",
+    "rect": [
+      80,
+      174,
+      276,
+      32
+    ],
+    "padding": "0px 8px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "tag": "div",
+    "label": "Preferences⌘,",
+    "rect": [
+      80,
+      206,
+      276,
+      32
+    ],
+    "padding": "0px 8px",
+    "radius": "6px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)"
+  }
+]
