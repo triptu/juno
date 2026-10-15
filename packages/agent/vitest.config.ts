@@ -8,7 +8,7 @@ export default defineConfig({
     fsModuleCachePath: fileURLToPath(new URL('./node_modules/.vitest-cache', import.meta.url)),
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
     maxWorkers: 2,
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.ts', 'eval/**/*.test.ts'],
     // Each test starts several agent processes.
     testTimeout: 120_000,
   },
