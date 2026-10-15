@@ -53,7 +53,7 @@ async function fixture() {
   const [find] = mcpTools(manager, { current: async () => run, actions })
   let serial = 0
   const ask = async (args: Record<string, string>) => {
-    const out = await (find!.registration.execute as (a: unknown, api: { callId: string }) => Promise<{ output: Array<{ text: string }>; isError?: true }>)(args, { callId: `find-${++serial}` })
+    const out = await (find!.registration.execute as unknown as (a: unknown, api: { callId: string }) => Promise<{ output: Array<{ text: string }>; isError?: true }>)(args, { callId: `find-${++serial}` })
     const text = out.output[0]!.text
     return { text, bytes: Buffer.byteLength(text), isError: out.isError === true, body: text.startsWith('Untrusted') ? JSON.parse(text.slice(text.indexOf('\n') + 1)) as unknown : undefined }
   }
