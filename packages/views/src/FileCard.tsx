@@ -37,11 +37,12 @@ export function Files({ files, onOpenImage, onDownload, tabbable = true, progres
   const tabIndex = tabbable ? 0 : -1
   return (
     <div {...stylex.props(styles.files)}>
-      {files.map((file) =>
+      {files.map((file, index) =>
         file.thumb === undefined ? (
           <FileCard key={file.id} file={file} onDownload={onDownload} tabIndex={tabIndex} />
         ) : (
-          <Thumbnail key={file.id} file={file} thumb={file.thumb} onOpen={onOpenImage} tabIndex={tabIndex} />
+          // Keyed by place: a sent file's id changes when Slack's copy replaces the staged one, and the image must stay.
+          <Thumbnail key={`thumb:${index}`} file={file} thumb={file.thumb} onOpen={onOpenImage} tabIndex={tabIndex} />
         ),
       )}
       {progress === undefined ? null : (
@@ -88,21 +89,26 @@ function Thumbnail({ file, thumb, onOpen, tabIndex }: ThumbnailProps) {
   const box = thumbnailBox(thumb.width, thumb.height)
   const broken = failed === thumb.src
   const sx = stylex.props(styles.thumb, styles.box(box.width, box.height, thumb.width, thumb.height), onOpen !== undefined && styles.thumbButton)
+  // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
+  const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
   const content = broken ? (
     <span {...stylex.props(styles.brokenGlyph)}>
       <Icon icon={Image} size={18} />
     </span>
   ) : (
-    <img
-      src={thumb.src}
-      alt=""
-      draggable={false}
-      decoding="async"
-      loading="lazy"
-      onLoad={() => setLoaded(thumb.src)}
-      onError={() => setFailed(thumb.src)}
-      {...stylex.props(styles.image, loaded === thumb.src && styles.imageShown)}
-    />
+    <>
+      {previous === undefined ? null : <img src={previous} alt="" draggable={false} decoding="async" {...stylex.props(styles.image, styles.imageShown)} />}
+      <img
+        src={thumb.src}
+        alt=""
+        draggable={false}
+        decoding="async"
+        loading="lazy"
+        onLoad={() => setLoaded(thumb.src)}
+        onError={() => setFailed(thumb.src)}
+        {...stylex.props(styles.image, loaded === thumb.src && styles.imageShown)}
+      />
+    </>
   )
   if (onOpen !== undefined) {
     return (
