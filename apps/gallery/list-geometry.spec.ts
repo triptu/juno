@@ -57,3 +57,20 @@ test('a selected option row prints its second line in the subtle colour, which k
   })
   expect(colours.line).toBe(colours.subtle)
 })
+
+test('two-line picker rows are 44px', async ({ page }) => {
+  for (const [component, id] of [['TopicHeader', 'switcher/switcher-thread'], ['NewChat', 'flow/thread-list']] as const) {
+    await open(page, component, id)
+    const rows = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="option"]')].map((row) => {
+        const box = row.getBoundingClientRect()
+        const range = document.createRange()
+        const text = [...row.querySelectorAll('span')].find((span) => span.children.length === 0 && span.textContent!.trim() !== '')!
+        range.selectNodeContents(text)
+        return { height: box.height, titleStart: Math.round(range.getBoundingClientRect().left - box.left) }
+      }),
+    )
+    expect(rows.length, id).toBeGreaterThan(2)
+    for (const row of rows) expect(row.height, id).toBe(44)
+  }
+})

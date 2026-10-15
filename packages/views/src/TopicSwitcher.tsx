@@ -124,7 +124,7 @@ function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowPro
       selected={current}
       leading={<Icon icon={ChatText} size={15} />}
       label={
-        <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default">
+        <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default" sx={styles.title}>
           Main
         </Text>
       }
@@ -147,7 +147,7 @@ function ThreadRow({ thread, now, active, current, onOpen, onActivate }: RowProp
       active={active}
       selected={current}
       label={
-        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate dir="auto">
+        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate dir="auto" sx={styles.title}>
           {thread.title}
         </Text>
       }
@@ -186,6 +186,10 @@ const reveal = (id: string) => document.getElementById(id)?.scrollIntoView({ blo
 const LIST_MAX_HEIGHT = '360px'
 
 const styles = stylex.create({
+  // The row's 20px title line (OptionRow 44), not the body's 1.6.
+  title: {
+    lineHeight: 'inherit',
+  },
   scroll: {
     maxHeight: LIST_MAX_HEIGHT,
     overflowY: 'auto',

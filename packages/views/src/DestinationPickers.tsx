@@ -243,6 +243,7 @@ function ThreadList({ query, onQuery, conversation, threads, now, onPickThread, 
               leading={<Icon icon={ChatText} size={15} />}
               label="Main"
               sub="Messages outside threads"
+              subPlacement="below"
               onSelect={() => onPickThread(undefined)}
               onActivate={() => setActive(MAIN_ID)}
             />

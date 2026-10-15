@@ -478,6 +478,11 @@ export const text = stylex.defineVars({
   '--text-tag-small-leading': 'normal',
   '--text-tag-small-tracking': '0',
 
+  // A two-line picker row (OptionRow 44): a 20px title line over a 16px meta
+  // line, 4px above and below, so the row is 44px whatever the fonts' metrics.
+  '--text-option-title-leading': '20px',
+  '--text-option-meta-leading': '16px',
+
   // Times, timestamps, card headers, status chips, log reasons.
   '--text-meta-family': fonts['--font-sans'],
   '--text-meta-size': '12.5px',
