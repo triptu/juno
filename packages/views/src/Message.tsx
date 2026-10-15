@@ -77,6 +77,11 @@ export interface MessageProps {
 
 const HOVER = '@media (hover: hover)'
 
+// The least of the header line the name and time keep in a narrow column. Below
+// it the toolbar's reserve gives way, so the toolbar covers the name's end on
+// hover instead of the name vanishing for good.
+const NAME_MIN = '160px'
+
 const dim = stylex.keyframes({
   from: { opacity: 1 },
   to: { opacity: opacity['--opacity-dim'] },
@@ -259,6 +264,16 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
+    // The toolbar is out of the layout until then too: every row has one, and
+    // laid out but transparent it was most of the list's style and layout work
+    // when a topic opened or the pane changed width (performance.md 8). It is
+    // absolutely placed in a reserved slot, so showing it moves nothing.
+    '--row-toolbar-display': {
+      default: 'none',
+      ':hover': { default: null, [HOVER]: 'block' },
+      ':focus-visible': 'block',
+      ':has(:focus-visible)': 'block',
+    },
   },
   rowEager: {
     contentVisibility: 'visible',
@@ -267,6 +282,7 @@ const styles = stylex.create({
   rowHeld: {
     backgroundColor: colors['--surface-hover'],
     '--row-action-opacity': '1',
+    '--row-toolbar-display': 'block',
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
@@ -317,7 +333,7 @@ const styles = stylex.create({
   // header, so the toolbar shows over the end of its first line, as Slack's
   // does; the row's paint containment keeps it inside the row.
   headerWithToolbar: {
-    paddingInlineEnd: layout['--toolbar-reserve'],
+    paddingInlineEnd: `min(${layout['--toolbar-reserve']}, max(0px, 100% - ${NAME_MIN}))`,
     minHeight: `calc(${layout['--toolbar-height']} - ${spacing['--space-0-5']})`,
   },
   name: {
@@ -356,6 +372,7 @@ const styles = stylex.create({
   // Inside the row's box (content-visibility brings paint containment, so
   // nothing can hang above it), top right, over the header line's empty end.
   toolbar: {
+    display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: spacing['--space-0-5'],
     right: spacing['--space-2'],

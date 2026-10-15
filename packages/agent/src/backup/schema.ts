@@ -4,6 +4,7 @@
  * the export cursor never makes a change to export. Steps are append-only.
  */
 import { OWNERSHIP_LOCAL_TABLES } from '../ownership/schema'
+import { REDACTION_LOCAL_TABLES } from '../redaction/schema'
 import { PROVIDER_LOCAL_TABLES } from '../spend/schema'
 import { LOCAL_TABLES as CORE_LOCAL_TABLES, type MigrationSet } from '../store/schema'
 
@@ -41,4 +42,4 @@ export const BACKUP_MIGRATIONS: MigrationSet = { name: 'backup', steps: [backup1
 export const BACKUP_LOCAL_TABLES: ReadonlyArray<string> = ['backup_progress']
 
 /** Every folder's local tables: what a backup never carries. Add a folder's list here with its migrations. */
-export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES, ...BACKUP_LOCAL_TABLES, ...OWNERSHIP_LOCAL_TABLES]
+export const LOCAL_TABLES: ReadonlyArray<string> = [...CORE_LOCAL_TABLES, ...PROVIDER_LOCAL_TABLES, ...REDACTION_LOCAL_TABLES, ...BACKUP_LOCAL_TABLES, ...OWNERSHIP_LOCAL_TABLES]

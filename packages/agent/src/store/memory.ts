@@ -14,12 +14,14 @@
  *   head from the revision it reads in that transaction. A stale job is
  *   discarded and its key stays queued.
  * - `failJob` (spec `failJob`): the key waits `retryDelay`.
+ * - `redactMemory` and `purgeNodes` (spec `redact`, `purge`): the memory
+ *   part of a removal and its purge, called by `redaction/` (WP16).
  *
  * The model calls are WP11's compactor; `runJob` is the seam it calls.
  */
 import { createHash } from 'node:crypto'
 import {
-  batch, children, compactionTask, complete, context as contextWindow, limits, readyQueue, retryDelay, start, withinCutoff,
+  batch, children, compactionTask, complete, context as contextWindow, limits, mask, readyQueue, retryDelay, start, taintClosure, withinCutoff,
   type Completion, type Input, type Key, type Line, type Node, type Ref, type Source,
 } from '@juno/agent-memory'
 import { transaction } from './database'
@@ -239,6 +241,72 @@ function advanceView(store: Store, h: number | undefined): void {
   store.db.prepare('INSERT INTO view_rev (rev, gen, covered, entries) VALUES (?, ?, ?, ?)').run(rev, current.gen, covered, JSON.stringify(entries))
   const advanced = store.db.prepare('UPDATE memory_head SET rev = ? WHERE singleton = 1 AND rev = ?').run(rev, current.rev)
   if (advanced.changes !== 1) throw new Error('memory head moved inside its own transaction')
+}
+
+/**
+ * Spec `redact`, the memory part, inside the removal's transaction (plan v3
+ * §4.5 step 1): tombstones the messages (their text is gone, the ids stay),
+ * records them in `redactions` at `gen + 1`, masks every view line whose node
+ * depends on a removed message through its recorded inputs (`taintClosure`),
+ * writes that view at `rev + 1` with the new `gen`, and queues a rebuild of
+ * each tainted key that has no clean node left. A job that read the old
+ * generation is discarded at publication. Messages already removed are
+ * skipped; with none left, nothing changes.
+ *
+ * `rewritten` are messages whose text the removal changed (a quote of a
+ * removed message became a placeholder; their version moved). Every node
+ * version built from them is deleted now, since it is not tainted by a
+ * tombstone and would otherwise read as clean, and its line is masked until
+ * the rebuild.
+ */
+export function redactMemory(store: Store, ids: ReadonlyArray<number>, rewritten: ReadonlyArray<number> = []): { readonly gen: number; readonly removed: ReadonlyArray<number>; readonly masked: number } {
+  if (!store.db.isTransaction) throw new Error('redactMemory runs inside the removal transaction')
+  const before = head(store)
+  const known = removedIds(store)
+  const fresh = [...new Set(ids)].filter((id) => !known.has(id)).toSorted((a, b) => a - b)
+  if (fresh.length === 0 && rewritten.length === 0) return { gen: before.gen, removed: [], masked: 0 }
+  const gen = before.gen + 1
+  const { db, now } = store
+  const tombstone = db.prepare("UPDATE messages SET text = '', bytes = 0, redacted_gen = ? WHERE id = ?")
+  const record = db.prepare('INSERT INTO redactions (message_id, gen, at) VALUES (?, ?, ?)')
+  for (const id of fresh) {
+    tombstone.run(gen, id)
+    record.run(id, gen, now())
+  }
+  const removed = new Set([...known, ...fresh])
+  const changed = new Set(rewritten)
+  const current = view(store)
+  const lines = mask(current.lines, new Set([...removed, ...changed]))
+  const masked = lines.filter((line, i) => line !== current.lines[i]).length
+  const entries: Entry[] = lines.map((line) => (line.kind === 'node' ? { node: [line.node.ref.a, line.node.ref.w, line.node.ref.v] } : { masked: [line.key.a, line.key.w] }))
+  const rev = current.rev + 1
+  db.prepare('INSERT INTO view_rev (rev, gen, covered, entries) VALUES (?, ?, ?, ?)').run(rev, gen, current.covered, JSON.stringify(entries))
+  const advanced = db.prepare('UPDATE memory_head SET rev = ?, gen = ? WHERE singleton = 1 AND rev = ?').run(rev, gen, current.rev)
+  if (advanced.changes !== 1) throw new Error('memory head moved inside the removal transaction')
+  const all = (db.prepare('SELECT * FROM nodes').all() as unknown as NodeRow[]).map(nodeOf)
+  const queue = db.prepare('INSERT OR IGNORE INTO queue (a, w, due_at) VALUES (?, ?, ?)')
+  const drop = db.prepare('DELETE FROM nodes WHERE a = ? AND w = ? AND ver = ?')
+  for (const node of taintClosure(all, changed)) drop.run(node.ref.a, node.ref.w, node.ref.v)
+  for (const node of taintClosure(all, new Set([...removed, ...changed]))) {
+    if (currentNode(store, node.ref, removed) === undefined) queue.run(node.ref.a, node.ref.w, now())
+  }
+  return { gen, removed: fresh, masked }
+}
+
+/**
+ * Spec `purge`: deletes node versions that depend on a removed message. The
+ * view masks every one of them since the removal, so none is in use. The
+ * tombstones stay. Idempotent; returns how many versions it deleted.
+ */
+export function purgeNodes(store: Store): number {
+  return transaction(store.db, () => {
+    const removed = removedIds(store)
+    const all = (store.db.prepare('SELECT * FROM nodes').all() as unknown as NodeRow[]).map(nodeOf)
+    const drop = store.db.prepare('DELETE FROM nodes WHERE a = ? AND w = ? AND ver = ?')
+    let deleted = 0
+    for (const node of taintClosure(all, removed)) deleted += Number(drop.run(node.ref.a, node.ref.w, node.ref.v).changes)
+    return deleted
+  })
 }
 
 /** Spec `failJob`: the key waits 30 s, 2 min, 10 min, then hourly. */

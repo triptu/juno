@@ -3,10 +3,11 @@ import { initialize } from '../../src/store/store'
 import { TURNS_MIGRATIONS } from '../../src/router/schema'
 import { JOBS_MIGRATIONS } from '../../src/jobs/schema'
 import { CHAT_MIGRATIONS } from '../../src/serve/schema'
+import { REDACTION_MIGRATIONS } from '../../src/redaction/schema'
 import type { ChatSource } from '../../src/serve/chat'
 
 export function chatFixture(count: number) {
-  const db = openDatabase(':memory:', [TURNS_MIGRATIONS, JOBS_MIGRATIONS, CHAT_MIGRATIONS])
+  const db = openDatabase(':memory:', [TURNS_MIGRATIONS, JOBS_MIGRATIONS, CHAT_MIGRATIONS, REDACTION_MIGRATIONS])
   const store = { db, now: () => 1_800_000_000_000 }
   initialize(store)
   db.prepare("INSERT INTO incarnations (id, created_at) VALUES ('fixture', 0)").run()

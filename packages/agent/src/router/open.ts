@@ -71,6 +71,7 @@ import { enterRecovery, observeOwner } from '../ownership/ownership'
 import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
 import { createOwnership, type Ownership } from '../ownership/service'
 import { ownerRules, rulesSection } from '../actions/rules'
+import { createRedaction, REDACTION_MIGRATIONS, removeExecutor, removeTool, type Redaction, type RemovalBackup } from '../redaction'
 
 /** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
 export interface ArchiveMessage {
@@ -121,6 +122,11 @@ export interface TurnsOptions {
     /** Restarts the agent process; the next open installs a staged restore. */
     readonly restart?: () => void
   }
+  /**
+   * Removal's backup hooks in place of the backup's own (`Backup.removal`), for tests. With neither, a
+   * removal raises no deletion record and regenerates no backup.
+   */
+  readonly removalBackup?: RemovalBackup
   readonly now?: () => number
   readonly onReport?: (error: unknown) => void
 }
@@ -171,6 +177,8 @@ export interface Turns {
   }
   /** Cards, clicks and dispatch (WP15). */
   readonly actions: Actions
+  /** The owner's Remove and the purge after it (WP16). */
+  readonly redaction: Redaction
   /** Who owns Juno, move, restore and Activate (WP21). */
   readonly ownership: Ownership
   /** The encrypted backup, when `backup` was given. Its `removal` hooks are WP16's `RemovalBackup`. */
@@ -201,7 +209,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
     try {
       db = openDatabase(
         join(options.agentDir, AGENT_DATABASE_FILE),
-        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+        [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
         now,
       )
     } catch (error) {
@@ -289,7 +297,7 @@ async function start(
     catchUp: () => projection!.catchUp(),
   }
 
-  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...(viewSettings ? [viewSettings.tool] : []), ...extraTools]
+  const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools, ...scheduleTools, ...(viewSettings ? [viewSettings.tool] : []), ...redactionTools, ...extraTools]
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))
@@ -346,12 +354,32 @@ async function start(
   const actions: Actions = createActions({
     ...options.actions,
     ...(viewSettings ? { decorateCard: viewSettings.decorate, undoCard: viewSettings.undo } : {}),
-    executors: () => [...(viewSettings ? [viewSettings.executor] : []), ...(typeof options.actions?.executors === 'function' ? options.actions.executors() : options.actions?.executors ?? []), ...scheduleExecutors({ store, scheduler, propose: (proposal) => actions.propose(proposal) })],
+    executors: () => [...(viewSettings ? [viewSettings.executor] : []), ...(typeof options.actions?.executors === 'function' ? options.actions.executors() : options.actions?.executors ?? []), ...scheduleExecutors({ store, scheduler, propose: (proposal) => actions.propose(proposal) }), removeExecutor(redaction, store)],
     onProposed: scheduler.bindNudge,
     store, position, jobs, spend: guard.spend, place: subagentModel?.modelId ?? '',
     accept: (input) => router.message(input),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
+  const backup = openBackup(store, options, (name) => {
+    observeOwner(store, name)
+    ownership.notify()
+  }, () => ownership.notify())
+  const removalBackup = options.removalBackup ?? backup?.removal
+  const redaction = createRedaction({
+    store,
+    ...(removalBackup ? { backup: removalBackup } : {}),
+    rotate: () => router.rotate(),
+    stopJob: async (jobId) => {
+      actions.jobStopped(jobId)
+      await jobs.stop(jobId)
+    },
+    changed: () => {
+      actions.changed()
+      compactor?.poke()
+    },
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  const redactionTools = [removeTool({ store, current: () => router.toolRun(), propose: actions.propose })]
   const scheduleContext = { store, scheduler, current: () => router.toolRun(), propose: actions.propose }
   const scheduleTools = [scheduleCreateTool(scheduleContext), ownScheduleTool(scheduleContext)]
   const jobTools = subagentModel
@@ -405,7 +433,10 @@ async function start(
     })
   }
 
-  const rotateNow = async () => {
+  // A rotation in flight; close waits for it before closing the journal.
+  let rotating: Promise<void> | undefined
+  const rotateNow = () => (rotating = rotateJournal().finally(() => (rotating = undefined)))
+  const rotateJournal = async () => {
     // Called by the loop between runs: no run is live. Drain the projection.
     await projection!.catchUp()
     crashPoint('rotation.drained')
@@ -420,10 +451,6 @@ async function start(
     journal!.resume()
   }
 
-  const backup = openBackup(store, options, (name) => {
-    observeOwner(store, name)
-    ownership.notify()
-  }, () => ownership.notify())
   const ownership = createOwnership({
     store,
     agentDir: options.agentDir,
@@ -482,6 +509,7 @@ async function start(
   jobs.resume()
   router.start()
   actions.start()
+  redaction.start()
   compactor?.poke()
   void ownership.resume().catch(options.onReport ?? noop)
   const scheduleDriver = driveScheduler(scheduler, options.onReport ?? noop)
@@ -538,6 +566,7 @@ async function start(
       undo: (expected) => undoPin(store, expected),
     },
     actions,
+    redaction,
     ownership,
     ...(backup !== undefined ? { backup } : {}),
     jobs: {
@@ -556,10 +585,12 @@ async function start(
     close: () =>
       (closed ??= (async () => {
         await scheduleDriver.close()
+        await redaction.close()
         await actions.close()
         await jobs.close()
         await compactor?.close()
         const stopped = router.close()
+        await rotating
         unsubscribe()
         await projection!.catchUp()
         await journal!.close()

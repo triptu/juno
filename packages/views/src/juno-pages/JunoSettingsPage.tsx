@@ -56,7 +56,8 @@ function modelOptions(models: ReadonlyArray<ModelChoice>) {
     label:
       model.resolved === undefined
         ? `${model.family} (not available)`
-        : `${model.resolved === model.family ? model.family : `${model.family} · ${model.resolved}`}${model.price === undefined ? '' : ` · ${model.price}`}`,
+        : // The resolved name already names its family: "Claude Sonnet 5.5", not "Claude Sonnet · Claude Sonnet 5.5".
+          `${model.resolved}${model.price === undefined ? '' : ` · ${model.price}`}`,
     disabled: model.resolved === undefined,
   }))
 }
@@ -175,6 +176,11 @@ export function JunoSettingsPage({
               <TextField
                 size={30}
                 label="Daily cap in dollars"
+                leading={
+                  <Text variant="ui" tone="muted" aria-hidden>
+                    $
+                  </Text>
+                }
                 type="number"
                 inputMode="decimal"
                 min={0}
@@ -223,12 +229,7 @@ export function JunoSettingsPage({
                 </span>
               }
             >
-              <span {...stylex.props(cell.lines)}>
-                <Text variant="body">Codex</Text>
-                <Text variant="meta" tone="muted">
-                  Uses your ChatGPT plan on this Mac.
-                </Text>
-              </span>
+              <Text variant="body">Uses your ChatGPT plan on this Mac.</Text>
             </ListRow>
           </Surface>
         </Section>
