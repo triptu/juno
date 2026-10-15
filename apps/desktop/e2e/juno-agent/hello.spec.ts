@@ -59,7 +59,7 @@ test("the renderer gets a port to the agent, and the agent's chat answers on it"
               if (kind === 1) resolve(message)
             })
             port.start()
-            port.postMessage([0, { _tag: 'Request', id: '1', tag: 'agent.chat.summary', payload: undefined, headers: [] }])
+            port.postMessage([0, { _tag: 'Request', id: '1', tag: 'agent.chat.summary', payload: null, headers: [] }])
           }
           window.addEventListener('message', onMessage)
           void window.juno.agent.requestPort().then((result) => {
