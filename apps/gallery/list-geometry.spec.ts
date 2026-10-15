@@ -98,3 +98,17 @@ test('a Juno card’s default button is the last, at the trailing edge, as on th
     expect(buttons.indexOf(true), id).toBe(buttons.length - 1)
   }
 })
+
+test('the avatar menu’s Sign out starts on the account line’s edge', async ({ page }) => {
+  await open(page, 'AccountMenu', 'sections/with-session')
+  const edges = await page.evaluate(() => {
+    const start = (el: Element) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return Math.round(range.getBoundingClientRect().left)
+    }
+    const section = document.querySelector('section[aria-label="Session"] section[aria-label="Session"]')!
+    return { line: start(section.querySelector('p')!), signOut: start(section.querySelector('button')!) }
+  })
+  expect(edges.signOut).toBe(edges.line)
+})
