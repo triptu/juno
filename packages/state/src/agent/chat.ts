@@ -150,10 +150,49 @@ export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>)
   return { ...page, items }
 }
 
+/** A row's identity across pages: the op for an owner bubble, the id otherwise. */
+function rowKey(item: ChatItem): string {
+  switch (item._tag) {
+    case 'owner':
+      return `o:${item.opId}`
+    case 'juno':
+      return `j:${item.id}`
+    case 'card':
+      return `c:${item.card.id}`
+    case 'ending':
+    case 'status':
+      return `${item._tag}:${item.runId}`
+    case 'note':
+    case 'groupLabel':
+      return `${item._tag}:${item.id}`
+    case 'day':
+      return `d:${item.at}`
+    case 'newDivider':
+      return 'new'
+  }
+}
+
+/** The rows seen last, by key, with their JSON, so an unchanged row keeps its object and its memoised view (performance 5.1). */
+const seen = new Map<string, { readonly json: string; readonly item: ChatItem }>()
+const SEEN_LIMIT = 2_000
+
+function stable(page: ChatPage): ChatPage {
+  if (seen.size > SEEN_LIMIT) seen.clear()
+  const items = page.items.map((item) => {
+    const key = rowKey(item)
+    const json = JSON.stringify(item)
+    const held = seen.get(key)
+    if (held !== undefined && held.json === json) return held.item
+    seen.set(key, { json, item })
+    return item
+  })
+  return { ...page, items }
+}
+
 const itemsFamily = Atom.family((key: string) =>
   Atom.make((get) => {
     const pending = get(pendingSendsAtom)
-    return AsyncResult.map(get(pageFamily(key)), (snapshot) => withPending(snapshot.page, pending))
+    return AsyncResult.map(get(pageFamily(key)), (snapshot) => stable(withPending(snapshot.page, pending)))
   }),
 )
 
