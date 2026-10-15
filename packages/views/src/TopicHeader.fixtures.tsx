@@ -6,7 +6,14 @@ import { TopicSwitcher } from './TopicSwitcher'
 
 const noop = () => {}
 
-const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'juno'> = { onMenu: noop, onPill: noop, onResolve: noop, juno: { open: false, onToggle: noop } }
+// The app always gives the title its switcher, so the title is the switcher's button here too, closed.
+const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'juno' | 'switcher'> = {
+  onMenu: noop,
+  onPill: noop,
+  onResolve: noop,
+  juno: { open: false, onToggle: noop },
+  switcher: { open: false, onOpen: noop, content: null },
+}
 
 const state = (props: Partial<TopicHeaderProps> & Pick<TopicHeaderProps, 'detail'>, frame?: FixtureFrame) => fixture<TopicHeaderProps>({ ...base, ...props }, frame)
 
@@ -74,7 +81,7 @@ export default defineFixtures(
     },
     // Every control in the islands has the same hover, keyboard focus and press.
     Interaction: {
-      'hover-title': state({ detail: details.postgres }, { hover: 'button[aria-haspopup="menu"]' }),
+      'hover-title': state({ detail: details.postgres }, { hover: 'h1 button' }),
       'hover-more': state({ detail: details.postgres }, { hover: 'button[aria-label="More"]' }),
       'press-more': state({ detail: details.postgres }, { press: 'button[aria-label="More"]' }),
       'focus-more': state({ detail: details.postgres }, { focus: 'button[aria-label="More"]' }),
@@ -85,9 +92,9 @@ export default defineFixtures(
       'hover-juno': state({ detail: details.postgres }, { hover: 'button[aria-label="Juno ⌘J"]' }),
       'hover-pill': state({ detail: details.postgres }, { hover: '[data-island="left"] button' }),
       'press-resolve': state({ detail: details.postgres }, { press: 'button[aria-label="Resolve"]' }),
-      'press-title': state({ detail: details.postgres }, { press: 'button[aria-haspopup="menu"]' }),
+      'press-title': state({ detail: details.postgres }, { press: 'h1 button' }),
       'focus-pill': state({ detail: details.hiring }, { focus: '[data-island="left"] button' }),
-      'focus-title': state({ detail: details.postgres }, { focus: 'button[aria-haspopup="menu"]' }),
+      'focus-title': state({ detail: details.postgres }, { focus: 'h1 button' }),
       'focus-resolve': state({ detail: details.postgres }, { focus: 'button[aria-label="Resolve"]' }),
       'focus-juno': state({ detail: details.postgres }, { focus: 'button[aria-label="Juno ⌘J"]' }),
     },
