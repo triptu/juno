@@ -9,7 +9,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 ## Budgets to keep in mind (p95, reference M1 Air, 120 Hz)
 
-- Direct feedback (tab switch, composer keystroke, press state): one frame, 16 ms.
+- Direct feedback (tab switch, press state): one frame, 16 ms. A keystroke's character: within one refresh interval of a bare `<input>` in the same run (`docs/performance.md` 7.1).
 - Topic open (cached), filter change, ⌘K open, send → pending row: 50 ms.
 - Write → pixels for a live query update: 50 ms. ⌘K keystroke → results: 100 ms.
 - Cold start → sidebar rows from the local cache: 800 ms p50. Shell visible: 400 ms p50.
@@ -33,7 +33,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 6. Prefetch on hover, focus or keyboard selection: mount the topic's `messagesAtom` (idle TTL 30 s, at most 3 warm). Local query only; the Slack fetch starts on the real open.
 7. The active tab and the 4 most recent topic tabs stay mounted in `<Activity mode="hidden">`. Older tabs keep a scroll snapshot and restore it in `useLayoutEffect` before paint. Every effect must clean up; hidden means unmounted.
 8. No spinner under 300 ms, never a global one. Skeletons only with the final geometry. Filter, tab and theme changes show the finished state in one frame, never an empty intermediate. `startTransition` does not hold atom state (`useAtomValue` commits synchronously): a list that switches its source atom holds the previous window in the atom, as `sidebarListAtom` does (`docs/performance.md` 5.3).
-9. Hover, press, focus and selection are CSS pseudo-classes, never React state. Only `transform` and `opacity` animate. `will-change` only while an element animates, never on rows or the shell.
+9. Hover, press, focus and selection are CSS pseudo-classes, never React state. Only `transform` and `opacity` animate. `will-change` only while an element animates, never on rows or the shell; the one exception is a text field inside a large layer with blurred shadows (the ⌘K field, `docs/performance.md` 2.3).
 
 **React and state**
 

@@ -47,7 +47,9 @@ aliases, replies and rolled-back transactions. That reference is deliberately
 independent of the cache implementation.
 
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
-a live run and a task card. Five alternating pairs of fresh Node processes measure
+a live run and a task card. Its Vitest project runs after the other agent tests,
+with file parallelism off, so their child processes do not compete with its timer.
+The 5 ms and 50 ms p95 limits still apply to every run. Five alternating pairs of fresh Node processes measure
 the original and cached projection. Each process warms up for ten events, then
 measures 100 alternating reaction writes, status changes, card updates, live bubble appends
 and read marks through
