@@ -128,3 +128,18 @@ test('Configure: tool rows are 56px, the list is seven of them, and no rule sits
   expect(at.list).toBe(7 * 56)
   for (const rule of at.bottomRules) expect(rule).toBe('0px')
 })
+
+test('sidebar times end at the row’s trailing edge, short or long', async ({ page }) => {
+  await open(page, 'Sidebar', 'list/default')
+  const ends = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-topic-row]')].flatMap((row) => {
+      const time = [...row.querySelectorAll('span')].find((span) => span.children.length === 0 && /^(\d+[mhd]|Yesterday|Now)$/.test(span.textContent!.trim()))
+      if (time === undefined) return []
+      const range = document.createRange()
+      range.selectNodeContents(time)
+      return [Math.round(row.getBoundingClientRect().right - range.getBoundingClientRect().right)]
+    }),
+  )
+  expect(ends.length).toBeGreaterThan(3)
+  expect(new Set(ends).size).toBe(1)
+})
