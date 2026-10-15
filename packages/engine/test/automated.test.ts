@@ -83,7 +83,7 @@ describe('the Automated view', () => {
     await viewsUntil(engine, (list) => holds(list, RELEASES), 'releases moved')
     await homeUntil(engine, (view) => !view.items.some((item) => item.kind === 'automated'), 'the question gone')
 
-    valueOf(await runCommand(engine.registry, viewsSortChannel, moved.undo!))
+    valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'ask' }))
     await viewsUntil(engine, (list) => !holds(list, RELEASES), 'the move undone')
     await homeUntil(engine, (view) => view.items.some((item) => item.id === `automated:${RELEASES}`), 'asked again')
 

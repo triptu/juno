@@ -3,7 +3,7 @@
 // the fake Slack.
 import { afterEach, describe, expect, it } from 'vitest'
 import { prefsSet, readsMarkRead, readsMarkUnread, type TopicRow, type UndoCommand } from '@juno/contract'
-import { mirrorReadsAtom, runCommand } from '@juno/state'
+import { mirrorReadsAtom, runCommand, type TopicListFilter } from '@juno/state'
 import { sleep, waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine as boot, quiet, readDb, restart, threadId, tsOf, valueOf } from './scenario'
 
