@@ -97,8 +97,8 @@ test('Tell Juno in the why popover opens the chat beside the topic with the mess
 
   const panel = JunoChatPane.panel(juno.win)
   const quote = juno.win.locator('aside[data-juno-panel] [data-panel-selection]')
-  await expect(quote).toContainText('Are we still on for the board deck review?')
-  await expect(quote).toContainText('Maya')
+  await expect(quote).toContainText('+ selection')
+  await expect(quote).toHaveAttribute('title', /^Maya[^:]*: Are we still on for the board deck review\?/)
   await expect(panel.composer).toBeFocused()
 })
 
