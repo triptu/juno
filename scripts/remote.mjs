@@ -54,7 +54,7 @@ const remoteShapes = {
   'test:desktop': '4x8',
   'test:e2e': '4x8',
   'specs:check': '8x16',
-  'specs:traces': '2x4',
+  'specs:traces': '4x8',
 }
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 

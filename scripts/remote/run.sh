@@ -28,7 +28,9 @@ if [ "$cores" -eq 4 ] && [ "$1" = test:desktop ] && [ -n "${JUNO_SHARD:-}" ]; th
 export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$desktop_workers}
 export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( cores * 3 ))}
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
-export SPECS_JOBS=${SPECS_JOBS:-$(at_least $(( cores / 2 )) 1)} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
+spec_jobs=$(at_least $(( cores / 2 )) 1)
+if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi
+export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
   while sleep 2; do
