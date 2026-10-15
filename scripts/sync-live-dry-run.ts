@@ -26,6 +26,8 @@
  *
  * Flags:
  *   --fake        run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
+ *   --large       with --fake, use the large seed
+ *   --paced       with --fake, retain production request pacing
  *   --seconds N   time limit for boot and discovery (default 900)
  *   --until-quiet after `live`, keep running until no call has been made for 30 s
  *                 (the background follow pass), within the same time limit
@@ -37,7 +39,7 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Logger, Scope } from 'effect'
 import { listTopics, SIDEBAR_WINDOW } from '@juno/engine'
-import { startFakeSlack } from '@juno/fake-slack'
+import { largeSeed, startFakeSlack } from '@juno/fake-slack'
 import { EdgeUsersInfoResponse, Methods, type MethodName } from '@juno/slack-schema'
 import {
   HttpTransport,
@@ -257,7 +259,7 @@ async function liveTarget(): Promise<Target | undefined> {
 }
 
 async function fakeTarget(): Promise<Target> {
-  const fake = await startFakeSlack()
+  const fake = await startFakeSlack(process.argv.includes('--large') ? { seed: largeSeed() } : {})
   const c = fake.credentials()
   return {
     cached: { session: { teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token }, cookie: `d=${c.cookie}` },
@@ -283,7 +285,7 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
         slackConfigLayer({
           socket: { allowedHosts: [...target.allowedHosts], onDiagnostic: (line) => console.log(`  socket: ${line}`) },
           // The fake has no rate limits, as in the engine tests; live keeps the 1.5 s background spacing.
-          ...(useFake ? { lanes: { backgroundMinIntervalMillis: 0 } } : {}),
+          ...(useFake && !process.argv.includes('--paced') ? { lanes: { backgroundMinIntervalMillis: 0 } } : {}),
         }),
       ),
     ),

@@ -33,7 +33,7 @@ import { acquire, destroy, keep, reap, release, status } from './remote/pool.mjs
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
+const remoteScripts = ['bench:engine', 'bench:sync', 'typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e']
 /**
  * The smallest shape that keeps each script within about three minutes,
  * measured on 2026-10-15 (docs/development.md, "Machine shapes"). Namespace bills

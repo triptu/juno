@@ -18,6 +18,8 @@
     "health:knip": "knip --config knip.config.mjs --no-exit-code",
     "health:clones": "jscpd --config .jscpd.json --workers 2 --absolute packages/*/src apps/*/src",
     "health:size": "node scripts/health-size.mjs",
+    "bench:sync": "node scripts/heavy.mjs node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts --fake --large --paced --seconds 3600",
+    "bench:engine": "env JUNO_BENCH=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/engine exec vitest run test/bench",
     "test": "node scripts/heavy.mjs pnpm -r --workspace-concurrency=2 --if-present test",
     "test:e2e": "node scripts/heavy.mjs sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
     "test:desktop": "node scripts/heavy.mjs pnpm --filter @juno/desktop test:e2e",
