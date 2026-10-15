@@ -6,6 +6,7 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { AiUnavailable, NotFound, NotSignedIn } from '../errors'
+import { artRestorePayload, CommandResult } from './topics'
 
 /**
  * Why a redraw did not happen: no workspace, an id that is not a topic a
@@ -19,8 +20,11 @@ export type RedrawError = typeof RedrawError.Type
  * "Redraw" in a topic's menu: asks the model for a new drawing that differs
  * from the stored one and replaces it. Waits for the answer (about 2 to
  * 10 s); the new recipe reaches the rows and the header through their live
- * queries, so the command returns nothing.
+ * queries. Returns the undo, `art.restore` with the drawing before.
  */
-export const artRedraw = Rpc.make('art.redraw', { payload: { id: Schema.String }, success: Schema.Void, error: RedrawError })
+export const artRedraw = Rpc.make('art.redraw', { payload: { id: Schema.String }, success: CommandResult, error: RedrawError })
 
-export const ArtRoutes = RpcGroup.make(artRedraw)
+/** Puts a topic's drawing back as it was before a redraw, or removes it when there was none: the undo of `art.redraw`. */
+export const artRestore = Rpc.make('art.restore', { payload: artRestorePayload, success: Schema.Void, error: NotSignedIn })
+
+export const ArtRoutes = RpcGroup.make(artRedraw, artRestore)

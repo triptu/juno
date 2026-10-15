@@ -8,6 +8,7 @@
  * in a text field that has text, and otherwise Juno's last action.
  */
 import {
+  artRedraw,
   channelsIgnore,
   notifyChoiceOf,
   readsMarkRead,
@@ -40,6 +41,7 @@ import {
   registry,
   renamingAtom,
   runAction,
+  showToast,
   sidebarRowAtom,
   signedInAtom,
   slackLink,
@@ -90,6 +92,12 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
+/** Redraw: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
+async function redrawArt(topic: ActionTopic): Promise<void> {
+  const done = await runAction(registry, artRedraw, { id: topic.id }, said('Redrawn', topic))
+  if (!done) showToast(registry, said('Could not redraw', topic))
+}
+
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */
 export function renameTopic(id: string, title: string): void {
   registry.set(renamingAtom, undefined)
@@ -118,7 +126,7 @@ function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; 
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const notify = notifyTarget(topic)
-  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: choiceFor(settings, notify.target, topic.subscribed) }
+  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: choiceFor(settings, notify.target, topic.subscribed), aiAssist: settings?.aiAssist === true }
   const linkable = topic.kind === 'main' || topic.rootTs !== undefined
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => linkable || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
   const { id } = topic
@@ -127,6 +135,8 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
       return openTopic(id, { newTab: true })
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
+    case 'redraw':
+      return redrawArt(topic)
     case 'mark-read':
       return void runAction(registry, readsMarkRead, { id }, said('Marked as read', topic))
     case 'mark-unread':

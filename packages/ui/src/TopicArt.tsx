@@ -14,7 +14,7 @@ export interface TopicArtProps {
    * moves); art that is there on the first paint shows at once.
    */
   readonly recipe?: string | undefined
-  /** 40 in rows, 20 in the topic header, 16 in tabs. */
+  /** 40 in rows, 20 in peek, 16 in tabs. */
   readonly size?: TopicArtSize
   /** Accessible name. Omit when the title is next to it; the art is decoration. */
   readonly label?: string

@@ -52,6 +52,25 @@ export default defineFixtures(
       'main-placeholder': state({ ...rows.alertsMain, art: undefined }),
       'placeholder-quiet': state(rows.notes),
       'art-quiet': state({ ...rows.flags, art: art.coins }),
+      // Five drawings in five hues, then four pebbles, against the row's text:
+      // the shot to judge the art's weight in light and in dark.
+      'art-and-pebbles': scene(() => (
+        <div style={column}>
+          {[
+            rows.postgres,
+            rows.hiring,
+            rows.alertsMain,
+            rows.offsite,
+            { ...rows.flags, art: art.coins },
+            { ...rows.roadmap, art: undefined },
+            { ...rows.pricing, art: undefined },
+            { ...rows.packet, art: undefined },
+            { ...rows.long, art: undefined },
+          ].map((row) => (
+            <TopicRow key={row.id} {...one(row)} />
+          ))}
+        </div>
+      )),
     },
     Kind: {
       main: state(rows.alertsMain),

@@ -528,6 +528,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Open in new tab | `square-arrow-out-up-right` | ⌘ click | always | |
 | — | | | | |
 | Rename | `pencil` | | not Main | inline rename in the row (or in the header's title island when opened from there) |
+| Redraw | `paintbrush` | | AI assist on, not a DM's Main | `art.redraw`: a new drawing of the topic's art (a few seconds), then the toast with Undo, which puts the old drawing back. "Could not redraw · …" (no Undo) when the model gives nothing |
 | Mark as read / Mark as unread | `check-check` / `circle-dot` | | by state | unread sets count to at least 1 |
 | Pin / Unpin | `pin` / `pin-off` | | by state | |
 | Resolve / Reopen | `circle-check` / `rotate-ccw` | | by state | undo toast; resolve clears unread and mention |
@@ -585,7 +586,7 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 - Position: bottom-left, left 16, bottom 16, z 45, max-width 352. Padding `8 8 8 14`, radius 10, bg `--foreground-default`, text `--background`, `--shadow-lg`, 13px, gap 12. Text ellipsis on one line.
 - Undo button (reversible actions only): 26px, padding 0 8, radius 6, bg `color-mix(var(--background) 16%, transparent)`, "Undo" 12.5/600 + "⌘Z" mono 11 at .75 opacity.
 - One toast at a time; a new one replaces the old. Auto-dismiss 5s (with Undo) or 4s (info). No enter/exit animation in the prototype; [proposed] 150ms fade is acceptable.
-- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
+- Undo stack holds 20 actions; ⌘Z pops the last one (resolve, reopen, pin, unpin, rename, redraw, mark read or unread, Notify me change, ignore, routed post, command send, Resolve all on Home) when focus is not in a non-empty input.
 - [built M5] `ActionToast` in `@juno/views`, mounted once by the shell over both panes, with the `Toast` rise. The undo stack and the toast are `undoStackAtom` and `toastAtom` in `@juno/state`; an action that changed nothing shows no toast. No exit fade yet.
 
 | Copy | Undo |
@@ -597,6 +598,8 @@ Right-click a sender's name or avatar in a message, or an @person chip. Notify m
 | Pinned · … / Unpinned · … | yes |
 | Marked as read · … / Marked as unread · … | yes |
 | Renamed · {new title} / Title cleared | yes |
+| Redrawn · … | yes |
+| Could not redraw · … | no |
 | Posted in Staging bill doubled since August · Posted in #eng · Main | yes |
 | Resolved 3 topics (Home's Tidy up) | yes |
 | Draft closed (a New chat closed with a draft) | yes |
