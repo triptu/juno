@@ -49,6 +49,23 @@ function Head({ title, body }: { readonly title: string; readonly body: string }
   )
 }
 
+/** A control with its name above it and, if given, a note below. */
+function Labelled({ label, note, children }: { readonly label: string; readonly note?: string; readonly children: ReactNode }) {
+  return (
+    <div {...stylex.props(styles.labelled)}>
+      <Text variant="bodySmall" weight="medium" tone="default" aria-hidden>
+        {label}
+      </Text>
+      {children}
+      {note === undefined ? null : (
+        <Text variant="meta" tone="muted" sx={cell.wrap}>
+          {note}
+        </Text>
+      )}
+    </div>
+  )
+}
+
 function Buttons({ children }: { readonly children: ReactNode }) {
   return <div {...stylex.props(styles.buttons)}>{children}</div>
 }
@@ -120,24 +137,20 @@ export function RestoreSheet({ folder, phrase, attested, busy, error, onChooseFo
   return (
     <Sheet label={copy.title} kind="restore">
       <Head title={copy.title} body={copy.body} />
-      <Surface kind="group">
-        <div {...stylex.props(styles.field)}>
-          <span {...stylex.props(cell.lines, styles.grow)}>
-            <Text variant="body">{copy.folder}</Text>
-            <Text variant="meta" tone="muted" truncate title={folder} data-restore-folder="">
-              {folder ?? copy.noFolder}
-            </Text>
-          </span>
+      <Labelled label={copy.folder}>
+        <Surface kind="inset" padding="none" sx={styles.folder}>
+          <Text variant="ui" tone={folder === undefined ? 'muted' : 'default'} truncate title={folder} data-restore-folder="">
+            {folder ?? copy.noFolder}
+          </Text>
           <Button variant="ghost" size="xs" tone="subtle" onClick={onChooseFolder} disabled={busy}>
             {copy.choose}
           </Button>
-        </div>
-      </Surface>
-      <span {...stylex.props(styles.labelled)}>
+        </Surface>
+      </Labelled>
+      <Labelled label={copy.phrase} note={copy.phraseNote}>
         <TextField
           size={32}
           label={copy.phrase}
-          placeholder={copy.phrase}
           value={phrase}
           onChange={(event) => onPhrase(event.currentTarget.value)}
           spellCheck={false}
@@ -146,10 +159,7 @@ export function RestoreSheet({ folder, phrase, attested, busy, error, onChooseFo
           autoCapitalize="characters"
           disabled={busy}
         />
-        <Text variant="meta" tone="muted" sx={cell.wrap}>
-          {copy.phraseNote}
-        </Text>
-      </span>
+      </Labelled>
       <Checkbox label={copy.attest} description={copy.attestNote} checked={attested} onChange={(event) => onAttest(event.currentTarget.checked)} disabled={busy} />
       <ErrorLine message={error} />
       <Buttons>
@@ -222,15 +232,15 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-1-5'],
   },
-  field: {
+  folder: {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing['--space-3'],
-    paddingBlock: spacing['--space-2'],
-    paddingInline: spacing['--space-3'],
-  },
-  grow: {
-    flexGrow: 1,
+    minWidth: 0,
+    paddingBlock: spacing['--space-1'],
+    paddingInlineStart: spacing['--space-3'],
+    paddingInlineEnd: spacing['--space-1'],
   },
   phraseBox: {
     display: 'flex',
