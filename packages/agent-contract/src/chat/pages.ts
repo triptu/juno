@@ -112,10 +112,16 @@ export const DiscoveredTool = Schema.Struct({
   /** The schema the row was read at. */
   schemaHash: Schema.optionalKey(Digest),
   /**
-   * A read: on the code's read list, or marked read-only by the server with
-   * its schema unchanged since Juno first saw it. Reads run with no review.
+   * A read: on the code's read list, with its schema unchanged since Juno
+   * first saw it. Reads run with no review under any rule.
    */
   read: Schema.Boolean,
+  /**
+   * The server marked it read-only when Juno first saw it, and its schema is
+   * unchanged. It skips the review only while Juno has read nothing in the
+   * conversation, and never under Always ask. It keeps a rule.
+   */
+  readOnly: Schema.optionalKey(Schema.Literal(true)),
   /** The server's one-line description, shown and never trusted. */
   hint: Schema.optionalKey(Schema.String),
   /** Offered to Juno. Every tool is on until the owner turns it off. */
@@ -124,6 +130,16 @@ export const DiscoveredTool = Schema.Struct({
   review: ReviewRule,
   /** Its schema changed since Juno first saw it, so a read-only claim no longer counts. */
   changed: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * It appeared after the owner chose Never ask for the connection, and has
+   * its own Auto until the owner sets a rule again. A changed tool is the same.
+   */
+  added: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * A rule the owner cannot change: `delete` always asks; `forbidden` (merge,
+   * buy, force-push) is never offered to Juno.
+   */
+  locked: Schema.optionalKey(Schema.Literals(['delete', 'forbidden'])),
 })
 export type DiscoveredTool = typeof DiscoveredTool.Type
 

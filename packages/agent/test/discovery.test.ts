@@ -97,7 +97,8 @@ it('discloses servers, then matching tools, then one schema, and measures each s
   const scoped = await ask({ server: 'team-docs', query: 'handbook' })
   expect((scoped.body as { tools: unknown[] }).tools).toEqual([
     { server: 'team-docs', tool: 'publish_page', about: 'Publish a handbook page.' },
-    { server: 'team-docs', tool: 'search_docs', about: 'Search the team handbook.', read: true },
+    // Marked read-only by the server, which is not on Juno's read list.
+    { server: 'team-docs', tool: 'search_docs', about: 'Search the team handbook.' },
   ])
   const list = await ask({ server: 'team-docs' })
   expect(list.text).not.toContain('purge_archive')
@@ -105,7 +106,7 @@ it('discloses servers, then matching tools, then one schema, and measures each s
   // 3. One tool's schema, only when asked for by name.
   const schema = await ask({ server: 'team-docs', tool: 'search_docs' })
   expect(schema.body).toEqual({
-    server: 'team-docs', tool: 'search_docs', about: 'Search the team handbook.\nLonger notes the model reads only with the schema.', read: true,
+    server: 'team-docs', tool: 'search_docs', about: 'Search the team handbook.\nLonger notes the model reads only with the schema.',
     inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
   })
   expectNothingInternal(schema.text, added.id, urls)

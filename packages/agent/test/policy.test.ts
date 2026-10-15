@@ -209,7 +209,10 @@ describe('the auto-review of a connection call', () => {
   it('lets the owner\'s rule override the review', () => {
     expect(reviewDecision('always', true, answered('explicit', 'reversible'))).toEqual({ _tag: 'card', line: 'always' })
     expect(reviewDecision('never', true, { _tag: 'skipped' })).toEqual({ _tag: 'run', line: 'ranNever' })
-    expect(reviewDecision('never', false, answered('implied', 'delete'))).toEqual({ _tag: 'run', line: 'ranNever' })
+    expect(reviewDecision('never', false, answered('implied', 'reversible'))).toEqual({ _tag: 'run', line: 'ranNever' })
+    // Never ask does not cover what the review finds can't be undone.
+    expect(reviewDecision('never', false, answered('implied', 'delete'))).toEqual({ _tag: 'card', line: 'delete' })
+    expect(reviewDecision('never', false, answered('explicit', 'write'))).toEqual({ _tag: 'card', line: 'write' })
     expect(needsReview('always', false)).toBe(false)
     expect(needsReview('never', true)).toBe(false)
     expect(needsReview('never', false)).toBe(true)

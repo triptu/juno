@@ -48,7 +48,7 @@ export function questionExecutor(manager: McpManagerApi): Executor {
     run: async ({ payload }) => {
       if (await check(payload) !== 'valid') return { _tag: 'failed', detail: 'This T3 Code question changed.' }
       try {
-        content(await manager.invoke('t3', RESPOND, answerArgs(payload.args), true))
+        content(await manager.invoke('t3', RESPOND, answerArgs(payload.args), 'write'))
         return { _tag: 'done', receipt: { confirmed: true } }
       } catch { return { _tag: 'unknown', detail: 'T3 Code did not confirm the answer. Check the session.' } }
     },

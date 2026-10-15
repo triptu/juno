@@ -133,7 +133,8 @@ it('reads Littlebird tools marked read-only at first sight and asks for writes',
   expect(server.calls.filter((c) => c.name === 'material_append_v2')).toHaveLength(0)
   await click()
   expect(server.calls.filter((c) => c.name === 'material_append_v2')).toHaveLength(1)
-  expect(manager.tool('littlebird', 'unreviewed').tier).toBe(0)
+  // Marked read-only by the server: not a read, but one that may skip the review in a clean run.
+  expect(manager.tool('littlebird', 'unreviewed')).toMatchObject({ tier: 3, hinted: true })
   expect(manager.tool('littlebird', 'material_append_v2').tier).toBe(3)
 })
 
