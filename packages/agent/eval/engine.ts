@@ -13,6 +13,7 @@ import type { Store } from '../src/store/store'
 import { fromArchive, handleTable, unique, type StepTrace, type Trace } from './trace'
 import { fakeActionHost } from '@juno/agent-testing'
 import { recordingHost } from './world'
+import { connections } from './connections'
 
 /** One owner action. `react` reacts to Juno's latest bubble. */
 export type Step = { readonly send: string } | { readonly react: string }
@@ -24,6 +25,7 @@ export interface Backend {
   /** The helper model for `delegate`. No compactor runs: cases are short. */
   readonly helper: ModelRef
   readonly provider: (store: Store) => ProviderGuardApi
+  readonly spent?: (dollars: number, unsettled: number) => void
 }
 
 export class StepTimeout extends Error {}
@@ -33,14 +35,17 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
   const { host, read } = recordingHost()
   const errors: unknown[] = []
   // Cards need the host's actions to look up a message's place. Nothing is clicked, so nothing is sent.
-  const actions = { host: fakeActionHost().host }
-  const opened = await openTurns({ agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
+  const slack = fakeActionHost()
+  const external = await connections()
+  const actions = { host: slack.host, executors: external.executors }
+  const opened = await openTurns({ ...external.options, agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
   const turns: Turns = opened
   const events: TurnEvent[] = []
   const off = turns.subscribe((event) => events.push(event))
   const traces: StepTrace[] = []
   try {
+    await external.connect()
     for (const [i, step] of steps.entries()) {
       const firstEvent = events.length
       const firstRead = read().length
@@ -62,6 +67,8 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
       const stepRead = unique(read().slice(firstRead))
       traces.push({
         input,
+        cards: turns.actions.views().map((view) => view.card),
+        effects: [...slack.calls.map((c) => c.rpc), ...external.calls.filter((c) => c.name === 't3_thread_launch').map((c) => c.name)],
         ...fromArchive(turns.messages(firstRow, 10_000)),
         read: stepRead,
         handles: handleTable(stepEvents.flatMap((e) => (e._tag === 'started' ? [sourceTable(turns.store, e.runId)] : [])), read()),
@@ -71,7 +78,10 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
     }
   } finally {
     off()
+    const spend = turns.store.db.prepare("SELECT coalesce(sum(actual), 0) AS actual, count(CASE WHEN state != 'settled' THEN 1 END) AS unsettled FROM spend_reservations").get()
+    backend.spent?.(Number(spend?.actual ?? 0) / 1e9, Number(spend?.unsettled ?? 0))
     await turns.close()
+    await external.close()
     await rm(dir, { recursive: true, force: true })
   }
   return { steps: traces }
