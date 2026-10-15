@@ -19,7 +19,8 @@
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
  *   Task card at the time its job started. A card is unread like a bubble.
  *
- * Notes come with the pin events; they are not listed yet.
+ * A removed owner message is a "Removed" note in its place. Other notes
+ * come with the pin events; they are not listed yet.
  */
 import type {
   BubbleId,
@@ -117,7 +118,9 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
     if (of !== undefined) original.set(op.opId, original.get(of) ?? of)
   }
   const ownerOp = (opId: string) => original.get(opId) ?? opId
-  const opText = new Map(ops.map((op) => [op.opId, op.text]))
+  // A removed message shows as "Removed", and a quote of it reads Removed (WP16).
+  const removed = new Set((store.db.prepare('SELECT op_id AS opId FROM removed_ops').all() as Array<{ opId: string }>).map((row) => row.opId))
+  const opText = new Map(ops.filter((op) => !removed.has(op.opId)).map((op) => [op.opId, op.text]))
 
   const archiveIds = new Map(
     (store.db.prepare("SELECT origin_op AS opId, min(id) AS id FROM messages WHERE kind = 'user' AND origin_op IS NOT NULL GROUP BY origin_op").all() as Array<{
@@ -221,8 +224,12 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
 
   for (const op of ops) {
     if (op.kind === 'retry') continue
-    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     const id = archiveIds.get(op.opId)
+    if (removed.has(op.opId)) {
+      entries.push({ by: 'line', at: op.at, item: { _tag: 'note', id: id ?? (`removed:${op.opId}` as ChatMessageId), kind: 'removed' } })
+      continue
+    }
+    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     entries.push({
       by: 'owner',
       at: op.at,

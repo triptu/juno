@@ -297,7 +297,23 @@ export function agentHandlers(host: ChatHost) {
               .run(at)
             state.changed()
           }),
-        'agent.chat.remove': notYet('Removing a message'),
+        // The owner's Remove is a local sheet: it works paused, offline and with AI assist off (SPEC 13.8).
+        'agent.chat.remove': ({ opId, messageId, alsoRemoveReply }) =>
+          Effect.suspend(() => {
+            const turns = state.turns
+            if (host.turns?._tag === 'updateNeeded') return unavailable('Juno needs to update its records.')
+            if (turns === undefined) return unavailable('Juno is not running.')
+            return changed(
+              Effect.tryPromise({
+                try: () => turns.redaction.remove({ opId, messageIds: [Number(messageId)], alsoRemoveReply }),
+                catch: () => new AgentCommandError({ reason: 'notDelivered', message: 'Juno could not remove the message.' }),
+              }).pipe(
+                Effect.flatMap((result) =>
+                  result._tag === 'notFound' ? Effect.fail(new AgentCommandError({ reason: 'stale', message: 'That message is not in the chat.' })) : Effect.succeed({ opId }),
+                ),
+              ),
+            )
+          }),
 
         'agent.cards.prepare': ({ identity, choice }) =>
           Effect.flatMap(engine(state, host), (turns) => {
