@@ -344,18 +344,12 @@ test.describe('Message actions', () => {
     expect(await boxes(page)).toEqual(before)
   })
 
-  test('a message’s first chip grows it at its bottom and moves nothing above', async ({ page }) => {
+  test('a message’s first chip uses its reserved line and moves no row', async ({ page }) => {
     await open(page, 'MessageList', 'shift/reaction-changes')
     const before = await boxes(page)
     await step(page, 'first-chip')
     await expect(page.getByRole('button', { name: '1 👀, including you' })).toHaveCount(1)
-    const after = await boxes(page)
-    // Rows 0 and 1 are above the message (row 2): untouched. The message keeps its top; the rows under it move down together.
-    expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
-    expect(after[2]!.y).toBe(before[2]!.y)
-    const grown = after[2]!.height - before[2]!.height
-    expect(grown).toBeGreaterThan(0)
-    for (let index = 3; index < before.length; index++) expect(after[index]!.y - before[index]!.y).toBe(grown)
+    expect(await boxes(page)).toEqual(before)
   })
 
   test('the delete confirm takes the toolbar’s place and moves nothing', async ({ page }) => {
