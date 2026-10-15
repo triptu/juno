@@ -132,7 +132,7 @@ export const upsertUsers = (users: ReadonlyArray<User>): Writer =>
  * The metadata of a conversation object. Membership is not part of it:
  * `client.userBoot` lists every channel of the workspace without
  * `is_member` (observed live), so a new row starts as not a member and
- * `setMembership` / `replaceMembership` set the flag from `client.counts`
+ * `storeMembership` in metadata.ts sets the flag from `client.counts`
  * and the membership events.
  */
 export const toConversationRow = (c: Channel | Im): ConversationRow => {
@@ -179,15 +179,6 @@ export const setMembership = (ids: ReadonlyArray<string>, member: boolean): Writ
     for (let i = 0; i < ids.length; i += MEMBERSHIP_BATCH) {
       yield* sql`UPDATE conversations SET is_member = ${flag} WHERE id IN ${sql.in(ids.slice(i, i + MEMBERSHIP_BATCH))} AND is_member <> ${flag}`
     }
-    yield* invalidate(syncKeys.conversations)
-  })
-
-/** The full membership list (a `client.counts` without `counts_last_fetched`): exactly `ids` are members. */
-export const replaceMembership = (ids: ReadonlyArray<string>): Writer =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    yield* sql`UPDATE conversations SET is_member = 0 WHERE is_member = 1`
-    yield* setMembership(ids, true)
     yield* invalidate(syncKeys.conversations)
   })
 

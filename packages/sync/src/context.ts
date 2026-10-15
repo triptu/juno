@@ -2,6 +2,7 @@
  * What every sync step shares: who the user is, the config, and the small
  * in-memory queues that connect steps (roots to fetch, users to name).
  */
+import type { MetadataFence } from './metadata'
 import type { Me } from '@juno/domain'
 import { Clock, Effect, Queue } from 'effect'
 import type { SyncConfigShape } from './config'
@@ -13,6 +14,7 @@ export interface RootFetch {
 
 export interface SyncContext {
   /** The user and the user groups they belong to (`client.userBoot.subteams.self`), for the mention rules. */
+  readonly metadata: MetadataFence
   me: Me
   readonly config: SyncConfigShape
   /** Messages to fetch again (`conversations.replies`, `limit: 1`): stub roots, and messages whose page was older than an event. A background fiber fetches them. */

@@ -102,6 +102,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       unknownUsers: new Set(),
       lateReactions: new Map(),
       fetchesInFlight: new Set(),
+      metadata: new Set(),
     }
     const state = {
       connected: false,
@@ -222,7 +223,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       const droppedAt = state.droppedAt
       state.droppedAt = undefined
       const recheck = droppedAt === undefined ? undefined : { since: droppedAt, first: yield* openNow }
-      yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshThreads: true, ...(recheck === undefined ? {} : { recheck }) }).pipe(
+      yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshMetadata: droppedAt !== undefined, refreshThreads: true, ...(recheck === undefined ? {} : { recheck }) }).pipe(
         Effect.tapError(() =>
           Effect.sync(() => {
             if (droppedAt !== undefined) state.droppedAt = Math.min(droppedAt, state.droppedAt ?? droppedAt)

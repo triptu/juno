@@ -160,8 +160,8 @@ describe('reconnect', () => {
     const { 'api:client.getWebSocketURL': _socket, ...budget } = callMap(engine)
     expect(budget).toEqual({
       'api:client.counts': 1,
-      // The joined channel, which counts listed and the store did not know.
-      'api:conversations.info': 1,
+      // One workspace snapshot also supplies the newly joined channel.
+      'api:client.userBoot': 1,
       // The two conversations whose latest moved.
       'api:conversations.history': 2,
       // The recheck of the drop: the ten most recently active topics, one page each.

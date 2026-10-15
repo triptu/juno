@@ -142,6 +142,14 @@ Validation on 2026-10-15: the full root `pnpm specs:check` passed in **636.2 sec
 
 The random simulation (10,000 traces of at most 160 transitions) found two forms of the `olderPage` race before the wait was added: an opened topic's page, and an earlier recheck's page, landing after a later recheck. Four seeds of 10,000 traces each pass with it. `pnpm specs:check` runs the random traces and the three pairs with the other protocols.
 
+## Conversation metadata
+
+`metadata.qnt` models name, membership and archive fields, socket observations during a snapshot, and full refresh after a gap. `staleRename`, `staleMembership` and `staleArchive` each disable the observation fence in their broken mode and violate `eventWins`. `missedRename` disables the gap refresh and violates `quietAgreement`. Every corrected schedule must reach `reachedAgreement`. The runner also samples 10,000 random traces of at most 160 transitions; after input stops, recovery has a 16-transition drain bound.
+
+The model serializes snapshot reads, matching the sync work permit. As with M7's older-page guard, an older read must finish before a later refresh can start. Events update the store and record the affected fields atomically. The implementation retains per-read patches until success, failure or interruption; it compares no Slack timestamp with a local timestamp. Membership snapshots cover absent members as well as listed ones. A rename leaves unrelated snapshot fields eligible to refresh.
+
+Assumptions: a successful full snapshot covers the relevant conversations, events are applied in socket order, and connectivity and reads eventually recover. Event creation and delivery are collapsed into one action; delayed or reordered events and local commands are outside this model. HTTP snapshots can survive a socket gap. This is simulation and directed regression coverage, not an unbounded proof.
+
 ## Accepted Unsubscribe: three races and their guards
 
 Each race is a directed schedule with a fixed mode (`<name>Step`, must satisfy `invariants`) and a bug mode (`<name>BugStep`, must violate `acceptedUnfollow`). The bug modes are the rules Juno had before the guards.
