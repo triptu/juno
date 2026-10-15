@@ -179,6 +179,42 @@ it('work that saw the removed message is refused: a waiting click, a pin edit, a
   expect(h.turns.pins.pinMessage({ messageId: ownerMessageId(h.turns, said) })).toMatchObject({ _tag: 'refused' })
 })
 
+it('a job started in a run that saw the message stops, and no report from it reaches Juno', async () => {
+  const hold = deferred()
+  let held = 0
+  const h = await turnsHarness({
+    compaction: false,
+    subagent: HAIKU,
+    // The helper's request waits for `hold`, so the job is still running at the removal.
+    transport: (fake) => ({
+      getProviders: () => fake.models.getProviders(),
+      getModel: (provider: string, id: string) => fake.models.getModel(provider, id),
+      streamSimple: (model: { id: string }, context: unknown, options: unknown) => {
+        const inner = () => fake.models.streamSimple(model as never, context as never, options as never)
+        if (model.id !== HAIKU.modelId) return inner()
+        return { async *[Symbol.asyncIterator]() { held += 1; await hold.promise; yield* inner() } }
+      },
+    }) as never,
+  })
+  harnesses.push(h)
+  h.fake.script([call('delegate', { title: 'Plan the gate', task: `Plan around the gate code ${SECRET}.` }), reply(say('Started.'))])
+  const said = h.send(`The gate code is ${SECRET}. Plan the repaint in the background.`)
+  await h.ended(said)
+  await waitUntil(() => held > 0)
+  const [job] = h.turns.jobs.list()
+  expect(job!.phase).toBe('running')
+
+  await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: false })
+  // Stop asked the job to end; the held request ends when released.
+  expect(h.turns.jobs.list()[0]!.phase).toBe('stopping')
+  hold.resolve()
+  await h.turns.jobs.idle()
+  expect(h.turns.jobs.list()[0]!.phase).toBe('stopped')
+  await h.turns.idle()
+  const reports = h.turns.store.db.prepare("SELECT state FROM inbox WHERE kind = 'report'").all() as Array<{ state: string }>
+  expect(reports.every((r) => r.state !== 'done' && r.state !== 'submitted')).toBe(true)
+})
+
 it("a removal Juno proposes: the card names the message and offers Juno's reply, and one click removes both", async () => {
   const h = await turnsHarness({ compaction: false })
   harnesses.push(h)

@@ -205,7 +205,8 @@ export function createRedaction(options: RedactionOptions) {
       if ('_tag' in result) return result
       crashPoint('redaction.committed')
       options.changed?.()
-      for (const job of result.jobs) await options.stopJob?.(job).catch(report)
+      // Stopping waits for the job's driver; the removal does not.
+      for (const job of result.jobs) void options.stopJob?.(job).catch(report)
       kick()
       return { _tag: 'removed', gen: result.gen, messages: result.messages }
     })
