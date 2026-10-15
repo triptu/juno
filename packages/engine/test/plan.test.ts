@@ -49,6 +49,8 @@ const filters: ReadonlyArray<ListFilter> = [
   { kind: 'dms', unreadOnly: true },
   { kind: 'all', unreadOnly: false, scope: 'C0ENG' },
   { kind: 'all', unreadOnly: true, scope: 'C0ENG' },
+  { kind: 'all', unreadOnly: false, view: 'vbots' },
+  { kind: 'all', unreadOnly: true, view: 'vbots' },
 ]
 
 describe('query plans', () => {

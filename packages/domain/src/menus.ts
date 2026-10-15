@@ -18,9 +18,13 @@ export type TopicMenuAction =
   | 'copy-link'
   | 'open-in-slack'
   | NotifyAction
+  | ViewMenuAction
   | 'ignore-channel'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | 'ignore-channel'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | ViewMenuAction | 'ignore-channel'
+
+/** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
+export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
 
 export type MenuItem<A extends string> =
   | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string; readonly checked?: boolean }
@@ -68,6 +72,48 @@ export interface TopicMenuState {
   readonly resolved: boolean
   /** The thread's Notify me choice; on Main, its channel's or DM's. */
   readonly notify: NotifyChoice
+  /** The views, in pill order, for Add to view on a Main row. Absent: no item. */
+  readonly views?: ReadonlyArray<ViewChoice>
+}
+
+/** A view as Add to view lists it. */
+export interface ViewChoice {
+  readonly id: string
+  readonly name: string
+  /** The view holds the conversation: the item has a check and removes it. */
+  readonly holds: boolean
+}
+
+/** The Add to view submenu (inventory 15.8). */
+export function addToViewMenu<A extends string>(views: ReadonlyArray<ViewChoice>): MenuItem<A | ViewMenuAction> {
+  const items: MenuItem<ViewMenuAction>[] = views.map((view) => ({
+    type: 'item',
+    id: view.holds ? `view-remove:${view.id}` : `view-add:${view.id}`,
+    label: view.name,
+    checked: view.holds,
+  }))
+  if (items.length > 0) items.push(separator)
+  items.push(item('view-new', 'New view…'))
+  return { type: 'submenu', label: 'Add to view', items }
+}
+
+/** What an Add to view item asks for. */
+export function viewMenuChoice(action: ViewMenuAction): { readonly kind: 'add' | 'remove'; readonly view: string } | { readonly kind: 'new' } {
+  if (action === 'view-new') return { kind: 'new' }
+  const colon = action.indexOf(':')
+  return { kind: action.slice(0, colon) === 'view-add' ? 'add' : 'remove', view: action.slice(colon + 1) }
+}
+
+/** Whether a menu id is an Add to view item. */
+export function isViewMenuAction(id: string): id is ViewMenuAction {
+  return id === 'view-new' || id.startsWith('view-add:') || id.startsWith('view-remove:')
+}
+
+export type ViewPillAction = 'view-edit' | 'view-left' | 'view-right' | 'view-delete'
+
+/** The menu on a view's pill (inventory 15.7). The owner disables Move left and Move right at the ends. */
+export function viewPillMenuItems(): ReadonlyArray<MenuItem<ViewPillAction>> {
+  return [item('view-edit', 'Edit view…'), item('view-left', 'Move left'), item('view-right', 'Move right'), separator, item('view-delete', 'Delete view')]
 }
 
 const separator = { type: 'separator' } as const
@@ -96,6 +142,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))
   items.push(separator, item('copy-link', 'Copy Slack link'), item('open-in-slack', 'Open in Slack'))
   items.push(notifyMenu(state.notify))
+  if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
   return items
 }
@@ -103,6 +150,8 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
 export interface ChannelMenuState {
   readonly channel: ChannelInfo
   readonly hasMain: boolean
+  /** The views, in pill order, for Add to view. Absent: no item. */
+  readonly views?: ReadonlyArray<ViewChoice>
 }
 
 /** The menu for a channel row in Browse. */
@@ -110,6 +159,7 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   const items: MenuItem<ChannelMenuAction>[] = [item('show-topics', 'Show its topics')]
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
+  if (state.views !== undefined) items.push(separator, addToViewMenu<ChannelMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(separator, item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
   return items
 }

@@ -18,3 +18,4 @@ export * from './channel-style'
 
 export { startsGroup, threadLinkLabel, type GroupMessage } from './messages'
 export * from './home'
+export * from './views'

@@ -31,6 +31,7 @@ import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
 import { SyncLink } from './syncLink'
 import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
+import { ViewsHandlers } from './views/handlers'
 import { Workspace } from './workspace'
 
 /**
@@ -77,7 +78,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))

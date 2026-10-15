@@ -15,11 +15,12 @@ import { loadavg } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { largeSeed } from '@juno/fake-slack'
-import { Effect, Schema } from 'effect'
-import { ALL_TOPICS_WINDOW, ChannelRef, Person, TopicListRow } from '@juno/contract'
+import { Effect, Exit, Schema } from 'effect'
+import { ALL_TOPICS_WINDOW, ChannelRef, Person, TopicListRow, viewsSave } from '@juno/contract'
+import { runCommand } from '@juno/state'
 import { Store, StoreReader, workspacePathsFromDir } from '@juno/store'
 import { listAllTopics, summarizeAllTopics } from '../../src/topics/allTopics'
-import { listTopics, makeRowCache } from '../../src/topics/query'
+import { countTopics, cutoffTs, listStatements, listTopics, makeRowCache } from '../../src/topics/query'
 import { sleep, startTestEngine } from '../harness'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
@@ -83,6 +84,12 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         deltas.push(bytes(changed.map(({ channel, participants, ...row }) => encodeRow({ ...row, channelId: channel.id, participantIds: participants.map((p) => p.id) }))))
         await sleep(50)
       }
+      // Two views (spec section 5, "Views"): a small one kept out of All, and a wide one of 40 channels.
+      const channelIds = [...new Set(rows.map((row) => row.channel.id))]
+      const bots = await runCommand(engine.registry, viewsSave, { name: 'Bots', keepOutOfAll: true, channels: channelIds.slice(0, 5) })
+      const wide = await runCommand(engine.registry, viewsSave, { name: 'Wide', keepOutOfAll: false, channels: channelIds.slice(5, 45) })
+      if (!Exit.isSuccess(bots) || !Exit.isSuccess(wide)) throw new Error('views.save failed')
+      await engine.syncIdle()
       // The query alone, on a reader of its own: every row shaped (no cache), then a subscription's re-run (warm cache).
       const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
       const isolated = await Effect.runPromise(
@@ -105,7 +112,20 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
           const cache = makeRowCache({ keepUsers: true })
           const warm = yield* time(40, listTopics(filter, { now, limit: 300 }, cache))
           const snapshot = yield* listTopics(filter, { now, limit: 300 }).pipe(Effect.provideService(StoreReader, reader))
-          return { cold, warm, snapshot }
+          const viewFilter = (view: string) => ({ kind: 'all', unreadOnly: false, view }) as const
+          const smallView = yield* time(40, listTopics(viewFilter(bots.value.id), { now, limit: 300 }, makeRowCache({ keepUsers: true })))
+          const wideView = yield* time(40, listTopics(viewFilter(wide.value.id), { now, limit: 300 }, makeRowCache({ keepUsers: true })))
+          const counts = yield* time(40, countTopics(undefined))
+          // The plans on real data, for the reader of the report.
+          const cutoff = cutoffTs(now, 7)
+          const plans: Record<string, ReadonlyArray<string>> = {}
+          for (const [name, f] of [['all', filter], ['view', viewFilter(bots.value.id)]] as const) {
+            for (const [i, statement] of listStatements(f, cutoff, 300).entries()) {
+              const lines = yield* reader.unsafe<{ detail: string }>(`EXPLAIN QUERY PLAN ${statement.sql}`, statement.params)
+              plans[`${name}${i}`] = lines.map((line) => line.detail).filter((line) => /topic_index|sidebar_view/.test(line))
+            }
+          }
+          return { cold, warm, snapshot, smallView, wideView, counts, plans }
         }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
       )
 
@@ -132,6 +152,9 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         isolatedNoCacheMsP95: p95(isolated.cold),
         isolatedWarmMsMedian: median(isolated.warm),
         isolatedWarmMsP95: p95(isolated.warm),
+        smallViewWarmMsP95: p95(isolated.smallView),
+        wideViewWarmMsP95: p95(isolated.wideView),
+        countsMsP95: p95(isolated.counts),
         firstQueryMs: Number(window.meta.queryMs.toFixed(2)),
         queryMsMedian: median(samples),
         queryMsP95: p95(samples),
@@ -150,6 +173,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
         codecMs: report.encodeMsMedian < 5 && report.decodeMsMedian < 5,
       }
       console.log(`topics.list large seed: ${JSON.stringify(report)} budgets: ${JSON.stringify(budgets)}`)
+      console.log(`topics.list plans with views: ${JSON.stringify(isolated.plans, null, 1)}`)
       expect(rows.length).toBe(300)
       expect(budgets.deltaBytesMax).toBe(true)
       // The query and snapshot budgets are reported; JUNO_BENCH_STRICT=1 makes them fail the run.
