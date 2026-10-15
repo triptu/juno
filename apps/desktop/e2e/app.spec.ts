@@ -111,6 +111,13 @@ test('exposes only the bridge to the page', async ({ win }) => {
   })
 })
 
+test('a second launch on the same data hands over to the open window', async ({ win, userData }) => {
+  await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
+  // The second process quits before it opens a window.
+  await expect(launchApp(userData)).rejects.toThrow()
+  await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
+})
+
 test('a window saved on a display that is gone opens on screen', async ({ running, userData }) => {
   await running.close()
   await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'light', bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
