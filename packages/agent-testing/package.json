@@ -2,12 +2,12 @@
   "name": "@juno/agent-testing",
   "version": "0.1.0",
   "private": true,
-  "description": "Test doubles for Juno Agent: a scripted model, a compactor model and a fake Codex binary, fake Notion, Littlebird and T3 MCP servers, hostile Slack fixtures and the crash harness. Imported only by tests.",
+  "description": "Test doubles for Juno Agent: a scripted model, a compactor model, a fake OpenRouter over HTTP and a fake Codex binary, fake Notion, Littlebird and T3 MCP servers, hostile Slack fixtures and the crash harness. Imported only by tests.",
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./openrouter": "./src/model/server.ts"
+    "./openrouter": "./src/model/openrouter.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

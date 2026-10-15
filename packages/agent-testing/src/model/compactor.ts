@@ -11,9 +11,6 @@
  */
 import type { Message, TranscriptContext } from '@earendil-works/pi-ai'
 
-/** The compaction default and its alternative (plan v3 §7.1). */
-export const COMPACTION_MODELS: ReadonlyArray<string> = ['anthropic/claude-haiku-5.5', 'google/gemini-3.8-flash']
-
 export interface CompactorOptions {
   /** Default 512, the target in `compactionTask`. */
   readonly targetBytes?: number

@@ -229,6 +229,8 @@ export const chatCopy = {
   pages: {
     activity: {
       outcome: { replied: 'Replied', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
+      /** Who asked, for a run without a named job. */
+      who: { owner: 'You', click: 'You', wake: 'A schedule', report: 'A job' },
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },

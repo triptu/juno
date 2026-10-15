@@ -17,9 +17,10 @@
  * (`@juno/agent-juno`, single-attempt dispatch).
  *
  * Off unless JUNO_AGENT=1 until the chat ships (M2); a renderer that asks
- * for a port is told `failed`. The OpenRouter key comes from the environment
- * for now, as the engine's does (ADR 0006); the keychain and OAuth requests
- * come with Settings › Juno.
+ * for a port is told `failed`. The OpenRouter key is main's
+ * (`keychain.ts`): each new agent process gets the current one once it is
+ * loaded, and a running one gets every change. OAuth requests come with
+ * Connections (WP17).
  */
 import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
 import { join } from 'node:path'
@@ -47,6 +48,8 @@ export class AgentSupervisor {
   private restartTimer: NodeJS.Timeout | undefined
   /** Renderer ports asked for while the agent was not spawned, by renderer. */
   private readonly pendingRendererPorts = new Map<WebContents, MessagePortMain>()
+  /** The OpenRouter key main holds; undefined until the keychain has been read. */
+  private openRouterKey: string | null | undefined
 
   constructor(
     private readonly config: AgentConfig,
@@ -54,7 +57,6 @@ export class AgentSupervisor {
     private readonly sendToEngine: (port: MessagePortMain) => void,
     /** Whether the engine is ready to take a port now. */
     private readonly engineReady: () => boolean,
-    private readonly openRouterKey: string | undefined,
   ) {}
 
   get currentState(): AgentState {
@@ -77,7 +79,7 @@ export class AgentSupervisor {
     child.on('spawn', () => {
       this.spawned = true
       this.send({ _tag: 'config', config: this.config })
-      this.send({ _tag: 'openRouterKey', key: this.openRouterKey ?? null })
+      if (this.openRouterKey !== undefined) this.send({ _tag: 'openRouterKey', key: this.openRouterKey })
       if (this.engineReady()) this.linkHost()
       for (const port of this.pendingRendererPorts.values()) this.send({ _tag: 'rendererPort' }, [port])
       this.pendingRendererPorts.clear()
@@ -97,6 +99,12 @@ export class AgentSupervisor {
       }
     })
     child.on('exit', (code) => this.onExit(code))
+  }
+
+  /** The key to give the agent: now if it runs, and to every process it starts later. */
+  setOpenRouterKey(key: string | null): void {
+    this.openRouterKey = key
+    if (this.child && this.spawned) this.send({ _tag: 'openRouterKey', key })
   }
 
   /** A new channel between the engine's AgentHost server and the agent. Call when the engine is ready. */
@@ -173,11 +181,11 @@ export class AgentSupervisor {
 
 export function createAgentSupervisor(sendToEngine: (port: MessagePortMain) => void, engineReady: () => boolean): AgentSupervisor {
   const e2e = process.env.JUNO_E2E === '1'
+  // Read only under JUNO_E2E, so a real run can never be pointed elsewhere.
+  const openRouterOrigin = e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
   return new AgentSupervisor(
-    { agentDir: join(app.getPath('userData'), 'agent'), e2e },
+    { agentDir: join(app.getPath('userData'), 'agent'), e2e, ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }) },
     sendToEngine,
     engineReady,
-    // Under e2e only the fake model server gets a key, and it is not a real one.
-    e2e ? (process.env.JUNO_FAKE_OPENROUTER_URL === undefined ? undefined : 'e2e-fake-key') : process.env.OPENROUTER_API_KEY,
   )
 }

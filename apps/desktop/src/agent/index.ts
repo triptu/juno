@@ -5,12 +5,13 @@
  * server (again after every engine restart), and a port per renderer for the
  * chat. Everything else is `@juno/agent`, which never imports Electron.
  *
- * The agent opens the turn engine on OpenRouter with the default models
- * (`openRouterTurns`) and serves the renderer's RPCs on the renderer ports.
+ * The agent opens the turn engine on OpenRouter with the owner's models
+ * from Settings › Juno (`openRouterTurns`) and serves the renderer's RPCs
+ * on the renderer ports. The key stays in memory (`openRouterKey`).
  */
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { openRouterTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
+import { modelPicker, openRouterKey, openRouterTurns, rendererPorts, startAgent, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -49,14 +50,8 @@ const nextPort = () =>
   })
 
 const renderers = rendererPorts()
-// The key arrives right after the config; a request waits for it, so the first send does not race it.
-let openRouterKey: string | null | undefined
-const keyWaiters: Array<(key: string | undefined) => void> = []
-const apiKey = () =>
-  new Promise<string | undefined>((resolve) => {
-    if (openRouterKey !== undefined) resolve(openRouterKey ?? undefined)
-    else keyWaiters.push(resolve)
-  })
+// The key arrives from main once it has read the keychain; a request waits for it.
+const key = openRouterKey()
 
 let started = false
 parent.on('message', (event) => {
@@ -71,10 +66,8 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      // The e2e tests point OpenRouter at their fake model server; nothing else may.
-      const fakeUrl = message.config.e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
-      const turns = openRouterTurns(apiKey, fakeUrl === undefined ? {} : { baseUrl: fakeUrl })
-      startAgent(message.config, { acquire: nextPort }, { turns, renderer: renderers }).then(
+      const picker = modelPicker(message.config.openRouterOrigin === undefined ? {} : { origin: message.config.openRouterOrigin })
+      startAgent(message.config, { acquire: nextPort }, { turns: openRouterTurns(key, picker), renderer: renderers }).then(
         (agent) => send({ _tag: 'ready', host: agent.host }),
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
@@ -84,8 +77,7 @@ parent.on('message', (event) => {
       return
     }
     case 'openRouterKey': {
-      openRouterKey = message.key
-      for (const resolve of keyWaiters.splice(0)) resolve(message.key ?? undefined)
+      key.set(message.key)
       return
     }
     case 'rendererPort': {

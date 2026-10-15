@@ -39,7 +39,7 @@ export interface LaunchOptions {
   readonly keychainPassword?: string
   /** Start the Juno Agent utility process (JUNO_AGENT=1). */
   readonly agent?: boolean
-  /** The fake OpenRouter the agent's models call (`startFakeOpenRouter`), with a stand-in key. */
+  /** The fake OpenRouter the agent reads its catalogue from and sends chat requests to. */
   readonly fakeOpenRouterUrl?: string
 }
 

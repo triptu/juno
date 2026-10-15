@@ -26,6 +26,7 @@ const bridge: JunoBridge = {
   },
   agent: {
     requestPort: () => ipcRenderer.invoke(Channels.agentRequestPort),
+    setOpenRouterKey: (key) => ipcRenderer.invoke(Channels.agentSetOpenRouterKey, { key }),
   },
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),

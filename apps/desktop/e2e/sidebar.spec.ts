@@ -227,6 +227,26 @@ test('the list scrollbar shows only while the pointer is over the list, and noth
   await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(top)
 })
 
+test('rows that scroll under a still pointer are not warmed; moving onto a row warms it', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar } = juno
+  const list = sidebar.list
+  await sidebar.hoverList()
+  const before = await juno.lastMark('juno.prefetch')
+
+  await win.mouse.wheel(0, 300)
+  await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
+  await win.mouse.wheel(0, 300)
+  await win.waitForTimeout(300)
+  expect(await juno.lastMark('juno.prefetch')).toBe(before)
+
+  // A real move onto another row warms it, as before.
+  const box = (await list.boundingBox())!
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 })
+  await expect.poll(() => juno.lastMark('juno.prefetch')).not.toBe(before)
+})
+
 test('pressing a row selects it, and the keyboard moves the selection', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()

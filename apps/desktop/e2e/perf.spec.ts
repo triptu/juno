@@ -14,7 +14,7 @@ import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { answer } from './juno-agent/chat'
+import { answer, setOpenRouterKey } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
@@ -237,6 +237,25 @@ test('live update: a reply from another client to pixels', async ({ juno, fake }
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
 
+test('send: Enter to the pending row painted', async ({ juno }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const measured: number[] = []
+  for (let i = 0; i < 9; i++) {
+    const text = `Perf send ${i} ${Date.now()}`
+    await juno.topic.send(text)
+    await juno.topic.expectSent(text)
+    measured.push((await juno.measure('juno.send'))!)
+    await juno.win.waitForTimeout(300)
+  }
+  // A local transaction, the delta and the paint; the Slack call is not part of it.
+  const send = stats('send, Enter to the pending row painted (juno.send)', measured)
+  within('send, p95', send.p95, 50)
+})
+
 // The large-workspace scenarios share one synced user-data directory: the
 // fake's 1,200-topic seed fills the 300-row window, and syncing it once
 // keeps the run short. Every scenario launches the app warm on it.
@@ -401,9 +420,12 @@ test.describe.serial('large workspace', () => {
         expect(over / frames.length).toBeLessThan(0.01)
       }
       // The first pass lays out rows the window has never shown; the second is the steady state.
+      const warmed = await juno.lastMark('juno.prefetch')
       await sweep('first pass')
       await win.waitForTimeout(1000)
       await sweep('second pass')
+      // Rows that scroll under the still pointer are not warmed (performance.md 3.2).
+      expect(await juno.lastMark('juno.prefetch')).toBe(warmed)
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
 
       // Memory per process (working set, MB) and the renderer's JS heap and DOM size.
@@ -616,6 +638,32 @@ test.describe.serial('topic view', () => {
     }
   })
 
+  // Peek reads the query the row's hover warmed, so it is a prefetched open: one frame.
+  test('peek: the peek key over a hovered row to the peeked messages painted', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    try {
+      const samples: number[] = []
+      await traced(running.win, 'peek-open', async () => {
+        for (let i = 0; i < 10; i++) {
+          for (const title of [THREAD, MAIN]) {
+            await juno.sidebar.row(title).hover()
+            await running.win.waitForTimeout(300)
+            const before = (await juno.measures('juno.peek-open')).length
+            await running.win.keyboard.down('Alt')
+            samples.push(await nextMeasure(juno, 'juno.peek-open', before))
+            await juno.peek.expectShowing(title)
+            await juno.peek.release()
+            await juno.peek.expectClosed()
+          }
+        }
+      })
+      within('peek open, p95', stats('peek open, key down to the peeked rows painted (juno.peek-open)', samples).p95, oneFrameBudget(await refreshInterval(running.win)))
+    } finally {
+      await running.close()
+    }
+  })
+
   test('scroll the 300-message thread, and prepend older pages with zero shift', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
@@ -776,7 +824,7 @@ test.describe.serial('Juno chat', () => {
   let slackApp: SlackAppFixture
 
   const launch = (): Promise<RunningApp> =>
-    launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.url })
+    launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
 
   test.beforeAll(async () => {
     fake = await startFakeSlack()
@@ -797,6 +845,7 @@ test.describe.serial('Juno chat', () => {
   test('send to your bubble and to the first answer, ⌘J to the panel, and scroll the chat', async () => {
     test.setTimeout(600_000)
     const running = await launch()
+    await setOpenRouterKey(running)
     const { win } = running
     const juno = new Juno(running.app, win)
     try {

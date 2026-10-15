@@ -27,29 +27,12 @@ import {
   type TranscriptContext,
   type Usage,
 } from '@earendil-works/pi-ai'
-import { COMPACTION_MODELS, compactorAnswer, type CompactorOptions } from './compactor'
+import { compactorAnswer, type CompactorOptions } from './compactor'
+import { COMPACTION_MODELS, fakeCatalogue } from './catalogue'
 
-export { COMPACTION_MODELS }
+export { COMPACTION_MODELS, fakeCatalogue }
 
 export const FAKE_PROVIDER = 'openrouter'
-
-const price = (input: number, output: number) => ({ input, output, cacheRead: input / 10, cacheWrite: input * 1.25 })
-
-/**
- * The chat families and both compaction models, with their real context
- * windows and input and output prices per million tokens (spikes.md). The
- * cache prices are invented: a tenth and 1.25 times the input price.
- */
-export const fakeCatalogue: ReadonlyArray<FauxModelDefinition> = [
-  { id: 'anthropic/claude-sonnet-5.5', contextWindow: 1_000_000, maxTokens: 64_000, cost: price(2, 10) },
-  { id: 'anthropic/claude-opus-5.5', contextWindow: 1_000_000, maxTokens: 64_000, cost: price(4, 20) },
-  { id: 'meta/muse-wonder', contextWindow: 1_048_576, maxTokens: 64_000, cost: price(4, 20) },
-  { id: 'openai/gpt-6.1-sol', contextWindow: 1_050_000, maxTokens: 64_000, cost: price(2, 10) },
-  { id: 'x-ai/grok-4.7', contextWindow: 500_000, maxTokens: 64_000, cost: price(2, 6) },
-  { id: 'anthropic/claude-haiku-5.5', contextWindow: 1_000_000, maxTokens: 64_000, cost: price(0.1, 0.5) },
-  { id: 'google/gemini-3.8-flash', contextWindow: 1_048_576, maxTokens: 64_000, cost: price(0.75, 3.75) },
-]
-
 
 /** What the provider reports as used. Cost is computed from the model's prices. */
 export interface UsageReport {

@@ -7,9 +7,11 @@
  * and feature folders do not import each other. The runner hands the sync's
  * `TopicFetcher` in when a sync starts and takes it back when it ends; the
  * messages handlers mark a topic as shown while its header is subscribed,
- * and the sync fetches those topics again after a reconnect.
+ * and the sync fetches those topics again after a reconnect. The runner
+ * also says when a boot or catch-up has finished, which is when the send
+ * outbox flushes (architecture 5.8).
  */
-import { Context, Effect, Layer, Ref, Stream, SubscriptionRef, type Scope } from 'effect'
+import { Context, Effect, Layer, PubSub, Ref, Stream, SubscriptionRef, type Scope } from 'effect'
 import type { TopicFetcher } from '@juno/sync'
 
 export class SyncLink extends Context.Service<
@@ -24,6 +26,10 @@ export class SyncLink extends Context.Service<
     readonly shown: Effect.Effect<ReadonlyArray<string>>
     /** `shown` at subscribe time, then every change. */
     readonly shownChanges: Stream.Stream<ReadonlyArray<string>>
+    /** Called by the runner when a boot, catch-up or sweep has finished. */
+    readonly caughtUp: Effect.Effect<void>
+    /** One element each time `caughtUp` is called after subscribing. */
+    readonly caughtUps: Stream.Stream<void>
   }
 >()('juno/engine/SyncLink') {
   static readonly layer: Layer.Layer<SyncLink> = Layer.effect(
@@ -34,6 +40,7 @@ export class SyncLink extends Context.Service<
       const counts = new Map<string, number>()
       const listed = () => [...counts.keys()].toReversed()
       const changes = yield* SubscriptionRef.make<ReadonlyArray<string>>([])
+      const cycles = yield* PubSub.sliding<void>(1)
       const publish = Effect.suspend(() => SubscriptionRef.set(changes, listed()))
       const showing = (topicId: string) =>
         Effect.acquireRelease(
@@ -55,6 +62,8 @@ export class SyncLink extends Context.Service<
         showing,
         shown: Effect.sync(listed),
         shownChanges: SubscriptionRef.changes(changes),
+        caughtUp: Effect.asVoid(PubSub.publish(cycles, undefined)),
+        caughtUps: Stream.fromPubSub(cycles),
       })
     }),
   )

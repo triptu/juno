@@ -5,7 +5,8 @@ The Juno Agent core: a portable, durable personal assistant. A plain Node progra
 ## What it owns today
 
 - `startAgent(config, connection, { turns?, renderer? })`: connects to the host over the AgentHost port, calls `host.hello`, refuses a host on another protocol, follows `host.presence`, and, given `turns`, opens the turn engine on `config.agentDir` with the Slack read tools bound to the host. Given `renderer`, it serves the renderer's RPCs on the ports that transport gives. Returns `{ host, turns, reads, presence, presenceChanges, stop }`. `connection.acquire()` gives the next host port; the client takes a new one after the host restarts.
-- `openRouterTurns(apiKey)`: the app's turn options: OpenRouter, with the default chat and compaction families resolved in pi-ai's catalogue (`piFamilyModel`, no network). The key is read on each request.
+- `openRouterTurns(key, picker?)`: the app's turn options: OpenRouter, with the owner's saved chat and compaction families (`src/settings/`) resolved in the picker's rows, and the saved daily cap. `modelPicker({ origin? })` lists the rows: OpenRouter's catalogue once read today (`createCatalogue`), else pi-ai's own (`piRows`). `openRouterKey()` holds the key main sends, in memory; a request waits until main has said whether there is one. Given a picker, `startAgent` also serves Settings › Juno.
+- `src/settings/`: Settings › Juno (`createJunoSettings`). See "Settings › Juno" below.
 - `src/serve/`: the renderer's RPCs (`AgentRpcs`). See "The chat server" below.
 - The turn engine (WP11): `openTurns(options)`, or the `TurnEngine` Effect service. See "Turns" below.
 - `src/host/`: the `AgentHost` service (an `effect/rpc` client of `AgentHostRpcs`, protocol 2) and its port protocol, the same shape as the renderer's engine client. `reads.ts` binds the read tools' `HostReads` to the account the latest `host.presence` names: a read after an account switch fails with `stale` at the host, and with none signed in it fails with `signedOut`.
@@ -131,16 +132,27 @@ The router parses the stream and publishes each block once it closes: a bubble a
 
 **Testing.** `test/turns.test.ts` runs the engine in-process with `fakeProvider`; `test/turns-crash.test.ts` kills it mid-turn under the crash harness.
 
+## Settings › Juno
+
+`src/settings/settings.ts` serves the page and the owner's changes over the running engine (SPEC 13.10, plan v3 §7.1, §5.4). The owner's choices are one row of `juno_settings` (`SETTINGS_MIGRATIONS`, replicated): the chat family, the compaction family and the cap for days not yet started.
+
+- **Models.** One row per family, labelled as the owner sees it ("Claude Sonnet"), with the resolved model ("Claude Sonnet 5.5"), the provider and the price per million tokens. A family with no usable model has no `resolved`. A change saves the family and calls `Turns.setModels`: the chat model applies from the next run (the router reconfigures pi's root conversation between runs, `beforeRun`), the compaction model from the next compaction job. The catalogue is checked every hour and read at most once a day; when the rows change, the guard takes the new models (`refreshModels`) and the saved families move to their newest model. Codex rows come with WP20.
+- **Spend.** Today's spend is the ledger's actual plus unknown spend; the cap is today's. A new cap applies today (`setCap`, refused below what today has committed) and is saved for later days.
+- **The key.** Only `missing`, `set` or `rejected`: a run that ends `failed: keyRejected` marks the current key, and a new key clears the mark.
+- **Pause** sets the run mode and asks every running job to stop. It is refused while the mode is `off`. Settings change with AI assist off too.
+- **Not served yet**: Codex status (shown `missing`), rules (WP15), the backup folder (the default `agentDir/backup`, with no backup taken; WP21) and ownership changes (WP21).
+
 ## The chat server (WP13b)
 
-`src/serve/` serves `AgentRpcs` to the renderer on the ports main brokers (ADR 0012). `rendererServer(transport, { turns, presence, presenceChanges })` is the layer; `startAgent` builds it when given a `renderer` transport.
+`src/serve/` serves `AgentRpcs` to the renderer on the ports main brokers (ADR 0012). `rendererServer(transport, { turns, presence, presenceChanges, settings? })` is the layer; `startAgent` builds it when given a `renderer` transport.
 
 - **The page** (`chat.ts`) is built from the agent's records on every change: owner messages from the inbox (`send` and `steer`; a `retry` is the same message again, so it is not a second bubble), each run's bubbles parsed from its archived text (the live run's from the router), endings from `runs`, the latest reaction per side and item, day separators, the "New" divider and group positions (same sender, within two minutes, same origin). Each bubble is timed by when it was first shown (`chat_bubbles`): when the model closed it in a live run, or its archive row's time for a bubble the server never saw live. That time never changes, so the order and the read state hold when the run ends and across a restart mid-run. A window is cut from the whole list; anchors are any row's own id.
 - **Read state** is one mark in `chat_read` (`CHAT_MIGRATIONS`, replicated tables): Juno's bubbles at or before it are read. `agent.chat.read` takes a bubble or an archive message and only moves the mark forward.
 - **The banner**: `updateNeeded`, then `aiOff` (AI assist off in Juno, or the mode is off), `paused`, `offline` (the host is not live), else `none`. The composer is off for `updateNeeded` and `aiOff`.
 - **Commands**: send, react and retry go to the engine's inbox and answer after the commit; a second Try again for the same failure names the retry already queued; `tooLong` and a failed write (`notDelivered`) come back as errors. With AI assist off they answer `unavailable`.
-- **Not served yet**: cards (WP15), Remove (WP16), the Scheduled, Remembers, Memory, Activity, Connections and Review pages, and Settings › Juno. Their commands answer `unavailable` and their streams end with a defect.
+- **The Juno menu's pages** (`pages.ts`) are rebuilt on the same signal. What Juno remembers lists the active pins with their source message; edit, remove and "Remember this" check the pin's (or the message's) version and answer `stale` when it moved. Memory of this chat is the published view as a timeline, each line dated from its messages' earliest to latest time, and rechecked every 2 s because compaction publishes between runs. Activity lists each finished run: who asked ("You", a job's title, "A schedule"), when, the outcome (`stayedQuiet` when a complete run said nothing), and whether it read untrusted content. Scheduled, Connections and Review stream empty pages. Memory and Activity page with `{ cursor?, limit }`: the newest `limit` rows before the cursor, oldest first, and `moreAbove`.
+- **Not served yet**: cards (WP15), Remove (WP16), the actions and read line under an Activity run (WP15), schedules (WP19), connections (WP17), review and ownership (WP21), and Codex sign-in (WP20). Their commands answer `unavailable`.
 - **Not listed yet**: cards and notes ("Remembered"), and schedule origins (a wake shows as Juno's own run). A message's `context` (the topic or the person it was sent about) is stored with the op but not yet shown to the model; that is the request builder's (WP11).
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
 
-`test/serve.test.ts` runs the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel`. `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.
+`test/serve.test.ts` and `test/juno-pages.test.ts` run the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel` (`test/serve-harness.ts`). `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.

@@ -187,7 +187,16 @@ export class SidebarRow {
     await expect(this.root.getByText(name, { exact: true })).toBeVisible()
   }
 
+  /** Points at the row and holds the peek key. `juno.peek.release()` lets go. */
+  async peek(key: PeekKeyName = 'option'): Promise<void> {
+    await this.hover()
+    await this.win.keyboard.down(peekKeys[key])
+  }
 }
+
+export type PeekKeyName = 'option' | 'space'
+
+const peekKeys: Record<PeekKeyName, string> = { option: 'Alt', space: 'Space' }
 
 /** The left pane: filters, sections and rows. */
 export class Sidebar {
@@ -375,6 +384,42 @@ export class AccountMenu {
   themeRadio(name: 'Light' | 'Dark') {
     return this.root.getByRole('radio', { name })
   }
+
+  /** "Hold to peek": ⌥ Option or Space. */
+  async setPeekKey(key: PeekKeyName): Promise<void> {
+    await this.open()
+    const radio = this.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    await radio.click()
+    await expect(radio).toHaveAttribute('aria-checked', 'true')
+    await this.close()
+  }
+}
+
+/** The peek popover beside the sidebar, while the peek key is held over a row. */
+export class PeekPopover {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[role="dialog"][aria-roledescription="peek"]')
+  }
+
+  async expectShowing(title: string): Promise<void> {
+    await expect(this.root).toBeVisible()
+    await expect(this.root).toHaveAccessibleName(new RegExp(`^${escapeRegExp(title)}`))
+  }
+
+  async expectMessage(text: string): Promise<void> {
+    await expect(this.root.getByRole('list', { name: 'Messages' }).getByText(text, { exact: false }).first()).toBeVisible()
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Lets go of the peek key. */
+  async release(key: PeekKeyName = 'option'): Promise<void> {
+    await this.win.keyboard.up(peekKeys[key])
+  }
 }
 
 export class Juno {
@@ -387,6 +432,7 @@ export class Juno {
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
+  readonly peek: PeekPopover
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -399,6 +445,7 @@ export class Juno {
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
+    this.peek = new PeekPopover(win)
   }
 
   /** Makes the next native context menu pick `id` without showing it. */
@@ -559,6 +606,11 @@ export class Juno {
       const last = entries[entries.length - 1]
       return last === undefined ? undefined : last.duration
     }, name)
+  }
+
+  /** When one of the app's marks (`@juno/state/perf`) was last recorded, on the page's clock; undefined if never. */
+  async lastMark(name: string): Promise<number | undefined> {
+    return this.win.evaluate((markName) => performance.getEntriesByName(markName, 'mark').at(-1)?.startTime, name)
   }
 
   /** Every recorded duration of one measure, oldest first. */
@@ -784,6 +836,38 @@ export class TopicPane {
   /** A message by the start of its text. */
   message(text: string): Locator {
     return this.list.locator('[data-message-row]').filter({ hasText: text })
+  }
+
+  /** The composer's text field. */
+  get composer(): Locator {
+    return this.root.locator('[data-composer] textarea')
+  }
+
+  /** The composer's box, which must not move as rows come and go. */
+  get composerField(): Locator {
+    return this.root.locator('[data-composer-field]')
+  }
+
+  /** Types `text` into the composer and presses Enter. */
+  async send(text: string): Promise<void> {
+    await this.composer.fill(text)
+    await this.composer.press('Enter')
+  }
+
+  /** The message is shown as Slack holds it: once, and not pending. */
+  async expectSent(text: string): Promise<void> {
+    await expect(this.message(text)).toHaveCount(1, { timeout: 15_000 })
+    await expect(this.message(text)).not.toHaveAttribute('data-pending', /.*/, { timeout: 15_000 })
+  }
+
+  /** A failed send's row, with its Retry and Delete draft. */
+  failed(text: string) {
+    const row = this.message(text).and(this.list.locator('[data-pending="failed"]'))
+    return {
+      row,
+      retry: () => row.getByRole('button', { name: 'Retry' }).click(),
+      discard: () => row.getByRole('button', { name: 'Delete draft' }).click(),
+    }
   }
 
   async expectTitle(title: string | RegExp): Promise<void> {

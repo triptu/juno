@@ -1,16 +1,23 @@
 // The Juno chat as a user drives it, for the Juno tab and the Juno panel,
 // and a test fixture that runs the agent against a fake OpenRouter.
-// The subpath, not the index: the index loads pi-ai, which is ESM only, and Playwright loads tests as CommonJS.
-import { startFakeOpenRouter, type FakeOpenRouter, type FakeOpenRouterRequest } from '@juno/agent-testing/openrouter'
+import { startFakeOpenRouter, type FakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import type { Locator, Page } from '@playwright/test'
-import { expect, launchApp, test as base } from '../fixtures'
+import { expect, launchApp, test as base, type RunningApp } from '../fixtures'
+
+/** A stand-in OpenRouter key, in the shape Settings › Juno accepts. */
+export const OPENROUTER_KEY = 'sk-or-v1-e2e0123456789abcdef0123456789abcdef'
+
+/** Gives the agent the key, as Settings › Juno does, so its chat requests reach the fake. */
+export async function setOpenRouterKey(running: RunningApp): Promise<void> {
+  expect(await running.win.evaluate((key) => window.juno.agent.setOpenRouterKey(key), OPENROUTER_KEY)).toBe('saved')
+}
 
 /**
  * The model the e2e agent talks to. It answers each message by echoing its
  * words, reacts with 🎉 when asked to "react", and says nothing to a
  * reaction. `requests` is what the agent sent.
  */
-export function answer(request: FakeOpenRouterRequest): string {
+export function answer(request: OpenRouterRequest): string {
   const input = request.input
   if (input.startsWith('<reaction')) return ''
   const id = /<message id="(n\d+)">/.exec(input)?.[1]
@@ -32,8 +39,9 @@ export const test = base.extend<{ readonly model: FakeOpenRouter }>({
       slackAppDir: slackApp.dir,
       keychainPassword: slackApp.keychainPassword,
       agent: true,
-      fakeOpenRouterUrl: model.url,
+      fakeOpenRouterUrl: model.origin,
     })
+    await setOpenRouterKey(running)
     await use(running)
     await running.close()
   },

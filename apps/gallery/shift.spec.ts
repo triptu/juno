@@ -117,12 +117,15 @@ for (let shard = 0; shard < shards; shard++) {
     const routes = await readRoutes(page)
     const failures: string[] = []
     for (let route = claimNext(routes, only); route !== undefined; route = claimNext(routes, only)) {
+      const started = Date.now()
       await test.step(route.route, async () => {
         await openState(page, route)
         for (const [index, element] of (await targets(page, route)).entries()) {
           for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
       })
+      // A slow state holds up its part; name it so it can be looked at.
+      if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
     }
     expect(failures.join('\n\n')).toBe('')
   })
@@ -250,6 +253,20 @@ test.describe('Topic art', () => {
  * The guard has to fail when something moves, or a green run means nothing.
  * These pages are made on the spot, so they do not depend on any component.
  */
+test.describe('Send', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+
+  test('a pending row replaced by the message Slack stored moves nothing', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/pending-settles')
+    const rows = page.locator('[data-message-row]')
+    await expect(page.locator('[data-pending="sending"]')).toHaveCount(1)
+    const before = await rows.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+    await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['settle']?.())
+    await expect(page.locator('[data-pending]')).toHaveCount(0)
+    expect(await rows.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
+  })
+})
+
 test.describe('the guard itself', () => {
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
@@ -402,6 +419,30 @@ test.describe('Juno chat', () => {
     }
     expect([...seen].toSorted()).toEqual(['aiOff', 'offline', 'otherDevice', 'paused', 'recovery', 'updateNeeded'])
   })
+})
+
+test('the peek floats beside the sidebar: the rows, the tab strip and the page sit where they do without it', async ({ page }) => {
+  // The peek fixtures draw the signed-in window of Shell's `signed-in` state with the peek in its slot.
+  const boxes = async () =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-topic-row], [role="tablist"], main'), (node) => {
+        const box = node.getBoundingClientRect()
+        return [box.x, box.y, box.width, box.height].map(Math.round).join(' ')
+      }),
+    )
+  await openState(page, { component: 'Shell', id: 'window/signed-in', route: 'Shell/window/signed-in' } as Route)
+  const without = await boxes()
+  await openState(page, { component: 'PeekView', id: 'topic/thread', route: 'PeekView/topic/thread' } as Route)
+  const peek = page.locator('[role="dialog"][aria-roledescription="peek"]')
+  await expect(peek).toBeVisible()
+  expect(without.length).toBeGreaterThan(3)
+  expect(await boxes()).toEqual(without)
+  // It hangs off the sidebar's right edge and stays inside the window.
+  const sidebar = (await page.getByRole('complementary', { name: 'Sidebar' }).boundingBox())!
+  const panel = (await peek.boundingBox())!
+  const frame = (await page.locator('[data-fixture-frame="PeekView/topic/thread"]').boundingBox())!
+  expect(panel.x).toBeGreaterThan(sidebar.x + sidebar.width)
+  expect(panel.x + panel.width).toBeLessThanOrEqual(frame.x + frame.width)
 })
 
 /**
