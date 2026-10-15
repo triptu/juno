@@ -12,6 +12,7 @@ Pure product rules. No I/O, no Effect services, no React. The same code runs in 
 - `reindexTopics` inputs: the topic index row computed from source rows.
 - The read-state merge rule and the notification decision order.
 - Clarity and audience checks before send.
+- `frequentDestinations`: New chat’s six destinations, ranked by decayed own sends and filled by activity.
 - The command palette grammar (`parseCommand`, with `confidenceLabel`), mention detection, context menu item lists.
 
 Import from `@juno/domain`; everything is exported from `src/index.ts`.

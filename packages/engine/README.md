@@ -84,3 +84,5 @@ incomplete or limited Slack history fails rather than reporting no reply.
 handlers and `agent-host/views.ts`. Saving captures the previous and resulting
 view in the same writer transaction. AgentHost Undo compares that snapshot
 before restoring it, so a later edit is not overwritten.
+
+New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.

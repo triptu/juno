@@ -5,7 +5,7 @@
  * that each one reads it through an index (performance 6).
  */
 import { PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
-import { channelLabelBare, contextTint, firstWords, mainTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { channelLabelBare, contextTint, frequentDestinations, firstWords, mainTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -205,4 +205,33 @@ export const queryThreads = Effect.fn('newChat.threads')(function* (channel: str
       conversation: pickOf(row, users, selfId),
     }),
   )
+})
+
+/** Indexed own-message range used by Frequent, also checked by the plan gate. */
+export const frequentSendsStatement = (selfId: string, now: number) => ({
+  sql: `SELECT channel, ts FROM messages INDEXED BY messages_sender_ts
+    WHERE user_id = ? AND ts >= ? AND ts <= ? AND deleted = 0`,
+  params: [selfId, String((now - 30 * DAY) / 1000), String(now / 1000)],
+})
+
+/** Member destinations and their latest cached activity, using the channel index. */
+export const frequentConversationsStatement = `SELECT ${CONVERSATION_COLUMNS},
+  (SELECT MAX(t.last_activity_ts) FROM topic_index t WHERE t.channel = c.id) AS activity
+  FROM conversations c LEFT JOIN ignored_channels g ON g.channel = c.id
+  WHERE c.is_member = 1 AND c.is_archived = 0 AND g.channel IS NULL`
+
+/** Local ranking only; no Slack fetch, including when the message cache is empty. */
+export const queryFrequent = Effect.fn('newChat.frequent')(function* () {
+  const sql = yield* StoreReader
+  const selfId = yield* selfIdOf(sql)
+  const now = yield* Clock.currentTimeMillis
+  const rows = yield* sql.unsafe<ConversationRow & { activity: string | null }>(frequentConversationsStatement)
+  const statement = frequentSendsStatement(selfId ?? '', now)
+  const sends = yield* sql.unsafe<{ channel: string; ts: string }>(statement.sql, statement.params)
+  const ids = frequentDestinations(rows.map(row => ({ id: row.id, kind: row.kind, lastActivityAt: Number(row.activity ?? 0) * 1000 })),
+    sends.map(row => ({ channel: row.channel, at: Number(row.ts) * 1000 })), now)
+  const byId = new Map(rows.map(row => [row.id, row]))
+  const chosen = ids.flatMap(id => { const row = byId.get(id); return row === undefined ? [] : [row] })
+  const users = yield* readUsers(sql, peopleOf(chosen))
+  return chosen.map(row => pickOf(row, users, selfId))
 })

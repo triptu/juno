@@ -45,3 +45,5 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 - `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.
 
 The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `UpdateState` keep release handling in main. `updates.changed` forwards changes to the renderer.
+
+New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
