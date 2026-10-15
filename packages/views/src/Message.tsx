@@ -199,8 +199,8 @@ export const Message = memo(function Message({
         styles.row,
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
-        message.mentionsMe && styles.rowMention,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
+        message.mentionsMe && styles.rowMention,
       )}
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
