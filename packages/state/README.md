@@ -57,3 +57,5 @@ Task commands retain the job id even without an approval binding. Stop uses
 the job RPC, which approves one interrupt under that click's op id. Expired
 cards retain only the identity Ask again needs; that RPC submits a fresh
 owner message quoting the card. It never approves the expired payload.
+
+While boot or catch-up fills the sidebar, existing rows retain their order and newly discovered rows append. The phase becoming live does not itself reorder the painted list. An explicit filter change or the next live activity uses the normal recency order again.

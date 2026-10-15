@@ -209,8 +209,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
 const HOVER = '@media (hover: hover)'
 
 const rise = stylex.keyframes({
-  from: { opacity: 0, transform: `translateY(${motion['--rise-stagger']})` },
-  to: { opacity: 1, transform: 'translateY(0)' },
+  from: { opacity: 0 },
+  to: { opacity: 1 },
 })
 
 const styles = stylex.create({

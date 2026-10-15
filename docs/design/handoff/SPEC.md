@@ -174,6 +174,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
 ### Messages
 
 - **Style.** Flat Slack-style messages. Consecutive messages from the same person group under one header.
+- **Stable geometry.** Messages reserve one line for reactions and Main reserves a thread-link line. Reactions overflow horizontally instead of adding height. Sender names and the Threads counter keep fixed-width slots while data arrives. Home enters by opacity only; its greeting and rows stay in their final positions.
 - **Where it opens.** A topic opens at a "N new" divider when it has unread messages, otherwise at the bottom. There is no summary card at the divider; "Catch me up" in the Juno panel does that.
 - **Mentions.** @people and #channels render as soft chips. Mentions of you get the accent colour and a lightly tinted message background. Clicking a #channel filters the sidebar to it.
 - **Hover toolbar:**  Reactions are toggleable chips under the message.
