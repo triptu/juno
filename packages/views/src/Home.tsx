@@ -39,9 +39,9 @@ export interface HomeProps {
   readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onBrowseAll?: (event: ActivateEvent) => void
-  /** The first sync is still running: `line` says so and there are no items yet. */
+  /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
-  /** Keep these row slots through a cold visit, including before its items arrive. */
+  /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
   readonly reservedItems?: number
 }
 

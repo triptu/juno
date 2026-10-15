@@ -162,6 +162,43 @@ for (const destination of ['Home', 'All topics'] as const) {
   })
 }
 
+test('Home rows painted during the first sync stay fixed as later history pages land', async ({ juno, win, fake }) => {
+  const method = 'conversations.history'
+  fake.holdNext({ method })
+  await juno.signIn()
+  const syncing = win.locator('[data-home][data-home-loading]')
+  // Let pages land one at a time until Home paints a row while the sync still runs.
+  await expect
+    .poll(
+      async () => {
+        if ((await syncing.locator('[data-home-item]').count()) > 0) return true
+        if (fake.heldCount({ method }) > 0) {
+          fake.release({ method })
+          fake.holdNext({ method })
+        }
+        return false
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  await expect.poll(() => fake.heldCount({ method })).toBe(1)
+  const boxes = () => win.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => ({ id: row.getAttribute('data-home-item'), ...row.getBoundingClientRect().toJSON() })))
+  const painted = await boxes()
+  // The latest-reply fetch comes after every history page: holding it keeps the sync open while the probe watches
+  // the pages land, so the sidebar's progress line leaving at the end is not part of it.
+  fake.holdNext({ method: 'conversations.replies', times: 1000 })
+  await expectStableAnchor(win, '[data-home-item]', async () => {
+    fake.release({ method })
+    await expect.poll(() => fake.heldCount({ method: 'conversations.replies' }), { timeout: 30_000 }).toBeGreaterThan(0)
+    await expect(syncing).toBeVisible()
+  })
+  expect((await boxes()).slice(0, painted.length)).toEqual(painted)
+  // The sync ends: the rows painted are still where they were.
+  fake.release({ method: 'conversations.replies' })
+  await expect(win.locator('[data-home]:not([data-home-loading])')).toBeVisible({ timeout: 30_000 })
+  expect((await boxes()).slice(0, painted.length)).toEqual(painted)
+})
+
 test('the probe rejects a one-pixel movement that returns before the action ends', async ({ win }) => {
   await win.setContent('<div id="anchor">Anchor</div>')
   await expect(expectStableAnchor(win, '#anchor', async () => {

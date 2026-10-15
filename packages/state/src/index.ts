@@ -189,6 +189,7 @@ export {
   showInJunoChat,
 } from './junoPanel'
 export {
+  fillHome,
   freezeHome,
   homeGreeting,
   homeShownAtom,

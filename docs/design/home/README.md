@@ -87,7 +87,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
 - Resolved, unfollowed and muted topics never appear.
-- Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer.
+- Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer. During the first sync, rows are only added, into empty slots (see "Performance").
 
 ## Accessibility
 
@@ -101,7 +101,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Performance
 
 - The scenes are inline SVG symbols in the bundle, about 4 KB for all eight. Nothing is fetched. The first paint has the scene, the greeting and the items; there is no loading state and no spinner.
-- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed. Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. Until the first sync has finished (first launch on a real workspace takes minutes), Home shows the scene and the greeting with "Syncing with Slack." in place of the count line, and no rows; it never says "All caught up" too early. The rows appear once, when the sync finishes, without the entrance, and the scene stays. Before `home.view` answers at all (milliseconds) the page is blank. The items it showed stay until Home appears again.
+- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed, except into a reserved slot during the first sync (below). Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. Until the first sync has finished (first launch on a real workspace takes minutes), Home shows the scene and the greeting with "Syncing with Slack." in place of the count line; it never says "All caught up" too early. The list reserves room for all its rows, and rows fill it from the top as conversations land, without the entrance: a new row only takes the next empty slot, so a row already shown never moves, even when a later one ranks higher. When the sync finishes, the rows shown stay where they are, the empty slots take the next items in rank order, the count line replaces "Syncing with Slack.", and the scene and the reserved room stay until Home appears again. Before `home.view` answers at all (milliseconds) the page is blank. The items it showed stay until Home appears again.
 - The AI rewrite of an item's title is the only thing that can arrive after paint. It replaces the text of a one-line, ellipsised title, so the row height does not change.
 - No timers. The scene and greeting do not update on the minute.
 

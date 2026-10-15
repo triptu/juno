@@ -4,6 +4,8 @@
  * - `homeViewAtom`: the engine's `home.view`. Home keeps the items it
  *   showed when it appeared (`freezeHome`) and takes only their `aiTitle`
  *   from later values, so a row never moves or leaves under the pointer.
+ *   During the first sync it adds items as they land, below the ones it
+ *   shows, into slots it reserved (`fillHome`).
  * - `homeGreeting`, `homeScene`, `homeItemLimit`: the copy, the scene and
  *   the cap, from the local clock and the window, chosen when Home appears.
  * - `startVisitLog`: tells the engine which topic was open for a minute,
@@ -144,10 +146,19 @@ export interface HomeShown {
   readonly enter: boolean
   /** Items whose Mark done or Resolve all was used. */
   readonly used: ReadonlySet<string>
-  /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE` and no items. */
+  /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE`, and items fill in as they land. */
   readonly loading: boolean
-  /** Row slots held through the cold visit so its greeting and composer stay put. */
+  /** Row slots held through the first sync's visit: rows that land later fill them, so nothing shown moves. */
   readonly reservedItems: number
+}
+
+/**
+ * `shown`, then the items of `latest` it lacks, in `latest`'s order, up to
+ * `limit`. Returns `shown` itself when nothing was added.
+ */
+export function addHomeItems(shown: ReadonlyArray<HomeItem>, latest: ReadonlyArray<HomeItem>, limit: number): ReadonlyArray<HomeItem> {
+  const added = latest.filter((item) => !shown.some((old) => old.id === item.id)).slice(0, Math.max(0, limit - shown.length))
+  return added.length === 0 ? shown : [...shown, ...added]
 }
 
 /** Home's second line until the first sync is done: present tense, names what is happening (SPEC 17). */
@@ -160,46 +171,61 @@ export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown |
  * Home appeared (mounted, shown again, or its first value arrived): takes
  * the items, the copy and the scene now, or nothing while there is no
  * value yet. Before the first sync is done it shows the greeting with
- * `HOME_SYNCING_LINE` and no items, never a blank page and never "All
- * caught up"; the scene it picked then stays when the items arrive.
+ * `HOME_SYNCING_LINE`, never a blank page and never "All caught up", and
+ * reserves the rows' slots; `fillHome` adds items to them as they land.
+ * When the sync ends, the rows already shown stay where they are, the
+ * free slots take the next items, and the scene stays.
  */
 export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean }): void {
   const result = registry.get(homeViewAtom)
   if (result._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
   const now = new Date()
   const previous = registry.get(homeShownAtom(key))
+  const limit = homeItemLimit(options.windowHeight)
+  const syncing = previous?.loading === true
   if (!result.value.ready) {
     const greeting = homeGreeting({ now, firstName: result.value.firstName, items: 0, caughtUp: false })
     return registry.set(homeShownAtom(key), {
-      view: { ...result.value, items: [] },
+      view: { ...result.value, items: addHomeItems(syncing ? previous.view.items : [], result.value.items, limit) },
       scene: previous?.loading === true ? previous.scene : homeScene({ now, caughtUp: false, firstVisitToday: homeAppeared(registry, now) }),
       title: greeting.title,
       line: HOME_SYNCING_LINE,
       now: now.getTime(),
       caughtUp: false,
       enter: options.enter,
-      used: new Set<string>(),
+      used: syncing ? previous.used : new Set<string>(),
       loading: true,
-      reservedItems: homeItemLimit(options.windowHeight),
+      reservedItems: limit,
     })
   }
   const view = result.value
-  const items = view.items.slice(0, homeItemLimit(options.windowHeight))
+  // Rows shown while syncing keep their places; the free slots take the next items.
+  const items = syncing ? addHomeItems(previous.view.items, view.items, previous.reservedItems) : view.items.slice(0, limit)
   const shown = { ...view, items }
   const done = caughtUp(shown)
   const greeting = homeGreeting({ now, firstName: view.firstName, items: items.length, caughtUp: done })
   registry.set(homeShownAtom(key), {
     view: shown,
     // Coming out of the syncing state the scene stays, unless there is nothing to do.
-    scene: previous?.loading === true && !done ? previous.scene : homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
+    scene: syncing && !done ? previous.scene : homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
     ...greeting,
     now: now.getTime(),
     caughtUp: done,
     enter: options.enter,
-    used: new Set<string>(),
+    used: syncing ? previous.used : new Set<string>(),
     loading: false,
-    reservedItems: previous?.loading === true ? previous.reservedItems : 0,
+    // The reserved slots, and the hidden Browse link's place, stay until Home appears again, so nothing moves.
+    reservedItems: syncing ? previous.reservedItems : 0,
   })
+}
+
+/** During the first sync: adds the items that landed since, into the free slots. */
+export function fillHome(registry: Registry, key: string): void {
+  const shown = registry.get(homeShownAtom(key))
+  const result = registry.get(homeViewAtom)
+  if (shown?.loading !== true || result._tag !== 'Success' || result.value.ready) return
+  const items = addHomeItems(shown.view.items, result.value.items, shown.reservedItems)
+  if (items !== shown.view.items) registry.set(homeShownAtom(key), { ...shown, view: { ...shown.view, items } })
 }
 
 /** A row's button was used: it goes, its slot stays. */
