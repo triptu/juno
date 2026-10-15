@@ -419,7 +419,7 @@ export const compact = stylex.createTheme(density, {
   '--density-row-padding-block': '8px',
   '--density-row-line-gap': '0px',
   '--density-row-tile-zoom': '0.8182',
-  '--density-row-estimate': '83px',
+  '--density-row-estimate': '64px',
   '--density-message-padding-block': '2px',
   '--density-message-group-gap': '6px',
 })

@@ -760,10 +760,11 @@ export const sizes = stylex.defineVars({
   '--row-44': '44px',
   '--row-48': '48px',
   '--row-52': '52px',
-  // The contain-intrinsic-size estimate for off-screen sidebar rows. It sizes
-  // the content box, so it is the row's measured height without its 11px
-  // block padding: 85px for a two-line preview (the row is 107px).
-  '--row-topic-estimate': '85px',
+  // A sidebar row's content box: three lines (title, one-line preview, meta),
+  // rounded up to a whole pixel. The row is this plus its block padding (88px
+  // in Comfortable) whatever it shows, so the off-screen estimate
+  // (contain-intrinsic-size) is exact and rows never land on a fraction.
+  '--row-topic-estimate': '66px',
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',

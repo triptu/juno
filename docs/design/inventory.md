@@ -135,14 +135,14 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 ```
 [tile 44]  [line 1: title ........................ time | Resolve]  height 22
-           [line 2: Sender: preview, 2 lines .....  @ | count ]
+           [line 2: Sender: preview, 1 line …........  @ | count ]
            [line 3: ⌗ channel   ○○○   ▢ 7   ]              margin-top 3
 ```
 
-- Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
+- Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, a fixed height of 88px (80 compact: `--density-row-estimate` plus the padding), radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
 - Tile: 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
 - Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then `bell-slash` 13 muted on a thread set to Never that shows because it mentions you. Spacer. Then time 12px tabular, muted (subtle when unread).
-- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), `-webkit-line-clamp` 2, `text-wrap: pretty`. Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
+- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), one line with an ellipsis (`Text truncate`; the full text is the tooltip while it is cut off). Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; unread row bg `--secondary-active` fg subtle; otherwise `--secondary-default` fg muted. Hidden at 0.
 - Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants), on every row. Then optional tags in order (gap 6):
@@ -170,10 +170,12 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 ### 3.3 Density (Preferences › Appearance)
 
-| Density | Vertical padding | Line gap | Title | Tile | Row height (1 / 2 preview lines) |
+| Density | Vertical padding | Line gap | Title | Tile | Row height |
 | --- | --- | --- | --- | --- | --- |
-| Comfortable (default; the prototype's "balanced") | 11 | 3 | 14.5 | 44 | 90 / 109 |
-| Compact | 8 | 1 | 13.5 | 36 | 80 / 99 |
+| Comfortable (default; the prototype's "balanced") | 11 | 2 | 14.5 | 44 | 88 |
+| Compact | 8 | 0 | 14.5 | 36 | 80 |
+
+The preview is one line in both, so the row height is fixed (measured 10-15: 87.56 and 79.56px, rounded up to whole pixels; before, 107px with a two-line preview).
 
 Density also changes the message list (§6.1). The prototype's "airy" level is gone.
 
@@ -664,7 +666,7 @@ Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a c
 
 ## 19. Preferences that change the look
 
-Stored as user preferences. Nothing else from the prototype's design panel (`data-props`) survives: `rowStyle`, `previewLines`, `showAvatars`, `grouping`, `quietDays` and `messageStyle` are removed, with their variants.
+Stored as user preferences. Nothing else from the prototype's design panel (`data-props`) survives: `rowStyle`, `showAvatars`, `grouping`, `quietDays` and `messageStyle` are removed, with their variants.
 
 | Preference | Options | Default | Affects |
 | --- | --- | --- | --- |
