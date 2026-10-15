@@ -128,6 +128,23 @@ export default defineFixtures(
       'sheet-edit': scene(() =>
         full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} mode="edit" name="Design crit" icon={undefined} keepOutOfAll={false} query="" chosen={sheetProps.chosen.slice(0, 1)} /> }),
       ),
+      // Automated's sheet: what Juno put there says so; #ci-builds the user added.
+      'sheet-automated': scene(() =>
+        full({
+          ...viewChrome,
+          views: views.slice(0, 2),
+          viewSheet: (
+            <ViewSheet
+              {...sheetProps}
+              mode="edit"
+              name="Automated"
+              query=""
+              results={[]}
+              chosen={[...sheetProps.chosen.map((c) => ({ ...c, addedByJuno: true })), { id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public' }]}
+            />
+          ),
+        }),
+      ),
     },
     Content: {
       // Right-to-left, emoji names, a long private channel, a lower-bound count, and the resolved and unsubscribed rows.
