@@ -113,8 +113,13 @@ const pickerCatalog: ReadonlyArray<EmojiCategory> = [
 function SelectionScene() {
   const [at, setAt] = useState<{ x: number; y: number } | undefined>(undefined)
   useEffect(() => {
-    // After the list's first frame, as a drag would end on a drawn list.
-    const frame = requestAnimationFrame(() => {
+    // Once the fonts are in and the list has drawn, as a drag would end on a settled list.
+    let frame = 0
+    let live = true
+    void document.fonts.ready.then(() => {
+      if (live) frame = requestAnimationFrame(select)
+    })
+    const select = () => {
       const text = document.querySelectorAll('[data-message-row] [data-msg-text] p')[2]
       const middle = text?.closest('[data-topic-middle]')
       if (text == null || middle == null || text.firstChild === null) return
@@ -127,8 +132,11 @@ function SelectionScene() {
       const box = range.getBoundingClientRect()
       const origin = middle.getBoundingClientRect()
       setAt({ x: box.left + box.width / 2 - origin.left, y: box.top - origin.top })
-    })
-    return () => cancelAnimationFrame(frame)
+    }
+    return () => {
+      live = false
+      cancelAnimationFrame(frame)
+    }
   }, [])
   return (
     <Topic

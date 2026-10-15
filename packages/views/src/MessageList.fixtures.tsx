@@ -64,7 +64,7 @@ function ReactionChanges() {
         : step === 'first'
           ? withReactions(thread, BARE, [eyes])
           : thread
-  return <MessageList {...base} items={items} main={false} actions={noopActions} />
+  return <MessageList {...base} items={items} main={false} actions={noopActions} onToggleReaction={noop} />
 }
 
 /** The delete confirm takes the toolbar's place and the edit field the body's, on the owner's command. */
