@@ -6,7 +6,7 @@
  * Drafts live in the engine per topic, so they outlive tabs and restarts;
  * the composer reads one once and writes it back as the user types.
  */
-import { draftsGet, draftsSet, messagesDiscard, messagesRetry, messagesSend, type SendTarget } from '@juno/contract'
+import { draftsGet, draftsSet, messagesDelete, messagesDiscard, messagesEdit, messagesReact, messagesRetry, messagesSend, type MessageRef, type SendTarget } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
@@ -19,6 +19,15 @@ export const retryMessage = (registry: Registry, clientMsgId: string) => runComm
 
 /** Delete draft on a failed row. */
 export const discardMessage = (registry: Registry, clientMsgId: string) => runCommand(registry, messagesDiscard, { clientMsgId })
+
+/** Edits an own message. The list shows the new text at once; the outbox sends it. */
+export const editMessage = (registry: Registry, message: MessageRef, text: string) => runCommand(registry, messagesEdit, { message, text })
+
+/** Deletes an own message. It leaves the list at once; the outbox sends it. */
+export const deleteMessage = (registry: Registry, message: MessageRef) => runCommand(registry, messagesDelete, { message })
+
+/** Adds (`on`) or removes the user's reaction `name`. The chip changes at once; the outbox sends it. */
+export const reactToMessage = (registry: Registry, message: MessageRef, name: string, on: boolean) => runCommand(registry, messagesReact, { message, name, on })
 
 const draftFamily = liveQuery(draftsGet)
 

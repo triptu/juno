@@ -32,7 +32,8 @@ const require = createRequire(import.meta.url)
 const useCache = !process.argv.includes('--no-cache')
 const jobs = Math.max(1, Number(process.env.JUNO_TYPECHECK_JOBS ?? 2))
 const cacheDir = process.env.JUNO_TYPECHECK_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'typecheck')
-const tsc = require.resolve('typescript/bin/tsc')
+// TypeScript 7's package exports no bin path; bin/tsc hands over to the native compiler for this platform.
+const tsc = join(dirname(require.resolve('typescript/package.json')), 'bin/tsc')
 const tsVersion = require('typescript/package.json').version
 
 /** Every file under a directory that a typecheck can read, without build output or dependencies. */

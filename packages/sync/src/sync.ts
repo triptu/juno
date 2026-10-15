@@ -27,7 +27,7 @@ import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, typ
 import { syncEmoji } from './emoji'
 import { SyncConfig } from './config'
 import { reindexOptions, type RootFetch, type SyncContext } from './context'
-import { applyFrame, applySent } from './events'
+import { applyActed, applyFrame, applySent, type Acted } from './events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
 import { applyPage } from './pages'
 import { reindexTopics } from './reindex'
@@ -65,6 +65,8 @@ export interface TopicFetcher {
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
   readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
+  /** Stores an edit, delete or reaction Slack accepted, with `alongside` in the same transaction (`applyActed`). */
+  readonly acted: (acted: Acted, alongside: Effect.Effect<unknown, SqlError, StoreWriter | Invalidation>) => Effect.Effect<void, SqlError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
@@ -131,6 +133,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
       older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
       sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
+      acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
     }
     if (options.onFetcher !== undefined) yield* options.onFetcher(fetcher)
 

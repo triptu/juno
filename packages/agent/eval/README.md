@@ -12,6 +12,7 @@ Behaviour cases for the Juno Agent: short conversations against an invented Slac
 | `pnpm agent:eval --live --model sonnet --model haiku` | Several chat models in one run, one report each |
 | `pnpm agent:eval --live --case remember --case thanks` | Only these cases |
 | `pnpm agent:eval --live --judge sol` | Another judge family (default `opus`) |
+| `pnpm agent:eval --live --case reaction-question --repeat 3` | The cases 3 times per model, to tell noise from a real change |
 
 A live run needs `OPENROUTER_API_KEY` in the environment or in the repo's `.env`; without it, it says so and runs nothing. When the app's keychain bridge can be reached outside Electron, `run.ts` should read the key from it. A live run costs money: about 14 chat runs per model plus one judge request per case. It never runs in `pnpm test`.
 
@@ -62,7 +63,7 @@ Not covered yet, because the agent cannot do them: the dismissal case of §19.5 
 
 ## Reports
 
-A live run (or `--save`) writes `reports/<date>-<model>.md` and appends one row to `reports/history.tsv`. The page has one row per behaviour (checks passed, and the share), all checks, cases with every check passed, the share of Slack claims with a source, and every failed check with its reason. The history row has the same numbers as `passed/total`, one column per behaviour, and `cited` (Slack claims with a source over all Slack claims), so a run can be compared with earlier ones. New behaviours add columns at the end. Each case's transcript, as the judge read it, goes to `<date>-<model>.transcripts.md` beside the page; it is not committed.
+A full live run (or `--save`) writes `reports/<date>-<model>.md` and appends one row to `reports/history.tsv`. The page has one row per behaviour (checks passed, and the share), all checks, cases with every check passed, the share of Slack claims with a source, and every failed check with its reason. The history row has the same numbers as `passed/total`, one column per behaviour, and `cited` (Slack claims with a source over all Slack claims), so a run can be compared with earlier ones. New behaviours add columns at the end. Each case's transcript, as the judge read it, goes to `<date>-<model>.transcripts.md` beside the page; it is not committed. A run with `--case` or `--repeat` saves no page and no history row, so it never replaces a full run's report; its transcripts go to a folder in the system temp folder, which it prints.
 
 ## Adding a case
 
