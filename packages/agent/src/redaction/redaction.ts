@@ -34,6 +34,7 @@ import { memoryGen } from '../actions/cards'
 import { revokeExposedGrants } from '../grants/grants'
 import { purgeCodexThreads } from '../providers/codex-purge'
 import { crashPoint } from '../runtime/crash'
+import { invalidateChatCaches } from '../serve/chat'
 import { checkpointTruncate, transaction } from '../store/database'
 import { purgeNodes, redactMemory } from '../store/memory'
 import type { Store } from '../store/store'
@@ -216,6 +217,8 @@ export function createRedaction(options: RedactionOptions) {
       const result = transaction(store.db, () => commit(store, input, gen))
       if ('_tag' in result) return result
       crashPoint('redaction.committed')
+      // The chat's caches hold the removed rows; drop them before anyone reads the page again.
+      invalidateChatCaches(store)
       options.changed?.()
       // Stopping waits for the job's driver; the removal does not.
       for (const job of result.jobs) void options.stopJob?.(job).catch(report)

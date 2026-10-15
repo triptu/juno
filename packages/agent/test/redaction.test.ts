@@ -9,6 +9,8 @@ import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import type { Card, CardBinding, ChatItem, ChatPage, OpId, ChatMessageId } from '@juno/agent-contract'
 import { liveGrant, mintGrant, type RemovalBackup, type Turns } from '../src/index'
 import { ONLINE, run, served } from './serve-harness'
+import { createChatCache, type ChatSource } from '../src/serve/chat'
+import { CHAT_MIGRATIONS } from '../src/serve/schema'
 import { deferred, HAIKU, say, turnsHarness } from './turns-harness'
 
 /** A made-up marker for the words the owner removes. */
@@ -324,6 +326,28 @@ it("a removal Juno proposes: the card names the message and offers Juno's reply,
   h.fake.script([call('remove_messages', { messages: ['n99'] }), reply(say('No.'))])
   await h.ended(h.send('forget something else'))
   expect(h.turns.actions.views()).toHaveLength(1)
+})
+
+it("a removal drops the chat's cached pages at once: the next read shows Removed", async () => {
+  const h = await turnsHarness({ compaction: false, migrations: [CHAT_MIGRATIONS] })
+  harnesses.push(h)
+  h.fake.script([reply(say(`Noted, ${SECRET}.`))])
+  const said = h.send(`The gate code is ${SECRET}.`)
+  await h.ended(said)
+  let changes = 0
+  const cache = createChatCache(h.turns.store, () => changes++)
+  const source: ChatSource = {
+    store: h.turns.store, live: undefined, seen: (_id, fallback) => fallback, jobs: [], cards: [], readAt: 0, waiting: undefined,
+    dayOf: (at) => new Date(at).setHours(0, 0, 0, 0),
+  }
+  expect(cache.items(source).some((item) => item._tag === 'owner')).toBe(true)
+
+  await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: true })
+  expect(changes).toBe(1)
+  const items = cache.items(source)
+  expect(items.filter((item) => item._tag === 'note')).toEqual([{ _tag: 'note', id: String(ownerMessageId(h.turns, said)), kind: 'removed' }])
+  expect(JSON.stringify(items)).not.toContain(SECRET)
+  cache.close()
 })
 
 it('the owner removes a message from the sheet with AI assist off, and the chat shows Removed in its place', async () => {
