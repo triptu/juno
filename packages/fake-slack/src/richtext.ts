@@ -21,6 +21,11 @@ export function escapeText(text: string): string {
   return out + escapeLiteral(text.slice(last))
 }
 
+/** The reverse of `escapeText`, for text a client sent already escaped. */
+export function unescapeText(text: string): string {
+  return text.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+}
+
 function escapeLiteral(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }

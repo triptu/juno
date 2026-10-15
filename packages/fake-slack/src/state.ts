@@ -21,7 +21,7 @@ import type {
 } from '@juno/slack-schema'
 import { compareTs, isReply, millisToTs, Ts } from '@juno/slack-schema'
 import type { Clock } from './clock.ts'
-import { textToBlocks, toMrkdwn } from './richtext.ts'
+import { textToBlocks, toMrkdwn, unescapeText } from './richtext.ts'
 
 export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -61,6 +61,8 @@ export interface PostInput {
   readonly channel: string
   readonly user: string
   readonly text?: string
+  /** `text` is Slack's mrkdwn already, escaped by the client (`chat.postMessage`); stored as sent. Otherwise it is fixture text and escaped here. */
+  readonly mrkdwn?: boolean
   readonly blocks?: Message['blocks']
   readonly threadTs?: Ts
   readonly broadcast?: boolean
@@ -366,8 +368,9 @@ export class Workspace {
     if (conversation === undefined) throw new Error(`No conversation ${input.channel}`)
     const ts = this.nextTs(input.at)
     const user = this.users.get(input.user)
-    const text = input.text === undefined ? '' : toMrkdwn(input.text)
-    const blocks = input.blocks ?? (input.text === undefined ? undefined : textToBlocks(input.text))
+    const text = input.text === undefined ? '' : input.mrkdwn === true ? input.text : toMrkdwn(input.text)
+    const plain = input.text === undefined ? undefined : input.mrkdwn === true ? unescapeText(input.text) : input.text
+    const blocks = input.blocks ?? (plain === undefined ? undefined : textToBlocks(plain))
     const root = input.threadTs === undefined ? undefined : this.find(input.channel, input.threadTs)
     if (input.threadTs !== undefined && root === undefined) throw new Error(`No thread ${input.threadTs}`)
     const message: Message = {
@@ -437,7 +440,8 @@ export class Workspace {
     return message
   }
 
-  edit(channel: string, ts: string, text: string, editor: string): Message {
+  /** `mrkdwn`: `text` came from a client, escaped already (`chat.update`). */
+  edit(channel: string, ts: string, text: string, editor: string, mrkdwn = false): Message {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === ts)
     const previous = list[index]
@@ -445,8 +449,8 @@ export class Workspace {
     const editTs = this.eventTs()
     const message: Message = {
       ...previous,
-      text: toMrkdwn(text),
-      blocks: textToBlocks(text),
+      text: mrkdwn ? text : toMrkdwn(text),
+      blocks: textToBlocks(mrkdwn ? unescapeText(text) : text),
       edited: { user: editor, ts: editTs },
     }
     list[index] = message

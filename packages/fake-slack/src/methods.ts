@@ -337,7 +337,8 @@ export const handlers: Handlers = {
     const message = ws.post({
       channel: args.channel,
       user: ws.selfId,
-      ...(text === undefined ? {} : { text }),
+      // The client escapes `&`, `<` and `>` itself; Slack stores the text as sent.
+      ...(text === undefined ? {} : { text, mrkdwn: args.text !== undefined }),
       ...(args.blocks === undefined ? {} : { blocks: args.blocks }),
       ...(args.thread_ts === undefined ? {} : { threadTs: args.thread_ts }),
       ...(args.reply_broadcast === undefined ? {} : { broadcast: args.reply_broadcast }),
@@ -355,7 +356,7 @@ export const handlers: Handlers = {
     if (existing.user !== ws.selfId) return new ApiError('cant_update_message')
     const text = args.text ?? args.markdown_text
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
-    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId)
+    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined)
     return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: withChannel(ws, args.channel, message) }
   },
 
