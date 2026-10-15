@@ -83,7 +83,7 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
           : props.kind === 'emoji' ? props.rows.map((emoji) => {
               const rowId = mentionRowId(id, emoji.id)
               return <OptionRow key={emoji.id} id={rowId} size={32} active={rowId === activeId}
-                leading={emoji.url === undefined ? <Text>{emoji.insert}</Text> : <img src={emoji.url} alt="" {...stylex.props(styles.emoji)} />}
+                leading={emoji.url === undefined ? <Text aria-hidden>{emoji.insert}</Text> : <img src={emoji.url} alt="" {...stylex.props(styles.emoji)} />}
                 label={`:${emoji.name}:`} onSelect={() => onPick(rowId)} onActivate={() => onActivate(rowId)} />
             }) : props.rows.map((channel) => {
               const rowId = mentionRowId(id, channel.id)
