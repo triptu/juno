@@ -167,7 +167,7 @@ app.whenReady().then(() => {
 })
 
 function openWindow(): BrowserWindow {
-  const window = createMainWindow(launch)
+  const window = createMainWindow(() => launch)
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
   return window
 }

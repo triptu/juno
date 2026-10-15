@@ -92,6 +92,20 @@ test('privacy mode blurs previews from the account menu, hides notification text
   }
 })
 
+test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.privacy.toggleWithMenu()
+  await expect(juno.privacy.footer).toBeVisible()
+
+  await app.evaluate(({ Menu, BrowserWindow }) => Menu.getApplicationMenu()?.getMenuItemById('reload')?.click(undefined, BrowserWindow.getAllWindows()[0]))
+  const rina = juno.sidebar.row(RINA)
+  await rina.expectVisible()
+  await expect(juno.privacy.footer).toBeVisible()
+  await juno.privacy.expectBlurred(rina.preview)
+  expect(await juno.privacy.menuLabel()).toBe('Show Message Text')
+})
+
 test('a launch.json field the app cannot read does not turn privacy mode off', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()

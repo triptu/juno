@@ -67,7 +67,16 @@ export function appWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => mainWindows.has(window) && !window.isDestroyed())
 }
 
-export function createMainWindow(launch: Launch): BrowserWindow {
+/** Each app window's way to read the current launch values, for a reload. */
+const launchOf = new WeakMap<BaseWindow, () => Launch>()
+
+/**
+ * `launch` reads the current launch values: the page takes its first state
+ * (theme, privacy, sidebar) from its URL, so a reload builds the URL again
+ * rather than loading the one the window opened with.
+ */
+export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
+  const launch = currentLaunch()
   const window = createWindow({
     title: 'Juno',
     width: 1200,
@@ -79,6 +88,7 @@ export function createMainWindow(launch: Launch): BrowserWindow {
   })
 
   mainWindows.add(window)
+  launchOf.set(window, currentLaunch)
   setAppMenu({ sidebarHidden: launch.sidebar?.collapsed ?? false, privacy: launch.privacy === true })
   // The three-finger swipe (Electron does not see the two-finger one): left is Back, as in Safari.
   window.on('swipe', (_event, direction) => {
@@ -90,11 +100,28 @@ export function createMainWindow(launch: Launch): BrowserWindow {
   window.webContents.on('did-finish-load', () => fitMinimumSizeToZoom(window))
   window.webContents.on('zoom-changed', () => setImmediate(() => fitMinimumSizeToZoom(window)))
 
-  // electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server.
-  const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
-  void window.loadURL(pageUrl(devUrl || APP_URL, launch))
+  void window.loadURL(appPageUrl(launch))
 
   return window
+}
+
+/** The app page for `launch`. electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server. */
+function appPageUrl(launch: Launch): string {
+  const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
+  return pageUrl(devUrl || APP_URL, launch)
+}
+
+/**
+ * View › Reload. The app page loads again with the current launch values,
+ * so a setting changed since the window opened, privacy mode above all,
+ * is not undone by a reload. Other windows reload as they are.
+ */
+function reload(window: BaseWindow | undefined, ignoringCache: boolean): void {
+  if (window === undefined || window.isDestroyed() || !(window instanceof BrowserWindow)) return
+  const launch = launchOf.get(window)
+  if (launch !== undefined) void window.loadURL(appPageUrl(launch()), ignoringCache ? { extraHeaders: 'pragma: no-cache\n' } : {})
+  else if (ignoringCache) window.webContents.reloadIgnoringCache()
+  else window.webContents.reload()
 }
 
 /**
@@ -185,8 +212,8 @@ function setAppMenu(state: MenuState, rebuild = false): void {
     // In a topic tab ⌘J opens or closes the Juno panel; elsewhere it opens the Juno tab.
     command('juno', 'Juno', 'CommandOrControl+J', 'juno.toggle'),
     { type: 'separator' },
-    { role: 'reload' },
-    { role: 'forceReload' },
+    { id: 'reload', label: 'Reload', accelerator: 'CommandOrControl+R', click: (_item, window) => reload(window, false) },
+    { id: 'force-reload', label: 'Force Reload', accelerator: 'Shift+CommandOrControl+R', click: (_item, window) => reload(window, true) },
     { role: 'toggleDevTools' },
     { type: 'separator' },
     { id: 'zoom-reset', label: 'Actual Size', accelerator: 'CommandOrControl+0', click: (_item, window) => zoom(window, 'reset') },
