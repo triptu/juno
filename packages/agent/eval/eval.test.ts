@@ -98,11 +98,12 @@ it('the report scores each behaviour, and leaves out what this build cannot do',
   expect(page).toContain('- proposes a card: no card tools in this build (WP15)')
 })
 
-it("a judge answer that is missing or not JSON fails that question", () => {
-  const questions = [{ id: 'q0', question: 'a' }, { id: 'q1', question: 'b' }]
-  expect(parseAnswers('```json\n{"answers": {"q0": {"pass": true, "reason": "fine"}}}\n```', questions)).toEqual({
-    q0: { pass: true, reason: 'fine' },
-    q1: { pass: false, reason: 'The judge gave no answer.' },
+it('the judge\'s answers are matched back to their questions, and a missing one fails', () => {
+  const questions = [{ id: 'answers right', question: 'a' }, { id: 'concise', question: 'b' }]
+  expect(parseAnswers('```json\n{"answers": {"q1": {"pass": true, "reason": "fine"}}}\n```', questions)).toEqual({
+    'answers right': { pass: true, reason: 'fine' },
+    concise: { pass: false, reason: 'The judge gave no answer: ```json\n{"answers": {"q1": {"pass": true, "reason": "fine"}}}\n```' },
   })
-  expect(parseAnswers('I think it passes', questions).q0).toEqual({ pass: false, reason: 'The judge gave no answer.' })
+  expect(parseAnswers('{"q2": {"pass": false, "reason": "long"}}', questions).concise).toEqual({ pass: false, reason: 'long' })
+  expect(parseAnswers('I think it passes', questions)['answers right']!.pass).toBe(false)
 })

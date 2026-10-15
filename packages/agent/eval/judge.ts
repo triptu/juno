@@ -60,8 +60,11 @@ const SYSTEM = [
   'Juno read in that step; it is cited when its words sit inside a <src> tag.',
 ].join('\n')
 
+/** Questions go out as `q1`, `q2`…, which the model keeps more reliably than a sentence. */
+const key = (i: number) => `q${i + 1}`
+
 function prompt(trace: Trace, questions: ReadonlyArray<JudgeQuestion>): string {
-  const asks = questions.map((q) => `- ${q.id}: ${q.question}${q.counts ? ' Give "claims" and "cited" counts over every step that read Slack.' : ''}`)
+  const asks = questions.map((q, i) => `- ${key(i)}: ${q.question}${q.counts ? ' Give "claims" and "cited" counts over every step that read Slack.' : ''}`)
   return `# Transcript\n\n${transcript(trace)}\n\n# Questions\n\n${asks.join('\n')}`
 }
 
@@ -87,19 +90,22 @@ export function openRouterJudge(options: { readonly model: string; readonly apiK
   }
 }
 
-/** The judge's JSON, with a missing or malformed answer as a failed one. */
+/**
+ * The judge's JSON, keyed back by question id. The answers may be nested
+ * under `answers` or not. A missing or malformed answer fails its question.
+ */
 export function parseAnswers(content: string, questions: ReadonlyArray<JudgeQuestion>): Record<string, JudgeAnswer> {
   let answers: Record<string, Partial<JudgeAnswer>> = {}
   try {
     const json = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)) as { answers?: typeof answers }
-    answers = json.answers ?? {}
+    answers = json.answers ?? (json as typeof answers)
   } catch {
     // Every question fails below with the reason.
   }
   return Object.fromEntries(
-    questions.map((q) => {
-      const a = answers[q.id]
-      if (a === undefined || typeof a.pass !== 'boolean') return [q.id, { pass: false, reason: 'The judge gave no answer.' }]
+    questions.map((q, i) => {
+      const a = answers[key(i)]
+      if (a === undefined || typeof a.pass !== 'boolean') return [q.id, { pass: false, reason: `The judge gave no answer: ${content.slice(0, 200)}` }]
       const counts = q.counts && typeof a.claims === 'number' && typeof a.cited === 'number' ? { claims: a.claims, cited: a.cited } : {}
       return [q.id, { pass: a.pass, reason: String(a.reason ?? ''), ...counts }]
     }),
