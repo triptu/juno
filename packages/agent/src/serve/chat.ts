@@ -40,8 +40,10 @@ import type {
   ReplyTarget,
   RunId,
   SendContext,
+  ScheduleId,
 } from '@juno/agent-contract'
 import type { CardView } from '../actions/cards'
+import { sessionOf } from '../t3/protocol'
 import { aboutOf } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import type { RunState } from '../router/events'
@@ -148,7 +150,7 @@ export function createChatCache(store: Store, changed: () => void = () => {}) {
   registered.add(invalidateAll)
   invalidators.set(store.db, registered)
   const inputs = (source: ChatSource, revision: ReturnType<typeof revisions>) => [
-    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs'),
+    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs', 'tool_blocks'),
     source.readAt, source.waiting, source.dayOf, new Date().getTimezoneOffset(),
     JSON.stringify(source.jobs), JSON.stringify(source.cards.map((view) => [view.at, view.runId, view.card.id])),
     JSON.stringify(source.live === undefined ? undefined : { ...source.live, status: undefined }),
@@ -335,8 +337,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   for (const run of runs) {
     const live = source.live?.runId === run.id ? source.live : undefined
     const job = run.origin === 'report' ? source.jobs.find((candidate) => candidate.id === reportJob(run.opId)) : undefined
-    const origin = cache.origins.get(run.id, [run.origin, run.opId, job?.id, job?.title], () => originOf(run, source.jobs))
-    const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag
+    const origin = cache.origins.get(run.id, [run.origin, run.opId, job?.id, job?.title], () => originOf(run, source.jobs, store))
+    const originKey = origin._tag === 'job' ? `job:${origin.jobs.map((j) => j.jobId).join(',')}` : origin._tag === 'schedule' ? `schedule:${origin.scheduleId}` : origin._tag
     let bubbles: ReadonlyArray<{ id: string; text: string; body: ReadonlyArray<BubbleSpan>; replyTo?: string; at: number }>
     if (live !== undefined) {
       bubbles = live.bubbles.map((b) => ({ ...b, at: source.seen(b.id, Date.now()) }))
@@ -414,6 +416,9 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     })))
   }
   entries.push(...junoEntries)
+  for (const row of store.db.prepare('SELECT call_id, at FROM tool_blocks').all()) {
+    entries.push({ by: 'line', at: Number(row.at), item: { _tag: 'note', id: `blocked:${String(row.call_id)}` as ChatMessageId, kind: 'secretBlocked' } })
+  }
   for (const view of source.cards) {
     const reactions = reactionsOf('card', view.card.id)
     entries.push(cache.entries.get(`card:${view.card.id}`, [view.at, view.runId, JSON.stringify(view.card), JSON.stringify(reactions), view.at > source.readAt],
@@ -424,7 +429,14 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   ))
   for (const job of source.jobs) {
     const at = started.get(job.id) ?? job.stepAt
+    const session = job.kind === 't3' ? sessionOf(job.task) : undefined
+    const pr = session?.pullRequest
+    const open = session === undefined ? {} : { open: { _tag: 'url' as const,
+      url: job.phase === 'done' && pr ? pr.url : `t3-thread://v1/${session.threadId}`,
+      label: job.phase === 'done' && pr ? `Open PR ${pr.number}` : 'Open',
+    } }
     const card = {
+      ...open,
       _tag: 'task' as const, id: `task:${job.id}` as CardId, jobId: job.id as JobId, kind: job.kind, title: job.title, where: job.place,
       phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
     }
@@ -472,8 +484,13 @@ const inlineOf = (span: BubbleSpan): JunoInline =>
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 
-/** What started a run, as the chat labels it. Schedules come with WP19; until then a wake shows as Juno's own. */
-function originOf(run: RunRow, jobs: ReadonlyArray<Job>): Origin {
+/** What started a run, using the persisted occurrence for a schedule wake. */
+function originOf(run: RunRow, jobs: ReadonlyArray<Job>, store: Store): Origin {
+  if (run.origin === 'wake') {
+    const row = store.db.prepare(`SELECT s.id, json_extract(s.definition, '$.what') AS name
+      FROM schedules s JOIN schedule_occurrences o ON o.schedule_id = s.id WHERE o.op_id = ?`).get(run.opId)
+    if (typeof row?.id === 'string' && typeof row.name === 'string') return { _tag: 'schedule', scheduleId: row.id as ScheduleId, name: row.name }
+  }
   if (run.origin !== 'report') return { _tag: 'owner' }
   const jobId = reportJob(run.opId)
   const job = jobs.find((j) => j.id === jobId)

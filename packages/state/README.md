@@ -53,3 +53,8 @@ Transport errors are retried every second and never reach an atom. Route errors 
 ## Testing
 
 `pnpm --filter @juno/state test` covers `applyListDelta` (identity of unchanged rows, order, removal, reset, refs), the read rule and the tab rules. The topic view atoms are tested end to end in `packages/engine/test/messages.test.ts`. The client and helpers are tested end to end in `packages/engine/test/protocol.test.ts`, and the sidebar atoms in `packages/engine/test/sidebar-state.test.ts`; both use a registry per test and a Node `MessageChannel` in place of the renderer's port. `test/agent-chat.test.ts` runs the chat atoms and actions against the agent's real renderer server and turn engine (`@juno/agent` and `@juno/agent-testing` are test-only dependencies).
+
+Task commands retain the job id even without an approval binding. Stop uses
+the job RPC, which approves one interrupt under that click's op id. Expired
+cards retain only the identity Ask again needs; that RPC submits a fresh
+owner message quoting the card. It never approves the expired payload.

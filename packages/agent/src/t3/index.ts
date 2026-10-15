@@ -88,7 +88,12 @@ export function createT3Adapter(manager: McpManagerApi) {
             }
             const id = context.actions.propose(proposal)
             return { text: `Proposed task ${id}. Nothing starts until the owner clicks Start.` }
-          } catch (error) { return { text: error instanceof McpError ? error.message : 'T3 Code has an unsupported tool schema or arguments. No session was started.', isError: true } }
+          } catch (error) {
+            if (error instanceof McpError && error.reason === 'secret') {
+              manager.store.db.prepare('INSERT OR IGNORE INTO tool_blocks VALUES (?, ?, ?)').run(call.callId, run.runId, manager.store.now())
+              context.actions.changed()
+            }
+            return { text: error instanceof McpError ? error.message : 'T3 Code has an unsupported tool schema or arguments. No session was started.', isError: true } }
         },
       })]
     },

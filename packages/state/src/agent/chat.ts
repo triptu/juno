@@ -66,7 +66,7 @@ export function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, A
 }
 
 /** The latest card views and bindings by card id, from every page seen, for `cardCommand`. */
-const cards = new Map<string, { readonly card: Card; readonly binding: Binding }>()
+const cards = new Map<string, { readonly card: Card; readonly binding: Binding | undefined }>()
 
 function remember(snapshot: Snapshot): Snapshot {
   rememberCards(snapshot.page.items.flatMap((item) => (item._tag === 'card' ? [item.card] : [])), snapshot.cards)
@@ -75,9 +75,8 @@ function remember(snapshot: Snapshot): Snapshot {
 
 /** Keeps the bindings of cards on screen outside the chat (the Review page), so their buttons work. */
 export function rememberCards(shown: ReadonlyArray<Card>, bindings: ReadonlyArray<Binding>): void {
-  for (const binding of bindings) {
-    const card = shown.find((candidate) => candidate.id === binding.identity.cardId)
-    if (card !== undefined) cards.set(binding.identity.cardId, { card, binding })
+  for (const card of shown) {
+    cards.set(card.id, { card, binding: bindings.find((binding) => binding.identity.cardId === card.id) })
   }
 }
 
@@ -317,6 +316,10 @@ async function cardCommand(registry: Registry, id: CardId, command: CardCommand)
   if (command._tag === 'signIn') return 'signIn'
   const known = cards.get(id)
   if (known === undefined) return 'unknownCard'
+  if (command._tag === 'stop') {
+    return known.card._tag === 'task' ? ok(await call(registry, 'agent.jobs.stop', { opId: uuidv7(), jobId: known.card.jobId })) : 'failed'
+  }
+  if (known.binding === undefined) return 'unknownCard'
   let identity = known.binding.identity
   switch (command._tag) {
     case 'dismiss':
@@ -326,8 +329,6 @@ async function cardCommand(registry: Registry, id: CardId, command: CardCommand)
       return ok(await call(registry, 'agent.cards.undo', { opId: uuidv7(), identity }))
     case 'askAgain':
       return ok(await call(registry, 'agent.cards.askAgain', { opId: uuidv7(), identity }))
-    case 'stop':
-      return known.card._tag === 'task' ? ok(await call(registry, 'agent.jobs.stop', { opId: uuidv7(), jobId: known.card.jobId })) : 'failed'
   }
   if (command._tag === 'send' && known.card._tag === 'sendMessage') {
     for (const row of command.texts) {

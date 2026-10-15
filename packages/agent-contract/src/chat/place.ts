@@ -110,9 +110,11 @@ const OPENABLE = /^(?:https:\/\/[^\s/?#]+|http:\/\/(?:localhost|127\.0\.0\.1|\[:
 /**
  * Whether an "Open" link may leave Juno. Only `https:` anywhere, or `http:`
  * on loopback (a local T3 Code thread). Anything else, such as `file:` or a
- * custom scheme in a spoofed tool result, is refused at decode time.
+ * custom scheme in a spoofed tool result, is refused at decode time. The fixed
+ * T3 thread link is the only permitted custom scheme.
  */
-export const isOpenableUrl = (url: string): boolean => OPENABLE.test(url)
+export const isT3ThreadUrl = (url: string): boolean => /^t3-thread:\/\/v1\/[a-zA-Z0-9_-]+$/.test(url)
+export const isOpenableUrl = (url: string): boolean => OPENABLE.test(url) || isT3ThreadUrl(url)
 
 export const OpenableUrl = Schema.String.check(
   Schema.makeFilter((url: string) => isOpenableUrl(url) || 'an https: URL, or http: on loopback', {

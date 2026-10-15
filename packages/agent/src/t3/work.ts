@@ -34,7 +34,7 @@ export function workTools(manager: McpManagerApi, context: { readonly jobs: Jobs
           threadId: session.threadId, ...(operation === 'send' ? { message: args.message } : {}),
         })
         if (discovered._tag !== 'change') throw new Error('Expected change')
-        const proposed = Schema.decodeUnknownSync(CardPayload)({ ...discovered, target: job.title, action: { ...discovered.action, payload: { ...discovered.action.payload, destination_ids: [session.threadId] } } })
+        const proposed = Schema.decodeUnknownSync(CardPayload)({ ...discovered, target: job.title, ...(decision._tag === 'card' ? { caption: 'Because Juno read Slack or a report in this reply' } : {}), action: { ...discovered.action, payload: { ...discovered.action.payload, destination_ids: [session.threadId] } } })
         if (proposed._tag !== 'change') throw new Error('Expected task change')
         const payload = decision._tag === 'card' ? proposed : Schema.decodeUnknownSync(CardPayload)({ ...proposed, action: { ...proposed.action, tier: 2 } })
         const id = context.actions.propose({ runId: run.runId, callId: call.callId, payload })
