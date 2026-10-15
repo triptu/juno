@@ -37,9 +37,9 @@ A provider registered as `openrouter` with today's resolved slugs, their real co
 For the e2e tests, where the agent runs in its own process with the real OpenRouter provider. Import it from `@juno/agent-testing/openrouter`, which loads nothing else. Give the agent `origin` in place of `https://openrouter.ai` (main does so from `JUNO_FAKE_OPENROUTER_URL` under `JUNO_E2E`).
 
 - `GET /api/v1/models` answers `openRouterCatalogue()`: `fakeCatalogue` in OpenRouter's shape, with names such as "Anthropic: Claude Opus 5.5".
-- `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble.
+- `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
 - `key`: a request carrying another key gets 401, as a rejected key does.
-- `requests` records each chat request's path, model and key; `catalogueReads()` counts list reads.
+- `requests` records each chat request's path, model, key, whether it was a compaction, and `input`, the last user message. `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
 
 ## Codex: `startFakeCodex(options?)`
 

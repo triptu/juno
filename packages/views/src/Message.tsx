@@ -169,7 +169,7 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span {...stylex.props(styles.header, actions !== undefined && styles.headerWithToolbar)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="">
+            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
               {name}
             </Text>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>

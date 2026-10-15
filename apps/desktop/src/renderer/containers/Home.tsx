@@ -1,7 +1,9 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, showHome } from '@juno/state'
+import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
+import { openJunoTab } from './juno/actions'
 import { openAllTopics, openTopic } from './navigation'
 
 function openItem(topicId: string, event: ActivateEvent): void {
@@ -13,11 +15,10 @@ function browseAll(event: ActivateEvent): void {
   openAllTopics({ newTab: event.metaKey })
 }
 
-/**
- * Ask Juno opens the Juno chat (SPEC section 12). The renderer has no Juno
- * tab yet; the Juno Agent wiring adds it and this opens it, as ⌘J will.
- */
-function askJuno(): void {}
+/** Ask Juno opens the Juno chat with its composer focused (SPEC section 12), as ⌘J does outside a topic. */
+function askJuno(): void {
+  openJunoTab()
+}
 
 /**
  * Home (SPEC section 12): the Home tab, and what the workspace shows with
@@ -33,6 +34,8 @@ export function HomePage() {
   const latest = result._tag === 'Success' && result.value.ready ? result.value : undefined
   const shown = useAtomValue(homeShownAtom(key))
   const appeared = useRef(false)
+  // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
+  const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
 
   const ready = latest !== undefined
   useLayoutEffect(() => {
@@ -74,6 +77,7 @@ export function HomePage() {
       onMarkDone={markDone}
       onResolveAll={resolveAll}
       onAsk={askJuno}
+      {...(jobLine === undefined ? {} : { askLine: jobLine })}
       onBrowseAll={browseAll}
     />
   )

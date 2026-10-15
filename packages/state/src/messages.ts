@@ -30,6 +30,7 @@ import {
   MESSAGE_WINDOW_DEFAULT,
   messagesList,
   messagesLoadOlder,
+  messagesLocate,
   THREADS_WINDOW_MAX,
   topicsGet,
   topicsOpen,
@@ -151,6 +152,9 @@ export const messageItem = (id: string, ts: string) => messageItemAtom(`${id}\u0
 
 /** Fetches what the store lacks for a topic a tab now shows. Never in a prefetch. */
 export const openTopic = (registry: Registry, id: string) => runCommand(registry, topicsOpen, { id })
+
+/** The topic that holds a message (its thread, or Main), for a Juno source link. */
+export const locateMessage = (registry: Registry, channel: string, ts: string) => runCommand(registry, messagesLocate, { channel, ts })
 
 /** Makes sure the page before `before` is stored; then widen `messageWindowSpecAtom(id)`. */
 export const loadOlderMessages = (registry: Registry, id: string, before: string) => runCommand(registry, messagesLoadOlder, { id, before })

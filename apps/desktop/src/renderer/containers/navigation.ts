@@ -34,6 +34,10 @@ import {
   allTopicsPlace,
   allTopicsTab,
   homePlace,
+  flashMessage,
+  junoPagePlace,
+  locateMessage,
+  junoPlace,
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
@@ -67,6 +71,7 @@ import {
   type Place,
   type Tabs,
 } from '@juno/state'
+import { chatCopy, type JunoPage } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { toggleSidebar } from './layout'
 
@@ -219,6 +224,16 @@ export function openHome(options: OpenOptions = {}): void {
   show((tabs) => openPlace(tabs, homePlace, options), undefined)
 }
 
+/** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */
+export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
+}
+
+/** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
+export function openJuno(options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, junoPlace, options), undefined)
+}
+
 /** The Notifications page (SPEC 14), a singleton like Home. */
 export function openNotifications(options: OpenOptions = {}): void {
   show((tabs) => openPlace(tabs, notificationsPlace, options), undefined)
@@ -236,12 +251,19 @@ const MESSAGE_TOP = 80
  * Opens a topic at one message, as a clicked notification does: a fresh
  * open lands with that message near the top when it is in the first
  * window, else at the divider or the bottom. A tab that already shows the
- * topic is focused as it is.
+ * topic is focused as it is. With `flash`, the message flashes once shown.
  */
-export function openTopicAt(id: string, ts: string): void {
+export function openTopicAt(id: string, ts: string, options: OpenOptions & { readonly flash?: boolean } = {}): void {
+  if (options.flash === true) flashMessage(registry, id, ts)
   if (tabShowing(registry.get(tabsAtom), id) !== undefined) return openTopic(id)
-  openTopic(id)
+  openTopic(id, options.newTab === true ? { newTab: true } : {})
   registry.set(scrollSnapshotAtom(id), { anchorKey: ts, offset: MESSAGE_TOP })
+}
+
+/** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes. */
+export async function openSlackMessage(channel: string, ts: string, options: OpenOptions = {}): Promise<void> {
+  const located = await locateMessage(registry, channel, ts)
+  if (located._tag === 'Success') openTopicAt(located.value.topicId, ts, { ...options, flash: true })
 }
 
 /** When the last All topics open started, for the page's first paint with rows to end its measure on. */
@@ -412,6 +434,9 @@ export function runMenuCommand(command: MenuCommand): void {
       return stepTabHistory(1)
     case 'sidebar.toggle':
       return toggleSidebar()
+    case 'juno.toggle':
+      // `juno/actions.ts` handles it.
+      return
     case 'edit.undo':
       // `topicActions.ts` handles it.
       return
@@ -477,6 +502,8 @@ export async function showTabMenu(tabId: string): Promise<void> {
 function placeLabel(place: Place): string {
   if (place.kind === 'newChat') return 'New chat'
   if (place.kind === 'home') return 'Home'
+  if (place.kind === 'juno') return 'Juno'
+  if (place.kind === 'junoPage') return chatCopy.pageTitles[place.page]
   if (place.kind === 'notifications') return 'Notifications'
   if (place.kind === 'preferences') return 'Preferences'
   if (place.kind === 'allTopics') return 'All topics'

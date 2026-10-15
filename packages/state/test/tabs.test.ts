@@ -8,6 +8,8 @@ import {
   dividerIndex,
   historyTarget,
   homePlace,
+  junoPagePlace,
+  junoPlace,
   mountedTabs,
   newChatPlace,
   noTabs,
@@ -26,8 +28,12 @@ import {
 } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)
-/** What each tab shows, left to right: a topic id, "new" for a New chat or "home". */
-const placeName = (tab: Tabs['tabs'][number]) => tabTopic(tab) ?? (tab.history.entries[tab.history.index]!.kind === 'home' ? 'home' : 'new')
+/** What each tab shows, left to right: a topic id, "new" for a New chat, "home" or "juno". */
+const placeName = (tab: Tabs['tabs'][number]) => {
+  const kind = tab.history.entries[tab.history.index]!.kind
+  const place = tab.history.entries[tab.history.index]!
+  return tabTopic(tab) ?? (place.kind === 'junoPage' ? place.page : kind === 'newChat' ? 'new' : kind)
+}
 const shown = (tabs: Tabs) => tabs.tabs.map(placeName)
 const activeShows = (tabs: Tabs) => {
   const tab = tabs.tabs.find((other) => other.id === tabs.active)
@@ -84,6 +90,29 @@ describe('Home', () => {
 
   it('with no tab open, opens a tab', () => {
     expect(shown(openPlace(noTabs, homePlace))).toEqual(['home'])
+  })
+})
+
+describe('Juno', () => {
+  it('is one tab: a second open focuses it, and it reads back after a restart', () => {
+    const juno = openPlace(three, junoPlace, { newTab: true })
+    expect(shown(juno)).toEqual(['a', 'b', 'juno', 'c'])
+    const again = openPlace(open(juno, 'd', { newTab: true }), junoPlace, { newTab: true })
+    expect(shown(again)).toEqual(['a', 'b', 'juno', 'd', 'c'])
+    expect(activeShows(again)).toBe('juno')
+    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'juno', 'd', 'c'])
+  })
+})
+
+describe('Juno pages', () => {
+  it('each opens in one tab, and reads back after a restart', () => {
+    const settings = openPlace(three, junoPagePlace('settings'), { newTab: true })
+    const both = openPlace(settings, junoPagePlace('activity'), { newTab: true })
+    expect(shown(both)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
+    const again = openPlace(both, junoPagePlace('settings'), { newTab: true })
+    expect(activeShows(again)).toBe('settings')
+    expect(shown(again)).toEqual(['a', 'b', 'settings', 'activity', 'c'])
+    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'settings', 'activity', 'c'])
   })
 })
 

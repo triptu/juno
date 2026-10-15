@@ -6,6 +6,13 @@ import { MessageList } from './MessageList'
 import { TopicHeader } from './TopicHeader'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicView } from './TopicView'
+import { noopActions } from './juno-chat/commands'
+import { day, juno, owner } from './juno-chat/fixtures/data'
+import { JunoChatFrame } from './juno-chat/JunoChatFrame'
+import { JunoChatList } from './juno-chat/JunoChatList'
+import { JunoComposer } from './juno-chat/JunoComposer'
+import { JunoHeader, JunoPanelActions } from './juno-chat/JunoHeader'
+import { JunoPanelContext } from './juno-chat/JunoPanelContext'
 import { Workspace, type WorkspaceProps, type WorkspaceTab } from './Workspace'
 
 const noop = () => {}
@@ -23,6 +30,7 @@ const tabs = {
   // A New chat with a destination picked keeps its icon and takes the destination's name.
   newChatPicked: { id: 'tab-new-chat', title: 'Postgres 16 cutover window', icon: 'new-chat' } satisfies WorkspaceTab,
   home: { id: 'tab-home', title: 'Home', icon: 'home' } satisfies WorkspaceTab,
+  juno: { id: 'tab-juno', title: 'Juno', icon: 'juno' } satisfies WorkspaceTab,
 } as const
 
 const browserTabs = [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.densityUnread, tabs.hiring]
@@ -47,6 +55,28 @@ const engPage = (
   <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} onThreads={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
+)
+
+const panelItems = [
+  day(0),
+  owner('m-w1', 'is this settled?', 'single', { _tag: 'sent' }, NOW - 5 * 60_000, { about: { _tag: 'topic', topicId: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan' } }),
+  ...juno('m-w1-r', 'Not yet. Leo asked for a reviewer from platform before Thursday, and nobody has said yes.', { at: NOW - 4 * 60_000 }),
+]
+
+/** The Juno panel as the workspace's side shows it, beside the Postgres topic. */
+const junoPanel = (
+  <JunoChatFrame
+    header={<JunoHeader column="panel" banner={{ _tag: 'none' }} menuOpen={false} onMenu={noop} onOpenPage={noop} onResume={noop} actions={<JunoPanelActions onOpenInTab={noop} onClose={noop} />} />}
+    composer={<JunoComposer column="panel" value="" onChange={noop} onSend={noop} enabled placeholder="Ask about this topic" context={<JunoPanelContext onCatchMeUp={noop} />} />}
+  >
+    <JunoChatList column="panel" items={panelItems} banner={{ _tag: 'none' }} moreAbove={false} moreBelow={false} now={NOW} actions={noopActions} onSuggest={noop} enterEmpty={false} />
+  </JunoChatFrame>
+)
+
+const junoPage = (
+  <JunoChatFrame header={<JunoHeader banner={{ _tag: 'none' }} menuOpen={false} onMenu={noop} onOpenPage={noop} onResume={noop} />} composer={<JunoComposer value="" onChange={noop} onSend={noop} enabled />}>
+    <JunoChatList items={panelItems} banner={{ _tag: 'none' }} moreAbove={false} moreBelow={false} now={NOW} actions={noopActions} onSuggest={noop} enterEmpty={false} />
+  </JunoChatFrame>
 )
 
 const workspace = (props: Partial<WorkspaceProps> = {}, page?: React.ReactNode, frame?: FixtureFrame) =>
@@ -74,6 +104,11 @@ export default defineFixtures(
       'new-chat-picked': workspace({ tabs: [tabs.postgres, tabs.newChatPicked], activeId: tabs.newChatPicked.id }),
       // Home's content is the empty workspace until the Home page is built.
       'home-tab': workspace({ tabs: [tabs.home, tabs.postgres], activeId: tabs.home.id }),
+      'juno-tab': workspace({ tabs: [tabs.postgres, tabs.juno], activeId: tabs.juno.id }, junoPage),
+      // The topic keeps 480px or more: the panel sits beside it.
+      'juno-panel': workspace({ side: junoPanel }, postgresPage, { width: 1200, height: 640 }),
+      // Under 480px for the topic: the panel covers it.
+      'juno-panel-covers': workspace({ side: junoPanel }, postgresPage, { width: 760, height: 640 }),
       'sidebar-hidden': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage),
       'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),

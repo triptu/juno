@@ -12,7 +12,9 @@ import { loadavg } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
-import { expect, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
+import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
+import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
+import { answer, setOpenRouterKey } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
@@ -1012,6 +1014,127 @@ test.describe('topic view', () => {
       })
       const measured = await running.win.evaluate(() => (window as unknown as { __live: number[] }).__live)
       within('live update in the topic, p95', stats('live update in the topic, engine commit to pixels (juno.live-update, messages.list)', measured).p95, 50)
+    } finally {
+      await running.close()
+    }
+  })
+})
+
+test.describe.serial('Juno chat', () => {
+  let fake: FakeSlack
+  let model: FakeOpenRouter
+  let userData: string
+  let slackDir: string
+  let slackApp: SlackAppFixture
+
+  const launch = (): Promise<RunningApp> =>
+    launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
+
+  test.beforeAll(async () => {
+    fake = await startFakeSlack()
+    // Three bubbles per answer, so the scroll scenario has rows of every kind.
+    model = await startFakeOpenRouter({ answer: (request) => `${answer(request)}<say>A second line about it.</say><say>And a third, longer one, so the bubble wraps onto two lines in the 720px column of the Juno tab.</say>` })
+    userData = await tempUserData()
+    slackDir = await tempUserData()
+    slackApp = await writeSlackApp(fake, slackDir)
+  })
+
+  test.afterAll(async () => {
+    await fake?.close()
+    await model?.close()
+    await rm(userData, { recursive: true, force: true })
+    await rm(slackDir, { recursive: true, force: true })
+  })
+
+  test('send to your bubble and to the first answer, ⌘J to the panel, and scroll the chat', async () => {
+    test.setTimeout(600_000)
+    const running = await launch()
+    await setOpenRouterKey(running)
+    const { win } = running
+    const juno = new Juno(running.app, win)
+    try {
+      await juno.signIn()
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      await expect.poll(() => hooks(running.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+      await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+      const composer = win.locator('main [data-juno-chat] textarea')
+      await composer.waitFor()
+
+      const sends: number[] = []
+      const bubbles: number[] = []
+      for (let i = 0; i < 80; i++) {
+        const before = { send: (await juno.measures('juno.chat-send')).length, bubble: (await juno.measures('juno.chat-bubble')).length }
+        await composer.fill(`message ${i}`)
+        await composer.press('Enter')
+        await expect.poll(async () => (await juno.measures('juno.chat-bubble')).length, { timeout: 15_000 }).toBeGreaterThan(before.bubble)
+        sends.push((await juno.measures('juno.chat-send')).at(-1)!)
+        bubbles.push((await juno.measures('juno.chat-bubble')).at(-1)!)
+      }
+      const oneFrame = oneFrameBudget(await refreshInterval(win))
+      within('chat send to your bubble, p95', stats('chat send, Enter to your bubble painted (juno.chat-send)', sends).p95, oneFrame)
+      within('chat first bubble, p95', stats('chat first bubble, Enter to Juno\'s bubble painted, fake model (juno.chat-bubble)', bubbles).p95, 2500)
+
+      // Scroll the 400-row chat, as the topic view's scenario does.
+      const scroller = win.locator('main [data-juno-chat] [data-scroll]')
+      const box = (await scroller.boundingBox())!
+      await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      const interval = await refreshInterval(win)
+      let result = { frames: [] as number[], loaf: 0 }
+      const { work } = await traced(win, 'scroll-chat', async () => {
+        await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__frames = []
+          w.__loaf = 0
+          w.__sampling = true
+          new PerformanceObserver((entries) => {
+            w.__loaf += entries.getEntries().length
+          }).observe({ type: 'long-animation-frame', buffered: false })
+          let last = performance.now()
+          const tick = (now: number) => {
+            w.__frames.push(now - last)
+            last = now
+            if (w.__sampling) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        })
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, -200)
+            await win.waitForTimeout(100)
+          }
+          for (let i = 0; i < 30; i++) {
+            await win.mouse.wheel(0, 200)
+            await win.waitForTimeout(100)
+          }
+        }
+        result = await win.evaluate(() => {
+          const w = window as unknown as { __frames: number[]; __sampling: boolean; __loaf: number }
+          w.__sampling = false
+          return { frames: w.__frames.slice(1), loaf: w.__loaf }
+        })
+      })
+      const over = result.frames.filter((frame) => frame > interval * 1.5).length
+      stats('scroll chat, frame interval', result.frames)
+      const perFrame = stats('scroll chat, main-thread work per frame', work)
+      console.log(`scroll chat: ${result.frames.length} frames, dropped (over 1.5 intervals) ${over} = ${((100 * over) / result.frames.length).toFixed(2)} %, long animation frames ${result.loaf}`)
+      within('scroll chat, main-thread work per frame, p95', perFrame.p95, 8.3)
+      expect(result.loaf).toBe(0)
+
+      // ⌘J beside a topic: the panel painted with its composer.
+      await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+      await juno.sidebar.row(POSTGRES).open()
+      await juno.topic.expectAtBottom()
+      const panels: number[] = []
+      for (let i = 0; i < 20; i++) {
+        const before = (await juno.measures('juno.panel-open')).length
+        await juno.tabs.menu('juno')
+        await expect.poll(async () => (await juno.measures('juno.panel-open')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+        panels.push((await juno.measures('juno.panel-open')).at(-1)!)
+        await juno.tabs.menu('juno')
+        await expect(win.locator('aside[data-juno-panel]')).toHaveCount(0)
+      }
+      within('panel open, p95', stats('panel open, ⌘J to the panel painted (juno.panel-open)', panels).p95, oneFrame)
     } finally {
       await running.close()
     }

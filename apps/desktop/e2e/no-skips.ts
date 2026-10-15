@@ -6,7 +6,8 @@
  * and the run green.
  *
  * A scenario that cannot run yet on purpose adds a `placeholder` annotation
- * before it skips (`feel/chat.feel.ts`); those are listed but allowed.
+ * before it skips (`recordSkipped` in `feel/feel.ts` does); those are listed
+ * but allowed.
  */
 import type { FullResult, Reporter, Suite, TestCase } from '@playwright/test/reporter'
 

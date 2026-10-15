@@ -30,6 +30,8 @@ export interface HomeProps {
   readonly onResolveAll: (itemId: string) => void
   /** Opens the Juno chat. */
   readonly onAsk: () => void
+  /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
+  readonly askLine?: string
   /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onBrowseAll?: (event: ActivateEvent) => void
 }
@@ -40,7 +42,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onAsk, onBrowseAll }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onAsk, askLine, onBrowseAll }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -67,7 +69,9 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
         )}
         <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
           <Icon icon={Sparkle} size={16} weight="duotone" />
-          <span {...stylex.props(styles.askText)}>Ask Juno…</span>
+          <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
+            {askLine ?? 'Ask Juno…'}
+          </span>
           <Kbd look="key">⌘J</Kbd>
         </button>
         {caughtUp && onBrowseAll !== undefined ? (
@@ -333,8 +337,13 @@ const styles = stylex.create({
     transitionProperty: 'background-color',
     transitionDuration: motion['--duration-fast'],
   },
+  // One line: a long job line takes an ellipsis instead of moving the page.
   askText: {
     flexGrow: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
     color: colors['--foreground-muted'],
   },
   quietLink: {

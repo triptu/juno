@@ -41,6 +41,7 @@ import type {
 } from '@juno/agent-contract'
 import { aboutOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
+import { junoAgentOnAtom } from '../shell'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
 
@@ -55,7 +56,8 @@ export const MAX_SEND_BYTES = 65_536
 
 const isRpcClientError = (error: unknown): error is RpcClientError => error instanceof RpcClientError
 
-function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, AgentClient> {
+/** A stream RPC of the agent, retried across agent restarts. */
+export function live<A, E>(tag: string, payload: unknown): Stream.Stream<A, E, AgentClient> {
   const make = (): Stream.Stream<A, E, AgentClient> =>
     Stream.unwrap(Effect.map(AgentClient, (client) => client(tag as never, payload as never) as unknown as Stream.Stream<A, E | RpcClientError>)).pipe(
       Stream.catchIf(isRpcClientError, () => Stream.unwrap(Effect.map(Effect.sleep(RETRY_DELAY), make))),
@@ -86,6 +88,19 @@ export const chatPageAtom = (window: Window) => pageFamily(JSON.stringify(window
 export const chatSummaryAtom = AgentClient.runtime
   .atom(live<ChatSummary, never>('agent.chat.summary', undefined))
   .pipe(Atom.keepAlive)
+
+const quiet: ChatSummary = { unread: 0, busy: false }
+
+/**
+ * The sidebar's Juno item: the unread count and the busy sparkle. Nothing
+ * asks the agent for it while the agent is off, so main is not asked for a
+ * port every second for nothing.
+ */
+export const junoNavAtom = Atom.make((get): ChatSummary => {
+  if (!get(junoAgentOnAtom)) return quiet
+  const summary = get(chatSummaryAtom)
+  return AsyncResult.isSuccess(summary) ? summary.value : quiet
+})
 
 /** An owner send the agent has not stored yet, or could not. */
 export interface PendingSend {
@@ -136,10 +151,49 @@ export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>)
   return { ...page, items }
 }
 
+/** A row's identity across pages: the op for an owner bubble, the id otherwise. */
+function rowKey(item: ChatItem): string {
+  switch (item._tag) {
+    case 'owner':
+      return `o:${item.opId}`
+    case 'juno':
+      return `j:${item.id}`
+    case 'card':
+      return `c:${item.card.id}`
+    case 'ending':
+    case 'status':
+      return `${item._tag}:${item.runId}`
+    case 'note':
+    case 'groupLabel':
+      return `${item._tag}:${item.id}`
+    case 'day':
+      return `d:${item.at}`
+    case 'newDivider':
+      return 'new'
+  }
+}
+
+/** The rows seen last, by key, with their JSON, so an unchanged row keeps its object and its memoised view (performance 5.1). */
+const seen = new Map<string, { readonly json: string; readonly item: ChatItem }>()
+const SEEN_LIMIT = 2_000
+
+function stable(page: ChatPage): ChatPage {
+  if (seen.size > SEEN_LIMIT) seen.clear()
+  const items = page.items.map((item) => {
+    const key = rowKey(item)
+    const json = JSON.stringify(item)
+    const held = seen.get(key)
+    if (held !== undefined && held.json === json) return held.item
+    seen.set(key, { json, item })
+    return item
+  })
+  return { ...page, items }
+}
+
 const itemsFamily = Atom.family((key: string) =>
   Atom.make((get) => {
     const pending = get(pendingSendsAtom)
-    return AsyncResult.map(get(pageFamily(key)), (snapshot) => withPending(snapshot.page, pending))
+    return AsyncResult.map(get(pageFamily(key)), (snapshot) => stable(withPending(snapshot.page, pending)))
   }),
 )
 
@@ -149,7 +203,7 @@ export const chatItemsAtom = (window: Window) => itemsFamily(JSON.stringify(wind
 type CommandResult<A> = Exit.Exit<A, AgentCommandError | RpcClientError>
 
 /** Runs one agent RPC on `registry`'s client and resolves with its exit. */
-function call<A>(registry: Registry, tag: string, payload: unknown): Promise<CommandResult<A>> {
+export function call<A>(registry: Registry, tag: string, payload: unknown): Promise<CommandResult<A>> {
   const atom = AgentClient.runtime.fn<unknown>()(() => AgentClient.use((client) => client(tag as never, payload as never) as never))
   const unmount = registry.mount(atom)
   registry.set(atom, undefined)

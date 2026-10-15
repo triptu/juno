@@ -25,13 +25,14 @@ import {
   MessagesRoutes,
   MessageView,
   NotFound,
+  NotSignedIn,
   THREADS_WINDOW_MAX,
   ThreadSummary,
   type FetchOutcome,
 } from '@juno/contract'
-import { parseTopicId } from '@juno/domain'
+import { mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import type { SlackApiError } from '@juno/slack'
-import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
+import { Invalidation, liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import type { FetchReport } from '@juno/sync'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
@@ -148,6 +149,19 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
           const { outcome } = yield* fetch((fetcher) => fetcher.open(payload.id))
           return { outcome }
+        }),
+      'messages.locate': ({ channel, ts }) =>
+        Effect.gen(function* () {
+          const open = yield* workspace.current
+          if (open === undefined) return yield* new NotSignedIn()
+          const rows = yield* Effect.gen(function* () {
+            const sql = yield* StoreReader
+            return yield* sql<{ thread_ts: string | null; reply_count: number }>`SELECT thread_ts, reply_count FROM messages WHERE channel = ${channel} AND ts = ${ts}`
+          }).pipe(Effect.provide(open.context), Effect.orDie)
+          const row = rows[0]
+          // A reply names its thread; a root with replies is its own thread's first message.
+          const thread = row?.thread_ts ?? (row !== undefined && row.reply_count > 0 ? ts : undefined)
+          return { topicId: thread === undefined ? mainTopicId(channel as ChannelId) : threadTopicId(channel as ChannelId, thread as Ts) }
         }),
       'messages.loadOlder': (payload) =>
         Effect.gen(function* () {
