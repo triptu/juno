@@ -153,6 +153,8 @@ export const handlers: Handlers = {
     }
   },
 
+  'dnd.info': () => ({ dnd_enabled: false, next_dnd_start_ts: 0, next_dnd_end_ts: 0, snooze_enabled: false }),
+
   'users.prefs.get': (ctx) => ({ prefs: ctx.workspace.prefs }),
 
   'client.getWebSocketURL': (ctx) => ({

@@ -51,6 +51,7 @@ const READ_ONLY_METHODS = [
   'auth.test',
   'client.userBoot',
   'users.prefs.get',
+  'dnd.info',
   'client.counts',
   'subscriptions.thread.getView',
   'conversations.history',
@@ -219,6 +220,7 @@ async function run(target: Target): Promise<number> {
     if (auth !== undefined) console.log(`    team ${auth.team_id}, user ${auth.user_id}${auth.enterprise_id === undefined ? '' : ', enterprise present'}`)
     const boot = yield* call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true })
     if (boot !== undefined) console.log(`    ${boot.channels.length} channels, ${boot.ims.length} ims, enterprise ${boot.team.enterprise_id === undefined ? 'absent' : 'present'}`)
+    yield* call('dnd.info', {})
     const prefs = yield* call('users.prefs.get', {})
     if (prefs !== undefined) console.log(`    ${Object.keys(prefs.prefs).length} prefs`)
     const counts = yield* call('client.counts', { thread_counts_by_channel: true })
