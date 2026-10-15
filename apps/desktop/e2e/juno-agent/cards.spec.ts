@@ -188,7 +188,10 @@ test.fixme('an old unapproved card expires, and Ask again creates a fresh card w
     const pane = await openChat(again)
     const expired = card(pane, 'sendMessage').first()
     await expect(expired).toHaveAttribute('data-card-status', 'expired')
-    // Expired cards lose their binding on relaunch, so cardCommand returns unknownCard.
+    // packages/state/src/agent/chat.ts rememberCards retains only cards with approval bindings.
+    // The expired card has none after relaunch: cardCommand returns unknownCard before calling
+    // agent.cards.askAgain in packages/agent/src/serve/server.ts. The first assertion below
+    // fails: no Ask again owner bubble is added, and no fresh model request is sent.
     await expired.getByRole('button', { name: 'Ask again' }).click()
     await expect(pane.ownerBubble('Ask again')).toHaveCount(1)
     await expect(card(pane, 'sendMessage')).toHaveCount(2)

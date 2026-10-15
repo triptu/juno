@@ -115,7 +115,10 @@ test.fixme('Stop on the Task card interrupts the session', async ({ juno, t3 }) 
   await connectT3(juno, t3.loopbackUrl)
   const { task } = await startTask(juno, t3)
 
-  // chat.ts cardCommand returns unknownCard because Task cards have no approval binding.
+  // packages/agent/src/serve/chat.ts creates task:<jobId> without an approval binding.
+  // packages/state/src/agent/chat.ts rememberCards therefore omits it; cardCommand returns
+  // unknownCard before its stop branch can call agent.jobs.stop. The first assertion below
+  // fails: fake T3 stays running and receives no t3_thread_interrupt.
   await task.getByRole('button', { name: 'Stop' }).click()
   await expect.poll(() => t3.threads()[0]?.status, { timeout: POLL }).toBe('interrupted')
   await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'stopped', { timeout: POLL })
