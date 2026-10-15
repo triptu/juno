@@ -52,6 +52,12 @@ test.describe('mouse-down activation', () => {
   })
 })
 
+test('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
+  await page.goto('/#/MessageList?__state=Thread/long')
+  await expect(page.getByRole('link', { name: 'runbook' })).toHaveCSS('cursor', 'pointer')
+  await expect(page.locator('[data-channel="C0ENG"]')).toHaveCSS('cursor', 'default')
+})
+
 /**
  * A one-line text that is cut off shows its full text as the tooltip when
  * hovered; one that fits shows none. The browser draws the tooltip itself, so
