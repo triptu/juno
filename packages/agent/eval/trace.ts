@@ -4,6 +4,7 @@
  * it called, the Slack messages the host returned, and how each run ended.
  * The grader reads only this.
  */
+import type { CardView } from '../src/actions/cards'
 import type { Ending } from '@juno/agent-contract'
 import type { SlackMessage } from '@juno/agent-testing'
 import { parseOutput, type ArchiveMessage, type Output, type SourceRef } from '../src/index'
@@ -31,6 +32,8 @@ export interface Call {
 }
 
 export interface StepTrace {
+  readonly cards: ReadonlyArray<CardView['card']>
+  readonly effects: ReadonlyArray<string>
   /** The owner's input as the judge reads it. */
   readonly input: string
   readonly bubbles: ReadonlyArray<Bubble>

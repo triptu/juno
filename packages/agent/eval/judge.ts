@@ -69,7 +69,7 @@ function prompt(trace: Trace, questions: ReadonlyArray<JudgeQuestion>): string {
 }
 
 /** A judge on OpenRouter. `apiKey` is read for each request. */
-export function openRouterJudge(options: { readonly model: string; readonly apiKey: () => Promise<string | undefined> }): Judge {
+export function openRouterJudge(options: { readonly model: string; readonly apiKey: () => Promise<string | undefined>; readonly spent?: (cost: number | undefined) => void }): Judge {
   return async (trace, questions) => {
     if (questions.length === 0) return {}
     const key = await options.apiKey()
@@ -85,7 +85,8 @@ export function openRouterJudge(options: { readonly model: string; readonly apiK
       }),
     })
     if (!response.ok) throw new Error(`the judge failed: HTTP ${response.status}`)
-    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const body = (await response.json()) as { usage?: { cost?: number }; choices?: Array<{ message?: { content?: string } }> }
+    options.spent?.(body.usage?.cost)
     return parseAnswers(body.choices?.[0]?.message?.content ?? '', questions)
   }
 }
