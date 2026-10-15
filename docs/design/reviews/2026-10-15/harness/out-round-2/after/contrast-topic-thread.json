@@ -1,0 +1,46 @@
+{
+  "light": [
+    {
+      "text": "What's the rollback if replication lags ",
+      "fg": "rgb(96, 94, 82)",
+      "bg": "102,85,85,0",
+      "ratio": 1.08,
+      "opacity": 1,
+      "size": "14.5px",
+      "weight": "400",
+      "path": "blockquote<div<span<div[listitem]<div[list]<div"
+    },
+    {
+      "text": "D",
+      "fg": "oklch(0.590356 0.0629807 252.357)",
+      "bg": "224,238,253,1",
+      "ratio": 3.47,
+      "opacity": 1,
+      "size": "12px",
+      "weight": "600",
+      "path": "span[img]<span<div[listitem]<div[list]<div<div"
+    },
+    {
+      "text": "L",
+      "fg": "oklch(0.576889 0.0630134 356.776)",
+      "bg": "249,228,234,1",
+      "ratio": 3.7,
+      "opacity": 1,
+      "size": "12px",
+      "weight": "600",
+      "path": "span[img]<span<div[listitem]<div[list]<div<div"
+    }
+  ],
+  "dark": [
+    {
+      "text": "What's the rollback if replication lags ",
+      "fg": "rgb(198, 196, 190)",
+      "bg": "204,187,204,0",
+      "ratio": 1.04,
+      "opacity": 1,
+      "size": "14.5px",
+      "weight": "400",
+      "path": "blockquote<div<span<div[listitem]<div[list]<div"
+    }
+  ]
+}

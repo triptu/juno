@@ -182,7 +182,7 @@ export const ModelChoice = Schema.Struct({
   /** "Claude Sonnet 5.5". Absent when the catalogue has no model that fits. */
   resolved: Schema.optionalKey(Schema.String),
   provider: Schema.Literals(['openrouter', 'codex', 'custom']),
-  /** "$3 / $15 per million tokens". */
+  /** "$3 in, $15 out per million tokens". */
   price: Schema.optionalKey(Schema.String),
   selected: Schema.Boolean,
 })

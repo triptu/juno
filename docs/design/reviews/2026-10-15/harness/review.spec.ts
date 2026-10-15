@@ -153,6 +153,19 @@ test('slack surfaces', async ({ juno, slack }) => {
     await home.expectShown()
     await win.mouse.move(1300, 850)
     await both(juno, '01-home')
+    // Each quick filter's box and its icon's box, for the insets of the icon pills.
+    save('measure-quick-filters', await win.evaluate(() => [...document.querySelectorAll('[aria-label="Quick filters"] button')].map((b) => {
+      const r = b.getBoundingClientRect()
+      const i = b.querySelector('svg')?.getBoundingClientRect()
+      return { name: b.getAttribute('aria-label'), box: [r.x, r.y, r.width, r.height], icon: i ? [i.x - r.x, i.y - r.y, i.width, i.height, r.right - i.right, r.bottom - i.bottom] : null }
+    })))
+    await win.getByRole('button', { name: /^Unread only$|^Show unread only$/ }).hover()
+    await both(juno, '01b-unread-hover', sidebar.root.getByRole('group', { name: 'Quick filters' }))
+    await win.getByRole('button', { name: /^Unread only$|^Show unread only$/ }).click()
+    await win.mouse.move(1300, 850)
+    await both(juno, '01c-unread-on', sidebar.root)
+    await win.getByRole('button', { name: /^Unread only$|^Show unread only$/ }).click()
+    await win.mouse.move(1300, 850)
     save('measure-home', await measure(win, '[data-home] *:is(h1,h2,[data-home-item],[data-home-scene])'))
     await sweep(juno, 'home', '[data-home]')
   })
@@ -267,10 +280,24 @@ test('slack surfaces', async ({ juno, slack }) => {
     await settle(win, 500)
     await sidebar.row(POSTGRES).open()
     await both(juno, '16-topic-720')
+    // The hover toolbar on a narrow row, mid-list and on the first row under the header.
+    await topic.message('I can own the dry run').hover()
+    await both(juno, '16c-topic-720-hover')
+    save('measure-720-hover', await measure(win, '[data-message-row]:hover, [data-message-row]:hover [data-sender], [data-message-row]:hover time, [data-message-row]:hover [role=toolbar]'))
+    await topic.scrollToTop()
+    await topic.message('Draft plan is in the doc').hover()
+    await both(juno, '16e-topic-720-hover-first')
     await sidebar.row(ENG_MAIN).open()
     await both(juno, '16b-main-720')
     await setSize(juno.app, 1400, 900)
     await settle(win, 500)
+  })
+
+  await step('section labels', async () => {
+    await sidebar.row(RINA).chooseInMenu('pin')
+    await win.mouse.move(1300, 850)
+    await both(juno, '17b-sidebar-pinned-recent', sidebar.root)
+    await sidebar.row(RINA).chooseInMenu('pin')
   })
 
   await step('peek', async () => {

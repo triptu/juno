@@ -28,7 +28,6 @@ const styles = stylex.create({
     marginTop: spacing['--space-5'],
     // The 8px group gap of the next row brings the total under the label to 20px.
     marginBottom: spacing['--space-3'],
-    textTransform: 'uppercase',
     userSelect: 'none',
   },
 })
