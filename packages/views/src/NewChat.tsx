@@ -73,7 +73,6 @@ const styles = stylex.create({
   frequentArea: {
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
     flexGrow: 1,
     paddingInline: spacing['--space-6'],
     paddingBlock: spacing['--space-4'],
@@ -83,6 +82,7 @@ const styles = stylex.create({
     width: '100%',
     maxWidth: layout['--composer-width'],
     marginInline: 'auto',
+    marginBlock: 'auto',
     boxSizing: 'border-box',
   },
   note: {
