@@ -57,6 +57,34 @@ function oneFrameBudget(interval: number): number {
 }
 
 /**
+ * The budget for a character to reach the screen: within one refresh
+ * interval of a bare `<input>` measured in the same run. The bare input runs
+ * no app code, so its p95 is the floor Electron, the compositor and the
+ * display set on this machine (about 38 ms in 10-15 runs); an absolute
+ * one-frame budget fails on it too (performance.md 1, 7.1).
+ */
+function characterBudget(control: number, interval: number): number {
+  return control + interval
+}
+
+/** Types into a bare `<input>` laid over the window: the floor for a character, with no app code. */
+async function nativeControl(win: Page, name: string, type: (input: ReturnType<Page['locator']>) => Promise<void>) {
+  await win.evaluate(() => {
+    const input = document.createElement('input')
+    input.id = 'perf-input'
+    input.style.cssText = 'position:fixed;top:100px;left:500px;z-index:9999;background:white;color:black'
+    document.body.append(input)
+  })
+  const input = win.locator('#perf-input')
+  try {
+    await input.focus()
+    return await typingReading(win, input, name, () => type(input))
+  } finally {
+    await input.evaluate((node) => node.remove())
+  }
+}
+
+/**
  * Rejects hidden or unfocused samples. Other desktop runs can steal focus
  * without hiding the page; their scheduling and pointer events contaminate
  * input-to-paint measurements too.
@@ -103,32 +131,33 @@ test('keystroke controls: composer, bare input and palette', async ({ juno, win 
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   const hidden = await countHidden(win)
-  const budget = oneFrameBudget(await refreshInterval(win))
-  for (const surface of ['composer', 'bare input', 'palette']) {
-    if (surface === 'bare input') await win.evaluate(() => {
-      const input = document.createElement('input')
-      input.id = 'perf-input'
-      input.style.cssText = 'position:fixed;top:100px;left:500px;z-index:9999;background:white;color:black'
-      document.body.append(input)
-    })
-    if (surface === 'palette') await juno.palette.open()
-    const input = surface === 'composer' ? juno.topic.composer : surface === 'palette' ? juno.palette.input : win.locator('#perf-input')
-    await input.fill('')
-    await input.focus()
-    const result = await typingReading(win, input, `typing-${surface.replace(' ', '-')}`, async () => {
-      for (let round = 0; round < 4; round++) {
-        await input.pressSequentially('deployment')
-        await win.waitForTimeout(150)
-      }
-    })
+  const interval = await refreshInterval(win)
+  const typeRounds = (input: ReturnType<Page['locator']>) => async () => {
+    for (let round = 0; round < 4; round++) {
+      await input.pressSequentially('deployment')
+      await win.waitForTimeout(150)
+    }
+  }
+  const report = (surface: string, result: Awaited<ReturnType<typeof typingReading>>) => {
     stats(`${surface}, Event Timing keydown/keypress >=16 ms (diagnostic)`, result.events)
     const presented = stats(`${surface}, input timestamp to character presented`, result.presented)
     stats(`${surface}, input to animation frame callback`, result.frame)
     stats(`${surface}, animation frame callback to presentation`, result.afterFrame)
     expect(result.count).toBe(40)
+    return presented
+  }
+  // The control first: the other surfaces are measured against it.
+  const control = report('bare input', await nativeControl(win, 'typing-bare-input', (input) => typeRounds(input)()))
+  const budget = characterBudget(control.p95, interval)
+  console.log(`character budget: bare input p95 ${control.p95.toFixed(1)} ms + one refresh interval ${interval.toFixed(1)} ms = ${budget.toFixed(1)} ms`)
+  for (const surface of ['composer', 'palette']) {
+    if (surface === 'palette') await juno.palette.open()
+    const input = surface === 'composer' ? juno.topic.composer : juno.palette.input
+    await input.fill('')
+    await input.focus()
+    const presented = report(surface, await typingReading(win, input, `typing-${surface}`, typeRounds(input)))
     await expect(input).toHaveValue('deployment'.repeat(4))
-    expect.soft(presented.p95, `${surface}: input to character presented`).toBeLessThanOrEqual(budget)
-    if (surface === 'bare input') await input.evaluate((node) => node.remove())
+    expect.soft(presented.p95, `${surface}: input to character presented, within one frame of the bare input`).toBeLessThanOrEqual(budget)
   }
   expect(await hidden()).toBe(0)
 })
@@ -530,15 +559,23 @@ test.describe('large workspace', () => {
         await palette.press('Escape')
         await palette.expectClosed()
       }
+      // The same words in a bare input, in the same run: the floor the palette is held to.
+      const controlKeys: number[] = []
+      for (let round = 0; round < 12; round++) {
+        const text = words[round % words.length]!
+        const reading = await nativeControl(win, `palette-control-${round}`, (input) => input.pressSequentially(text))
+        expect(reading.count).toBe(text.length)
+        controlKeys.push(...reading.presented)
+      }
       expect(await hidden(), 'palette lost focus or visibility').toBe(0)
       const open = stats('palette open, ⌘K to recent rows painted (juno.palette-open)', (await juno.measures('juno.palette-open')).slice(2))
       const results = stats('palette keystroke to its rows painted (juno.palette-results)', (await juno.measures('juno.palette-results')).slice(5))
-      const budget = oneFrameBudget(interval)
       stats('palette Event Timing keydown/keypress >=16 ms (diagnostic)', eventKeys)
       const characters = stats('palette input timestamp to character presented', keys)
+      const control = stats('bare input (control) input timestamp to character presented', controlKeys)
       within('palette open, p95', open.p95, 50)
       within('palette keystroke to rows, p95', results.p95, 100)
-      within('palette input to character presented, p95', characters.p95, budget)
+      within('palette input to character presented, p95, within one frame of the bare input', characters.p95, characterBudget(control.p95, interval))
     } finally {
       await running.close()
     }
