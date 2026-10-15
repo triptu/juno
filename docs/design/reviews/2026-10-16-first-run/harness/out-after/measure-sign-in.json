@@ -1,0 +1,254 @@
+[
+  {
+    "tag": "section",
+    "label": "Hi, I'm JunoSign in to Slack and I'll sort your conversation",
+    "rect": [
+      360,
+      174,
+      680,
+      429
+    ],
+    "padding": "48px 0px",
+    "margin": "114.234px 0px 114.227px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "div",
+    "label": "Hi, I'm JunoSign in to Slack and I'll sort your conversation",
+    "rect": [
+      360,
+      222,
+      680,
+      134
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "span",
+    "label": "",
+    "rect": [
+      360,
+      222,
+      680,
+      40
+    ],
+    "padding": "0px",
+    "margin": "0px 0px 8px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "svg",
+    "label": "",
+    "rect": [
+      360,
+      222,
+      40,
+      40
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "circle",
+    "label": "",
+    "rect": [
+      381,
+      224,
+      9,
+      9
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "path",
+    "label": "",
+    "rect": [
+      379,
+      238,
+      10,
+      15
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "circle",
+    "label": "",
+    "rect": [
+      369,
+      249,
+      6,
+      6
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "circle",
+    "label": "",
+    "rect": [
+      364,
+      242,
+      6,
+      6
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "h1",
+    "label": "Hi, I'm Juno",
+    "rect": [
+      360,
+      282,
+      680,
+      39
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "34px/39.1px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "p",
+    "label": "Sign in to Slack and I'll sort your conversations into topic",
+    "rect": [
+      360,
+      333,
+      680,
+      23
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/23.2px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "div",
+    "label": "Sign in to SlackUse the Slack app's sessionmacOS will ask fo",
+    "rect": [
+      360,
+      389,
+      680,
+      111
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "Sign in to Slack",
+    "rect": [
+      360,
+      389,
+      123,
+      36
+    ],
+    "padding": "0px 14px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)"
+  },
+  {
+    "tag": "span",
+    "label": "Sign in to Slack",
+    "rect": [
+      375,
+      396,
+      93,
+      20
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(255, 255, 255)"
+  },
+  {
+    "tag": "div",
+    "label": "Use the Slack app's sessionmacOS will ask for access to the ",
+    "rect": [
+      360,
+      441,
+      297,
+      59
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "button",
+    "label": "Use the Slack app's session",
+    "rect": [
+      360,
+      441,
+      196,
+      36
+    ],
+    "padding": "0px 14px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "span",
+    "label": "Use the Slack app's session",
+    "rect": [
+      375,
+      448,
+      166,
+      20
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "p",
+    "label": "macOS will ask for access to the Slack keychain item.",
+    "rect": [
+      360,
+      485,
+      297,
+      15
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "12.5px/normal 400",
+    "color": "rgb(112, 110, 102)"
+  },
+  {
+    "tag": "div",
+    "label": "",
+    "rect": [
+      360,
+      532,
+      680,
+      24
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  }
+]

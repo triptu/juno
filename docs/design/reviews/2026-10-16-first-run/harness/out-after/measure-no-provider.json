@@ -1,0 +1,156 @@
+[
+  {
+    "tag": "div",
+    "label": "Juno needs a modelJuno runs on a model provider you choose: ",
+    "rect": [
+      532,
+      44,
+      720,
+      789
+    ],
+    "padding": "96px 32px 0px",
+    "margin": "0px 148px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "svg",
+    "label": "",
+    "rect": [
+      564,
+      140,
+      40,
+      40
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "g",
+    "label": "",
+    "rect": [
+      570,
+      148,
+      29,
+      29
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "circle",
+    "label": "",
+    "rect": [
+      570,
+      148,
+      29,
+      29
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "g",
+    "label": "",
+    "rect": [
+      583,
+      142,
+      10,
+      29
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "circle",
+    "label": "",
+    "rect": [
+      585,
+      142,
+      9,
+      9
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "path",
+    "label": "",
+    "rect": [
+      583,
+      156,
+      10,
+      15
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14.5px/21.75px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "h1",
+    "label": "Juno needs a model",
+    "rect": [
+      564,
+      198,
+      249,
+      42
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "38px/41.8px 400",
+    "color": "rgb(35, 33, 26)"
+  },
+  {
+    "tag": "p",
+    "label": "Juno runs on a model provider you choose: OpenRouter, or a m",
+    "rect": [
+      564,
+      258,
+      520,
+      43
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "14px/21.7px 400",
+    "color": "rgb(96, 94, 82)"
+  },
+  {
+    "tag": "button",
+    "label": "Add a provider",
+    "rect": [
+      564,
+      319,
+      108,
+      28
+    ],
+    "padding": "0px 10px",
+    "margin": "0px",
+    "font": "13px/normal 500",
+    "color": "rgb(255, 255, 255)"
+  },
+  {
+    "tag": "span",
+    "label": "Add a provider",
+    "rect": [
+      575,
+      325,
+      86,
+      16
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "13px/normal 500",
+    "color": "rgb(255, 255, 255)"
+  }
+]

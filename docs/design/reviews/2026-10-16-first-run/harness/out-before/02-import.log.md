@@ -1,0 +1,4 @@
+- shot 07-sign-in-import-hover
+- shot 07b-import-0
+- shot 07c-import-400
+- shot 08-after-import

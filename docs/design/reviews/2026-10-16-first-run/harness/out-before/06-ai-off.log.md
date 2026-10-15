@@ -1,0 +1,6 @@
+- shot 30-ai-off-home
+- shot 31-ai-off-juno
+- shot 32-ai-off-topic
+- shot 33-ai-off-account-menu
+- shot 34-ai-off-palette
+- shot 35-ai-off-notifications

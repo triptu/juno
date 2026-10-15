@@ -1,0 +1,16 @@
+[
+  {
+    "tag": "button",
+    "label": "Close tab",
+    "rect": [
+      597,
+      17,
+      20,
+      20
+    ],
+    "padding": "0px",
+    "margin": "0px",
+    "font": "13.5px/20.25px 500",
+    "color": "rgb(112, 110, 102)"
+  }
+]
