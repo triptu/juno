@@ -198,7 +198,7 @@ What Slack's shell taught us: one shared contract package with names, types and 
 
 `<userData>/workspaces/<team_id>/` (on Grid `<enterprise_id>-<team_id>/`) holds:
 
-- `cache.db`: the Slack mirror, `topic_index`, `messages_fts`, `emoji`, `files`, `ai_cache`. Disposable. `CACHE_SCHEMA_VERSION` in `store/src/migrations/cache/index.ts` is written to `PRAGMA user_version`; when the store opens a file with another version it deletes it and recreates it, and the engine re-syncs. "Reset local cache" in Settings (`Store.resetCache`) does the same at runtime: detach from both connections, delete, recreate, attach, re-run every live query. `cache.db` is never `VACUUM`ed, so the rowids `messages_fts` points at stay stable.
+- `cache.db`: the Slack mirror, `topic_index`, `messages_fts`, `emoji`, `files`, `ai_cache`. Disposable. `CACHE_SCHEMA_VERSION` in `store/src/migrations/cache/index.ts` is written to `PRAGMA user_version`; when the store opens a file with another version, or SQLite cannot open or migrate the existing cache, it deletes it and recreates it, and the engine re-syncs. This recovery keeps `user.db`. "Reset local cache" in Settings (`Store.resetCache`) does the same at runtime: detach from both connections, delete, recreate, attach, re-run every live query. `cache.db` is never `VACUUM`ed, so the rowids `messages_fts` points at stay stable.
 - `user.db`: overlay, reads, ignored channels, notification settings and log, Juno chat, drafts, outbox, prefs, Home's visit log (`topic_visits`), found follow-ups (`follow_ups`) and sidebar views. Durable.
 - `uploads/`: staged files waiting in the outbox.
 

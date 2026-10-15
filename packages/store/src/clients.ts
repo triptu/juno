@@ -144,14 +144,16 @@ const removeDatabaseFiles = (dbPath: string) =>
 
 /**
  * Makes sure `cache.db` exists with the current schema. A file with another
- * `user_version` is deleted first. Uses a short-lived connection of its own so
- * the Migrator's table lands in `cache.db`, not in `user.db`.
+ * `user_version` is deleted first, and so is one SQLite cannot open (a
+ * damaged file, or one whose WAL no longer matches it): the cache is a copy
+ * of Slack and syncs again. Uses a short-lived connection of its own so the
+ * Migrator's table lands in `cache.db`, not in `user.db`.
  */
 const prepareCache = (paths: WorkspacePaths, invalidation: Invalidation['Service']): Effect.Effect<void, StoreError> =>
   Effect.gen(function* () {
     const existed = yield* fileExists(paths.cacheDb)
     if (existed) {
-      const version = yield* readUserVersion(paths.cacheDb, invalidation)
+      const version = yield* readUserVersion(paths.cacheDb, invalidation).pipe(Effect.catch(() => Effect.succeed(undefined)))
       if (version !== CACHE_SCHEMA_VERSION) {
         yield* Effect.logInfo('cache.db schema version differs, recreating', {
           found: version,
@@ -160,14 +162,28 @@ const prepareCache = (paths: WorkspacePaths, invalidation: Invalidation['Service
         yield* removeDatabaseFiles(paths.cacheDb)
       }
     }
-    yield* Effect.scoped(
-      Effect.gen(function* () {
-        const sql = yield* SqliteClient.make({ filename: paths.cacheDb, busyTimeout: BUSY_TIMEOUT })
-        yield* Effect.provideService(migrate(cacheMigrations), SqlClient.SqlClient, sql)
-        yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_SCHEMA_VERSION))}`
-      }),
-    ).pipe(invalidation.provideReactivity)
+    yield* createCache(paths, invalidation).pipe(
+      Effect.catch((error) =>
+        existed && error._tag !== 'StoreIoError'
+          ? Effect.gen(function* () {
+              yield* Effect.logWarning('cache.db could not be opened, recreating', { error: error.message })
+              yield* removeDatabaseFiles(paths.cacheDb)
+              yield* createCache(paths, invalidation)
+            })
+          : Effect.fail(error),
+      ),
+    )
   }).pipe(Effect.withSpan('Store.prepareCache'))
+
+/** Opens `cache.db`, creating it if needed, and migrates it to the current schema. */
+const createCache = (paths: WorkspacePaths, invalidation: Invalidation['Service']): Effect.Effect<void, StoreError> =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const sql = yield* SqliteClient.make({ filename: paths.cacheDb, busyTimeout: BUSY_TIMEOUT })
+      yield* Effect.provideService(migrate(cacheMigrations), SqlClient.SqlClient, sql)
+      yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_SCHEMA_VERSION))}`
+    }),
+  ).pipe(invalidation.provideReactivity)
 
 const readUserVersion = (dbPath: string, invalidation: Invalidation['Service']): Effect.Effect<number, SqlError> =>
   Effect.scoped(
