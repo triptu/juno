@@ -56,7 +56,7 @@ export class JunoChatPane {
   }
 
   get composer(): Locator {
-    return this.root.getByRole('textbox')
+    return this.root.getByRole('textbox', { name: /^Ask Juno/ })
   }
 
   ownerBubble(text: string): Locator {
