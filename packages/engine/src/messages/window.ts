@@ -93,6 +93,11 @@ export function actionsStatement(channel: string): Statement {
   return { sql: `SELECT id, kind, payload_json FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, params: [channel] }
 }
 
+/** Network copies of Juno's posts that stay hidden though not deleted (file copies, ADR 0014), by primary key. */
+export function hiddenCopiesStatement(channel: string): Statement {
+  return { sql: `SELECT ts FROM kept_copies WHERE channel = ? AND hidden = 1`, params: [channel] }
+}
+
 /** Reactions of the window's messages, by primary key. */
 export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): Statement {
   return {

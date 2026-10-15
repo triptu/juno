@@ -24,15 +24,21 @@
  *   with backoff, also after a restart.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
- * posts (`@juno/sync` `sent.ts`), which wakes this worker.
+ * posts (`@juno/sync` `sent.ts`), which wakes this worker. Just before
+ * that delete goes out, one transaction checks again that it loses
+ * nothing (`checkCopyDelete`) and cancels it otherwise. After the socket
+ * comes back, a copy's delete waits for the catch-up, at most
+ * `COPY_CATCH_UP_MILLIS`; the check then also needs the copy's own topic
+ * rechecked since the reconnect, so a delete of the kept message made
+ * meanwhile on another device is stored first. Otherwise the copy is kept.
  *
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
-import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
-import { actionDone, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
+import { actionDone, checkCopyDelete, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
@@ -47,6 +53,8 @@ const MAX_BACKOFF_MILLIS = 5 * 60_000
 const NO_SESSION_MILLIS = 5_000
 /** A worker pass that failed (a store error) is tried again after this. */
 const PASS_RETRY_MILLIS = 5_000
+/** After a reconnect, how long a copy's delete waits for the catch-up before the copy is kept instead. */
+const COPY_CATCH_UP_MILLIS = 2 * 60_000
 /** How often a row waiting for its post looks again, besides the wakes from the send commands. */
 const DEPENDENCY_POLL_MILLIS = 250
 /** Refusals Slack gives for its own trouble: tried again later, like no answer. */
@@ -68,6 +76,10 @@ export class ActionWorker extends Context.Service<
       const outbox = yield* Outbox
       const link = yield* SyncLink
       const signal = yield* Queue.sliding<void>(1)
+      // False from a socket drop until the next catch-up: the store may not know what changed meanwhile.
+      const inStep = yield* Ref.make(false)
+      // When the socket last came back: the end of a gap the store may have missed changes in.
+      const reconnectedAt = yield* Ref.make<number | undefined>(undefined)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
 
       /** The call for a row whose message has `ts`, and what Slack's acceptance stores. Undefined when there is nothing to send. */
@@ -123,6 +135,10 @@ export class ActionWorker extends Context.Service<
             yield* local(transaction(dropAction(action)))
             return false
           }
+          if (action.kind === 'delete') {
+            const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
+            if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return false
+          }
           const selfId = (yield* local(storedMe))?.userId ?? ''
           const result = yield* Effect.result(callFor(action, place.ts, selfId))
           const now = yield* Clock.currentTimeMillis
@@ -169,17 +185,27 @@ export class ActionWorker extends Context.Service<
           const now = yield* Clock.currentTimeMillis
           const held = new Set<string>()
           const waiting = new Set<number>()
+          const caughtUp = yield* Ref.get(inStep)
+          // A copy's delete waits for the catch-up, which wakes the worker, but not past this; then the check keeps the copy.
+          const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + COPY_CATCH_UP_MILLIS
+          let copyWait: number | undefined
           for (const action of yield* local(pendingActions)) {
             if (held.has(action.channel)) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
+            if (!caughtUp && now < catchUpDeadline && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) {
+              copyWait = catchUpDeadline
+              continue
+            }
             if (yield* run(open, fetcher, action)) waiting.add(action.id)
           }
-          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id))
+          // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
+          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null))
           const after = yield* Clock.currentTimeMillis
-          const due = rest.length === 0 ? undefined : Math.max(0, Math.min(...rest.map((action) => action.nextAt)) - after)
+          const due = [...rest.map((action) => action.nextAt), ...(copyWait === undefined ? [] : [copyWait])]
+          const next = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - after)
           // A row waiting for its post looks again soon; the post's own settling does not wake this worker.
-          return waiting.size === 0 ? due : Math.min(due ?? DEPENDENCY_POLL_MILLIS, DEPENDENCY_POLL_MILLIS)
+          return waiting.size === 0 ? next : Math.min(next ?? DEPENDENCY_POLL_MILLIS, DEPENDENCY_POLL_MILLIS)
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: action pass failed', { cause }), PASS_RETRY_MILLIS)))
 
       const loop = Effect.gen(function* () {
@@ -191,6 +217,7 @@ export class ActionWorker extends Context.Service<
       })
 
       const flush = Effect.gen(function* () {
+        yield* Ref.set(inStep, true)
         const open = yield* workspace.current
         if (open !== undefined) yield* inStore(open)(transaction(flushActions(yield* Clock.currentTimeMillis)))
         yield* wake
@@ -203,7 +230,11 @@ export class ActionWorker extends Context.Service<
       )
       yield* Effect.forkScoped(Stream.runForEach(queuedBySync, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
-      yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
+      yield* Effect.forkScoped(
+        Stream.runForEach(link.onlineChanges, (online) =>
+          online ? Effect.andThen(Effect.flatMap(Clock.currentTimeMillis, (now) => Ref.set(reconnectedAt, now)), wake) : Ref.set(inStep, false),
+        ),
+      )
       yield* Effect.forkScoped(loop)
       return ActionWorker.of({ wake })
     }),
