@@ -99,6 +99,7 @@ export {
   appInfoAtom,
   copyText,
   editUndo,
+  junoAgentOnAtom,
   onMenuCommand,
   openExternal,
   openInSlack,
@@ -125,4 +126,5 @@ export {
   junoPanelOpenAtom,
   openedAtNewAtom,
   setJunoPanelOpen,
+  type JunoFocusRequest,
 } from './junoPanel'

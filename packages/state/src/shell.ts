@@ -44,6 +44,12 @@ function savedAccent(): Accent {
   return isAccent(accent) ? accent : DEFAULT_ACCENT
 }
 
+/**
+ * The Juno Agent runs (`?agent=1`): the Juno button, ⌘J and Ask Juno show.
+ * Fixed for the window's life; the agent starts only with JUNO_AGENT=1.
+ */
+export const junoAgentOnAtom = Atom.make(launchParam('agent') === '1')
+
 /** The current theme. Starts as the saved theme; the OS setting is not read yet. */
 export const themeAtom = Atom.make<Theme>(savedTheme())
 

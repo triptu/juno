@@ -41,6 +41,7 @@ import type {
 } from '@juno/agent-contract'
 import { aboutOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
+import { junoAgentOnAtom } from '../shell'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
 
@@ -86,6 +87,19 @@ export const chatPageAtom = (window: Window) => pageFamily(JSON.stringify(window
 export const chatSummaryAtom = AgentClient.runtime
   .atom(live<ChatSummary, never>('agent.chat.summary', undefined))
   .pipe(Atom.keepAlive)
+
+const quiet: ChatSummary = { unread: 0, busy: false }
+
+/**
+ * The sidebar's Juno item: the unread count and the busy sparkle. Nothing
+ * asks the agent for it while the agent is off, so main is not asked for a
+ * port every second for nothing.
+ */
+export const junoNavAtom = Atom.make((get): ChatSummary => {
+  if (!get(junoAgentOnAtom)) return quiet
+  const summary = get(chatSummaryAtom)
+  return AsyncResult.isSuccess(summary) ? summary.value : quiet
+})
 
 /** An owner send the agent has not stored yet, or could not. */
 export interface PendingSend {

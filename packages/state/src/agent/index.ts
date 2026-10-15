@@ -11,6 +11,7 @@ export {
   chatItemsAtom,
   chatPageAtom,
   chatSummaryAtom,
+  junoNavAtom,
   MAX_SEND_BYTES,
   pendingSendsAtom,
   withPending,

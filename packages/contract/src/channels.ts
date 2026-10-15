@@ -50,7 +50,7 @@ export const Events = {
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
- * Sidebar, and Edit › Undo, which undoes typing in a text field or else
+ * Sidebar, ⌘J for Juno, and Edit › Undo, which undoes typing in a text field or else
  * Juno's last action.
  */
 export type MenuCommand =
@@ -63,6 +63,7 @@ export type MenuCommand =
   | 'history.back'
   | 'history.forward'
   | 'sidebar.toggle'
+  | 'juno.toggle'
   | 'edit.undo'
 
 /** One item of a context menu the renderer asks for, or a separator. */

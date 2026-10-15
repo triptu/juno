@@ -51,8 +51,14 @@ export const junoAboutAtom = Atom.make<Exclude<About, { _tag: 'topic' }> | undef
 export const openedAtNewAtom = Atom.family((_topicId: string) => Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive))
 export const catchUpDoneAtom = Atom.family((_topicId: string) => Atom.make(false).pipe(Atom.keepAlive))
 
-export const junoFocusAtom = Atom.make(0).pipe(Atom.keepAlive)
+/** A request for the Juno tab's or the panel's composer to take focus; `n` counts requests, so each is taken once. */
+export interface JunoFocusRequest {
+  readonly n: number
+  readonly where: 'tab' | 'panel'
+}
 
-export function focusJunoComposer(registry: Registry): void {
-  registry.set(junoFocusAtom, registry.get(junoFocusAtom) + 1)
+export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' }).pipe(Atom.keepAlive)
+
+export function focusJunoComposer(registry: Registry, where: JunoFocusRequest['where']): void {
+  registry.set(junoFocusAtom, { n: registry.get(junoFocusAtom).n + 1, where })
 }

@@ -22,6 +22,12 @@ export type PerfName =
   | 'juno.palette-results'
   | 'juno.send'
   | 'juno.live-update'
+  /** Enter in a Juno composer to the owner's bubble painted (SPEC 13.12: within a frame). */
+  | 'juno.chat-send'
+  /** Enter in a Juno composer to Juno's first bubble of the answer painted (SPEC 13.12: 2.5 s on OpenRouter). */
+  | 'juno.chat-bubble'
+  /** ⌘J or the header's Juno button to the panel painted with its composer (one frame). */
+  | 'juno.panel-open'
 
 const TRACK = 'Juno'
 
