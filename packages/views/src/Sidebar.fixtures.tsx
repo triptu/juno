@@ -185,6 +185,8 @@ export default defineFixtures(
     Interaction: {
       'row-hover': scene(() => full({}, { selected: rows.postgres.id }), { hover: '[data-topic-row]:nth-of-type(2)' }),
       'filter-hover': scene(() => full(), { hover: '[aria-label="Quick filters"] [aria-label^="Channels"]' }),
+      'unread-hover': scene(() => full(), { hover: '[aria-label="Unread only"]' }),
+      'unread-focus': scene(() => full(), { focus: '[aria-label="Unread only"]' }),
       'view-hover': scene(() => full(viewChrome), { hover: '[data-view-pill="vdesign"]' }),
       'nav-focus': scene(() => full(), { focus: '[aria-label="Pages"] [role="button"]:nth-of-type(2)' }),
     },

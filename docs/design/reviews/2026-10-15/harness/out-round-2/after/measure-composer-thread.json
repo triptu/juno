@@ -1,0 +1,82 @@
+[
+  {
+    "tag": "div",
+    "label": "",
+    "rect": {
+      "x": 384,
+      "y": 765,
+      "w": 1016,
+      "h": 68
+    },
+    "padding": "8px 24px 20px",
+    "gap": "normal",
+    "radius": "0px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgba(0, 0, 0, 0)",
+    "border": "0px none rgb(35, 33, 26)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "",
+        "rect": {
+          "x": 516,
+          "y": 773,
+          "w": 752,
+          "h": 40
+        },
+        "padding": "0px 6px 0px 14px",
+        "gap": "normal",
+        "radius": "20px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgb(251, 251, 248)",
+        "border": "1px solid rgb(216, 213, 203)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  },
+  {
+    "tag": "div",
+    "label": "",
+    "rect": {
+      "x": 516,
+      "y": 773,
+      "w": 752,
+      "h": 40
+    },
+    "padding": "0px 6px 0px 14px",
+    "gap": "normal",
+    "radius": "20px",
+    "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+    "color": "rgb(35, 33, 26)",
+    "bg": "rgb(251, 251, 248)",
+    "border": "1px solid rgb(216, 213, 203)",
+    "shadow": "none",
+    "outline": "none 3px rgb(35, 33, 26) offset 0px",
+    "children": [
+      {
+        "tag": "div",
+        "label": "",
+        "rect": {
+          "x": 531,
+          "y": 773,
+          "w": 730,
+          "h": 40
+        },
+        "padding": "0px",
+        "gap": "4px",
+        "radius": "0px",
+        "font": "14.5px/21.75px 400 \"Figtree Variable\"",
+        "color": "rgb(35, 33, 26)",
+        "bg": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(35, 33, 26)",
+        "shadow": "none",
+        "outline": "none 3px rgb(35, 33, 26) offset 0px"
+      }
+    ]
+  }
+]

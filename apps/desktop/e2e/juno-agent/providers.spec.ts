@@ -116,7 +116,7 @@ test('adding an OpenRouter key turns the agent on, and the chosen model answers'
 
     const agent = await agentClient(win)
     const settings = await agent.follow<Settings>('agent.settings.page')
-    await expect.poll(async () => (await settings.latest())?.chatModels.find((m) => m.family === 'Claude Opus')?.price).toBe('$4 / $20 per million tokens')
+    await expect.poll(async () => (await settings.latest())?.chatModels.find((m) => m.family === 'Claude Opus')?.price).toBe('$4 in, $20 out per million tokens')
     expect(await settings.latest()).toMatchObject({ openRouterKey: 'set' })
     expect(openRouter.catalogueReads()).toBe(1)
 

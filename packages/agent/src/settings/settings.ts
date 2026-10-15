@@ -27,11 +27,14 @@
  * - Rules: the owner's rules (`actions/rules.ts`), replaced as a whole list.
  *   The model reads them with Juno's instructions from the next request.
  *
- * Not yet served, each with its work package: Codex (WP20; shown as not
- * installed), the backup folder (WP21; the default folder, with no backup
- * taken) and ownership changes (WP21; read only).
+ * - Backup and This Mac (WP21): the backup folder and the last backup, when
+ *   the recovery phrase was exported, and who owns Juno's state. A new
+ *   folder starts a generation there. Move, restore and Activate are their
+ *   own RPCs (`agent.settings.ownership`, `agent.review.activate`).
+ *
+ * Not yet served: Codex (WP20; shown as not installed).
  */
-import { join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import type { JunoSettingsPage, ModelChoice, Ownership, SettingsChange } from '@juno/agent-contract'
 import { pickerFamilies, type PickerModel } from '../providers/catalog'
 import type { ProviderConnection } from '../providers/connection'
@@ -39,6 +42,7 @@ import type { ModelPicker } from '../providers/picker'
 import type { Turns } from '../router/open'
 import { DOLLAR, dollars } from '../spend'
 import { ownerRules, setOwnerRules } from '../actions/rules'
+import { defaultBackupFolder } from '../backup/backup'
 import { modelFor, save, type Purpose } from './store'
 
 /** How often the catalogue is checked; it is read at most once a day. */
@@ -117,8 +121,9 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
   })
   // A provider switch (or new key) from main: its models, then the page.
   const offConnection = connection.subscribe(() => void refresh(true))
+  const offOwnership = turns.ownership.subscribe(changed)
 
-  const priceText = (row: PickerModel) => (row.price === undefined ? {} : { price: `${money(row.price.input)} / ${money(row.price.output)} per million tokens` })
+  const priceText = (row: PickerModel) => (row.price === undefined ? {} : { price: `${money(row.price.input)} in, ${money(row.price.output)} out per million tokens` })
 
   /** The custom endpoint's rows: what it lists, with a typed model added when chosen. */
   const customChoices = (): ReadonlyArray<ModelChoice> => {
@@ -147,9 +152,21 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
   }
 
   const ownership = (): Ownership => {
-    const row = store.db.prepare('SELECT state, epoch FROM ownership WHERE singleton = 1').get() as { state: Ownership['_tag']; epoch: number }
-    return row.state === 'recovery' ? { _tag: 'recovery', pending: 0 } : { _tag: row.state, epoch: Number(row.epoch) }
+    const owner = turns.ownership.owner()
+    switch (owner.state) {
+      case 'recovery':
+        return { _tag: 'recovery', pending: turns.ownership.pending() }
+      case 'released':
+        return {
+          _tag: 'released', epoch: owner.epoch,
+          ...(owner.moveCode === undefined ? {} : { moveCode: owner.moveCode }),
+          ...(owner.deviceName === undefined ? {} : { deviceName: owner.deviceName }),
+        }
+      case 'active':
+        return { _tag: 'active', epoch: owner.epoch }
+    }
   }
+  const backup = turns.backup
 
   const page = (): JunoSettingsPage => {
     const spend = turns.guard.spend.snapshot()
@@ -169,8 +186,10 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       ...(chat === undefined || chat.price === undefined || (chat.price.input === 0 && chat.price.output === 0) ? { spendUntracked: true as const } : {}),
       rules: ownerRules(store),
       paused: turns.mode() === 'paused',
-      backupFolder: join(options.agentDir, 'backup'),
+      backupFolder: backup?.folder() ?? defaultBackupFolder(options.agentDir),
+      ...(backup?.lastAt() === undefined ? {} : { lastBackupAt: backup.lastAt()! }),
       ownership: ownership(),
+      ...(backup?.phraseExportedAt() === undefined ? {} : { recoveryPhraseExportedAt: backup.phraseExportedAt()! }),
     }
   }
 
@@ -210,8 +229,12 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       case 'rules':
         if (setOwnerRules(store, next.rules) === 'invalid') return { _tag: 'refused', reason: 'invalid', message: 'Each rule is one line of up to 280 bytes, and there are at most 20.' }
         break
-      case 'backupFolder':
-        return { _tag: 'refused', reason: 'unavailable', message: 'Backup is not available yet.' }
+      case 'backupFolder': {
+        if (backup === undefined) return { _tag: 'refused', reason: 'unavailable', message: 'Backup is not available on this Mac.' }
+        if (!isAbsolute(next.path)) return { _tag: 'refused', reason: 'invalid', message: 'Choose a folder.' }
+        void backup.setFolder(next.path).catch(options.onReport)
+        break
+      }
     }
     changed()
     return { _tag: 'done' }
@@ -230,6 +253,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       clearInterval(timer)
       offTurns()
       offConnection()
+      offOwnership()
     },
   }
 }

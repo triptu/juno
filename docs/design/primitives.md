@@ -101,7 +101,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 `Surface` `kind`: `card` (surface + `--card-ring`, radius 20, padding 14), `popover` (`--pop-shadow`, radius 13, padding 6), `toolbar` (`--pop-shadow`, radius 16), `group` (card with no padding, clips children), `inset` (`--background` + 1px `--border-default`, radius 8), `field` (the composer frame: surface + 1px `--input-border` that turns `--focus-ring` on `:focus-within`, with no extra ring, radius 20, a pill at its single-line height), `toast` (ink on paper, `--shadow-lg`, radius 14), `island` (the page header's islands: `--surface-default`, `--card-ring`, `--radius-pill`, a flex row with a 2px gap, the inset of 3 that is left around a 28px control, height `--header-island-height`; inventory §5). `--card-ring` and `--pop-shadow` are wide soft shadows with no ring. `padding` `none` | `xs` 4 | `sm` 6 | `md` 12 | `lg` 14 and `radius` override the defaults. Floating kinds carry a transparent 1px border so a ring never changes layout.
 
-`Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 NEW" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
+`Divider`: 1px, `tone` `default` | `subtle`, `vertical`, `inset`. `LabelledRule`: the "3 new" divider, `label` + rule in `--hl` / `--hl-rule` (or `muted`); fills its row.
 
 `HeaderBand`: the static band behind a page header's islands (`--header-band` tall, solid to `--header-band-solid`, then a fade), `aria-hidden`, no pointer events. Used by the topic header, the Juno tab and the Juno panel.
 
@@ -157,7 +157,7 @@ Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120
 
 ## 16. Page, PageHeader, Section
 
-`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 | `wide` 880, padding 40 32 72. The scroller keeps a stable scrollbar gutter, so the column does not move when the page starts or stops overflowing. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
+`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 (every settings page), padding 40 32 72. The scroller keeps a stable scrollbar gutter, so the column does not move when the page starts or stops overflowing. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
 
 ## 17. CodeBlock
 

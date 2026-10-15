@@ -1,7 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
-import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
-import { accent, colors, layout, opacity, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, layout, opacity, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Icon, Surface, Text } from '@juno/ui'
 
 export interface ComposerSlotProps {
@@ -12,15 +11,12 @@ export interface ComposerSlotProps {
 /**
  * Where the composer goes (inventory 7), at the composer's single-line
  * height, so M6 swaps the real one in with no shift. Inert: it draws the
- * frame, the placeholder and the attach and send marks, and takes no input.
+ * frame, the placeholder and the send mark, and takes no input.
  */
 export function ComposerSlot({ placeholder }: ComposerSlotProps) {
   return (
     <div data-composer-slot="" {...stylex.props(styles.outer)}>
       <Surface kind="field" aria-hidden data-composer-field="" sx={styles.box}>
-        <span {...stylex.props(styles.mark, styles.attach)}>
-          <Icon icon={Plus} size={18} />
-        </span>
         <Text variant="body" tone="muted" sx={styles.placeholder}>
           {placeholder}
         </Text>
@@ -50,7 +46,9 @@ const styles = stylex.create({
     maxWidth: layout['--composer-width'],
     height: sizes['--control-40'],
     marginInline: 'auto',
-    paddingInline: spacing['--space-1-5'],
+    // The composer's: its text starts 18px in (14 here, then the textarea's 4).
+    paddingInlineStart: spacing['--space-3-5'],
+    paddingInlineEnd: spacing['--space-1-5'],
   },
   mark: {
     display: 'inline-flex',
@@ -61,9 +59,6 @@ const styles = stylex.create({
     height: sizes['--control-28'],
     borderRadius: radii['--radius-full'],
   },
-  attach: {
-    color: colors['--foreground-subtle'],
-  },
   send: {
     color: accent['--hl-fg'],
     backgroundColor: accent['--hl'],
@@ -71,6 +66,7 @@ const styles = stylex.create({
   },
   placeholder: {
     flexGrow: 1,
+    paddingInlineStart: spacing['--space-1'],
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',

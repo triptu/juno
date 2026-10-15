@@ -232,13 +232,13 @@ Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -we
 
 ### 2.2 Type roles
 
-Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role except the three uppercase labels. Family is sans unless stated.
+Sizes are the Figtree values; the prototype's Inter value is half a pixel smaller for every sans role at or below 15px (see 2.1). Letter spacing is 0 for every sans role. Every label is in sentence case (SPEC §17); there are no uppercase labels, so none needs tracking. Family is sans unless stated.
 
 | Role | Size | Weight | Line height | Letter spacing | Colour | Where |
 | --- | --- | --- | --- | --- | --- | --- |
-| Section label | 11px | 500 | normal | 0.06em, uppercase | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
-| Table header | 11.5px | 500 | normal | 0.06em, uppercase | muted | All topics columns |
-| New divider | 11.5px | 600 | normal | 0.06em, uppercase | `--hl` | "3 NEW" |
+| Section label | 11px | 500 | normal | 0 | muted | Pinned / Recent / channel groups, popover headings (People, Channels, Recent, Results, Juno) |
+| Table header | 11.5px | 500 | normal | 0 | muted | All topics columns |
+| New divider | 11.5px | 600 | normal | 0 | `--hl` | "3 new", and the Juno chat's day label ("Today") in muted |
 | Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
 | Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons, the page header's 24px context pill (600) and island buttons (500) |
@@ -345,7 +345,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
-| `--page-width-settings` | 760px (Preferences), 880px (Notifications) |
+| `--page-width-settings` | 760px: Notifications, Preferences and Settings › Juno, so the settings pages share one column and one title edge |
 | `--settings-label-width` | 104px: the label column of Preferences' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
@@ -361,6 +361,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
+| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
 | `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 280px. An image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). File cards are `--thumb-max-width` wide |
 

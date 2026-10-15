@@ -33,7 +33,7 @@ const outcomeLabel: Record<ActivityAction['outcome'], string | undefined> = {
 /**
  * Every run (SPEC 13.9): who asked, when, the outcome, each action from
  * the Local tier up with the decision made about it, and one folded read
- * line. Failures are in plain words with "Copy details"; the technical
+ * line. Only a run with actions has a card; the rest are their head line. Failures are in plain words with "Copy details"; the technical
  * reason lives behind that button and never in the chat.
  */
 export function ActivityPage({ page, now, onCopyDetails, onLoadMore }: ActivityPageProps) {
@@ -77,63 +77,65 @@ function Run({ run, now, onCopyDetails }: { readonly run: ActivityRun; readonly 
           </Chip>
         ) : null}
       </div>
-      <Surface kind="group" role="list" aria-label="Actions">
-        {rows.map((action, index) => (
-          <ListRow
-            key={action.id}
-            role="listitem"
-            data-activity-action={action.outcome}
-            divider={index < rows.length - 1 || run.reads !== undefined}
-            trailing={
-              <span {...stylex.props(cell.controls)}>
-                <Chip variant="filled" size={20}>
-                  {decisionLabel[action.decision]}
-                </Chip>
-                {outcomeLabel[action.outcome] !== undefined ? (
-                  <Chip variant={action.outcome === 'done' ? 'filled' : 'outline'} size={20}>
-                    {outcomeLabel[action.outcome]}
+      {rows.length === 0 ? (
+        // A run with no actions has no card: its read line, if any, sits under the head.
+        run.reads === undefined ? null : (
+          <Text variant="meta" tone="muted" truncate>
+            {run.reads}
+          </Text>
+        )
+      ) : (
+        <Surface kind="group" role="list" aria-label="Actions">
+          {rows.map((action, index) => (
+            <ListRow
+              key={action.id}
+              role="listitem"
+              data-activity-action={action.outcome}
+              divider={index < rows.length - 1 || run.reads !== undefined}
+              trailing={
+                <span {...stylex.props(cell.controls)}>
+                  <Chip variant="filled" size={20}>
+                    {decisionLabel[action.decision]}
                   </Chip>
+                  {outcomeLabel[action.outcome] !== undefined ? (
+                    <Chip variant={action.outcome === 'done' ? 'filled' : 'outline'} size={20}>
+                      {outcomeLabel[action.outcome]}
+                    </Chip>
+                  ) : null}
+                </span>
+              }
+            >
+              <span {...stylex.props(cell.lines)}>
+                <span {...stylex.props(cell.line)}>
+                  <Text variant="tagSmall" tone="muted" numeric>
+                    Tier {action.tier}
+                  </Text>
+                  <Text variant="body" truncate dir="auto">
+                    {action.label}
+                  </Text>
+                </span>
+                {action.failure !== undefined ? (
+                  <span {...stylex.props(cell.line)}>
+                    <Text variant="meta" tone="muted" sx={cell.wrap}>
+                      {action.failure.text}
+                    </Text>
+                    <Button variant="ghost" size="xs" tone="subtle" onClick={() => onCopyDetails(action.failure?.details ?? '')}>
+                      {copy.copyDetails}
+                    </Button>
+                  </span>
                 ) : null}
               </span>
-            }
-          >
-            <span {...stylex.props(cell.lines)}>
-              <span {...stylex.props(cell.line)}>
-                <Text variant="tagSmall" tone="muted" numeric>
-                  Tier {action.tier}
-                </Text>
-                <Text variant="body" truncate dir="auto">
-                  {action.label}
-                </Text>
-              </span>
-              {action.failure !== undefined ? (
-                <span {...stylex.props(cell.line)}>
-                  <Text variant="meta" tone="muted" sx={cell.wrap}>
-                    {action.failure.text}
-                  </Text>
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => onCopyDetails(action.failure?.details ?? '')}>
-                    {copy.copyDetails}
-                  </Button>
-                </span>
-              ) : null}
-            </span>
-          </ListRow>
-        ))}
-        {run.reads !== undefined ? (
-          <ListRow role="listitem" minHeight={44} divider={false}>
-            <Text variant="meta" tone="muted" truncate>
-              {run.reads}
-            </Text>
-          </ListRow>
-        ) : null}
-        {rows.length === 0 && run.reads === undefined ? (
-          <ListRow role="listitem" minHeight={44} divider={false}>
-            <Text variant="meta" tone="muted">
-              No actions
-            </Text>
-          </ListRow>
-        ) : null}
-      </Surface>
+            </ListRow>
+          ))}
+          {run.reads !== undefined ? (
+            <ListRow role="listitem" minHeight={44} divider={false}>
+              <Text variant="meta" tone="muted" truncate>
+                {run.reads}
+              </Text>
+            </ListRow>
+          ) : null}
+        </Surface>
+      )}
     </section>
   )
 }

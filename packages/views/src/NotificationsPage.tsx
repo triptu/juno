@@ -51,7 +51,7 @@ const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'
 export function NotificationsPage(props: NotificationsPageProps) {
   const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onMattersSave, onRemove, showWhy = false } = props
   return (
-    <Page width="wide">
+    <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
 
       <Section heading="Hours">
