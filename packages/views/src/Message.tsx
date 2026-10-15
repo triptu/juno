@@ -77,6 +77,11 @@ export interface MessageProps {
 
 const HOVER = '@media (hover: hover)'
 
+// The least of the header line the name and time keep in a narrow column. Below
+// it the toolbar's reserve gives way, so the toolbar covers the name's end on
+// hover instead of the name vanishing for good.
+const NAME_MIN = '160px'
+
 const dim = stylex.keyframes({
   from: { opacity: 1 },
   to: { opacity: opacity['--opacity-dim'] },
@@ -317,7 +322,7 @@ const styles = stylex.create({
   // header, so the toolbar shows over the end of its first line, as Slack's
   // does; the row's paint containment keeps it inside the row.
   headerWithToolbar: {
-    paddingInlineEnd: layout['--toolbar-reserve'],
+    paddingInlineEnd: `min(${layout['--toolbar-reserve']}, max(0px, 100% - ${NAME_MIN}))`,
     minHeight: `calc(${layout['--toolbar-height']} - ${spacing['--space-0-5']})`,
   },
   name: {
