@@ -51,6 +51,12 @@ export interface RunSyncOptions {
   readonly onFetcher?: (fetcher: TopicFetcher) => Effect.Effect<void>
   /** The topics open in a tab the user can see. They are fetched again after a reconnect and with each sweep (architecture 5.8). */
   readonly openTopics?: Effect.Effect<ReadonlyArray<string>>
+  /**
+   * Runs after each boot has stored its state and before the phase settles,
+   * for work that should be done by the time the sync reports live (the
+   * engine sorts clear bot channels into Automated here). It must not fail.
+   */
+  readonly onBooted?: Effect.Effect<void>
 }
 
 /**
@@ -216,6 +222,7 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
       state.lastBoot = yield* bootState()
       // Both boots read the followed threads over the window and check the ones left out: a follow pass.
       state.lastFollowPass = startedAt
+      if (options.onBooted !== undefined) yield* options.onBooted
     }).pipe(work.withPermit)
 
     /** A `force_reload`: boot again from the current store. */
