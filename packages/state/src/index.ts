@@ -169,10 +169,13 @@ export {
   junoAvailableAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
+  junoQuoteAtom,
   messageFlashAtom,
   openedAtNewAtom,
+  quoteInJuno,
   setJunoPanelOpen,
   type JunoFocusRequest,
+  type JunoQuoteRequest,
 } from './junoPanel'
 export {
   caughtUp,

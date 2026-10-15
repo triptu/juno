@@ -11,12 +11,15 @@
  *   until a message about the topic is sent from it (`catchUpDoneAtom`).
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
+ * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
+ *   why popover's Tell Juno (SPEC 14). The panel beside that topic takes it
+ *   as its selection quote.
  */
 import { Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { prefsGet, prefsSet } from '@juno/contract'
-import type { About } from '@juno/agent-contract'
+import type { About, Selection } from '@juno/agent-contract'
 import { liveQuery, runCommand } from './atoms'
 import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
@@ -66,6 +69,22 @@ export interface JunoFocusRequest {
 }
 
 export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' }).pipe(Atom.keepAlive)
+
+/** A topic message to quote in the Juno panel's composer; `n` counts requests, so each is taken once. */
+export interface JunoQuoteRequest {
+  readonly n: number
+  readonly topicId: string
+  readonly selection: Selection
+}
+
+export const junoQuoteAtom = Atom.make<JunoQuoteRequest | undefined>(undefined).pipe(Atom.keepAlive)
+
+let quoteRequests = 0
+
+/** The panel clears the request once it has taken it, so a panel that opens later does not quote it again. */
+export function quoteInJuno(registry: Registry, topicId: string, selection: Selection): void {
+  registry.set(junoQuoteAtom, { n: ++quoteRequests, topicId, selection })
+}
 
 export function focusJunoComposer(registry: Registry, where: JunoFocusRequest['where']): void {
   registry.set(junoFocusAtom, { n: registry.get(junoFocusAtom).n + 1, where })
