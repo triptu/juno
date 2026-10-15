@@ -64,6 +64,7 @@ export interface PostInput {
   /** `text` came from a client (`chat.postMessage`): escaped like Slack does, so a client's entities and `<@U…>` tokens stay and a raw `&`, `<` or `>` is escaped. Otherwise it is fixture text, converted by `toMrkdwn`. */
   readonly mrkdwn?: boolean
   readonly blocks?: Message['blocks']
+  readonly attachments?: Message['attachments']
   readonly threadTs?: Ts
   readonly broadcast?: boolean
   readonly clientMsgId?: string
@@ -380,6 +381,7 @@ export class Workspace {
       text,
       team: this.team.id,
       ...(blocks === undefined ? {} : { blocks }),
+      ...(input.attachments === undefined ? {} : { attachments: input.attachments }),
       ...(user?.is_bot === true
         ? { bot_id: `B${user.id.slice(1)}`, bot_profile: { id: `B${user.id.slice(1)}`, name: user.real_name ?? user.name ?? '', team_id: this.team.id } }
         : {}),

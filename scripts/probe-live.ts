@@ -35,6 +35,7 @@
  * A 429 or `ratelimited` answer is logged with its `Retry-After` and retried
  * once after that wait (capped at 120 s). The probe never bursts.
  */
+import { probeIntegrations } from './probe-integrations.ts'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -165,6 +166,11 @@ async function main(): Promise<number> {
       return json?.['ok'] === true ? json : undefined
     }
     return undefined
+  }
+
+  if (flag('--only') === 'integrations') {
+    await probeIntegrations(call, out)
+    return 0
   }
 
   const now = Date.now() / 1000
@@ -632,7 +638,7 @@ function pick(object: Json, keys: ReadonlyArray<string>): Record<string, unknown
 main().then(
   (code) => process.exit(code),
   (error: unknown) => {
-    console.error(`probe-live: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(flag('--only') === 'integrations' ? 'probe-live: integration probe failed (details suppressed)' : `probe-live: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
   },
 )

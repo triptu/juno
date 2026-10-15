@@ -21,6 +21,7 @@ describe('topic index row', () => {
       activity: { lastActivityTs: reply2.ts, messageCount: 3, unreadCount: 0, unreadExact: true, mentionsMe: false, participants: [mayaId, leoId] },
       preview: { sender: 'You', text: 'On it.' },
       rootTs: root.ts,
+      rootText: 'Has anyone looked at the staging bill?',
     })
   })
 

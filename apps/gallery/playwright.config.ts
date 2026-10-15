@@ -41,7 +41,7 @@ export default defineConfig({
   projects: [
     // Wide enough for the 240px switcher plus the widest frame (1400px).
     { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },
-    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'shift.spec.ts', 'geometry.spec.ts'] },
+    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'shift.spec.ts', 'geometry.spec.ts', 'attachment-images.spec.ts'] },
   ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,

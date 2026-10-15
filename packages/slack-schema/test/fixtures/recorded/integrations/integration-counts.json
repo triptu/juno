@@ -1,0 +1,47 @@
+{
+  "sampledChannels": 24,
+  "selectedChannels": [
+    {
+      "messages": 30,
+      "bots": 30
+    },
+    {
+      "messages": 30,
+      "bots": 29
+    },
+    {
+      "messages": 30,
+      "bots": 4
+    },
+    {
+      "messages": 30,
+      "bots": 2
+    }
+  ],
+  "messages": 65,
+  "attachments": 74,
+  "attachmentKeys": {
+    "title": 72,
+    "title_link": 0,
+    "pretext": 0,
+    "text": 72,
+    "fields": 0,
+    "color": 72,
+    "footer": 0,
+    "ts": 0,
+    "actions": 0,
+    "image_url": 0,
+    "thumb_url": 0,
+    "author_name": 0,
+    "blocks": 0
+  },
+  "blockTypes": {
+    "section": 56,
+    "context": 78,
+    "header": 0,
+    "divider": 0,
+    "image": 0,
+    "actions": 29,
+    "rich_text": 37
+  }
+}

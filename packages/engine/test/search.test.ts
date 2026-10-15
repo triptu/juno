@@ -141,3 +141,16 @@ describe('palette commands through the engine', () => {
     expect(await command('tell maya the slot works')).toBeNull()
   })
 })
+
+it('searches attachment and section text from fake Slack, then removes deleted content', async () => {
+  const e = await boot()
+  const message = e.fake.workspace.post({ channel: 'C0SEARCH', user: 'U0MAYA', text: 'Integration updated', attachments: [{ title: 'Cache invalidation', text: 'Unique attachment detail' }], blocks: [{ type: 'section', fields: [{ type: 'plain_text', text: 'Unique section detail' }] }] })
+  await waitFor(async () => {
+    const results = await search(e, 'invalidation')
+    return results.some((result) => result.kind === 'message' && result.ts === message.ts) ? true : undefined
+  })
+  const sections = await search(e, 'section')
+  expect(sections).toContainEqual(expect.objectContaining({ kind: 'message', text: expect.stringContaining('Unique section detail') }))
+  e.fake.deleteMessage({ channel: 'C0SEARCH', ts: message.ts })
+  await waitFor(async () => (await search(e, 'invalidation')).every((result) => result.kind !== 'message' || result.ts !== message.ts) ? true : undefined)
+})

@@ -18,3 +18,5 @@ export {
   unicodeFromHex,
   type EmojiCategory,
 } from './emoji'
+
+export { messageTitle } from './title'

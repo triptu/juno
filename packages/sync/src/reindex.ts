@@ -28,7 +28,7 @@ import {
   type Ts,
   type UserId,
 } from '@juno/domain'
-import type { Block } from '@juno/slack-schema'
+import type { Attachment, Block } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIndexRow } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
@@ -175,6 +175,9 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       ts: row.ts as Ts,
       ...(row.user_id === null ? {} : { userId: row.user_id as UserId }),
       text: row.text,
+      get attachments(): ReadonlyArray<Attachment> | undefined {
+        return row.attachments_json === null ? undefined : (JSON.parse(row.attachments_json) as ReadonlyArray<Attachment>)
+      },
       get blocks(): ReadonlyArray<Block> | undefined {
         return row.blocks_json === null ? undefined : (JSON.parse(row.blocks_json) as ReadonlyArray<Block>)
       },
@@ -197,7 +200,7 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         if (user !== options.me.userId && !participants.includes(user as UserId)) participants.push(user as UserId)
       }
     }
-    const rootText = root !== undefined && root.deleted === 0 && root.text !== '' ? root.text.slice(0, ROOT_TEXT_CHARS) : undefined
+    const rootText = root !== undefined && root.deleted === 0 ? indexed.rootText?.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
       sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
       text: indexed.preview?.text ?? '',

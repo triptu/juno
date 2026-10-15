@@ -6,7 +6,7 @@
  * `*bold*`, `_italic_`, `~strike~`, `` `code` `` and fenced ``` blocks.
  * Lines that start with `&gt;` are quotes.
  */
-import type { Block, Inline, InlineStyle, Lookups } from './model'
+import type { ContentBlock as Block, Inline, InlineStyle, Lookups } from './model'
 import { channelInline, dateInline, emojiInline, normalize, usergroupInline, userInline } from './inline'
 
 export function unescapeMrkdwn(text: string): string {

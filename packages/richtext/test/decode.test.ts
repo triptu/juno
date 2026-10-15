@@ -79,12 +79,13 @@ describe('decode with slack-schema, render with richtext', () => {
       },
       { kind: 'quote', children: [{ kind: 'text', text: 'from the finance thread' }] },
       { kind: 'paragraph', children: [{ kind: 'text', text: 'see the table' }] },
+      { kind: 'paragraph', children: [{ kind: 'text', text: 'Approve' }] },
     ])
   })
 
   it('keeps the text of unknown elements in previews and plain text', () => {
     const body = messageBody(message, lookups)
-    expect(previewText(body)).toBe('@Tushar the staging bill doubled, see the invoice 📈 and the file invoice-october.pdf plus Q4 plan see the table')
+    expect(previewText(body)).toBe('@Tushar the staging bill doubled, see the invoice 📈 and the file invoice-october.pdf plus Q4 plan see the table Approve')
     expect(plainText(body)).toContain('invoice-october.pdf')
     expect(plainText(body)).toContain('> from the finance thread')
   })
