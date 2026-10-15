@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { channelMenuItems, followsThread, notifyChoiceOf, tabMenuItems, threadNotifyChoice, topicMenuItems, type MenuItem, type TopicMenuState } from '../src/index'
+import { channelMenuItems, personMenuItems, followsThread, notifyChoiceOf, tabMenuItems, threadNotifyChoice, topicMenuItems, type MenuItem, type TopicMenuState } from '../src/index'
 import { eng, group, maya } from './fixtures'
 
 const labels = (items: ReadonlyArray<MenuItem<string>>) => items.map((i) => (i.type === 'separator' ? '—' : i.label))
@@ -100,6 +100,18 @@ describe('channel menu', () => {
     ])
     expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', '—', 'Mark channel as read', 'Mark channel as unread'])
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
+  })
+
+  it('ends with Ask Juno while the Juno Agent is on', () => {
+    expect(labels(channelMenuItems({ channel: maya, hasMain: true, askJuno: true })).slice(-2)).toEqual(['—', 'Ask Juno'])
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
+  })
+})
+
+describe('person menu', () => {
+  it('offers Ask Juno only while the Juno Agent is on', () => {
+    expect(labels(personMenuItems({ askJuno: true }))).toEqual(['Ask Juno'])
+    expect(personMenuItems({ askJuno: false })).toEqual([])
   })
 })
 

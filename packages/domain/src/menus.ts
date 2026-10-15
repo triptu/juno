@@ -20,7 +20,8 @@ export type TopicMenuAction =
   | NotifyAction
   | 'ignore-channel'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | 'ignore-channel'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | 'ignore-channel' | 'ask-juno'
+export type PersonMenuAction = 'ask-juno'
 
 export type MenuItem<A extends string> =
   | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string; readonly checked?: boolean }
@@ -94,15 +95,28 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
 export interface ChannelMenuState {
   readonly channel: ChannelInfo
   readonly hasMain: boolean
+  /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
+  readonly askJuno?: boolean
 }
 
-/** The menu for a channel row in Browse. */
+/** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
 export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuItem<ChannelMenuAction>> {
   const items: MenuItem<ChannelMenuAction>[] = [item('show-topics', 'Show its topics')]
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
   if (!isDm(state.channel.kind)) items.push(separator, item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items
+}
+
+export interface PersonMenuState {
+  /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
+  readonly askJuno: boolean
+}
+
+/** The person menu (inventory 15.6): a sender's name or avatar, an @person chip. Notify me comes with the notifications work. */
+export function personMenuItems(state: PersonMenuState): ReadonlyArray<MenuItem<PersonMenuAction>> {
+  return state.askJuno ? [item('ask-juno', 'Ask Juno')] : []
 }
 
 export type TabKind = 'topic' | 'all-topics' | 'juno' | 'notifications' | 'preferences'

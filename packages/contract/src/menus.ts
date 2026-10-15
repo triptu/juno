@@ -4,13 +4,19 @@
  * the renderer reaches them here, as it reaches the domain's schemas.
  */
 export {
+  channelMenuItems,
   followsThread,
   notifyChoiceOf,
+  personMenuItems,
   threadNotifyChoice,
   topicMenuItems,
+  type ChannelMenuAction,
+  type ChannelMenuState,
   type MenuItem,
   type NotifyAction,
   type NotifyChoice,
+  type PersonMenuAction,
+  type PersonMenuState,
   type TopicMenuAction,
   type TopicMenuState,
 } from '@juno/domain'

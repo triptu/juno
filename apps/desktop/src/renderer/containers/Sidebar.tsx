@@ -16,11 +16,13 @@ import {
   type Tabs,
   type Theme,
 } from '@juno/state'
+import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AccountMenu, AppearanceSettings, hueFor, initials, Sidebar as SidebarView, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
+import { openJunoTab } from './juno/actions'
 import { openHome, openNewTab } from './navigation'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
@@ -28,13 +30,16 @@ import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
-  // TODO(M5/M9/M11): open the All topics or Juno page in a tab.
+  if (target === 'juno') return openJunoTab({ newTab: event.metaKey })
+  // TODO(M5/M9/M11): open the All topics page in a tab.
 }
 
 /** The nav item of the active tab's page. Home also reads as selected with no tab open. */
 function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
-  return tab === undefined || currentPlace(tab).kind === 'home' ? 'home' : undefined
+  if (tab === undefined) return 'home'
+  const kind = currentPlace(tab).kind
+  return kind === 'home' || kind === 'juno' ? kind : undefined
 }
 
 /**
@@ -53,6 +58,8 @@ export function Sidebar() {
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
   const activeNav = useAtomValue(tabsAtom, activeNavOf)
+  const junoUnread = useAtomValue(junoNavAtom, (nav) => nav.unread)
+  const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
   const [menuOpen, setMenuOpen] = useState(false)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
@@ -119,6 +126,8 @@ export function Sidebar() {
         // TODO(M9): open the ⌘K palette.
       }}
       {...(activeNav === undefined ? {} : { activeNav })}
+      junoUnread={junoUnread}
+      junoBusy={junoBusy}
       onNewChat={openNewTab}
       onNavigate={navigate}
       onFilterKind={changeKind}

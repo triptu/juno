@@ -1,9 +1,26 @@
 import { Activity, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
+import {
+  activeTab,
+  currentPlace,
+  junoAgentOnAtom,
+  junoPanelOpenAtom,
+  mountedTabs,
+  onMenuCommand,
+  sidebarLayoutAtom,
+  tabsAtom,
+  tabStripAtom,
+  tabTopic,
+  type Tab,
+  type Tabs,
+  type TabSummary,
+} from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
+import { runJunoShortcut } from './juno/actions'
+import { JunoPanel } from './juno/JunoPanel'
+import { JunoTab } from './juno/JunoTab'
 import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
@@ -30,7 +47,9 @@ function stripTab(summary: TabSummary): WorkspaceTab {
       ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
       : place.kind === 'home'
         ? { ...base, title: 'Home', icon: 'home' }
-        : {
+        : place.kind === 'juno'
+          ? { ...base, title: 'Juno', icon: 'juno' }
+          : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -51,7 +70,15 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':
       return <HomePage key="home" />
+    case 'juno':
+      return <JunoTab key="juno" />
   }
+}
+
+/** The topic the active tab shows, for the Juno panel beside it. */
+const activeTopicOf = (state: Tabs): string | undefined => {
+  const tab = activeTab(state)
+  return tab === undefined ? undefined : tabTopic(tab)
 }
 
 function selectTab(id: string, _event: ActivateEvent): void {
@@ -82,9 +109,14 @@ export function Workspace() {
   const strip = useAtomValue(tabStripAtom)
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
+  // The Juno panel shows beside a topic tab while it is open, and never on a page (SPEC 7).
+  const agentOn = useAtomValue(junoAgentOnAtom)
+  const panelOpen = useAtomValue(junoPanelOpenAtom)
+  const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
 
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
@@ -103,6 +135,7 @@ export function Workspace() {
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
       nothingShown={state.active === undefined}
       empty={<HomePage />}
+      side={agentOn && panelOpen && panelTopic !== undefined ? <JunoPanel topicId={panelTopic} /> : undefined}
     >
       {pages.length === 0
         ? undefined

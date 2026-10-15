@@ -2,20 +2,23 @@ import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState, ty
 import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail } from '@juno/contract'
 import {
   bottomWindow,
+  catchUpDoneAtom,
   channelThreadsAtom,
   dividerIndex,
   headerRenamingAtom,
+  junoAgentOnAtom,
+  junoPanelOpenAtom,
   loadOlderMessages,
   messageListAtom,
   messageWindowSpecAtom,
   nowAtom,
   openExternal,
+  openedAtNewAtom,
   openTopic as fetchTopic,
   registry,
   runCommand,
   scrollSnapshotAtom,
   shouldMarkRead,
-  sidebarFilterAtom,
   topicAtom,
   type MessageWindow,
   type ScrollSnapshot,
@@ -36,8 +39,9 @@ import {
   type MessageListStatus,
   type OlderStatus,
 } from '@juno/views'
-import { markFilterChange } from './filterMark'
+import { toggleJunoPanel } from './juno/actions'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { scopeToChannel, showChannelMenu, showPersonMenu } from './placeMenus'
 import { cancelRename, renameTopic, showMessageMenu, showTopicMenu, toggleResolved } from './topicActions'
 
 /**
@@ -81,11 +85,7 @@ function openThread(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
 }
 
-/** A #channel chip scopes the sidebar to that channel. */
-function scopeToChannel(channel: string): void {
-  markFilterChange()
-  registry.set(sidebarFilterAtom, { ...registry.get(sidebarFilterAtom), scope: channel })
-}
+const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 
@@ -275,6 +275,15 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
   const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
   const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs)
   const dividerBefore = at > 0 ? list.order[at] : undefined
+
+  // The Juno panel offers Catch me up while the topic opened at a "new" divider (SPEC 7); a new divider offers it again.
+  useEffect(() => {
+    if (readOnly || registry.get(openedAtNewAtom(id)) === dividerBefore) return
+    registry.set(openedAtNewAtom(id), dividerBefore)
+    registry.set(catchUpDoneAtom(id), false)
+  }, [id, readOnly, dividerBefore])
+  const agentOn = useAtomValue(junoAgentOnAtom)
+  const panelOpen = useAtomValue(junoPanelOpenAtom)
 
   const [positioned, setPositioned] = useState(false)
   // Until the first frame is presented, only the rows from `firstRows()` above the open position down are drawn.
@@ -525,7 +534,16 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
-      {...(readOnly ? {} : { onMessageMenu: (ts: string) => void showMessageMenu(detail, ts) })}
+      {...(readOnly
+        ? {}
+        : {
+            onMessageMenu: (ts: string) => void showMessageMenu(detail, ts),
+            onPersonMenu: personMenu,
+            onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
+              const known = list.refs.channels.get(chip.id)
+              void showChannelMenu(known ?? { id: chip.id, kind: 'public', name: chip.name, label: `#${chip.name}`, tint: 'public' })
+            },
+          })}
     />
   )
   if (readOnly) return messages
@@ -538,6 +556,8 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
           menuOpen={menuOpen}
           onMenu={openMenu}
           onPill={() => scopeToChannel(detail.channel.id)}
+          onPillMenu={() => void showChannelMenu(detail.channel)}
+          {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
           {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
           {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
           threadsOpen={threadsOpen}

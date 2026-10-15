@@ -31,6 +31,7 @@ import {
   cycleTab,
   goToEntry,
   homePlace,
+  junoPlace,
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
@@ -214,6 +215,11 @@ export function openHome(options: OpenOptions = {}): void {
   show((tabs) => openPlace(tabs, homePlace, options), undefined)
 }
 
+/** The Juno tab (SPEC 13). One chat, so one tab: the tab that shows it is focused. */
+export function openJuno(options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, junoPlace, options), undefined)
+}
+
 /**
  * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
  * topic can paint, or closes when another tab shows it (`settleNewChat`).
@@ -322,6 +328,9 @@ export function runMenuCommand(command: MenuCommand): void {
       return stepTabHistory(1)
     case 'sidebar.toggle':
       return toggleSidebar()
+    case 'juno.toggle':
+      // `juno/actions.ts` handles it.
+      return
     case 'edit.undo':
       // `topicActions.ts` handles it.
       return
@@ -385,6 +394,7 @@ export async function showTabMenu(tabId: string): Promise<void> {
 function placeLabel(place: Place): string {
   if (place.kind === 'newChat') return 'New chat'
   if (place.kind === 'home') return 'Home'
+  if (place.kind === 'juno') return 'Juno'
   const result = registry.get(topicAtom(place.topicId))
   const detail = result._tag === 'Success' ? result.value : null
   if (detail === null) return 'Topic'
