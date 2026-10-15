@@ -85,6 +85,15 @@ export class Person {
     throw new Error(`No DM with ${this.id}`)
   }
 
+  /**
+   * Posted in a channel's Main `days` ago, with no event: Juno's cache does
+   * not hold it, so only Slack's search finds it. Returns the message ts.
+   */
+  postedLongAgo(channelName: string, text: string, days: number): string {
+    const workspace = this.slack.fake.workspace
+    return workspace.post({ channel: this.slack.channel(channelName), user: this.id, text, at: workspace.clock.now() - days * 24 * 60 * 60 * 1000, silent: true }).ts
+  }
+
   /** Posts in a channel's Main. Returns the message ts. */
   postIn(channelName: string, text: string): string {
     return this.slack.fake.injectMessage({ channel: this.slack.channel(channelName), user: this.id, text }).ts

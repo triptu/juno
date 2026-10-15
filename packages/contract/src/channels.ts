@@ -66,7 +66,7 @@ export const Events = {
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
- * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, Edit › Undo, which undoes typing in a text field or else
+ * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
  * Juno's last action, and Settings (⌘,), which opens Preferences.
  */
 export type MenuCommand =
@@ -81,6 +81,7 @@ export type MenuCommand =
   | 'sidebar.toggle'
   | 'privacy.toggle'
   | 'juno.toggle'
+  | 'palette.toggle'
   | 'edit.undo'
   | 'preferences.open'
 
