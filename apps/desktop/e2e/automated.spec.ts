@@ -83,8 +83,7 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
 
   await homeAsks(juno)
   await expect(home.title('automated')).toHaveText('Move #releases?')
-  await expect(juno.win.locator('[data-home-item=automated] [data-home-meta]')).toHaveText('To Automated')
-  await expect(home.meta('automated')).toHaveText(/^3 of the last 6 from apps · \d+m$/)
+  await expect(home.meta('automated')).toHaveText('To Automated')
 
   await home.button('automated', 'Move').click()
   await juno.expectToast('Moved #releases to Automated')

@@ -352,9 +352,9 @@ test('Connections tools keep symmetric row insets with one tier checkbox', async
 })
 
 test('Backup cuts the path in the middle and keeps the row insets', async ({ page }) => {
-  await open(page, 'BackupSection', 'backup/on-a-shared-drive')
+  await open(page, 'BackupSection', 'backup/long-path')
   const path = page.locator('[data-backup-folder]')
-  await expect(path).toHaveAttribute('title', '/Users/maya/Library/CloudStorage/Dropbox/Juno backup')
+  await expect(path).toHaveAttribute('title', '/Users/maya/Library/CloudStorage/Dropbox/Workspace archives/Shared folders/Desktop clients/Juno backup')
   await expect(path).toContainText('…')
   await expect(path).toContainText('/Juno backup')
   const at = await path.evaluate((node) => {
