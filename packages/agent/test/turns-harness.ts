@@ -23,6 +23,7 @@ export interface HarnessOptions {
   /** No compactor without it. */
   readonly compaction?: boolean
   readonly subagent?: ModelRef
+  readonly views?: import('../src/view-tools/host').ViewHost
   readonly host?: HostReads
   /** Wraps the fake's models, for example to hold compaction requests. */
   readonly transport?: (fake: Fake) => Fake['models']
@@ -45,6 +46,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     model: options.model ?? SONNET,
     ...(options.compaction === false ? {} : { compaction: HAIKU }),
     ...(options.subagent ? { subagent: options.subagent } : {}),
+    ...(options.views ? { views: options.views } : {}),
     ...(options.host ? { host: options.host } : {}),
     ...(options.migrations ? { migrations: options.migrations } : {}),
     ...(options.actions ? { actions: options.actions } : {}),

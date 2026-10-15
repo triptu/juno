@@ -11,13 +11,14 @@
  *
  *   m3 #eng (C0ENG) ts 1760500000.000004 in thread 1760500000.000001, Maya Chen: It times out…
  */
-import type { AgentHostError, HostMessagePage, TopicLink } from '@juno/agent-contract'
+import type { AgentHostError, HostMessagePage, HostChannel, TopicLink } from '@juno/agent-contract'
 import { defineTool, type JunoTool } from '../request/tool'
 import type { SourceRef } from './sources'
 
 type Page = typeof HostMessagePage.Type
 
 export interface HostReads {
+  readonly channels?: (pattern: string) => Promise<ReadonlyArray<typeof HostChannel.Type>>
   readonly search: (query: string) => Promise<Page>
   readonly history: (channelId: string) => Promise<Page>
   readonly replies: (channelId: string, threadTs: string) => Promise<Page>
@@ -61,7 +62,7 @@ async function read(f: () => Promise<string>): Promise<{ readonly text: string; 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const string = (description: string) => ({ type: 'string', description })
 
-export type HostTool = JunoTool & { readonly taints: true }
+export type HostTool = JunoTool & { readonly taints: boolean }
 
 /** `handles` numbers the messages read in the live run. */
 export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<HostTool> {
@@ -120,5 +121,13 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
         }),
     }),
   ]
-  return tools.map((tool) => ({ ...tool, taints: true as const }))
+  const directory = host.channels
+  return [
+    ...tools.map((tool) => ({ ...tool, taints: true })),
+    ...(directory === undefined ? [] : [{ ...defineTool<{ readonly pattern: string }>({
+      name: 'slack_channels', description: 'Find all cached channels by case-insensitive name glob (* matches any text, ? one character). For every alerts channel use *alerts*. Returns only channel ids and names, no message content.',
+      parameters: { type: 'object', properties: { pattern: string('Channel name glob') }, required: ['pattern'], additionalProperties: false },
+      replay: 'safe', status: () => 'Finding channels', run: ({ pattern }) => read(async () => JSON.stringify(await directory(pattern))),
+    }), taints: false }]),
+  ]
 }

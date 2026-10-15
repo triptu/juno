@@ -1,3 +1,4 @@
+import { bindViewHost } from './view-tools/host'
 /**
  * Starts the agent. The Electron entry (`apps/desktop/src/agent`) calls this
  * in the agent utility process; tests call it from Node.
@@ -50,7 +51,7 @@ export interface AgentHandle {
  * picker, the renderer gets Settings › Juno; with a key, the page shows its
  * state.
  */
-export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions'> & {
+export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions' | 'views'> & {
   /** Executors other folders own. The host's sends come from the port. */
   readonly actions?: Omit<NonNullable<TurnsOptions['actions']>, 'host'>
   readonly picker?: ModelPicker
@@ -79,6 +80,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         if (hello.protocol !== AGENT_HOST_PROTOCOL) return yield* new HostProtocolMismatch({ host: hello })
         const bound = yield* bindHost.pipe(Effect.provide(context), Scope.provide(scope))
         const actionHost = yield* bindActionHost(bound.presence).pipe(Effect.provide(context))
+        const viewHost = yield* bindViewHost(bound.presence).pipe(Effect.provide(context))
         // A first start has no agent directory yet.
         if (turns !== undefined) mkdirSync(config.agentDir, { recursive: true })
         const engine =
@@ -89,6 +91,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                   ...turns,
                   agentDir: config.agentDir,
                   host: bound.reads,
+                  views: viewHost,
                   schedule: bound.schedule,
                   actions: { ...turns.actions, host: actionHost },
                   migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])],

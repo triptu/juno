@@ -154,7 +154,7 @@ function openCard(store: Store, identity: Binding['identity']): { card: CardRow;
   if (card === undefined) return { _tag: 'refused', reason: 'invalid' }
   const payload = payloadOf(store, card)
   if (card.revision !== identity.revision || payloadDigest(payload) !== identity.digest) return { _tag: 'refused', reason: 'stale' }
-  if (card.dismissed_at !== null || clicked(store, card.id) !== undefined) return { _tag: 'refused', reason: 'stale' }
+  if (card.dismissed_at !== null || clicked(store, card.id) !== undefined || store.db.prepare('SELECT 1 FROM authorizations JOIN intents ON intents.id = authorizations.intent_id WHERE intents.card_id = ?').get(card.id) !== undefined) return { _tag: 'refused', reason: 'stale' }
   if (expiry(store, card, store.now()) !== undefined) return { _tag: 'refused', reason: 'expired' }
   return { card, payload }
 }
@@ -444,7 +444,7 @@ export function viewOf(store: Store, card: CardRow, now: number): CardView {
   } else if (payload._tag === 'task') {
     throw new Error('task cards are listed from jobs')
   } else {
-    record = { ...base, payload, status: statusOf(store, card, payload, evidences, approved) } as CardRecord
+    record = { ...base, payload, status: statusOf(store, card, payload, evidences, approved || ran) } as CardRecord
   }
   const view = toCard(record, now)
   const binding = view._tag !== 'unknown' && 'status' in view && view.status._tag === 'open' && children.length > 0 ? bindingOf(card, payload) : undefined

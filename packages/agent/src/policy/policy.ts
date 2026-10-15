@@ -97,7 +97,7 @@ export interface RunFacts {
  * - `destructive`: Tier 4. Never offered.
  */
 export type OpClass =
-  | 'read' | 'local' | 'scheduleCreate' | 'notificationsSet' | 'ownSchedule'
+  | 'read' | 'local' | 'scheduleCreate' | 'notificationsSet' | 'viewsSet' | 'ownSchedule'
   | 't3Start' | 'delegateSpawn' | 'steer' | 'stopJob' | 'outward' | 'destructive'
 
 export type ToolDecision =
@@ -123,6 +123,7 @@ export function toolDecision(op: OpClass, run: RunFacts, facts: ToolFacts = {}):
       return { _tag: 'run' }
     case 'scheduleCreate':
     case 'notificationsSet':
+    case 'viewsSet':
       if (cleanOwner(run)) return { _tag: 'run' }
       // Wake and report runs get neither path (§11.1).
       return run.origin === 'owner' ? { _tag: 'card', because: true } : { _tag: 'refused', reason: 'notOwnerRun' }

@@ -337,7 +337,8 @@ export function agentHandlers(host: ChatHost) {
             const view = turns.actions.views().find((v) => v.card.id === identity.cardId)!
             return Effect.succeed({ card: view.card, identity: result.identity })
           }),
-        'agent.cards.undo': notYet('Undo on this card'),
+        'agent.cards.undo': ({ opId, identity }) => Effect.flatMap(engine(state, host), (turns) =>
+          Effect.promise(() => turns.actions.undo(identity)).pipe(Effect.flatMap((done) => done ? Effect.succeed({ opId }) : refused({ _tag: 'refused', reason: 'stale' })))),
         'agent.jobs.stop': ({ opId, jobId }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
 
