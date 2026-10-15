@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
@@ -10,7 +11,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   AvatarButton,
@@ -18,10 +19,12 @@ import {
   Chip,
   Divider,
   FilterPill,
+  Icon,
   IconButton,
   NavItem,
   PillRow,
   Popover,
+  Text,
   viewIcons,
   type ActivateEvent,
   type HueName,
@@ -106,6 +109,9 @@ export interface SidebarProps {
   readonly onClearScope: () => void
   /** A status line under the filters, when the list may be behind Slack (`EngineNotice`). */
   readonly status?: ReactNode
+  /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
+  readonly privacy?: boolean
+  readonly onPrivacyOff?: () => void
   /** The topic list. */
   readonly children: ReactNode
 }
@@ -114,8 +120,9 @@ export interface SidebarProps {
  * The left pane (spec section 5): the title bar with the traffic-light
  * space, Search, New chat and the account button, the nav items, a hairline, the quick
  * filters with their dots and the Unread toggle, a status line when the
- * list may be behind Slack, the scope chip when scoped, and the list the
- * owner renders into it.
+ * list may be behind Slack, the scope chip when scoped, the list the
+ * owner renders into it, and, only while privacy mode is on, a footer that
+ * says so with a Show button.
  */
 export function Sidebar({
   titlebarLeading,
@@ -143,6 +150,8 @@ export function Sidebar({
   onToggleUnread,
   onClearScope,
   status,
+  privacy = false,
+  onPrivacyOff,
   children,
 }: SidebarProps) {
   // The pill that is selected: a view, else the kind.
@@ -285,6 +294,20 @@ export function Sidebar({
       ) : null}
 
       {children}
+
+      {privacy ? (
+        <div {...stylex.props(styles.footer)}>
+          <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
+            <Icon icon={EyeSlash} size={14} />
+            <Text variant="meta" tone="subtle" truncate sx={styles.privacyText}>
+              Message text hidden
+            </Text>
+            <Button variant="raised" size="xs" aria-label="Show message text" onClick={onPrivacyOff}>
+              Show
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </aside>
   )
 }
@@ -432,5 +455,29 @@ const styles = stylex.create({
     display: 'flex',
     paddingInline: spacing['--space-4'],
     paddingBottom: spacing['--space-2'],
+  },
+  // The sidebar inset on every side, so the widget sits as far from the bottom as from the edges.
+  footer: {
+    flexShrink: 0,
+    padding: layout['--sidebar-inset'],
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors['--border-subtle'],
+  },
+  // One line: the icon at the row text's inset, the Show button 4px from the edge on all three sides.
+  privacy: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    height: sizes['--control-30'],
+    paddingInlineStart: spacing['--space-2-5'],
+    paddingInlineEnd: spacing['--space-1'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--secondary-default'],
+    color: colors['--foreground-subtle'],
+  },
+  privacyText: {
+    flexGrow: 1,
+    minWidth: 0,
   },
 })

@@ -19,6 +19,8 @@ export const Launch = Schema.Struct({
   // Optional so a launch.json written before accents existed still decodes.
   accent: Schema.optionalKey(AccentSchema),
   density: Schema.optionalKey(DensitySchema),
+  // Privacy mode (SPEC section 5): message text blurred for screen sharing. It stays on across a relaunch.
+  privacy: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
 })

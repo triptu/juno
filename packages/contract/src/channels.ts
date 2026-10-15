@@ -29,6 +29,8 @@ export const Channels = {
   launchSetAccent: 'launch.setAccent',
   /** Remember the density so the next launch's first render already uses it. */
   launchSetDensity: 'launch.setDensity',
+  /** Remember privacy mode, so the next launch's first render already hides message text. */
+  launchSetPrivacy: 'launch.setPrivacy',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
   launchSetSidebar: 'launch.setSidebar',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
@@ -64,7 +66,7 @@ export const Events = {
 /**
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
- * Sidebar, ⌘J for Juno, Edit › Undo, which undoes typing in a text field or else
+ * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, Edit › Undo, which undoes typing in a text field or else
  * Juno's last action, and Settings (⌘,), which opens Preferences.
  */
 export type MenuCommand =
@@ -77,6 +79,7 @@ export type MenuCommand =
   | 'history.back'
   | 'history.forward'
   | 'sidebar.toggle'
+  | 'privacy.toggle'
   | 'juno.toggle'
   | 'edit.undo'
   | 'preferences.open'
@@ -162,6 +165,7 @@ export interface JunoBridge {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
     readonly setDensity: (density: Density) => Promise<unknown>
+    readonly setPrivacy: (privacy: boolean) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
   }
   readonly contextMenu: {
