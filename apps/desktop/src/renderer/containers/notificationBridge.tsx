@@ -1,0 +1,74 @@
+/**
+ * The renderer's side of OS notifications (architecture 11): it tells main
+ * which topic is on screen while the window has focus, so the engine does
+ * not notify about it, and opens what a clicked notification points at.
+ * Also the why popover, which the message menu opens.
+ */
+import { useEffect } from 'react'
+import type { NotificationTarget } from '@juno/contract'
+import { activeTab, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
+import { useAtomMount, useAtomValue } from '@juno/state/react'
+import { WhyPopover } from '@juno/views'
+import { openTopicAt } from './navigation'
+import { changeFromWhy, closeWhy } from './notifyActions'
+
+/** A clicked notification: the topic at its message. The summary opens its first message until the Juno chat can take it (WP14). */
+function open(target: NotificationTarget): void {
+  const source = target._tag === 'message' ? target.source : target.first
+  openTopicAt(source.topicId, source.ts)
+}
+
+/**
+ * Keeps the settings subscribed while signed in, so a menu reads the
+ * current Notify me choice without waiting, and reports the topic on screen.
+ */
+export function useNotificationBridge(): void {
+  useAtomMount(notificationSettingsAtom)
+  const shown = useAtomValue(tabsAtom, (tabs) => {
+    const tab = activeTab(tabs)
+    return tab === undefined ? undefined : tabTopic(tab)
+  })
+
+  useEffect(() => onNotificationOpen(open), [])
+
+  useEffect(() => {
+    let focused = document.hasFocus()
+    let last: string | null | undefined
+    const report = () => {
+      const next = focused && document.visibilityState === 'visible' ? (shown ?? null) : null
+      if (next === last) return
+      last = next
+      setViewing(next)
+    }
+    const onFocus = () => {
+      focused = true
+      report()
+    }
+    const onBlur = () => {
+      focused = false
+      report()
+    }
+    report()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('visibilitychange', report)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('visibilitychange', report)
+    }
+  }, [shown])
+}
+
+/** The why popover, over everything, where the message menu opened. */
+export function WhyLayer() {
+  const popover = useAtomValue(whyPopoverAtom)
+  if (popover === undefined) return null
+  const { why, at } = popover
+  const action =
+    why.action.kind === 'change' || why.action.kind === 'hours'
+      ? { label: 'Change' as const, onAction: () => void changeFromWhy(why, at) }
+      : undefined
+  return <WhyPopover at={at} title={why.title} reason={why.reason} {...(action === undefined ? {} : { action })} onClose={closeWhy} />
+}
+

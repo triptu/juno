@@ -14,6 +14,7 @@ import Checkbox from './Checkbox.fixtures'
 import Chip from './Chip.fixtures'
 import CodeBlock from './CodeBlock.fixtures'
 import ContextPill from './ContextPill.fixtures'
+import DayToggles from './DayToggles.fixtures'
 import Divider from './Divider.fixtures'
 import EmojiButton from './EmojiButton.fixtures'
 import EmptyState from './EmptyState.fixtures'
@@ -53,6 +54,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Chip,
   CodeBlock,
   ContextPill,
+  DayToggles,
   Divider,
   EmojiButton,
   EmptyState,

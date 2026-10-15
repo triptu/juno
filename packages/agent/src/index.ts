@@ -20,7 +20,8 @@ export * from './providers'
 export { openTurns, type ArchiveMessage, type ModelRef, type Turns, type TurnsOptions } from './router/open'
 export { TurnEngine } from './router/service'
 export type { Input, Queued } from './router/router'
-export { parseOutput, type Output } from './router/output'
+export { parseOutput, type Output, type Span } from './router/output'
+export { sourceTable, type BubbleSpan, type SourceRef } from './router/sources'
 export type { Origin as RunOrigin, RunState, TurnEvent } from './router/events'
 export type { HostReads } from './router/host-tools'
 export { TURNS_MIGRATIONS } from './router/schema'
@@ -29,3 +30,11 @@ export type { Job, JobKind } from './jobs/jobs'
 export type { CompactorState } from './compactor/scheduler'
 export type { PinResult } from './pins/pins'
 export type { JournalPosition } from './store/ledger'
+export {
+  ACTIONS_MIGRATIONS, RESOLVE_SCHEMA, RESOLVE_TOOL, SLACK_CONNECTION, SLACK_SEND_SCHEMA, ANSWER_TOOL, DELEGATE_TOOL, SPEND_RAISE_TOOL,
+  budgetCard, proposedTask, question, resolveCard,
+  type Actions, type ActionsOptions, type ActionHost, type CardView, type Choice, type Executor, type ExecutorCall, type ExecutorResult, type Proposal,
+} from './actions'
+export { authorizeDecision, bindingMatches, mayAuthorize, mayMintGrant, toolDecision,
+  type Authority, type AuthorizeDecision, type AuthorizeInput, type CardOutcome, type GrantAuthority, type Invalid, type OpClass, type RunFacts, type ToolDecision } from './policy/policy'
+export { liveGrant, mintGrant, revokeAllGrants, revokeGrant, type Grant, type GrantClass, type Mint } from './grants/grants'

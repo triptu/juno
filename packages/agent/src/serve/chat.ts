@@ -16,11 +16,14 @@
  *   separator, an ending or a group label ends a group.
  * - A Juno bubble is unread when it is newer than the read mark.
  *
- * Cards come with the actions (WP15) and notes with the pin events; neither
- * is listed yet.
+ * - Cards (WP15) sit at the time Juno proposed them, under their run; a
+ *   Task card at the time its job started. A card is unread like a bubble.
+ *
+ * Notes come with the pin events; they are not listed yet.
  */
 import type {
   BubbleId,
+  CardId,
   ChatItem,
   ChatMessageId,
   ChatSummary,
@@ -34,7 +37,10 @@ import type {
   Reaction,
   ReplyTarget,
   RunId,
+  SendContext,
 } from '@juno/agent-contract'
+import type { CardView } from '../actions/cards'
+import { aboutOf } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import { ownerOpOf } from '../router/input'
 import type { RunState } from '../router/events'
@@ -50,6 +56,8 @@ export interface ChatSource {
   /** When a bubble was first shown; `fallback` is stored for a bubble not seen before. */
   readonly seen: (bubbleId: string, fallback: number) => number
   readonly jobs: ReadonlyArray<Job>
+  /** Every card Juno proposed (`actions.views`). */
+  readonly cards: ReadonlyArray<CardView>
   /** Juno items at or before this time are read. */
   readonly readAt: number
   /** Why accepted messages wait, if they do. */
@@ -211,7 +219,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
 
   for (const op of ops) {
     if (op.kind === 'retry') continue
-    const data = parse<{ replyTo?: ReplyTarget }>(op.data)
+    const data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
     const id = archiveIds.get(op.opId)
     entries.push({
       by: 'owner',
@@ -224,11 +232,26 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
         at: op.at,
         delivery: op.state === 'accepted' && source.waiting !== undefined ? { _tag: 'waiting', for: source.waiting } : { _tag: 'sent' },
         ...(data?.replyTo === undefined ? {} : { replyTo: quoteOf(data.replyTo) }),
+        ...(data?.context === undefined ? {} : { about: aboutOf(data.context) }),
         reactions: reactionsOf('owner', op.opId),
       },
     })
   }
   entries.push(...junoEntries)
+  for (const view of source.cards) {
+    entries.push({ by: 'line', at: view.at, item: { _tag: 'card', runId: view.runId as RunId, card: view.card, reactions: reactionsOf('card', view.card.id), unread: view.at > source.readAt } })
+  }
+  const started = new Map(
+    (store.db.prepare('SELECT id, created_at AS at FROM jobs').all() as Array<{ id: string; at: number }>).map((row) => [row.id, row.at]),
+  )
+  for (const job of source.jobs) {
+    const at = started.get(job.id) ?? job.stepAt
+    const card = {
+      _tag: 'task' as const, id: `task:${job.id}` as CardId, jobId: job.id as JobId, kind: job.kind, title: job.title, where: job.place,
+      phase: job.phase === 'unknown' ? ('failed' as const) : job.phase, ...(job.state === null ? {} : { state: job.state }),
+    }
+    entries.push({ by: 'line', at, item: { _tag: 'card', runId: job.runId as RunId, card, reactions: reactionsOf('card', card.id), unread: at > source.readAt } })
+  }
   // Stable: at the same time an owner message comes before what answers it.
   entries.sort((a, b) => a.at - b.at)
   return layout(entries, source)

@@ -1,41 +1,40 @@
 import { startTransition, useState } from 'react'
 import type { KindFilter } from '@juno/contract'
 import {
-  accentAtom,
   activeTab,
   currentPlace,
-  persistAccent,
-  persistTheme,
+  notificationStatusAtom,
+  registry,
+  setPresence,
   sidebarDotAtom,
   sidebarFilterAtom,
   sidebarListAtom,
   signedInAtom,
   tabsAtom,
-  themeAtom,
-  type Accent,
   type Tabs,
-  type Theme,
 } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AccountMenu, AppearanceSettings, hueFor, initials, Sidebar as SidebarView, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
+import { AccountMenu, hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus, SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
-import { openHome, openNewTab } from './navigation'
-import { PeekKeyPreference } from './Peek'
+import { openAllTopics, openHome, openNewTab, openNotifications, openPreferences } from './navigation'
 import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
-  // TODO(M5/M9/M11): open the All topics or Juno page in a tab.
+  if (target === 'all-topics') return openAllTopics({ newTab: event.metaKey })
+  // TODO(M11): open the Juno page in a tab.
 }
 
 /** The nav item of the active tab's page. Home also reads as selected with no tab open. */
 function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   const tab = activeTab(tabs)
-  return tab === undefined || currentPlace(tab).kind === 'home' ? 'home' : undefined
+  if (tab === undefined) return 'home'
+  const place = currentPlace(tab)
+  return place.kind === 'home' ? 'home' : place.kind === 'allTopics' ? 'all-topics' : undefined
 }
 
 /**
@@ -47,27 +46,26 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  * child with no props, so a render here does not reach the rows.
  */
 export function Sidebar() {
-  const [theme, setTheme] = useAtom(themeAtom)
-  const [accent, setAccent] = useAtom(accentAtom)
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
   const activeNav = useAtomValue(tabsAtom, activeNavOf)
   const [menuOpen, setMenuOpen] = useState(false)
+  const status = useAtomValue(notificationStatusAtom)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
   const name = user?.userName ?? ''
   const account = { name, initials: initials(name) || '?', hue: hueFor('', user?.userId ?? '') }
 
-  const changeTheme = (next: Theme) => {
-    setTheme(next)
-    persistTheme(next)
-  }
-  const changeAccent = (next: Accent) => {
-    setAccent(next)
-    persistAccent(next)
+  const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', label: status.value.presenceLabel } : undefined
+  const paused = status._tag === 'Success' ? status.value.paused : undefined
+  const accountAction = (action: AccountMenuAction) => {
+    setMenuOpen(false)
+    if (action === 'notifications') return openNotifications()
+    if (action === 'preferences') return openPreferences()
+    setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
   const changeKind = (kind: KindFilter) => {
@@ -101,9 +99,10 @@ export function Sidebar() {
         <AccountMenu
           {...account}
           workspace={user?.teamName ?? ''}
+          {...(presence === undefined ? {} : { presence })}
+          {...(paused === undefined ? {} : { paused })}
+          onAction={accountAction}
           sections={[
-            { title: 'Appearance', content: <AppearanceSettings theme={theme} accent={accent} layout="stack" onThemeChange={changeTheme} onAccentChange={changeAccent} /> },
-            { title: 'Peek', content: <PeekKeyPreference /> },
             { title: 'Session', content: <Session /> },
             {
               title: 'Diagnostics',

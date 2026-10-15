@@ -9,7 +9,7 @@ export default defineConfig({
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
     // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.ts', 'eval/**/*.test.ts'],
     // Each test starts several agent processes.
     testTimeout: 120_000,
   },

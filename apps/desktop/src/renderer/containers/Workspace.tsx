@@ -1,14 +1,20 @@
-import { Activity, useEffect } from 'react'
+import { Activity, lazy, Suspense, useEffect } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, mountedTabs, onMenuCommand, sidebarLayoutAtom, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
+import { currentPlace, mountedTabs, onMenuCommand, registry, sidebarLayoutAtom, startVisitLog, tabsAtom, tabStripAtom, type Tab, type TabSummary } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { HomePage } from './Home'
-import { closeTabById, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { NotificationsPage } from './Notifications'
+import { useNotificationBridge, WhyLayer } from './notificationBridge'
+import { PreferencesPage } from './Preferences'
+import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
+
+/** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
+const AllTopicsPage = lazy(loadAllTopicsPage)
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -30,7 +36,13 @@ function stripTab(summary: TabSummary): WorkspaceTab {
       ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
       : place.kind === 'home'
         ? { ...base, title: 'Home', icon: 'home' }
-        : {
+        : place.kind === 'allTopics'
+          ? { ...base, title: 'All topics', icon: 'all-topics' }
+          : place.kind === 'notifications'
+            ? { ...base, title: 'Notifications', icon: 'notifications' }
+            : place.kind === 'preferences'
+              ? { ...base, title: 'Preferences', icon: 'preferences' }
+              : {
           ...base,
           title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
           icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
@@ -51,6 +63,16 @@ function Page({ tab }: { readonly tab: Tab }) {
       return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':
       return <HomePage key="home" />
+    case 'notifications':
+      return <NotificationsPage key="notifications" />
+    case 'preferences':
+      return <PreferencesPage key="preferences" />
+    case 'allTopics':
+      return (
+        <Suspense key="all-topics" fallback={null}>
+          <AllTopicsPage />
+        </Suspense>
+      )
   }
 }
 
@@ -83,8 +105,15 @@ export function Workspace() {
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
   const mounted = mountedTabs(state)
 
+  useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
+  useEffect(() => startVisitLog(registry), [])
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadAllTopicsPage(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
@@ -93,6 +122,7 @@ export function Workspace() {
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
 
   return (
+    <>
     <WorkspaceView
       tabs={strip.map(stripTab)}
       {...(state.active === undefined ? {} : { activeId: state.active })}
@@ -112,5 +142,7 @@ export function Workspace() {
             </Activity>
           ))}
     </WorkspaceView>
+    <WhyLayer />
+    </>
   )
 }

@@ -25,6 +25,8 @@ export interface ToolRun {
   readonly runId: string
   readonly opId: string
   readonly h: number
+  /** What started the run (§6.4): only an owner run can be clean. */
+  readonly origin: 'owner' | 'wake' | 'report' | 'click'
   /** The archive length now: the run's own messages are `[h, cutoff)`. */
   readonly cutoff: number
   /** The run has read no untrusted content yet (§6.4). */

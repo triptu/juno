@@ -554,6 +554,13 @@ export const text = stylex.defineVars({
   '--text-display-leading': '1.1',
   '--text-display-tracking': '0',
 
+  // Home's greeting: "Morning, Tushar."
+  '--text-greeting-family': fonts['--font-serif'],
+  '--text-greeting-size': '36px',
+  '--text-greeting-weight': '400',
+  '--text-greeting-leading': '1.15',
+  '--text-greeting-tracking': '0',
+
   // "Nothing open"
   '--text-empty-title-family': fonts['--font-serif'],
   '--text-empty-title-size': '30px',
@@ -689,7 +696,14 @@ export const layout = stylex.defineVars({
   '--thumb-max-width': '360px',
   '--thumb-max-height': '280px',
   '--search-field-width': '260px',
+  // The All topics table (inventory 10): topic, where, status, messages,
+  // updated. Under the minimum width (the columns' minimums, their gaps and
+  // the row and table padding) the table scrolls sideways.
+  '--all-topics-columns': 'minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px',
+  '--all-topics-table-min': '576px',
   '--keyword-field-width': '160px',
+  // Home's column: the item rows and the Ask Juno field.
+  '--home-width': '480px',
   '--page-width-narrow': '680px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
@@ -794,6 +808,24 @@ export const sizes = stylex.defineVars({
 /* -------------------------------------------------------------------------- */
 /* Layers and opacity                                                         */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Density (Preferences › Appearance, inventory 3.3 and 6.1). These are the
+ * Comfortable values; `compact` in themes.stylex.ts overrides them on
+ * <html>. Only the sidebar row and the message row read them.
+ */
+export const density = stylex.defineVars({
+  '--density-row-padding-block': '11px',
+  // Line three's gap above it.
+  '--density-row-line-gap': '2px',
+  // The 44px tile drawn at 36px in Compact.
+  '--density-row-tile-zoom': '1',
+  // The row's content-box estimate for off-screen rows.
+  '--density-row-estimate': sizes['--row-topic-estimate'],
+  '--density-message-padding-block': '4px',
+  // Above the first message of a sender group.
+  '--density-message-group-gap': '12px',
+})
 
 export const z = stylex.defineVars({
   '--z-toolbar': '2',

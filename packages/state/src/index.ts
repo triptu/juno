@@ -3,6 +3,18 @@ export { configureConnection, connectionStateAtom, makeRegistry, registry, resta
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
+export {
+  allTopicsFilterAtom,
+  allTopicsLayoutAtom,
+  allTopicsListAtom,
+  allTopicsOffsetAtom,
+  allTopicsRowAtom,
+  allTopicsSummaryAtom,
+  allTopicsWindowAtom,
+  defaultAllTopicsFilter,
+  type AllTopicsLayout,
+  type AllTopicsWindow,
+} from './allTopics'
 export { mirrorReadsAtom, shouldMarkRead, type ReadTrigger, type ReadView } from './reads'
 export { isPeekKey, PEEK_KEY_PREF, peekKeyAtom, setPeekKey, type PeekKey } from './peek'
 export {
@@ -53,8 +65,12 @@ export {
   historyStateAtom,
   historyTarget,
   mountedTabs,
+  allTopicsPlace,
+  allTopicsTab,
   homePlace,
   homeTab,
+  notificationsPlace,
+  preferencesPlace,
   newChatPlace,
   openPlace,
   reopenClosedTab,
@@ -92,26 +108,65 @@ export {
 } from './newChat'
 export { deleteMessage, discardMessage, draftAtom, editMessage, reactToMessage, retryMessage, saveDraft, sendMessage } from './send'
 export { errorOf } from './result'
+export {
+  currentNotificationSettings,
+  loadNotificationSettings,
+  loadWhy,
+  notificationSettingsAtom,
+  notificationsPageAtom,
+  notificationStatusAtom,
+  setHours,
+  setMatters,
+  setPresence,
+  whyPopoverAtom,
+  type WhyPopover,
+} from './notifications'
 export { acquireRendererPort, EngineFailed } from './port'
 export {
   accentAtom,
   appInfoAtom,
   copyText,
+  densityAtom,
   editUndo,
   onMenuCommand,
+  onNotificationOpen,
   openExternal,
   openInSlack,
   persistAccent,
+  persistDensity,
   persistSidebar,
   persistTheme,
   popupContextMenu,
+  resolvedThemeAtom,
+  setViewing,
   sidebarLayoutAtom,
   themeAtom,
   type Accent,
+  type Density,
+  type ResolvedTheme,
   type Theme,
 } from './shell'
 export type { PortConnection, PortLike } from './transport'
 export { redrawTopic, topicArtAtom } from './art'
 export { messageLink, slackLink, threadRootTs } from './links'
-export { headerRenamingAtom, renamingAtom, rowRenamingAtom, type RenameTarget } from './rename'
+export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
+export {
+  caughtUp,
+  freezeHome,
+  homeAppeared,
+  homeGreeting,
+  homeItemLimit,
+  homeScene,
+  homeShownAtom,
+  homeViewAtom,
+  markFollowUpDone,
+  markHomeItemUsed,
+  readyHomeView,
+  showHome,
+  resolveAllTopics,
+  startVisitLog,
+  VISIT_MILLIS,
+  type HomeScene,
+  type HomeShown,
+} from './home'

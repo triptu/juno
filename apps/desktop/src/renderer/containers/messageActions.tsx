@@ -85,7 +85,8 @@ export interface MessageActionsOutput {
   readonly editing: { readonly ts: string; readonly editor: ReactNode } | undefined
   readonly onRowKey: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onToggleReaction: (ts: string, name: string) => void
-  readonly onMessageMenu: (ts: string) => void
+  /** A right-click on a row, or on its sender's name or avatar. */
+  readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
   /** ↑ in an empty composer. */
   readonly selectNewest: () => void
   /** The emoji picker or the selection's Quote button, for `TopicView`'s floating slot. */
@@ -193,8 +194,10 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
         if (ts !== undefined) focusRow(ts)
       },
     }
-    const menu = async (message: MessageView, at?: MenuAnchor) => {
-      const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at)
+    const menu = async (message: MessageView, at: MenuAnchor, onSender = false) => {
+      const people = latest.current.list.refs.people
+      const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
+      const chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
       if (chosen === 'edit') startEdit(message)
       else if (chosen === 'delete') askDelete(message)
       else if (chosen === 'reply') handlers.onReply?.(message)
@@ -253,9 +256,9 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     if (message !== undefined) actions.react(message, name)
   }
 
-  const onMessageMenu = (ts: string) => {
+  const onMessageMenu = (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
     const message = rowMessage(ts)
-    if (message !== undefined) void actions.menu(message)
+    if (message !== undefined) void actions.menu(message, { x: at.clientX, y: at.clientY }, onSender)
   }
 
   // The selection's Quote button: shown when a drag or a Shift-arrow selection ends inside a message's text.

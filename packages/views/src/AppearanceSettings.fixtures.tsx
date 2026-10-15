@@ -12,6 +12,9 @@ export default defineFixtures(AppearanceSettings, {
     'light-teal': fixture({ theme: 'light', accent: 'teal', onThemeChange: noop, onAccentChange: noop }),
     'light-ink': fixture({ theme: 'light', accent: 'ink', onThemeChange: noop, onAccentChange: noop }),
   },
+  System: {
+    'system-density': fixture({ theme: 'system', accent: 'coral', density: 'compact', onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+  },
   Layout: {
     stacked: fixture({ theme: 'light', accent: 'coral', layout: 'stack', onThemeChange: noop, onAccentChange: noop }, { width: 300 }),
   },

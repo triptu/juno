@@ -5,10 +5,15 @@
  * account: the host binds the signed-in account.
  *
  * Every read is untrusted content, so it taints the run (§6.4). Results are
- * plain lines; the request builder pages long ones.
+ * plain lines; the request builder pages long ones. A message line starts
+ * with its handle for sources (§19.1, `sources.ts`) and names the channel
+ * and sender as the owner sees them, keeping the ids the tools take:
+ *
+ *   m3 #eng (C0ENG) ts 1760500000.000004 in thread 1760500000.000001, Maya Chen: It times out…
  */
 import type { AgentHostError, HostMessagePage, TopicLink } from '@juno/agent-contract'
 import { defineTool, type JunoTool } from '../request/tool'
+import type { SourceRef } from './sources'
 
 type Page = typeof HostMessagePage.Type
 
@@ -20,10 +25,21 @@ export interface HostReads {
   readonly person: (userId: string) => Promise<{ readonly id: string; readonly name: string; readonly displayName: string }>
 }
 
-const lines = (page: Page) =>
-  page.messages.length === 0
-    ? 'No messages.'
-    : page.messages.map((m) => `${m.channelId} ${m.ts}${m.threadTs ? ` (thread ${m.threadTs})` : ''} ${m.senderId}: ${m.text}`).join('\n')
+/** Gives each message of a read its handle in the live run. */
+export type Handles = (messages: ReadonlyArray<SourceRef>) => Promise<ReadonlyArray<string>>
+
+const line = (m: Page['messages'][number], handle: string | undefined) => {
+  const place = m.channelName === undefined ? m.channelId : `${m.channelName} (${m.channelId})`
+  const thread = m.threadTs ? ` in thread ${m.threadTs}` : ''
+  return `${handle === undefined ? '' : `${handle} `}${place} ts ${m.ts}${thread}, ${m.senderName ?? (m.senderId || 'unknown sender')}: ${m.text}`
+}
+
+const lines = async (page: Page, handles: Handles) => {
+  if (page.messages.length === 0) return 'No messages.'
+  const refs = page.messages.map((m) => ({ channelId: m.channelId, ts: m.ts, ...(m.channelName === undefined ? {} : { place: m.channelName }) }))
+  const assigned = await handles(refs)
+  return page.messages.map((m, i) => line(m, assigned[i])).join('\n')
+}
 
 const reasons: Record<string, string> = {
   offline: 'Slack is not reachable right now.',
@@ -47,7 +63,8 @@ const string = (description: string) => ({ type: 'string', description })
 
 export type HostTool = JunoTool & { readonly taints: true }
 
-export function hostTools(host: HostReads): ReadonlyArray<HostTool> {
+/** `handles` numbers the messages read in the live run. */
+export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<HostTool> {
   const tools = [
     defineTool<{ readonly query: string }>({
       name: 'slack_search',
@@ -55,7 +72,7 @@ export function hostTools(host: HostReads): ReadonlyArray<HostTool> {
       parameters: { type: 'object', properties: { query: string('The search') }, required: ['query'], additionalProperties: false },
       replay: 'safe',
       status: (n) => (n === 1 ? 'Searching Slack' : `Searching Slack, ${plural(n, 'search', 'searches')}`),
-      run: ({ query }) => read(async () => lines(await host.search(query))),
+      run: ({ query }) => read(async () => lines(await host.search(query), handles)),
     }),
     defineTool<{ readonly channel: string }>({
       name: 'slack_history',
@@ -63,7 +80,7 @@ export function hostTools(host: HostReads): ReadonlyArray<HostTool> {
       parameters: { type: 'object', properties: { channel: string('The channel id') }, required: ['channel'], additionalProperties: false },
       replay: 'safe',
       status: (n) => `Reading ${plural(n, 'conversation', 'conversations')}`,
-      run: ({ channel }) => read(async () => lines(await host.history(channel))),
+      run: ({ channel }) => read(async () => lines(await host.history(channel), handles)),
     }),
     defineTool<{ readonly channel: string; readonly thread: string }>({
       name: 'slack_replies',
@@ -76,7 +93,7 @@ export function hostTools(host: HostReads): ReadonlyArray<HostTool> {
       },
       replay: 'safe',
       status: (n) => `Reading ${plural(n, 'thread', 'threads')}`,
-      run: ({ channel, thread }) => read(async () => lines(await host.replies(channel, thread))),
+      run: ({ channel, thread }) => read(async () => lines(await host.replies(channel, thread), handles)),
     }),
     defineTool<Record<string, never>>({
       name: 'slack_topics',
@@ -92,7 +109,7 @@ export function hostTools(host: HostReads): ReadonlyArray<HostTool> {
     }),
     defineTool<{ readonly user: string }>({
       name: 'slack_person',
-      description: 'Look up a Slack user by id: their name and display name.',
+      description: 'Look up a Slack user by id, such as one mentioned as <@U…> in a message: their name and display name.',
       parameters: { type: 'object', properties: { user: string('The user id') }, required: ['user'], additionalProperties: false },
       replay: 'safe',
       status: (n) => `Looking up ${plural(n, 'person', 'people')}`,

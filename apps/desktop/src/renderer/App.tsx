@@ -1,7 +1,7 @@
 import { useLayoutEffect } from 'react'
-import { accentAtom, persistAccent, persistTheme, signedInAtom, themeAtom, type Accent, type Theme } from '@juno/state'
+import { accentAtom, densityAtom, persistAccent, persistTheme, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyTheme, Shell, type AccentName, type ThemeName } from '@juno/views'
+import { AppearanceSettings, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { Frame } from './containers/Frame'
 import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
@@ -12,17 +12,23 @@ import { Workspace } from './containers/Workspace'
 // assignments fail to compile if either side drifts.
 const _accentFromContract: AccentName = null as unknown as Accent
 const _accentFromTokens: Accent = null as unknown as AccentName
-const _themeFromContract: ThemeName = null as unknown as Theme
-const _themeFromViews: Theme = null as unknown as ThemeName
-void [_accentFromContract, _accentFromTokens, _themeFromContract, _themeFromViews]
+const _themeFromContract: ThemeName = null as unknown as ResolvedTheme
+const _themeFromViews: ResolvedTheme = null as unknown as ThemeName
+const _preferenceFromContract: ThemePreference = null as unknown as Theme
+const _preferenceFromViews: Theme = null as unknown as ThemePreference
+const _densityFromContract: DensityName = null as unknown as Density
+const _densityFromViews: Density = null as unknown as DensityName
+void [_accentFromContract, _accentFromTokens, _themeFromContract, _themeFromViews, _preferenceFromContract, _preferenceFromViews, _densityFromContract, _densityFromViews]
 
 /** The root container: the theme, and the shell in its signed-in or signed-out shape. */
 export function App() {
   const [theme, setTheme] = useAtom(themeAtom)
+  const resolved = useAtomValue(resolvedThemeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
+  const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
 
-  useLayoutEffect(() => applyTheme(theme, accent), [theme, accent])
+  useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
 
   const changeTheme = (next: Theme) => {
     setTheme(next)
@@ -34,9 +40,9 @@ export function App() {
     persistAccent(next)
   }
 
-  // Signed in: the sidebar and the workspace. Otherwise the sign-in page is
-  // the whole page, with the appearance block under it until Preferences
-  // exists (signed in, it lives in the account menu).
+  // Signed in: the sidebar and the workspace; Preferences holds the
+  // appearance settings. Otherwise the sign-in page is the whole page, with
+  // the appearance block under it.
   if (signedIn !== undefined) {
     return (
       <Frame sidebar={<Sidebar />} peek={<Peek />}>

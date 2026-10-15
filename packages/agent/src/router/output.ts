@@ -5,6 +5,11 @@
  *   <say>One bubble.</say>
  *   <say reply-to="n12">A bubble that answers owner message n12.</say>
  *   <react to="n12">👍</react>
+ *   <say>The review moved to <src m="m3">Thursday at 14:00</src>.</say>
+ *
+ * Inside a bubble, `<src m="m3">` marks words taken from Slack message `m3`
+ * of the run's handle table (plan v3 §19.1, `sources.ts`). The owner reads
+ * the words without the tags.
  *
  * Everything outside these blocks (reasoning, notes to itself, an input it
  * chose to ignore) is never shown. If the model marks nothing, nothing
@@ -21,8 +26,16 @@
  */
 import { isEmoji } from '@juno/agent-contract'
 
-export interface OutputBubble {
+/** A run of a bubble's text. `source` is the handle it cites (`m3`), as the model wrote it. */
+export interface Span {
   readonly text: string
+  readonly source?: string
+}
+
+export interface OutputBubble {
+  /** What the owner reads: the spans' text. */
+  readonly text: string
+  readonly spans: ReadonlyArray<Span>
   /** The handle of the owner message it replies to (`n12`), as the model wrote it. */
   readonly replyTo?: string
 }
@@ -40,6 +53,27 @@ export interface Output {
 
 const BLOCK = /<say(?:\s+reply-to="([^"]*)")?\s*>([\s\S]*?)<\/say>|<react\s+to="([^"]*)"\s*>([\s\S]*?)<\/react>/g
 
+const SRC = /<src\s+m="([^"]*)"\s*>([\s\S]*?)<\/src>/g
+/** Markup that has no place inside a bubble: a `<src>` left open or closed alone, a nested `<say>` tag, a `<react>`. */
+const STRAY = /<react\b[^>]*>[\s\S]*?<\/react>|<\/?(?:src|say|react)\b[^>]*>/g
+
+function spansOf(body: string): ReadonlyArray<Span> {
+  const spans: Span[] = []
+  const plain = (text: string) => {
+    const clean = text.replace(STRAY, '')
+    if (clean !== '') spans.push({ text: clean })
+  }
+  let at = 0
+  for (const match of body.matchAll(SRC)) {
+    plain(body.slice(at, match.index))
+    const words = match[2]!.replace(STRAY, '')
+    if (words !== '') spans.push({ text: words, source: match[1]! })
+    at = match.index + match[0].length
+  }
+  plain(body.slice(at))
+  return spans
+}
+
 /** The closed blocks in `text`, in order. An empty bubble or a reaction that is not one emoji is dropped. */
 export function parseOutput(text: string): Output {
   const bubbles: OutputBubble[] = []
@@ -47,8 +81,9 @@ export function parseOutput(text: string): Output {
   for (const match of text.matchAll(BLOCK)) {
     const [, replyTo, say, to, emoji] = match
     if (say !== undefined) {
-      const body = say.trim()
-      if (body !== '') bubbles.push({ text: body, ...(replyTo ? { replyTo } : {}) })
+      const spans = spansOf(say.trim())
+      const body = spans.map((span) => span.text).join('')
+      if (body.trim() !== '') bubbles.push({ text: body, spans, ...(replyTo ? { replyTo } : {}) })
     } else if (to !== undefined && emoji !== undefined && isEmoji(emoji.trim())) {
       reactions.push({ to, emoji: emoji.trim() })
     }

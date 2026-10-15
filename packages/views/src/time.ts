@@ -108,3 +108,19 @@ export function dayLabel(at: number, now: number): string {
   if (day > today - 7 * DAY && day < today) return weekday.format(at)
   return new Date(at).getFullYear() === new Date(now).getFullYear() ? monthDay.format(at) : monthDayYear.format(at)
 }
+
+/** "9am", "6:30pm": a time of day in minutes since midnight, for the hours selects. The same rule as `hourLabel` in `@juno/domain`. */
+export function hourLabel(minutesOfDay: number): string {
+  const total = ((Math.round(minutesOfDay) % 1440) + 1440) % 1440
+  const h24 = Math.floor(total / 60)
+  const m = total % 60
+  const suffix = h24 < 12 ? 'am' : 'pm'
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`
+}
+
+/** "13:42": the clock time of `at`, for Today's list. */
+export function clockLabel(at: number): string {
+  const date = new Date(at)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}

@@ -13,7 +13,7 @@
 import { Schema } from 'effect'
 import { Card } from './cards'
 import { BubbleId, CardId, ChatMessageId, OpId, RunId, ScheduleId } from './ids'
-import { JobRef } from './place'
+import { About, JobRef } from './place'
 
 /** Exactly one emoji, any emoji. A reaction is content, so it shows as the emoji itself. */
 export const isEmoji = (text: string): boolean => {
@@ -117,6 +117,8 @@ export const OwnerMessageItem = Schema.TaggedStruct('owner', {
   delivery: Delivery,
   /** The owner replied to a Juno bubble or card. */
   replyTo: Schema.optionalKey(Quote),
+  /** Sent from the Juno panel or with an About chip: the "About …" line over the bubble. */
+  about: Schema.optionalKey(About),
   /** Juno may react instead of replying. */
   reactions: Schema.Array(Reaction),
   group: GroupPosition,

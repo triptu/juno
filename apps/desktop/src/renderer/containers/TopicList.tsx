@@ -18,7 +18,7 @@ import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
-import { openTopic, warmTopic } from './navigation'
+import { openAllTopics, openTopic, warmTopic } from './navigation'
 import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 
 /**
@@ -49,7 +49,7 @@ function focusRow(id: string): void {
 
 /** "View all topics" in the empty states. */
 function viewAllTopics(): void {
-  // TODO(M5): open the All topics page in a tab.
+  openAllTopics()
 }
 
 /** "Clear filters" in the empty states: back to All, everything. */

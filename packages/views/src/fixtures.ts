@@ -4,6 +4,7 @@
  */
 import type { FixtureSet } from '@juno/ui'
 import AccountMenu from './AccountMenu.fixtures'
+import AllTopics from './AllTopics.fixtures'
 import ActiveThreads from './ActiveThreads.fixtures'
 import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
@@ -12,12 +13,15 @@ import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures } from './EngineStatusView.fixtures'
+import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
 import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
+import NotificationsPage from './NotificationsPage.fixtures'
+import PreferencesPage from './PreferencesPage.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
@@ -31,6 +35,7 @@ import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
 import Workspace from './Workspace.fixtures'
+import WhyPopover from './WhyPopover.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
 import JunoChatList from './juno-chat/JunoChatList.fixtures'
@@ -51,6 +56,7 @@ import ScheduledPage from './juno-pages/ScheduledPage.fixtures'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AccountMenu,
+  AllTopics,
   ActivityPage,
   ActiveThreads,
   AppearanceSettings,
@@ -67,6 +73,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EngineNotice: engineNoticeFixtures,
   EmptyChat,
   EngineStatusView,
+  Home,
   HoverToolbar,
   JunoChatList,
   JunoComposer,
@@ -78,9 +85,11 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewChat,
   NewDivider,
   NewMessagesPill,
+  NotificationsPage,
   PeekKeySetting,
   PeekView,
   OwnerBubble,
+  PreferencesPage,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,
   ProviderCard: providerCard,
@@ -108,5 +117,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicRow,
   TopicView,
   UnknownCard: unknownCardSet,
+  WhyPopover,
   Workspace,
 }

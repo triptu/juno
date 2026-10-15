@@ -11,10 +11,13 @@ import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiProviderLive } from './ai'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
+import { HomeHandlers } from './home/handlers'
+import { HomeJob } from './home/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { MessagesHandlers } from './messages/handlers'
 import { NewChatHandlers } from './newchat/handlers'
+import { NotificationsHandlers } from './notifications/handlers'
 import { SendHandlers } from './send/handlers'
 import { ActionWorker } from './send/actionWorker'
 import { PostWorker } from './send/worker'
@@ -28,7 +31,7 @@ import { StatusHandlers } from './status/handlers'
 import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
 import { SyncLink } from './syncLink'
-import { TopicsHandlers } from './topics/handlers'
+import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
 import { Workspace } from './workspace'
 
 /**
@@ -60,7 +63,7 @@ const EnginePhases = Layer.effectDiscard(
 )
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
-export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
+export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(ActionWorker.layer),
@@ -76,7 +79,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob).pipe(
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))

@@ -17,6 +17,8 @@ export type PerfName =
   | 'juno.sidebar-paint'
   | 'juno.topic-open'
   | 'juno.tab-switch'
+  /** From the All topics nav item's mouse down to the page painted with its first rows. */
+  | 'juno.all-topics-open'
   | 'juno.filter'
   | 'juno.palette-open'
   | 'juno.palette-results'
