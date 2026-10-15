@@ -33,12 +33,23 @@ clean owner run with the job's live grant records a Change intent and an
 attempt without a click. The settled Change card is the audit record. A
 send without that authority leaves the Change card open; a stop without it
 points to the Task card. Task Stop is already an owner click: it approves
-one stored interrupt through the dispatcher, with no second click. While
-Juno is paused or off, Stop approves nothing and the job keeps running: Pause
-stops every job, and an interrupt queued then would reach T3 Code on Resume
-with no click. Failed stops remain visible on their Change card and do not
-claim the session stopped.
+one stored interrupt through the dispatcher, under the click's op, with no
+second click. While Juno is paused or off, Stop approves nothing and the job
+keeps running: Pause stops every job, and an interrupt queued then would reach
+T3 Code on Resume with no click. Failed stops remain visible on their Change
+card and do not claim the session stopped. A later Stop click is a new click:
+it gets a new interrupt card, since an interrupt repeated on a session is
+harmless; an interrupt still on its way is not sent again. A Stop that cannot
+be built leaves the job running and never fails the click.
 Closing Juno only stops observation; it does not interrupt the external session.
+
+A removal that reaches the run that started a session makes Juno stop
+watching it: the job settles unknown with "Juno stopped watching after a
+removal", so no report carries the removed words to the model and the card
+does not claim the session stopped. The interrupt goes through the same
+Change card, proposed with a line saying why, and is sent only when the owner
+clicks Apply. The removal click is not taken as approval of an interrupt the
+owner has not seen.
 
 The watcher resumes from the recorded thread, never from the launch brief.
 It reads durable thread state, updates the job's `where` from a targeted

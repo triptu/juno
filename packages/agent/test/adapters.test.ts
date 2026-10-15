@@ -48,7 +48,7 @@ async function fixture(serverId: 't3' | 'littlebird', tools: FakeTool[]) {
       return createProviderGuard({ store, transport: fake.models })
     },
     jobDrivers: () => t3 ? [t3.driver] : [],
-    stopExternalJob: async (job) => t3?.stop(job) ?? false,
+    stopExternalJob: async (job, click) => t3?.stop(job, click) ?? false,
     actions: { executors: () => [...(manager ? mcpExecutors(manager) : []), ...(t3?.executors ?? [])] },
     tools: (context) => {
       if (!manager) throw new Error('No manager')
@@ -366,6 +366,57 @@ it('says a T3 question needs an answer in T3 Code when Juno cannot show it', asy
   await click()
   await expect.poll(() => turns.jobs.list()[0]?.state).toBe('T3 Code needs your answer in T3 Code')
   expect(turns.actions.views().some((v) => v.card._tag === 'question')).toBe(false)
+})
+
+it('after a removal, stops watching a T3 session and leaves its interrupt to an owner click', async () => {
+  const { server, turns, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  const { opId } = turns.store.db.prepare('SELECT op_id AS opId FROM runs WHERE id = ?').get(job.runId) as { opId: string }
+  const { id } = turns.store.db.prepare("SELECT min(id) AS id FROM messages WHERE kind = 'user' AND origin_op = ?").get(opId) as { id: number }
+  await turns.redaction.remove({ opId: 'remove-test', messageIds: [id], alsoRemoveReply: false })
+  await expect.poll(() => turns.jobs.list()[0]?.phase).toBe('unknown')
+  const open = () => turns.actions.views().find((v) => v.card._tag === 'change' && v.binding)
+  await expect.poll(() => open()?.card).toMatchObject({ _tag: 'change', caption: 'Juno stopped watching this session after a removal.' })
+  await turns.actions.idle()
+  // Not claimed stopped, and nothing sent on its own.
+  expect(turns.jobs.list()[0]?.state).toContain('Juno stopped watching')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(0)
+  const stop = open()
+  await click(stop?.card.id)
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+})
+
+it('lets a new Stop click try again after a lost interrupt, and never throws from Stop', async () => {
+  const { server, turns, manager, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.loseNextCall('t3_thread_interrupt')
+  await turns.jobs.stop(job.id, 'stop-1')
+  expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
+  await manager.connect('t3')
+  // The same click again is the same click: nothing more is sent.
+  await turns.jobs.stop(job.id, 'stop-1')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(1)
+  await turns.jobs.stop(job.id, 'stop-2')
+  expect(server.calls.filter((c) => c.name === 't3_thread_interrupt')).toHaveLength(2)
+  expect(turns.jobs.list()[0]?.phase).toBe('stopped')
+})
+
+it('a T3 Stop that cannot be built leaves the job running instead of failing the click', async () => {
+  const { server, turns, manager, call, click } = await fixture('t3', t3Tools)
+  await call('t3_start', start)
+  await click()
+  const job = turns.jobs.list()[0]
+  if (!job) throw new Error('No job')
+  server.setTools(t3Tools.filter((tool) => tool.name !== 't3_thread_interrupt'))
+  await manager.refresh('t3')
+  await expect(turns.jobs.stop(job.id, 'stop-test')).resolves.toBeUndefined()
+  expect(turns.jobs.list()[0]?.phase).not.toBe('stopped')
 })
 
 it('shows a session T3 Code started even when the account changed during the launch, without a grant', async () => {

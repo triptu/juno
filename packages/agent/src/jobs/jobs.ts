@@ -74,6 +74,8 @@ const settled = (phase: JobPhase) => phase === 'done' || phase === 'failed' || p
 export function createJobs(options: JobsOptions) {
   const { store } = options
   const running = new Map<string, { readonly controller: AbortController; readonly done: Promise<void> }>()
+  /** Jobs settled while their driver still ran (`release`): its last update is dropped. */
+  const released = new Set<string>()
   let closed = false
 
   const get = (id: string) => {
@@ -107,19 +109,24 @@ export function createJobs(options: JobsOptions) {
     if (driver === undefined || closed) return apply(job.id, { event: 'unknown' })
     const controller = new AbortController()
     const done = driver
-      .run(job, controller.signal, (update) => apply(job.id, update))
+      .run(job, controller.signal, (update) => {
+        if (!released.has(job.id)) apply(job.id, update)
+      })
       .then(
         (last) => {
           // At shutdown the job is left running; the next launch resumes it.
-          if (!closed) apply(job.id, controller.signal.aborted ? { event: 'cancelled' } : last)
+          if (!closed && !released.has(job.id)) apply(job.id, controller.signal.aborted ? { event: 'cancelled' } : last)
         },
         (error: unknown) => {
-          if (closed) return
+          if (closed || released.has(job.id)) return
           options.onReport?.(error)
           apply(job.id, controller.signal.aborted ? { event: 'cancelled' } : { event: 'failed', report: `${job.title} failed.` })
         },
       )
-      .finally(() => running.delete(job.id))
+      .finally(() => {
+        running.delete(job.id)
+        released.delete(job.id)
+      })
     running.set(job.id, { controller, done })
   }
 
@@ -150,6 +157,20 @@ export function createJobs(options: JobsOptions) {
       if (entry === undefined) return apply(id, { event: 'cancelled' })
       entry.controller.abort()
       await entry.done
+    },
+    /**
+     * Stops watching a job whose work goes on outside Juno (a T3 Code
+     * session), and settles it `unknown` with `state`: Juno no longer knows
+     * whether it runs, and does not claim it stopped.
+     */
+    release: async (id: string, state: string) => {
+      const job = get(id)
+      if (job === undefined || settled(job.phase)) return
+      const entry = running.get(id)
+      if (entry !== undefined) released.add(id)
+      apply(id, { event: 'unknown', state })
+      entry?.controller.abort()
+      await entry?.done
     },
     get,
     /** Every job, newest first. */
