@@ -85,11 +85,25 @@ function forget(id) {
   unlock(id)
 }
 function ensureReaper() {
-  const pidFile = join(dir, 'watcher.pid')
-  try { if (alive(Number(readFileSync(pidFile, 'utf8')))) return } catch { /* No watcher yet. */ }
-  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore' })
-  writeFileSync(pidFile, String(child.pid))
-  child.unref()
+  if (!takeLock('watcher-start')) return
+  try {
+    const pidFile = join(dir, 'watcher.pid')
+    const versionFile = join(dir, 'watcher.version')
+    let pid
+    try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
+    const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
+    if (alive(pid) && version >= 3) return
+    // Upgrade housekeeping only. Machine/job owners are untouched.
+    if (alive(pid)) {
+      const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
+      if (!/\/scripts\/remote\/pool\.mjs --watch\s*$/.test(command)) return
+      try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
+    }
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
+    writeFileSync(pidFile, String(child.pid))
+    writeFileSync(versionFile, '3')
+    child.unref()
+  } finally { unlock('watcher-start') }
 }
 
 /** A failed destroy remains recorded and cannot be handed out again. */
@@ -197,7 +211,7 @@ export function release(id, image) {
   try {
   const idle = machines().filter((other) => other.id !== id && !other.kept && !other.destroying && other.machine === state.machine && !existsSync(lockPath(other.id)))
   if (idleMs === 0 || idle.length >= idlePerShape) { destroy(id); return }
-  write({ ...state, lastUsed: Date.now(), images: [...new Set([...(state.images ?? []), image])] })
+  write({ ...state, lastUsed: Date.now(), idleMs, images: [...new Set([...(state.images ?? []), image])] })
   unlock(id)
   ensureReaper()
   } finally { unlock('decide') }
@@ -205,7 +219,12 @@ export function release(id, image) {
 
 /** Also accepts old per-machine reaper invocations during rollout. */
 export async function reap() {
-  if (!takeLock('watcher')) return
+  let owned = false
+  for (let attempt = 0; attempt < 20 && !owned; attempt++) {
+    owned = takeLock('watcher')
+    if (!owned) await sleep(100)
+  }
+  if (!owned) return
   const started = Date.now()
   try {
     for (;;) {

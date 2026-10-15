@@ -23,6 +23,7 @@ export function runnerConfig(env = process.env) {
 export function checkRunner(config) {
   const command = `echo __juno_runner_connected; set -eu; test "$(uname -sm)" = 'Linux x86_64'; command -v flock >/dev/null; command -v timeout >/dev/null; docker info >/dev/null; cores=$(cat "$HOME/.config/juno-runner/cores"); test "$cores" -gt 0; test "$cores" -le "$(getconf _NPROCESSORS_ONLN)"; printf 'juno-runner-ready %s\\n' "$cores"`
   const result = spawnSync('ssh', [...config.args, command], { encoding: 'utf8', timeout: 15_000 })
+  if (result.status === 255 && /Permission denied|Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|bad permissions|Load key|no such identity|no matching (host key|key exchange)/i.test(result.stderr ?? '')) throw new Error(`runner SSH configuration failed: ${result.stderr.trim()}`)
   if ((result.status === 255 || result.error?.code === 'ETIMEDOUT') && !result.stdout?.includes('__juno_runner_connected')) return { reachable: false, reason: result.stderr?.trim() || result.error?.message }
   if (result.error || result.status !== 0) throw new Error(`runner health check failed: ${result.error?.message ?? result.stderr.trim()}`)
   const cores = Number(/^juno-runner-ready (\d+)$/m.exec(result.stdout)?.[1])

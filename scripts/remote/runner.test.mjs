@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const command = process.argv.at(-1);
 fs.appendFileSync(process.env.TEST_CALLS, 'ssh\\n');
 if (process.env.TEST_MODE === 'unreachable') process.exit(255);
+if (process.env.TEST_MODE === 'auth') { console.error('Permission denied (publickey)'); process.exit(255); }
 if (command.includes('__juno_runner_connected')) {
  if (process.env.TEST_MODE === 'broken') { console.error('Docker unavailable'); process.exit(1); }
  console.log('__juno_runner_connected\\njuno-runner-ready 4');
@@ -34,12 +35,13 @@ if (command.includes('__juno_runner_connected')) {
   const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_REMOTE_MAX_VCPU: '0' }
   const runs = []
   try {
-    for (const mode of ['unreachable', 'broken', 'healthy']) {
+    for (const mode of ['unreachable', 'auth', 'broken', 'healthy']) {
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', 'test:agent-contracts'], { cwd: resolve('.'), env: { ...env, TEST_MODE: mode }, encoding: 'utf8', timeout: 30_000 })
       const path = /remote: output in (.+)\/run.log/.exec(child.stderr)?.[1]
       if (path) runs.push(path)
       assert.equal(child.status, mode === 'healthy' ? 7 : 255, child.stderr)
       if (mode === 'unreachable') assert.match(child.stderr, /Namespace is disabled/)
+      if (mode === 'auth') assert.match(child.stderr, /runner SSH configuration failed/)
       if (mode === 'broken') assert.match(child.stderr, /runner health check failed/)
       if (mode === 'healthy') {
         assert.match(child.stdout, /script time 1 s/)
@@ -87,4 +89,24 @@ test('Linux host queue preserves stdin and bounds concurrent core reservations',
     assert.equal(used, 0)
     for (const id of ['a', 'b', 'c']) assert.equal(readFileSync(join(dir, `input-${id}`), 'utf8'), `workspace-${id}`)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('watcher upgrade never signals an unrelated process with a reused PID', async () => {
+  const { spawn } = await import('node:child_process')
+  const { mkdirSync } = await import('node:fs')
+  const dir = mkdtempSync(join(tmpdir(), 'juno-watcher-upgrade-'))
+  const state = join(dir, 'juno-remote-pool')
+  mkdirSync(state)
+  const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+  writeFileSync(join(state, 'watcher.pid'), String(unrelated.pid))
+  writeFileSync(join(dir, 'nsc'), '#!/bin/sh\nif [ "$1" = list ]; then echo "[]"; fi\n')
+  chmodSync(join(dir, 'nsc'), 0o755)
+  const pool = new URL('./pool.mjs', import.meta.url).href
+  try {
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e', `import { acquire, destroy } from ${JSON.stringify(pool)}; const job = await acquire('linux/amd64:2x4', async () => 'fake-upgrade-machine', () => {}); if (!destroy(job.id)) process.exitCode=1`], {
+      env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, JUNO_REMOTE_MAX_VCPU: '24' }, encoding: 'utf8', timeout: 10_000,
+    })
+    assert.equal(child.status, 0, child.stderr)
+    assert.doesNotThrow(() => process.kill(unrelated.pid, 0))
+  } finally { unrelated.kill(); rmSync(dir, { recursive: true, force: true }) }
 })

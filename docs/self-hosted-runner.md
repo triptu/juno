@@ -2,13 +2,13 @@
 
 Namespace remains the default. Set `JUNO_RUNNER_HOST` on the Mac to try a Linux
 runner first. An unreachable host falls back to Namespace. A reachable host with
-broken Docker, a missing image, or failing tests returns an error without fallback.
+broken Docker, an SSH key error, a missing image, or failing tests returns an error without fallback.
 Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation, including image builds.
 
 Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
 16 GB available to Linux is a reasonable starting point. The host's
 `~/.config/juno-runner/cores` file is the total capacity across all clients.
-Jobs reserve the cores in their requested machine shape, wait when full, and
+Use the same Linux account from every client. Jobs reserve the cores in their requested machine shape, wait when full, and
 release their reservation after Docker stops. Each job has its own container
 and output directory. A host lock protects reservations. Jobs stop after 3 hours.
 

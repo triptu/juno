@@ -6,14 +6,16 @@ export function machinesToDestroy({ instances, states, pending, owner, now, idle
   const result = new Set()
   for (const state of states) {
     if (state.live) continue
-    if (state.destroying || state.abandoned || now - state.created >= lifetimeMs || (!state.kept && now - state.lastUsed >= idleMs)) result.add(state.id)
+    if (state.destroying || state.abandoned || now - state.created >= lifetimeMs || (!state.kept && now - state.lastUsed >= (state.idleMs ?? idleMs))) result.add(state.id)
   }
   for (const instance of instances) {
     const labels = instance.labels ?? {}
     if (tracked.has(instance.cluster_id) || labels['juno-remote'] !== '1') continue
     if (labels['juno-pool'] && labels['juno-pool'] !== owner) continue
-    if (pending.some((entry) => entry.live && entry.token === labels['juno-create'])) continue
-    if (now - Date.parse(instance.created_at) >= orphanGraceMs) result.add(instance.cluster_id)
+    const attempt = pending.find((entry) => entry.token === labels['juno-create'])
+    if (attempt?.live) continue
+    // A failed creator never handed this machine to a job.
+    if (attempt || now - Date.parse(instance.created_at) >= orphanGraceMs) result.add(instance.cluster_id)
   }
   return [...result]
 }
