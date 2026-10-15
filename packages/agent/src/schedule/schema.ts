@@ -12,6 +12,8 @@ export const SCHEDULE_MIGRATIONS: MigrationSet = {
       op_id TEXT NOT NULL UNIQUE, state TEXT NOT NULL CHECK(state IN ('queued','admitted','started','cancelled')),
       PRIMARY KEY(schedule_id, revision, due_at)
     ) STRICT`,
+    'CREATE TABLE schedule_commands (op_id TEXT PRIMARY KEY, accepted INTEGER NOT NULL CHECK(accepted IN (0,1))) STRICT',
+    'CREATE INDEX occurrence_queue ON schedule_occurrences(state, due_at)',
     'CREATE INDEX schedule_due ON schedules(state, due_at)',
   ]],
 }

@@ -347,13 +347,13 @@ export function agentHandlers(host: ChatHost) {
           const scheduler = host.schedule?.scheduler
           if (scheduler === undefined) return unavailable('Scheduled is not available yet.')
           const row = scheduler.get(id)
-          const done = row !== undefined && scheduler.edit(id, revision, opId, { ...row.definition, what, schedule, deliver })
+          const done = scheduler.command(opId, () => row !== undefined && scheduler.edit(id, revision, opId, { ...row.definition, what, schedule, deliver }))
           return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
         }),
         'agent.scheduled.action': ({ opId, id, revision, action }) => Effect.suspend(() => {
           if (host.schedule === undefined) return unavailable('Scheduled is not available yet.')
           const scheduler = host.schedule.scheduler
-          const done = action === 'resume' ? scheduler.resume(id, revision, opId) : scheduler.cancel(id, revision, action === 'pause' ? 'paused' : 'deleted')
+          const done = scheduler.command(opId, () => action === 'resume' ? scheduler.resume(id, revision, opId) : scheduler.cancel(id, revision, action === 'pause' ? 'paused' : 'deleted'))
           return done ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This schedule changed.' }))
         }),
         'agent.remembers.page': () => (state.turns === undefined ? Stream.make(emptyRemembers) : live(state.changes, () => remembersPage(state.turns!.store))),

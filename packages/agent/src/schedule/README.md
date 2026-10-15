@@ -1,6 +1,7 @@
 # Scheduler (WP19)
 
 `SCHEDULE_MIGRATIONS` owns replicated `schedules` and `schedule_occurrences`.
+`schedule_commands` keeps owner command results so transport retries apply once.
 An occurrence's primary key is `(schedule_id, revision, due_at)`. Queuing is
 idempotent. Admission checks the current revision, owner mode and live grant,
 and commits the inbox wake and admission together. Start repeats those checks.
@@ -40,7 +41,7 @@ The following wiring is required before enabling schedules in the app:
   `scheduler.start(opId, persistRun)` for an accepted wake. `persistRun` writes
   the run/run-input record synchronously in the same transaction. Do this
   after asynchronous catch-up and immediately before delivery. Refuse delivery
-  when start returns false. Restoring an already persisted run does not call
+  when start returns false and settle that inbox op as interrupted. Restoring an already persisted run does not call
   start again. This closes the crash gap between consuming a wake and recording
   the run. Do not call `Turns.accept` to deliver an unvalidated occurrence.
 - WP13 supplies complete refreshed reply reads, owner identity, message events,

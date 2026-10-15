@@ -165,3 +165,12 @@ it('a Proposed schedule Start mints the grant and posts a Schedule card through 
     expect(h.fake.requests).toHaveLength(0)
   } finally { await h.close() }
 })
+
+it('repeating a page command after restart returns its result without changing the schedule again', () => {
+  const h = harness(); const row = h.create()
+  const pause = () => h.scheduler.command('pause-click', () => h.scheduler.cancel(row.id, row.revision, 'paused'))
+  expect(pause()).toBe(true)
+  h.restart()
+  expect(pause()).toBe(true)
+  expect(h.scheduler.get(row.id)?.revision).toBe(2)
+})

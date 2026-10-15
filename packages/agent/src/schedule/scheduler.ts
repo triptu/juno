@@ -28,6 +28,7 @@ export interface SchedulerOptions {
 
 export function createScheduler(options: SchedulerOptions) {
   const { store } = options
+  const atomic = <A>(f: () => A): A => store.db.isTransaction ? f() : transaction(store.db, f)
   const get = (id: string) => {
     const row = store.db.prepare('SELECT * FROM schedules WHERE id = ?').get(id)
     return row === undefined ? undefined : record(decodeRow(row))
@@ -43,23 +44,23 @@ export function createScheduler(options: SchedulerOptions) {
     return bounds.revision === current.revision && bounds.purpose === current.definition.prompt ? current : undefined
   }
   function create(input: { readonly key: string; readonly sourceOp: string; readonly authority: GrantAuthority; readonly definition: Definition }) {
-    return transaction(store.db, () => {
-    const definition = decodeDefinition(input.definition)
-    if (definition.unlessReply !== undefined && definition.schedule._tag !== 'once') return undefined
-    const previous = store.db.prepare('SELECT * FROM schedules WHERE creation_key = ?').get(input.key)
-    if (previous !== undefined) return record(decodeRow(previous))
-    const id = uuidv7(store.now())
-    const grant = mintGrant(store, { opClass: 'schedule', target: id, bounds: { revision: 1, purpose: definition.prompt }, authority: input.authority, sourceOp: input.sourceOp })
-    if (grant._tag === 'refused') return undefined
-    store.db.prepare('INSERT INTO schedules VALUES (?, 1, ?, ?, ?, ?, ?)')
-      .run(id, JSON.stringify(definition), 'active', nextDue(definition.schedule, store.now()), input.sourceOp, input.key)
-    if (input.authority._tag === 'menu') store.db.prepare("INSERT OR IGNORE INTO inbox (op_id, kind, text, data, at, state) VALUES (?, 'click', '', ?, ?, 'done')").run(input.sourceOp, JSON.stringify({ scheduleId: id, action: 'watchReply' }), store.now())
-    options.changed()
-    return get(id)
+    return atomic(() => {
+      const definition = decodeDefinition(input.definition)
+      if (definition.unlessReply !== undefined && definition.schedule._tag !== 'once') return undefined
+      const previous = store.db.prepare('SELECT * FROM schedules WHERE creation_key = ?').get(input.key)
+      if (previous !== undefined) return record(decodeRow(previous))
+      const id = uuidv7(store.now())
+      const grant = mintGrant(store, { opClass: 'schedule', target: id, bounds: { revision: 1, purpose: definition.prompt }, authority: input.authority, sourceOp: input.sourceOp })
+      if (grant._tag === 'refused') return undefined
+      store.db.prepare('INSERT INTO schedules VALUES (?, 1, ?, ?, ?, ?, ?)')
+        .run(id, JSON.stringify(definition), 'active', nextDue(definition.schedule, store.now()), input.sourceOp, input.key)
+      if (input.authority._tag === 'menu') store.db.prepare("INSERT OR IGNORE INTO inbox (op_id, kind, text, data, at, state) VALUES (?, 'click', '', ?, ?, 'done')").run(input.sourceOp, JSON.stringify({ scheduleId: id, action: 'watchReply' }), store.now())
+      options.changed()
+      return get(id)
     })
   }
   function cancel(id: string, revision: number, state: 'paused' | 'deleted' = 'deleted'): boolean {
-    const changed = transaction(store.db, () => {
+    const changed = atomic(() => {
       const row = get(id)
       if (row === undefined || row.revision !== revision || row.state === 'deleted') return false
       revokeGrant(store, 'schedule', id, 'delete')
@@ -72,24 +73,24 @@ export function createScheduler(options: SchedulerOptions) {
     return changed
   }
   function resume(id: string, revision: number, sourceOp: string): boolean {
-    return transaction(store.db, () => {
-    const row = get(id)
-    if (row === undefined || row.revision !== revision || row.state === 'deleted' || !mayAuthorize(authorityOf(store))) return false
-    // A new explicit click is required. Global Resume never calls this method.
-    revokeGrant(store, 'schedule', id, 'delete')
-    const next = revision + 1
-    const grant = mintGrant(store, { opClass: 'schedule', target: id, bounds: { revision: next, purpose: row.definition.prompt }, authority: { _tag: 'click', current: true }, sourceOp })
-    if (grant._tag === 'refused') return false
-    store.db.prepare("UPDATE schedules SET state = 'active', revision = ?, due_at = ?, source_op = ? WHERE id = ?")
-      .run(next, nextDue(row.definition.schedule, store.now()), sourceOp, id)
-    options.changed()
-    return true
+    return atomic(() => {
+      const row = get(id)
+      if (row === undefined || row.revision !== revision || row.state === 'deleted' || !mayAuthorize(authorityOf(store))) return false
+      // A new explicit click is required. Global Resume never calls this method.
+      revokeGrant(store, 'schedule', id, 'delete')
+      const next = revision + 1
+      const grant = mintGrant(store, { opClass: 'schedule', target: id, bounds: { revision: next, purpose: row.definition.prompt }, authority: { _tag: 'click', current: true }, sourceOp })
+      if (grant._tag === 'refused') return false
+      store.db.prepare("UPDATE schedules SET state = 'active', revision = ?, due_at = ?, source_op = ? WHERE id = ?")
+        .run(next, nextDue(row.definition.schedule, store.now()), sourceOp, id)
+      options.changed()
+      return true
     })
   }
   function edit(id: string, revision: number, sourceOp: string, definition: Definition): boolean {
     const next = decodeDefinition(definition)
     if (next.unlessReply !== undefined && next.schedule._tag !== 'once') return false
-    return transaction(store.db, () => {
+    return atomic(() => {
       const row = get(id)
       if (row === undefined || row.revision !== revision || row.state === 'deleted' || !mayAuthorize(authorityOf(store))) return false
       revokeGrant(store, 'schedule', id, 'delete')
@@ -102,16 +103,17 @@ export function createScheduler(options: SchedulerOptions) {
     })
   }
   function queue(): void {
-    transaction(store.db, () => {
-      for (const row of list()) {
-        if (row.state !== 'active' || row.dueAt > store.now()) continue
+    atomic(() => {
+      const due = store.db.prepare("SELECT * FROM schedules WHERE state = 'active' AND due_at <= ? ORDER BY due_at").all(store.now())
+      for (const raw of due) {
+        const row = record(decodeRow(raw))
         store.db.prepare("INSERT OR IGNORE INTO schedule_occurrences VALUES (?, ?, ?, ?, 'queued')")
           .run(row.id, row.revision, row.dueAt, `wake:${row.id}:${row.revision}:${row.dueAt}`)
       }
     })
   }
   function admit(opId: string): boolean {
-    return transaction(store.db, () => {
+    return atomic(() => {
       const raw = store.db.prepare('SELECT * FROM schedule_occurrences WHERE op_id = ?').get(opId)
       if (raw === undefined) return false
       const occurrence = decodeOccurrence(raw)
@@ -151,8 +153,8 @@ export function createScheduler(options: SchedulerOptions) {
   }
   async function tick(): Promise<void> {
     queue()
-    for (const occurrence of occurrences()) {
-      if (occurrence.state !== 'queued') continue
+    const queued = store.db.prepare("SELECT * FROM schedule_occurrences WHERE state = 'queued' ORDER BY due_at").all().map((row) => decodeOccurrence(row))
+    for (const occurrence of queued) {
       const row = valid(occurrence)
       if (row === undefined) continue
       if (row.definition.unlessReply !== undefined) {
@@ -180,7 +182,16 @@ export function createScheduler(options: SchedulerOptions) {
       revisions: list().map((row) => ({ id: ScheduleId.make(row.id), revision: Revision.make(row.revision) })),
     }
   }
-  return { get, list, occurrences, create, cancel, resume, edit, queue, admit, start, observe, tick, watchReply, page }
+  function command(opId: string, apply: () => boolean): boolean {
+    return atomic(() => {
+      const prior = store.db.prepare('SELECT accepted FROM schedule_commands WHERE op_id = ?').get(opId)
+      if (prior !== undefined) return prior.accepted === 1
+      const accepted = apply()
+      store.db.prepare('INSERT INTO schedule_commands VALUES (?, ?)').run(opId, accepted ? 1 : 0)
+      return accepted
+    })
+  }
+  return { get, list, occurrences, create, cancel, resume, edit, queue, admit, start, observe, tick, watchReply, page, command }
 }
 export type Scheduler = ReturnType<typeof createScheduler>
 export function describeWhen(definition: Definition): string {
