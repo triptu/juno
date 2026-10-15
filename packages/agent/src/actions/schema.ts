@@ -78,8 +78,9 @@ const actions1 = [
   // §6.4 Grants. `op_class` is what the grant allows (`job`: steer and stop one job; `schedule`: one
   // schedule's wakes). `target` is the job or schedule id, `bounds` its scope (a schedule's revision).
   // `authority` is the owner authority that minted it, `source_op` that authority's op (the clean run's
-  // input, the click, the menu op), and `source_gen` the memory generation then. The model never names a
-  // grant. Pause, AI off, a redaction, a job's Stop and a schedule's deletion revoke it.
+  // input, the click, the menu op), and `source_gen` the memory generation it is valid in: the one it was
+  // minted in, or a later one a removal carried it into. The model never names a grant. Pause, AI off, a
+  // removal (only when the minting run saw the removed messages), a job's Stop and a schedule's deletion revoke it.
   `CREATE TABLE grants (
     id TEXT PRIMARY KEY,
     op_class TEXT NOT NULL CHECK (op_class IN ('job', 'schedule')),
