@@ -36,6 +36,8 @@ Conventions that apply everywhere (SPEC §16):
 
 **Shows:** S01 (whole sidebar; its Browse and Theme icons and For you item are removed), S02 (row context menu), shot 30-avatar-menu, shot 33-scope-chip.
 
+**One inset** (`--sidebar-inset`, 10px) on both sides of everything that spans the sidebar: the title bar's end, the nav items, the filter row and the topic rows, measured from the sidebar's content box (inside its right border). The list's 10px scrollbar gutter is part of the right inset, so the 4px thumb sits inside the margin and reserves no extra width; a row is 10px from either edge with a scrollbar or without one. The gallery's `geometry.spec.ts` checks this to the pixel. Before 10-15 the rows sat 8px from the left and 18px from the right.
+
 ### 2.1 Title bar icons
 
 Right-aligned group, gap 2px, inside the 44px bar.
@@ -66,7 +68,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 
 ### 2.2 Navigation
 
-Container padding `4 10 0`, gap 2. Three full-width buttons, none with a count, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
+Container padding `4 10 0` (`--sidebar-inset`), gap 2. Three full-width buttons, none with a count, 32px, radius 7, padding 0 10, gap 10, 13/500, icon 15 `--foreground-subtle`:
 
 | Label | Icon | Trailing | Active when |
 | --- | --- | --- | --- |
@@ -82,11 +84,11 @@ Hairline below: 1px `--border-default`, margin `12 16 10`.
 
 Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller (flex 1, min-width 0) with the pills, gap 2, and the **Unread** toggle fixed at the right, 6px after the scroller. `docs/design/sidebar-views/` has the mock.
 
-- **The scroller** (`PillRow` in `@juno/ui`): `overflow-x: auto`, no visible scrollbar, `overscroll-behavior: contain` (a sideways swipe at an end never reaches Back or Forward, a wheel never reaches the list). A vertical wheel over it scrolls it sideways. When it overflows, the side it can scroll toward fades over 16px (`--pill-fade`, a CSS mask driven by the scroll position). Keyboard focus scrolls the focused pill into view.
+- **The scroller** (`PillRow` in `@juno/ui`): `overflow-x: auto`, no visible scrollbar, `overscroll-behavior: contain` (a sideways swipe at an end never reaches Back or Forward, a wheel never reaches the list). A vertical wheel over it scrolls it sideways. When it overflows, the side it can scroll toward fades over 16px (`--space-4`): a sticky gradient in `--background-subtle` at each end, shown by a `scroll-state` container query, so no script watches the scroll. Keyboard focus scrolls the focused pill into view.
 - **Pills**, 28px, radius 8 (`Button variant="filter"`): selected bg `--secondary-default`, fg default; unselected transparent, fg muted, hover fg default. Weight 500 in both, so selecting never changes a width.
   - **All**: text.
   - **Channels** (`hash` 14) and **DMs** (`user` 14): icon-only, 28×28. Tooltip and accessible name "Channels" and "DMs".
-  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px with an ellipsis.
+  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px (`--filter-pill-max-width`) with an ellipsis.
   - **New view**: `plus` 14, 28×28, fg muted, tooltip and name "New view". Always last.
 - **Dot**: 5px `--hl` at the pill's top right (4px in from the top and right edge), absolute so it moves nothing; only its opacity changes. Channels and DMs: the group has unread topics the sidebar would show. A view: one of its topics has an unread mention (plain unread does not count). Never on the selected pill. The name says it: "Channels, unread", "Bots, unread mention".
 - **Picking**: on pointer down, like the rows. Picking a view clears the scope chip. A view's list follows the same rules as All, limited to its conversations; Unread narrows it as it does All.
@@ -96,7 +98,7 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
 
 1. **Name**: text field, 30px, placeholder "Name", at most 32 characters. Required.
 2. **Icon**: "Icon" 11/500 muted, then a grid of 24px icon buttons (8 per row, gap 2) from the view icon set, the first cell "None" (`prohibit`). Selected: bg `--secondary-default`, fg default. Optional.
-3. **Conversations**: a search field (30px, `magnifying-glass` 14, placeholder "Add channels and people") over a list, at most 200px tall, scrolling. Chosen conversations first, each a 30px row with its channel icon or photo, name, and a check; then, while the field has text, matches from the New chat picker (`newChat.conversations`, channels, group DMs and DMs that exist). Clicking a row toggles it. "3 conversations" 12 muted under the list.
+3. **Conversations**: a search field (30px, `magnifying-glass` 14, placeholder "Add channels and people") over a list, at most 200px tall (`--view-sheet-list-max-height`), scrolling. Chosen conversations first, each a 30px row with its channel icon or photo, name, and a check; then, while the field has text, matches from the New chat picker (`newChat.conversations`, channels, group DMs and DMs that exist). Clicking a row toggles it. "3 conversations" 12 muted under the list.
 4. **Keep these out of All**: a checkbox (`Checkbox`, as macOS sheets use), 13px, with "They show only in this view." 12 muted under it.
 
 Buttons at the bottom right: Cancel (ghost) and Save (primary), 28px; Save disabled until there is a name. Enter saves from the name field; Esc cancels. Saving a new view selects it. The sheet makes no change until Save.
@@ -253,7 +255,7 @@ Keyboard order inside the header: context pill → title button → Resolve or T
 
 **Shows:** S01 (flat, new divider, quote, mentions, reaction; its catch-up card is removed), S04 (thread link; its grouping card is removed), S14 (mention tint), S15 (dark), shot 07, 08 (hover toolbar, picker), shot 15 (selection quote), shot 19 (settled hint).
 
-Scroll container `[data-scroll]` with contained scroll; inner column max-width 800, centered, padding `20 24 16`.
+Scroll container `[data-scroll]` with contained scroll; inner column max-width 800, centered, padding `20 24 16`. The container mirrors its 10px scrollbar gutter on the left (`ScrollArea evenInset`), so the column is centred in the pane, not 5px left of it (`geometry.spec.ts`).
 
 ### 6.1 Flat messages
 
@@ -420,6 +422,8 @@ A tab with the message list's area on top and the composer at the bottom, like a
 ## 12. Juno chat
 
 **Shows:** S11 (empty), `docs/design/juno-chat/mock.html` (bubbles, status bubble, cards, states; renders `mock-light.png`, `mock-dark.png`). SPEC §13 decides behaviour; the view models are `@juno/agent-contract` `src/chat/`.
+
+The chat's scroll container mirrors its scrollbar gutter on the left, as the message list does, so the column is centred in the pane.
 
 One long list, no "new chat". Scroll container under the header islands (§5); column max-width `--page-width` 720, padding `40 32 24` below the `--header-inset`. The list is virtualised (`@tanstack/react-virtual`); it opens at the "New" divider when there are unread Juno messages, otherwise at the bottom, and shows the "New message" pill (§6) when scrolled up and something arrives. Row kinds are the `ChatItem` union: owner bubble, Juno bubble, status bubble, note, group label, day separator, New divider.
 

@@ -28,6 +28,7 @@ export {
   type SidebarNavTarget,
   type SidebarProps,
   type SidebarScope,
+  type SidebarViewPill,
 } from './Sidebar'
 export { ThreadLink, type ThreadLinkProps } from './ThreadLink'
 export { TopicHeader, type TopicHeaderProps } from './TopicHeader'
@@ -54,3 +55,5 @@ export { PreferencesPage, type PreferencesPageProps } from './PreferencesPage'
 export { WhyPopover, type WhyPopoverProps } from './WhyPopover'
 export { Home, type HomeProps } from './Home'
 export { HomeScene, type HomeSceneName } from './HomeScene'
+export { ViewSheet, type ViewSheetConversation, type ViewSheetProps } from './ViewSheet'
+export type { ViewIconName } from '@juno/ui'

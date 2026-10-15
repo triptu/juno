@@ -2,7 +2,7 @@ export { command, liveQuery, prefetch, rowAtom, runCommand, type CommandAtom, ty
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand } from './engine'
 export { importFromSlackAppCommand, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand, type ReadySession } from './session'
-export { viewDotAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
+export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewPill, type ViewSheetState } from './views'
 export { defaultTopicListFilter, joinTopicWindow, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
   allTopicsFilterAtom,

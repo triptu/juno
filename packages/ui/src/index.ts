@@ -45,6 +45,8 @@ export {
   type OptionRowSize,
 } from './OptionList'
 export { Page, PageHeader, Section, type PageHeaderProps, type PageProps, type PageWidth, type SectionProps } from './Page'
+export { FilterPill, PillRow, type FilterPillProps, type PillRowProps } from './PillRow'
+export { viewIconNames, viewIcons, type ViewIconName } from './viewIcons'
 export { Popover, type PopoverLayer, type PopoverPlacement, type PopoverProps, type PopoverWidth } from './Popover'
 export { ScrollArea, type ScrollAreaProps, type ScrollAreaScrollbar } from './ScrollArea'
 export { Segmented, type SegmentedOption, type SegmentedProps } from './Segmented'

@@ -9,6 +9,7 @@
  */
 import {
   channelsIgnore,
+  isViewMenuAction,
   notifyChoiceOf,
   readsMarkRead,
   readsMarkUnread,
@@ -49,6 +50,7 @@ import {
   type ToastContent,
 } from '@juno/state'
 import { openTopic } from './navigation'
+import { runViewMenuAction, viewChoices } from './viewActions'
 import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
 
 /** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
@@ -117,10 +119,20 @@ function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; 
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const notify = notifyTarget(topic)
-  const state = { kind: topic.kind, channel: topic.channel, unread: topic.unreadCount > 0, pinned: topic.pinned, resolved: topic.resolved, notify: choiceFor(settings, notify.target, topic.subscribed) }
+  const state = {
+    kind: topic.kind,
+    channel: topic.channel,
+    unread: topic.unreadCount > 0,
+    pinned: topic.pinned,
+    resolved: topic.resolved,
+    notify: choiceFor(settings, notify.target, topic.subscribed),
+    // Add to view (inventory 15.8) is on Main: the row's channel or DM.
+    ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
+  }
   const linkable = topic.kind === 'main' || topic.rootTs !== undefined
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => linkable || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
   const { id } = topic
+  if (chosen !== undefined && isViewMenuAction(chosen)) return runViewMenuAction(chosen, topic.channel)
   switch (chosen) {
     case 'open-new-tab':
       return openTopic(id, { newTab: true })
