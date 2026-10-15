@@ -88,19 +88,21 @@ test('exposes only the bridge to the page', async ({ win }) => {
       shell: Object.keys(window.juno.shell),
       clipboard: Object.keys(window.juno.clipboard),
       menu: Object.keys(window.juno.menu),
+      notifications: Object.keys(window.juno.notifications),
     }
   })
   expect(exposed).toEqual({
     require: 'undefined',
     process: 'undefined',
-    juno: ['app', 'engine', 'agent', 'launch', 'contextMenu', 'shell', 'clipboard', 'menu'],
+    juno: ['app', 'engine', 'agent', 'launch', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey'],
-    launch: ['setTheme', 'setAccent', 'setSidebar'],
+    launch: ['setTheme', 'setAccent', 'setDensity', 'setSidebar'],
     contextMenu: ['popup'],
     shell: ['openExternal', 'openInSlack', 'editUndo'],
     clipboard: ['writeText'],
     menu: ['onCommand'],
+    notifications: ['setViewing', 'onOpen'],
   })
 })

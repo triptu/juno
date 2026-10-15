@@ -9,18 +9,20 @@ import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { AccentSchema, SidebarLayout, ThemeSchema } from '@juno/contract'
+import { nativeTheme } from 'electron'
+import { AccentSchema, DEFAULT_THEME, DensitySchema, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
   // Optional so a launch.json written before accents existed still decodes.
   accent: Schema.optionalKey(AccentSchema),
+  density: Schema.optionalKey(DensitySchema),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
 })
 export type Launch = typeof Launch.Type
 
-const DEFAULTS: Launch = { theme: 'light' }
+const DEFAULTS: Launch = { theme: DEFAULT_THEME }
 
 /**
  * Page background per theme, the `--background` token from
@@ -28,6 +30,11 @@ const DEFAULTS: Launch = { theme: 'light' }
  * import StyleX files, so the two values are repeated here; keep them in sync.
  */
 export const BACKGROUND = { light: '#fdfcf8', dark: '#1b1916' } as const
+
+/** The background a window paints in before the page loads. System follows macOS. */
+export function backgroundFor(theme: Theme): string {
+  return BACKGROUND[theme === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : theme]
+}
 
 const decode = Schema.decodeUnknownSync(Launch)
 const encode = Schema.encodeSync(Launch)

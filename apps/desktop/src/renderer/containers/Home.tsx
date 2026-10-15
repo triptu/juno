@@ -2,10 +2,15 @@ import { useId, useLayoutEffect, useRef } from 'react'
 import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, showHome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
-import { openTopic } from './navigation'
+import { openAllTopics, openTopic } from './navigation'
 
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
+}
+
+/** "Browse all topics" in the caught-up state: the All topics tab. */
+function browseAll(event: ActivateEvent): void {
+  openAllTopics({ newTab: event.metaKey })
 }
 
 /**
@@ -69,6 +74,7 @@ export function HomePage() {
       onMarkDone={markDone}
       onResolveAll={resolveAll}
       onAsk={askJuno}
+      onBrowseAll={browseAll}
     />
   )
 }

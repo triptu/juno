@@ -1,27 +1,35 @@
 import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type ThemeName } from '@juno/ui'
+import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 
 export interface AppearanceSettingsProps {
-  readonly theme: ThemeName
+  readonly theme: ThemePreference
   readonly accent: AccentName
-  readonly onThemeChange: (theme: ThemeName) => void
+  readonly onThemeChange: (theme: ThemePreference) => void
   readonly onAccentChange: (accent: AccentName) => void
+  /** With both, a Density row: Comfortable or Compact. */
+  readonly density?: DensityName
+  readonly onDensityChange?: (density: DensityName) => void
   /** `row` puts the label beside the control (Preferences); `stack` puts it above (a narrow popover). Default `row`. */
   readonly layout?: 'row' | 'stack'
 }
 
-const themeOptions: ReadonlyArray<{ readonly value: ThemeName; readonly label: string }> = [
+const themeOptions: ReadonlyArray<{ readonly value: ThemePreference; readonly label: string }> = [
+  { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
 ]
 
+const densityOptions: ReadonlyArray<{ readonly value: DensityName; readonly label: string }> = [
+  { value: 'comfortable', label: 'Comfortable' },
+  { value: 'compact', label: 'Compact' },
+]
+
 /**
- * The appearance block of Preferences: the theme as a segmented control and
- * the accent as a row of swatches. Following the OS theme is not offered
- * yet; main would have to resolve it before the window paints.
+ * The Appearance group of Preferences (SPEC 14, inventory 14): the theme
+ * (System follows macOS), the accent as a row of swatches, and the density.
  */
-export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, layout = 'row' }: AppearanceSettingsProps) {
+export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, density, onDensityChange, layout = 'row' }: AppearanceSettingsProps) {
   const stacked = layout === 'stack'
   return (
     <section {...stylex.props(styles.section)} aria-label="Appearance">
@@ -48,6 +56,16 @@ export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChang
           ))}
         </div>
       </div>
+      {density === undefined || onDensityChange === undefined ? null : (
+        <div {...stylex.props(styles.row, stacked && styles.rowStacked)}>
+          <div {...stylex.props(styles.label, stacked && styles.labelStacked)}>
+            <Text variant="ui" tone="default" weight="medium">
+              Density
+            </Text>
+          </div>
+          <Segmented options={densityOptions} value={density} onChange={onDensityChange} label="Density" />
+        </div>
+      )}
     </section>
   )
 }

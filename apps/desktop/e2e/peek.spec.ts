@@ -1,4 +1,4 @@
-// Peek (spec section 5): hold ⌥ (or Space, from the account menu) over a
+// Peek (spec section 5): hold ⌥ (or Space, set in Preferences) over a
 // sidebar row to read the topic in a popover. A peek marks nothing read,
 // opens no tab and moves no focus; letting go or moving off the rows closes it.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
@@ -86,7 +86,7 @@ test('⌥ peeks while a text field has focus, and the field keeps it', async ({ 
 test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text field types a space', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.accountMenu.setPeekKey('space')
+  await juno.setPeekKey('space')
   const rina = juno.sidebar.row(RINA)
   slack.resetCalls()
 

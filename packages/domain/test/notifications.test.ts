@@ -10,6 +10,9 @@ import {
   scheduledPresence,
   slackPresence,
   untilLabel,
+  decideWithCause,
+  pausedLabel,
+  presenceLabel,
   type DecisionContext,
   type Hours,
   type LocalTime,
@@ -78,6 +81,18 @@ describe('notification decision', () => {
   })
 })
 
+describe('what decided a message', () => {
+  it('names the level that decided, or the hours, or Juno', () => {
+    const thread = candidate({ topicId: 't:C0HIRING:1.0' })
+    const threads = { ...settings, threads: { 't:C0HIRING:1.0': 'never' as const } }
+    expect(decideWithCause(thread, threads, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'thread', id: 't:C0HIRING:1.0' } } })
+    expect(decideWithCause(candidate({ senderId: mayaId }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'person', id: mayaId } } })
+    expect(decideWithCause(candidate({ channel: eng }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'channel', id: eng.id } } })
+    expect(decideWithCause(candidate({ at: at(SAT, 12) }), settings, ai, { notify: true, reason: 'asks you' })).toMatchObject({ decision: { outcome: 'summary' }, cause: { kind: 'hours' } })
+    expect(decideWithCause(candidate(), settings, ai, { notify: false, reason: 'chatter' })).toEqual({ decision: { outcome: 'hold', reason: 'Juno: chatter' }, cause: { kind: 'juno' } })
+  })
+})
+
 describe('the summary when notification hours start', () => {
   const summary = { outcome: 'summary', reason: '' } as const
   const hold = { outcome: 'hold', reason: '' } as const
@@ -142,6 +157,19 @@ describe('presence', () => {
   it('sets Slack to auto when active, so an idle owner still shows away', () => {
     expect(slackPresence('active')).toBe('auto')
     expect(slackPresence('away')).toBe('away')
+  })
+
+  it('says until when the status changes next', () => {
+    const work = settings.presenceHours
+    expect(presenceLabel(at(MON, 12), 'active', work)).toBe('Active')
+    expect(presenceLabel(at(MON, 21), 'away', work)).toBe('Away until tomorrow 9am')
+    // Away by hand inside the hours lasts until they start again.
+    expect(presenceLabel(at(MON, 12), 'away', work)).toBe('Away until tomorrow 9am')
+    // Active by hand before the hours runs to their end.
+    expect(presenceLabel(at(MON, 8), 'active', work)).toBe('Active until 8pm')
+    expect(presenceLabel(at(MON, 12), 'away', { days: [], from: 540, to: 1140 })).toBe('Away')
+    expect(pausedLabel(at(MON, 12), settings.notificationHours)).toBeUndefined()
+    expect(pausedLabel(at(5, 20), settings.notificationHours)).toBe('Paused until Mon 9am')
   })
 
   it('uses the same hours for both by default', () => {

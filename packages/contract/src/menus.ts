@@ -5,9 +5,13 @@
  */
 export {
   followsThread,
+  notifyChoice,
+  notifyChoiceLabel,
   notifyChoiceOf,
+  personMenuItems,
   threadNotifyChoice,
   topicMenuItems,
+  whyLabel,
   type MenuItem,
   type NotifyAction,
   type NotifyChoice,

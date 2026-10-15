@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { MessageView, Person } from '@juno/contract'
-import { accent, colors, layout, motion, opacity, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
+import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
@@ -110,7 +110,7 @@ export const Message = memo(function Message({
       onFocus={focus}
       {...stylex.props(styles.row, eager && styles.rowEager, header && !flush && styles.rowGroupStart, message.mentionsMe && styles.rowMention)}
     >
-      <span {...stylex.props(styles.gutter)}>
+      <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
         ) : (
@@ -122,7 +122,7 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span {...stylex.props(styles.header, toolbar !== undefined && styles.headerWithToolbar)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name}>
+            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="">
               {name}
             </Text>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
@@ -180,7 +180,7 @@ const styles = stylex.create({
     alignItems: 'flex-start',
     gap: spacing['--space-3'],
     minWidth: 0,
-    paddingBlock: spacing['--space-1'],
+    paddingBlock: density['--density-message-padding-block'],
     paddingInline: spacing['--space-2'],
     borderRadius: radii['--radius-2xl'],
     color: colors['--foreground-default'],
@@ -215,7 +215,7 @@ const styles = stylex.create({
     contentVisibility: 'visible',
   },
   rowGroupStart: {
-    marginTop: spacing['--space-3'],
+    marginTop: density['--density-message-group-gap'],
   },
   // Mentions you (SPEC section 7): the tint stays, hovered or not.
   rowMention: {

@@ -2,7 +2,7 @@
 // real turn engine with the scripted fake provider (`serve-harness.ts`).
 import { expect, it } from 'vitest'
 import { Effect, Stream } from 'effect'
-import { rateLimited, reply } from '@juno/agent-testing'
+import { fakeActionHost, rateLimited, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Digest, Revision } from '@juno/agent-cards'
 import type { CardId, ChatItem, ChatPage, OpId } from '@juno/agent-contract'
 import type { HostReads } from '../src/index'
@@ -134,10 +134,37 @@ it('pages above an anchor and reports what lies on each side', async () => {
   ])
 })
 
-it('answers unavailable for cards, which come with the actions', async () => {
-  const { client } = await chat()
-  const identity = { cardId: 'c1' as CardId, revision: Revision.make(1), digest: Digest.make('0'.repeat(64)) }
-  expect(await run(client['agent.cards.dismiss']({ opId: 'op-1' as OpId, identity }))).toMatchObject({ _tag: 'Failure', failure: { reason: 'unavailable' } })
+it('a card through the renderer: listed under its run with its binding, one click sends once, and it says Sent', async () => {
+  const slack = fakeActionHost()
+  const { h, client, pageWhere } = await chat({ actions: { host: slack.host } })
+  h.fake.script([
+    reply({ type: 'toolCall', id: 'call-send', name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text: 'On my way.' }] } }),
+    reply(say('Here is a draft.')),
+  ])
+  await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'tell them I am coming' }))
+  await h.ended('op-1')
+  const [snapshot] = await Effect.runPromise(client['agent.chat.page']({ window: { _tag: 'latest', limit: 50 } }).pipe(Stream.take(1), Stream.runCollect))
+  const item = of(snapshot!.page, 'card')[0]!
+  expect(item.card).toMatchObject({ _tag: 'sendMessage', status: { _tag: 'open' }, messages: [{ text: 'On my way.', result: { _tag: 'pending' } }] })
+  expect(item.unread).toBe(true)
+  const [binding] = snapshot!.cards
+  expect(binding!.identity.cardId).toBe(item.card.id)
+
+  // A click with another revision is stale, and a dismissal of a card that does not exist is invalid.
+  expect(await run(client['agent.cards.approve']({ opId: 'op-2' as OpId, identity: { ...binding!.identity, revision: Revision.make(2) }, children: binding!.children as never })))
+    .toMatchObject({ _tag: 'Failure', failure: { reason: 'stale' } })
+  const missing = { cardId: 'c1' as CardId, revision: Revision.make(1), digest: Digest.make('0'.repeat(64)) }
+  expect(await run(client['agent.cards.dismiss']({ opId: 'op-3' as OpId, identity: missing }))).toMatchObject({ _tag: 'Failure', failure: { reason: 'invalid' } })
+
+  expect(await run(client['agent.cards.approve']({ opId: 'op-4' as OpId, identity: binding!.identity, children: binding!.children as never })))
+    .toMatchObject({ _tag: 'Success', success: { opId: 'op-4' } })
+  const sent = await pageWhere((p) => of(p, 'card')[0]?.card._tag === 'sendMessage' && 'status' in of(p, 'card')[0]!.card && (of(p, 'card')[0]!.card as { status: { _tag: string } }).status._tag === 'done', 'the card sent')
+  expect(of(sent, 'card')[0]!.card).toMatchObject({ status: { _tag: 'done', line: 'Sent' }, messages: [{ result: { _tag: 'sent' } }] })
+  expect(slack.messages().map((m) => m.text)).toEqual(['On my way.'])
+  // A second click is refused; nothing is sent again.
+  expect(await run(client['agent.cards.approve']({ opId: 'op-5' as OpId, identity: binding!.identity, children: binding!.children as never })))
+    .toMatchObject({ _tag: 'Failure', failure: { reason: 'stale' } })
+  expect(slack.calls).toHaveLength(1)
 })
 
 it('a bubble read while its run is live stays read, and in place, when the run ends', async () => {

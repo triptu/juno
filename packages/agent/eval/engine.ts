@@ -11,6 +11,7 @@ import type { BubbleId, Ending } from '@juno/agent-contract'
 import { openTurns, sourceTable, type ModelRef, type ProviderGuardApi, type TurnEvent, type Turns } from '../src/index'
 import type { Store } from '../src/store/store'
 import { fromArchive, handleTable, unique, type StepTrace, type Trace } from './trace'
+import { fakeActionHost } from '@juno/agent-testing'
 import { recordingHost } from './world'
 
 /** One owner action. `react` reacts to Juno's latest bubble. */
@@ -31,7 +32,9 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
   const dir = await mkdtemp(join(tmpdir(), 'juno-eval-'))
   const { host, read } = recordingHost()
   const errors: unknown[] = []
-  const opened = await openTurns({ agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, onReport: (e) => errors.push(e) })
+  // Cards need the host's actions to look up a message's place. Nothing is clicked, so nothing is sent.
+  const actions = { host: fakeActionHost().host }
+  const opened = await openTurns({ agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
   const turns: Turns = opened
   const events: TurnEvent[] = []

@@ -1,0 +1,80 @@
+/**
+ * The engine's notifications reach main's `Notifier`: the real engine
+ * against the fake Slack, over the host link main uses in the app, with a
+ * fake Electron notification and dock.
+ */
+import { afterEach, expect, it } from 'vitest'
+import { notificationsSetLevel, notificationsWhy, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
+import { runCommand } from '@juno/state'
+import { Exit } from 'effect'
+import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
+import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
+import { DOCK_BADGE, Notifier } from '../src/main/notifier'
+
+const engines: RunningEngine[] = []
+afterEach(async () => {
+  for (const engine of engines.splice(0)) await engine.stop()
+})
+
+/** Main's notifier on the engine's host link, with Electron faked. */
+function connect(engine: RunningEngine) {
+  const shown: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
+  const opened: NotificationTarget[] = []
+  let badge = ''
+  const notifier = new Notifier({
+    create: (options) => {
+      const entry = { ...options, click: () => {} }
+      return {
+        show: () => shown.push(entry),
+        close: () => {},
+        onClick: (listener) => {
+          entry.click = listener
+        },
+      }
+    },
+    setBadge: (text) => {
+      badge = text
+    },
+    open: (target) => opened.push(target),
+    send: (message: MainToEngine) => engine.main.host.deliver(message),
+  })
+  // Main hears the engine from its start; the test connects after the boot.
+  for (const message of engine.main.host.fromEngine) notifier.handle(message)
+  engine.main.host.onEngine((message) => {
+    notifier.handle(message)
+  })
+  return { notifier, shown, opened, badge: () => badge }
+}
+
+it('shows what the engine decides, opens the message on click, hides the topic on screen and badges unread mentions', async () => {
+  const engine = await bootedEngine(engines)
+  const main = connect(engine)
+
+  const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'every' })
+  expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'matters' } })
+
+  const first = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Can you look at the draft?' })
+  await waitFor(() => (main.shown.length === 1 ? true : undefined), 15_000, 'the first notification')
+  expect(main.shown[0]).toMatchObject({ title: 'Maya', body: 'Can you look at the draft?' })
+  main.shown[0]?.click()
+  expect(main.opened).toEqual([{ _tag: 'message', source: { channelId: 'D0MAYA', ts: first.ts, topicId: 'm:D0MAYA' } }])
+
+  const why = await runCommand(engine.registry, notificationsWhy, { topicId: 'm:D0MAYA', ts: first.ts })
+  expect(Exit.isSuccess(why) && why.value).toMatchObject({ notified: true, reason: 'Maya is set to Every message', action: { kind: 'change', target: { kind: 'channel', id: 'D0MAYA' } } })
+
+  // The DM is on screen in a focused window: decided, logged, not shown.
+  main.notifier.setViewing('m:D0MAYA')
+  const second = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Never mind, found it' })
+  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE ts = ?').get(second.ts))?.suppressed_at ?? undefined, 15_000, 'the suppressed row')
+  expect(main.shown).toHaveLength(1)
+  main.notifier.setViewing(null)
+
+  // Reading every topic that mentions you clears the badge; a new mention brings it back.
+  const mentioned = readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE mentions_me = 1 AND unread_count > 0').all()) as Array<{ topic_id: string }>
+  expect(mentioned.length).toBeGreaterThan(0)
+  expect(main.badge()).toBe(DOCK_BADGE)
+  for (const { topic_id } of mentioned) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
+  await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
+  engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
+  await waitFor(() => (main.badge() === DOCK_BADGE ? true : undefined), 15_000, 'the dock badge')
+})

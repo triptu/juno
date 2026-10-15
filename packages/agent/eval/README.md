@@ -59,7 +59,7 @@ Not covered yet, because the agent cannot do them: the dismissal case of §19.5 
 ## Sources and cards
 
 - **Sources.** The router gives each message a run reads a handle and exports its table (`sourceTable`); `engine.ts` reads it for each step's runs, so a source counts only when it names a message the router numbered in that reply.
-- **Cards.** No tool proposes a card yet (WP15), so `proposes a card` is reported as not scored, and the card cases grade what Juno says instead. When WP15 lands, list its card tools in `CARD_TOOLS` in `grade.ts`.
+- **Cards.** `proposes a card` passes when the last step calls a tool in `CARD_TOOLS` (`grade.ts`): today `send_message`, which proposes a Send message card. The engine gives the agent `fakeActionHost`'s actions so the tool can look up a place; nothing is clicked, so nothing is sent. Add a tool there when it proposes a card.
 
 ## Reports
 

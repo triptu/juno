@@ -107,7 +107,7 @@ Changing notification settings from the chat is a Local action (SPEC 13.9): no c
 
 Not changed: no Quint spec, since presence and notification settings are owner-set values, not a sync protocol.
 
-The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The OS and agent summary callbacks are host interfaces. The remaining host work is in `docs/backlog.md`.
+The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The page, Preferences' Appearance group, the Notify me menus, the why popover, Set yourself away or active, main's OS notifier and the dock badge are built (`NotificationsPage`, `PreferencesPage`, `WhyPopover` and `AccountMenu` in `@juno/views`, `engine/src/notifications/handlers.ts`, `apps/desktop/src/main/notifier.ts`); inventory 2.1, 13, 14 and 15 say what differs. Writing the hours into Slack's schedule waits for the owner's approval. The remaining work is in `docs/backlog.md`.
 
 ## Open items
 
