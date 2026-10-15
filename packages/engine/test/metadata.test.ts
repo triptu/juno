@@ -52,6 +52,7 @@ describe('conversation observation fence', () => {
     engines.push(engine)
     await engine.status('ready')
     await waitFor(() => engine.fake.heldCount({ method: 'client.userBoot' }) === 1 ? true : undefined, 30_000, 'first workspace snapshot held')
+    await waitFor(() => engine.fake.socketCount() === 1 ? true : undefined, 20_000, 'socket connected')
     engine.fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
     // Socket frames are consumed in order. This message witnesses that the preceding rename was applied.
     const barrier = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'After the rename.' })
