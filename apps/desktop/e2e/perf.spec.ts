@@ -687,10 +687,10 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
       await juno.signIn()
       await juno.waitForSync()
       await juno.sidebar.row('#eng').open()
-      const threads = await juno.topic.openThreads()
+      const switcher = await juno.topic.openSwitcher()
       // Not followed, so the boot never fetched its replies.
       const before = (await juno.measures('juno.topic-open')).length
-      await threads.open('checkout.spec failed again')
+      await switcher.open('checkout.spec failed again')
       await expect.poll(async () => (await juno.measures('juno.topic-open')).length).toBeGreaterThan(before)
       samples.push((await juno.measures('juno.topic-open')).at(-1)!)
       await juno.topic.expectMessage('Can you add a wait')
