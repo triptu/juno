@@ -439,8 +439,8 @@ Validation on 2026-10-14 after the WP8 and WP9 alignment: the full root `pnpm sp
 
 `agent-actions.qnt` also contains `agent_resolve`: the corrected/broken pair checks that Undo retains the host receipt, so a repeated dispatch cannot resolve the topic again.
 
-## Background request pacing
+## Request pacing
 
-`requestqueue.qnt` models independent method clocks, admission after a lane wait, and Retry-After with a doubled method interval. Its time units abstract the production intervals. `invariants` checks that dispatch never crosses a pause and a tier never becomes faster after a 429. The simulation does not model HTTP latency, lane fairness or Slack's actual limits; fake-server tests check the dispatch timestamps. Existing follow/read/catch-up models already permit reordered HTTP responses and make no fixed-spacing assumption.
+`requestqueue.qnt` models the total background clock (1,500 ms), method clocks, the interactive bucket (20 tokens, 2/second), and unpaced sends. Each tick is 125 ms; four credits make one interactive token. Retry-After doubles a method interval once per pause window up to 60 s; five quiet minutes halve it down to base. Admission follows the lane wait. `invariants` checks pauses, background deadlines, token bounds and interval bounds. The simulation does not model HTTP latency, lane fairness or Slack's actual limits; fake-server tests check the dispatch timestamps. Existing follow/read/catch-up models already permit reordered HTTP responses and make no fixed-spacing assumption.
 
 `discovery.qnt` describes a partial search page with a root and reply, or a reply alone. Applying root metadata first avoids a lookup only in the first case. Search leaves reaction and follow state unchanged. The model abstracts the counters and lookup success; it does not prove search completeness or replace the merge tests.

@@ -122,7 +122,7 @@ describe('SlackApi.call', () => {
     }),
   )
 
-  it.live('background methods have independent tiers and queued calls respect a new Retry-After', () =>
+  it.live('queued calls respect a new Retry-After after waiting for a permit', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -131,7 +131,7 @@ describe('SlackApi.call', () => {
         const history = api.call('conversations.history', { channel: CHANNEL, limit: 1 }, { lane: 'background' })
         yield* history
         const waiting = yield* Effect.forkScoped(history)
-        yield* api.call('client.counts', {}, { lane: 'background' })
+        yield* api.call('client.counts', {}, { lane: 'interactive' })
         // The history call is already waiting for its slot when the pause arrives.
         const pausedAt = Date.now()
         yield* queue.pause('conversations.history', 1_500)
@@ -140,7 +140,7 @@ describe('SlackApi.call', () => {
         const calls = fake.calls.filter((call) => call.method === 'conversations.history')
         assert.lengthOf(calls, 3)
         assert.isAtLeast(calls[1]!.at - pausedAt, 1_450)
-        // A 429 doubles the Tier 3 interval for this session.
+        // A 429 doubles the method interval until the quiet period.
         assert.isAtLeast(calls[2]!.at - calls[1]!.at, 2_350)
         const counts = fake.calls.find((call) => call.method === 'client.counts')!
         assert.isBelow(counts.at, calls[1]!.at)

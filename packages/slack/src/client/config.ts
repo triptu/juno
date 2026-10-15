@@ -29,8 +29,10 @@ export interface SlackConfigShape {
   readonly lanes: {
     readonly interactiveConcurrency: number
     readonly backgroundConcurrency: number
-    /** Override per-method background spacing; zero disables pacing in fake-server tests. */
+    /** Override total and per-method background spacing; zero disables pacing in fake-server tests. */
     readonly backgroundMinIntervalMillis?: number
+    /** Interactive token refill interval (capacity 20); zero disables it in fake-server tests. */
+    readonly interactiveRefillIntervalMillis?: number
     readonly sendConcurrency: number
   }
   readonly socket: {
