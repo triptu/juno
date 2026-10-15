@@ -44,7 +44,7 @@ async function fixture(engine = false) {
     const m = create(store)
     cleanup.push(() => m.close())
     await m.authorize('notion')
-    return { server, manager: m }
+    return { server, manager: m, creds }
   }
   const turns = await openTurns({
     agentDir: dir, model: SONNET, migrations: [MCP_MIGRATIONS],
@@ -61,7 +61,7 @@ async function fixture(engine = false) {
   cleanup.push(() => m.close())
   m.subscribe(() => turns.actions.kick())
   await m.authorize('notion')
-  return { server, manager: m, turns, fake }
+  return { server, manager: m, turns, fake, creds }
 }
 
 it('signs in on loopback, discovers Notion, refreshes tokens and disconnects', async () => {
@@ -201,4 +201,18 @@ it('the model can only propose an outward tool, and destructive arguments never 
   expect(turns.actions.views()[0]?.card._tag).toBe('change')
   expect(server.calls.filter((c) => c.name === 'notion-update-page')).toHaveLength(0)
   await expect(changeCard(manager, 'notion', 'notion-update-page', { page_id: 'page-roadmap', command: 'replace_content', content: '', archived: true })).rejects.toMatchObject({ reason: 'destructive' })
+})
+
+it('keeps the owner tier decision and connection identity across a manager restart', async () => {
+  const { manager, creds } = await fixture()
+  const old = manager.tool('notion', 'notion-search')
+  const epoch = manager.stored('notion').epoch
+  manager.setTier('notion', old.name, old.hash, 3)
+  await manager.close()
+  const restarted = createMcpManager({ store: manager.store, credentials: creds })
+  cleanup.push(() => restarted.close())
+  await restarted.start()
+  expect(restarted.state('notion')).toBe('ready')
+  expect(restarted.stored('notion').epoch).toBe(epoch)
+  expect(restarted.tool('notion', old.name).tier).toBe(3)
 })

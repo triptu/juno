@@ -100,13 +100,14 @@ export function createMcpManager({ store, credentials, defaults = [NOTION] }: Ma
     })().catch((error: unknown) => failed(id, error)).finally(() => { delete s.pending })
     return s.pending
   }
-  const disconnect = async (id: string, forget = true) => {
+  const disconnect = async (id: string, forget = true, signingIn = false) => {
     const s = session(id)
     s.abort.abort()
     if (forget) store.db.prepare('UPDATE mcp_connections SET epoch = ? WHERE id = ?').run(uuidv7(), id)
     if (s.retry) { clearTimeout(s.retry); delete s.retry }
     await s.client?.close()
     await s.pending
+    if (!signingIn) await signIns.get(id)
     delete s.client
     delete s.auth
     save({ ...stored(id).config, enabled: false })
@@ -118,7 +119,7 @@ export function createMcpManager({ store, credentials, defaults = [NOTION] }: Ma
   }
   const signIns = new Map<string, Promise<void>>()
   const authorizeOnce = async (id: string) => {
-    await disconnect(id, false)
+    await disconnect(id, false, true)
     const s = session(id)
     s.abort = new AbortController()
     s.state = 'connecting'

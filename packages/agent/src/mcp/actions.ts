@@ -52,8 +52,10 @@ export function mcpExecutors(manager: McpManagerApi): ReadonlyArray<Executor> {
       reconcile: async ({ payload }) => {
         if (identity(manager, config.id, payload) !== 'valid' || tool.name !== 'notion-update-page') return { _tag: 'unknown' }
         try {
+          if (manager.state(config.id) !== 'ready' && manager.stored(config.id).config.enabled) await manager.connect(config.id)
+          if (identity(manager, config.id, payload) !== 'valid') return { _tag: 'unknown' }
           const receipt = await notionReconcile(manager, config.id, payload.preconditions)
-          return receipt ? { _tag: 'found', receipt } : { _tag: 'unknown' }
+          return receipt && identity(manager, config.id, payload) === 'valid' ? { _tag: 'found', receipt } : { _tag: 'unknown' }
         } catch { return { _tag: 'unknown' } }
       },
     })),
