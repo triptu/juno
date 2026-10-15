@@ -6,7 +6,7 @@
  * person menu is `notifyActions.showPersonMenu`.
  */
 import { channelMenuItems, channelsIgnore, notifyChoiceOf, type ChannelMenuAction, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
-import { currentNotificationSettings, junoAgentOnAtom, loadNotificationSettings, popupContextMenu, registry, runAction, sidebarFilterAtom } from '@juno/state'
+import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, sidebarFilterAtom } from '@juno/state'
 import { markFilterChange } from './filterMark'
 import { askJunoAbout } from './juno/actions'
 import { openTopic } from './navigation'
@@ -35,7 +35,7 @@ export async function showChannelMenu(channel: MenuChannel): Promise<void> {
     channel: { id: channel.id as never, kind: channel.kind, name: channel.name },
     hasMain: channel.mainId !== undefined,
     notify: choiceFor(settings, target),
-    askJuno: registry.get(junoAgentOnAtom),
+    askJuno: registry.get(junoAvailableAtom),
   })
   const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)))) as ChannelMenuAction | undefined
   if (chosen === undefined) return
