@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, machinesToDestroy } from './pool-decisions.mjs'
+import { capacity, machinesToDestroy, pendingVcpu } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -136,10 +136,14 @@ function reconcile() {
 }
 
 export async function acquire(machine, create, log) {
+  if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
+  if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
+  if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
   ensureReaper()
   const started = Date.now()
   let reported = false
   for (;;) {
+    let pending
     if (!takeLock('decide')) { await sleep(500); continue }
     try {
       const instances = reconcile()
@@ -150,27 +154,17 @@ export async function acquire(machine, create, log) {
         }
       }
       let usage = capacity(instances, all)
-      let used = usage.tracked + usage.untracked
+      // Pending creates reserve capacity before leaving the short decision lock.
+      const reserved = pendingVcpu(instances, entries().filter((entry) => entry.pending))
+      let used = usage.tracked + usage.untracked + reserved
       for (const state of all) {
         if (used + vcpu(machine) <= maxVcpu) break
         if (!state.kept && !state.destroying && takeLock(state.id) && destroy(state.id)) used -= vcpu(state.machine)
       }
       if (used + vcpu(machine) <= maxVcpu) {
         const token = randomUUID()
-        const pending = { id: `pending-${token}`, pending: true, token, pid: process.pid, created: Date.now(), machine }
+        pending = { id: `pending-${token}`, pending: true, token, pid: process.pid, created: Date.now(), machine }
         write(pending)
-        // Do not retry creation: a timeout can mean the machine was created.
-        // The attempt label lets reconciliation recover even a lost response.
-        try {
-          const id = await create('3h', { 'juno-pool': owner, 'juno-create': token })
-          write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
-          lock(id)
-          rmSync(statePath(pending.id), { force: true })
-          return { id, warm: false, images: [] }
-        } catch (error) {
-          write({ ...pending, pid: undefined })
-          throw error
-        }
       }
       if (!reported && Date.now() - started >= 60_000) {
         usage = capacity(list(), machines())
@@ -178,6 +172,20 @@ export async function acquire(machine, create, log) {
         reported = true
       }
     } finally { unlock('decide') }
+    if (pending) {
+      // Do not hold the pool-wide decision lock over provisioning or SSH.
+      // A lost response is recovered by the attempt label, never retried here.
+      try {
+        const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
+        lock(id)
+        write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
+        rmSync(statePath(pending.id), { force: true })
+        return { id, warm: false, images: [] }
+      } catch (error) {
+        write({ ...pending, pid: undefined })
+        throw error
+      }
+    }
     await sleep(10_000)
   }
 }
@@ -185,11 +193,14 @@ export async function acquire(machine, create, log) {
 export function release(id, image) {
   const state = read(id)
   if (!state || state.destroying) return
+  if (!takeLock('decide')) { destroy(id); return }
+  try {
   const idle = machines().filter((other) => other.id !== id && !other.kept && !other.destroying && other.machine === state.machine && !existsSync(lockPath(other.id)))
-  if (idle.length >= idlePerShape) { destroy(id); return }
+  if (idleMs === 0 || idle.length >= idlePerShape) { destroy(id); return }
   write({ ...state, lastUsed: Date.now(), images: [...new Set([...(state.images ?? []), image])] })
   unlock(id)
   ensureReaper()
+  } finally { unlock('decide') }
 }
 
 /** Also accepts old per-machine reaper invocations during rollout. */

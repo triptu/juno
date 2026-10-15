@@ -25,3 +25,9 @@ export function capacity(instances, states) {
     return total
   }, { tracked: 0, untracked: 0 })
 }
+
+/** Creates not yet visible in the workspace still reserve their requested cores. */
+export function pendingVcpu(instances, pending) {
+  const visible = new Set(instances.map((instance) => instance.labels?.['juno-create']))
+  return pending.filter((entry) => !visible.has(entry.token)).reduce((sum, entry) => sum + Number(/:(\d+)x/.exec(entry.machine)?.[1] ?? 8), 0)
+}
