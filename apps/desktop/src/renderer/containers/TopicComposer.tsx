@@ -132,8 +132,6 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     })
   }
   const follow = (outcome: Outcome) => {
-    // A click on the bar took the focus; typing goes on in the field.
-    field.current?.focus()
     if (outcome.kind === 'send') deliver(outcome.text, outcome.to)
     else if (outcome.kind === 'bar') setBar(outcome.bar)
     else setBar(undefined)
@@ -157,15 +155,17 @@ function LoadedComposer({ detail, initial, placeholder, onSent, handle, onArrowU
     })
   }
 
+  // A click on the bar takes the focus; typing goes on in the field.
+  const pick = (choice: 'primary' | 'secondary') => {
+    field.current?.focus()
+    if (bar !== undefined) follow(choose(bar, choice))
+  }
   const audience = aiAssist && audienceCheck(text, detail.channel) !== undefined ? audienceCheck(paused, detail.channel) : undefined
-  const shown = bar === undefined ? undefined : findingOf(bar)
   const notices =
-    audience === undefined && shown === undefined ? undefined : (
+    audience === undefined && bar === undefined ? undefined : (
       <>
         {audience === undefined ? null : <AudienceWarning message={audience.message} />}
-        {shown === undefined || bar === undefined ? null : (
-          <SendCheckBar finding={shown.finding} confidence={shown.confidence} onPrimary={() => follow(choose(bar, 'primary'))} onSecondary={() => follow(choose(bar, 'secondary'))} />
-        )}
+        {bar === undefined ? null : <SendCheckBar {...findingOf(bar)} onPrimary={() => pick('primary')} onSecondary={() => pick('secondary')} />}
       </>
     )
 
