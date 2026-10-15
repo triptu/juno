@@ -426,3 +426,18 @@ test('a card header reads as one meta line: the dot after the kind has the kindâ
     expect(parts[1]!.bottom, id).toBe(parts[0]!.bottom)
   }
 })
+
+test('a selected option row prints its second line in the subtle colour, which keeps 4.5:1 on the fill', async ({ page }) => {
+  await open(page, 'TopicHeader', 'switcher/switcher-thread')
+  const colours = await page.evaluate(() => {
+    const row = document.querySelector('[data-topic-switcher] [role="option"][aria-selected="true"]')!
+    const lines = [...row.querySelectorAll('span')].filter((span) => span.children.length === 0 && /repl/.test(span.textContent!))
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--foreground-subtle)'
+    document.body.append(probe)
+    const subtle = getComputedStyle(probe).color
+    probe.remove()
+    return { line: getComputedStyle(lines[0]!).color, subtle }
+  })
+  expect(colours.line).toBe(colours.subtle)
+})

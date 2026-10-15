@@ -295,6 +295,8 @@ const styles = stylex.create({
   },
   rowSelected: {
     backgroundColor: colors['--secondary-default'],
+    // Muted text on the fill is under 4.5:1 in light; one step stronger, as ListRow's selected row.
+    '--foreground-muted': colors['--foreground-subtle'],
   },
   rowDisabled: {
     color: colors['--foreground-muted'],
