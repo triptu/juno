@@ -99,14 +99,6 @@ export class ActionWorker extends Context.Service<
         }
       }
 
-      /** What the call stores when Slack says the change was already made. */
-      const alreadyDone = (action: PendingAction, ts: string): Acted | undefined =>
-        action.kind === 'delete'
-          ? ({ kind: 'deleted', channel: action.channel, ts } as const)
-          : action.kind === 'react'
-            ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
-            : undefined
-
       /** Settles one row. Answers whether it still waits for its post. */
       const run = (open: OpenWorkspace, fetcher: TopicFetcher, action: PendingAction) =>
         Effect.gen(function* () {
@@ -207,5 +199,13 @@ export class ActionWorker extends Context.Service<
     }),
   )
 }
+
+/** What the call stores when Slack says the change was already made. */
+const alreadyDone = (action: PendingAction, ts: string): Acted | undefined =>
+  action.kind === 'delete'
+    ? ({ kind: 'deleted', channel: action.channel, ts } as const)
+    : action.kind === 'react'
+      ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
+      : undefined
 
 const backoff = (attempts: number): number => Math.min(1000 * 2 ** attempts, MAX_BACKOFF_MILLIS)
