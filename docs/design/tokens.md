@@ -206,6 +206,8 @@ The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, 
 
 The dark Tide tones sit 0.045 above the study's (base 0.285 there): on the near-black sidebar (L 0.19) the study's pebbles read too dim. In dark they stay near neutral on purpose (chroma 0.012 to 0.026): at low lightness amber, olive and coral turn to mud at any real chroma, so the bands step in lightness instead.
 
+Checked again on 10-15 against the row's text (gallery `TopicRow/Tile/art-and-pebbles`, light and dark). On the sidebar, the title is 15.2:1 in light and 15.5:1 in dark, and the preview 4.8:1 and 6.9:1. The art's ink is 7.6 to 7.8:1 in light and 9.1 to 9.3:1 in dark, the same lightness step from the sidebar in both themes. The pebble bands are 1.25 to 2.15:1 in light and 1.5 to 2.9:1 in dark: further from the sidebar in lightness than in light, but still clearly quieter than the drawings and the text. Lower dark ramps (ground at 0.27 to 0.30) were tried side by side and only read murkier, so the values stay.
+
 ## 2. Typography
 
 ### 2.1 Families
