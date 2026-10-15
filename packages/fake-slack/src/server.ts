@@ -58,6 +58,8 @@ interface FailureRule {
 interface HoldRule {
   remaining: number
   readonly before: boolean
+  /** Only calls whose `_x_reason` is this are held. */
+  readonly reason: string | undefined
   readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
 }
 
@@ -191,10 +193,10 @@ export class FakeServer {
    * The next `times` calls of `method` wait for `release`: before their
    * handler runs when `before`, else after it, before answering.
    */
-  holdNext(method: string, times: number, before = false): void {
+  holdNext(method: string, times: number, before = false, reason?: string): void {
     const rules = before ? this.#stalls : this.#holds
     const existing = rules.get(method)
-    if (existing === undefined) rules.set(method, { remaining: times, before, waiting: [] })
+    if (existing === undefined || existing.reason !== reason) rules.set(method, { remaining: times, before, reason, waiting: [...(existing?.waiting ?? [])] })
     else existing.remaining += times
   }
 
@@ -225,6 +227,7 @@ export class FakeServer {
   #hold(rules: Map<string, HoldRule>, method: string, args: Record<string, unknown>): Promise<void> | undefined {
     const rule = rules.get(method)
     if (rule === undefined || rule.remaining <= 0) return undefined
+    if (rule.reason !== undefined && args['_x_reason'] !== rule.reason) return undefined
     rule.remaining -= 1
     return new Promise((resolve) => rule.waiting.push({ resume: resolve, args }))
   }

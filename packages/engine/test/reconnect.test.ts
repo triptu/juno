@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { SELF_ID } from '@juno/fake-slack'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { apiCalls, bootedEngine, callMap, DAY, quiet, readDb, seedThread, storedFollow, threadId, tsOf, type SeededThread } from './scenario'
+import { apiCalls, bootedEngine, callMap, DAY, notRecheck, quiet, readDb, restart, seedThread, storedFollow, threadId, tsOf, type SeededThread } from './scenario'
 
 const engines: Array<RunningEngine> = []
 afterEach(async () => {
@@ -21,6 +21,97 @@ async function offline(engine: RunningEngine, whileOffline: () => void): Promise
   await engine.phase('live', 30_000)
   await engine.syncIdle()
 }
+
+/** A stored message's text, whether it is a tombstone, and its reactions as `name:users`. */
+function storedMessage(engine: RunningEngine, channel: string, ts: string) {
+  return readDb(engine, 'cache.db', (db) => {
+    const row = db.prepare('SELECT text, deleted FROM messages WHERE channel = ? AND ts = ?').get(channel, ts) as { text: string; deleted: number } | undefined
+    const reactions = (db.prepare('SELECT name, user_ids_json FROM reactions WHERE channel = ? AND ts = ? ORDER BY name').all(channel, ts) as Array<{ name: string; user_ids_json: string }>).map(
+      (r) => `${r.name}:${(JSON.parse(r.user_ids_json) as Array<string>).join(',')}`,
+    )
+    return row === undefined ? undefined : { text: row.text, deleted: row.deleted === 1, reactions }
+  })
+}
+
+/** Recent messages in #eng's Main and in a thread, with a reaction, for changes made while Juno cannot hear them. */
+function seedRecent(engine: RunningEngine) {
+  const { fake } = engine
+  const edited = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Deploy at 3.' })
+  const deleted = fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Wrong channel, sorry.' })
+  const unreacted = fake.injectMessage({ channel: 'C0ENG', user: 'U0PRIYA', text: 'Release notes are up.' })
+  fake.addReaction({ channel: 'C0ENG', ts: unreacted.ts, name: 'eyes', user: 'U0JONAS' })
+  const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Which runner do we use?' })
+  const reply = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'The big one.', threadTs: root.ts })
+  return { edited, deleted, unreacted, root, reply }
+}
+
+/** Every change from `changeWhileAway` is in the store, and nothing else moved. */
+async function expectChanges(engine: RunningEngine, seeded: ReturnType<typeof seedRecent>) {
+  await waitFor(
+    () => (storedMessage(engine, 'C0ENG', seeded.deleted.ts)?.deleted === true && storedMessage(engine, 'C0ENG', seeded.reply.ts)?.text === 'The small one.' ? true : undefined),
+    30_000,
+    'the changes made while away',
+  )
+  expect(storedMessage(engine, 'C0ENG', seeded.edited.ts)).toEqual({ text: 'Deploy at 4.', deleted: false, reactions: ['tada:U0SAM'] })
+  expect(storedMessage(engine, 'C0ENG', seeded.deleted.ts)).toMatchObject({ deleted: true })
+  expect(storedMessage(engine, 'C0ENG', seeded.unreacted.ts)).toEqual({ text: 'Release notes are up.', deleted: false, reactions: [] })
+  expect(storedMessage(engine, 'C0ENG', seeded.root.ts)).toMatchObject({ text: 'Which runner do we use?', deleted: false })
+  expect(storedMessage(engine, 'C0ENG', seeded.reply.ts)).toMatchObject({ text: 'The small one.', deleted: false })
+}
+
+/** Edits in Main and in a thread, a delete, a reaction added and the only reaction removed. */
+function changeWhileAway(engine: RunningEngine, seeded: ReturnType<typeof seedRecent>) {
+  const { fake } = engine
+  fake.editMessage({ channel: 'C0ENG', ts: seeded.edited.ts, text: 'Deploy at 4.' })
+  fake.addReaction({ channel: 'C0ENG', ts: seeded.edited.ts, name: 'tada', user: 'U0SAM' })
+  fake.deleteMessage({ channel: 'C0ENG', ts: seeded.deleted.ts })
+  fake.removeReaction({ channel: 'C0ENG', ts: seeded.unreacted.ts, name: 'eyes', user: 'U0JONAS' })
+  fake.editMessage({ channel: 'C0ENG', ts: seeded.reply.ts, text: 'The small one.' })
+}
+
+describe('recheck after a gap', () => {
+  it('brings edits, deletes and reactions made during a drop, in Main and in a thread', async () => {
+    const engine = await bootedEngine(engines)
+    const seeded = seedRecent(engine)
+    await waitFor(() => (storedMessage(engine, 'C0ENG', seeded.reply.ts) === undefined ? undefined : true), 20_000, 'the recent messages stored')
+    await quiet(engine)
+    await offline(engine, () => changeWhileAway(engine, seeded))
+    await expectChanges(engine, seeded)
+    // One page for each recently active topic, at most ten: #eng's Main and the new thread among them.
+    const rechecks = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck')
+    expect(rechecks).toHaveLength(10)
+    expect(rechecks.some((c) => c.method === 'conversations.history' && c.args['channel'] === 'C0ENG')).toBe(true)
+    expect(rechecks.some((c) => c.method === 'conversations.replies' && c.args['ts'] === seeded.root.ts)).toBe(true)
+  })
+
+  it('brings the same changes made while the app was closed, at the warm boot', async () => {
+    const first = await bootedEngine(engines)
+    const seeded = seedRecent(first)
+    await waitFor(() => (storedMessage(first, 'C0ENG', seeded.reply.ts) === undefined ? undefined : true), 20_000, 'the recent messages stored')
+    const engine = await restart(engines, first, () => changeWhileAway(first, seeded))
+    await expectChanges(engine, seeded)
+  })
+
+  it('does not delete a message posted after the recheck asked, whose event came first', async () => {
+    const engine = await bootedEngine(engines)
+    const seeded = seedRecent(engine)
+    await waitFor(() => (storedMessage(engine, 'C0ENG', seeded.reply.ts) === undefined ? undefined : true), 20_000, 'the recent messages stored')
+    await quiet(engine)
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.holdNext({ method: 'conversations.history', reason: 'recheck' })
+    engine.fake.goOnline()
+    // The recheck's first Main page, #eng's, has left; a message posted now is stored by its event before the page lands.
+    const [held] = await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? engine.fake.heldCalls({ method: 'conversations.history' }) : undefined), 30_000, 'the held recheck page')
+    expect(held!['channel']).toBe('C0ENG')
+    const late = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Posted during the recheck.' })
+    await waitFor(() => (storedMessage(engine, 'C0ENG', late.ts) === undefined ? undefined : true), 20_000, 'the late message stored')
+    engine.fake.release()
+    await engine.phase('live', 30_000)
+    await quiet(engine)
+    expect(storedMessage(engine, 'C0ENG', late.ts)).toMatchObject({ text: 'Posted during the recheck.', deleted: false })
+  })
+})
 
 describe('reconnect', () => {
   it('brings back what changed offline: a read, a reply, an unfollow, a Main message and a channel joined', async () => {
@@ -73,13 +164,16 @@ describe('reconnect', () => {
       'api:conversations.info': 1,
       // The two conversations whose latest moved.
       'api:conversations.history': 2,
+      // The recheck of the drop: the ten most recently active topics, one page each.
+      'recheck:conversations.history': 5,
+      'recheck:conversations.replies': 5,
       // One page back to the last sync (its last thread is older), then the complete pass of two pages.
       'api:subscriptions.thread.getView': 3,
       // The root of the one stored follow the list left out.
       'api:conversations.replies': 1,
       'api:search.modules.messages': 1,
     })
-    expect(apiCalls(engine, 'conversations.replies')[0]!.args['ts']).toBe(tsOf(finance))
+    expect(apiCalls(engine, 'conversations.replies').filter(notRecheck)[0]!.args['ts']).toBe(tsOf(finance))
   })
 
   it('reads followed threads past the first getView page', async () => {

@@ -13,8 +13,13 @@
  * The lanes have separate permits, so a flood of background calls cannot
  * starve an interactive one. A 429 pauses one method's bucket until its
  * `Retry-After`; every other method keeps going.
+ *
+ * `slowedUntil` tells the engine when Slack has slowed it down: the end of
+ * the latest pause longer than `interactiveMaxWaitMillis`, the wait the
+ * interactive lane gives up at, and `undefined` once every such pause has
+ * ended. Shorter pauses pass unnoticed.
  */
-import { Clock, Context, Effect, Layer, Ref, Semaphore } from 'effect'
+import { Clock, Context, Effect, Layer, Ref, Semaphore, Stream, SubscriptionRef } from 'effect'
 import { SlackConfig } from './config.ts'
 import { SlackRateLimited } from './errors.ts'
 
@@ -27,6 +32,8 @@ export interface RequestQueueShape {
   pause(method: string, retryAfterMillis: number): Effect.Effect<void>
   /** Epoch millis until which `method` is paused, if it is. */
   pausedUntil(method: string): Effect.Effect<number | undefined>
+  /** Epoch millis until which a long pause holds the client back, at subscribe time and on every change; `undefined` when none does. */
+  readonly slowedUntil: Stream.Stream<number | undefined>
 }
 
 export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShape>()('juno/slack/RequestQueue') {
@@ -42,6 +49,15 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
       const paused = yield* Ref.make(new Map<string, number>())
       const nextBackgroundStart = yield* Ref.make(0)
       const slotLock = yield* Semaphore.make(1)
+      const slowed = yield* SubscriptionRef.make<number | undefined>(undefined)
+      const scope = yield* Effect.scope
+
+      /** Clears `slowed` at `until` unless a later pause has moved it. */
+      const clearAt = (until: number) =>
+        Effect.gen(function* () {
+          yield* Effect.sleep(Math.max(0, until - (yield* Clock.currentTimeMillis)))
+          yield* SubscriptionRef.update(slowed, (current) => (current === until ? undefined : current))
+        })
 
       const pausedUntil = (method: string) =>
         Effect.gen(function* () {
@@ -54,8 +70,12 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
       const pause = (method: string, retryAfterMillis: number) =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis
-          const until = now + Math.min(Math.max(retryAfterMillis, 0), config.maxRetryAfterMillis)
+          const wait = Math.min(Math.max(retryAfterMillis, 0), config.maxRetryAfterMillis)
+          const until = now + wait
           yield* Ref.update(paused, (map) => new Map(map).set(method, Math.max(until, map.get(method) ?? 0)))
+          if (wait <= config.interactiveMaxWaitMillis) return
+          const moved = yield* SubscriptionRef.modify(slowed, (current) => (current !== undefined && current >= until ? [false, current] : [true, until]))
+          if (moved) yield* Effect.forkIn(clearAt(until), scope)
         })
 
       /** Waits until the method's bucket is open. The interactive lane gives up instead of waiting long. */
@@ -94,7 +114,7 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
           )
         })
 
-      return RequestQueue.of({ run, pause, pausedUntil })
+      return RequestQueue.of({ run, pause, pausedUntil, slowedUntil: SubscriptionRef.changes(slowed) })
     }),
   )
 }
