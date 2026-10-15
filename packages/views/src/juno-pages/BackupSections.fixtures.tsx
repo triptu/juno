@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex'
 import { defineFixtures, Page, scene, type Fixture } from '@juno/ui'
 import { BackupSection, type BackupSectionProps } from './BackupSections'
 import { NOW, settings, settingsTrouble } from './fixtures'
@@ -5,12 +6,17 @@ import { NOW, settings, settingsTrouble } from './fixtures'
 const noop = () => {}
 const base: BackupSectionProps = { page: settings, now: NOW, onBackupFolder: noop, onExportPhrase: noop }
 
+// The frame sizes a lone component to its content; the page fills the frame as it fills its tab.
+const column = stylex.create({ fill: { width: '100%' } })
+
 /** In the settings column, at the width Settings › Juno gives it. */
 const inPage = (props: Partial<BackupSectionProps> = {}): Fixture<BackupSectionProps> =>
   scene(() => (
-    <Page width="settings">
-      <BackupSection {...base} {...props} />
-    </Page>
+    <div {...stylex.props(column.fill)}>
+      <Page width="settings">
+        <BackupSection {...base} {...props} />
+      </Page>
+    </div>
   ))
 
 export default defineFixtures(
