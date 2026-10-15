@@ -44,11 +44,14 @@ test('Configure lists the tools, searches them, and turns one off', async ({ jun
   await ready(juno)
   const { row } = await addServer(juno, 'Meetings', mcp.url)
   const sheet = await configure(juno, row)
-  // Every tool is on by default, the reads marked Read, the rest Auto.
+  // Every tool is on by default and Auto, a tool the server marks read-only too; a delete always asks, and says why.
   await expect(sheet.locator('[data-tool]')).toHaveCount(9)
   await expect(sheet.locator('[data-tool][data-tool-enabled="false"]')).toHaveCount(0)
-  await expect(sheet.locator('[data-tool="get_meeting"]')).toHaveAttribute('data-tool-review', 'read')
-  await expect(sheet.locator('[data-tool="delete_material"]')).toHaveAttribute('data-tool-review', 'auto')
+  await expect(sheet.locator('[data-tool="get_meeting"]')).toHaveAttribute('data-tool-review', 'auto')
+  await expect(sheet.locator('[data-tool="get_meeting"]')).toHaveAttribute('data-tool-read-only', 'true')
+  await expect(sheet.locator('[data-tool="delete_material"]')).toHaveAttribute('data-tool-review', 'always')
+  await expect(sheet.locator('[data-tool="delete_material"]')).toContainText("Deleting can't be undone, so Juno always asks.")
+  await expect(sheet.getByRole('combobox', { name: 'Auto-review: delete_material' })).toHaveCount(0)
 
   await sheet.getByRole('textbox', { name: 'Search tools' }).fill('routine')
   await expect(sheet.locator('[data-tool]')).toHaveCount(3)
@@ -64,8 +67,9 @@ test('Configure lists the tools, searches them, and turns one off', async ({ jun
   await material.getByRole('checkbox', { name: 'Enabled: delete_material' }).click()
   await expect(material).toHaveAttribute('data-tool-enabled', 'true')
   // A rule for one tool; the connection's own rule is at the top.
-  await material.getByRole('combobox', { name: 'Auto-review: delete_material' }).selectOption('always')
-  await expect(material).toHaveAttribute('data-tool-review', 'always')
+  const add = sheet.locator('[data-tool="add_material"]')
+  await add.getByRole('combobox', { name: 'Auto-review: add_material' }).selectOption('always')
+  await expect(add).toHaveAttribute('data-tool-review', 'always')
   await expect(sheet.getByRole('combobox', { name: 'Auto-review for all tools' })).toHaveValue('auto')
   await sheet.press('Escape')
   await expect(sheet).toHaveCount(0)

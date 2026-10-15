@@ -28,9 +28,10 @@ const RULES: ReadonlyArray<ReviewRule> = ['auto', 'always', 'never']
  * Configure on a connection (SPEC 13.10, 13.9): the connection's auto-review
  * rule, then every tool it offers with a search box, an Enabled switch (all
  * on by default) and its own rule. A read runs with no review, so its rule
- * column says Read. T3 Code's other tools always ask, because they can start
- * or steer a session. A panel for `SheetLayer`; the Settings page can host it
- * the same way.
+ * column says Read. A delete, and T3 Code's other tools, always ask, and a
+ * tool that merges, buys or force-pushes is not offered; each says why. A
+ * changed or new tool is marked. A panel for `SheetLayer`; the Settings page
+ * can host it the same way.
  */
 export function ConnectionToolsSheet({ row, error, onTool, onRule, onT3Address, onClose, initialQuery = '' }: ConnectionToolsSheetProps) {
   const copy = chatCopy.pages.connections
@@ -117,10 +118,19 @@ function Tool({ tool, t3, options, onTool }: {
   readonly onTool: ConnectionToolsSheetProps['onTool'] extends (tool: string, change: infer C) => void ? (change: C) => void : never
 }) {
   const copy = chatCopy.pages.connections
-  // A read runs with no review; T3 Code's other tools always ask.
-  const fixed = tool.read ? copy.read : t3 ? copy.rules.always : undefined
+  // A read runs with no review; a delete and T3 Code's other tools always ask; a forbidden tool is never offered.
+  const fixed = tool.read ? 'read' : tool.locked === 'forbidden' ? 'forbidden' : tool.locked === 'delete' || t3 ? 'always' : undefined
+  const mark = tool.changed ? copy.changed : tool.added ? copy.added : undefined
   return (
-    <div {...stylex.props(styles.row, styles.tool)} role="row" data-tool={tool.name} data-tool-enabled={tool.enabled} data-tool-review={fixed === undefined ? tool.review : tool.read ? 'read' : 'always'}>
+    <div
+      {...stylex.props(styles.row, styles.tool)}
+      role="row"
+      data-tool={tool.name}
+      data-tool-enabled={tool.enabled}
+      data-tool-review={fixed ?? tool.review}
+      data-tool-mark={tool.changed ? 'changed' : tool.added ? 'new' : undefined}
+      data-tool-read-only={tool.readOnly}
+    >
       <span {...stylex.props(cell.lines, styles.toolLines)} role="cell">
         <Text variant="bodySmall" weight="medium" truncate sx={styles.toolName}>
           {tool.name}
@@ -130,19 +140,30 @@ function Tool({ tool, t3, options, onTool }: {
             {tool.hint}
           </Text>
         ) : null}
-        {tool.changed ? (
+        {mark !== undefined ? (
           <Text variant="meta" tone="muted" sx={styles.toolMeta}>
-            {copy.changed}
+            {mark}
+          </Text>
+        ) : null}
+        {tool.locked !== undefined ? (
+          <Text variant="meta" tone="muted" sx={[cell.wrap, styles.toolMeta]}>
+            {copy.locked[tool.locked]}
           </Text>
         ) : null}
       </span>
       <span role="cell" {...stylex.props(styles.center)}>
-        <Checkbox labelHidden label={`${copy.enabled}: ${tool.name}`} checked={tool.enabled} onChange={(event) => onTool({ enabled: event.currentTarget.checked })} />
+        <Checkbox
+          labelHidden
+          label={`${copy.enabled}: ${tool.name}`}
+          checked={tool.enabled && fixed !== 'forbidden'}
+          disabled={fixed === 'forbidden'}
+          onChange={(event) => onTool({ enabled: event.currentTarget.checked })}
+        />
       </span>
       <span role="cell">
         {fixed !== undefined ? (
           <Text variant="bodySmall" tone="muted">
-            {fixed}
+            {fixed === 'read' ? copy.read : fixed === 'forbidden' ? copy.notOffered : copy.rules.always}
           </Text>
         ) : (
           <Select size={30} label={`${copy.autoReview}: ${tool.name}`} options={options} value={tool.review} disabled={!tool.enabled} onChange={(event) => onTool({ review: event.currentTarget.value as ReviewRule })} />

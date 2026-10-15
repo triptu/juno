@@ -58,7 +58,7 @@ test('a tool marked read-only at first sight runs at once, and asks once its sch
 
   const { id, row } = await addServer(juno, 'Meetings', littlebird.url)
   const sheet = await configure(juno, row)
-  await expect(sheet.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-review', 'read')
+  await expect(sheet.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-read-only', 'true')
   await sheet.getByRole('button', { name: 'Done' }).click()
 
   const pane = await openChat(juno)
@@ -74,6 +74,8 @@ test('a tool marked read-only at first sight runs at once, and asks once its sch
   const page = await openPage(juno, 'Connections')
   const changed = await configure(juno, page.locator(`[data-connection-id="${id}"]`))
   await expect(changed.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-review', 'auto')
+  await expect(changed.locator('[data-tool="export_everything"]')).toHaveAttribute('data-tool-mark', 'changed')
+  await expect(changed.locator('[data-tool="export_everything"]')).not.toHaveAttribute('data-tool-read-only')
   await changed.getByRole('button', { name: 'Done' }).click()
   const after = await openChat(juno)
   await after.send(`export everything on ${id} again`)
