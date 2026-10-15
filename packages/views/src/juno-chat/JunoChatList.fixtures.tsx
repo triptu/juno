@@ -141,6 +141,8 @@ export default defineFixtures(
     },
     States: {
       'ai-off': list(conversation, { banner: { _tag: 'aiOff' } }),
+      // AI assist off before the first message: the one line, with no suggestions.
+      'ai-off-empty': list([], { banner: { _tag: 'aiOff' } }),
       'citation-hover': list(conversation, {}, { ...frame, hover: '[data-cite]' }),
       'bubble-hover': list(conversation, {}, { ...frame, hover: '[data-chat-owner="op-m-2"] p' }),
     },

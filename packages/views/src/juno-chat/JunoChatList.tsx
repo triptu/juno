@@ -51,7 +51,8 @@ export interface JunoChatListProps {
  * exist, so a page arriving never moves the rows.
  */
 export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page' }: JunoChatListProps) {
-  const empty = items.length === 0
+  // With AI assist off an empty chat is the one AI-off line (SPEC 13.7), not suggestions it cannot act on.
+  const empty = items.length === 0 && banner._tag !== 'aiOff'
   return (
     <ScrollArea scrollbar="hover" evenInset underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
       <div role="list" aria-label="Juno chat" {...stylex.props(styles.column, column === 'panel' && styles.panel)}>

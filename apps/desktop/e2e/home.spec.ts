@@ -122,6 +122,8 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
     await again.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
     await expect(again.win.locator('main').getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
     await expect(again.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
+    await expect(again.win.locator('main').getByText('What do you need?')).toHaveCount(0)
+    await expect(again.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
   } finally {
     await again.close()
   }

@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { layout, opacity, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea } from '@juno/ui'
 import { QuoteStub } from './QuoteStub'
 
@@ -56,7 +56,7 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
           <QuoteStub quote={quote} {...(onClearQuote ? { onClear: onClearQuote } : {})} />
         </div>
       ) : null}
-      <Surface kind="field" sx={[styles.box, panel && styles.wide]}>
+      <Surface kind="field" sx={[styles.box, panel && styles.wide, !enabled && styles.off]}>
         <div {...stylex.props(styles.row)}>
           <Textarea
             ref={inputRef}
@@ -80,6 +80,10 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
 }
 
 const styles = stylex.create({
+  // Disabled (AI off, update needed, another device): dimmed like any disabled control, so it does not invite typing.
+  off: {
+    opacity: opacity['--opacity-disabled'],
+  },
   outer: {
     flexShrink: 0,
     width: '100%',
