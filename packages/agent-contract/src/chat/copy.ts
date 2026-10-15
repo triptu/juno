@@ -343,7 +343,7 @@ export const chatCopy = {
         cancel: 'Cancel',
       },
       allowNetwork: 'Allow T3 Code over the local network',
-      allowNetworkNote: 'Only an https address works over the network.',
+      allowNetworkNote: 'Tries this Mac first. Network sign-in may require https.',
     },
     connections: {
       connect: 'Connect',

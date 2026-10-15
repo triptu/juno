@@ -75,3 +75,8 @@ ledger with the agent-testing provider and an injected clock: deadline to Send
 card, reply cancellation without a run, expiry during drafting, and a wake
 steering an owner run. The engine's `test/agent-host.test.ts` verifies the host
 port, message changes and refreshed replies beyond a single Slack page.
+
+The Slack message menu wires the watch RPC directly, with an Undo toast.
+The chat summary publishes whether the owner may authorize so the menu is
+disabled during Pause, AI off, recovery and ownership on another Mac. Wake
+groups use the persisted occurrence to show Scheduled and its schedule name.

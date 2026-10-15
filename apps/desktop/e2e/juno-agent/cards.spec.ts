@@ -49,9 +49,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
 
 test.describe.configure({ timeout: 150_000 })
 
-test.fixme(
+test(
   'a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has both',
-  // Slack writes are refused: packages/engine/src/startEngine.ts:61 defaults agentWrites to disabled and apps/desktop/src/engine/index.ts:80 never sets it.
   async ({ juno, fake, slack }) => {
     await ready(juno)
     const eng = slack.channel('eng')
@@ -170,7 +169,7 @@ test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stay
 })
 
 
-test.fixme('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, running, userData, fake, slackApp, slack, model }) => {
+test('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, running, userData, fake, slackApp, slack, model }) => {
   await ready(juno)
   const chat = await openChat(juno)
   const channel = slack.channel('eng')
@@ -188,10 +187,6 @@ test.fixme('an old unapproved card expires, and Ask again creates a fresh card w
     const pane = await openChat(again)
     const expired = card(pane, 'sendMessage').first()
     await expect(expired).toHaveAttribute('data-card-status', 'expired')
-    // packages/state/src/agent/chat.ts rememberCards retains only cards with approval bindings.
-    // The expired card has none after relaunch: cardCommand returns unknownCard before calling
-    // agent.cards.askAgain in packages/agent/src/serve/server.ts. The first assertion below
-    // fails: no Ask again owner bubble is added, and no fresh model request is sent.
     await expired.getByRole('button', { name: 'Ask again' }).click()
     await expect(pane.ownerBubble('Ask again')).toHaveCount(1)
     await expect(card(pane, 'sendMessage')).toHaveCount(2)

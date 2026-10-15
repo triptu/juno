@@ -9,5 +9,7 @@ export const MCP_MIGRATIONS: MigrationSet = {
     // The build of 10-15 copied the code's T3 read list into the stored row without making the added
     // `t3_pending_request_read` Read, so the start-up rule in the manager no longer sees it as added.
     `UPDATE mcp_tools SET tier = 0 WHERE connection_id = 't3' AND name = 't3_pending_request_read' AND changed = 0`,
+  ], [
+    'ALTER TABLE mcp_connections ADD COLUMN active_url TEXT',
   ]],
 }

@@ -9,6 +9,7 @@ export {
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
+  watchReply,
   type CommandAnswer,
   type JunoSettingsChange,
 } from './pages'

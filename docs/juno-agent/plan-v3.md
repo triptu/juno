@@ -102,7 +102,7 @@ These replace earlier rows where they disagree (B5's Esc, M7, W1's Stop line, W9
 - **Sync in v1:** one writer, an encrypted backup, and a way to move ownership.
 - **MCP endpoints:** Littlebird: `https://mcp.littlebird.ai/mcp`, with OAuth. T3 Code: `http://192.168.1.22:3773/mcp`; the spikes found it needs OAuth and that plain `http` works only on loopback. Prefer loopback when T3 runs on the same machine. The URL is a setting. Never send it secrets.
 - **T3 sessions** Juno starts run with full access, each in a new worktree.
-- **T3 over the network** needs the Settings switch "Allow T3 Code over the local network", off by default. With it on, only an `https` address works, because the sign-in refuses plain `http` off loopback (spikes, finding 1).
+- **T3 over the network** needs the Settings switch "Allow T3 Code over the local network", off by default. The connection rule in §10.2 accepts private HTTP addresses and tries loopback first. OAuth sign-in may still require HTTPS off loopback (spikes, finding 1).
 - **Backup:** a local folder the owner chooses, under the app's data directory by default. The owner may point it at a synced drive later.
 - **Sign in with ChatGPT:** not planned. Codex local and OpenRouter cover it.
 - **Still pending:** the owner bubble colour, between options A to D in `docs/design/juno-chat/` (the mock's README recommends B).

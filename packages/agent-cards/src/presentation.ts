@@ -41,9 +41,10 @@ export const TopicLink = Schema.Struct({
 })
 export type TopicLink = typeof TopicLink.Type
 const OPENABLE = /^(?:https:\/\/[^\s/?#]+|http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?)(?:[/?#]|$)/i
-export const isOpenableUrl = (url: string): boolean => OPENABLE.test(url)
+export const isT3ThreadUrl = (url: string): boolean => /^t3-thread:\/\/v1\/[a-zA-Z0-9_-]+$/.test(url)
+export const isOpenableUrl = (url: string): boolean => OPENABLE.test(url) || isT3ThreadUrl(url)
 export const OpenableUrl = Schema.String.check(
-  Schema.makeFilter((url: string) => isOpenableUrl(url) || 'an https: URL, or http: on loopback', {
+  Schema.makeFilter((url: string) => isOpenableUrl(url) || 'an https: URL, http: on loopback, or a T3 thread link', {
     title: 'OpenableUrl',
   }),
 )

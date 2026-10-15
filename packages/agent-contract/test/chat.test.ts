@@ -6,13 +6,13 @@ const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
 describe('OpenTarget url', () => {
   it('accepts https anywhere and http on loopback', () => {
-    for (const url of ['https://github.com/t3/juno/pull/412', 'HTTPS://notion.so/page', 'http://localhost:3773/thread/1', 'http://127.0.0.1/x', 'http://[::1]:3773']) {
+    for (const url of ['https://github.com/t3/juno/pull/412', 'HTTPS://notion.so/page', 'http://localhost:3773/thread/1', 'http://127.0.0.1/x', 'http://[::1]:3773', 't3-thread://v1/thread-1']) {
       expect(decodeOpen({ _tag: 'url', url, label: 'Open' })).toEqual({ _tag: 'url', url, label: 'Open' })
     }
   })
 
   it('refuses every other scheme and plain http off loopback', () => {
-    for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'x-juno://open', 'http://192.168.1.22:3773/mcp', 'http://localhost.evil.com/', 'https://', 'notaurl']) {
+    for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'x-juno://open', 'http://192.168.1.22:3773/mcp', 'http://localhost.evil.com/', 'https://', 'notaurl', 't3-thread://v1/../other', 't3-thread://v1/thread?command=run']) {
       expect(() => decodeOpen({ _tag: 'url', url, label: 'Open' })).toThrow()
     }
   })

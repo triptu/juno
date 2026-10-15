@@ -1,3 +1,4 @@
+import { isT3ThreadUrl } from '@juno/agent-contract'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
 import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type ShellInput, type ShellOutput } from '@juno/contract'
@@ -188,7 +189,7 @@ export function registerIpc({ updates, supervisor, agent, providers, backupSecre
   )
 
   handle(Channels.shellOpenExternal, ({ url }) => {
-    if (isWebUrl(url)) void shell.openExternal(url)
+    if (isWebUrl(url) || isT3ThreadUrl(url)) void shell.openExternal(url)
   })
 
   // Built here from ids, so the renderer can never open an arbitrary slack:// link.

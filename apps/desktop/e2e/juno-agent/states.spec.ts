@@ -3,7 +3,7 @@
 // each state from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
 import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
 import { Juno } from '../driver/juno'
 import { launchApp } from '../fixtures'
@@ -69,12 +69,36 @@ picker('the chat model picker offers the newest usable model per family and hide
   await expect.poll(names, { timeout: 15_000 }).toEqual(['Claude Sonnet 6', 'Claude Opus 5.5', 'Muse Wonder', 'GPT-6.1 Sol', 'Grok 4.7'])
 })
 
-picker.fixme('the model settings offer Sol through Codex', async ({ juno }) => {
-  // ProviderSection offers only OpenRouter and Custom endpoint; no Codex choice is wired.
-  await ready(juno)
-  const page = await openPage(juno, 'Settings › Juno')
-  await expect(page.getByRole('radio', { name: 'Codex', exact: true })).toBeVisible()
-  await expect(page.getByLabel('Chat model').locator('option').filter({ hasText: /Sol.*Codex/ })).toHaveCount(1)
+picker('the model settings offer Sol through Codex', async ({ fake, slackApp, userData, model }) => {
+  const { startFakeCodex } = await import('@juno/agent-testing/codex')
+  const codex = startFakeCodex()
+  codex.signIn(join(userData, 'agent', 'codex'))
+  codex.script([{ reply: '<say>Hello from local Codex.</say>' }])
+  const previousPath = process.env.PATH
+  process.env.PATH = `${dirname(codex.path)}:${previousPath ?? ''}`
+  let running: Awaited<ReturnType<typeof launchApp>> | undefined
+  try {
+    running = await relaunch(userData, { fake, slackApp, model })
+    const juno = new Juno(running.app, running.win)
+    await ready(juno)
+    const page = await openPage(juno, 'Settings › Juno')
+    const select = page.getByLabel('Chat model')
+    const option = select.locator('option').filter({ hasText: /Sol.*Codex/ })
+    await expect(option).toHaveCount(1)
+    await expect(option).toContainText('Uses your ChatGPT plan')
+    await select.selectOption({ label: await option.innerText() })
+    await expect(select).toHaveValue('codex:GPT Sol')
+    const chat = await openChat(juno)
+    await chat.send('Hello')
+    await chat.expectJuno('Hello from local Codex.')
+    expect(codex.invocations().filter((call) => call.command === 'exec')).toHaveLength(1)
+    expect(model.requests.filter((request) => !request.compaction)).toHaveLength(0)
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH
+    else process.env.PATH = previousPath
+    await running?.close()
+    codex.close()
+  }
 })
 
 test('while Juno is paused a message waits for Resume, then runs', async ({ juno, model }) => {
@@ -211,9 +235,7 @@ test('offline, the chat shows the chip and its composer still works, and the chi
   await expect(chip).toHaveCount(0, { timeout: 30_000 })
 })
 
-test.fixme('offline, a message waits for the network and runs once back', async ({ juno, fake }) => {
-  // Blocked: packages/agent/src/runtime/core.ts:165 starts a run whenever the mode is `on`, offline or not, so the
-  // message runs at once and "Waiting for network" never shows.
+test('offline, a message waits for the network and runs once back', async ({ juno, fake }) => {
   await ready(juno)
   const chat = await openChat(juno)
   fake.goOffline()

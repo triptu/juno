@@ -35,17 +35,7 @@ export function createT3Adapter(manager: McpManagerApi) {
     if (grant && current) mintGrant(manager.store, { opClass: 'job', target: job.id, authority: { _tag: 'click', current: true }, sourceOp: call.opId })
     return job
   }
-  const check: NonNullable<Executor['check']> = async (payload) => {
-    if (payload.connection_id !== 't3') return 'connectionChanged'
-    if (payload.account_id !== manager.stored('t3').epoch) return 'accountChanged'
-    if (manager.state('t3') !== 'ready') return 'preconditionFailed'
-    try {
-      if (manager.tool('t3', LAUNCH).hash !== payload.schema_hash) return 'schemaChanged'
-      validateArguments(manager.tool('t3', LAUNCH).definition, payload.args)
-      await manager.checkSecrets(payload.args)
-      return 'valid'
-    } catch { return 'preconditionFailed' }
-  }
+  const check = checkLaunch(manager)
   const executor: Executor = {
     tool: START, tier: 2, deduped: false, check,
     run: async (call) => {
@@ -88,9 +78,34 @@ export function createT3Adapter(manager: McpManagerApi) {
             }
             const id = context.actions.propose(proposal)
             return { text: `Proposed task ${id}. Nothing starts until the owner clicks Start.` }
-          } catch (error) { return { text: error instanceof McpError ? error.message : 'T3 Code has an unsupported tool schema or arguments. No session was started.', isError: true } }
+          } catch (error) {
+            return proposalFailure(manager, context.actions, { error, callId: call.callId, runId: run.runId })
+          }
         },
       })]
     },
+  }
+}
+
+function proposalFailure(manager: McpManagerApi, actions: Actions, input: { readonly error: unknown; readonly callId: string; readonly runId: string }) {
+  const { error, callId, runId } = input
+  if (error instanceof McpError && error.reason === 'secret') {
+    manager.store.db.prepare('INSERT OR IGNORE INTO tool_blocks VALUES (?, ?, ?)').run(callId, runId, manager.store.now())
+    actions.changed()
+  }
+  return { text: error instanceof McpError ? error.message : 'T3 Code has an unsupported tool schema or arguments. No session was started.', isError: true }
+}
+
+function checkLaunch(manager: McpManagerApi): NonNullable<Executor['check']> {
+  return async (payload) => {
+    if (payload.connection_id !== 't3') return 'connectionChanged'
+    if (payload.account_id !== manager.stored('t3').epoch) return 'accountChanged'
+    if (manager.state('t3') !== 'ready') return 'preconditionFailed'
+    try {
+      if (manager.tool('t3', LAUNCH).hash !== payload.schema_hash) return 'schemaChanged'
+      validateArguments(manager.tool('t3', LAUNCH).definition, payload.args)
+      await manager.checkSecrets(payload.args)
+      return 'valid'
+    } catch { return 'preconditionFailed' }
   }
 }
