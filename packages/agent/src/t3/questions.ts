@@ -58,9 +58,9 @@ export function questionExecutor(manager: McpManagerApi): Executor {
 
 /**
  * Unknown question shapes remain in T3; never invent approval answers.
- * Resolves false when a pending question has no card, so the job can say to answer it in T3 Code.
+ * Returns shown: false when a pending question has no card, so the job can say to answer it in T3 Code.
  */
-export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string, signal: AbortSignal): Promise<boolean> {
+export async function proposeQuestions(manager: McpManagerApi, actions: Actions, job: Job, threadId: string, signal: AbortSignal): Promise<{ readonly shown: boolean; readonly requestIds: ReadonlyArray<string> }> {
   const source = memoryGen(manager.store)
   const epoch = manager.stored('t3').epoch
   const list = Schema.decodeUnknownSync(Schema.Struct({ requestIds: Schema.Array(Schema.String) }))(
@@ -78,7 +78,7 @@ export async function proposeQuestions(manager: McpManagerApi, actions: Actions,
     }
     const tool = manager.tool('t3', RESPOND)
     const options = q.options.map((o, i) => ({ id: `option-${i}`, label: o.label, value: o.value ?? o.label }))
-    if (signal.aborted || source !== memoryGen(manager.store) || epoch !== manager.stored('t3').epoch) return shown
+    if (signal.aborted || source !== memoryGen(manager.store) || epoch !== manager.stored('t3').epoch) return { shown, requestIds: list.requestIds }
     actions.propose({ runId: job.runId, callId, payload: Schema.decodeUnknownSync(CardPayload)({
       _tag: 'question', asks: { _tag: 't3', job: { jobId: job.id, title: job.title } },
       prompt: q.question, options: options.map(({ id, label }) => ({ id, label })), freeText: q.allowCustomAnswer === true,
@@ -87,5 +87,5 @@ export async function proposeQuestions(manager: McpManagerApi, actions: Actions,
           args: { threadId, requestId, questionId: q.id, options: options.map(({ id, value }) => ({ id, value })) }, preconditions: {}, ops: [] } },
     }) })
   }
-  return shown
+  return { shown, requestIds: list.requestIds }
 }

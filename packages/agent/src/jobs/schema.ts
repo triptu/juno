@@ -28,4 +28,4 @@ const jobs1 = [
   'CREATE INDEX jobs_by_origin ON jobs (origin_op)',
 ]
 
-export const JOBS_MIGRATIONS: MigrationSet = { name: 'jobs', steps: [jobs1] }
+export const JOBS_MIGRATIONS: MigrationSet = { name: 'jobs', steps: [jobs1, ['ALTER TABLE jobs ADD COLUMN stop_failed INTEGER NOT NULL DEFAULT 0 CHECK (stop_failed IN (0, 1))']] }
