@@ -30,6 +30,16 @@ export const chatCopy = {
     prefix: 'About ',
     remove: 'Remove',
   },
+  /** A Juno page's tab title, as the Juno menu names it (SPEC 13.10). */
+  pageTitles: {
+    scheduled: 'Scheduled',
+    remembers: 'What Juno remembers',
+    memory: 'Memory of this chat',
+    activity: 'Activity',
+    connections: 'Connections',
+    settings: 'Settings › Juno',
+    review: 'Review',
+  },
   /** The Juno panel (SPEC 7, inventory 12.1). */
   panel: {
     catchMeUp: 'Catch me up',
@@ -245,6 +255,9 @@ export const chatCopy = {
       removalPending: (copies: number) => `Removal pending · ${copies === 1 ? '1 copy' : `${copies} copies`} in a running job`,
       stopJob: 'Stop job',
       keyRejected: 'OpenRouter rejected this key',
+      /** Under the key field: main refused it as not a key, or the keychain did not take it. */
+      keyInvalid: 'That is not an OpenRouter key.',
+      keyFailed: 'The keychain did not save the key. Try again.',
       exportPhrase: 'Export recovery phrase',
       move: 'Move to another Mac',
       restore: 'Restore from backup',

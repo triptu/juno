@@ -4,6 +4,22 @@ import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Sur
 import { cell } from './cell'
 import { fullTime, messageTime } from '../time'
 
+/** The OpenRouter key being typed in its row. The draft is the renderer's; the key goes to main, never to the page. */
+export interface KeyEntry {
+  readonly draft: string
+  /** "That is not an OpenRouter key." and the like, under the field. */
+  readonly error?: string
+  readonly onDraft: (draft: string) => void
+  readonly onSave: () => void
+  readonly onCancel: () => void
+}
+
+/**
+ * A section whose work is not built yet is left out by leaving out its
+ * callbacks: Codex (`onSignInCodex`), Rules (`onRuleChange`, `onRuleRemove`,
+ * `onRuleAdd`), Backup (`onBackupFolder`, `onExportPhrase`) and This Mac
+ * (`onMove`, `onRestore`, `onStopJob`).
+ */
 export interface JunoSettingsPageProps {
   readonly page: JunoSettingsPageModel
   readonly now: number
@@ -11,16 +27,23 @@ export interface JunoSettingsPageProps {
   readonly onCompactionModel: (family: string) => void
   readonly onCap: (usd: number) => void
   readonly onOpenRouterKey: () => void
-  readonly onSignInCodex: () => void
-  readonly onRuleChange: (id: string, text: string) => void
-  readonly onRuleRemove: (id: string) => void
-  readonly onRuleAdd: () => void
+  /** Open while the owner types a key. */
+  readonly keyEntry?: KeyEntry
   readonly onPaused: (paused: boolean) => void
-  readonly onBackupFolder: () => void
-  readonly onExportPhrase: () => void
-  readonly onMove: () => void
-  readonly onRestore: () => void
-  readonly onStopJob: (jobId: JobId) => void
+  readonly onSignInCodex?: () => void
+  readonly onRuleChange?: (id: string, text: string) => void
+  readonly onRuleRemove?: (id: string) => void
+  readonly onRuleAdd?: () => void
+  readonly onBackupFolder?: () => void
+  readonly onExportPhrase?: () => void
+  readonly onMove?: () => void
+  readonly onRestore?: () => void
+  readonly onStopJob?: (jobId: JobId) => void
+}
+
+function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
+  const value = Number(text)
+  if (text.trim() !== '' && Number.isFinite(value) && value >= 0 && value !== current) onCap(value)
 }
 
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
@@ -39,13 +62,38 @@ function modelOptions(models: ReadonlyArray<ModelChoice>) {
  * Juno's state with Export recovery phrase, Move and Restore. Settings
  * change only here; no conversation can change them.
  */
-export function JunoSettingsPage({ page, now, onChatModel, onCompactionModel, onCap, onOpenRouterKey, onSignInCodex, onRuleChange, onRuleRemove, onRuleAdd, onPaused, onBackupFolder, onExportPhrase, onMove, onRestore, onStopJob }: JunoSettingsPageProps) {
+export function JunoSettingsPage({
+  page,
+  now,
+  onChatModel,
+  onCompactionModel,
+  onCap,
+  onOpenRouterKey,
+  keyEntry,
+  onSignInCodex,
+  onRuleChange,
+  onRuleRemove,
+  onRuleAdd,
+  onPaused,
+  onBackupFolder,
+  onExportPhrase,
+  onMove,
+  onRestore,
+  onStopJob,
+}: JunoSettingsPageProps) {
   const copy = chatCopy.pages.settings
   const chatSelected = page.chatModels.find((model) => model.selected)?.family ?? ''
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
   return (
     <Page width="settings">
-      <PageHeader title="Juno" subtitle="Models, spend, rules and where Juno's state lives. Only you can change these." />
+      <PageHeader
+        title="Juno"
+        subtitle={
+          onRuleChange !== undefined && onMove !== undefined
+            ? "Models, spend, rules and where Juno's state lives. Only you can change these."
+            : 'Models, spend and the provider. Only you can change these.'
+        }
+      />
 
       <Section heading="Model" sub="The newest model of each family, from the provider's catalogue.">
         <Surface kind="group">
@@ -69,7 +117,27 @@ export function JunoSettingsPage({ page, now, onChatModel, onCompactionModel, on
           >
             <Text variant="body">Today</Text>
           </ListRow>
-          <ListRow divider={false} trailing={<TextField size={30} label="Daily cap in dollars" type="number" inputMode="decimal" min={0} step={0.5} value={page.capUsd} onChange={(event) => onCap(Number(event.currentTarget.value))} width="keyword" />}>
+          <ListRow
+            divider={false}
+            trailing={
+              <TextField
+                size={30}
+                label="Daily cap in dollars"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={0.5}
+                // Committed on blur or Enter, so a field cleared while typing never sets the cap to $0.
+                key={page.capUsd}
+                defaultValue={page.capUsd}
+                onBlur={(event) => commitCap(event.currentTarget.value, page.capUsd, onCap)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitCap(event.currentTarget.value, page.capUsd, onCap)
+                }}
+                width="keyword"
+              />
+            }
+          >
             <Text variant="body">Daily cap</Text>
           </ListRow>
         </Surface>
@@ -78,74 +146,109 @@ export function JunoSettingsPage({ page, now, onChatModel, onCompactionModel, on
       <Section heading="Providers">
         <Surface kind="group">
           <ListRow
+            divider={onSignInCodex !== undefined}
             data-openrouter={page.openRouterKey}
             trailing={
-              <span {...stylex.props(cell.controls)}>
-                <Chip variant={page.openRouterKey === 'set' ? 'filled' : 'outline'} size={20}>
-                  {page.openRouterKey === 'set' ? 'Key set' : page.openRouterKey === 'rejected' ? 'Rejected' : 'No key'}
-                </Chip>
-                <Button variant="ghost" size="xs" tone="subtle" onClick={onOpenRouterKey}>
-                  {page.openRouterKey === 'missing' ? 'Add key' : 'Change key'}
-                </Button>
-              </span>
+              keyEntry === undefined ? (
+                <span {...stylex.props(cell.controls)}>
+                  <Chip variant={page.openRouterKey === 'set' ? 'filled' : 'outline'} size={20}>
+                    {page.openRouterKey === 'set' ? 'Key set' : page.openRouterKey === 'rejected' ? 'Rejected' : 'No key'}
+                  </Chip>
+                  <Button variant="ghost" size="xs" tone="subtle" onClick={onOpenRouterKey}>
+                    {page.openRouterKey === 'missing' ? 'Add key' : 'Change key'}
+                  </Button>
+                </span>
+              ) : (
+                <span {...stylex.props(cell.controls)}>
+                  <TextField
+                    size={30}
+                    label="OpenRouter key"
+                    type="password"
+                    placeholder="sk-or-…"
+                    value={keyEntry.draft}
+                    invalid={keyEntry.error !== undefined}
+                    autoFocus
+                    onChange={(event) => keyEntry.onDraft(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') keyEntry.onSave()
+                      else if (event.key === 'Escape') keyEntry.onCancel()
+                    }}
+                    width="keyword"
+                  />
+                  <Button variant="secondary" size="md" onClick={keyEntry.onSave} disabled={keyEntry.draft.trim() === ''}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" size="md" tone="subtle" onClick={keyEntry.onCancel}>
+                    Cancel
+                  </Button>
+                </span>
+              )
             }
           >
             <span {...stylex.props(cell.lines)}>
               <Text variant="body">OpenRouter</Text>
-              {page.openRouterKey === 'rejected' ? (
+              {keyEntry?.error !== undefined ? (
+                <Text variant="meta" tone="danger" data-key-error="">
+                  {keyEntry.error}
+                </Text>
+              ) : page.openRouterKey === 'rejected' ? (
                 <Text variant="meta" tone="danger">
                   {copy.keyRejected}
                 </Text>
               ) : null}
             </span>
           </ListRow>
-          <ListRow
-            divider={false}
-            data-codex={page.codex._tag}
-            trailing={
-              <span {...stylex.props(cell.controls)}>
-                <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20}>
-                  {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
-                </Chip>
-                {page.codex._tag === 'signedOut' ? (
-                  <Button variant="ghost" size="xs" tone="subtle" onClick={onSignInCodex}>
-                    Sign in
-                  </Button>
-                ) : null}
+          {onSignInCodex === undefined ? null : (
+            <ListRow
+              divider={false}
+              data-codex={page.codex._tag}
+              trailing={
+                <span {...stylex.props(cell.controls)}>
+                  <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20}>
+                    {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
+                  </Chip>
+                  {page.codex._tag === 'signedOut' ? (
+                    <Button variant="ghost" size="xs" tone="subtle" onClick={onSignInCodex}>
+                      Sign in
+                    </Button>
+                  ) : null}
+                </span>
+              }
+            >
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body">Codex</Text>
+                <Text variant="meta" tone="muted">
+                  Uses your ChatGPT plan on this Mac.
+                </Text>
               </span>
-            }
-          >
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body">Codex</Text>
-              <Text variant="meta" tone="muted">
-                Uses your ChatGPT plan on this Mac.
-              </Text>
-            </span>
-          </ListRow>
+            </ListRow>
+          )}
         </Surface>
       </Section>
 
-      <Section heading="Rules" sub="One line each. Rules can only make Juno ask more, never less.">
-        <Surface kind="group">
-          {page.rules.map((rule) => (
-            <ListRow
-              key={rule.id}
-              trailing={
-                <Button variant="ghost" size="xs" tone="subtle" onClick={() => onRuleRemove(rule.id)}>
-                  Remove
-                </Button>
-              }
-            >
-              <TextField size={30} label="Rule" value={rule.text} onChange={(event) => onRuleChange(rule.id, event.currentTarget.value)} dir="auto" />
+      {onRuleChange === undefined || onRuleRemove === undefined || onRuleAdd === undefined ? null : (
+        <Section heading="Rules" sub="One line each. Rules can only make Juno ask more, never less.">
+          <Surface kind="group">
+            {page.rules.map((rule) => (
+              <ListRow
+                key={rule.id}
+                trailing={
+                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => onRuleRemove(rule.id)}>
+                    Remove
+                  </Button>
+                }
+              >
+                <TextField size={30} label="Rule" value={rule.text} onChange={(event) => onRuleChange(rule.id, event.currentTarget.value)} dir="auto" />
+              </ListRow>
+            ))}
+            <ListRow divider={false} minHeight={44}>
+              <Button variant="ghost" size="sm" tone="subtle" onClick={onRuleAdd}>
+                Add a rule
+              </Button>
             </ListRow>
-          ))}
-          <ListRow divider={false} minHeight={44}>
-            <Button variant="ghost" size="sm" tone="subtle" onClick={onRuleAdd}>
-              Add a rule
-            </Button>
-          </ListRow>
-        </Surface>
-      </Section>
+          </Surface>
+        </Section>
+      )}
 
       <Section heading="Pause" sub="Stops the current reply, asks every running job to stop, and starts nothing new. Messages wait for Resume.">
         <Surface kind="group">
@@ -155,25 +258,26 @@ export function JunoSettingsPage({ page, now, onChatModel, onCompactionModel, on
         </Surface>
       </Section>
 
-      <Section heading="Backup" sub="An encrypted copy of Juno's state, in a folder you choose.">
-        <Surface kind="group">
-          <ListRow
-            trailing={
-              <Button variant="ghost" size="xs" tone="subtle" onClick={onBackupFolder}>
-                Choose folder
-              </Button>
-            }
-          >
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body" truncate>
-                {page.backupFolder}
-              </Text>
-              <Text variant="meta" tone="muted">
-                {page.lastBackupAt === undefined ? 'No backup yet' : (
-                  <>
-                    Last backup <time title={fullTime(page.lastBackupAt)}>{messageTime(page.lastBackupAt, now)}</time>
-                  </>
-                )}
+      {onBackupFolder === undefined || onExportPhrase === undefined ? null : (
+        <Section heading="Backup" sub="An encrypted copy of Juno's state, in a folder you choose.">
+          <Surface kind="group">
+            <ListRow
+              trailing={
+                <Button variant="ghost" size="xs" tone="subtle" onClick={onBackupFolder}>
+                  Choose folder
+                </Button>
+              }
+            >
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body" truncate>
+                  {page.backupFolder}
+                </Text>
+                <Text variant="meta" tone="muted">
+                  {page.lastBackupAt === undefined ? 'No backup yet' : (
+                    <>
+                      Last backup <time title={fullTime(page.lastBackupAt)}>{messageTime(page.lastBackupAt, now)}</time>
+                    </>
+      )}
               </Text>
             </span>
           </ListRow>
@@ -192,56 +296,59 @@ export function JunoSettingsPage({ page, now, onChatModel, onCompactionModel, on
         </Surface>
       </Section>
 
-      <Section heading="This Mac" sub="Juno runs on one Mac at a time.">
-        <Surface kind="group" data-ownership={page.ownership._tag}>
-          <ListRow
-            trailing={
-              <Chip variant={page.ownership._tag === 'active' ? 'filled' : 'outline'} size={20}>
-                {page.ownership._tag === 'active' ? 'Active here' : page.ownership._tag === 'released' ? 'Moving' : 'Recovery'}
-              </Chip>
-            }
-          >
-            <span {...stylex.props(cell.lines)}>
-              <Text variant="body">
-                {page.ownership._tag === 'active'
-                  ? 'This Mac owns Juno’s state.'
-                  : page.ownership._tag === 'released'
-                    ? 'This Mac is read-only until the other Mac takes over.'
-                    : `Restored from a backup. ${page.ownership.pending === 1 ? '1 action was' : `${page.ownership.pending} actions were`} pending.`}
-              </Text>
-            </span>
-          </ListRow>
-          {page.removalPending !== undefined ? (
+      )}
+      {onMove === undefined || onRestore === undefined || onStopJob === undefined ? null : (
+        <Section heading="This Mac" sub="Juno runs on one Mac at a time.">
+          <Surface kind="group" data-ownership={page.ownership._tag}>
             <ListRow
-              data-removal-pending=""
               trailing={
-                <Button variant="ghost" size="xs" tone="subtle" onClick={() => page.removalPending !== undefined && onStopJob(page.removalPending.jobId)}>
-                  {copy.stopJob}
-                </Button>
+                <Chip variant={page.ownership._tag === 'active' ? 'filled' : 'outline'} size={20}>
+                  {page.ownership._tag === 'active' ? 'Active here' : page.ownership._tag === 'released' ? 'Moving' : 'Recovery'}
+                </Chip>
               }
             >
-              <Text variant="body">{copy.removalPending(page.removalPending.copies)}</Text>
-            </ListRow>
-          ) : null}
-          <ListRow
-            divider={false}
-            trailing={
-              <span {...stylex.props(cell.controls)}>
-                <Button variant="ghost" size="xs" tone="subtle" onClick={onMove} disabled={page.ownership._tag !== 'active'}>
-                  {copy.move}
-                </Button>
-                <Button variant="ghost" size="xs" tone="subtle" onClick={onRestore}>
-                  {copy.restore}
-                </Button>
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body">
+                  {page.ownership._tag === 'active'
+                    ? 'This Mac owns Juno’s state.'
+                    : page.ownership._tag === 'released'
+                      ? 'This Mac is read-only until the other Mac takes over.'
+                      : `Restored from a backup. ${page.ownership.pending === 1 ? '1 action was' : `${page.ownership.pending} actions were`} pending.`}
+                </Text>
               </span>
-            }
-          >
-            <Text variant="meta" tone="muted" sx={cell.wrap}>
-              {copy.attest}
-            </Text>
-          </ListRow>
-        </Surface>
-      </Section>
+            </ListRow>
+            {page.removalPending !== undefined ? (
+              <ListRow
+                data-removal-pending=""
+                trailing={
+                  <Button variant="ghost" size="xs" tone="subtle" onClick={() => page.removalPending !== undefined && onStopJob(page.removalPending.jobId)}>
+                    {copy.stopJob}
+                  </Button>
+                }
+              >
+                <Text variant="body">{copy.removalPending(page.removalPending.copies)}</Text>
+              </ListRow>
+            ) : null}
+            <ListRow
+              divider={false}
+              trailing={
+                <span {...stylex.props(cell.controls)}>
+                  <Button variant="ghost" size="xs" tone="subtle" onClick={onMove} disabled={page.ownership._tag !== 'active'}>
+                    {copy.move}
+                  </Button>
+                  <Button variant="ghost" size="xs" tone="subtle" onClick={onRestore}>
+                    {copy.restore}
+                  </Button>
+                </span>
+              }
+            >
+              <Text variant="meta" tone="muted" sx={cell.wrap}>
+                {copy.attest}
+              </Text>
+            </ListRow>
+          </Surface>
+        </Section>
+      )}
     </Page>
   )
 }

@@ -21,14 +21,10 @@ export interface JunoHeaderProps {
   readonly actions?: ReactNode
 }
 
-const pages: ReadonlyArray<{ readonly page: JunoPage; readonly label: string }> = [
-  { page: 'scheduled', label: 'Scheduled' },
-  { page: 'remembers', label: 'What Juno remembers' },
-  { page: 'memory', label: 'Memory of this chat' },
-  { page: 'activity', label: 'Activity' },
-  { page: 'connections', label: 'Connections' },
-  { page: 'settings', label: 'Settings › Juno' },
-]
+const pages: ReadonlyArray<{ readonly page: JunoPage; readonly label: string }> = (['scheduled', 'remembers', 'memory', 'activity', 'connections', 'settings'] as const).map((page) => ({
+  page,
+  label: chatCopy.pageTitles[page],
+}))
 
 /**
  * The Juno header (inventory 12 and 12.1): the topic header's islands and
