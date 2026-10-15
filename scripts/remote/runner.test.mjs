@@ -125,7 +125,7 @@ const file = process.env.TEST_INSTANCES;
 if (process.argv[2] === 'list') {
  const count = fs.existsSync(process.env.TEST_LISTS) ? Number(fs.readFileSync(process.env.TEST_LISTS)) : 0;
  fs.writeFileSync(process.env.TEST_LISTS, String(count + 1));
- if (count < 2) { console.error(count ? 'Unavailable' : 'spawnSync nsc ETIMEDOUT'); process.exit(1); }
+ if (count < 3) { console.error(count ? 'Unavailable' : 'spawnSync nsc ETIMEDOUT'); process.exit(1); }
  console.log(fs.readFileSync(file, 'utf8'));
 } else if (process.argv[2] === 'destroy') {
  fs.writeFileSync(file, JSON.stringify(JSON.parse(fs.readFileSync(file)).filter(x => x.cluster_id !== process.argv[3])));

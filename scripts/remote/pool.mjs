@@ -75,11 +75,18 @@ function takeLock(id) {
   return lock(id)
 }
 function list() {
-  const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 30_000 })
-  if (result.status !== 0) throw new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
-  const instances = JSON.parse(result.stdout)
-  if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
-  return instances
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 90_000 })
+    if (result.status !== 0) {
+      const error = new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
+      if (attempt < 3 && transient(error)) continue
+      throw error
+    }
+    // nsc prints null when no instance exists.
+    const instances = JSON.parse(result.stdout) ?? []
+    if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
+    return instances
+  }
 }
 function forget(id) {
   rmSync(statePath(id), { force: true })
