@@ -88,29 +88,18 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
           if (moved) yield* Effect.forkIn(clearAt(until), scope)
         })
 
-      /** Waits until the method's bucket is open. The interactive lane gives up instead of waiting long. */
-      const waitForMethod = (lane: Lane, method: string): Effect.Effect<void, SlackRateLimited> =>
-        Effect.gen(function* () {
-          while (true) {
-            const until = yield* pausedUntil(method)
-            if (until === undefined) return
-            const remaining = until - (yield* Clock.currentTimeMillis)
-            if (lane === 'interactive' && remaining > config.interactiveMaxWaitMillis) {
-              return yield* new SlackRateLimited({ method, retryAfterMillis: remaining })
-            }
-            yield* Effect.sleep(remaining)
-          }
-        })
-
       const run = <A, E, R>(lane: Lane, method: string, effect: Effect.Effect<A, E, R>) =>
         Effect.gen(function* () {
           while (true) {
-            yield* waitForMethod(lane, method)
+            if (lane === 'interactive') {
+              const remaining = ((yield* pausedUntil(method)) ?? 0) - (yield* Clock.currentTimeMillis)
+              if (remaining > config.interactiveMaxWaitMillis) return yield* new SlackRateLimited({ method, retryAfterMillis: remaining })
+            }
             const result = yield* permits[lane].withPermit(Effect.gen(function* () {
               const now = yield* Clock.currentTimeMillis
-              const pausedUntil = (yield* Ref.get(paused)).get(method) ?? 0
+              const pauseEnd = (yield* Ref.get(paused)).get(method) ?? 0
               const bucket = lane === 'background' ? bucketOf(method) : undefined
-              const until = Math.max(pausedUntil, bucket?.next ?? 0)
+              const until = Math.max(pauseEnd, bucket?.next ?? 0)
               // Do not reserve a future slot or hold a lane permit while sleeping.
               // Another method can run, and a new pause is checked on every admission.
               if (until > now) return { kind: 'wait', millis: until - now } as const
