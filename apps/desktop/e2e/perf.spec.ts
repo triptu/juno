@@ -287,6 +287,39 @@ test('send: Enter to the pending row painted', async ({ juno }) => {
   within('send, p95', send.p95, 50)
 })
 
+// Typing "@ma " quickly in a reply, ten times over: each input to its
+// character presented, measured like the keystroke controls (`perfTyping.ts`,
+// performance.md 7.1). Every "@" opens the suggestions and each letter
+// narrows them; the field draws its text through the chip layer. Soft
+// against the budget, as the plain composer control is: the presentation
+// measure misses it on a bare input too (performance.md 7.1).
+test('mention typing: each keystroke of "@ma" to its character presented', async ({ juno, win }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  const hidden = await countHidden(win)
+  const budget = oneFrameBudget(await refreshInterval(win))
+  const input = juno.topic.composer
+  await input.fill('')
+  await input.focus()
+  const result = await typingReading(win, input, 'typing-mention', async () => {
+    for (let round = 0; round < 10; round++) {
+      await input.pressSequentially('@ma ')
+      await win.waitForTimeout(150)
+    }
+  })
+  expect(result.count).toBe(40)
+  await expect(input).toHaveValue('@ma '.repeat(10))
+  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
+  stats('mention typing, Event Timing keydown/keypress >=16 ms (diagnostic)', result.events)
+  const presented = stats('mention typing, input timestamp to character presented', result.presented)
+  stats('mention typing, input to animation frame callback', result.frame)
+  stats('mention typing, animation frame callback to presentation', result.afterFrame)
+  expect.soft(presented.p95, 'mention typing: input to character presented').toBeLessThanOrEqual(budget)
+})
+
 test('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
   test.setTimeout(180_000)
   await juno.signIn()

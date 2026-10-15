@@ -95,6 +95,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
+export { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
   checkMessage,
   deleteMessage,
