@@ -243,5 +243,3 @@ export function createDispatcher(options: DispatcherOptions) {
     },
   }
 }
-
-export type Dispatcher = ReturnType<typeof createDispatcher>

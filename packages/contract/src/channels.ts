@@ -7,7 +7,7 @@
  */
 import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme } from './shell'
 
-export type { Accent, AppInfo, Density, Platform, ProviderChange, ProviderKind, ProviderResult, ProviderState, SidebarLayout, SlackTarget, Theme } from './shell'
+export type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme } from './shell'
 
 export const Channels = {
   updatesGet: 'updates.get',
@@ -57,8 +57,6 @@ export const Channels = {
   /** The topic the window shows, or null. Main adds whether the window is focused and tells the engine. */
   notificationsViewing: 'notifications.viewing',
 } as const
-
-export type Channel = (typeof Channels)[keyof typeof Channels]
 
 /** main -> preload messages sent with `webContents.postMessage`. */
 export const Events = {

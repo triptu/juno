@@ -83,4 +83,4 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicArt,
 }
 
-export type { Fixture, FixtureFrame, FixtureGroup, FixtureSet, FixtureState } from './fixtures/define'
+export type { FixtureSet } from './fixtures/define'

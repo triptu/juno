@@ -37,9 +37,6 @@ export interface FakeNotion extends FakeMcpServer {
   readonly loseNextWrite: (options?: { readonly tool?: 'notion-update-page' | 'notion-create-pages'; readonly applied?: boolean }) => void
 }
 
-export const NOTION_READ_TOOLS = ['notion-search', 'notion-fetch'] as const
-export const NOTION_WRITE_TOOLS = ['notion-create-pages', 'notion-update-page'] as const
-
 const examplePages = [
   { id: 'page-roadmap', title: 'Roadmap', content: 'Q4: ship the topic view.' },
   { id: 'page-notes', title: 'Meeting notes', content: 'Decided to move the launch to Tuesday.' },

@@ -21,8 +21,6 @@ export const tasks = {
   automatedChannel,
 } as const
 
-export type TaskName = keyof typeof tasks
-
 /** The structured tasks, for the eval and for schema tests. */
 export const decisionTasks = [routeCheck, settledScore, urgencyGate, parseCommand, followUps, automatedChannel] as const
 

@@ -9,7 +9,7 @@
 import { Ts, isTs } from '@juno/slack-schema'
 import { Schema } from 'effect'
 
-export { Ts, compareTs, maxTs, millisToTs, minTs, tsToMillis } from '@juno/slack-schema'
+export { Ts, compareTs, maxTs, millisToTs, tsToMillis } from '@juno/slack-schema'
 
 export const ChannelId = Schema.String.pipe(Schema.brand('ChannelId'))
 export type ChannelId = typeof ChannelId.Type
@@ -55,8 +55,4 @@ export function parseTopicId(id: string): ParsedTopicId | undefined {
 
 export function topicKindOf(id: TopicId): TopicKind {
   return id.startsWith('t:') ? 'thread' : 'main'
-}
-
-export function channelOfTopic(id: TopicId): ChannelId {
-  return parseTopicId(id)?.channel ?? ChannelId.make('')
 }

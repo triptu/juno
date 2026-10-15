@@ -65,7 +65,6 @@ export const ATTRS = {
 } as const satisfies Record<string, ReadonlyArray<string>>
 
 export type ElementTag = keyof typeof ATTRS
-export const TAGS = Object.keys(ATTRS) as ReadonlyArray<ElementTag>
 const isTag = (value: string): value is ElementTag => Object.hasOwn(ATTRS, value)
 
 const NUM = /^-?\d+(\.\d+)?$/
@@ -238,4 +237,3 @@ export function countElements(recipe: Recipe): number {
   const walk = (elements: ReadonlyArray<RecipeElement>): number => elements.reduce((n, element) => n + (element.tag === 'g' ? walk(element.children ?? []) : 1), 0)
   return walk(recipe.elements)
 }
-

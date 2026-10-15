@@ -32,12 +32,3 @@ export function imageSize(bytes: Uint8Array): { readonly width: number; readonly
   }
   return undefined
 }
-
-/** The mimetype of an image by its first bytes, for a file whose name says nothing. */
-export function imageType(bytes: Uint8Array): string | undefined {
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png'
-  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg'
-  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif'
-  if (bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'image/webp'
-  return undefined
-}

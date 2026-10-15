@@ -2,8 +2,6 @@ import { Effect } from 'effect'
 import { Migrator, type SqlClient } from 'effect/sql'
 import type { SqlError } from 'effect/sql/SqlError'
 
-export type { MigrationError } from 'effect/sql/Migrator'
-
 /** The table the Migrator records applied migration ids in, in each database. */
 export const MIGRATIONS_TABLE = 'juno_migrations'
 
