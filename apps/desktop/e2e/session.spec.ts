@@ -106,7 +106,7 @@ test('explains a Slack app that is not signed in', async ({ fake, userData }) =>
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: join(userData, 'no-such-dir'), keychainPassword: 'x' })
   try {
     const juno = new Juno(running.app, running.win)
-    await juno.importFromSlackApp()
+    await juno.importFromSlackApp({ skipSetUp: false })
     await juno.expectSignInError('No signed-in Slack app was found on this Mac.')
     await juno.expectSignedOut()
   } finally {
@@ -118,7 +118,7 @@ test('explains a keychain password that does not unlock the cookie', async ({ fa
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: 'wrong' })
   try {
     const juno = new Juno(running.app, running.win)
-    await juno.importFromSlackApp()
+    await juno.importFromSlackApp({ skipSetUp: false })
     await juno.expectSignInError(/keychain item/)
     await juno.expectSignedOut()
   } finally {

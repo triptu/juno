@@ -54,7 +54,8 @@ function commitModel(text: string, current: string, onChatModel: (id: string) =>
 
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
-function modelOptions(models: ReadonlyArray<ModelChoice>) {
+/** The model select's rows: the resolved name, Codex, and the price, as Settings › Juno and Set up Juno show them. */
+export function modelOptions(models: ReadonlyArray<ModelChoice>) {
   return models.map((model) => ({
     value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.

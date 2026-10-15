@@ -32,6 +32,7 @@ import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
 import SessionView from './SessionView.fixtures'
+import SetUpJunoView from './SetUpJunoView.fixtures'
 import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
 import Sidebar from './Sidebar.fixtures'
@@ -130,6 +131,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   SessionView,
   Shell,
   Sidebar,
+  SetUpJunoView,
   SignInView,
   StatusBubble,
   TaskCard: taskCard,

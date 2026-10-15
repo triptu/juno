@@ -28,6 +28,7 @@ export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 export { PeekView } from './PeekView'
 
 export { SessionView } from './SessionView'
+export { SetUpJunoView, type SetUpChoice, type SetUpCodex } from './SetUpJunoView'
 export { SignInView } from './SignInView'
 export { Shell } from './Shell'
 export { Sidebar, type SidebarNavTarget } from './Sidebar'

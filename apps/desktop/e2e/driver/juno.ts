@@ -700,15 +700,31 @@ export class Juno {
 
   /**
    * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
-   * that opens, and waits for the app to come back signed in.
+   * that opens, and waits for the app to come back signed in. Then skips
+   * "Set up Juno" unless `skipSetUp` is false.
    */
-  async signIn(options: { readonly email?: string } = {}): Promise<void> {
+  async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
     const opened = this.app.waitForEvent('window')
     await this.signInButton.click()
     const page = await opened
     await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
     await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
+    if (options.skipSetUp !== false) await this.skipSetUp()
+  }
+
+  /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
+  get setUp(): Locator {
+    return this.win.locator('[data-set-up-juno]')
+  }
+
+  /**
+   * Once signed in, presses Skip for now on "Set up Juno" if it shows. It
+   * shows before the sidebar or not at all, so whichever comes first says.
+   */
+  async skipSetUp(): Promise<void> {
+    await expect(this.setUp.or(this.sidebar.root).first()).toBeVisible({ timeout: 15_000 })
+    if (await this.setUp.isVisible()) await this.setUp.getByRole('button', { name: 'Skip for now' }).click()
   }
 
   /** Clicks "Sign in to Slack" and closes the window without signing in. */
@@ -719,9 +735,10 @@ export class Juno {
     await page.close()
   }
 
-  /** Clicks "Use the Slack app's session". The app reads the fixture directory it was launched with. */
-  async importFromSlackApp(): Promise<void> {
+  /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */
+  async importFromSlackApp(options: { readonly skipSetUp?: boolean } = {}): Promise<void> {
     await this.importButton.click()
+    if (options.skipSetUp !== false) await this.skipSetUp()
   }
 
   async signOut(): Promise<void> {
