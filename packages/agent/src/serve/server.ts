@@ -5,10 +5,16 @@
  * The chat group is served over the turn engine: the page and summary are
  * rebuilt from the agent's records (`chat.ts`) whenever a run moves, a
  * command lands or presence changes; send, react and retry go to the
- * engine's inbox, and each answers only after the inbox commit. The other
- * groups (cards, pages, settings) belong to later work packages: until they
- * exist, their commands fail with `unavailable` and their streams end with
- * a defect, so a container shows the failure instead of waiting forever.
+ * engine's inbox, and each answers only after the inbox commit.
+ *
+ * The Juno menu's pages (`pages.ts`) and Settings › Juno
+ * (`settings/settings.ts`) are rebuilt on the same signal, and on their own
+ * changes. Every page streams, empty where its records come with a later
+ * work package; a command whose records do not exist yet (cards,
+ * schedules, connections, rules, backup, ownership, review) fails with
+ * `unavailable`. Pin edits and settings changes are owner actions on the
+ * trusted side: they are written to `agent.sqlite` at FULL before they
+ * answer, without an inbox op.
  *
  * The header banner, by precedence: `updateNeeded` (the records are newer
  * than this build), `aiOff` (AI assist is off in Juno), `paused`, `offline`
@@ -21,6 +27,7 @@ import {
   AgentCommandError,
   AgentRpcs,
   ChatMessageId,
+  chatCopy,
   type Banner,
   type ChatItem,
   type ChatPage,
@@ -29,8 +36,11 @@ import {
 import { Revision } from '@juno/agent-cards'
 import type { Presence } from '../host/reads'
 import type { Turns } from '../router/open'
+import type { PinResult } from '../pins/pins'
 import type { UpdateNeeded } from '../runtime/core'
+import type { JunoSettings } from '../settings/settings'
 import { chatItems, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
+import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
 import { runnerPlatform, type RendererTransport } from './runner'
 
 export interface ChatHost {
@@ -38,11 +48,14 @@ export interface ChatHost {
   readonly turns: Turns | UpdateNeeded | undefined
   readonly presence: () => Presence | undefined
   readonly presenceChanges: Stream.Stream<Presence | undefined>
+  /** Settings › Juno, when the engine runs on a model picker. */
+  readonly settings?: JunoSettings
 }
 
 const unavailable = (message: string) => Effect.fail(new AgentCommandError({ reason: 'unavailable', message }))
 const notYet = (what: string) => () => unavailable(`${what} is not available yet.`)
-const notServed = (what: string) => () => Stream.die(new Error(`${what} is not served yet`))
+/** How often the Memory page looks for a newly published view: compaction moves it between runs. */
+const MEMORY_RECHECK = '2 seconds'
 
 const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
 
@@ -131,6 +144,27 @@ function chatState(host: ChatHost) {
   }
 
   return { turns, changed, changes, items, page, close: () => unsubscribe?.() }
+}
+
+/** `build` on every change, emitting only what differs from the last. */
+const live = <A>(changes: Stream.Stream<void>, build: () => A): Stream.Stream<A> =>
+  changes.pipe(
+    Stream.map(build),
+    Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+  )
+
+/** A pin change's answer: the op id once written, or why it was refused. */
+const pinAnswer = (opId: OpId, result: PinResult) => {
+  if (result._tag === 'changed') return Effect.succeed({ opId })
+  switch (result.reason) {
+    case 'conflict':
+    case 'source':
+      return Effect.fail(new AgentCommandError({ reason: 'stale', message: chatCopy.pages.remembers.changed }))
+    case 'budget':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: chatCopy.pages.remembers.full }))
+    case 'span':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: 'Juno can remember up to 280 bytes of one of your messages.' }))
+  }
 }
 
 /** The engine, or why a command cannot reach it. */
@@ -224,25 +258,56 @@ export function agentHandlers(host: ChatHost) {
         'agent.jobs.stop': ({ opId, jobId }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(Effect.promise(() => turns.jobs.stop(jobId)).pipe(Effect.as({ opId })))),
 
-        'agent.scheduled.page': notServed('The Scheduled page'),
+        'agent.scheduled.page': () => Stream.make({ page: { schedules: [] }, revisions: [] }),
         'agent.scheduled.edit': notYet('Scheduled'),
         'agent.scheduled.action': notYet('Scheduled'),
-        'agent.remembers.page': notServed('The What Juno remembers page'),
-        'agent.remembers.edit': notYet('What Juno remembers'),
-        'agent.remembers.remove': notYet('What Juno remembers'),
-        'agent.remembers.pin': notYet('Remember this'),
-        'agent.memory.page': notServed('The Memory page'),
-        'agent.activity.page': notServed('The Activity page'),
-        'agent.connections.page': notServed('The Connections page'),
+        'agent.remembers.page': () => (state.turns === undefined ? Stream.make(emptyRemembers) : live(state.changes, () => remembersPage(state.turns!.store))),
+        'agent.remembers.edit': ({ opId, id, revision, text }) =>
+          Effect.flatMap(engine(state, host), (turns) => changed(Effect.suspend(() => pinAnswer(opId, turns.pins.edit({ id, version: revision }, text))))),
+        'agent.remembers.remove': ({ opId, id, revision }) =>
+          Effect.flatMap(engine(state, host), (turns) => changed(Effect.suspend(() => pinAnswer(opId, turns.pins.undo({ id, version: revision }))))),
+        'agent.remembers.pin': ({ opId, messageId, revision, startByte, endByte }) =>
+          Effect.flatMap(engine(state, host), (turns) =>
+            changed(
+              Effect.suspend(() => {
+                const message = turns.store.db.prepare('SELECT version FROM messages WHERE id = ?').get(Number(messageId)) as { version: number } | undefined
+                if (message?.version !== revision) return Effect.fail(new AgentCommandError({ reason: 'stale', message: 'That message changed.' }))
+                return pinAnswer(opId, turns.pins.pinMessage({ messageId: Number(messageId), from: startByte, to: endByte }))
+              }),
+            ),
+          ),
+        'agent.memory.page': ({ window }) =>
+          state.turns === undefined
+            ? Stream.make({ lines: [] })
+            : live(Stream.merge(state.changes, Stream.tick(MEMORY_RECHECK)), () => memoryPage(state.turns!.store, window)),
+        'agent.activity.page': ({ window }) =>
+          state.turns === undefined ? Stream.make({ runs: [], moreAbove: false }) : live(state.changes, () => activityPage(state.turns!.store, window)),
+        'agent.connections.page': () => Stream.make({ connections: [] }),
         'agent.connections.action': notYet('Connections'),
         'agent.connections.tier': notYet('Connections'),
         'agent.connections.address': notYet('Connections'),
-        'agent.review.page': notServed('The Review page'),
+        'agent.review.page': () => Stream.make(reviewPage()),
         'agent.review.activate': notYet('Review'),
-        'agent.settings.page': notServed('Settings › Juno'),
-        'agent.settings.change': notYet('Settings › Juno'),
-        'agent.settings.credentials': notYet('Settings › Juno'),
-        'agent.settings.ownership': notYet('Settings › Juno'),
+        'agent.settings.page': () => {
+          const settings = host.settings
+          if (settings === undefined) return Stream.die(new Error('Settings › Juno needs the engine'))
+          const own = Stream.callback<void>((queue) =>
+            Effect.acquireRelease(
+              Effect.sync(() => settings.subscribe(() => void Queue.offerUnsafe(queue, undefined))),
+              (unsubscribe) => Effect.sync(unsubscribe),
+            ),
+          )
+          return live(Stream.merge(state.changes, own), settings.page)
+        },
+        // Settings change with AI assist off too: only Pause needs the engine on.
+        'agent.settings.change': ({ opId, change }) =>
+          Effect.suspend(() => {
+            if (host.settings === undefined) return unavailable('Juno is not running.')
+            const result = host.settings.change(change)
+            return result._tag === 'done' ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: result.reason, message: result.message }))
+          }),
+        'agent.settings.credentials': notYet('Signing in to Codex'),
+        'agent.settings.ownership': notYet('Moving Juno'),
       })
     }),
   )

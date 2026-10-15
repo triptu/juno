@@ -96,7 +96,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     juno: ['app', 'engine', 'agent', 'launch', 'contextMenu', 'shell', 'clipboard', 'menu'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
-    agent: ['requestPort'],
+    agent: ['requestPort', 'setOpenRouterKey'],
     launch: ['setTheme', 'setAccent', 'setSidebar'],
     contextMenu: ['popup'],
     shell: ['openExternal', 'openInSlack', 'editUndo'],
