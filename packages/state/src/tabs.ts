@@ -99,6 +99,8 @@ export const CLOSED_LIMIT = 20
 export interface OpenOptions {
   /** A new tab after the current one, instead of the current tab. */
   readonly newTab?: boolean
+  /** The current tab's New chat has a draft or a destination, so it stays in the history for Back. */
+  readonly keepNewChat?: boolean
 }
 
 export const currentPlace = (tab: Tab): Place => tab.history.entries[tab.history.index]!
@@ -153,13 +155,13 @@ export function activateTab(tabs: Tabs, id: string): Tabs {
 const freshTab = (id: string, place: Place): Tab => ({ id, pinned: false, history: { entries: [place], index: 0 } })
 
 /** `place` as the tab's next entry. Forward is dropped. An empty New chat is replaced, not kept. */
-function push(history: TabHistory, place: Place): TabHistory {
-  const kept = history.entries[history.index]!.kind === 'newChat' ? history.index : history.index + 1
+function push(history: TabHistory, place: Place, keepNewChat: boolean): TabHistory {
+  const kept = history.entries[history.index]!.kind === 'newChat' && !keepNewChat ? history.index : history.index + 1
   const entries = [...history.entries.slice(0, kept), place].slice(-HISTORY_LIMIT)
   return { entries, index: entries.length - 1 }
 }
 
-export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOptions = {}): Tabs {
+export function openPlace(tabs: Tabs, place: Place, { newTab = false, keepNewChat = false }: OpenOptions = {}): Tabs {
   // A plain open of a place a tab shows focuses that tab. A new tab is always new, so a place can show in several.
   const showing = newTab ? undefined : tabShowingPlace(tabs, place)
   if (showing !== undefined) return activateTab(tabs, showing.id)
@@ -172,7 +174,7 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false }: OpenOpti
   }
   const current = tabs.tabs[at]!
   if (samePlace(currentPlace(current), place)) return tabs
-  const tab: Tab = { ...current, history: push(current.history, place) }
+  const tab: Tab = { ...current, history: push(current.history, place, keepNewChat) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
 }
 
@@ -190,19 +192,32 @@ export const newTabPlace = (page: NewTabPage): Place => (page === 'home' ? homeP
  * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
  * in place of the New chat's entry, so Back goes to what the tab showed
  * before. If another tab already shows the topic, that tab is focused and
- * the New chat tab closes; it does not go onto the reopen stack.
+ * the New chat tab closes; it does not go onto the reopen stack. A tab
+ * closed while the message was sending comes back from the reopen stack
+ * showing the topic, not the sent draft.
  */
 export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs {
   const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
   const tab = tabs.tabs[at]
-  if (tab === undefined || currentPlace(tab).kind !== 'newChat') return tabs
+  if (tab === undefined) {
+    const closedAt = tabs.closed.findIndex((closed) => closed.tab.id === tabId)
+    const closed = tabs.closed[closedAt]
+    if (closed === undefined || currentPlace(closed.tab).kind !== 'newChat') return tabs
+    return { ...tabs, closed: tabs.closed.with(closedAt, { ...closed, tab: { ...closed.tab, history: sentHistory(closed.tab.history, topicId) } }) }
+  }
+  if (currentPlace(tab).kind !== 'newChat') return tabs
   const showing = tabShowing(tabs, topicId)
   if (showing !== undefined) {
     const closed = closeTab(tabs, tabId)
     return activateTab({ ...closed, closed: tabs.closed }, showing.id)
   }
-  const entries = [...tab.history.entries.slice(0, tab.history.index), topicPlace(topicId)]
-  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: { entries, index: entries.length - 1 } }) }
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: sentHistory(tab.history, topicId) }) }
+}
+
+/** The history with its New chat entry replaced by the topic it sent to. */
+function sentHistory(history: TabHistory, topicId: string): TabHistory {
+  const entries = [...history.entries.slice(0, history.index), topicPlace(topicId)]
+  return { entries, index: entries.length - 1 }
 }
 
 /** The place Back (-1) or Forward (1) would show in the active tab, if there is one. */

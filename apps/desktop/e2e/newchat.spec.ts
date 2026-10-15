@@ -139,6 +139,45 @@ test('a person never messaged: the start of the conversation, then conversations
   expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
 })
 
+test('a New chat with a draft stays in the tab history when a topic opens over it', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { tabs, newChat, topic, sidebar, nav } = juno
+
+  await tabs.newTabButton.click()
+  await newChat.write('A long thought I do not want to lose')
+  await sidebar.row('Draft plan is in the doc').open()
+  await topic.expectTitle('Draft plan is in the doc')
+  await tabs.expectCount(1)
+  await nav.back()
+  await expect(newChat.composer).toHaveValue('A long thought I do not want to lose')
+})
+
+test('a New chat closed while it sends comes back as the conversation, so Enter cannot send it again', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { tabs, newChat, topic } = juno
+
+  await tabs.newTabButton.click()
+  await newChat.pickConversation('jon', 'Jonas')
+  await newChat.write('Welcome once')
+  fake.holdNext({ method: 'conversations.open' })
+  await newChat.send()
+  await tabs.menu('close-tab')
+  // The last tab gives way to a fresh New chat.
+  await juno.expectNothingOpen()
+  fake.release()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
+
+  await tabs.menu('reopen-tab')
+  await tabs.expectActive('Jonas')
+  await topic.expectSent('Welcome once')
+  await expect(newChat.composer).toHaveCount(0)
+  await topic.composer.press('Enter')
+  await juno.win.waitForTimeout(500)
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(1)
+})
+
 test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()

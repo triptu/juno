@@ -93,6 +93,29 @@ test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
   await tabs.expectActive(ROADMAP)
 })
 
+test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, app }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  const topics = [POSTGRES, RINA, ROADMAP, OFFSITE, 'Unrelated: has anyone looked at the', 'p95 on /v2/search jumped to 1.8s', 'Two options for the thread list', 'Final copy for pricing is in']
+  await sidebar.row(topics[0]!).open()
+  for (const title of topics.slice(1)) await sidebar.row(title).openInNewTab()
+  await tabs.menu('tab-1')
+  await tabs.expectActive(POSTGRES)
+  // Past the idle time, the tabs that are not mounted have let go of their topics, so showing one waits for the engine.
+  await juno.win.waitForTimeout(31_000)
+
+  // Three presses in one go, as the key repeats.
+  await app.evaluate(({ Menu, BrowserWindow }) => {
+    const close = Menu.getApplicationMenu()!.getMenuItemById('close-tab')!
+    for (let press = 0; press < 3; press++) close.click(undefined, BrowserWindow.getAllWindows()[0])
+  })
+  await tabs.expectCount(topics.length - 3)
+  await juno.win.waitForTimeout(500)
+  await tabs.expectCount(topics.length - 3)
+  expect(await tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
+})
+
 test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
