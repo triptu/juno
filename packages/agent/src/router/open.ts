@@ -58,6 +58,7 @@ import { view, type CompactionModel, type MemoryView } from '../store/memory'
 import type { JournalPosition, Mode } from '../store/ledger'
 import { ACTIONS_MIGRATIONS, budgetCard, createActions, proposedTask, sendMessageTool, type Actions, type ActionsOptions } from '../actions'
 import { mintGrant } from '../grants/grants'
+import { ownerRules, rulesSection } from '../actions/rules'
 
 /** One archive message (§4.1). `opId` is the inbox op whose run wrote it. */
 export interface ArchiveMessage {
@@ -224,7 +225,11 @@ async function start(
   }
 
   const tools = () => [...memoryTools, ...jobTools, ...slackTools, ...actionTools]
-  const section = () => instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
+  const section = () => {
+    const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
+    const rules = rulesSection(ownerRules(store))
+    return rules === '' ? base : `${base}\n\n${rules}`
+  }
   const builder = createRequestBuilder({ store, guard, systemAndTools: () => [`<juno>\n${section()}\n</juno>`, ...tools().map((t) => declaration(t.registration))] })
   // The chat model pi runs with (`running`) and the one Settings chose (`wanted`). They meet between runs.
   let wanted = initial.chat

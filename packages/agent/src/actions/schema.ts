@@ -113,4 +113,14 @@ const actions1 = [
   'CREATE INDEX card_outcomes_waiting ON card_outcomes (carried_by, at)',
 ]
 
-export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1] }
+const actions2 = [
+  // The owner's rules (Settings › Juno), in order. Only Settings writes them.
+  `CREATE TABLE owner_rules (
+    id TEXT PRIMARY KEY,
+    position INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    at INTEGER NOT NULL
+  ) STRICT`,
+]
+
+export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2] }
