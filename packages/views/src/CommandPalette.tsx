@@ -46,7 +46,7 @@ export interface PaletteItem {
   readonly snippet?: { readonly sender: string; readonly text: string }
   /** A command's confidence, "95%". */
   readonly badge?: string
-  /** The key hint on the active row; a ⌘↵ keycap and "New tab" by default when `opensTab`. */
+  /** The key hint on the active row: its keys, a space, then what they do ("↵ Send"). "⌘↵ New tab" by default when `opensTab`, else "↵". */
   readonly hint?: string
   /** ⌘Enter and ⌘-click open it in a new tab. */
   readonly opensTab?: boolean
@@ -124,6 +124,10 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
       case 'Escape':
         event.preventDefault()
         return onClose()
+      // The field is the palette's one stop: Tab must not reach the window under the dim while it is open.
+      case 'Tab':
+        event.preventDefault()
+        return
       case 'Enter':
         if (event.nativeEvent.isComposing || activeId === undefined) return
         event.preventDefault()
@@ -232,12 +236,18 @@ function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: Palette
         </span>
       </>
     )
-  const hint = item.hint === undefined && item.opensTab === true ? (
-    <span {...stylex.props(styles.tabHint)}>
-      <Kbd look="key">⌘↵</Kbd>
-      <Text variant="tagSmall" tone="muted">New tab</Text>
+  // One look for every hint: the keys as a keycap, then what they do. "↵ Send" is the key and its word.
+  const [keys, ...words] = (item.hint ?? (item.opensTab === true ? '⌘↵ New tab' : '↵')).split(' ')
+  const hint = (
+    <span {...stylex.props(styles.hintLine)}>
+      <Kbd look="key">{keys}</Kbd>
+      {words.length === 0 ? null : (
+        <Text variant="tagSmall" tone="muted">
+          {words.join(' ')}
+        </Text>
+      )}
     </span>
-  ) : <Kbd>{item.hint ?? '↵'}</Kbd>
+  )
   return (
     <OptionRow
       id={rowDomId(item.id)}
@@ -341,7 +351,7 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
   },
-  tabHint: {
+  hintLine: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],

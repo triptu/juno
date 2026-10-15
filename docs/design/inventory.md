@@ -397,7 +397,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
 - Overlay: `position: absolute; inset 0`, bg `rgba(27,28,21,0.16)`, z 30, click closes. Panel 560px (max calc(100% − 48px)) at top 96, radius 14, `--pop-shadow`, overflow hidden.
 - Header: padding 14 16, border-bottom 1px `--border-default`, gap 10: `search` 18 muted · input 15px, placeholder "Search, or tell Juno: message maya the slot works" · kbd "esc" (mono 10, padding 1 5, 1px `--border-strong`, 2px bottom, radius 4, subtle).
-- List: padding 6, max-height 400, contained scroll. Heading 11 muted, sentence case, padding `8 10 4`: **Recent** (empty query), **Results** (search), **Juno** (a command is recognised). Rows: padding 8 10, radius 8, gap 12, measured 55px: icon 16 muted · label 14 ellipsis + sub 12 muted · optional confidence badge · hint 11 muted on the active row only. Active row bg `--surface-hover`; mouse hover moves the active row.
+- List: padding 6, max-height 400, contained scroll. Heading 11 muted, sentence case, padding `8 10 4`: **Recent** (empty query), **Results** (search), **Juno** (a command is recognised). Rows: padding 8 10, radius 8, gap 12, measured 55px: icon 16 muted · label 14 ellipsis + sub 12 muted · optional confidence badge · key hint on the active row only, always a keycap for the keys then the action in 12 muted ("⌘↵ New tab", "↵ Send"; a bare "↵" when there is no word). Active row bg `--surface-hover`; mouse hover moves the active row.
 - Empty query: 6 most recent topics (Main rows read "Main · #alerts-prod", sub "#alerts-prod · 3m").
 - Search (titles, message text, channels, people), up to 8 results:
   - Topic: label = title, sub = "#eng · 4m" or "#eng · Leo: matched text".
@@ -417,7 +417,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 
   A send command posts straight into that Main with the toast "Posted in Maya Chen · Main" and Undo (⌘Z). Search results still follow below the command (up to 6).
 - Selection follows the displayed query. Once highlighted, a result keeps the highlight through local refreshes, late commands and Slack results. If it disappears, Enter does nothing until another row is chosen. Older queries cannot replace the current results.
-- Keys: ⌘K toggles (also closes). ArrowUp/Down move; Enter runs the active row; ⌘Enter opens a topic result in a new tab (hint: a `⌘↵` keycap followed by muted "New tab"); Esc closes. Input is autofocused.
+- Keys: ⌘K toggles (also closes). ArrowUp/Down move; Enter runs the active row; ⌘Enter opens a topic result in a new tab (hint: a `⌘↵` keycap followed by muted "New tab"); Esc closes. Input is autofocused, and it is the palette's only Tab stop: Tab and Shift Tab stay in it rather than reaching the window under the dim.
 
 [built M9] `CommandPalette` in `@juno/views`, `Palette` in the desktop containers (its own chunk, loaded on idle). Differences from the prototype, and choices the prototype left open:
 - Sends are final (SPEC 18, ADR 0010), so the send command's toast is "Posted in Maya Chen · Main" with no Undo.
