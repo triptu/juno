@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { chatCopy } from '@juno/agent-contract'
-import { colors, fonts, layout, spacing, text, z } from '@juno/tokens/tokens.stylex'
+import { colors, fonts, layout, radii, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 
@@ -12,20 +12,50 @@ import { cell } from './cell'
  * `SheetLayer`, which dims the page and closes on Escape.
  */
 
-/** Dims the page under a centred sheet. Escape calls `onClose`; a click outside does nothing, so a sheet is never lost by accident. */
+const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Dims the page under a centred sheet. Escape calls `onClose`; a click
+ * outside does nothing, so a sheet is never lost by accident. Like a macOS
+ * sheet it holds the keyboard: Tab and Shift Tab go round its controls and
+ * never reach the page under the dim, and on close focus goes back to what
+ * opened it.
+ */
 export function SheetLayer({ onClose, children }: { readonly onClose: () => void; readonly children: ReactNode }) {
   const close = useRef(onClose)
+  const layer = useRef<HTMLDivElement>(null)
   useEffect(() => {
     close.current = onClose
   })
   useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close.current()
+      if (event.key === 'Escape') return close.current()
+      if (event.key !== 'Tab' || layer.current === null) return
+      const stops = [...layer.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
+      const first = stops[0]
+      const last = stops.at(-1)
+      if (first === undefined || last === undefined) return
+      const inside = layer.current.contains(document.activeElement)
+      if (event.shiftKey && (!inside || document.activeElement === first)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (!inside || document.activeElement === last)) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      if (opener?.isConnected === true) opener.focus()
+    }
   }, [])
-  return <div {...stylex.props(styles.layer)}>{children}</div>
+  return (
+    <div ref={layer} {...stylex.props(styles.layer)}>
+      {children}
+    </div>
+  )
 }
 
 function Sheet({ label, kind, children }: { readonly label: string; readonly kind: 'phrase' | 'restore' | 'move'; readonly children: ReactNode }) {
@@ -138,14 +168,14 @@ export function RestoreSheet({ folder, phrase, attested, busy, error, onChooseFo
     <Sheet label={copy.title} kind="restore">
       <Head title={copy.title} body={copy.body} />
       <Labelled label={copy.folder}>
-        <Surface kind="inset" padding="none" sx={styles.folder}>
+        <div {...stylex.props(styles.folder)}>
           <Text variant="ui" tone={folder === undefined ? 'muted' : 'default'} truncate title={folder} data-restore-folder="">
             {folder ?? copy.noFolder}
           </Text>
           <Button variant="ghost" size="xs" tone="subtle" onClick={onChooseFolder} disabled={busy}>
             {copy.choose}
           </Button>
-        </Surface>
+        </div>
       </Labelled>
       <Labelled label={copy.phrase} note={copy.phraseNote}>
         <TextField
@@ -232,15 +262,22 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-1-5'],
   },
+  // Drawn as the 32px text field under it (its radius, border and fill, and its 10px text inset), so the two read as one form.
   folder: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing['--space-3'],
     minWidth: 0,
-    paddingBlock: spacing['--space-1'],
-    paddingInlineStart: spacing['--space-3'],
+    height: sizes['--control-32'],
+    boxSizing: 'border-box',
+    paddingInlineStart: spacing['--space-2-5'],
     paddingInlineEnd: spacing['--space-1'],
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderRadius: radii['--radius-md-plus'],
+    borderColor: colors['--input-border'],
+    backgroundColor: colors['--surface-default'],
   },
   phraseBox: {
     display: 'flex',
