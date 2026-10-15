@@ -222,13 +222,16 @@ test.describe('settings chips', () => {
     page.evaluate(
       ([chipSelector, card]) => {
         const chip = document.querySelector(chipSelector!)!
-        const right = chip.closest(card!)!.getBoundingClientRect().right
+        // The card: the This Mac group itself, or the group around the Codex row.
+        const holder = chip.closest(card!)!
+        const group = holder.hasAttribute('data-codex') ? holder.parentElement! : holder
+        const right = group.getBoundingClientRect().right
         const text = (element: Element) => {
           const range = document.createRange()
           range.selectNodeContents(element)
           return right - range.getBoundingClientRect().right
         }
-        return { chip: right - chip.getBoundingClientRect().right, buttons: [...chip.closest(card!)!.querySelectorAll('button')].map(text) }
+        return { chip: right - chip.getBoundingClientRect().right, buttons: [...group.querySelectorAll('button')].map(text) }
       },
       [chipSelector, card],
     )
