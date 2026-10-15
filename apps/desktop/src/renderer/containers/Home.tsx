@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { viewsSortChannel } from '@juno/contract'
-import { freezeHome, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
+import { freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
@@ -88,7 +88,8 @@ export function HomePage() {
     <Home
       loading={shown.loading}
       scene={shown.scene}
-      title={shown.title}
+      // While syncing there are no rows to hold still, so the greeting takes the name once the boot has stored it.
+      title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, items: 0, caughtUp: false }).title : shown.title}
       line={shown.line}
       items={view.items}
       done={shown.used}

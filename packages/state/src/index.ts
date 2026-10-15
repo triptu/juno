@@ -182,6 +182,7 @@ export {
 } from './junoPanel'
 export {
   freezeHome,
+  homeGreeting,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
