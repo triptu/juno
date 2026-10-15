@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
-import { chatCopy, type BubbleId, type ChatItem, type ChatPage, type ChatWindow, type OpId, type Quote, type ReplyTarget, type SendContext } from '@juno/agent-contract'
-import { copyText, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
-import { agentConnectionStateAtom, chatItemsAtom } from '@juno/state/agent'
+import { chatCopy, type MessageMenu, type BubbleId, type ChatItem, type ChatPage, type ChatWindow, type OpId, type Quote, type ReplyTarget, type SendContext } from '@juno/agent-contract'
+import { copyText, registry, junoFocusAtom, nowAtom, openExternal, popupContextMenu } from '@juno/state'
+import { messageActions, agentConnectionStateAtom, chatItemsAtom } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
+  RemoveSheet,
+  SheetLayer,
   flashChatRow,
   JunoChatFrame,
   JunoChatList,
@@ -37,6 +39,8 @@ const EDGE_MARGIN = '800px 0px'
 const READ_AFTER_MS = 1000
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
+
+const messages = messageActions(registry)
 
 const latest: Window = { _tag: 'latest', limit: WINDOW }
 const empty: ChatPage = { items: [], banner: { _tag: 'none' }, moreAbove: false, moreBelow: false, composerEnabled: true }
@@ -330,6 +334,8 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
     }
   }, [sendRef])
 
+  const [removal, setRemoval] = useState<typeof MessageMenu.Type | undefined>(undefined)
+  const [removing, setRemoving] = useState(false)
   const [picker, setPicker] = useState<{ readonly target: ReactionTarget; readonly x: number; readonly y: number } | undefined>(undefined)
 
   const scrollTo = (target: ReplyTarget | { readonly _tag: 'message'; readonly id: string }) => {
@@ -374,12 +380,11 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
         inputRef.current?.focus()
       },
       onQuote: (target) => scrollTo(target),
-      // Remembered notes and group labels need the agent's pins and schedules, which it does not serve yet.
-      onUndoNote: () => {},
+      onUndoNote: messages.undo,
       onGroupLabel: () => {},
       onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
         event.preventDefault()
-        void showChatMenu(target, itemsRef.current, (reaction) => {
+        void showChatMenu(target, itemsRef.current, selectedSpan(event.currentTarget), setRemoval, (reaction) => {
           const box = event.currentTarget.getBoundingClientRect()
           setPicker({ target: reaction, x: box.right, y: box.top })
         }, (reply) => {
@@ -406,6 +411,14 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
         }
 
   return (
+    <>
+    {removal === undefined ? null : <SheetLayer onClose={() => { if (!removing) setRemoval(undefined) }}>
+      <RemoveSheet sheet={removal.sheet} now={now} onKeep={() => { if (!removing) setRemoval(undefined) }} onRemove={(alsoReply) => {
+        if (removing) return
+        setRemoving(true)
+        void messages.remove(removal.messageId, alsoReply).then((done) => { setRemoving(false); if (done) setRemoval(undefined) })
+      }} />
+    </SheetLayer>}
     <JunoChatFrame
       header={header(page.banner)}
       pill={positioned && !atBottom && (unseen || page.moreBelow) ? <NewMessagesPill count={0} label={chatCopy.list.newMessage} onJump={toBottom} /> : undefined}
@@ -446,6 +459,7 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
         enterEmpty={loaded && agent !== 'off'}
       />
     </JunoChatFrame>
+    </>
   )
 }
 
@@ -457,28 +471,43 @@ function selectedOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): { r
   return mine === undefined ? {} : { selected: mine.emoji }
 }
 
-/**
- * The native menu on a chat message (SPEC 13.1): Copy, React and Reply on
- * Juno's, Remember this on the owner's, Remove. Remember this and Remove
- * wait for the agent's pins and removal, so they show disabled.
- */
-async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatItem>, react: (target: ReactionTarget) => void, reply: (target: ReactionTarget) => void): Promise<void> {
+/** Capture a range in the message's words before the native menu takes focus. */
+function selectedSpan(root: HTMLElement): { text: string; startByte: number; endByte: number } | undefined {
+  const selection = globalThis.getSelection()
+  const words = root.querySelector('p')
+  if (words === null || selection === null || selection.rangeCount === 0 || selection.isCollapsed) return undefined
+  const range = selection.getRangeAt(0)
+  if (!words.contains(range.startContainer) || !words.contains(range.endContainer)) return undefined
+  const prefix = range.cloneRange()
+  prefix.selectNodeContents(words)
+  prefix.setEnd(range.startContainer, range.startOffset)
+  const text = range.toString()
+  const startByte = new TextEncoder().encode(prefix.toString()).length
+  return { text, startByte, endByte: startByte + new TextEncoder().encode(text).length }
+}
+
+async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatItem>, selection: ReturnType<typeof selectedSpan>, remove: (message: typeof MessageMenu.Type) => void, react: (target: ReactionTarget) => void, reply: (target: ReactionTarget) => void): Promise<void> {
   const copy = chatCopy.contextMenu
   const juno = target.kind !== 'owner'
+  const reaction: ReactionTarget | undefined = target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : target.kind === 'card' ? { _tag: 'card', id: target.id } : undefined
+  const message = await messages.menu(target.kind === 'owner' ? { _tag: 'owner', opId: target.opId } : target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : { _tag: 'card', id: target.id })
+  const item = items.find((i) => (target.kind === 'owner' ? i._tag === 'owner' && i.opId === target.opId : target.kind === 'juno' ? i._tag === 'juno' && i.id === target.id : false))
+  const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? item.body.map((part) => part.text).join('') : ''
+  const span = selection ?? { text, startByte: 0, endByte: new TextEncoder().encode(text).length }
   const chosen = await popupContextMenu([
     { id: 'copy', label: copy.copy },
-    ...(juno ? [{ id: 'react', label: chatCopy.react.react }, { id: 'reply', label: chatCopy.react.reply }] : [{ id: 'remember', label: copy.remember, enabled: false }]),
+    ...(juno ? [{ id: 'react', label: chatCopy.react.react }, { id: 'reply', label: chatCopy.react.reply }] : [{ id: 'remember', label: copy.remember, enabled: message !== null && span.endByte - span.startByte > 0 && span.endByte - span.startByte <= 280 }]),
     { separator: true },
-    { id: 'remove', label: copy.remove, enabled: false },
+    { id: 'remove', label: copy.remove, enabled: message !== null },
   ])
-  const reaction: ReactionTarget | undefined = target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : target.kind === 'card' ? { _tag: 'card', id: target.id } : undefined
   switch (chosen) {
-    case 'copy': {
-      const selection = globalThis.getSelection()?.toString() ?? ''
-      const item = items.find((i) => (target.kind === 'owner' ? i._tag === 'owner' && i.opId === target.opId : target.kind === 'juno' ? i._tag === 'juno' && i.id === target.id : false))
-      const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? item.body.map((part) => part.text).join('') : ''
-      return copyText(selection !== '' ? selection : text)
-    }
+    case 'copy': return copyText(span.text)
+    case 'remember':
+      if (message !== null) await messages.pin(message, span.startByte, span.endByte)
+      return
+    case 'remove':
+      if (message !== null) remove(message)
+      return
     case 'react':
       if (reaction !== undefined) react(reaction)
       return

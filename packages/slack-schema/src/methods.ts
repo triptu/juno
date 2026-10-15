@@ -47,6 +47,8 @@ import {
   FilesCompleteUploadFields,
   FilesGetUploadUrlArgs,
   FilesGetUploadUrlFields,
+  FilesShareArgs,
+  FilesShareFields,
 } from './files.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
 import { AuthTestArgs, AuthTestFields } from './users.ts'
@@ -88,8 +90,9 @@ export const Methods = {
   'reactions.add': method(ReactionArgs, ReactionFields),
   'reactions.remove': method(ReactionArgs, ReactionFields),
   'search.modules.messages': method(SearchMessagesArgs, SearchMessagesFields),
-  'files.getUploadURLExternal': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
-  'files.completeUploadExternal': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),
+  'files.getUploadURL': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
+  'files.completeUpload': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),
+  'files.share': method(FilesShareArgs, FilesShareFields),
 } as const
 
 export type Methods = typeof Methods

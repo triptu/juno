@@ -77,7 +77,7 @@ parent.on('message', (event) => {
     case 'config': {
       if (started) return
       started = true
-      startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport }).then(
+      startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled' }).then(
         () => send({ _tag: 'ready' }),
         (cause: unknown) => {
           console.error('engine: failed to start', cause)

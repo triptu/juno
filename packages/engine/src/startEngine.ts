@@ -47,7 +47,7 @@ export interface EngineHostOptions {
   readonly httpTransport?: Layer.Layer<HttpTransport>
   /** Ports from the agent utility process. When set, the engine serves the AgentHost group on them (ADR 0012). */
   readonly agentTransport?: Transport
-  /** Whether the agent's sends reach Slack. Default `disabled`: external writes stay off until M3. Tests turn them on. */
+  /** Whether the agent's sends reach Slack. Default `disabled`; the desktop enables the guarded single-attempt path. */
   readonly agentWrites?: HandlerOptions['writes']
 }
 

@@ -3,7 +3,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { Revision } from '@juno/agent-cards'
 import { CardBinding } from './identity'
 import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
-import { Emoji, ReplyTarget } from '../chat/items'
+import { Emoji, ReplyTarget, RemoveSheet } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
 import { SendContext } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
@@ -55,4 +55,8 @@ export const chatRead = Rpc.make('agent.chat.read', { payload: { through: Schema
 export const chatRemove = Rpc.make('agent.chat.remove', {
   payload: { ...operation, messageId: ChatMessageId, alsoRemoveReply: Schema.Boolean }, success: Accepted, error: AgentCommandError,
 })
-export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatReact, chatRetry, chatRead, chatRemove)
+export const MessageMenu = Schema.Struct({ messageId: ChatMessageId, revision: Revision, sheet: RemoveSheet })
+export const chatMessage = Rpc.make('agent.chat.message', {
+  payload: { target: ReplyTarget }, success: Schema.NullOr(MessageMenu), error: AgentCommandError,
+})
+export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatReact, chatRetry, chatRead, chatRemove, chatMessage)

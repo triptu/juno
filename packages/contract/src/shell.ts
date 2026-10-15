@@ -116,6 +116,10 @@ export const UpdateState = Schema.Union([
 ])
 export type UpdateState = typeof UpdateState.Type
 
+/** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */
+export const DownloadResult = Schema.Literals(['saved', 'failed'])
+export type DownloadResult = typeof DownloadResult.Type
+
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
@@ -145,6 +149,10 @@ export const ShellRoutes = {
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
+  [Channels.shellDownloadFile]: {
+    input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
+    output: DownloadResult,
+  },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
   [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },

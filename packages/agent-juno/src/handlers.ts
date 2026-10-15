@@ -6,8 +6,8 @@
  *   account than the signed-in one fails with `stale`; none open, `signedOut`.
  * - Slack and topic reads come from Juno's local store.
  * - Sends are single-attempt (`dispatch.ts`). They are off unless the
- *   options turn them on: external writes are disabled in M2 (plan v3 §17),
- *   so a send fails with `unsupported` before anything is recorded.
+ *   options turn them on. The desktop enables them for approved cards;
+ *   a disabled host refuses before recording an attempt.
  * - Resolve and OS notification delivery fail with `unsupported`: Juno has
  *   no resolve command or notifier yet (M3 and M10 add them).
  *
@@ -20,7 +20,7 @@ import { makeDispatcher, parseSend } from './dispatch'
 import { JunoHost, type Account, type AccountId } from './host'
 
 export interface HandlerOptions {
-  /** Whether sends reach Slack. `disabled` in the app until M3. */
+  /** Whether approved sends reach Slack. */
   readonly writes: 'enabled' | 'disabled'
 }
 
