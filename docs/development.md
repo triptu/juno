@@ -35,12 +35,12 @@ Run these from the repo root.
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
-| `pnpm flake <spec>` | Repeats one or more desktop e2e or gallery specs many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
+| `pnpm flake <spec>` | Repeats desktop e2e, gallery or package tests many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
-| `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. Not run in CI yet. |
+| `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
@@ -494,7 +494,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
-- **Results.** Output streams live; reports (spec traces, Playwright results) land in `.remote/<run>/`. The exit code is the script's own.
+- **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 5) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
 - **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. A reaper starts before acquisition and reconciles the workspace every 30 seconds, as does each acquisition. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. A failed workspace listing stops acquisition rather than treating usage as zero.
 - **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 64 vCPU, the Team plan's Linux limit: for example sixteen 4x8 machines, or about three typical `pnpm affected` runs at once). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
@@ -522,6 +522,8 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 
 `pnpm flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]` runs the specs (all under `apps/desktop/e2e` or all under `apps/gallery`) through `pnpm remote` with Playwright's `--repeat-each`, no retries and traces kept on failure. The repeats are split across the machines (at most two, so other agents keep theirs), and each machine runs its usual number of workers, so the tests run under the load of a normal remote run; `--workers` raises it. It ends with one line, `flake: 2 of 160 failed`, and the names of the failing tests. Traces are in `.remote/<run>/`; `pnpm exec playwright show-trace <trace.zip>` opens one.
 
+Package tests under `packages/` use Vitest's `--repeats` with retries off. Their summary counts test cases, each failed if any repetition failed, and states the number of executions per case. For example, `pnpm flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200 --machines 1` runs that case 200 times on one small machine. Every repetition runs its setup and teardown.
+
 ```sh
 pnpm flake apps/desktop/e2e/sidebar.spec.ts -g "list scrollbar" --repeat 120
 pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --workers 32
@@ -530,6 +532,8 @@ pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --wor
 Measure the failure rate before a fix and prove the fix with the same count and load. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
 
 Causes found so far (2026-10-15):
+
+- **A host port started before its listener.** The agent started its Electron port as soon as main handed it over, before the RPC worker attached its message listener. The engine's one-time ready frame could be lost in that gap, leaving `host.hello` waiting forever and both chat tests timing out at agent readiness. The adapter now starts the port only after attaching the listener, so Electron keeps the frame queued.
 
 - **One X display for every worker.** On Linux the workers' windows opened on one Xvfb display, stacked at the same place. When another test's window mapped or closed over one, X sent crossing events at the real pointer, and Chromium moved hover there: hover tests lost the pointer. The e2e fixtures now start an Xvfb per worker (`display` in `apps/desktop/e2e/fixtures.ts`).
 - **Work after "Engine live".** Against the fake, every sync cycle ends with a follow pass on the background lane, after the phase is already live. `waitForSync` (through `expectEngineLive`) now also waits for the engine status's `aria-busy` to be false, which it is once the cycle has ended (`EngineStatus.syncing`).
@@ -543,6 +547,8 @@ Causes found so far (2026-10-15):
 - **A row drawn at its estimate next to a held row.** When an older page went in above the rows in view, its rows were laid out at their size estimate; the one between the top of the view and the held row grew a frame later and moved what was on screen (the long-thread topic test, 12 of 200). The page's rows above the held row are now laid out in full (`eagerRows` in `TopicView.tsx`).
 
 - **A scroll set from a script is not the user's.** The topic list lets go of its hold on the bottom on the user's input (wheel, touch, key, pointer). A test that sets `scrollTop` gives no input, so a commit that adds rows before the scroll settles (the rest of the window, just after an open) puts the bottom back. `TopicPane.scrollUp` turns the mouse wheel over the list instead. Install a `scrollend` listener and await that before the wheel turns: the wheel reaches the page by another path than `evaluate`.
+
+- **A source-link jump kept the bottom hold until `scrollend`.** A reply committed before that event pulled the topic back to the bottom. A source jump now releases the hold before calling `scrollIntoView`, just as user input does. The e2e test defers `scrollend` until a reply is drawn to cover that ordering.
 
 ## Machine shapes
 
@@ -576,3 +582,105 @@ Both wall times include waiting for machines, because other worktrees still on 1
 
 Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it): e2e and gallery runs spend most of their time waiting, so two fit on an 8-core, 8 GB machine. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
 
+
+## Releasing
+
+The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
+native dependencies for Electron, and writes the DMG, ZIP, block maps and
+update metadata (when a feed is configured) to `apps/desktop/release/`. It never
+publishes. Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
+the build prints one unsigned-build line and disables identity discovery.
+On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
+flipping fuses. This uses no certificate or credentials and does not grant
+Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
+"unsigned" here means without Developer ID signing or notarization.
+
+The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
+addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
+files and koffi are explicitly unpacked. Only `electron-updater` and its runtime
+dependencies ship as node_modules; application dependencies are bundled by Vite.
+Source maps are excluded. Codex uses the separately installed `codex` executable;
+its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
+
+### What the owner provides
+
+- A **Developer ID Application** certificate with its private key, exported as a
+  password-protected `.p12`. Set `CSC_LINK` to its path locally or its base64
+  contents in CI, and `CSC_KEY_PASSWORD` to the export password. An already
+  installed identity can instead be selected locally with `CSC_NAME`.
+- The Apple Developer **Team ID** (`APPLE_TEAM_ID`).
+- Either `APPLE_ID` and `APPLE_APP_SPECIFIC_PASSWORD`, or an App Store Connect
+  team API key: `APPLE_API_KEY` (absolute path to its `.p8`), `APPLE_API_KEY_ID`
+  and `APPLE_API_ISSUER`. In Actions, store the file as the
+  `APPLE_API_KEY_BASE64` secret; the workflow writes it to a temporary file and
+  deletes it after the build. Supply one authentication method at a time.
+- A public update feed URL, supplied at build time as `JUNO_UPDATE_FEED_URL`
+  (Actions variable `UPDATE_FEED_URL`). For GitHub Releases, use
+  `https://github.com/<owner>/<repo>/releases/latest/download`. There is no default
+  repository or feed. Without a feed, updates remain unavailable.
+- A release destination (`RELEASE_REPOSITORY=owner/repo` in Actions) and a GitHub
+  token with **Contents: write** access to it (`RELEASE_GITHUB_TOKEN`). A local
+  upload uses `GH_TOKEN`. The workflow can use its scoped `github.token` when
+  publishing to its own repository. Without a destination, CI only uploads
+  Actions artifacts. The installed app contains no GitHub token; update assets
+  must be publicly readable.
+
+Keep all credentials in the environment or repository Actions secrets. Never
+commit certificates, keys, passwords or tokens. No secrets are needed for PR
+lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
+
+### Steps
+
+1. Install Node 26, pnpm 12.11.2 and Xcode (including its command-line tools).
+   Run `pnpm install --frozen-lockfile` and `pnpm affected`.
+2. Set the desktop version in `apps/desktop/package.json`. Build and smoke the
+   local package with `pnpm package` and `pnpm test:package`. The smoke launches
+   the executable directly, signs in to fake Slack, waits for sidebar rows,
+   starts the agent against fake OpenRouter, and relaunches the cached account.
+   It uses temporary data and never reads a real Slack session. Without a Developer
+   ID signature, it applies `codesign -s -` locally and verifies the result. It
+   measures five cached-account launches from process spawn to the renderer's
+   first sidebar-row paint marker, reporting median and range. These are warm
+   filesystem-cache runs with CDP attached, not a cold-disk benchmark.
+3. For a local signed release, provide the variables above (including the public
+   feed URL), then run
+   `JUNO_RELEASE=1 pnpm package`. electron-builder uses `notarytool` and staples
+   the ticket. Partial release credentials fail the build. Verify with
+   `codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app`
+   and `xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app`, then
+   run `pnpm test:package` again.
+4. For CI, configure those repository secrets, commit the version, and create
+   and push the matching `v<version>` tag. `.github/workflows/release.yml` runs
+   on `macos-26`. Complete credentials enable signing and notarization;
+   otherwise it builds unsigned artifacts. It uploads artifacts to a **draft**
+   GitHub release in the configured distribution repository and will not modify
+   an already published release. In a separate distribution repository, GitHub
+   creates the version tag there; the build still comes from the source tag.
+5. Review the artifacts and signing/notarization results before publishing the
+   draft. Never publish the unsigned fallback as an update. On another Mac,
+   install the prior signed build, opt into updates in Preferences › About,
+   publish the newer signed release, and check **Restart to update**. This
+   cross-version signature and installation check requires the owner's ID and
+   cannot be verified by the unsigned smoke.
+
+Updates are off by default and unavailable without a configured feed, in
+development, and in tests. An enabled install checks 30 seconds after launch and every six hours, quietly downloads,
+and shows a single ready line in Preferences › About. Closing the app does not
+install the update; only **Restart to update** does. Turning the setting off
+cancels a download and suppresses the ready line. Errors retry quietly later.
+
+The hardened runtime entitlements grant JIT for Electron's V8 and network client
+access. There is no application sandbox entitlement or disabled library
+validation. No shared keychain access group is used today: secrets use
+Electron `safeStorage` and generic login-keychain items through
+`/usr/bin/security`. Adding a Team-ID-prefixed sharing group would not describe
+those existing items, so the entitlement deliberately has none.
+
+The six configured fuses turn RunAsNode, NODE_OPTIONS and Node CLI inspection
+off, and cookie encryption, embedded asar integrity validation and asar-only
+loading on. Engine and agent use `utilityProcess.fork`, not Electron-as-Node.
+The Codex child is a separate native executable. Development wrappers that
+strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
+Electron. Playwright's Electron launcher needs Node inspection and cannot drive
+the hardened package; the packaged smoke instead uses Chromium CDP. The
+`JUNO_E2E` fake-server seams remain available independently of the Node fuses.

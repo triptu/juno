@@ -1,9 +1,11 @@
+import type { ReactNode } from 'react'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { Button, Page, PageHeader, Section, Surface, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 import { AppearanceSettings } from './AppearanceSettings'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 export interface PreferencesPageProps {
+  readonly about?: ReactNode
   readonly theme: ThemePreference
   readonly accent: AccentName
   readonly density: DensityName
@@ -20,7 +22,7 @@ export interface PreferencesPageProps {
  * and the way to the notification settings. Anything Juno can do from the owner's words
  * belongs in the chat, not here.
  */
-export function PreferencesPage({ theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, onOpenNotifications }: PreferencesPageProps) {
+export function PreferencesPage({ about, theme, accent, density, onThemeChange, onAccentChange, onDensityChange, peekKey, onPeekKeyChange, onOpenNotifications }: PreferencesPageProps) {
   return (
     <Page width="settings">
       <PageHeader title="Preferences" />
@@ -41,6 +43,7 @@ export function PreferencesPage({ theme, accent, density, onThemeChange, onAccen
           </Button>
         </div>
       </Section>
+      {about === undefined ? null : <Section heading="About"><Surface kind="group" padding="md">{about}</Surface></Section>}
     </Page>
   )
 }

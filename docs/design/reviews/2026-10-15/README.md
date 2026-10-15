@@ -23,9 +23,11 @@ At a 720px window the topic column is about 260px wide. Every message header kep
 
 Fix: the reserve gives way below a 160px floor for the name and time (`min(reserve, max(0px, 100% − 160px))`). In a narrow column the toolbar now covers the end of the name while the row is hovered, which is the better loss.
 
-### 2. A reaction on the last message pushes the list off the bottom. Not fixed (feel).
+### 2. A reaction on the last message pushes the list off the bottom. Fixed after the review (feel).
 
 `reaction-at-bottom` fails "stays at the bottom": from frame #5 the list is off the bottom on 38 of 39 frames, by up to 30px, and it never comes back. In the last frame (#42) the new reaction chip is cut off under the composer. The user reading at the bottom has to scroll to see it. Evidence: `feel/reaction-at-bottom-0001.jpg` and `-0042.jpg`, `feel/reaction-at-bottom-filmstrip.png`. The bottom pin in the topic view does not follow a row that grows in place. This is scroll code in the container, which the perf and flake work owns, so it is reported here and not changed.
+
+Fixed by 9cb45ce3 (the bottom is held again whenever the window's rows change, not only when a new last message arrives), which reached main after this review. The scenario now posts enough replies that the list scrolls, since in a list that fits, staying at the bottom proves nothing; on this review's code it fails (6 of 6 frames off the bottom, by up to 20px), and on main it passed 5 of 5 runs on the Mac.
 
 ### 3. The field focus ring was heavy, and doubled. Fixed.
 
@@ -113,7 +115,7 @@ Run at `7c556f19` on 2026-10-15, about 2.1 minutes for 8 tests and 19 scenarios,
 | What a person sees | Scenario | Frames | Check | Likely cause |
 | --- | --- | --- | --- | --- |
 | A reaction on the last message pushes the list off the bottom, and the chip ends up under the composer | `reaction-at-bottom` | #5 to #16, still off at #42 | stays at the bottom | The bottom pin does not follow a row that grows in place (finding 2) |
-| The test never reached its recording: after opening `#perf-main` in a new tab the list was 7,970px from the bottom with "Jump to latest" showing | `tabs.feel.ts` (switching back to a scrolled tab) | none | precondition (`expectAtBottom`) | Suite problem or the long-thread anchor flake already seen on main; its checks prove nothing this run |
+| The test never reached its recording: after opening `#perf-main` in a new tab the list was 7,970px from the bottom with "Jump to latest" showing | `tabs.feel.ts` (switching back to a scrolled tab) | none | precondition (`expectAtBottom`) | Suite problem: `#perf-main` has never been read, so it opens at its "N new" divider, about 8,000px up, as designed. 7aae965e (after this review) makes the setup jump to the latest; with that, this review's app code passes, and main passed 5 of 5 runs |
 | Your own bubble moves down 46px as Juno's first reply arrives | `juno-first-bubble` | warn | no layout shift (0.0027) | The reply's row is laid out above the owner's bubble's final place; small, seen once |
 | A sidebar row moves when a reply arrives elsewhere | `live-reply-at-bottom` | warn | the sidebar holds still (0.005) | The row moves to the top, as designed; the warning is expected |
 

@@ -211,55 +211,52 @@ importers:
 
   apps/desktop:
     dependencies:
+      electron-updater:
+        specifier: 6.8.3
+        version: 6.8.3(supports-color@7.2.0)
+    devDependencies:
+      '@electron/fuses':
+        specifier: 1.8.0
+        version: 1.8.0
       '@juno/agent':
         specifier: workspace:*
         version: link:../../packages/agent
       '@juno/agent-contract':
         specifier: workspace:*
         version: link:../../packages/agent-contract
+      '@juno/agent-testing':
+        specifier: workspace:*
+        version: link:../../packages/agent-testing
       '@juno/contract':
         specifier: workspace:*
         version: link:../../packages/contract
       '@juno/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@juno/fake-slack':
+        specifier: workspace:*
+        version: link:../../packages/fake-slack
       '@juno/slack':
         specifier: workspace:*
         version: link:../../packages/slack
       '@juno/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@juno/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       '@juno/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
       '@juno/views':
         specifier: workspace:*
         version: link:../../packages/views
-      '@stylexjs/stylex':
-        specifier: 0.19.1
-        version: 0.19.1
-      effect:
-        specifier: 4.0.3
-        version: 4.0.3
-      react:
-        specifier: 19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
-    devDependencies:
-      '@juno/agent-testing':
-        specifier: workspace:*
-        version: link:../../packages/agent-testing
-      '@juno/fake-slack':
-        specifier: workspace:*
-        version: link:../../packages/fake-slack
-      '@juno/testing':
-        specifier: workspace:*
-        version: link:../../packages/testing
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
+      '@stylexjs/stylex':
+        specifier: 0.19.1
+        version: 0.19.1
       '@stylexjs/unplugin':
         specifier: 0.19.1
         version: 0.19.1(supports-color@7.2.0)(unplugin@2.3.11)
@@ -278,6 +275,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: 1.0.0
         version: 1.0.0
+      effect:
+        specifier: 4.0.3
+        version: 4.0.3
       electron:
         specifier: 44.7.0
         version: 44.7.0(supports-color@7.2.0)
@@ -287,6 +287,12 @@ importers:
       electron-vite:
         specifier: 5.0.0
         version: 5.0.0(supports-color@7.2.0)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: 19.3.0
+        version: 19.3.0(react@19.3.0)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -2679,6 +2685,10 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
+  builder-util-runtime@9.5.1:
+    resolution: {integrity: sha512-qt41tMfgHTllhResqM5DcnHyDIWNgzHvuY2jDcYP9iaGpkWxTUzV6GQjDeLnlR1/DtdlcsWQbA7sByMpmJFTLQ==}
+    engines: {node: '>=12.0.0'}
+
   builder-util-runtime@9.7.0:
     resolution: {integrity: sha512-g/kR520giAFYkSXTzcmF3kqQq7wi8F6N6SzeDgZrqTBN+VHdmgWOyTdD1yD7AATDId/yXLvuP34CxW46/BwCdw==}
     engines: {node: '>=12.0.0'}
@@ -2881,6 +2891,9 @@ packages:
 
   electron-to-chromium@1.5.452:
     resolution: {integrity: sha512-cVvk1YBSj6571VmV6hdJTqj94Y79xSu8cj6Y9t6ae4Y4431z8/7EJFvu3rVp90xhfuv9BpPKUmaLfTo4+FOGBg==}
+
+  electron-updater@6.8.3:
+    resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
 
   electron-vite@5.0.0:
     resolution: {integrity: sha512-OHp/vjdlubNlhNkPkL/+3JD34ii5ov7M0GpuXEVdQeqdQ3ulvVR7Dg/rNBLfS5XPIFwgoBLDf9sjjrL+CuDyRQ==}
@@ -3403,6 +3416,13 @@ packages:
   lodash.clonedeep@4.5.0:
     resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
 
+  lodash.escaperegexp@4.1.2:
+    resolution: {integrity: sha512-TM9YBvyC84ZxE3rgfefxUWiQKLilstD6k7PTGt6wfbtXF8ixIJLOL3VYyV/z+ZiPLsVxAsKAFVwWlWeb2Y8Yyw==}
+
+  lodash.isequal@4.5.0:
+    resolution: {integrity: sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==}
+    deprecated: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+
   lodash@4.18.1:
     resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
@@ -3893,6 +3913,9 @@ packages:
 
   tiny-async-pool@1.3.0:
     resolution: {integrity: sha512-01EAw5EDrcVrdgyCLgoSPvqznC0sVxDSVeiOz09FUpjh71G79VCqneOr+xvt7T1r76CF6ZZfPjHorN2+d+3mqA==}
+
+  tiny-typed-emitter@2.1.0:
+    resolution: {integrity: sha512-qVtvMxeXbVej0cQWKqVSSAHmKZEHAvxdF8HEUBFWts8h+xEo5m/lEiPakuyZ3BnCBjOD8i24kzNOiOLLgsSxhA==}
 
   tinybench@6.2.2:
     resolution: {integrity: sha512-nIZ2N2dFpjBsg2hgitKu7mA+FvsIJuGJOwysRngmVRRmWgR/UyPjwJj8c/fT/dhm8EkHnF5EOogRf+0Z2qrimA==}
@@ -5706,6 +5729,13 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
+  builder-util-runtime@9.5.1(supports-color@7.2.0):
+    dependencies:
+      debug: 4.4.3(supports-color@7.2.0)
+      sax: 1.6.1
+    transitivePeerDependencies:
+      - supports-color
+
   builder-util-runtime@9.7.0(supports-color@7.2.0):
     dependencies:
       debug: 4.4.3(supports-color@7.2.0)
@@ -5940,6 +5970,19 @@ snapshots:
       - supports-color
 
   electron-to-chromium@1.5.452: {}
+
+  electron-updater@6.8.3(supports-color@7.2.0):
+    dependencies:
+      builder-util-runtime: 9.5.1(supports-color@7.2.0)
+      fs-extra: 10.1.0
+      js-yaml: 4.3.2
+      lazy-val: 1.0.5
+      lodash.escaperegexp: 4.1.2
+      lodash.isequal: 4.5.0
+      semver: 7.7.4
+      tiny-typed-emitter: 2.1.0
+    transitivePeerDependencies:
+      - supports-color
 
   electron-vite@5.0.0(supports-color@7.2.0)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1)):
     dependencies:
@@ -6530,6 +6573,10 @@ snapshots:
 
   lodash.clonedeep@4.5.0: {}
 
+  lodash.escaperegexp@4.1.2: {}
+
+  lodash.isequal@4.5.0: {}
+
   lodash@4.18.1: {}
 
   long@5.3.2: {}
@@ -7043,6 +7090,8 @@ snapshots:
   tiny-async-pool@1.3.0:
     dependencies:
       semver: 5.7.2
+
+  tiny-typed-emitter@2.1.0: {}
 
   tinybench@6.2.2: {}
 

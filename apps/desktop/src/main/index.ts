@@ -13,6 +13,7 @@ import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { Notifier, type ShownNotification } from './notifier'
+import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
 // Every renderer runs in the Chromium sandbox. Must be called before ready.
@@ -36,6 +37,8 @@ function updateLaunch(patch: Partial<Launch>): void {
   launch = { ...launch, ...patch }
   launchFile.write(launch)
 }
+
+const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }))
 
 // Test seams (architecture 13): the fake Slack to sign in against, a fixture
 // Slack-app directory to import from, and a stand-in keychain password.
@@ -130,6 +133,7 @@ app.whenReady().then(() => {
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   powerMonitor.on('resume', () => notifier.wake())
   registerIpc({
+    updates,
     supervisor,
     setViewing: (topicId) => notifier.setViewing(topicId),
     agent,
@@ -152,6 +156,7 @@ app.whenReady().then(() => {
   supervisor.start()
   void providers.load()
   openWindow()
+  updates.start()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openWindow()
@@ -169,6 +174,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  updates.stop()
   supervisor.stop()
   agent.stop()
 })
