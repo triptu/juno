@@ -1,7 +1,7 @@
 /** Behaviour through the AiProvider interface with the fake, the way the assistant will use it. */
 import { Effect, Stream } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { AiProvider, FakeAiProvider, chatTools, tasks, type ChatEvent, type Decision } from '../src/index'
+import { AiProvider, FakeAiProvider, chatTools, tasks, validateOutput, type ChatEvent, type Decision } from '../src/index'
 import { NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 
 const run = <A>(f: (p: typeof AiProvider.Service) => Effect.Effect<A>) =>
@@ -106,6 +106,51 @@ describe('FakeAiProvider generation', () => {
 })
 
 const collect = (events: Stream.Stream<ChatEvent>) => Stream.runCollect(events)
+
+describe('FakeAiProvider Home tasks', () => {
+  const base = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: NOW }
+
+  it("finds the user's own promise and drops one a later message says is done", async () => {
+    const open = decided(
+      await run((p) =>
+        p.decide(tasks.followUps, {
+          ...base,
+          messages: [
+            { ...msg('Dev Patel', 'Who sends Rina the scorecard?', 30), id: '1.000001' },
+            { ...msg('Tushar', "I'll send Rina the scorecard tomorrow.", 20, true), id: '1.000002' },
+          ],
+        }),
+      ),
+    )
+    expect(open.followUps).toEqual([{ messageId: '1.000002', text: "You said you'd send Rina the scorecard tomorrow" }])
+    const kept = decided(
+      await run((p) =>
+        p.decide(tasks.followUps, {
+          ...base,
+          messages: [
+            { ...msg('Tushar', "I'll send Rina the scorecard.", 20, true), id: '1.000002' },
+            { ...msg('Tushar', 'Done, sent it.', 5, true), id: '1.000003' },
+          ],
+        }),
+      ),
+    )
+    expect(kept.followUps).toEqual([])
+  })
+
+  it("rejects a follow-up that points at someone else's message", () => {
+    const input = { ...base, messages: [{ ...msg('Dev Patel', "I'll check.", 5), id: '1.000001' }] }
+    expect(validateOutput(tasks.followUps, input, { followUps: [{ messageId: '1.000001', text: "You said you'd check" }] }).ok).toBe(false)
+    expect(validateOutput(tasks.followUps, input, { followUps: [] }).ok).toBe(true)
+  })
+
+  it('rewrites a waiting item from the question, and is not confident with nothing to read', async () => {
+    const item = { itemId: `waiting:${postgres.id}`, kind: 'waiting' as const, title: postgres.title, channel: '#eng', newCount: 1 }
+    const asked = decided(await run((p) => p.decide(tasks.homeTitle, { ...item, messages: [msg('Dev Patel', '<@U0TUSHAR> can you pick the cutover window?', 3)] })))
+    expect(asked).toEqual({ title: 'Dev asks: Can you pick the cutover window', confident: true })
+    const empty = decided(await run((p) => p.decide(tasks.homeTitle, { ...item, messages: [] })))
+    expect(empty.confident).toBe(false)
+  })
+})
 
 describe('FakeAiProvider chat', () => {
   it('turns "tell maya …" into a propose_message tool call and ends with done', async () => {

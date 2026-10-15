@@ -10,7 +10,7 @@ import { cleanText, validateOutput, type StructuredTask, type TextTask } from '.
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
 import { fakeChatTurn } from './replies'
-import { fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
+import { fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
@@ -19,6 +19,8 @@ const structuredRules: Record<string, (input: never) => unknown> = {
   settledScore: fakeSettledScore,
   urgencyGate: fakeUrgencyGate,
   parseCommand: fakeParseCommand,
+  followUps: fakeFollowUps,
+  homeTitle: fakeHomeTitle,
 }
 
 const textRules: Record<string, (input: never) => string> = {
