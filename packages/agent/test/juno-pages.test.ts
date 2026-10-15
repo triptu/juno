@@ -99,6 +99,15 @@ it('Pause holds new messages until Resume', async () => {
   await pageWhere((p) => of(p, 'juno').length === 1, 'the answer after Resume')
 })
 
+it("Pause and Resume show in the chat's banner at once, with no message sent", async () => {
+  const { client, pageWhere } = await served()
+  await pageWhere((p) => p.banner._tag === 'none', 'the chat')
+  await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'paused', value: true } }))
+  await pageWhere((p) => p.banner._tag === 'paused', 'the paused banner')
+  await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'paused', value: false } }))
+  await pageWhere((p) => p.banner._tag === 'none', 'the banner gone')
+})
+
 it('shows whether the OpenRouter key is set, and when OpenRouter rejected it', async () => {
   const { h, client, follow, key } = await served()
   const settings = follow(client['agent.settings.page']())
