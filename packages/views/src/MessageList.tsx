@@ -142,6 +142,9 @@ export function MessageList({
         {items.length === 0 ? <Empty main={main} status={status} /> : null}
         {items.map((item, index) => {
           const atDivider = index === dividerIndex && index > 0
+          // A row's header and margin never depend on its place in the window, so a page added above
+          // changes no row's height. Only the topic's first message, with nothing that can arrive above it, sits flush.
+          const first = index === 0 && notDrawnAbove === 0 && older === 'none'
           return (
             <Row key={item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
               <Message
@@ -150,9 +153,9 @@ export function MessageList({
                 time={messageTime(item.message.at, now)}
                 now={now}
                 main={main}
-                startsGroup={index === 0 || atDivider}
+                startsGroup={atDivider}
                 eager={eager?.has(item.message.ts) ?? false}
-                flush={index === 0 || atDivider}
+                flush={first || atDivider}
                 tabbable={item.message.ts === tabbable}
                 hueOf={hueOf}
                 toolbar={renderToolbar?.(item.message)}

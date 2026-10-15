@@ -2,14 +2,15 @@
  * The AgentHost port: what the host app (Juno's engine) offers the agent.
  *
  * The agent is the client and the host serves the group, over a MessagePort
- * that main brokers between the two utility processes (ADR 0012). WP6 adds
- * the Slack reads, sends, resolve, presence and the notification gate here.
+ * that main brokers between the two utility processes (ADR 0012). This file
+ * holds the hello; `services.ts` adds the reads, sends, resolve, presence and
+ * the notification gate and exports the whole group, `AgentHostRpcs`.
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 
 /** Bumped when a change to this group breaks an older agent or host. */
-export const AGENT_HOST_PROTOCOL = 1
+export const AGENT_HOST_PROTOCOL = 2
 
 export const HostHello = Schema.Struct({
   /** Which app hosts the agent. Juno's engine answers "juno". */
@@ -24,4 +25,4 @@ export const hostHello = Rpc.make('host.hello', {
   success: HostHello,
 })
 
-export const AgentHostRpcs = RpcGroup.make(hostHello)
+export const HostHelloRpcs = RpcGroup.make(hostHello)

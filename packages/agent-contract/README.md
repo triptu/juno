@@ -4,7 +4,7 @@ Juno Agent's wire. Schemas, the two chat rules (`isOpenableUrl`, `sendMessageSta
 
 | Folder | Owner | Holds |
 | --- | --- | --- |
-| `src/host/` | WP6 (Astra), seeded by WP1 | The AgentHost port: what the host app serves the agent (`AgentHostRpcs`, today only `host.hello`), and the parentPort messages between main and the agent process (`MainToAgent`, `AgentToMain`) |
+| `src/host/` | WP6 (Astra), seeded by WP1 | The AgentHost port: what the host app serves the agent (`AgentHostRpcs`, protocol 2), and the parentPort messages between main and the agent process (`MainToAgent`: `config`, `openRouterKey`, `hostPort`, `rendererPort`; `AgentToMain`) |
 | `src/rpc/` | WP6 (Astra) | The RPC groups the agent serves to the renderer, with approval metadata beside the view models |
 | `src/chat/` | WP7 (Fable) | The chat as the renderer draws it: items, delivery and ending states, card view models, the page and its banner, the header-menu pages, the recovery review, and the fixed copy |
 
@@ -22,6 +22,7 @@ View-shaped types for the Juno chat (SPEC "Juno Agent", plan v3 §12 and §13). 
 | `cards.ts` | `Card`: the catalogue (`sendMessage`, `resolve`, `topics`, `proposedTask`, `task`, `question`, `proposedSchedule`, `schedule`, `connect`, `change`, `remove`, `budget`, `provider`, plus `unknown` for a kind this build lacks). `CardStatus` is the one status machine every kind but `task` shares: open, working, done, dismissed, expired, failed, with the after-line carried as text. A card runs once: no retry, and an action Juno cannot confirm shows as failed. `task` has `JobPhase` instead. `sendMessageStatus` derives a Send card's status from its rows |
 | `page.ts` | `ChatPage` (items, `moreAbove` and `moreBelow`, the `Banner` picked by precedence: otherDevice, updateNeeded, recovery, aiOff, paused, offline) and `ChatSummary` (unread count, busy while a job runs, the job line the sidebar and home show) |
 | `pages.ts` | The header-menu pages: `ScheduledPage`, `RemembersPage`, `MemoryPage`, `ActivityPage`, `ConnectionsPage` (with the T3 address settings), `ReviewPage` (recovery), `JunoSettingsPage` (with `Ownership`) |
+| `commands.ts` | `CardCommand`: what a card button asks for, one union for every card. The views call back with it; `@juno/state/agent` maps it to the card RPCs |
 | `copy.ts` | `chatCopy`: every fixed string the chat prints: plan v3 §13.2 states, ending and failure lines, banner chips and lines, card buttons and after-lines, the Remove sheet, the pages. The model never writes any of them |
 
 Rules of the shape:
@@ -41,7 +42,7 @@ Rules of the shape:
 
 ## Renderer RPCs
 
-`AgentRpcs` merges `ChatRpcs`, `CardRpcs`, `ScheduledRpcs`, `RemembersRpcs`, `MemoryRpcs`, `ActivityRpcs`, `ConnectionsRpcs`, `ReviewRpcs` and `SettingsRpcs`. Each route is also exported. Live pages use streamed snapshots; chat windows are bounded to 200 rows and can open at latest, unread, around an anchor, above or below it. `ChatPageSnapshot.page` is exactly WP7's `ChatPage`, including `moreAbove` and `moreBelow`.
+`AgentRpcs` merges `ChatRpcs`, `CardRpcs`, `ScheduledRpcs`, `RemembersRpcs`, `MemoryRpcs`, `ActivityRpcs`, `ConnectionsRpcs`, `ReviewRpcs` and `SettingsRpcs`. Each route is also exported. Live pages use streamed snapshots; chat windows are bounded to 200 rows and can open at latest, unread, around an anchor, above or below it. An anchor (`ChatAnchor`) is any row's own id: an archive message, a bubble, a card, or an owner op before it is stored. `chat.read` takes a bubble or an archive message, so the list can mark read what it has on screen. `ChatPageSnapshot.page` is exactly WP7's `ChatPage`, including `moreAbove` and `moreBelow`.
 
 `chat.send` takes an optional `replyTo` (a Juno bubble or card). `chat.react` sets or removes the owner's reaction on a bubble or card: a thumbs up or a removal is only recorded; any other emoji is queued to Juno like a message. A reaction or a reply is never a click. Every durable mutation carries an `OpId`. `Accepted` means the FULL inbox commit succeeded, not that a run or external action succeeded. Failed delivery retries reuse the same op id. There is no command to stop a run: `chat.send` while Juno is working joins the run at its next step. Stopping a background job is the Task card's command. The local Remove command needs no model run.
 
@@ -49,9 +50,9 @@ Approval identities and source revisions travel beside the view models. A card c
 
 Scheduled and Remembers snapshots also carry revisions, because their WP7 rows do not. Credentials use main's setup flow and never put secret values into the inbox. Settings changes and ownership operations are renderer-only commands, not model tools.
 
-## Host contracts for WP13
+## Host contracts
 
-`AgentHostRpcs` remains the working protocol-1 hello scaffold. `AgentHostFullRpcs` is the complete protocol-2 contract, merging it with `HostReadRpcs`, `HostActionRpcs`, `HostPresenceRpcs` and `HostNotificationRpcs`. WP13 switches the served group and hello protocol together when it supplies the handlers; this package adds no placeholder implementations.
+`AgentHostRpcs` is the whole AgentHost group, protocol 2 (`AGENT_HOST_PROTOCOL`): the hello (`HostHelloRpcs`), `HostReadRpcs`, `HostActionRpcs`, `HostPresenceRpcs` and `HostNotificationRpcs`. Protocol 1, the hello alone, is gone.
 
 Reads cover Slack search/history/replies/people and Juno topics. Presence streams the current account, online and AI state, quiet hours and the current “this” topic. Dispatch carries the exact executable identity, digest and already-consumed authorization/attempt ids, with `mode: single-attempt`. Duplicate submissions of the same authorization must return its stored attempt. A transport loss remains unknown. A negative send lookup cannot prove failure. Notification delivery has an id and respects the notification gate independently of action admission.
 

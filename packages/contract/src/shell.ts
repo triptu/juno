@@ -73,6 +73,7 @@ export const ShellRoutes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
+  [Channels.agentRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },

@@ -10,8 +10,8 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { AgentHostFullRpcs, HostDispatch, type HostPresence } from '@juno/agent-contract'
-import { hostProtocol, type HostConnection, type HostPort } from '@juno/agent'
+import { AgentHostRpcs, HostDispatch, type HostPresence } from '@juno/agent-contract'
+import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { prefsSet } from '@juno/contract'
 import { runCommand, topicAtom } from '@juno/state'
@@ -28,7 +28,7 @@ afterEach(async () => {
   for (const engine of engines.splice(0)) await engine.stop()
 })
 
-type Client = RpcClient.RpcClient<RpcGroup.Rpcs<typeof AgentHostFullRpcs>, RpcClientError.RpcClientError>
+type Client = RpcClient.RpcClient<RpcGroup.Rpcs<typeof AgentHostRpcs>, RpcClientError.RpcClientError>
 
 const nodePort = (port: MessagePort): HostPort => ({
   postMessage: (message) => port.postMessage(message),
@@ -54,7 +54,7 @@ async function connectAgent(transport: ReturnType<typeof memoryTransport>) {
   const client = await Effect.runPromise(
     Effect.gen(function* () {
       const context = yield* Layer.buildWithScope(hostProtocol(connection), scope)
-      return yield* RpcClient.make(AgentHostFullRpcs).pipe(Effect.provide(context), Scope.provide(scope))
+      return yield* RpcClient.make(AgentHostRpcs).pipe(Effect.provide(context), Scope.provide(scope))
     }),
   )
   const agent = { client: client as unknown as Client, close: () => Effect.runPromise(Scope.close(scope, Exit.void)) }
@@ -77,6 +77,20 @@ const failure = async <A, E>(effect: Effect.Effect<A, E>): Promise<E> => {
 /** The first presence that names an account. */
 const presence = (client: Client, until: (p: typeof HostPresence.Type) => boolean = (p) => p.accountId !== null) =>
   ok(client['host.presence']().pipe(Stream.filter(until), Stream.take(1), Stream.runHead, Effect.map((p) => p._tag === 'Some' ? p.value : undefined)))
+
+/** The agent itself (`startAgent`) on a new port, without the turn engine. */
+async function startRealAgent(transport: ReturnType<typeof memoryTransport>, agentDir: string) {
+  const connection: HostConnection = {
+    acquire: async () => {
+      const { port1, port2 } = new MessageChannel()
+      transport.add(port2 as unknown as MessagePortLike)
+      return nodePort(port1)
+    },
+  }
+  const handle = await startAgent({ agentDir, e2e: false }, connection)
+  agents.push({ close: handle.stop })
+  return handle
+}
 
 async function hostWithAgent(writes: 'enabled' | 'disabled') {
   const transport = memoryTransport()
@@ -121,7 +135,7 @@ describe('the AgentHost port', () => {
     const { client } = agent
 
     expect(await ok(client['host.hello']({ protocol: 2 }))).toEqual({ host: 'juno', protocol: 2 })
-    expect(await ok(client['host.hello']({ protocol: 1 }))).toEqual({ host: 'juno', protocol: 1 })
+    expect(await ok(client['host.hello']({ protocol: 1 }))).toEqual({ host: 'juno', protocol: 2 })
     expect(account).toBe(`${engine.fake.teamId}:U0TUSHAR`)
 
     const injection = hostileMessages.find((f) => f.name === 'ignoreInstructions')!.message.text
@@ -163,6 +177,39 @@ describe('the AgentHost port', () => {
     expect(replies.messages.slice(1).every((m) => m.threadTs === rootTs)).toBe(true)
 
     expect(await failure(client['host.slack.history']({ accountId: 'T0OTHER:U0OTHER', channelId: CHANNEL, limit: 5 } as never))).toMatchObject({ reason: 'stale' })
+  })
+
+  it("binds the agent's Slack reads to the account its presence names", async () => {
+    const { engine, transport, account } = await hostWithAgent('disabled')
+    engine.fake.injectMessage({ channel: CHANNEL, user: 'U0MAYA', text: 'Deploy is green' })
+    const agent = await startRealAgent(transport, engine.userData)
+    expect(agent.host).toEqual({ host: 'juno', protocol: 2 })
+    await waitFor(() => (agent.presence()?.accountId === account ? true : undefined), 15_000, 'the presence to name the account')
+
+    const history = await waitFor(async () => {
+      const page = await agent.reads.history(CHANNEL)
+      return page.messages.some((m) => m.text === 'Deploy is green') ? page : undefined
+    }, 30_000, 'the message in history')
+    expect(history.messages.find((m) => m.text === 'Deploy is green')).toMatchObject({ channelId: CHANNEL, senderId: 'U0MAYA' })
+    expect((await agent.reads.search('green')).messages.map((m) => m.text)).toEqual(['Deploy is green'])
+    expect(await agent.reads.person('U0MAYA')).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
+    await expect(agent.reads.person('U0NOBODY')).rejects.toMatchObject({ reason: 'notFound' })
+  })
+
+  it('reads notification and active hours from the notifications settings', async () => {
+    const { engine, agent } = await hostWithAgent('disabled')
+    const never = { days: [], from: 9 * 60, to: 19 * 60 }
+    const settings = { notificationHours: never, presenceHours: never, matters: '', channels: {}, people: {} }
+    await runCommand(engine.registry, prefsSet, { key: 'notifications', value: settings })
+    expect(await presence(agent.client, (p) => p.quietHours && !p.ownerActive)).toMatchObject({ quietHours: true, ownerActive: false })
+
+    const always = { days: [0, 1, 2, 3, 4, 5, 6], from: 0, to: 1439 }
+    const minute = new Date().getHours() * 60 + new Date().getMinutes()
+    // 23:59 is outside 0 to 1439; skip the flip when the test runs in that minute.
+    if (minute < 1438) {
+      await runCommand(engine.registry, prefsSet, { key: 'notifications', value: { ...settings, notificationHours: always, presenceHours: always } })
+      expect(await presence(agent.client, (p) => !p.quietHours && p.ownerActive)).toMatchObject({ quietHours: false, ownerActive: true })
+    }
   })
 
   it('follows AI assist and the topic last viewed in presence', async () => {
@@ -254,6 +301,19 @@ describe('the AgentHost port', () => {
     expect(await reconcile(forged)).toEqual({ _tag: 'unknown' })
     expect(await ok(agent.client['host.outbox.send'](forged))).toEqual({ _tag: 'unknown', attemptId: forged.attemptId })
     expect(engine.fake.callCount('chat.postMessage')).toBe(2)
+  })
+
+  it('settles a lost send whose text Slack stores escaped', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    const lost = send(account, 'Ship it if p95 < 200ms & errors > 0? <@U0MAYA>')
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    expect(await ok(agent.client['host.outbox.send'](lost))).toEqual({ _tag: 'unknown', attemptId: lost.attemptId })
+    const [stored] = posted(engine, lost.actionId)
+    expect(stored!.text).not.toBe('Ship it if p95 < 200ms & errors > 0? <@U0MAYA>')
+    const found = await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: lost.actionId, attemptId: lost.attemptId } as never))
+    expect(found).toMatchObject({ _tag: 'found', message: { clientMessageId: lost.actionId, text: stored!.text } })
+    expect(await ok(agent.client['host.outbox.send'](lost))).toMatchObject({ _tag: 'done', attemptId: lost.attemptId })
+    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
   })
 
   it('a cancel before the send refuses it; a send cut off by an engine restart is unknown', async () => {

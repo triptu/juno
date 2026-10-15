@@ -13,7 +13,9 @@
  *   call may or may not have reached Slack.
  * - Only positive evidence settles an unknown send: a message in Slack with
  *   the send's `client_msg_id`, from the owner, with the recorded text and
- *   place. A missing match stays unknown.
+ *   place. Slack stores text with `&`, `<` and `>` escaped, so both texts
+ *   are escaped the same way before they are compared. A missing match
+ *   stays unknown.
  */
 import { Deferred, Effect } from 'effect'
 import { AgentHostError, type HostDispatchResult } from '@juno/agent-contract'
@@ -48,12 +50,20 @@ export function parseSend(dispatch: Dispatch): Attempt | AgentHostError {
   }
 }
 
+/**
+ * Text as Slack stores it: `&`, `<` and `>` escaped. An `&` that already
+ * starts one of the three entities is left alone, so Slack's copy, which is
+ * escaped already, comes out unchanged.
+ */
+export const slackEscaped = (text: string): string =>
+  text.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+
 /** Whether `message` proves `attempt` landed: Slack's copy of exactly this send, from the owner. */
 export const proves = (attempt: Attempt, userId: string, message: Message): boolean =>
   message.clientMessageId === attempt.actionId &&
   message.senderId === userId &&
   message.channelId === attempt.channelId &&
-  message.text === attempt.text &&
+  slackEscaped(message.text) === slackEscaped(attempt.text) &&
   (message.threadTs ?? undefined) === attempt.threadTs
 
 const resultOf = (attemptId: Dispatch['attemptId'], state: Exclude<AttemptState, { _tag: 'submitted' }>): Result => {

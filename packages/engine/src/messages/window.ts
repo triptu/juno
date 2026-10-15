@@ -59,15 +59,20 @@ const scope = (target: WindowTarget): Statement =>
  * one: up to `before` rows older than the anchor, then the anchor and newer
  * rows up to `limit` in all. Rows come newest first from the first
  * statement and oldest first from the second; the caller orders them.
+ *
+ * The first statement reads one row more than the window holds: the message
+ * just before the window, when there is one. It is not shown; it only says
+ * whether the window's first row starts a sender group, so that row keeps
+ * its header (and its height) when an older page arrives above it.
  */
 export function windowStatements(target: WindowTarget, range: { readonly anchor?: string | undefined; readonly before: number; readonly limit: number }): ReadonlyArray<Statement> {
   const where = scope(target)
   if (range.anchor === undefined) {
-    return [{ sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.limit] }]
+    return [{ sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.limit + 1] }]
   }
   const before = Math.min(range.before, range.limit)
   return [
-    { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts < ? ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.anchor, before] },
+    { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts < ? ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.anchor, before + 1] },
     { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts >= ? ORDER BY ts ASC LIMIT ?`, params: [...where.params, range.anchor, range.limit] },
   ]
 }

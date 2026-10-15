@@ -25,7 +25,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 1. The sidebar list and the message list are in-flow rows with `content-visibility: auto` and `contain-intrinsic-size: auto <estimate>`; the live query window is the virtualizer (300 topic rows, 100 to 500 message rows). No scroll handlers, no absolute positioning, no `overflow-anchor: none`. Prepends rely on Chromium scroll anchoring, so nothing in that frame may change `position`, `transform`, `overflow` or `display` on the scroller or the anchor's ancestors.
 2. `@tanstack/react-virtual` is the only virtualization library, used for unbounded flat lists (All topics, Browse) and as the measured escalation for the message list (`docs/performance.md` 3.4). Do not add another.
 3. Every image box has `aspect-ratio` from file metadata before the bytes arrive. Late content never moves what the user is reading.
-4. Rows set `contain: content`. Section headers are `position: sticky`.
+4. Rows set `contain: content`. Section headers are `position: sticky`. A message row's height depends only on its message, never on its place in the window, and is a whole number of pixels (the content box rounds up with `calc-size`), so scroll anchoring moves the list by exact amounts.
 
 **Interaction**
 
