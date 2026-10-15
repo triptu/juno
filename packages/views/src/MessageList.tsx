@@ -56,6 +56,10 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry on a failed send. */
+  readonly onRetry?: (clientMsgId: string) => void
+  /** Delete draft on a failed send. */
+  readonly onDiscard?: (clientMsgId: string) => void
 }
 
 const ROW = '[data-message-row]'
@@ -99,6 +103,8 @@ export function MessageList({
   onChannel,
   onLink,
   onToggleReaction,
+  onRetry,
+  onDiscard,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
   const last = items[items.length - 1]
@@ -123,7 +129,8 @@ export function MessageList({
         {items.map((item, index) => {
           const atDivider = index === dividerIndex && index > 0
           return (
-            <Row key={item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
+            // A message's client_msg_id outlives its pending row, so the row becomes the stored message in place.
+            <Row key={item.message.clientMsgId ?? item.message.ts} atDivider={atDivider} newCount={newCount} anchorRef={anchorRef}>
               <Message
                 message={item.message}
                 sender={item.sender}
@@ -140,6 +147,8 @@ export function MessageList({
                 onChannel={onChannel}
                 onLink={onLink}
                 onToggleReaction={onToggleReaction}
+                onRetry={onRetry}
+                onDiscard={onDiscard}
                 onFocus={setFocusedTs}
               />
             </Row>

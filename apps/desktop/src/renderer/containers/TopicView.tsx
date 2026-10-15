@@ -3,6 +3,7 @@ import { MESSAGE_WINDOW_MAX, readsMarkRead, type MessageView, type TopicDetail }
 import {
   bottomWindow,
   channelThreadsAtom,
+  discardMessage,
   dividerIndex,
   loadOlderMessages,
   messageListAtom,
@@ -11,6 +12,7 @@ import {
   openExternal,
   openTopic as fetchTopic,
   registry,
+  retryMessage,
   runCommand,
   scrollSnapshotAtom,
   shouldMarkRead,
@@ -23,7 +25,6 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import {
   ActiveThreads,
-  ComposerSlot,
   hueFor,
   MessageList,
   NewMessagesPill,
@@ -37,6 +38,8 @@ import {
 } from '@juno/views'
 import { markFilterChange } from './filterMark'
 import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
+import { takeSendMark } from './sendMark'
+import { TopicComposer } from './TopicComposer'
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 const BOTTOM_SLACK = 32
@@ -77,6 +80,8 @@ function scopeToChannel(channel: string): void {
 }
 
 const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
+const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
+const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
@@ -356,6 +361,11 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
     setSeenTs(last)
   }, [positioned, last, atEnd])
 
+  // `juno.send`: from Enter to the frame that shows the message, pending or, after a very quick answer, settled.
+  useLayoutEffect(() => {
+    if (last !== undefined && list.rows.get(last)?.fromMe === true && takeSendMark()) afterPaint(() => measure('juno.send', 'juno.send'))
+  }, [last, list.rows])
+
   // The user's own scrolling lets go of the pin; where the list comes to rest decides the next one.
   useEffect(() => {
     const scroller = scrollRef.current
@@ -484,7 +494,8 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
   const eager = eagerRows(list.order, openAt, rows)
 
   const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
-  const newCount = seenAt < 0 ? 0 : list.order.length - seenAt - 1
+  // The user's own messages, sent or still sending, are never new to them.
+  const newCount = seenAt < 0 ? 0 : list.order.slice(seenAt + 1).filter((ts) => list.rows.get(ts)?.fromMe !== true).length
   const showPill = positioned && !atBottom && (newCount > 0 || far || !atEnd)
 
   // An empty list says nothing until Slack has answered or 300 ms have passed.
@@ -507,9 +518,15 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
+      {...(readOnly ? {} : { onRetry: retry, onDiscard: discard })}
     />
   )
   if (readOnly) return messages
+
+  const sent = () => {
+    jumpToLatest()
+    void markRead(id)
+  }
 
   return (
     <TopicViewFrame
@@ -523,7 +540,7 @@ function Topic({ id, detail, readOnly = false }: TopicProps) {
         />
       }
       pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
-      composer={<ComposerSlot placeholder={main ? `Message ${detail.channel.label}` : 'Reply'} />}
+      composer={<TopicComposer key={id} detail={detail} onSent={sent} />}
     >
       {messages}
     </TopicViewFrame>

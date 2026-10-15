@@ -244,6 +244,20 @@ test.describe('Topic art', () => {
  * The guard has to fail when something moves, or a green run means nothing.
  * These pages are made on the spot, so they do not depend on any component.
  */
+test.describe('Send', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+
+  test('a pending row replaced by the message Slack stored moves nothing', async ({ page }) => {
+    await open(page, 'MessageList', 'shift/pending-settles')
+    const rows = page.locator('[data-message-row]')
+    await expect(page.locator('[data-pending="sending"]')).toHaveCount(1)
+    const before = await rows.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+    await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['settle']?.())
+    await expect(page.locator('[data-pending]')).toHaveCount(0)
+    expect(await rows.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))).toEqual(before)
+  })
+})
+
 test.describe('the guard itself', () => {
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
