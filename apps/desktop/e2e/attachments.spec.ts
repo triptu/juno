@@ -105,6 +105,22 @@ test('a file dropped on the topic is sent on its own as a file row with Download
   expect(share?.args['blocks']).toBeUndefined()
 })
 
+test('a file dropped on a reply composer is attached once and shared in that thread', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  await drop(topic.composer, [brief()])
+  await expect(chips(topic)).toHaveCount(1)
+  await topic.send('The launch brief')
+  await topic.expectSent('The launch brief')
+  const shares = fake.calls.filter((call) => call.method === 'files.share')
+  expect(shares).toHaveLength(1)
+  expect(shares[0]!.args['thread_ts']).toBe(root.ts)
+  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL')).toHaveLength(1)
+})
+
 test('a removed chip is not sent, and the text row does not move', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
