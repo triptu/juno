@@ -13,6 +13,7 @@ const noop = () => {}
 const DRAFT = 'Can we move the cutover to Thursday night? Dev needs one more day on the replica check.'
 
 interface Scene {
+  readonly frequent?: boolean
   readonly conversation?: PickConversation
   readonly thread?: PickThread
   readonly open?: PickerName
@@ -32,6 +33,9 @@ const page = (input: Scene, frame?: FixtureFrame) =>
   scene<NewChatProps>(
     () => (
       <NewChat
+        frequent={input.frequent ? recentConversations.recent : []}
+        selectedConversation={input.conversation?.key}
+        onPickConversation={noop}
         {...(input.preview === true ? { preview: <MessageList items={postgresThread.slice(-4)} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} /> } : {})}
         {...(input.note === undefined ? {} : { note: input.note })}
         composer={
@@ -66,6 +70,11 @@ const page = (input: Scene, frame?: FixtureFrame) =>
 export default defineFixtures(
   NewChat,
   {
+    Frequent: {
+      rows: page({ frequent: true, draft: '' }),
+      chosen: page({ frequent: true, conversation: conversations.maya, draft: '' }),
+      empty: page({ draft: '' }),
+    },
     Flow: {
       // The composer has focus; nothing above it but one line.
       'write-first': page({}),
