@@ -1,12 +1,9 @@
 /**
  * `search.modules.messages`, used for thread discovery (`is:thread after:<date>`).
  *
- * The response shape is partly Unknown (research section 3; architecture 5.3):
- * matches may come as `items` or as `messages.matches`, an item may hold its
- * messages in `messages[]` (observed live), and paging may be by `page` or
- * `cursor`. Everything uncertain is optional and `searchMatches` hides the
- * difference. The fake answers like the live module API: `items[]` with
- * `messages[]`, `pagination` and a `response_metadata.next_cursor`.
+ * The live module returns one message in each `items[].messages` array and
+ * page-number pagination, without a cursor (research section 10, Live probe).
+ * The decoder also tolerates the public API's flat matches and paging fields.
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
@@ -52,6 +49,10 @@ export type SearchMessagesArgs = typeof SearchMessagesArgs.Type
 export const SearchChannel = S.Struct({
   id: S.String,
   name: opt(S.String),
+  user: opt(S.String),
+  is_archived: opt(S.Boolean),
+  is_pending_ext_shared: opt(S.Boolean),
+  pending_shared: opt(S.Array(S.String)),
   is_channel: opt(S.Boolean),
   is_group: opt(S.Boolean),
   is_im: opt(S.Boolean),
@@ -85,8 +86,8 @@ export type SearchItemMessage = typeof SearchItemMessage.Type
 /**
  * One result. Observed live (2026-10-13, `is:thread`, `sort=timestamp`):
  * the module API answers `items[]` of `{ channel, iid, team, messages[] }`,
- * the message fields inside `messages`, with no `thread_ts` and no
- * `reply_count` (a reply's thread is only in its permalink). The flat shape,
+ * the message fields inside `messages`. `extra_message_data=1` adds
+ * `thread_ts` and root `reply_count`. The flat shape,
  * the fields on the item with a `ts`, is the public API's and the fake's
  * older one; both decode, and `searchMatches` flattens them.
  */

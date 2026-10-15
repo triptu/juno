@@ -100,14 +100,14 @@ describe('pagination', () => {
     for (let i = 1; i < oldestFirst.length; i++) expect(compareTs(oldestFirst[i - 1]!.ts, oldestFirst[i]!.ts)).toBe(-1)
   })
 
-  it('search pages by page number and by cursor', async () => {
+  it('search pages by page number without a cursor', async () => {
     const first = await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 5, page: 1 })
     expect(searchMatches(first)).toHaveLength(5)
     expect(first.pagination?.page_count).toBeGreaterThan(1)
     const second = await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 5, page: 2 })
     expect(searchMatches(second)[0]?.ts).not.toBe(searchMatches(first)[0]?.ts)
-    const byCursor = await client.ok('search.modules.messages', { module: 'messages', query: 'is:thread', count: 5, cursor: first.response_metadata!.next_cursor! })
-    expect(searchMatches(byCursor).map((m) => m.ts)).toEqual(searchMatches(second).map((m) => m.ts))
+    expect(first.response_metadata).toBeUndefined()
+    expect(first.items?.every((item) => item.messages?.length === 1)).toBe(true)
     const today = new Date(fake.now()).toISOString().slice(0, 10)
     const recent = await client.ok('search.modules.messages', { module: 'messages', query: `is:thread after:${today}`, count: 50 })
     expect(searchMatches(recent)).toHaveLength(0)

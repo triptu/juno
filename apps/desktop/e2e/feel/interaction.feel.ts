@@ -100,3 +100,25 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
     await expect(juno.accountMenu.root).toBeVisible()
   })
 })
+
+test('palette opens with recent topics and holds still', async ({ juno, win, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const dialog = '[role="dialog"][aria-label="Search and commands"]'
+  await feel.run({
+    name: 'palette-open',
+    title: 'Open search with recent topics',
+    probes: [
+      { kind: 'rect', name: 'dialog', selector: dialog },
+      { kind: 'box', name: 'dialogBox', selector: dialog },
+      { kind: 'opacity', name: 'dialogOpacity', selector: dialog },
+    ],
+    checks: [landsAndStays('dialogBox', 'the palette', { from: 'press', where: seen }), noFlicker('window', 'the window')],
+  }, async (rec) => {
+    await rec.mark('press')
+    await juno.palette.open()
+    await expect(juno.palette.section('Recent').getByRole('option')).toHaveCount(6)
+  })
+  await win.keyboard.press('Escape')
+  await juno.palette.expectClosed()
+})
