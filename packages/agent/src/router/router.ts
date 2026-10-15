@@ -157,39 +157,64 @@ export type Retry =
   | { readonly _tag: 'refused'; readonly reason: 'notRetryable' }
 
 export function createRouter(options: RouterOptions) {
-  const { store, session, builder } = options
-  const listeners = new Set<(event: TurnEvent) => void>()
-  const emit = (event: TurnEvent) => {
-    for (const listener of listeners) {
+  return new Router(options)
+}
+
+class Router {
+  private readonly options: RouterOptions
+
+  constructor(options: RouterOptions) {
+    this.options = options
+  }
+
+  private get store() { return this.options.store }
+  private get session() { return this.options.session }
+  private get builder() { return this.options.builder }
+
+  private listeners = new Set<(event: TurnEvent) => void>()
+
+  emit = (event: TurnEvent) => {
+    for (const listener of this.listeners) {
       try {
         listener(event)
       } catch (error) {
-        options.onReport?.(error)
+        this.options.onReport?.(error)
       }
     }
   }
-  let current: Live | undefined
-  let closing = false
-  let signalled = false
-  let wake: (() => void) | undefined
-  const signal = () => {
-    signalled = true
-    wake?.()
-  }
-  const admitting = () => mode(store) === 'on' && (options.admits?.() ?? true)
-  const idleWaiters: Array<() => void> = []
-  const rotateWaiters: Array<() => void> = []
-  const isIdle = () => current === undefined && (!admitting() || nextAccepted(store) === undefined)
-  const notifyIdle = () => {
-    if (isIdle()) for (const resolve of idleWaiters.splice(0)) resolve()
-  }
-  const archiveLength = () => (store.db.prepare('SELECT count(*) AS n FROM messages').get() as { n: number }).n
 
-  const text = (run: Live) => join(run.done, run.partial)
+  private current: Live | undefined
+
+  private closing = false
+
+  private signalled = false
+
+  private wake: (() => void) | undefined
+
+  private signal = () => {
+    this.signalled = true
+    this.wake?.()
+  }
+
+  private admitting = () => mode(this.store) === 'on' && (this.options.admits?.() ?? true)
+
+  private idleWaiters: Array<() => void> = []
+
+  private rotateWaiters: Array<() => void> = []
+
+  private isIdle = () => this.current === undefined && (!this.admitting() || nextAccepted(this.store) === undefined)
+
+  private notifyIdle = () => {
+    if (this.isIdle()) for (const resolve of this.idleWaiters.splice(0)) resolve()
+  }
+
+  private archiveLength = () => (this.store.db.prepare('SELECT count(*) AS n FROM messages').get() as { n: number }).n
+
+  private text = (run: Live) => join(run.done, run.partial)
 
   // ---- Endings
 
-  const endingOf = (run: Live, results: ReadonlyMap<string, Settled | InboxOp['state']>): Ending => {
+  private endingOf = (run: Live, results: ReadonlyMap<string, Settled | InboxOp['state']>): Ending => {
     const retry = run.retryable ? { retry: run.opId as OpId } : {}
     if (run.failure !== undefined) {
       return run.failure._tag === 'interrupted' || run.failure._tag === 'failed' ? { ...run.failure, ...retry } : run.failure
@@ -197,21 +222,22 @@ export function createRouter(options: RouterOptions) {
     const answered = [...results.values()].every((result) => (typeof result === 'string' ? result === 'done' : result.status === 'done'))
     return answered ? { _tag: 'complete' } : { _tag: 'interrupted', ...retry }
   }
-  const finish = (run: Live, ending: Ending) => {
-    transaction(store.db, () => {
-      store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(store.now(), JSON.stringify(ending), run.runId)
+
+  private finish = (run: Live, ending: Ending) => {
+    transaction(this.store.db, () => {
+      this.store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(this.store.now(), JSON.stringify(ending), run.runId)
     })
-    for (const opId of run.inputs.keys()) settle(store, opId, stateFor(ending), reasonFor(ending))
-    if (current === run) current = undefined
-    emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
-    options.onRunEnded?.()
+    for (const opId of run.inputs.keys()) settle(this.store, opId, stateFor(ending), reasonFor(ending))
+    if (this.current === run) this.current = undefined
+    this.emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
+    this.options.onRunEnded?.()
   }
 
   // ---- Restore, before pi resumes
 
-  const restore = () => {
+  restore = () => {
     // A run whose ending was committed before its ops were settled.
-    const ended = store.db
+    const ended = this.store.db
       .prepare(
         `SELECT runs.ending, run_inputs.op_id AS opId FROM runs JOIN run_inputs ON run_inputs.run_id = runs.id JOIN inbox ON inbox.op_id = run_inputs.op_id
          WHERE runs.ended_at IS NOT NULL AND inbox.state IN ('accepted', 'submitted')`,
@@ -219,185 +245,187 @@ export function createRouter(options: RouterOptions) {
       .all() as Array<{ ending: string; opId: string }>
     for (const row of ended) {
       const ending = JSON.parse(row.ending) as Ending
-      settle(store, row.opId, stateFor(ending), reasonFor(ending))
+      settle(this.store, row.opId, stateFor(ending), reasonFor(ending))
     }
-    const journal = session.journal()
-    const open = unsettled(store, journal.incarnation)
-    let row = store.db.prepare('SELECT id, op_id, origin, h, clean FROM runs WHERE ended_at IS NULL').get() as
+    const journal = this.session.journal()
+    const open = unsettled(this.store, journal.incarnation)
+    let row = this.store.db.prepare('SELECT id, op_id, origin, h, clean FROM runs WHERE ended_at IS NULL').get() as
       | { id: string; op_id: string; origin: Origin; h: number; clean: number }
       | undefined
     if (row === undefined) {
       const first = open[0]
       if (first === undefined) return
       // Submitted with no run row: adopt it, with H before its first message.
-      const at = store.db.prepare('SELECT min(id) AS id FROM messages WHERE origin_op = ?').get(first.opId) as { id: number | null }
-      const id = uuidv7(store.now())
-      transaction(store.db, () => {
-        store.db
+      const at = this.store.db.prepare('SELECT min(id) AS id FROM messages WHERE origin_op = ?').get(first.opId) as { id: number | null }
+      const id = uuidv7(this.store.now())
+      transaction(this.store.db, () => {
+        this.store.db
           .prepare('INSERT INTO runs (id, op_id, origin, h, clean, started_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(id, first.opId, originOf(first.kind), at.id ?? archiveLength(), originOf(first.kind) === 'owner' ? 1 : 0, store.now())
-        store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(first.opId, id)
+          .run(id, first.opId, originOf(first.kind), at.id ?? this.archiveLength(), originOf(first.kind) === 'owner' ? 1 : 0, this.store.now())
+        this.store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(first.opId, id)
       })
-      row = { id, op_id: first.opId, origin: originOf(first.kind), h: at.id ?? archiveLength(), clean: 0 }
+      row = { id, op_id: first.opId, origin: originOf(first.kind), h: at.id ?? this.archiveLength(), clean: 0 }
     }
-    const run = live(row, isMessage(find(store, row.op_id)?.kind))
+    const run = live(row, isMessage(find(this.store, row.op_id)?.kind))
     // What the run already wrote, so bubble numbers carry on where they were.
-    run.done = runText(store, run.runId)
+    run.done = runText(this.store, run.runId)
     const published = parseOutput(run.done)
-    const sources = sourceTable(store, run.runId)
+    const sources = sourceTable(this.store, run.runId)
     run.bubbles.push(...published.bubbles.map((bubble, n) => ({ id: `${run.runId}:${n}`, text: bubble.text, body: resolveSpans(bubble.spans, sources) })))
     run.reactions = published.reactions.length
-    const inputs = store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
-    for (const input of inputs) run.inputs.set(input.opId, find(store, input.opId)?.submissionId ?? undefined)
+    const inputs = this.store.db.prepare('SELECT op_id AS opId FROM run_inputs WHERE run_id = ?').all(run.runId) as Array<{ opId: string }>
+    for (const input of inputs) run.inputs.set(input.opId, find(this.store, input.opId)?.submissionId ?? undefined)
     for (const op of open) {
       if (run.inputs.has(op.opId)) continue
-      transaction(store.db, () => {
-        store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
+      transaction(this.store.db, () => {
+        this.store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
       })
       run.inputs.set(op.opId, op.submissionId ?? undefined)
     }
-    current = run
+    this.current = run
   }
 
   // ---- A run
 
-  const persistInput = (op: InboxOp, persist: () => void): boolean => {
-    if (op.kind === 'wake' && options.startWake !== undefined) {
-      if (options.startWake(op.opId, persist)) return true
-      settle(store, op.opId, 'interrupted', 'schedule cancelled')
+  private persistInput = (op: InboxOp, persist: () => void): boolean => {
+    if (op.kind === 'wake' && this.options.startWake !== undefined) {
+      if (this.options.startWake(op.opId, persist)) return true
+      settle(this.store, op.opId, 'interrupted', 'schedule cancelled')
       return false
     }
-    transaction(store.db, persist)
+    transaction(this.store.db, persist)
     return true
   }
-  const begin = async (op: InboxOp): Promise<Live | undefined> => {
-    await session.catchUp()
-    if (!admitting()) return undefined
+
+  private begin = async (op: InboxOp): Promise<Live | undefined> => {
+    await this.session.catchUp()
+    if (!this.admitting()) return undefined
     const origin = originOf(op.kind)
     // A message sent beside a topic carries Slack content (SPEC 7): the run starts tainted.
-    const row = { id: uuidv7(store.now()), op_id: op.opId, origin, h: archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }
-    if (!persistInput(op, () => {
-      store.db
+    const row = { id: uuidv7(this.store.now()), op_id: op.opId, origin, h: this.archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }
+    if (!this.persistInput(op, () => {
+      this.store.db
         .prepare('INSERT INTO runs (id, op_id, origin, h, clean, started_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(row.id, row.op_id, row.origin, row.h, row.clean, store.now())
-      store.db.prepare('INSERT INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(op.opId, row.id)
+        .run(row.id, row.op_id, row.origin, row.h, row.clean, this.store.now())
+      this.store.db.prepare('INSERT INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 0)').run(op.opId, row.id)
     })) return undefined
     const run = live(row, isMessage(op.kind))
     run.inputs.set(op.opId, undefined)
-    current = run
-    emit({ _tag: 'started', runId: run.runId, opId: run.opId, origin })
+    this.current = run
+    this.emit({ _tag: 'started', runId: run.runId, opId: run.opId, origin })
     return run
   }
 
-  const runToEnd = async (run: Live) => {
-    const journal = session.journal()
-    const input = find(store, run.opId)
+  private runToEnd = async (run: Live) => {
+    const journal = this.session.journal()
+    const input = find(this.store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(store, journal, input, { steer: false, text: () => inputText(input) }))
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(this.store, journal, input, { steer: false, text: () => this.inputText(input) }))
     // A crash can leave a steered input recorded in run_inputs but not yet in pi.
     for (const opId of run.inputs.keys()) {
       if (opId === run.opId) continue
-      const queued = find(store, opId)
-      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(store, journal, queued, { steer: true, text: () => inputText(queued) }))
+      const queued = find(this.store, opId)
+      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(this.store, journal, queued, { steer: true, text: () => this.inputText(queued) }))
     }
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
       const pending = [...run.inputs].filter(([opId]) => !results.has(opId))
       if (pending.length === 0) break
       for (const [opId, submission] of pending) {
-        const state = find(store, opId)?.state
+        const state = find(this.store, opId)?.state
         if (state !== undefined && settledStates.has(state)) results.set(opId, state)
         else if (submission === undefined) results.set(opId, { status: 'unanswered', reason: 'missing' })
         else results.set(opId, await journal.wait(submission))
       }
       await run.flushing
     }
-    await session.catchUp()
-    finish(run, endingOf(run, results))
+    await this.session.catchUp()
+    this.finish(run, this.endingOf(run, results))
   }
 
   // ---- What the run shows
 
   /** A bubble's text: from the live run, or from the archive. */
-  const bubbleText = (id: string) => current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(store, id)
-  const inputText = (op: InboxOp) => modelText(store, op, bubbleText, options.cards)
+  private bubbleText = (id: string) => this.current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(this.store, id)
 
-  const recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
-    const added = transaction(store.db, () =>
-      store.db
+  private inputText = (op: InboxOp) => modelText(this.store, op, this.bubbleText, this.options.cards)
+
+  private recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
+    const added = transaction(this.store.db, () =>
+      this.store.db
         .prepare('INSERT OR IGNORE INTO reactions (op_id, target_kind, target_id, by, emoji, at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(input.opId, input.kind, input.id, input.by, input.emoji, store.now()).changes > 0,
+        .run(input.opId, input.kind, input.id, input.by, input.emoji, this.store.now()).changes > 0,
     )
-    if (added) emit({ _tag: 'reaction', target: { kind: input.kind, id: input.id }, by: input.by, emoji: input.emoji })
+    if (added) this.emit({ _tag: 'reaction', target: { kind: input.kind, id: input.id }, by: input.by, emoji: input.emoji })
   }
 
   /** Publishes the blocks the model has closed since the last call: each bubble whole, each reaction once. */
-  const publish = (run: Live) => {
-    const output = parseOutput(text(run))
+  private publish = (run: Live) => {
+    const output = parseOutput(this.text(run))
     for (const bubble of output.bubbles.slice(run.bubbles.length)) {
       const id = `${run.runId}:${run.bubbles.length}`
-      const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(store, bubble.replyTo)
-      const body = resolveSpans(bubble.spans, sourceTable(store, run.runId))
+      const replyTo = bubble.replyTo === undefined ? undefined : ownerOpOf(this.store, bubble.replyTo)
+      const body = resolveSpans(bubble.spans, sourceTable(this.store, run.runId))
       run.bubbles.push({ id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
       run.status = {}
-      emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
+      this.emit({ _tag: 'bubble', runId: run.runId, id, text: bubble.text, body, ...(replyTo ? { replyTo } : {}) })
     }
     for (const reaction of output.reactions.slice(run.reactions)) {
-      const target = ownerOpOf(store, reaction.to)
-      if (target !== undefined) recordReaction({ opId: `${run.runId}:r${run.reactions}`, kind: 'owner', id: target, by: 'juno', emoji: reaction.emoji })
+      const target = ownerOpOf(this.store, reaction.to)
+      if (target !== undefined) this.recordReaction({ opId: `${run.runId}:r${run.reactions}`, kind: 'owner', id: target, by: 'juno', emoji: reaction.emoji })
       run.reactions += 1
     }
   }
 
-  const progress = (run: Live, update: StreamProgress) => {
-    if (run !== current) return
-    if (update.status !== undefined) { showStatus(run, update.status); return }
+  private progress = (run: Live, update: StreamProgress) => {
+    if (run !== this.current) return
+    if (update.status !== undefined) { this.showStatus(run, update.status); return }
     run.streamed = true
     if (update.text === run.partial) return
     run.partial = update.text
-    publish(run)
+    this.publish(run)
   }
 
-  const showStatus = (run: Live, line: string) => {
+  private showStatus = (run: Live, line: string) => {
     run.status = { text: line }
-    emit({ _tag: 'status', runId: run.runId, text: line })
+    this.emit({ _tag: 'status', runId: run.runId, text: line })
   }
 
-  const taint = (run: Live) => {
+  private taint = (run: Live) => {
     if (!run.clean) return
     run.clean = false
-    transaction(store.db, () => {
-      store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
+    transaction(this.store.db, () => {
+      this.store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
     })
   }
 
-  const toolStarted = (name: string) => {
-    const run = current
+  private toolStarted = (name: string) => {
+    const run = this.current
     if (run === undefined) return
-    const tool = options.tools().find((t) => t.name === name)
+    const tool = this.options.tools().find((t) => t.name === name)
     const count = (run.calls.get(name) ?? 0) + 1
     run.calls.set(name, count)
-    if (tool?.taints) taint(run)
-    showStatus(run, tool?.status(count) ?? 'Working')
+    if (tool?.taints) this.taint(run)
+    this.showStatus(run, tool?.status(count) ?? 'Working')
   }
 
   /** Delivers held input into the live run at a boundary, oldest first. */
-  const flush = async () => {
-    const run = current
-    if (run === undefined || !admitting()) return
+  private flush = async () => {
+    const run = this.current
+    if (run === undefined || !this.admitting()) return
     const work = (async () => {
       for (;;) {
-        const op = nextAccepted(store)
-        if (op === undefined || run.inputs.has(op.opId) || run !== current) return
+        const op = nextAccepted(this.store)
+        if (op === undefined || run.inputs.has(op.opId) || run !== this.current) return
         const untrusted = originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op)
-        if (!persistInput(op, () => {
-          if (untrusted) store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
-          store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
+        if (!this.persistInput(op, () => {
+          if (untrusted) this.store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
+          this.store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })) continue
         // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic.
         if (untrusted) run.clean = false
-        run.inputs.set(op.opId, await deliver(store, session.journal(), op, { steer: true, text: () => inputText(op) }))
-        emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
+        run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op) }))
+        this.emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
     })()
     run.flushing = run.flushing.then(() => work)
@@ -405,24 +433,24 @@ export function createRouter(options: RouterOptions) {
   }
 
   /** pi hooks of the root conversation's generation and tool tasks. */
-  const hooks = {
+  hooks = {
     generation: {
       beforeRequest: async (
         request: { readonly messages: ReadonlyArray<WireMessage> },
         api: { readonly models: { readonly getModel: (provider: string, id: string) => ChatModel | undefined } },
       ) => {
-        const run = current
+        const run = this.current
         if (run === undefined) throw new Error('no live run')
-        await session.catchUp()
+        await this.session.catchUp()
         run.streamed = false
         run.cleanAtRequest = run.clean
-        const ref = options.model()
+        const ref = this.options.model()
         const model = api.models.getModel(ref.provider, ref.modelId)
         if (model === undefined) {
           run.failure ??= { _tag: 'interrupted' }
           throw new Error('the chat model is not available')
         }
-        const built = builder.chat({ h: run.h, messages: request.messages, model, observe: (update) => progress(run, update) })
+        const built = this.builder.chat({ h: run.h, messages: request.messages, model, observe: (update) => this.progress(run, update) })
         if (built._tag === 'refused') {
           // pi then sends its raw context, which the guard refuses: no provider call.
           run.failure ??= built.ending
@@ -431,7 +459,7 @@ export function createRouter(options: RouterOptions) {
         return { messages: built.messages }
       },
       afterResponse: (message: { readonly stopReason: string; readonly errorMessage?: string }) => {
-        const run = current
+        const run = this.current
         if (run === undefined) return
         if (message.stopReason === 'error') {
           const ending = providerFailure(message.errorMessage).ending
@@ -439,19 +467,19 @@ export function createRouter(options: RouterOptions) {
           const lost = run.streamed && ending._tag === 'failed' && ending.reason === 'offline'
           run.failure ??= lost ? { _tag: 'interrupted' } : ending
         }
-        run.done = text(run)
+        run.done = this.text(run)
         run.partial = ''
-        publish(run)
+        this.publish(run)
       },
-      afterTools: () => flush(),
+      afterTools: () => this.flush(),
       onYield: async () => {
-        await flush()
+        await this.flush()
         return undefined
       },
     },
     tool: {
       beforeTool: (call: { readonly name: string }) => {
-        toolStarted(call.name)
+        this.toolStarted(call.name)
         return undefined
       },
     },
@@ -459,126 +487,132 @@ export function createRouter(options: RouterOptions) {
 
   // ---- Input
 
-  const message = (input: Extract<Input, { kind: Exclude<InboxKind, 'react'> }>): Accept => {
+  message = (input: Extract<Input, { kind: Exclude<InboxKind, 'react'> }>): Accept => {
     const { replyTo, ...rest } = input
-    const result = accept(store, replyTo === undefined ? rest : { ...rest, data: { ...(rest.data as object | undefined), replyTo } })
-    signal()
+    const result = accept(this.store, replyTo === undefined ? rest : { ...rest, data: { ...(rest.data as object | undefined), replyTo } })
+    this.signal()
     return result
   }
 
-  const react = (input: Extract<Input, { kind: 'react' }>): Queued => {
+  private react = (input: Extract<Input, { kind: 'react' }>): Queued => {
     const reaction = { opId: input.opId, kind: input.target._tag, id: input.target.id, by: 'owner' as const, emoji: input.emoji }
     if (input.emoji === null || input.emoji === THUMBS_UP) {
-      recordReaction(reaction)
+      this.recordReaction(reaction)
       return { _tag: 'recorded' }
     }
-    const result = accept(store, { opId: input.opId, kind: 'react', text: input.emoji, data: { target: input.target, emoji: input.emoji } })
-    if (result._tag === 'accepted') recordReaction(reaction)
-    signal()
+    const result = accept(this.store, { opId: input.opId, kind: 'react', text: input.emoji, data: { target: input.target, emoji: input.emoji } })
+    if (result._tag === 'accepted') this.recordReaction(reaction)
+    this.signal()
     return result
   }
 
   // ---- The loop
 
-  const loop = async () => {
+  private loop = async () => {
     for (;;) {
-      if (closing) return
-      signalled = false
-      if (current !== undefined) {
-        await runToEnd(current)
+      if (this.closing) return
+      this.signalled = false
+      if (this.current !== undefined) {
+        await this.runToEnd(this.current)
         continue
       }
-      if (rotateWaiters.length > 0 || options.rotationDue()) {
-        const waiting = rotateWaiters.splice(0)
-        await options.rotate()
+      if (this.rotateWaiters.length > 0 || this.options.rotationDue()) {
+        const waiting = this.rotateWaiters.splice(0)
+        await this.options.rotate()
         for (const resolve of waiting) resolve()
         continue
       }
-      const op = admitting() ? nextAccepted(store) : undefined
+      const op = this.admitting() ? nextAccepted(this.store) : undefined
       if (op === undefined) {
-        notifyIdle()
-        if (!signalled) await new Promise<void>((resolve) => (wake = resolve))
-        wake = undefined
+        this.notifyIdle()
+        if (!this.signalled) await new Promise<void>((resolve) => (this.wake = resolve))
+        this.wake = undefined
         continue
       }
-      await options.beforeRun?.()
-      await begin(op)
+      await this.options.beforeRun?.()
+      await this.begin(op)
     }
   }
 
-  let done: Promise<void> = Promise.resolve()
+  private done: Promise<void> = Promise.resolve()
 
-  return {
-    hooks,
-    restore,
-    kick: signal,
-    /** Starts the loop. Call after `restore` and pi's resume. */
-    start: () => {
-      done = loop().catch((error: unknown) => {
-        // After close, pi rejects pending waits; the ops stay submitted and resume next time.
-        if (!closing) options.onReport?.(error)
-      })
-    },
-    /**
-     * Queues an input: it joins the live run at its next step, or starts a run. A thumbs up or a
-     * removed reaction is only recorded. A reaction is never a click and never a pin.
-     */
-    accept: (input: Input): Queued => (input.kind === 'react' ? react(input) : message(input)),
-    /** A message, report, wake or click: always an inbox op. */
-    message,
-    /** "Try again" on an interrupted or failed owner send: a new op with the same text. */
-    retry: (input: { readonly opId: string; readonly interruptedOpId: string }): Retry => {
-      const earlier = find(store, input.interruptedOpId)
-      if (earlier === undefined || !isMessage(earlier.kind) || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
-        return { _tag: 'refused', reason: 'notRetryable' }
-      }
-      const result = accept(store, { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId } })
-      signal()
-      return result
-    },
-    mode: (): Mode => mode(store),
-    setMode: (next: Mode) => {
-      setMode(store, next)
-      signal()
-    },
-    state: (): RunState | undefined => {
-      const run = current
-      if (run === undefined) return undefined
-      return { runId: run.runId, opId: run.opId, origin: run.origin, bubbles: run.bubbles, status: run.status }
-    },
-    /** The live run's cutoff, for the compactor's ceiling (G2). */
-    cutoff: (): number | undefined => current?.h,
-    /** The live run as a tool sees it. Call it inside the tool's `execute()`. */
-    toolRun: async (): Promise<ToolRun | undefined> => {
-      const run = current
-      if (run === undefined) return undefined
-      const journal = session.journal()
-      const position = { incarnation: journal.incarnation, seq: await journal.lastCommitted() }
-      await session.catchUp()
-      return { runId: run.runId, opId: run.opId, h: run.h, origin: run.origin, cutoff: archiveLength(), clean: run.clean, cleanAtRequest: run.cleanAtRequest, position }
-    },
-    emit,
-    subscribe: (listener: (event: TurnEvent) => void) => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
-    },
-    rotate: () =>
-      new Promise<void>((resolve) => {
-        rotateWaiters.push(resolve)
-        signal()
-      }),
-    idle: () =>
-      new Promise<void>((resolve) => {
-        idleWaiters.push(resolve)
-        notifyIdle()
-        signal()
-      }),
-    close: async () => {
-      closing = true
-      signal()
-      return done
-    },
-    /** Resolves when the loop has stopped. */
-    stopped: () => done,
+  kick = this.signal
+
+  /** Starts the loop. Call after `restore` and pi's resume. */
+  start = () => {
+    this.done = this.loop().catch((error: unknown) => {
+      // After close, pi rejects pending waits; the ops stay submitted and resume next time.
+      if (!this.closing) this.options.onReport?.(error)
+    })
   }
+
+  /**
+   * Queues an input: it joins the live run at its next step, or starts a run. A thumbs up or a
+   * removed reaction is only recorded. A reaction is never a click and never a pin.
+   */
+  accept = (input: Input): Queued => (input.kind === 'react' ? this.react(input) : this.message(input))
+
+  /** "Try again" on an interrupted or failed owner send: a new op with the same text. */
+  retry = (input: { readonly opId: string; readonly interruptedOpId: string }): Retry => {
+    const earlier = find(this.store, input.interruptedOpId)
+    if (earlier === undefined || !isMessage(earlier.kind) || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
+      return { _tag: 'refused', reason: 'notRetryable' }
+    }
+    const result = accept(this.store, { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId } })
+    this.signal()
+    return result
+  }
+
+  mode = (): Mode => mode(this.store)
+
+  setMode = (next: Mode) => {
+    setMode(this.store, next)
+    this.signal()
+  }
+
+  state = (): RunState | undefined => {
+    const run = this.current
+    if (run === undefined) return undefined
+    return { runId: run.runId, opId: run.opId, origin: run.origin, bubbles: run.bubbles, status: run.status }
+  }
+
+  /** The live run's cutoff, for the compactor's ceiling (G2). */
+  cutoff = (): number | undefined => this.current?.h
+
+  /** The live run as a tool sees it. Call it inside the tool's `execute()`. */
+  toolRun = async (): Promise<ToolRun | undefined> => {
+    const run = this.current
+    if (run === undefined) return undefined
+    const journal = this.session.journal()
+    const position = { incarnation: journal.incarnation, seq: await journal.lastCommitted() }
+    await this.session.catchUp()
+    return { runId: run.runId, opId: run.opId, h: run.h, origin: run.origin, cutoff: this.archiveLength(), clean: run.clean, cleanAtRequest: run.cleanAtRequest, position }
+  }
+
+  subscribe = (listener: (event: TurnEvent) => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  rotate = () =>
+    new Promise<void>((resolve) => {
+      this.rotateWaiters.push(resolve)
+      this.signal()
+    })
+
+  idle = () =>
+    new Promise<void>((resolve) => {
+      this.idleWaiters.push(resolve)
+      this.notifyIdle()
+      this.signal()
+    })
+
+  close = async () => {
+    this.closing = true
+    this.signal()
+    return this.done
+  }
+
+  /** Resolves when the loop has stopped. */
+  stopped = () => this.done
 }
