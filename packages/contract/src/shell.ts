@@ -110,6 +110,10 @@ export const ContextMenuItems = Schema.Array(
 /** Where the menu opens, in CSS pixels from the window's top left. */
 export const ContextMenuAt = Schema.Struct({ x: Schema.Number, y: Schema.Number })
 
+/** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */
+export const DownloadResult = Schema.Literals(['saved', 'failed'])
+export type DownloadResult = typeof DownloadResult.Type
+
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
@@ -129,6 +133,10 @@ export const ShellRoutes = {
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
+  [Channels.shellDownloadFile]: {
+    input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
+    output: DownloadResult,
+  },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
   [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },
