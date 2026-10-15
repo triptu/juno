@@ -37,6 +37,7 @@ export {
   bottomWindow,
   channelThreadsAtom,
   loadOlderMessages,
+  locateMessage,
   messageItem,
   messageItemAtom,
   messageListAtom,
@@ -159,11 +160,13 @@ export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, t
 export { dismissToast, runAction, showToast, TOAST_LIFE_MS, toastAtom, undoLast, undoStackAtom, UNDO_LIMIT, type Toast, type ToastContent } from './undo'
 export {
   catchUpDoneAtom,
+  flashMessage,
   focusJunoComposer,
   JUNO_PANEL_PREF,
   junoAboutAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
+  messageFlashAtom,
   openedAtNewAtom,
   setJunoPanelOpen,
   type JunoFocusRequest,

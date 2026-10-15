@@ -22,7 +22,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { TopicKind } from '@juno/domain'
 import { MessageBody } from '../body'
-import { NotFound } from '../errors'
+import { NotFound, NotSignedIn } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { RowChannel, TitleSource, TopicStatus } from './topics'
 
@@ -312,4 +312,16 @@ export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
   error: NotFound,
 })
 
-export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder)
+/**
+ * The topic that holds a message, from the store: its thread when it is a
+ * reply or a thread's root, else the channel's Main. A message the store
+ * does not have is placed in Main. For a Juno source link (SPEC 13.1), which
+ * names only the channel and the message.
+ */
+export const messagesLocate = Rpc.make('messages.locate', {
+  payload: { channel: Schema.String, ts: Schema.String },
+  success: Schema.Struct({ topicId: Schema.String }),
+  error: NotSignedIn,
+})
+
+export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLocate)

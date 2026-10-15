@@ -16,7 +16,7 @@ import {
   type ReactionPickerAt,
   type ReactionTarget,
 } from '@juno/views'
-import { openTopic } from '../navigation'
+import { openSlackMessage, openTopic } from '../navigation'
 import { junoCommands, openJunoPage, takePanelOpenStart } from './actions'
 
 type Window = typeof ChatWindow.Type
@@ -340,6 +340,8 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
             return openTopic(target.topicId, { newTab: event.metaKey })
           case 'chatMessage':
             return scrollTo({ _tag: 'message', id: target.messageId })
+          case 'message':
+            return void openSlackMessage(target.channelId, target.ts, { newTab: event.metaKey })
           case 'url':
             return openExternal(target.url)
           case 'page':

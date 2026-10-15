@@ -62,3 +62,14 @@ export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' })
 export function focusJunoComposer(registry: Registry, where: JunoFocusRequest['where']): void {
   registry.set(junoFocusAtom, { n: registry.get(junoFocusAtom).n + 1, where })
 }
+
+/**
+ * A message a topic should show and flash once it is on screen: a Juno
+ * source link opened it (SPEC 13.1). `n` counts requests, so the same
+ * message asked twice flashes twice.
+ */
+export const messageFlashAtom = Atom.family((_topicId: string) => Atom.make<{ readonly ts: string; readonly n: number } | undefined>(undefined).pipe(Atom.keepAlive))
+
+export function flashMessage(registry: Registry, topicId: string, ts: string): void {
+  registry.set(messageFlashAtom(topicId), { ts, n: (registry.get(messageFlashAtom(topicId))?.n ?? 0) + 1 })
+}
