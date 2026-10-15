@@ -118,6 +118,9 @@ export interface PendingSend {
 
 export const pendingSendsAtom = Atom.make<ReadonlyArray<PendingSend>>([]).pipe(Atom.keepAlive)
 
+/** The local midnight before `at`, as the agent's day separators use. */
+const dayOf = (at: number) => new Date(at).setHours(0, 0, 0, 0)
+
 const firstLine = (text: string) => text.trim().split('\n', 1)[0] ?? ''
 
 /** A reply's quote, from the item it points at when the page holds it. */
@@ -132,23 +135,40 @@ function quoteIn(items: ReadonlyArray<ChatItem>, target: ReplyTarget): NonNullab
   return { target, preview }
 }
 
+/**
+ * Sends a page has shown as stored. A stored send stays pending until then, so its bubble
+ * never leaves the screen between the agent's acknowledgement and the page that holds its
+ * row; after it, the send never shows again, even when the row is later removed.
+ */
+const landed = new Set<string>()
+
 /** Pending sends after the page's own items, before the status bubble, once the window reaches the newest row. */
 export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>): ChatPage {
-  if (page.moreBelow || pending.length === 0) return page
+  if (pending.length === 0) return page
   const stored = new Set(page.items.flatMap((item) => (item._tag === 'owner' ? [item.opId] : [])))
+  for (const send of pending) if (stored.has(send.opId)) landed.add(send.opId)
+  if (page.moreBelow) return page
+  // A send on a day the page has no separator for gets the one the agent will put above its row, so the bubble does not move when the row lands.
+  let day = page.items.findLast((item) => item._tag === 'day')?.at
   const shown: ReadonlyArray<ChatItem> = pending
-    .filter((send) => !stored.has(send.opId))
-    .map((send) => ({
-      _tag: 'owner',
-      opId: send.opId,
-      text: send.text,
-      at: send.at,
-      delivery: send.delivery,
-      ...(send.replyTo ? { replyTo: quoteIn(page.items, send.replyTo) } : {}),
-      ...(send.context ? { about: aboutOf(send.context) } : {}),
-      reactions: [],
-      group: 'single',
-    }))
+    .filter((send) => !stored.has(send.opId) && !landed.has(send.opId))
+    .flatMap((send): ReadonlyArray<ChatItem> => {
+      const owner: ChatItem = {
+        _tag: 'owner',
+        opId: send.opId,
+        text: send.text,
+        at: send.at,
+        delivery: send.delivery,
+        ...(send.replyTo ? { replyTo: quoteIn(page.items, send.replyTo) } : {}),
+        ...(send.context ? { about: aboutOf(send.context) } : {}),
+        reactions: [],
+        group: 'single',
+      }
+      const start = dayOf(send.at)
+      if (start === day) return [owner]
+      day = start
+      return [{ _tag: 'day', at: start }, owner]
+    })
   if (shown.length === 0) return page
   const last = page.items.at(-1)
   const items = last?._tag === 'status' ? [...page.items.slice(0, -1), ...shown, last] : [...page.items, ...shown]
@@ -259,8 +279,8 @@ export function chatActions(registry: Registry) {
       ...(send.replyTo ? { replyTo: send.replyTo } : {}),
     })
     if (Exit.isSuccess(exit)) {
-      // The acknowledgement follows the durable inbox commit.
-      setPending(send.opId, undefined)
+      // Stored: the bubble stays until a page shows the agent's row (`landed`), which can arrive after this acknowledgement.
+      setPending(send.opId, { ...send, delivery: { _tag: 'sent' } })
       return
     }
     const error = Exit.isFailure(exit) ? exit.cause.reasons.find((r) => r._tag === 'Fail')?.error : undefined
@@ -268,13 +288,13 @@ export function chatActions(registry: Registry) {
     setPending(send.opId, { ...send, delivery: { _tag: 'failed', reason } })
   }
 
-  /** Forget stored sends the page has had time to show. */
+  /** Forget stored sends a page has shown, or has had time to show. */
   const prune = () => {
     const now = Date.now()
-    registry.set(
-      pendingSendsAtom,
-      registry.get(pendingSendsAtom).filter((send) => send.delivery._tag !== 'sent' || now - send.at < 60_000),
-    )
+    const pending = registry.get(pendingSendsAtom)
+    const kept = pending.filter((send) => send.delivery._tag !== 'sent' || (!landed.has(send.opId) && now - send.at < 60_000))
+    for (const send of pending) if (!kept.includes(send)) landed.delete(send.opId)
+    if (kept.length !== pending.length) registry.set(pendingSendsAtom, kept)
   }
 
   return {

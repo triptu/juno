@@ -89,6 +89,11 @@ it('a send shows at once, then as the agent stored it, and Juno answers it', asy
   const actions = chatActions(registry)
 
   fake.script([reply('<say>Morning. Two meetings today.</say>')])
+  // Every page the chat is given from the send on, to check the bubble never leaves.
+  const pages: Array<ChatPage> = []
+  const unsubscribe = registry.subscribe(chatItemsAtom(LATEST), (result) => {
+    if (result._tag === 'Success') pages.push(result.value)
+  })
   const opId = actions.send('what is on today?')
   // From the first frame, before the agent has it.
   expect(pageOf(registry)?.items).toContainEqual(expect.objectContaining({ _tag: 'owner', opId, text: 'what is on today?', delivery: { _tag: 'sending' } }))
@@ -100,6 +105,10 @@ it('a send shows at once, then as the agent stored it, and Juno answers it', asy
   const owners = answered.items.filter((item) => item._tag === 'owner')
   expect(owners).toHaveLength(1)
   expect(owners[0]).toMatchObject({ opId, delivery: { _tag: 'sent' } })
+  unsubscribe()
+  // In every page, with the day separator the stored row has above it, so the bubble never moves when it lands.
+  const sentAt = (page: ChatPage) => page.items.findIndex((item) => item._tag === 'owner' && item.opId === opId)
+  expect(pages.filter((page) => sentAt(page) < 1 || page.items[sentAt(page) - 1]?._tag !== 'day')).toEqual([])
   const bubble = answered.items.find((item) => item._tag === 'juno')!
   expect(bubble).toMatchObject({ body: [{ _tag: 'text', text: 'Morning. Two meetings today.' }], unread: true })
 
