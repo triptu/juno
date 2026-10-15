@@ -10,9 +10,9 @@ import { capacity, machinesToDestroy } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
-const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 5) * 60_000
-const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2)
-const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 64)
+const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 1) * 60_000
+const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 1)
+const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24)
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
