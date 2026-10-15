@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import type { ActivateEvent } from '@juno/ui'
-import { accent, colors, motion, sizes } from '@juno/tokens/tokens.stylex'
+import { accent, colors, motion, sizes, spacing, radii } from '@juno/tokens/tokens.stylex'
 
 export interface InlineLinkProps {
   readonly onOpen: (event: ActivateEvent) => void
@@ -51,9 +51,9 @@ const styles = stylex.create({
       default: colors['--foreground-muted'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
-    textUnderlineOffset: '2px',
+    textUnderlineOffset: spacing['--space-0-5'],
     cursor: 'default',
-    borderRadius: '2px',
+    borderRadius: radii['--radius-inline'],
     transitionProperty: 'text-decoration-color',
     transitionDuration: motion['--duration-fast'],
     transitionTimingFunction: motion['--ease-out'],

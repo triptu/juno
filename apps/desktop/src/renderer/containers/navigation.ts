@@ -37,6 +37,7 @@ import {
   allTopicsPlace,
   allTopicsTab,
   homePlace,
+  homeViewAtom,
   flashMessage,
   junoPagePlace,
   locateMessage,
@@ -192,26 +193,27 @@ let currentTicket = 0
 /**
  * Applies `change` once `topic` (the topic the change brings on screen) can
  * paint, unless something newer replaced it meanwhile. With no topic to
- * wait for, it applies now.
+ * wait for, it applies after the supplied readiness wait, or now.
  */
 function show(
   change: (tabs: Tabs) => Tabs,
   topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch'; readonly target?: string } | undefined,
   replaceable = true,
+  ready?: Promise<void>,
 ): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
   if (topic === undefined) {
-    queue = queue.then(() => {
+    queue = queue.then(() => ready).then(() => {
       if (ticket === currentTicket) apply(change)
     })
     return
   }
   registry.set(selectedTopicAtom, topic.id)
   pending = { id: topic.id, at, name: topic.name }
-  const ready = whenReady(topic.id, topic.fresh, topic.target)
+  const topicReady = whenReady(topic.id, topic.fresh, topic.target)
   queue = queue
-    .then(() => ready)
+    .then(() => topicReady)
     .then(() => {
       if (!replaceable || ticket === currentTicket) apply(change)
     })
@@ -267,9 +269,32 @@ export function openNewChatTo(conversation: PickConversation): void {
   }, undefined)
 }
 
-/** The sidebar's Home item. Home is a singleton: the tab that shows it is focused. */
+/**
+ * Keep the topic on screen until Home's local rows are ready. After the
+ * subscription expires, replacing it first would lay out an empty page
+ * and then Home in separate frames. The wait is bounded as for All topics.
+ */
 export function openHome(options: OpenOptions = {}): void {
-  show((tabs) => openHere(tabs, homePlace, options), undefined)
+  const ready = new Promise<void>((resolve) => {
+    const release = registry.mount(homeViewAtom)
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      off()
+      resolve()
+      afterPaint(release)
+    }
+    const check = () => {
+      const result = registry.get(homeViewAtom)
+      if (result._tag === 'Failure' || (result._tag === 'Success' && result.value.ready)) finish()
+    }
+    const timer = setTimeout(finish, READY_WAIT_MS)
+    const off = registry.subscribe(homeViewAtom, check, { immediate: false })
+    check()
+  })
+  show((tabs) => openHere(tabs, homePlace, options), undefined, true, ready)
 }
 
 /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */

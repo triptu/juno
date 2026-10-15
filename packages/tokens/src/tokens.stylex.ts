@@ -332,6 +332,7 @@ export const shadows = stylex.defineVars({
  * from that rule rather than picking from the list.
  */
 export const radii = stylex.defineVars({
+  '--radius-inline': '2px',
   '--radius-xs': '4px',
   '--radius-sm': '5px',
   '--radius-md': '6px',
@@ -362,6 +363,7 @@ export const radii = stylex.defineVars({
 
 /** Spacing. A 4px scale with the 2px and 6px steps the design actually uses. */
 export const spacing = stylex.defineVars({
+  '--space-pixel': '1px',
   '--space-0-5': '2px',
   '--space-1': '4px',
   '--space-1-5': '6px',
@@ -656,6 +658,7 @@ export const motion = stylex.defineVars({
 
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
+  '--chat-empty-width': '520px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '280px',
@@ -756,6 +759,8 @@ export const layout = stylex.defineVars({
  * spec measurement maps straight to a token.
  */
 export const sizes = stylex.defineVars({
+  '--inline-em': '1em',
+  '--link-underline-offset': '0.12em',
   '--control-18': '18px',
   '--control-20': '20px',
   '--control-22': '22px',

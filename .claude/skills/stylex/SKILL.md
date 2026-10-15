@@ -12,8 +12,11 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 ## Rules
 
 1. **Every design value comes from `@juno/tokens`.** Colours, spacing, radii, type sizes, line
-   heights, fonts, shadows, durations, easing and layout sizes. Nothing checks this for you:
-   StyleX compiles `color: '#fff'` without complaint, so review for it.
+   heights, fonts, shadows, durations, easing and layout sizes. `pnpm lint` runs `scripts/check-tokens.mjs` on UI, views and renderer StyleX calls.
+   It rejects literal colours and lengths, including nested conditions and templates.
+   Zero, percentages and 1px border/outline hairlines pass. For geometry exceptions,
+   add a trailing `// tokens-allow: reason` on the declaration line. Constants and
+   runtime parameters are not evaluated; review those for token use.
    - Allowed raw values: `0`, `none`, `auto`, `transparent`, `1px` hairlines. Before writing any
      other number, search `tokens.stylex.ts` for it (focus ring, press scale, disabled opacity and
      font weights have tokens or are being added). A one-off size that no other component will
@@ -105,5 +108,5 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   has one weight (400); never set bold on it.
 - **Main process** cannot use StyleX. The one raw colour there (`BrowserWindow.backgroundColor` in
   `main/window.ts`) must match `--background`; update both together.
-- **Verify** with `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `pnpm test:e2e` for anything
+- **Verify** with `pnpm affected`, plus `pnpm remote test:gallery` for anything
   that changes computed colours or states.

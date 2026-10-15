@@ -12,7 +12,7 @@
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
     "typecheck": "node scripts/typecheck.mjs",
-    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
+    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
     "health:knip": "knip --config knip.config.mjs --no-exit-code",

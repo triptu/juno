@@ -88,7 +88,7 @@ const styles = stylex.create({
   bar: {
     flexShrink: 0,
     alignSelf: 'stretch',
-    width: '2px',
+    width: spacing['--space-0-5'],
     backgroundColor: colors['--border-strong'],
   },
   quote: {

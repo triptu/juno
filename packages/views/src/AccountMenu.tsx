@@ -141,7 +141,7 @@ const styles = stylex.create({
   },
   dotAway: {
     backgroundColor: colors['--surface-default'],
-    boxShadow: `inset 0 0 0 1px ${colors['--foreground-muted']}`,
+    boxShadow: `inset 0 0 0 1px ${colors['--foreground-muted']}`, // tokens-allow: The inset ring is a 1px hairline.
   },
   section: {
     display: 'flex',
