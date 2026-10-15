@@ -51,7 +51,7 @@ function UpdatingResults() {
   useFixtureControl('remove-first', () => setItems((rows) => rows.filter((row) => row.id !== 'c1')))
   return (
     <div {...stylex.props(styles.window)}>
-      <output data-activation-log="">{chosen}</output>
+      <output hidden data-activation-log="">{chosen}</output>
       <CommandPalette
         query="eng"
         resultsQuery="eng"

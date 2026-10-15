@@ -365,13 +365,14 @@ test('every font family comes from the bundle', async ({ page }) => {
 
 test('palette keeps the highlighted item through late commands and reordered results', async ({ page }) => {
   await page.goto('/#/CommandPalette?__state=interaction/updates')
-  const input = page.getByRole('combobox')
+  const palette = page.getByRole('dialog', { name: 'Search and commands' })
+  const input = palette.getByRole('combobox')
   await expect(input).toHaveAttribute('aria-activedescendant', 'palette-c1')
   await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['prepend-command']?.())
-  await expect(page.getByRole('option').first()).toContainText('Send to Maya Chen')
+  await expect(palette.getByRole('option').first()).toContainText('Send to Maya Chen')
   await expect(input).toHaveAttribute('aria-activedescendant', 'palette-c1')
   await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['reverse-results']?.())
-  await expect(page.getByRole('option').last()).toContainText('Public channel · Main')
+  await expect(palette.getByRole('option').last()).toContainText('Public channel · Main')
   await input.press('Enter')
   await expect(log(page)).toHaveText('c1')
   await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['remove-first']?.())
