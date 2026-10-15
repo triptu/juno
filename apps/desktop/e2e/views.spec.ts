@@ -2,8 +2,11 @@
 // 15.7 and 15.8): making a view with and without an icon, keeping its
 // channels out of All, the mention dot, editing, reordering by menu and by
 // drag, deleting with Undo, Add to view from a channel's menu, and a row of
-// many views that scrolls sideways without moving the list.
+// many views that scrolls sideways without moving the list. The built-in
+// Automated view is deleted first where a test needs the bot channels in All
+// or only its own views (automated.spec.ts covers Automated itself).
 import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -11,9 +14,16 @@ const ALERTS_MAIN = '#alerts-prod'
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite.'
 
-test('a view with an icon gathers its channel, keeps it out of All, and lights only for a mention', async ({ juno, fake }) => {
+/** Signs in, waits for the sync and deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
+async function withoutAutomated(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
+  await juno.sidebar.viewMenu('Automated', 'view-delete')
+  await expect.poll(() => juno.sidebar.viewNames()).toEqual([])
+}
+
+test('a view with an icon gathers its channel, keeps it out of All, and lights only for a mention', async ({ juno, fake }) => {
+  await withoutAutomated(juno)
   const { sidebar } = juno
   await sidebar.row(ALERTS_MAIN).expectVisible()
 
@@ -48,8 +58,7 @@ test('a view with an icon gathers its channel, keeps it out of All, and lights o
 })
 
 test('a view with no icon shows its name; edit it, reorder by menu and drag, and delete it with Undo', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+  await withoutAutomated(juno)
   const { sidebar } = juno
 
   await sidebar.createView({ name: 'Team', conversations: ['eng'] })
@@ -92,8 +101,7 @@ test('a view with no icon shows its name; edit it, reorder by menu and drag, and
 })
 
 test('Add to view on a channel’s menu adds and removes it, with Undo, and New view… starts with it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+  await withoutAutomated(juno)
   const { sidebar } = juno
   await sidebar.createView({ name: 'Ops', conversations: ['eng'] })
   const ops = await sidebar.viewId('Ops')

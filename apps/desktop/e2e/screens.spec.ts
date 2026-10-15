@@ -36,13 +36,13 @@ test('sidebar views: the pill row with views, a mention dot and the view sheet, 
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  await sidebar.createView({ name: 'Bots', icon: 'Robot', conversations: ['alerts-prod'], keepOutOfAll: true })
+  // Automated is there already: the first sync put #alerts-prod and #deploys in it.
   await sidebar.createView({ name: 'Design crit', conversations: ['eng'] })
   await sidebar.createView({ name: 'Leadership', conversations: ['hiring'] })
   await sidebar.createView({ name: 'Work', icon: 'Briefcase' })
   await sidebar.filter('All')
   fake.injectMessage({ channel: 'C0ALERTSPROD', user: 'U0LEO', text: '<@U0TUSHAR> can you take the pager tonight?' })
-  await sidebar.expectViewDot('Bots', true)
+  await sidebar.expectViewDot('Automated', true)
   for (const theme of ['light', 'dark'] as const) {
     if (theme === 'dark') await juno.setTheme('Dark')
     await win.mouse.move(900, 400)
@@ -50,7 +50,7 @@ test('sidebar views: the pill row with views, a mention dot and the view sheet, 
     await win.evaluate(() => document.fonts.ready)
     await win.waitForTimeout(300)
     await win.screenshot({ path: resolve(screens, `views-${theme}.png`) })
-    await sidebar.viewMenu('Bots', 'view-edit')
+    await sidebar.viewMenu('Automated', 'view-edit')
     await expect(sidebar.viewSheet).toBeVisible()
     await win.waitForTimeout(300)
     await win.screenshot({ path: resolve(screens, `views-sheet-${theme}.png`) })

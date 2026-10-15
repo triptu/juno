@@ -137,17 +137,19 @@ describe('the AgentHost port', () => {
     const slackCalls = engine.fake.calls.length
     const view = { name: 'Bots', icon: 'robot', channels: [CHANNEL], keepOutOfAll: true }
     const created = await ok(client['host.views.create']({ accountId: account, view }))
-    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([{ ...view, id: created.id, position: 0 }])
+    // The built-in Automated view comes first: the first sync made it.
+    const own = async () => (await ok(client['host.views.list']({ accountId: account }))).filter((each) => each.id !== 'automated')
+    expect(await own()).toEqual([{ ...view, id: created.id, position: 1 }])
     const updated = await ok(client['host.views.update']({ accountId: account, id: created.id, view: { ...view, name: 'Alerts', channels: [] } }))
     expect(await failure(client['host.views.undo']({ accountId: account, undo: created.undo }))).toMatchObject({ reason: 'stale' })
     await ok(client['host.views.undo']({ accountId: account, undo: updated.undo }))
     const deleted = await ok(client['host.views.delete']({ accountId: account, id: created.id }))
-    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([])
+    expect(await own()).toEqual([])
     await ok(client['host.views.undo']({ accountId: account, undo: deleted.undo }))
-    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([{ ...view, id: created.id, position: 0 }])
+    expect(await own()).toEqual([{ ...view, id: created.id, position: 1 }])
     await ok(client['host.views.undo']({ accountId: account, undo: created.undo }))
     await ok(client['host.views.undo']({ accountId: account, undo: created.undo }))
-    expect(await ok(client['host.views.list']({ accountId: account }))).toEqual([])
+    expect(await own()).toEqual([])
     expect(await failure(client['host.views.update']({ accountId: account, id: 'missing', view }))).toMatchObject({ reason: 'notFound' })
     expect(await failure(client['host.views.create']({ accountId: account, view: { ...view, icon: 'invalid' } }))).toMatchObject({ reason: 'rejected' })
     expect(await failure(client['host.views.create']({ accountId: Schema.decodeUnknownSync(HostPresence.fields.accountId)('other')!, view }))).toMatchObject({ reason: 'stale' })

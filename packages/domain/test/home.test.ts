@@ -36,4 +36,9 @@ describe('Home items', () => {
     const ranked = rankHomeItems([item('waiting', 'a'), item('tidyUp', 'a', 'b', 'c')])
     expect(ranked[1]).toMatchObject({ kind: 'tidyUp', topicIds: ['b', 'c'] })
   })
+
+  it("asks Automated's question after a follow-up and before Tidy up", () => {
+    const ranked = rankHomeItems([item('tidyUp', 'x', 'y'), item('automated', 'm'), item('followUp', 'c'), item('waiting', 'd')])
+    expect(ranked.map((row) => row.value)).toEqual(['waiting:d', 'followUp:c', 'automated:m'])
+  })
 })
