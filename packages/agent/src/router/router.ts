@@ -50,7 +50,7 @@ import { mode, setMode, type Mode } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
 import { THUMBS_UP, type ReplyTarget } from '@juno/agent-contract'
 import type { Origin, RunState, TurnEvent } from './events'
-import { archivedBubble, modelText, ownerOpOf, runText } from './input'
+import { archivedBubble, modelText, ownerOpOf, readsTopic, runText } from './input'
 import { parseOutput } from './output'
 
 export interface Session {
@@ -247,7 +247,8 @@ export function createRouter(options: RouterOptions) {
   const begin = async (op: InboxOp): Promise<Live> => {
     await session.catchUp()
     const origin = originOf(op.kind)
-    const row = { id: uuidv7(store.now()), op_id: op.opId, origin, h: archiveLength(), clean: origin === 'owner' ? 1 : 0 }
+    // A message sent beside a topic carries Slack content (SPEC 7): the run starts tainted.
+    const row = { id: uuidv7(store.now()), op_id: op.opId, origin, h: archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }
     transaction(store.db, () => {
       store.db
         .prepare('INSERT INTO runs (id, op_id, origin, h, clean, started_at) VALUES (?, ?, ?, ?, ?, ?)')
@@ -353,8 +354,8 @@ export function createRouter(options: RouterOptions) {
       for (;;) {
         const op = nextAccepted(store)
         if (op === undefined || run.inputs.has(op.opId) || run !== current) return
-        // §6.4: a steered report or wake is untrusted content.
-        if (originOf(op.kind) === 'report' || originOf(op.kind) === 'wake') taint(run)
+        // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic.
+        if (originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op)) taint(run)
         transaction(store.db, () => {
           store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })

@@ -5,7 +5,7 @@ import { CardBinding } from './identity'
 import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
 import { Emoji, ReplyTarget } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
-import { Place } from '../chat/place'
+import { SendContext } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
 
 /** First subscription opens the newest window or the first unread row. Anchored windows
@@ -32,7 +32,7 @@ export const chatSummary = Rpc.make('agent.chat.summary', { success: ChatSummary
  * step; otherwise it starts one. A reply to a card is not a click.
  */
 export const chatSend = Rpc.make('agent.chat.send', {
-  payload: { ...operation, text: Schema.String, context: Schema.optionalKey(Place), replyTo: Schema.optionalKey(ReplyTarget) },
+  payload: { ...operation, text: Schema.String, context: Schema.optionalKey(SendContext), replyTo: Schema.optionalKey(ReplyTarget) },
   success: Accepted, error: AgentCommandError,
 })
 /**
