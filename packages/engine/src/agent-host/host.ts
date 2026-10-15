@@ -6,6 +6,8 @@
  *   fail with `signedOut`.
  * - The send is `Outbox.sendOnce`, the single-attempt mode: one
  *   `chat.postMessage` with `client_msg_id` set to the action id, no retry.
+ *   It is recorded as sent first (`recordSend`), so a second copy the
+ *   network makes is deleted when Juno stores it (ADR 0014).
  * - `sent` asks Slack, not the store, for the reconcile lookup.
  * - The hours-start summaries come from the notification host, which
  *   holds them until the agent has appended them.
@@ -19,7 +21,8 @@ import { JunoHost, type Account, type AccountId, type Attempt, type Message, typ
 import type { EnginePhase } from '@juno/contract'
 import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
 import { readSettings } from '@juno/notifications'
-import { liveQuery, StoreReader, type SqlError } from '@juno/store'
+import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
+import { recordSend, storedMe } from '@juno/sync'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { NotificationHost } from '../notificationRuntime'
@@ -111,6 +114,13 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     )
 
     const post = (attempt: Attempt): Effect.Effect<PostOutcome> =>
+      // Recorded before it leaves, so a copy the network makes is deleted (ADR 0014).
+      inStore(Effect.flatMap(storedMe, (me) => transaction(recordSend(attempt.actionId, attempt.channelId, me?.userId ?? '')))).pipe(
+        Effect.flatMap(() => send(attempt)),
+        Effect.catchTag('AgentHostError', () => Effect.succeed<PostOutcome>({ _tag: 'refused', reason: 'signedOut' })),
+      )
+
+    const send = (attempt: Attempt): Effect.Effect<PostOutcome> =>
       outbox
         .sendOnce((api) =>
           api.call('chat.postMessage', {

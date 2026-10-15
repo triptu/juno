@@ -53,7 +53,8 @@ describe('migrations', () => {
       yield* sql`CREATE TABLE for_you_cards (id TEXT PRIMARY KEY)`
       yield* sql`INSERT INTO for_you_cards VALUES ('old-card')`
       yield* sql`INSERT INTO prefs (key, value_json) VALUES ('theme', '"dark"')`
-      yield* sql`DELETE FROM ${sql(MIGRATIONS_TABLE)} WHERE migration_id = 202610160200`
+      // As on a database from before the drop: it and every later migration run again.
+      yield* sql`DELETE FROM ${sql(MIGRATIONS_TABLE)} WHERE migration_id >= 202610160200`
       yield* Effect.provideService(migrate(userMigrations), SqlClient.SqlClient, sql)
       assert.notInclude(yield* tableNames('main'), 'for_you_cards')
       const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'theme'`

@@ -1,5 +1,7 @@
 // One persisted pending row per client_msg_id. Slack does not deduplicate
-// requests in this model: each acceptance adds another message.
+// requests in this model: each acceptance adds another message. The network
+// can run an accepted post again (Chromium resends on a reused connection,
+// ADR 0014); Juno deletes that copy.
 module outboxProtocol {
   const drafts: Set[int]
   const fetchLimit: int
@@ -20,7 +22,11 @@ module outboxProtocol {
     // whose intent changed while a call was out. `actSent` records every
     // action call that left Juno; `acted` every message Slack applied one to.
     act: int -> str, actKind: int -> str, stale: Set[int],
-    actSent: Set[int], acted: Set[int]
+    actSent: Set[int], acted: Set[int],
+    // Copies the network made of an accepted post (0 or 1) and copies Juno
+    // deleted. `copyRow`: none, hidden (stored hidden, its delete row
+    // waits) or shown (the bug: listed as a second message).
+    dup: int -> int, deletes: int -> int, copyRow: int -> str
   }
   var s: State
   var remaining: int
@@ -32,12 +38,17 @@ module outboxProtocol {
       events: Set(), fetches: Set(), scan: Set(),
       online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
-      actSent: Set(), acted: Set() },
+      actSent: Set(), acted: Set(),
+      dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none") },
     remaining' = drainLimit, turn' = 0
   }
 
   def actPending(k: int): bool = Set("waiting", "transit", "accepted").contains(s.act.get(k))
   def actInFlight(k: int): bool = Set("transit", "accepted").contains(s.act.get(k))
+  // Messages Slack holds for one client_msg_id.
+  def held(k: int): int = s.server.get(k) + s.dup.get(k) - s.deletes.get(k)
+  // A copy in Slack that Juno has not stored yet.
+  def copyUnseen(k: int): bool = s.dup.get(k) > s.deletes.get(k) and s.copyRow.get(k) == "none"
 
   action send(k: int): bool = all {
     not(s.sealed), not(s.created.contains(k)),
@@ -78,6 +89,37 @@ module outboxProtocol {
     not(s.sealed), s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
     s' = { ...s, row: s.row.set(k, "failed"), due: s.due.exclude(Set(k)), label: "uploadFail", target: k }
   }
+  // The network sends an accepted request again before its answer: the
+  // connection closed with no answer and the stack resent it by itself.
+  // Slack runs it again, so it holds a second message with the same ID.
+  action resend(k: int): bool = all {
+    not(s.sealed), s.request.get(k) == "accepted", s.dup.get(k) == 0,
+    s' = { ...s, dup: s.dup.set(k, 1), label: "resend", target: k }
+  }
+  // Juno stores a second message with a sent post's ID (`sent.ts`): the
+  // echo, the answer, a page or a lookup shows it. Whichever it stored
+  // first is the message; this one is hidden in the same transaction and a
+  // delete row is queued for it. With the guard off it is listed.
+  action observeCopyWith(k: int, guard: bool): bool = all {
+    s.connected, s.stored.contains(k), copyUnseen(k),
+    s' = { ...s, copyRow: s.copyRow.set(k, if (guard) "hidden" else "shown"), label: "observeCopy", target: k }
+  }
+  action observeCopy(k: int): bool = observeCopyWith(k, true)
+  // The delete row's `chat.delete`. A lost answer sends it again, and
+  // `message_not_found` counts as done, so only its success is modelled.
+  // With `byId` off, the bug takes a message with the same text for a copy:
+  // every draft here has the same text, so another stored draft is enough.
+  action deleteCopyWith(k: int, byId: bool): bool = all {
+    s.online, s.connected,
+    if (byId) s.copyRow.get(k) == "hidden" else all {
+      s.stored.contains(k), s.copyRow.get(k) == "none", held(k) > 0,
+      drafts.exists(j => j != k and s.stored.contains(j))
+    },
+    s' = { ...s, deletes: s.deletes.set(k, s.deletes.get(k) + 1),
+      copyRow: if (byId) s.copyRow.set(k, "none") else s.copyRow, label: "deleteCopy", target: k }
+  }
+  action deleteCopy(k: int): bool = deleteCopyWith(k, true)
+
   // Slack can drop the request without an answer.
   action drop(k: int): bool = all {
     not(s.sealed), s.request.get(k) == "transit",
@@ -278,16 +320,21 @@ module outboxProtocol {
   }
   action seal = all { not(s.sealed), s' = { ...s, sealed: true, label: "seal" } }
 
+  // Juno submits each ID at most once that Slack accepts; a network copy is
+  // not Juno's submission and is deleted instead.
   val atMostOnce = drafts.forall(k => s.server.get(k) <= 1)
+  val shownOnce = drafts.forall(k => s.copyRow.get(k) != "shown")
+  val keepsRealSends = drafts.forall(k => s.stored.contains(k) implies held(k) >= 1)
   val noDoubleShow = drafts.forall(k => s.stored.contains(k) implies s.row.get(k) == "gone")
   val noSilentLoss = s.created.forall(k => s.row.get(k) == "gone" implies
     (s.stored.contains(k) or s.discarded.contains(k)))
   val quiet = s.online and s.connected and not(s.catchup) and s.scan.size() == 0 and
     s.events.size() == 0 and s.fetches.size() == 0 and drafts.forall(k =>
-      s.request.get(k) == "idle" and Set("gone", "failed").contains(s.row.get(k)) and not(actPending(k)))
+      s.request.get(k) == "idle" and Set("gone", "failed").contains(s.row.get(k)) and not(actPending(k)) and
+      s.copyRow.get(k) != "hidden" and not(copyUnseen(k)))
   val agreed = s.created.forall(k => s.discarded.contains(k) or
-    (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1) or
-    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and s.server.get(k) == 0)) and
+    (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1 and held(k) == 1) or
+    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and held(k) == 0)) and
     drafts.forall(k => s.act.get(k) == "done" implies s.acted.contains(k))
   val quietAgreement = (s.sealed and quiet) implies agreed
   val reachedAgreement = s.sealed and quiet and agreed
@@ -297,13 +344,13 @@ module outboxProtocol {
   val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
-    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline
+    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends
 
   action work = any {
     goOnline, reconnect, catchUp,
     { nondet k = drafts.oneOf(); nondet withEcho = Set(true, false).oneOf(); any {
       claim(k), accept(k, withEcho), answer(k), refused(k), lookup(k), wake(k),
-      runAction(k), actAccept(k), actAnswer(k), dropAction(k),
+      runAction(k), actAccept(k), actAnswer(k), dropAction(k), observeCopy(k), deleteCopy(k),
       all { s.request.get(k) == "dropped", lost(k) }
     } },
     { nondet k = s.events.oneOf(); echo(k) },
@@ -316,7 +363,7 @@ module outboxProtocol {
     nondet later = Set(true, false).oneOf()
     nondet kind = Set("change", "delete").oneOf()
     any {
-      send(k), refuse(k, later), drop(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
+      send(k), refuse(k, later), drop(k), resend(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
       queueAction(k, kind), actFail(k), actRefuse(k),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
@@ -503,6 +550,42 @@ module outboxProtocol {
     if (turn == 8) actFail(1) else
     seal
   ) }
+
+  // The network resends an accepted post before its answer, so Slack holds
+  // two messages with the ID. The answer stores one, the echo of the other
+  // arrives, and Juno hides that copy and deletes it. The bug lists it.
+  action networkCopyWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, true) else
+    if (turn == 3) resend(1) else
+    if (turn == 4) answer(1) else
+    if (turn == 5) echo(1) else
+    if (turn == 6) observeCopyWith(1, guard) else
+    seal
+  ) }
+  action networkCopyStep = networkCopyWith(true)
+  action networkCopyBugStep = networkCopyWith(false)
+
+  // Two posts with the same text, each sent once. The guarded reconciler
+  // matches by ID and deletes nothing. The bug matches by text and deletes
+  // the second post, which the user sent on purpose.
+  action sameTextWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) send(2) else
+    if (turn == 2) claim(1) else
+    if (turn == 3) accept(1, false) else
+    if (turn == 4) answer(1) else
+    if (turn == 5) claim(2) else
+    if (turn == 6) accept(2, false) else
+    if (turn == 7) answer(2) else
+    if (turn == 8) (if (guard) seal else deleteCopyWith(2, false)) else
+    seal
+  ) }
+  action sameTextStep = sameTextWith(true)
+  action sameTextBugStep = sameTextWith(false)
 }
 
 module outbox {
