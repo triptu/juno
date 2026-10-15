@@ -1,10 +1,11 @@
-import { Context, Effect, Layer, Schema } from 'effect'
-import { Revision } from '@juno/agent-cards'
+import { Context, Layer, Schema } from 'effect'
+import { CARD_LIFETIME_MS, Revision } from '@juno/agent-cards'
 import { ScheduleId } from '@juno/agent-contract'
 import { authorityOf, liveGrant, mintGrant, revokeGrant } from '../grants/grants'
 import { mayAuthorize, type GrantAuthority } from '../policy/policy'
 import { transaction } from '../store/database'
 import { uuidv7, type Store } from '../store/store'
+import type { Proposal } from '../actions/cards'
 import { Definition, matchesReply, menuDeadline, nextDue, NUDGE_PROMPT, type NotificationHours, type Reply, type ReplyWatch } from './rules'
 
 const Row = Schema.Struct({ id: Schema.String, revision: Schema.Int, definition: Schema.String,
@@ -24,6 +25,10 @@ export interface SchedulerOptions {
   /** Refresh the whole conversation before returning replies; failures must reject. */
   readonly replies: (watch: ReplyWatch) => Promise<{ readonly owner: string; readonly messages: ReadonlyArray<Reply> }>
   readonly changed: () => void
+  readonly cachedReplies?: SchedulerOptions['replies']
+  readonly account?: () => string | undefined
+  readonly enabled?: () => boolean
+  readonly onError?: (error: unknown) => void
 }
 
 export function createScheduler(options: SchedulerOptions) {
@@ -39,13 +44,17 @@ export function createScheduler(options: SchedulerOptions) {
     const current = get(occurrence.schedule_id)
     const grant = liveGrant(store, 'schedule', occurrence.schedule_id)
     if (current === undefined || current.state !== 'active' || current.revision !== occurrence.revision ||
-      !mayAuthorize(authorityOf(store)) || grant === undefined) return undefined
+      !mayAuthorize(authorityOf(store)) || options.enabled?.() === false || grant === undefined) return undefined
+    const watch = current.definition.unlessReply
+    if (watch?.accountId !== undefined && watch.accountId !== options.account?.()) return undefined
     const bounds = Schema.decodeUnknownSync(Schema.Struct({ revision: Schema.Int, purpose: Schema.String }))(grant.bounds)
     return bounds.revision === current.revision && bounds.purpose === current.definition.prompt ? current : undefined
   }
   function create(input: { readonly key: string; readonly sourceOp: string; readonly authority: GrantAuthority; readonly definition: Definition }) {
     return atomic(() => {
-      const definition = decodeDefinition(input.definition)
+      if (options.enabled?.() === false) return undefined
+      const accountId = options.account?.()
+      const definition = decodeDefinition({ ...input.definition, ...(input.definition.unlessReply !== undefined && accountId !== undefined ? { unlessReply: { ...input.definition.unlessReply, accountId } } : {}) })
       if (definition.unlessReply !== undefined && definition.schedule._tag !== 'once') return undefined
       const previous = store.db.prepare('SELECT * FROM schedules WHERE creation_key = ?').get(input.key)
       if (previous !== undefined) return record(decodeRow(previous))
@@ -145,27 +154,74 @@ export function createScheduler(options: SchedulerOptions) {
     }
     return store.db.isTransaction ? commit() : transaction(store.db, commit)
   }
-  function observe(reply: Reply, owner: string): void {
-    for (const row of list()) {
+  function watched() {
+    return store.db.prepare(`SELECT s.* FROM schedules s WHERE json_type(s.definition, '$.unlessReply') = 'object'
+      AND NOT EXISTS (SELECT 1 FROM schedule_replies r WHERE r.schedule_id = s.id)
+      AND (s.state = 'active'
+        OR EXISTS (SELECT 1 FROM schedule_occurrences o JOIN inbox i ON i.op_id = o.op_id WHERE o.schedule_id = s.id AND o.state = 'started' AND i.at >= ?)
+        OR EXISTS (SELECT 1 FROM schedule_nudges n JOIN cards c ON c.id = n.card_id WHERE n.schedule_id = s.id AND c.created_at >= ?))`)
+      .all(store.now() - CARD_LIFETIME_MS, store.now() - CARD_LIFETIME_MS).map((row) => record(decodeRow(row)))
+  }
+  function expireNudges() {
+    const result = store.db.prepare(`UPDATE cards SET expired_at = ? WHERE expired_at IS NULL
+      AND id IN (SELECT n.card_id FROM schedule_nudges n JOIN schedule_replies r ON r.schedule_id = n.schedule_id)
+      AND NOT EXISTS (SELECT 1 FROM intents i JOIN authorizations a ON a.intent_id = i.id WHERE i.card_id = cards.id)`)
+      .run(store.now())
+    if (Number(result.changes) > 0) options.changed()
+  }
+  function bindNudge(cardId: string, proposal: Proposal): void {
+    if (proposal.payload._tag !== 'sendMessage') return
+    const schedules = store.db.prepare(`SELECT s.* FROM schedules s JOIN schedule_occurrences o ON o.schedule_id = s.id
+      JOIN run_inputs i ON i.op_id = o.op_id WHERE i.run_id = ? AND o.state = 'started'`).all(proposal.runId)
+    for (const raw of schedules) {
+      const row = record(decodeRow(raw))
       const watch = row.definition.unlessReply
-      if (watch !== undefined && matchesReply(watch, reply, owner)) cancel(row.id, row.revision)
+      if (watch === undefined || !proposal.payload.messages.some((message) => message.target.channelId === watch.channelId && message.threadTs === watch.threadTs)) continue
+      store.db.prepare('INSERT OR IGNORE INTO schedule_nudges VALUES (?, ?)').run(cardId, row.id)
+    }
+    expireNudges()
+  }
+  function observe(reply: Reply, owner: string): void {
+    atomic(() => {
+      for (const row of watched()) {
+        const watch = row.definition.unlessReply
+        if (watch === undefined || watch.accountId !== undefined && watch.accountId !== options.account?.() || !matchesReply(watch, reply, owner)) continue
+        store.db.prepare('INSERT OR IGNORE INTO schedule_replies VALUES (?, ?)').run(row.id, store.now())
+        cancel(row.id, row.revision)
+      }
+      expireNudges()
+    })
+  }
+  async function checkReplies(): Promise<void> {
+    if (options.cachedReplies === undefined) return
+    for (const row of watched()) {
+      if (row.definition.unlessReply === undefined) continue
+      if (row.definition.unlessReply.accountId !== undefined && row.definition.unlessReply.accountId !== options.account?.()) continue
+      try {
+        const result = await options.cachedReplies(row.definition.unlessReply)
+        for (const reply of result.messages) observe(reply, result.owner)
+      } catch (error) { options.onError?.(error) }
     }
   }
   async function tick(): Promise<void> {
+    if (options.enabled?.() === false) return
+    await checkReplies()
     queue()
     const queued = store.db.prepare("SELECT * FROM schedule_occurrences WHERE state = 'queued' ORDER BY due_at").all().map((row) => decodeOccurrence(row))
     for (const occurrence of queued) {
       const row = valid(occurrence)
       if (row === undefined) continue
       if (row.definition.unlessReply !== undefined) {
-        const refreshed = await options.replies(row.definition.unlessReply)
-        for (const reply of refreshed.messages) observe(reply, refreshed.owner)
+        try {
+          const refreshed = await options.replies(row.definition.unlessReply)
+          for (const reply of refreshed.messages) observe(reply, refreshed.owner)
+        } catch (error) { options.onError?.(error); continue }
       }
       if (admit(occurrence.op_id)) options.changed()
     }
   }
   function watchReply(input: { readonly opId: string; readonly watch: Omit<ReplyWatch, 'from'>; readonly hours: NotificationHours }) {
-    if (!mayAuthorize(authorityOf(store))) return undefined
+    if (!mayAuthorize(authorityOf(store)) || options.enabled?.() === false) return undefined
     const at = menuDeadline(store.now(), input.hours)
     const result = create({ key: input.opId, sourceOp: input.opId, authority: { _tag: 'menu' }, definition: {
       what: 'Tell you if nobody replies', prompt: NUDGE_PROMPT, schedule: { _tag: 'once', at }, deliver: 'now', unlessReply: { ...input.watch, from: 'others' },
@@ -191,7 +247,7 @@ export function createScheduler(options: SchedulerOptions) {
       return accepted
     })
   }
-  return { get, list, occurrences, create, cancel, resume, edit, queue, admit, start, observe, tick, watchReply, page, command }
+  return { get, list, occurrences, create, cancel, resume, edit, queue, admit, start, observe, tick, watchReply, page, command, bindNudge, checkReplies }
 }
 export type Scheduler = ReturnType<typeof createScheduler>
 export function describeWhen(definition: Definition): string {
@@ -204,10 +260,3 @@ export function describeWhen(definition: Definition): string {
 export class ScheduleService extends Context.Service<ScheduleService, Scheduler>()('juno/agent/Schedule') {
   static layer(options: SchedulerOptions) { return Layer.sync(ScheduleService, () => createScheduler(options)) }
 }
-/** Scoped by the caller; a failed refresh leaves the occurrence queued for the next tick. */
-export const runScheduler = (scheduler: Scheduler) => Effect.gen(function* () {
-  while (true) {
-    yield* Effect.tryPromise(() => scheduler.tick()).pipe(Effect.catch(() => Effect.void))
-    yield* Effect.sleep('1 second')
-  }
-})

@@ -89,12 +89,18 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                   ...turns,
                   agentDir: config.agentDir,
                   host: bound.reads,
+                  schedule: bound.schedule,
                   actions: { ...turns.actions, host: actionHost },
                   migrations: [CHAT_MIGRATIONS, ...(turns.migrations ?? [])],
                 }),
                 scope,
               )
         if (engine?._tag === 'running') {
+          yield* bound.scheduleChanges.pipe(
+            Stream.runForEach(() => Effect.promise(engine.checkSchedules)),
+            Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
+            Effect.forkScoped, Scope.provide(scope),
+          )
           // A click waits while no Slack account is known; each presence lets it look again.
           yield* bound.presenceChanges.pipe(
             Stream.runForEach(() => Effect.sync(() => engine.actions.kick())),
@@ -118,7 +124,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             : undefined
         if (renderer !== undefined) {
           yield* Layer.buildWithScope(
-            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(settings ? { settings } : {}) }),
+            rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}) }),
             scope,
           )
         }
