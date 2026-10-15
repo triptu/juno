@@ -39,7 +39,8 @@
     "test:agent-contracts": "node scripts/heavy.mjs pnpm --filter @juno/agent-cards --filter @juno/agent-contract test",
     "test:agent-testing": "node scripts/heavy.mjs pnpm --filter @juno/agent-testing test",
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
-    "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test"
+    "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
+    "flake": "node scripts/flake.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

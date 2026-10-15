@@ -803,10 +803,15 @@ export class Juno {
     return this.win.getByRole('dialog', { name: title })
   }
 
-  /** Waits until the engine has caught up with Slack and says it is live. */
+  /**
+   * Waits until the engine says it is live and its sync cycle has ended. A
+   * cycle goes on after "Engine live" with work on the background lane (the
+   * follow pass), whose Slack calls and row changes would land in the test.
+   */
   async expectEngineLive(timeout = 30_000): Promise<void> {
     await this.accountMenu.open()
     await expect(this.accountMenu.engineStatus).toHaveText('Engine live', { timeout })
+    await expect(this.accountMenu.engineStatus).toHaveAttribute('aria-busy', 'false', { timeout })
     await this.accountMenu.close()
   }
 

@@ -60,6 +60,7 @@ const EnginePhases = Layer.effectDiscard(
       })
     yield* Effect.forkScoped(Stream.runForEach(session.statuses, (value) => update({ session: value })))
     yield* Effect.forkScoped(Stream.runForEach(sync.phases, (value) => update({ sync: value })))
+    yield* Effect.forkScoped(Stream.runForEach(sync.syncing, status.setSyncing))
   }),
 )
 
