@@ -193,26 +193,27 @@ let currentTicket = 0
 /**
  * Applies `change` once `topic` (the topic the change brings on screen) can
  * paint, unless something newer replaced it meanwhile. With no topic to
- * wait for, it applies now.
+ * wait for, it applies after the supplied readiness wait, or now.
  */
 function show(
   change: (tabs: Tabs) => Tabs,
   topic: { readonly id: string; readonly fresh: boolean; readonly name: 'juno.topic-open' | 'juno.tab-switch'; readonly target?: string } | undefined,
   replaceable = true,
+  ready?: Promise<void>,
 ): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
   if (topic === undefined) {
-    queue = queue.then(() => {
+    queue = queue.then(() => ready).then(() => {
       if (ticket === currentTicket) apply(change)
     })
     return
   }
   registry.set(selectedTopicAtom, topic.id)
   pending = { id: topic.id, at, name: topic.name }
-  const ready = whenReady(topic.id, topic.fresh, topic.target)
+  const topicReady = whenReady(topic.id, topic.fresh, topic.target)
   queue = queue
-    .then(() => ready)
+    .then(() => topicReady)
     .then(() => {
       if (!replaceable || ticket === currentTicket) apply(change)
     })
@@ -274,7 +275,6 @@ export function openNewChatTo(conversation: PickConversation): void {
  * and then Home in separate frames. The wait is bounded as for All topics.
  */
 export function openHome(options: OpenOptions = {}): void {
-  const ticket = ++currentTicket
   const ready = new Promise<void>((resolve) => {
     const release = registry.mount(homeViewAtom)
     let done = false
@@ -294,9 +294,7 @@ export function openHome(options: OpenOptions = {}): void {
     const off = registry.subscribe(homeViewAtom, check, { immediate: false })
     check()
   })
-  queue = queue.then(() => ready).then(() => {
-    if (ticket === currentTicket) apply((tabs) => openHere(tabs, homePlace, options))
-  })
+  show((tabs) => openHere(tabs, homePlace, options), undefined, true, ready)
 }
 
 /** A page behind the Juno menu, or Settings › Juno (SPEC 13.10). Each shows in one tab. */
