@@ -190,7 +190,7 @@ export default defineFixtures(
       'hover-toolbar-main': state({ items: mainStream, main: true, actions: noopActions }, { hover: `${ROW}:nth-of-type(5)` }),
       // Seven quick reactions: the header keeps room for all of them.
       'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { hover: `${ROW}:nth-of-type(5)` }),
-      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: `${ROW}:first-of-type` }),
+      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
@@ -199,8 +199,8 @@ export default defineFixtures(
     // except near the list's top, where it drops inside under the name line.
     Narrow: {
       'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
-      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:first-of-type` }),
-      'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: `${ROW}:first-of-type` }),
+      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: ROW }),
+      'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: ROW }),
       // Seven quick reactions: the raised toolbar shows as many as fit, then More reactions.
       'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
       // A pane between narrow and wide: with seven, the toolbar rises above the row rather than cover the name.
