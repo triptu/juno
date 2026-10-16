@@ -98,6 +98,7 @@ test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
         { kind: 'rect', name: 'panel', selector: PANEL },
         { kind: 'rect', name: 'composer', selector: `${PANEL} [data-juno-composer]` },
         { kind: 'rect', name: 'topic', selector: 'main [data-topic-view]' },
+        { kind: 'opacity', name: 'emptyTitle', selector: `${PANEL} [data-chat-empty] h1` },
       ],
       regions: { panel: PANEL },
       checks: [
@@ -105,6 +106,14 @@ test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
         landsAndStays('composer', 'the panel composer', { from: 'press' }),
         switchesOnce('the topic width', (v) => JSON.stringify((v['topic'] as { width?: number } | null)?.width ?? null), { from: 'press' }),
         noFlicker('panel', 'the panel', { from: 'press' }),
+        ({ recording }) => {
+          // The empty chat lands with the panel: no entrance after the panel is up.
+          const shown = recording.frames.filter((frame) => frame.values['panel'] !== null)
+          const faded = shown.filter((frame) => frame.values['emptyTitle'] !== 1)
+          const name = 'the empty chat lands with the panel'
+          if (shown.length === 0) return { name, status: 'fail', detail: 'the panel never appeared', shots: [] }
+          return { name, status: faded.length === 0 ? 'pass' : 'fail', detail: `${faded.length} of ${shown.length} frames with the panel had its title below full opacity`, shots: [] }
+        },
       ],
     },
     async (rec) => {
