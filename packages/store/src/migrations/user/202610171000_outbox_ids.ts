@@ -10,6 +10,7 @@ import { SqlClient } from 'effect/sql'
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
+  yield* sql`DROP TABLE IF EXISTS outbox_next`
   yield* sql`
     CREATE TABLE outbox_next (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

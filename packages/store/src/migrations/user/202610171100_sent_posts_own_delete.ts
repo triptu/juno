@@ -10,5 +10,8 @@ import { SqlClient } from 'effect/sql'
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
+  // Safe to run again, as later migrations must be (test/migrations.test.ts).
+  const columns = yield* sql<{ name: string }>`SELECT name FROM pragma_table_info('sent_posts')`
+  if (columns.some((column) => column.name === 'deleted_by_user')) return
   yield* sql`ALTER TABLE sent_posts ADD COLUMN deleted_by_user INTEGER NOT NULL DEFAULT 0`
 })
