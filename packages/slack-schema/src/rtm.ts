@@ -297,14 +297,15 @@ export type PrefChangeEvent = typeof PrefChangeEvent.Type
 // Files.
 
 /**
- * Slack made a file's thumbnails, or the file changed. Live, a shared
- * image's echo carries no thumbnails and no size, and
- * `file_thumbnail_generated` follows it by a fraction of a second with the
- * square and 360/480 thumbnail urls but no sizes. `file_change` was not seen
- * live. Juno reads only the id and asks `files.info` (research section 3).
+ * A file was shared, changed, or Slack made its thumbnails. Live, a shared
+ * image's echo carries no thumbnails and no size; `file_shared` comes with
+ * it and `file_thumbnail_generated` a fraction of a second later with the
+ * square and 360/480 thumbnail urls but no sizes. `file_shared`,
+ * `file_change` and `file_public` carry `file: { id }` alone. Juno reads
+ * only the id and asks `files.info` (research section 3).
  */
 export const FileEvent = S.Struct({
-  type: S.Literals(['file_change', 'file_thumbnail_generated']),
+  type: S.Literals(['file_change', 'file_shared', 'file_thumbnail_generated']),
   file_id: S.String,
   event_ts: opt(Ts),
 })

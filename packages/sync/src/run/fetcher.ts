@@ -3,6 +3,7 @@ import { trackFetch } from '../context'
 import { applyActed, applyOpened, applySent } from '../events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
+import { queueTopicFiles } from './files'
 
 import type { SyncServices, TopicFetcher } from '../sync'
 import { isNotAuth, type SyncRuntime } from './runtime'
@@ -32,7 +33,14 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     )
   }
   const fetcher: TopicFetcher = {
-    open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
+    // After the fetch, the topic's stored files Slack had not filled in are asked about, so an old card becomes the picture.
+    open: (topicId) =>
+      fetched((lane) => fetchTopic(ctx, topicId, lane), 'open').pipe(
+        // Forked: the open's answer does not wait for the check.
+        Effect.tap(() =>
+          FiberSet.run(background, queueTopicFiles(ctx, topicId).pipe(Effect.catchCause((cause) => Effect.logWarning('sync: topic files not checked', { cause })), Effect.provide(services))).pipe(Effect.asVoid),
+        ),
+      ),
     older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
     opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),

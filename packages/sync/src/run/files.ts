@@ -1,18 +1,25 @@
 /**
- * Thumbnails for images stored without them (`files.ts`). Each file is
+ * Files stored before Slack filled them in (`files.ts`): images without
+ * thumbnails, videos without a poster, and partial copies. Each file is
  * asked about with `files.info` on the background lane at most
  * `FILE_TRIES.length` times, after the waits listed, and a file event
- * (`file_thumbnail_generated`, `file_change`) asks at once instead of
- * waiting. Thumbnails in the answer go into every stored message that
+ * (`file_shared`, `file_change`, `file_thumbnail_generated`) asks at once
+ * instead of waiting. The answer goes into every stored message that
  * carries the file, in one transaction. A file whose tries ran out is not
  * asked about again in this session unless an event names it.
+ *
+ * Files come to be asked about two ways: a write of a recent message that
+ * carries one (`pages.ts`), and an opened topic whose stored messages carry
+ * one, however old (`queueTopicFiles`), so a card stored before Juno asked
+ * becomes the picture once its topic is opened.
  */
 import { SlackApi } from '@juno/slack'
-import { transaction } from '@juno/store'
+import { StoreReader, transaction, type SqlError } from '@juno/store'
+import { parseTopicId } from '@juno/domain'
 import { Effect, FiberSet, Queue } from 'effect'
 import type { SyncContext } from '../context'
-import { hasThumbs } from '../files'
-import { storeFileThumbs } from '../write'
+import { filesToFetch, isReady } from '../files'
+import { storeFileInfo } from '../write'
 
 /** The wait before each try. Live, `files.info` had the thumbnails 0.3 s after the share. */
 const FILE_TRIES = [1_000, 3_000, 10_000, 30_000] as const
@@ -52,8 +59,8 @@ export const refreshFiles = (ctx: SyncContext) =>
             continue
           }
           const file = result.success.file
-          if (!hasThumbs(file)) continue
-          yield* transaction(storeFileThumbs(fileId, file, [...entry.targets.values()])).pipe(
+          if (!isReady(file)) continue
+          yield* transaction(storeFileInfo(fileId, file, [...entry.targets.values()])).pipe(
             Effect.catchCause((cause) => Effect.logError('sync: file thumbnails not stored', { cause })),
           )
           return 'stored' as const
@@ -109,3 +116,25 @@ export const refreshFiles = (ctx: SyncContext) =>
       yield* start(fetch.fileId, new Map([[`${target.channel}:${target.ts}`, target]]), FILE_TRIES)
     }
   })
+
+/** The stored messages of an opened topic the check reads, newest first. */
+const TOPIC_FILES_LIMIT = 200
+
+/** Queues the files the newest stored messages of `topicId` carry that Slack has not filled in. */
+export const queueTopicFiles = (ctx: SyncContext, topicId: string): Effect.Effect<void, SqlError, StoreReader> =>
+  Effect.gen(function* () {
+    const parsed = parseTopicId(topicId)
+    if (parsed === undefined) return
+    const sql = yield* StoreReader
+    // Through `messages (channel, thread_ts, ts)`: Main's own messages, or one thread's.
+    const rows =
+      parsed.kind === 'main'
+        ? yield* sql<{ ts: string; files_json: string }>`SELECT ts, files_json FROM messages
+            WHERE channel = ${parsed.channel} AND thread_ts IS NULL AND files_json IS NOT NULL ORDER BY ts DESC LIMIT ${TOPIC_FILES_LIMIT}`
+        : yield* sql<{ ts: string; files_json: string }>`SELECT ts, files_json FROM messages
+            WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs} AND files_json IS NOT NULL ORDER BY ts DESC LIMIT ${TOPIC_FILES_LIMIT}`
+    for (const row of rows) {
+      for (const fileId of filesToFetch(row.files_json)) yield* Queue.offer(ctx.fileFetches, { kind: 'stored', fileId, channel: parsed.channel, ts: row.ts })
+    }
+  })
+
