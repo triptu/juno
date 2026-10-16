@@ -56,7 +56,12 @@ for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 
 test('a late reaction on the last message grows it without a jump', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  // Enough replies that the thread is longer than the view, so the list keeps its end whatever the window's height.
+  for (let i = 1; i <= 6; i++) slack.as('Leo').replyIn(POSTGRES, `Dry run checklist item ${i} is done.`)
   await juno.sidebar.row(POSTGRES).open()
+  // The open's replies page brings an earlier reply in full, with its 👍; wait for it so only the new reaction moves anything.
+  await expect(juno.topic.message('We keep the old primary warm for 48h.').getByRole('button', { name: /^2 👍/ })).toBeVisible()
+  await expect(juno.topic.message('Dry run checklist item 6 is done.')).toBeVisible()
   const row = juno.topic.list.locator('[data-message-row]').last()
   const ts = await row.getAttribute('data-message-row')
   expect(ts).not.toBeNull()

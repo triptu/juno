@@ -1,5 +1,6 @@
 import avatarSizes from './202610171000_avatar_sizes'
 import usergroups from './202610171200_usergroups'
+import partialMessages from './202610171300_partial_messages'
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import integrationSearch from './202610160300_integration_search'
@@ -45,4 +46,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610170910_rechecked_topics': recheckedTopics,
   '202610171000_avatar_sizes': avatarSizes,
   '202610171200_usergroups': usergroups,
+  '202610171300_partial_messages': partialMessages,
 }

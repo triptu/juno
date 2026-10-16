@@ -15,6 +15,8 @@
  *   (`check_file_info`) keeps the complete stored file (`files.ts`).
  * - A stub root (a reply arrived before its root) keeps the counters it
  *   learned and is filled in by whichever page brings the root.
+ * - A row a search match created or filled is `partial` until a page or an
+ *   event brings the whole message, so opening its thread fetches it.
  *
  * Nothing here touches the store; `write.ts` reads the existing row and
  * writes the result.
@@ -74,6 +76,7 @@ export function toMessageRow(channel: string, message: Message): MessageRow {
     latest_reply: message.latest_reply ?? null,
     reply_users_json: json(message.reply_users),
     last_event_ts: null,
+    partial: 0,
     version: 0,
   }
 }
@@ -99,6 +102,7 @@ export function stubRoot(channel: string, threadTs: string, reply: Pick<Message,
     latest_reply: reply.ts,
     reply_users_json: reply.user === undefined ? null : JSON.stringify([reply.user]),
     last_event_ts: null,
+    partial: 0,
     version: 0,
   }
 }
@@ -115,7 +119,7 @@ const sameRow = (a: MessageRow, b: MessageRow): boolean => {
 export function mergeMessage(existing: MessageRow | undefined, incoming: Message, channel: string, source: MergeSource): MergeResult {
   const fresh = toMessageRow(channel, incoming)
   if (existing === undefined) {
-    const row = source.kind === 'event' ? { ...fresh, last_event_ts: source.eventTs } : fresh
+    const row: MessageRow = source.kind === 'event' ? { ...fresh, last_event_ts: source.eventTs } : source.kind === 'partial' ? { ...fresh, partial: 1 } : fresh
     return { row, changed: true, applyReactions: incoming.reactions !== undefined && source.kind !== 'partial' && !row.deleted }
   }
 
@@ -135,6 +139,7 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
       reply_count: Math.max(existing.reply_count, fresh.reply_count),
       latest_reply: maxNullable(existing.latest_reply, fresh.latest_reply),
       last_event_ts: lastEventTs,
+      partial: 0,
     }
     return finish(existing, row, false)
   }
@@ -176,6 +181,8 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
     latest_reply: maxNullable(existing.latest_reply, fresh.latest_reply),
     reply_users_json: fresh.reply_count >= existing.reply_count && fresh.reply_users_json !== null ? fresh.reply_users_json : existing.reply_users_json,
     last_event_ts: lastEventTs,
+    // A page or an event brings the whole message; a search match only fills a stub.
+    partial: source.kind === 'partial' ? 1 : 0,
     version: existing.version,
   }
 
@@ -208,6 +215,7 @@ export function mergeTombstone(existing: MessageRow | undefined, channel: string
     latest_reply: null,
     reply_users_json: null,
     last_event_ts: null,
+    partial: 0,
     version: 0,
   }
   const row: MessageRow = {
@@ -218,6 +226,7 @@ export function mergeTombstone(existing: MessageRow | undefined, channel: string
     attachments_json: null,
     deleted: 1,
     last_event_ts: source.kind === 'event' ? maxNullable(base.last_event_ts, source.eventTs) : base.last_event_ts,
+    partial: 0,
   }
   return existing === undefined ? { row, changed: true, applyReactions: false } : finish(existing, row, false)
 }

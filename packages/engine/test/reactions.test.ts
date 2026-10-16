@@ -4,7 +4,7 @@
 // call names the emoji as Slack does, a refusal puts back what Slack has
 // with Retry and Dismiss, and a reaction that waits long says so.
 import { describe, expect, it } from 'vitest'
-import { editMessage, reactToMessage, sendMessage } from '@juno/state'
+import { editMessage, openTopic, reactToMessage, sendMessage } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'
 import { apiCalls, quiet, readDb, valueOf } from './scenario'
 import { actionRows, booted, chip, eng, inSlack, MAIN, refOf, rowWith, sent, stopEnginesAfterEach, watch } from './actionScenario'
@@ -190,5 +190,22 @@ describe('reactions: refused or waiting', () => {
     engine.fake.release()
     await rows((list) => rowWith(list, 'Slow post')?.reactionIssue === undefined && chip(rowWith(list, 'Slow post'), 'eyes')?.count === 1, 'sent')
     expect(actionRows(engine)).toHaveLength(0)
+  })
+})
+
+describe('reactions from pages', () => {
+  it('stores the reactions of a thread reply discovery found by search, when the thread opens', async () => {
+    const engine = await booted()
+    await quiet(engine)
+    const reply = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('We keep the old primary warm'))!
+    const stored = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT name, count, me FROM reactions WHERE channel = ? AND ts = ?').all('C0ENG', reply.ts))
+    const row = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT partial, blocks_json IS NOT NULL AS blocks FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', reply.ts))
+    // The followed thread's view carries only its latest replies; the discovery search stored this one without its 👍.
+    expect(row()).toEqual({ partial: 1, blocks: 0 })
+    expect(stored()).toEqual([])
+    // Opening the thread does not count the search match as stored: its replies page brings the reply in full.
+    valueOf(await openTopic(engine.registry, `t:C0ENG:${reply.thread_ts}`))
+    expect(stored()).toEqual([{ name: '+1', count: 2, me: 1 }])
+    expect(row()).toEqual({ partial: 0, blocks: 1 })
   })
 })
