@@ -97,8 +97,8 @@ function identities through the shared heavy-job queue.
 The engine/agent runner clone remains: neither package may import the other, and
 transport implementations do not belong in their schema-only contracts. Sharing it
 needs a separate architecture decision. The maintenance pass deliberately leaves
-`TopicView.tsx`, `JunoChat.tsx`, `agent/src/router/*`, composer code, and
-`apps/desktop/e2e/perf.spec.ts` as future split candidates.
+`agent/src/router/*`, composer code, and `apps/desktop/e2e/perf.spec.ts` as
+future split candidates (`TopicView.tsx` and `JunoChat.tsx` were split since).
 
 ## Layout
 
