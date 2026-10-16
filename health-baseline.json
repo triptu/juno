@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 5,
     "oversizedFiles": 43,
-    "oversizedFunctions": 138
+    "oversizedFunctions": 136
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -87,10 +87,8 @@
     "packages/agent-testing/src/mcp/t3.ts:startFakeT3#1",
     "packages/agent/src/actions/dispatcher.ts:createDispatcher#1",
     "packages/agent/src/actions/index.ts:createActions#1",
-    "packages/agent/src/backup/backup.ts:createBackup#1",
     "packages/agent/src/compactor/scheduler.ts:createCompactor#1",
     "packages/agent/src/jobs/jobs.ts:createJobs#1",
-    "packages/agent/src/mcp/manager.ts:createMcpManager#1",
     "packages/agent/src/ownership/service.ts:createOwnership#1",
     "packages/agent/src/providers/codex.ts:createCodexAdapter#1",
     "packages/agent/src/providers/guard.ts:createProviderGuard#1",

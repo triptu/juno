@@ -24,11 +24,7 @@ export interface ManagerOptions {
   readonly defaults?: ReadonlyArray<ConnectionConfig>
 }
 
-export function createMcpManager({ store, credentials, defaults = PRESETS }: ManagerOptions) {
-  const sessions = new Map<string, Session>()
-  const listeners = new Set<() => void>()
-  let closed = false
-  const changed = () => { for (const listener of listeners) listener() }
+function connectionRecords(store: Store) {
   const stored = (id: string) => {
     const raw = store.db.prepare('SELECT config, epoch, discovered, active_url, review FROM mcp_connections WHERE id = ?').get(id)
     if (!raw) throw new McpError({ reason: 'invalid', message: 'Unknown connection.' })
@@ -36,15 +32,12 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     return { ...row, config: Schema.decodeUnknownSync(ConnectionConfig)(JSON.parse(row.config)) }
   }
   const configs = () => Schema.decodeUnknownSync(Schema.Array(Schema.Struct({ id: Schema.String })))(store.db.prepare('SELECT id FROM mcp_connections ORDER BY rowid').all()).map(({ id }) => stored(id).config)
-  const session = (id: string) => {
-    let value = sessions.get(id)
-    if (!value) {
-      value = { state: 'off', abort: new AbortController(), failures: 0 }
-      sessions.set(id, value)
-    }
-    return value
-  }
   const save = (config: ConnectionConfig) => store.db.prepare('UPDATE mcp_connections SET config = ? WHERE id = ?').run(JSON.stringify(config), config.id)
+  return { stored, configs, save }
+}
+
+function installDefaults(store: Store, defaults: ReadonlyArray<ConnectionConfig>, records: ReturnType<typeof connectionRecords>) {
+  const { stored, save } = records
   for (const config of defaults) {
     endpoint(config.url, config.allowNetwork, config.id === 't3')
     if (config.noSecrets && config.auth.kind === 'bearer') throw new McpError({ reason: 'invalid', message: 'This connection requires its own OAuth sign-in.' })
@@ -54,6 +47,74 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     const saved = stored(config.id).config
     if (saved.allowlist.join('\n') !== config.allowlist.join('\n')) save({ ...saved, allowlist: config.allowlist })
   }
+}
+
+function managerContext({ store, credentials, defaults = PRESETS }: ManagerOptions) {
+  const sessions = new Map<string, Session>()
+  const listeners = new Set<() => void>()
+  const state = { closed: false }
+  const changed = () => { for (const listener of listeners) listener() }
+  const records = connectionRecords(store)
+  const session = (id: string) => {
+    let value = sessions.get(id)
+    if (!value) {
+      value = { state: 'off', abort: new AbortController(), failures: 0 }
+      sessions.set(id, value)
+    }
+    return value
+  }
+  installDefaults(store, defaults, records)
+  const presets = new Set(defaults.map((config) => config.id))
+  return { store, credentials, sessions, listeners, state, changed, session, presets, ...records }
+}
+
+type ManagerContext = ReturnType<typeof managerContext>
+
+function connectionOpener(context: ManagerContext, refresh: (id: string) => Promise<void>, failed: (id: string, error: unknown) => void) {
+  const { stored, credentials, store } = context
+  return async (id: string, s: Session, signal: AbortSignal) => {
+    const old = s.client
+    delete s.client
+    await old?.close()
+    const config = stored(id).config
+    endpoint(config.url, config.allowNetwork, config.id === 't3')
+    let selected = config
+    if (id === 't3') {
+      const local = new URL(config.url)
+      local.protocol = 'http:'
+      local.hostname = '127.0.0.1'
+      local.pathname = '/mcp'
+      const candidate = { ...config, url: local.href }
+      try {
+        // Probe without credentials. A sign-in challenge still identifies the local endpoint.
+        const probe = await clientFor(candidate, undefined)
+        await probe.close()
+        selected = candidate
+      } catch (error) {
+        if (error instanceof McpOAuthAuthorizationRequiredError || error instanceof McpAuthRequiredError) selected = candidate
+      }
+    }
+    if (selected.url !== (stored(id).active_url ?? config.url)) {
+      await credentials.clear(id)
+      store.db.prepare('UPDATE mcp_connections SET epoch = ? WHERE id = ?').run(uuidv7(), id)
+    }
+    store.db.prepare('UPDATE mcp_connections SET active_url = ? WHERE id = ?').run(selected.url, id)
+    s.address = selected.url
+    const auth = await connectionAuth(selected, credentials)
+    const client = await clientFor(selected, auth)
+    if (signal.aborted) { await client.close(); return }
+    if (auth) s.auth = auth
+    s.client = client
+    client.onNotification('notifications/tools/list_changed', () => { void refresh(id).catch((error: unknown) => failed(id, error)) })
+    client.onError((error) => { if (s.client === client) failed(id, error) })
+    client.onClose(() => { if (s.client === client) failed(id, new Error('Closed')) })
+    await refresh(id)
+    s.failures = 0
+  }
+}
+
+function connectionLifecycle(context: ManagerContext) {
+  const { store, session, stored, changed, state, save } = context
   const refresh = async (id: string) => {
     const s = session(id)
     const client = s.client
@@ -67,7 +128,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
   }
   const failed = (id: string, error: unknown) => {
     const s = session(id)
-    if (s.abort.signal.aborted || closed) return
+    if (s.abort.signal.aborted || state.closed) return
     s.state = error instanceof McpOAuthAuthorizationRequiredError || error instanceof McpAuthRequiredError ? 'needsSignIn' : s.client?.connectionState === 'connected' ? 'degraded' : 'error'
     if ((s.state === 'error' || s.state === 'degraded') && !s.retry) {
       const delay = [1000, 5000, 30_000, 300_000][Math.min(s.failures++, 3)] ?? 300_000
@@ -76,57 +137,26 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     }
     changed()
   }
+  const openConnection = connectionOpener(context, refresh, failed)
   const connect = (id: string): Promise<void> => {
     const s = session(id)
     if (s.pending) return s.pending
-    if (closed) return Promise.resolve()
+    if (state.closed) return Promise.resolve()
     if (s.retry) { clearTimeout(s.retry); delete s.retry }
     s.abort = new AbortController()
     const signal = s.abort.signal
     save({ ...stored(id).config, enabled: true })
     s.state = 'connecting'
     changed()
-    s.pending = (async () => {
-      const old = s.client
-      delete s.client
-      await old?.close()
-      const config = stored(id).config
-      endpoint(config.url, config.allowNetwork, config.id === 't3')
-      let selected = config
-      if (id === 't3') {
-        const local = new URL(config.url)
-        local.protocol = 'http:'
-        local.hostname = '127.0.0.1'
-        local.pathname = '/mcp'
-        const candidate = { ...config, url: local.href }
-        try {
-          // Probe without credentials. A sign-in challenge still identifies the local endpoint.
-          const probe = await clientFor(candidate, undefined)
-          await probe.close()
-          selected = candidate
-        } catch (error) {
-          if (error instanceof McpOAuthAuthorizationRequiredError || error instanceof McpAuthRequiredError) selected = candidate
-        }
-      }
-      if (selected.url !== (stored(id).active_url ?? config.url)) {
-        await credentials.clear(id)
-        store.db.prepare('UPDATE mcp_connections SET epoch = ? WHERE id = ?').run(uuidv7(), id)
-      }
-      store.db.prepare('UPDATE mcp_connections SET active_url = ? WHERE id = ?').run(selected.url, id)
-      s.address = selected.url
-      const auth = await connectionAuth(selected, credentials)
-      const client = await clientFor(selected, auth)
-      if (signal.aborted) { await client.close(); return }
-      if (auth) s.auth = auth
-      s.client = client
-      client.onNotification('notifications/tools/list_changed', () => { void refresh(id).catch((error: unknown) => failed(id, error)) })
-      client.onError((error) => { if (s.client === client) failed(id, error) })
-      client.onClose(() => { if (s.client === client) failed(id, new Error('Closed')) })
-      await refresh(id)
-      s.failures = 0
-    })().catch((error: unknown) => failed(id, error)).finally(() => { delete s.pending })
+    s.pending = openConnection(id, s, signal).catch((error: unknown) => failed(id, error)).finally(() => { delete s.pending })
     return s.pending
   }
+  return { refresh, failed, connect }
+}
+
+function connectionAuthorization(context: ManagerContext, lifecycle: ReturnType<typeof connectionLifecycle>) {
+  const { session, store, credentials, stored, save, changed } = context
+  const { connect, failed } = lifecycle
   const disconnect = async (id: string, forget = true, signingIn = false) => {
     const s = session(id)
     s.abort.abort()
@@ -173,6 +203,11 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     signIns.set(id, pending)
     return pending
   }
+  return { disconnect, authorize, signIns }
+}
+
+function managerTools(context: ManagerContext, failed: ReturnType<typeof connectionLifecycle>['failed']) {
+  const { store, credentials, stored, session } = context
   const tool = (id: string, name: string) => {
     // A tool the owner turned off, or one that merges, buys or force-pushes, is not offered, and is never called.
     const found = catalogue(store, id).find((row) => row.name === name && row.present === 1 && row.enabled === 1 && row.lock !== 'forbidden')
@@ -209,6 +244,11 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       throw new McpError({ reason: 'unavailable', message: 'The server did not confirm the result.' })
     } finally { if (write && client !== s.client) await client.close() }
   }
+  return { tool, checkSecrets, invoke }
+}
+
+function managerConfiguration(context: ManagerContext, disconnect: ReturnType<typeof connectionAuthorization>['disconnect']) {
+  const { store, stored, configs, changed, presets, sessions } = context
   /** Owner-only configuration. Replacing an endpoint revokes credentials and old cards. */
   const configure = async (input: ConnectionConfig) => {
     const config = Schema.decodeUnknownSync(ConnectionConfig)(input)
@@ -219,9 +259,7 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
     store.db.prepare('DELETE FROM mcp_tools WHERE connection_id = ?').run(config.id)
     changed()
   }
-  const presets = new Set(defaults.map((config) => config.id))
   return {
-    store, stored, configs, tool, invoke, checkSecrets, connect, disconnect, authorize, refresh,
     configure,
     /** Another server by address. It starts off and without auth; Connect finds out whether it needs a sign-in. */
     add: async (label: string, url: string) => {
@@ -245,7 +283,12 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       if (href === config.url && allowNetwork === (config.allowNetwork ?? false)) return
       await configure({ ...config, url: href, allowNetwork, enabled: false })
     },
-    state: (id: string) => session(id).state,
+  }
+}
+
+function managerRules(context: ManagerContext, tool: ReturnType<typeof managerTools>['tool']) {
+  const { store, stored, changed } = context
+  return {
     /** The owner's switch and auto-review rule for one tool (Settings › Connections › Configure). */
     setTool: (id: string, name: string, change: { readonly enabled?: boolean; readonly review?: ReviewRule }) => {
       const found = catalogue(store, id).find((row) => row.name === name && row.present === 1)
@@ -274,6 +317,12 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
       const connection = stored(id).review
       return found.fresh === 1 && connection === 'never' ? 'auto' : connection
     },
+  }
+}
+
+function managerPresentation(context: ManagerContext) {
+  const { store, configs, presets, session, stored } = context
+  return {
     /**
      * The name the model uses for a connection: a preset's id, or a short slug of the label the
      * owner gave a server they added. Never its internal id, address or anything else.
@@ -303,10 +352,26 @@ export function createMcpManager({ store, credentials, defaults = PRESETS }: Man
         ...(row.lock === undefined ? {} : { locked: row.lock }),
       })),
     })) }),
+  }
+}
+
+export function createMcpManager(options: ManagerOptions) {
+  const context = managerContext(options)
+  const { store, stored, configs, session, listeners, sessions, state } = context
+  const lifecycle = connectionLifecycle(context)
+  const { connect, refresh } = lifecycle
+  const { disconnect, authorize, signIns } = connectionAuthorization(context, lifecycle)
+  const tools = managerTools(context, lifecycle.failed)
+  return {
+    store, stored, configs, ...tools, connect, disconnect, authorize, refresh,
+    ...managerConfiguration(context, disconnect),
+    state: (id: string) => session(id).state,
+    ...managerRules(context, tools.tool),
+    ...managerPresentation(context),
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     start: async () => { for (const config of configs()) if (config.enabled) await connect(config.id) },
     close: async () => {
-      closed = true
+      state.closed = true
       for (const s of sessions.values()) {
         s.abort.abort()
         if (s.retry) clearTimeout(s.retry)

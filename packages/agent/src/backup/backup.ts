@@ -36,9 +36,10 @@ import { isAbsolute, join } from 'node:path'
 import { crashPoint } from '../runtime/crash'
 import { transaction } from '../store/database'
 import type { Store } from '../store/store'
-import { replicatedTables, snapshotInto, startCapture, type Capture } from './capture'
+import { replicatedTables, snapshotInto, startCapture } from './capture'
 import { generations, manifestHash, manifestPath, parseManifest, readText, removeGeneration, segmentPath, signManifest, writeDurable, type Manifest, type ManifestOwner } from './folder'
-import { counterNonce, moveCode, newKey, newPhrase, seal, sha256, unwrapKey, wrapKey, wrapWithPhrase, type PhraseWrap } from './keys'
+import { createBackupContext, type BackupContext, type Current } from './context'
+import { counterNonce, moveCode, newKey, newPhrase, seal, sha256, unwrapKey, wrapKey, wrapWithPhrase } from './keys'
 
 /** Names under which main's keychain keeps Juno's backup secrets. */
 export type BackupSecret = 'backupKey' | 'deletionRecord' | 'recoveryPhrase'
@@ -113,26 +114,6 @@ export interface Backup {
   readonly stop: () => void
 }
 
-interface Progress {
-  readonly folder: string | null
-  readonly gen: number
-  readonly head: number
-  readonly head_hash: string
-  readonly label: number
-  readonly memory_gen: number
-  readonly clean: number
-  readonly last_at: number | null
-  readonly phrase_at: number | null
-  readonly phrase: string | null
-  readonly retired: string
-}
-
-interface Current {
-  readonly folder: string
-  readonly manifest: Manifest
-  readonly dataKey: Buffer
-}
-
 /**
  * The folder holds a backup this Mac must not write over: one its key cannot open, or one from another
  * Mac at the same epoch (this Mac's own earlier install, or a second restore of one backup). Writing
@@ -156,66 +137,10 @@ export class OwnedElsewhere extends Error {
 const SNAPSHOT_FILE = 'backup-snapshot.tmp'
 const aad = (gen: number, position: number, prev: string) => `juno-backup:${gen}:${position}:${prev}`
 
-export const defaultBackupFolder = (agentDir: string) => join(agentDir, 'backup')
+export { defaultBackupFolder } from './context'
 
-export function createBackup(options: BackupOptions): Backup {
-  const { store, keychain } = options
-  const { db } = store
-  const local = new Set(options.local)
-  // The migration log is the snapshot's schema; it is never captured, but the snapshot keeps it.
-  const strip = options.local.filter((table) => table !== 'schema_migrations')
-  const report = options.onReport ?? (() => {})
-
-  const progress = (): Progress => {
-    db.prepare('INSERT OR IGNORE INTO backup_progress (singleton) VALUES (1)').run()
-    return db.prepare('SELECT * FROM backup_progress WHERE singleton = 1').get() as unknown as Progress
-  }
-  const folder = () => progress().folder ?? defaultBackupFolder(options.agentDir)
-  const owner = () => db.prepare('SELECT device_id AS device, epoch, state FROM ownership WHERE singleton = 1').get() as { device: string; epoch: number; state: string }
-  const schema = () => (db.prepare('SELECT "set" || \'/\' || step AS step FROM schema_migrations ORDER BY "set", step').all() as Array<{ step: string }>).map((row) => row.step)
-  const memoryGen = () => (db.prepare('SELECT gen FROM memory_head WHERE singleton = 1').get() as { gen: number }).gen
-  /**
-   * The removals a snapshot taken now excludes: up to the memory generation,
-   * but not a removal whose node versions the purge has not deleted yet
-   * (WP16's `nodes` step), and the deletion record when the removal behind
-   * it never committed (G13).
-   */
-  const labelNow = (record: number) => {
-    const gen = memoryGen()
-    const unpurged = (db.prepare("SELECT min(gen) AS gen FROM redaction_purges WHERE step = 'nodes' AND done_at IS NULL").get() as { gen: number | null }).gen
-    const excluded = unpurged === null ? gen : Math.min(gen, unpurged - 1)
-    return gen < record ? Math.max(excluded, record) : excluded
-  }
-  const phraseWrap = (): PhraseWrap | undefined => {
-    const text = progress().phrase
-    return text === null ? undefined : (JSON.parse(text) as PhraseWrap)
-  }
-
-  // A start after a crash cannot know what changed since the last segment: begin a new generation.
-  let due = progress().clean === 0 || progress().gen === 0
-  transaction(db, () => db.prepare('UPDATE backup_progress SET clean = 0 WHERE singleton = 1').run())
-  let capture: Capture | undefined = startCapture(db, replicatedTables(db, local))
-  let current: Current | undefined
-  let stopped = false
-  // The newest removal generation a `regenerate` snapshot of this process covers.
-  let regenerated = 0
-
-  let queue: Promise<unknown> = Promise.resolve()
-  const serial = <T>(f: () => Promise<T>): Promise<T> => {
-    const next = queue.then(f)
-    queue = next.catch(() => {})
-    return next
-  }
-
-  const backupKey = async (): Promise<Buffer> => {
-    const stored = await keychain.get('backupKey')
-    if (stored !== undefined) return Buffer.from(stored, 'base64')
-    const key = newKey()
-    await keychain.set('backupKey', key.toString('base64'))
-    return key
-  }
-  const deletionRecord = async () => Number((await keychain.get('deletionRecord')) ?? 0)
-
+function backupPublication(context: BackupContext) {
+  const { options, db, state, folder, owner, progress } = context
   /**
    * Reads the newest manifest before a write. Spec `observeOwner`: another
    * Mac at this epoch or later owns Juno, so this one stops and returns
@@ -235,7 +160,7 @@ export function createBackup(options: BackupOptions): Backup {
       // The same epoch from another Mac: this Mac's own older install, or a second restore of one
       // backup. Neither is a newer owner, and writing would delete that backup.
       if (theirs.epoch === me.epoch) throw new ForeignBackup(dir)
-      stopped = true
+      state.stopped = true
       options.observed(theirs)
       return true
     }
@@ -245,12 +170,12 @@ export function createBackup(options: BackupOptions): Backup {
   /** The current generation as the folder has it, or undefined if it must start again. */
   const load = (key: Buffer): Current | undefined => {
     const p = progress()
-    if (current !== undefined && current.folder === folder() && current.manifest.gen === p.gen) return current
+    if (state.current !== undefined && state.current.folder === folder() && state.current.manifest.gen === p.gen) return state.current
     const text = readText(manifestPath(folder(), p.gen))
     const parsed = text === undefined ? undefined : parseManifest(text)
     if (parsed === undefined || !parsed.verify(key) || parsed.manifest.head !== p.head || parsed.manifest.headHash !== p.head_hash) return undefined
-    current = { folder: folder(), manifest: parsed.manifest, dataKey: unwrapKey(key, parsed.manifest.key, `g${p.gen}`) }
-    return current
+    state.current = { folder: folder(), manifest: parsed.manifest, dataKey: unwrapKey(key, parsed.manifest.key, `g${p.gen}`) }
+    return state.current
   }
 
   const reserveNonce = (): number =>
@@ -280,25 +205,31 @@ export function createBackup(options: BackupOptions): Backup {
     transaction(db, () => db.prepare("UPDATE backup_progress SET retired = '[]' WHERE singleton = 1").run())
   }
 
-  const ownerOf = (state: ManifestOwner['state']): ManifestOwner => {
+  const ownerOf = (ownerState: ManifestOwner['state']): ManifestOwner => {
     const me = owner()
-    return { device: me.device, name: options.deviceName, epoch: me.epoch, state }
+    return { device: me.device, name: options.deviceName, epoch: me.epoch, state: ownerState }
   }
 
+  return { ownedElsewhere, load, reserveNonce, publish, republish, clearRetired, ownerOf }
+}
+
+function backupExports(context: BackupContext, publication: ReturnType<typeof backupPublication>) {
+  const { options, store, db, local, strip, state, deletionRecord, folder, progress, memoryGen, labelNow, phraseWrap, schema } = context
+  const { publish, clearRetired, ownerOf, republish, reserveNonce } = publication
   /** Spec `newGeneration`, `snapshot`, `publishManifest` at head 0, then `shred`. */
-  const newGeneration = async (key: Buffer, state: ManifestOwner['state']): Promise<string> => {
+  const newGeneration = async (key: Buffer, ownerState: ManifestOwner['state']): Promise<string> => {
     const record = await deletionRecord()
     const dir = folder()
     const gen = Math.max(progress().gen, ...generations(dir), 0) + 1
     const snapshotPath = join(options.agentDir, SNAPSHOT_FILE)
-    due = true
+    state.due = true
     // The snapshot and the sessions after it start with no write between them. Capture restarts even
     // if the snapshot fails, and `due` makes the next export try a generation again.
-    capture?.close()
+    state.capture?.close()
     try {
       snapshotInto(db, snapshotPath, strip)
     } finally {
-      capture = startCapture(db, replicatedTables(db, local))
+      state.capture = startCapture(db, replicatedTables(db, local))
     }
     const atSnapshot = memoryGen()
     const label = labelNow(record)
@@ -314,11 +245,11 @@ export function createBackup(options: BackupOptions): Backup {
     const phrase = phraseWrap()
     const manifest: Manifest = {
       v: 1, gen, at: store.now(), schema: schema(), snapshotHash: hash, head: 0, headHash: hash, label, deletion: record,
-      owner: ownerOf(state), key: wrapKey(key, dataKey, `g${gen}`), ...(phrase ? { phrase } : {}),
+      owner: ownerOf(ownerState), key: wrapKey(key, dataKey, `g${gen}`), ...(phrase ? { phrase } : {}),
     }
     const text = publish(key, manifest)
-    current = { folder: dir, manifest, dataKey }
-    due = false
+    state.current = { folder: dir, manifest, dataKey }
+    state.due = false
     for (const old of generations(dir)) if (old < gen) removeGeneration(dir, old)
     clearRetired()
     options.changed?.()
@@ -327,10 +258,10 @@ export function createBackup(options: BackupOptions): Backup {
 
   /** Spec `encrypt` then `publishManifest` then `persistExport`, for the changes since the last cut. */
   const exportChanges = async (key: Buffer, at: Current): Promise<void> => {
-    const segment = capture!.cut()
+    const segment = state.capture!.cut()
     if (segment === undefined && !republish()) return
     // From here a failure leaves cut changes outside the backup: the next export starts a generation.
-    due = true
+    state.due = true
     const p = progress()
     const record = await deletionRecord()
     let head = p.head
@@ -346,23 +277,30 @@ export function createBackup(options: BackupOptions): Backup {
     // A phrase is replaced, never removed, so the newest wrap always overrides.
     const manifest: Manifest = { ...at.manifest, at: store.now(), head, headHash, deletion: Math.max(record, at.manifest.deletion), owner: ownerOf('active'), ...(phrase ? { phrase } : {}) }
     publish(key, manifest)
-    current = { ...at, manifest }
-    due = false
+    state.current = { ...at, manifest }
+    state.due = false
     options.changed?.()
   }
 
+  return { newGeneration, exportChanges }
+}
+
+function backupExporter(context: BackupContext, publication: ReturnType<typeof backupPublication>, exports: ReturnType<typeof backupExports>) {
+  const { state, owner, backupKey, progress, deletionRecord, memoryGen, schema, db, local } = context
+  const { ownedElsewhere, load } = publication
+  const { newGeneration, exportChanges } = exports
   const exportNow = async (): Promise<void> => {
-    if (stopped || owner().state !== 'active') return
+    if (state.stopped || owner().state !== 'active') return
     const key = await backupKey()
     if (ownedElsewhere(key)) return
     const p = progress()
-    const at = due ? undefined : load(key)
+    const at = state.due ? undefined : load(key)
     const record = await deletionRecord()
     const stale =
       at === undefined ||
       (record > p.label && memoryGen() < record) ||
       at.manifest.schema.join() !== schema().join() ||
-      replicatedTables(db, local).join() !== capture!.tables.join()
+      replicatedTables(db, local).join() !== state.capture!.tables.join()
     if (stale) {
       await newGeneration(key, 'active')
       return
@@ -370,17 +308,14 @@ export function createBackup(options: BackupOptions): Backup {
     await exportChanges(key, at)
   }
 
-  const flush = () => serial(exportNow)
+  return exportNow
+}
 
-  const intervalMs = options.intervalMs ?? 60_000
-  const timer = intervalMs > 0 ? setInterval(() => void flush().catch(report), intervalMs) : undefined
-  timer?.unref()
-
+function backupCommands(context: BackupContext, publication: ReturnType<typeof backupPublication>, newGeneration: ReturnType<typeof backupExports>['newGeneration'], serial: <T>(f: () => Promise<T>) => Promise<T>, exportNow: () => Promise<void>): Pick<Backup, 'setFolder' | 'exportPhrase' | 'finalCheckpoint'> {
+  const { options, store, db, state, folder, owner, backupKey } = context
+  const { keychain } = options
+  const { ownedElsewhere } = publication
   return {
-    folder,
-    lastAt: () => progress().last_at ?? undefined,
-    phraseExportedAt: () => progress().phrase_at ?? undefined,
-    flush,
     setFolder: (path) =>
       serial(async () => {
         if (!isAbsolute(path)) throw new Error('The backup folder must be an absolute path.')
@@ -393,8 +328,8 @@ export function createBackup(options: BackupOptions): Backup {
         transaction(db, () =>
           db.prepare("UPDATE backup_progress SET folder = ?, retired = json_insert(retired, '$[#]', ?) WHERE singleton = 1").run(path, old),
         )
-        due = true
-        current = undefined
+        state.due = true
+        state.current = undefined
         options.changed?.()
         await exportNow()
       }),
@@ -422,33 +357,62 @@ export function createBackup(options: BackupOptions): Backup {
         }
         return moveCode(manifestHash(await newGeneration(key, 'released')))
       }),
+  }
+}
+
+export function createBackup(options: BackupOptions): Backup {
+  const context = createBackupContext(options)
+  const { db, state, folder, progress, owner, backupKey, deletionRecord } = context
+  const { keychain } = options
+  const report = options.onReport ?? (() => {})
+  const publication = backupPublication(context)
+  const { ownedElsewhere, load } = publication
+  const exports = backupExports(context, publication)
+  const { newGeneration } = exports
+  const exportNow = backupExporter(context, publication, exports)
+  let queue: Promise<unknown> = Promise.resolve()
+  const serial = <T>(f: () => Promise<T>): Promise<T> => {
+    const next = queue.then(f)
+    queue = next.catch(() => {})
+    return next
+  }
+  const flush = () => serial(exportNow)
+  const intervalMs = options.intervalMs ?? 60_000
+  const timer = intervalMs > 0 ? setInterval(() => void flush().catch(report), intervalMs) : undefined
+  timer?.unref()
+  return {
+    folder,
+    lastAt: () => progress().last_at ?? undefined,
+    phraseExportedAt: () => progress().phrase_at ?? undefined,
+    flush,
+    ...backupCommands(context, publication, newGeneration, serial, exportNow),
     removal: {
       raiseDeletion: async (gen) => {
         if ((await deletionRecord()) < gen) await keychain.set('deletionRecord', String(gen))
       },
       regenerate: (gen) =>
         serial(async () => {
-          if (stopped || owner().state !== 'active') return
+          if (state.stopped || owner().state !== 'active') return
           const key = await backupKey()
-          if (!due && regenerated >= gen && load(key) !== undefined) return
+          if (!state.due && state.regenerated >= gen && load(key) !== undefined) return
           if (ownedElsewhere(key)) return
           await newGeneration(key, 'active')
-          regenerated = Math.max(regenerated, gen)
+          state.regenerated = Math.max(state.regenerated, gen)
         }),
     },
     stop: () => {
       if (timer) clearInterval(timer)
-      stopped = true
-      capture?.close()
-      capture = undefined
+      state.stopped = true
+      state.capture?.close()
+      state.capture = undefined
     },
     close: async () => {
       if (timer) clearInterval(timer)
       await flush().catch(report)
       await queue
-      if (!due) transaction(db, () => db.prepare('UPDATE backup_progress SET clean = 1 WHERE singleton = 1').run())
-      capture?.close()
-      capture = undefined
+      if (!state.due) transaction(db, () => db.prepare('UPDATE backup_progress SET clean = 1 WHERE singleton = 1').run())
+      state.capture?.close()
+      state.capture = undefined
     },
   }
 }
