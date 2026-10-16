@@ -997,3 +997,18 @@ After queueing at the 24-vCPU cap, final remote checks used the supported
 The sidebar holds its first list on an empty cache until the cold boot's quick start (membership, DM names, the first page of followed threads) is stored, then shows rows as the sync stores them. Clear bot channels are sorted into Automated as each one's history lands. Cached rows still paint immediately. Topic-row timestamps, unread badges, participant stacks and status tags reserve their widths; New view stays beside Unread only while view pills fill.
 
 All topics holds its first cold rows until the quick start is stored, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
+
+### First sync quick start and per-method pacing (2026-10-16)
+
+`pnpm bench:sync -- --latency 300 --until-quiet` on the Mac: the large seed, 300 ms per Slack call, production pacing, the same 471 Web API calls before and after, no rate-limit hits.
+
+| | Before | After |
+| --- | --- | --- |
+| Sign-in to sidebar rows shown | 855 s (held until the whole boot ended) | 2.6 s |
+| First channel or DM row in the index | 5.1 s | 1.0 s (from `client.counts`) |
+| Boot to `live`, last call | 855 s | 545 s |
+| `getView` call time | 147 s | 74 s (one `users/info` per page, not per thread) |
+| Edge `users/info` calls | 471 | 153 |
+| Unread threads shown as a dot | 33 | 0 |
+
+The 33 dots before were threads whose reply coverage was recorded after their last re-index. Single runs, not a distribution. Full sync is now set by history alone: 300 calls at 40 a minute.
