@@ -25,11 +25,11 @@ export function ConnectCard({ card, actions, enter }: ConnectCardProps) {
       because={card.because}
       buttons={
         <>
-          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'connect' })}>
-            {copy.connect}
-          </Button>
           <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(card.id, { _tag: 'dismiss' })}>
             {copy.skip}
+          </Button>
+          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'connect' })}>
+            {copy.connect}
           </Button>
         </>
       }

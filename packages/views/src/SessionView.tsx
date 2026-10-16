@@ -21,17 +21,26 @@ export function SessionView({ teamName, userName, enterpriseName, signingOut = f
       <Text variant="meta" tone="muted" as="p" role="status" aria-label="Session status">
         Signed in to {where} as {userName}
       </Text>
-      <Button variant="ghost" size="sm" tone="muted" onClick={onSignOut} disabled={signingOut}>
-        Sign out
-      </Button>
+      {/* Pulled back by its padding and border, so "Sign out" starts on the line's edge, at the menu's inset. */}
+      <span {...stylex.props(styles.signOut)}>
+        <Button variant="ghost" size="sm" tone="muted" onClick={onSignOut} disabled={signingOut}>
+          Sign out
+        </Button>
+      </span>
     </section>
   )
 }
 
 const styles = stylex.create({
+  // The line, then Sign out under it, both at the start.
   section: {
     display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: spacing['--space-1'],
+  },
+  signOut: {
+    display: 'inline-flex',
+    marginInlineStart: `calc(-1 * (${spacing['--space-2-5']} + 1px))`, // tokens-allow: The button's padding and its 1px border.
   },
 })

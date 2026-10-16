@@ -1,9 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
-import { useState, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, Icon, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
+import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
 import { countLabel } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
@@ -53,12 +52,25 @@ export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, que
   const topicIds = [...(main ? [mainId] : []), ...open.map((thread) => thread.id), ...resolved.map((thread) => thread.id)]
   const ids = topicIds.map(rowId)
   const [chosen, setChosen] = useState<string | undefined>(undefined)
-  const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
+  // It opens on the topic on screen, as a Mac pop-up menu opens on its current
+  // item, so one row is lit, not that one and Main. A query starts on the first match.
+  const current = rowId(currentId)
+  const start = query.trim() === '' && ids.includes(current) ? current : ids[0]
+  const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : start
   const pick = (id: string, metaKey = false) => {
     const topicId = topicIds[ids.indexOf(id)]
     if (topicId !== undefined) onOpen(topicId, { metaKey })
   }
-  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setChosen, onSelect: (id) => pick(id) })
+  // The row the arrows reach, and the current row on open, come into view; the pointer never scrolls the list.
+  const moveTo = (id: string) => {
+    setChosen(id)
+    reveal(id)
+  }
+  // On open and after each query, before the paint.
+  useLayoutEffect(() => {
+    if (start !== undefined) reveal(start)
+  }, [start])
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: moveTo, onSelect: (id) => pick(id) })
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' && event.metaKey && activeId !== undefined) {
       event.preventDefault()
@@ -100,7 +112,7 @@ interface RowProps {
   readonly onActivate: (rowId: string) => void
 }
 
-/** Main: first, with the line New chat's thread picker gives it. */
+/** Main: first, with the line New chat's thread picker gives it, and no icon, so its title starts on the threads' edge. */
 function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowProps & { readonly mainId: string; readonly unread: number }) {
   const id = rowId(mainId)
   return (
@@ -109,9 +121,8 @@ function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowPro
       size={44}
       active={active}
       selected={current}
-      leading={<Icon icon={ChatText} size={15} />}
       label={
-        <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default">
+        <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default" sx={styles.title}>
           Main
         </Text>
       }
@@ -134,7 +145,7 @@ function ThreadRow({ thread, now, active, current, onOpen, onActivate }: RowProp
       active={active}
       selected={current}
       label={
-        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate dir="auto">
+        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate dir="auto" sx={styles.title}>
           {thread.title}
         </Text>
       }
@@ -167,10 +178,16 @@ function Badges({ unread, exact, mentionsMe }: { readonly unread: number; readon
   )
 }
 
+const reveal = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'nearest' })
+
 /** The list's height before it scrolls, as New chat's pickers. */
 const LIST_MAX_HEIGHT = '360px'
 
 const styles = stylex.create({
+  // The row's 20px title line (OptionRow 44), not the body's 1.6.
+  title: {
+    lineHeight: 'inherit',
+  },
   scroll: {
     maxHeight: LIST_MAX_HEIGHT,
     overflowY: 'auto',
