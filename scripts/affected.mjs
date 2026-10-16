@@ -46,7 +46,9 @@ import { forwardSignals } from './remote/children.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(name)
-const base = argv.includes('--base') ? argv[argv.indexOf('--base') + 1] : spawnSync('git', ['merge-base', 'HEAD', 'main'], { cwd: root, encoding: 'utf8' }).stdout.trim()
+// Branches are cut from origin/main and the local main is often behind it, so the merge base is taken with origin/main when it exists.
+const mergeBase = (ref) => spawnSync('git', ['merge-base', 'HEAD', ref], { cwd: root, encoding: 'utf8' }).stdout.trim()
+const base = argv.includes('--base') ? argv[argv.indexOf('--base') + 1] : mergeBase('origin/main') || mergeBase('main')
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
