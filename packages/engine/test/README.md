@@ -13,6 +13,7 @@ node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test
 - `handle.commandIdle()` waits for background command recovery fibers, including the lookup's local transaction. Await the command first so its recovery has been scheduled.
 - `rowsUntil(predicate)` waits for the actual sidebar outcome after a command or socket event.
 - `waitFor(predicate, timeout, label)` accepts synchronous or async predicates. Only a resolved value other than `undefined` completes the wait; errors reject it.
+- `openWindow()` gives a second atom registry on a new port to the same engine, as a second renderer would be: a live query mounted there is a new subscription at once, with no wait for the 30 s idle time. `stop()` disposes it; `restart()` does not, so do not combine them.
 - `quiet()` drains sync cycles and then polls for a quiet API window. Use the explicit completion helpers for budgets and command recovery.
 
 `bootedEngine()` and `restart()` wait for `live` and `syncIdle()`. Stop and restart dispose the old atom registry so its ports and subscriptions do not reconnect after shutdown. Before resetting the fake's call log or dropping the socket for a new operation, finish the preceding cycle. A fake call record says the server handled a request; it does not prove the engine applied its answer.
@@ -43,6 +44,6 @@ CONFORMANCE_ONLY=copy-7 pnpm specs:conformance          # only the traces whose 
 ```
 
 - `itf.ts` reads ITF. `replay.ts` is the loop for any spec: it cuts a trace into rounds (a step the harness drives, then the steps Juno takes on its own), drives the first step, waits until the projections agree, and reports the first round where they do not, with the fields that differ, the gated calls and the outbox.
-- `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry.
+- `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry. The outbox suite is in `outbox-suite.ts`; `outbox.conformance.ts` and `outbox-2` to `outbox-4` each take a share of the traces, slowest first, so vitest runs them in four workers.
 - The files are not `*.test.ts`, so `pnpm test` does not run them: they need the generated traces. `vitest.conformance.config.ts` runs up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once (default 6); each boots its own engine and fake.
 - A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.

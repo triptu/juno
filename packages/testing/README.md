@@ -15,7 +15,7 @@ Starts a `PerformanceObserver` for `layout-shift` entries (only from the start o
 
 The box comparison reads `offsetLeft`, `offsetTop`, `offsetWidth` and `offsetHeight` of every HTML element under the root, relative to the root. Those ignore transforms, so the press scale (or any scale, translate or opacity effect) is not counted, while a change of size, padding, border or position is. Elements are compared to themselves, so nothing needs to be excluded.
 
-Options: `root` (default the gallery's `[data-fixture-frame]`, else `body`), `settleMs` (extra wait) and `tolerance` (px, default 0.5; offsets are whole pixels, so any change counts).
+Options: `root` (default the gallery's `[data-fixture-frame]`, else `body`), `settleMs` (extra wait), `tolerance` (px, default 0.5; offsets are whole pixels, so any change counts) and `motion`. `motion: 'layout'` waits only for transitions and animations of a property that can move a box; a colour, opacity, shadow, filter or transform change cannot, so a hover's colour fade or the press scale is not waited out. The gallery uses it, where every touch starts such fades and nothing else lands while they run. The default, `all`, waits for every one, which also gives late data in the app time to land.
 
 `measureLayoutShift` returns the report without throwing; `formatLayoutShiftReport` renders it.
 

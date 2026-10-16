@@ -1,3 +1,6 @@
+import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
 
 /** One state, as the gallery lists it on `window.__galleryRoutes`. */
@@ -54,4 +57,36 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       new Promise((resolve) => setTimeout(resolve, 600)),
     ]),
   )
+}
+
+/**
+ * A queue of states that several tests (the parts of one check) share, so
+ * the parts finish together however long each state takes. The run's id
+ * comes from playwright.config.ts, so every worker sees the same queue.
+ * A claim is a directory: mkdir succeeds for one process only.
+ */
+export function claimQueue(name: string) {
+  const dir = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local', name)
+  mkdirSync(dir, { recursive: true })
+  const claim = (key: string): boolean => {
+    try {
+      mkdirSync(join(dir, encodeURIComponent(key)))
+      return true
+    } catch {
+      return false
+    }
+  }
+  // Every state before the last one claimed here was taken by some part already.
+  let from = 0
+  return {
+    /** The next state of `routes` no part has taken yet, in order. Pass the same list each time. */
+    next: (routes: ReadonlyArray<Route>): Route | undefined => {
+      for (; from < routes.length; from++) {
+        if (claim(`state ${routes[from]!.route}`)) return routes[from++]
+      }
+      return undefined
+    },
+    /** Claims any other key (a DOM signature); false when a part already has it. */
+    claim,
+  }
 }

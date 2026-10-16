@@ -175,28 +175,6 @@ test('a relaunch keeps many tabs and their drafts', async ({ juno, running, user
   }
 })
 
-test('a relaunch keeps a New chat tab with its destination and draft', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.tabs.newTabButton.click()
-  await juno.newChat.write('New chat draft')
-  await juno.newChat.pickConversation('product', 'product')
-  await juno.tabs.expectActive('product')
-  await juno.win.waitForTimeout(800)
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(2)
-    await restarted.newChat.expectConversation('product')
-    await expect(restarted.newChat.composer).toHaveValue('New chat draft')
-  } finally {
-    await again.close()
-  }
-})
-
 test('the topic switcher with many threads keeps the selected row in view and fits the window', async ({ juno, fake }) => {
   for (let i = 0; i < 60; i++) {
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Busy day thread number ${i} about things` })

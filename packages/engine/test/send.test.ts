@@ -256,17 +256,18 @@ describe('send', () => {
     const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
     engine.fake.holdFrames({ types: ['message'] })
     engine.fake.loseResponse({ method: 'chat.postMessage' })
-    // The lookup's client retries transient errors itself, so each failed lookup takes several of these.
-    engine.fake.forceError({ method: 'conversations.replies', error: 'internal_error', times: 100 })
+    // An error the client does not retry itself, so each lookup fails at once and only the outbox backoff waits.
+    engine.fake.forceError({ method: 'conversations.replies', error: 'request_timeout', times: 100 })
     valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'After the flush'))
     const post = await waitFor(() => apiCalls(engine, 'chat.postMessage')[0], WAIT_MS, 'the post')
     const id = String(post.args['client_msg_id'])
     const nextAt = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { next_at: number } | undefined)?.next_at)
-    // Each failed lookup doubles the wait; stop once the next one is far off.
+    // Each failed lookup doubles the wait (2 s, 4 s, 8 s); stop once the next one is far off.
+    // The catch-up below takes well under a second, so 8 s leaves a wide margin.
     const due = await waitFor(() => {
       const at = nextAt()
-      return at !== undefined && at - Date.now() > 10_000 ? at : undefined
-    }, 90_000, 'a long backoff')
+      return at !== undefined && at - Date.now() > 6_000 ? at : undefined
+    }, WAIT_MS, 'a long backoff')
     engine.fake.clearError({ method: 'conversations.replies' })
     engine.fake.releaseFrames({ drop: true })
     engine.fake.dropSocket()

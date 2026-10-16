@@ -18,9 +18,11 @@ describe('rate limits', () => {
     await engine.phase('offline')
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Sent while the limits were tight.' })
     engine.fake.resetCalls()
-    // Each of the next two calls of history and of counts gets a 429 with a 6 s Retry-After.
-    engine.fake.force429({ method: 'conversations.history', retryAfter: 6, times: 2 })
-    engine.fake.force429({ method: 'client.counts', retryAfter: 6, times: 1 })
+    // The next call of history gets a 429 with a 6 s Retry-After, long enough to show rate-limited (over the
+    // client's 5 s interactive wait). Each of the next two calls of counts gets one with 1 s, which is not shown.
+    const retryAfter: Record<string, number> = { 'conversations.history': 6, 'client.counts': 1 }
+    const times: Record<string, number> = { 'conversations.history': 1, 'client.counts': 2 }
+    for (const method of Object.keys(retryAfter)) engine.fake.force429({ method, retryAfter: retryAfter[method]!, times: times[method]! })
     engine.fake.goOnline()
 
     const limited = await engine.phase('rate-limited', 30_000)
@@ -31,12 +33,12 @@ describe('rate limits', () => {
     for (const method of ['conversations.history', 'client.counts']) {
       const calls = apiCalls(engine, method)
       const limitedCalls = calls.filter((call) => call.status === 429)
-      expect(limitedCalls.length, method).toBeGreaterThan(0)
+      expect(limitedCalls.length, method).toBe(times[method])
       // Every call after a 429 of the same method waited out its Retry-After.
       for (const call of limitedCalls) {
         const next = calls.find((later) => later.at > call.at)
         expect(next, method).toBeDefined()
-        expect(next!.at - call.at, method).toBeGreaterThanOrEqual(6_000 - 50)
+        expect(next!.at - call.at, method).toBeGreaterThanOrEqual(retryAfter[method]! * 1000 - 50)
       }
     }
   }, 120_000)

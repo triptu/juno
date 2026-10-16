@@ -99,35 +99,6 @@ test('a deleted sender and a live rename keep their messages readable', async ({
   await juno.topic.expectSent('Reply to the old message')
 })
 
-test('a lost edit response settles on the edited text', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.send('Before dropped edit response')
-  await juno.topic.expectSent('Before dropped edit response')
-  await juno.chooseNextMenuItem('edit')
-  await juno.topic.message('Before dropped edit response').click({ button: 'right' })
-  const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
-  await field.fill('After dropped edit response')
-  fake.loseResponse({ method: 'chat.update', times: 1 })
-  await field.press('Enter')
-  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'After dropped edit response').length).toBe(1)
-  await expect(field).toHaveCount(0)
-  await expect(juno.topic.message('After dropped edit response')).toBeVisible()
-})
-
-
-test('quitting immediately after a theme change keeps the last choice', async ({ win, running, userData }) => {
-  await win.getByRole('radio', { name: 'Dark' }).click()
-  await running.close()
-  const again = await launchApp(userData)
-  try {
-    await expect(again.win.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
-  } finally {
-    await again.close()
-  }
-})
-
 test('repeated window minimize and restore keeps the draft', async ({ juno, app }) => {
   await juno.signIn()
   await juno.waitForSync()

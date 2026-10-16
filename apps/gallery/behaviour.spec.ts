@@ -4,7 +4,7 @@ import { openState, readRoutes } from './support'
 /**
  * Behaviour that a screenshot cannot show, checked against the built gallery
  * in a real browser: mouse-down activation, the cursor rule and the state
- * switcher. Layout shift is in shift.spec.ts.
+ * switcher. Layout shift, and the cursor rule on every state, are in shift.spec.ts.
  */
 const log = (page: Page) => page.locator('[data-activation-log]')
 
@@ -175,38 +175,7 @@ test('every message row is a whole number of pixels tall', async ({ page }) => {
   expect(fractional).toEqual([])
 })
 
-/**
- * SPEC section 16: the arrow cursor everywhere, the text cursor only over
- * editable or selectable text, never the pointer. Checked on every fixture
- * in the light theme: an element may compute `cursor: text` only when it
- * also computes `user-select: text`, or when it is part of a field (a label
- * wrapping an input), which focuses the input wherever it is clicked.
- */
-test('no state shows the pointer outside external links, and the text cursor only over selectable text', async ({ page }) => {
-  const routes = await readRoutes(page)
-
-  const offenders: string[] = []
-  for (const route of routes) {
-    await openState(page, route)
-    const hits = await page.evaluate((frameName) => {
-      const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
-      if (!frame) return ['no frame']
-      const bad: string[] = []
-      for (const element of Array.from(frame.querySelectorAll('*'))) {
-        const style = getComputedStyle(element)
-        const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
-        // Links that open outside Juno are the one place the hand cursor is allowed.
-        const external = element.closest('a[href^="http:"], a[href^="https:"], a[href^="mailto:"]') !== null
-        if (style.cursor === 'pointer' && !external) bad.push(describe())
-        const inField = element.closest('label') !== null && element.closest('label')!.querySelector('input, textarea') !== null
-        if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) bad.push(describe())
-      }
-      return bad
-    }, route.route)
-    for (const hit of hits) offenders.push(`${route.route}: ${hit}`)
-  }
-  expect(offenders).toEqual([])
-})
+// The cursor rule (SPEC section 16) is checked on every state by the shift guard's walk in shift.spec.ts, which opens each state anyway.
 
 test('the gallery chrome keeps the arrow cursor too', async ({ page }) => {
   await page.goto('/#/Button?__state=variant/primary')

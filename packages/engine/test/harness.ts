@@ -132,6 +132,8 @@ export interface RunningEngine {
   readonly fake: FakeSlack
   readonly main: ReturnType<typeof fakeMain>
   readonly registry: Registry
+  /** A second renderer: a new registry on a new port to the same engine. `stop` disposes it. */
+  readonly openWindow: () => Registry
   readonly userData: string
   readonly handle: EngineHandle
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
@@ -200,14 +202,22 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       },
     },
   })
-  const registry = makeRegistry()
-  configureConnection(registry, {
+  const connection = {
     acquire: async () => {
       const channel = new MessageChannel()
       transport.add(channel.port2 as unknown as MessagePortLike)
       return channel.port1 as unknown as PortLike
     },
-  })
+  }
+  const registry = makeRegistry()
+  configureConnection(registry, connection)
+  const windows: Array<Registry> = []
+  const openWindow = () => {
+    const window = makeRegistry()
+    configureConnection(window, connection)
+    windows.push(window)
+    return window
+  }
   const unmounts: Array<() => void> = [registry.mount(sessionStatusAtom), registry.mount(engineStatusAtom)]
   const mounted = new Set<unknown>()
   const topicsOf = (filter?: TopicListFilter) => {
@@ -227,6 +237,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     fake,
     main,
     registry,
+    openWindow,
     userData,
     handle,
     status: (tag) =>
@@ -266,6 +277,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       ),
     stop: async () => {
       for (const unmount of unmounts.splice(0)) unmount()
+      for (const window of windows.splice(0)) window.dispose()
       registry.dispose()
       await handle.stop()
       if (options.reuse === undefined) {

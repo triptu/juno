@@ -1,11 +1,9 @@
 import { expectStableAnchor } from './shiftProbe'
 // The sidebar against the fake Slack: what shows after sign-in, the quick
-// filters, a live update from another client, hover and keyboard, and dark
-// mode. The rows asserted on are threads the self user follows (started,
-// replied in, or was mentioned in) and a channel's Main, so they stay in
-// the sidebar under the followed-threads rule as well as the older
-// every-active-thread rule.
-import type { Page } from '@playwright/test'
+// filters, a live update from another client, hover and keyboard. The rows
+// asserted on are threads the self user follows (started, replied in, or was
+// mentioned in) and a channel's Main, so they stay in the sidebar under the
+// followed-threads rule as well as the older every-active-thread rule.
 import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -21,18 +19,6 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 const ALERTS_MAIN = '#alerts-prod'
 
-/** Resolves a CSS custom property to the colour Chromium computes for it. */
-async function resolveColorVar(win: Page, name: string): Promise<string> {
-  return win.evaluate((variable) => {
-    const probe = document.createElement('span')
-    probe.style.color = `var(${variable})`
-    document.body.append(probe)
-    const color = getComputedStyle(probe).color
-    probe.remove()
-    return color
-  }, name)
-}
-
 /**
  * A new message in #incidents' Main, so a row sits above the Postgres
  * thread: after the first sync it is the newest in All, since Automated
@@ -41,11 +27,6 @@ async function resolveColorVar(win: Page, name: string): Promise<string> {
 async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
   fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0JONAS', text: 'Paging drill at 3pm.' })
   await expect.poll(() => juno.sidebar.titles('Recent').then((titles) => titles[0])).toBe('#incidents')
-}
-
-function brightness(rgb: string): number {
-  const [r = 0, g = 0, b = 0] = rgb.match(/\d+/g)?.map(Number) ?? []
-  return (r + g + b) / 3
 }
 
 test('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', async ({ juno }) => {
@@ -420,27 +401,6 @@ test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, 
   // And Shift-Tab goes back to its row.
   await win.keyboard.press('Shift+Tab')
   await postgres.expectFocused()
-})
-
-test('the sidebar renders in dark mode', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  await sidebar.row(POSTGRES).expectVisible()
-  const lightSidebar = await resolveColorVar(win, '--background-subtle')
-  await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
-
-  await juno.setTheme('Dark')
-  const darkSidebar = await resolveColorVar(win, '--background-subtle')
-  expect(brightness(darkSidebar)).toBeLessThan(brightness(lightSidebar))
-  await expect(sidebar.root).toHaveCSS('background-color', darkSidebar)
-  await expect(win.getByRole('main')).toHaveCSS('background-color', await resolveColorVar(win, '--background'))
-  // The title is still readable: its colour is lighter than the row behind it.
-  const title = sidebar.row(POSTGRES).titleText
-  expect(brightness(await title.evaluate((node) => getComputedStyle(node).color))).toBeGreaterThan(brightness(darkSidebar))
-
-  await juno.setTheme('Light')
-  await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
 })
 
 test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ juno }) => {
