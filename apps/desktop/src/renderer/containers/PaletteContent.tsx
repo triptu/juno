@@ -50,7 +50,7 @@ import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSec
 import { junoCommands, openJunoTab } from './juno/actions'
 import { openNewChatTo, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette } from './paletteActions'
-import { commandGroups, globalCommands, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
+import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { scopeToChannel, showChannelMenu, type MenuChannel } from './placeMenus'
 
@@ -186,9 +186,13 @@ const conversationRow = (pick: PickConversation): Row => {
 /** Commands shown in each group beside conversations when the text is not a ">" listing, unless the text names their family. */
 const COMMANDS_WITH_TEXT = 4
 
-/** The global commands that match `text`, under Pages, Settings and Commands. */
+/**
+ * The global commands that match `text`, under Pages, Settings and
+ * Commands. A group whose first row's label starts with the text moves
+ * first, so "theme light" makes Theme: Light the active row.
+ */
 function globalSections(rows: ReadonlyArray<CommandRow>, text: string, max?: number): ReadonlyArray<PaletteSection & { readonly items: ReadonlyArray<CommandRow> }> {
-  return commandGroups.map(({ group, heading }) => ({
+  const sections = commandGroups.map(({ group, heading }) => ({
     key: `commands-${group}`,
     heading,
     items: matchCommands(
@@ -197,6 +201,8 @@ function globalSections(rows: ReadonlyArray<CommandRow>, text: string, max?: num
       max,
     ),
   }))
+  const leads = (section: (typeof sections)[number]) => Number(section.items[0] !== undefined && labelStartsWith(section.items[0], text))
+  return sections.toSorted((a, b) => leads(b) - leads(a))
 }
 
 const commandIcon: Record<PaletteCommand['kind'], PaletteIconName> = { 'send-dm': 'send', post: 'send', 'open-dm': 'open-dm', ask: 'ask', resolve: 'resolve' }

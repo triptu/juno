@@ -196,6 +196,12 @@ function namesFamily(candidate: CommandRow, typed: ReadonlyArray<string>): boole
   return typed.every((word) => family.some((own) => own === word || (word.length >= FAMILY_PREFIX && own.startsWith(word))))
 }
 
+/** The label starts with the text, word by word: "theme light" starts "Theme: Light". */
+export function labelStartsWith(candidate: CommandRow, text: string): boolean {
+  const label = wordsOf(candidate.label)
+  return wordsOf(text).every((word, at) => label[at]?.startsWith(word) === true)
+}
+
 /**
  * The commands that match `text`: every typed word starts a word of the
  * label, its extra words or its family. Labels that start with the text
@@ -205,12 +211,11 @@ function namesFamily(candidate: CommandRow, typed: ReadonlyArray<string>): boole
 export function matchCommands(rows: ReadonlyArray<CommandRow>, text: string, max = Infinity): ReadonlyArray<CommandRow> {
   const typed = wordsOf(text)
   if (typed.length === 0) return rows
-  const whole = text.trim().toLowerCase()
   const found = rows.filter((candidate) => {
     const words = wordsOf(`${candidate.label} ${candidate.words} ${candidate.family ?? ''}`)
     return typed.every((word) => words.some((own) => own.startsWith(word)))
   })
-  const ranked = found.toSorted((a, b) => Number(b.label.toLowerCase().startsWith(whole)) - Number(a.label.toLowerCase().startsWith(whole)))
+  const ranked = found.toSorted((a, b) => Number(labelStartsWith(b, text)) - Number(labelStartsWith(a, text)))
   let left = max
   return ranked.filter((candidate) => namesFamily(candidate, typed) || left-- > 0)
 }
