@@ -270,6 +270,33 @@ async function fakeTarget(): Promise<Target> {
   }
 }
 
+/**
+ * The sidebar as the renderer sees it, sampled every 100 ms: when rows first
+ * exist, when the renderer would show them (`windowCovered`), and when the
+ * first channel or DM row appears.
+ */
+const watchSidebar = (startedAt: number) =>
+  Effect.gen(function* () {
+    const seen: { rows?: number; shown?: number; main?: number } = {}
+    while (true) {
+      const window = yield* listTopics({ kind: 'all', unreadOnly: false }, { now: Date.now(), limit: SIDEBAR_WINDOW })
+      const at = performance.now() - startedAt
+      if (window.rows.length > 0 && seen.rows === undefined) {
+        seen.rows = at
+        console.log(`  ${ms(at)}: first sidebar rows (${window.rows.length})`)
+      }
+      if (window.rows.length > 0 && window.windowCovered !== false && seen.shown === undefined) {
+        seen.shown = at
+        console.log(`  ${ms(at)}: sidebar usable, rows shown (${window.rows.length})`)
+      }
+      if (window.rows.some((row) => row.kind === 'main') && seen.main === undefined) {
+        seen.main = at
+        console.log(`  ${ms(at)}: first channel or DM row`)
+      }
+      yield* Effect.sleep(100)
+    }
+  }).pipe(Effect.catchCause(() => Effect.void))
+
 async function run(target: Target, workspaceDir: string): Promise<number> {
   const { cached } = target
   const startedAt = performance.now()
@@ -310,29 +337,7 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
         if (phase._tag === 'live') Deferred.doneUnsafe(booted, Effect.succeed('live' as const))
       })
 
-    // The sidebar as the renderer sees it, sampled every 100 ms: when rows first exist, and when it would show them (`windowCovered`).
-    const sidebar: { rows?: number; shown?: number; main?: number } = {}
-    const watcher = yield* Effect.forkChild(
-      Effect.gen(function* () {
-        while (true) {
-          const window = yield* listTopics({ kind: 'all', unreadOnly: false }, { now: Date.now(), limit: SIDEBAR_WINDOW })
-          const at = performance.now() - startedAt
-          if (window.rows.length > 0 && sidebar.rows === undefined) {
-            sidebar.rows = at
-            console.log(`  ${ms(at)}: first sidebar rows (${window.rows.length})`)
-          }
-          if (window.rows.length > 0 && window.windowCovered !== false && sidebar.shown === undefined) {
-            sidebar.shown = at
-            console.log(`  ${ms(at)}: sidebar usable, rows shown (${window.rows.length})`)
-          }
-          if (window.rows.some((row) => row.kind === 'main') && sidebar.main === undefined) {
-            sidebar.main = at
-            console.log(`  ${ms(at)}: first channel or DM row`)
-          }
-          yield* Effect.sleep(100)
-        }
-      }).pipe(Effect.catchCause(() => Effect.void)),
-    )
+    const watcher = yield* Effect.forkChild(watchSidebar(startedAt))
     const scope = yield* Scope.make()
     const sync = yield* Effect.forkChild(
       runSync({ onPhase }).pipe(
