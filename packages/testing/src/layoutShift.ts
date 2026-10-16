@@ -37,7 +37,12 @@ import type { Page } from '@playwright/test'
  *
  * A `<video>`'s own controls are not the page's layout: a shift source with
  * no node (it is in the video's shadow root) that stays inside a video's box
- * is dropped, and an entry with only such sources counts as no shift.
+ * is dropped, and an entry with only such sources counts as no shift. Chromium
+ * may also report the controls' shift with no sources at all (a video whose
+ * source failed, as the gallery's do), so while a video with controls is under
+ * the root, or was when the action started (the action may remove it), an
+ * entry with no sources counts as no shift. The geometry check still compares
+ * every page element.
  */
 export interface LayoutShiftOptions {
   /** CSS selector of the region to snapshot. Default: the gallery's `[data-fixture-frame]`, else `body`. */
@@ -227,6 +232,8 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         return longest
       }
 
+      // Noted now: the action may remove the video before its entry is read.
+      const hadVideo = rootEl.querySelector('video[controls]') !== null
       const rectBox = (rect: DOMRectReadOnly): Box => ({ x: rect.x, y: rect.y, width: rect.width, height: rect.height })
       const startedAt = performance.now()
       const toEntry = (entry: PerformanceEntry): ShiftEntry => {
@@ -244,8 +251,9 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
           source.node === null && videos.some((box) => inside(box, source.previousRect) && inside(box, source.currentRect))
         const all = shift.sources ?? []
         const kept = all.filter((source) => !inControls(source))
+        const unattributed = all.length === 0 && (hadVideo || rootEl.querySelector('video[controls]') !== null)
         return {
-          value: all.length > 0 && kept.length === 0 ? 0 : shift.value,
+          value: (all.length > 0 && kept.length === 0) || unattributed ? 0 : shift.value,
           hadRecentInput: shift.hadRecentInput,
           at: Math.round(shift.startTime - startedAt),
           sources: kept.map((source) => ({
