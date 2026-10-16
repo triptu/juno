@@ -124,13 +124,13 @@ const takeWaiting = (ctx: SyncContext, ids: ReadonlyArray<string>): ReadonlySet<
 }
 
 /**
- * Fetches on the interactive lane and never fails but for an expired
+ * Fetches on the selected lane (interactive by default) and fails only for an expired
  * session: when Slack holds the interactive lane back the ids go to
  * `nameUsers`, which asks on the background lane; any other failure is
  * logged and left to the next sweep.
  */
-const fetchSoon = (ctx: SyncContext, ids: ReadonlyArray<string>): Effect.Effect<void, SlackAuthRequired | SqlError, UsersServices> =>
-  fetchUsers(ctx, ids, 'interactive').pipe(
+const fetchSoon = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane = 'interactive'): Effect.Effect<void, SlackAuthRequired | SqlError, UsersServices> =>
+  fetchUsers(ctx, ids, lane).pipe(
     Effect.catchTag('SlackRateLimited', () => Effect.sync(() => wantUsers(ctx, ids, true))),
     Effect.catchTags({
       SlackRejected: (error) => Effect.logWarning('sync: users not named', { tag: error._tag }),
@@ -144,10 +144,10 @@ const fetchSoon = (ctx: SyncContext, ids: ReadonlyArray<string>): Effect.Effect<
  * them at their first paint. Only ids the store lacks cost a call; after the
  * DM and group DM members most pages bring none.
  */
-export const nameFirst = (ctx: SyncContext, messages: ReadonlyArray<Message>): Effect.Effect<void, SlackAuthRequired | SqlError, UsersServices> =>
+export const nameFirst = (ctx: SyncContext, messages: ReadonlyArray<Message>, lane: Lane = 'interactive'): Effect.Effect<void, SlackAuthRequired | SqlError, UsersServices> =>
   Effect.gen(function* () {
     const ids = (yield* unstored(referencedUserIds(messages))).filter((id) => !ctx.unknownUsers.has(id))
-    if (ids.length > 0) yield* fetchSoon(ctx, ids)
+    if (ids.length > 0) yield* fetchSoon(ctx, ids, lane)
   })
 
 /**

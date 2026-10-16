@@ -16,7 +16,7 @@ export interface SyncContext {
   /** The user and the user groups they belong to (`client.userBoot.subteams.self`), for the mention rules. */
   readonly metadata: MetadataFence
   me: Me
-  readonly config: SyncConfigShape
+  config: SyncConfigShape
   /** Messages to fetch again (`conversations.replies`, `limit: 1`): stub roots, and messages whose page was older than an event. A background fiber fetches them. */
   readonly rootFetches: Queue.Queue<RootFetch>
   /** Channels whose Main read pointer Slack must settle (`conversations.info`): an event Juno cannot order, or a page too old to apply. A background fiber asks. */

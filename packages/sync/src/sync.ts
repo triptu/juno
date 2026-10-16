@@ -28,6 +28,7 @@ import { makeBootLoop } from './run/boot'
 import { makeTopicFetcher } from './run/fetcher'
 import { fetchRoots, lookUpReads } from './run/lookups'
 import { makeReconcile } from './run/reconcile'
+import { watchWindow } from './run/window'
 import { makeSyncRuntime } from './run/runtime'
 import { handleSocketEvent } from './run/socket'
 import { nameUsers } from './users'
@@ -98,6 +99,6 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 
-    yield* Effect.all([consumer, bootLoop, fetchRoots(ctx), lookUpReads(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

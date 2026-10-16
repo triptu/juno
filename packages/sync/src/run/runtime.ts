@@ -1,3 +1,5 @@
+import { quietDaysOf } from '@juno/domain'
+import { prefs } from '@juno/store'
 import { SlackAuthRequired, SlackSession, SlackSocket } from '@juno/slack'
 import { Deferred, Effect, FiberSet, Queue, Semaphore } from 'effect'
 import type { BootState, Phase } from '../boot'
@@ -11,11 +13,13 @@ export const isNotAuth = <E extends { readonly _tag: string }>(error: E): error 
 
 export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function* () {
   const config = yield* SyncConfig
+  const saved = yield* prefs.get<unknown>('quietDays').pipe(Effect.orDie)
+  const quietDays = quietDaysOf({ now: 0, quietDays: typeof saved === 'number' ? saved : config.quietDays })
   const session = yield* SlackSession
   const socket = yield* SlackSocket
   const ctx: SyncContext = {
     me: { userId: session.userId as SyncContext['me']['userId'] },
-    config,
+    config: { ...config, quietDays },
     rootFetches: yield* Queue.unbounded<RootFetch>(),
     readLookups: yield* Queue.unbounded<string>(),
     missingUsers: new Map(),

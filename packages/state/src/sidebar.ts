@@ -22,6 +22,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import type { RowChannel, TopicRow } from '@juno/contract'
 import { engineStatusAtom } from './engine'
+import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
@@ -59,6 +60,7 @@ export const nowAtom = Atom.make<number>((get) => {
 
 /** The window the sidebar shows, and the filter it belongs to. */
 export interface SidebarWindow extends ListWindow<TopicRow> {
+  readonly quietDays: number
   /** The filter of these rows. It lags `sidebarFilterAtom` until the new filter's first snapshot arrives. */
   readonly filter: TopicListFilter
 }
@@ -103,26 +105,27 @@ function sameChannel(a: RowChannel, b: RowChannel): boolean {
  */
 export const sidebarListAtom = Atom.make((get): SidebarWindow => {
   const filter = get(sidebarFilterAtom)
+  const quietDays = get(quietDaysAtom)
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
-  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter }
+  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, quietDays }
   const status = get(engineStatusAtom)
-  const syncing = status._tag !== 'Success' || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
-  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter }
+  const syncing = status._tag !== 'Success' || status.value.syncing || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
+  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter, quietDays }
   if (shown?.meta.windowCovered === false && syncing) return shown
   const next = carryOver(shown, result.value)
   if (shown !== undefined && shown.filter === filter) {
     // Finishing sync is not a reason to reorder a painted list. The next live
     // activity or an explicit filter change resumes the ordinary recency order.
-    if (shown.meta === next.meta) return shown
-    if (syncing) {
+    if (shown.meta === next.meta) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
+    if (syncing || quietDays > shown.quietDays) {
       const kept = shown.order.filter((id) => next.rows.has(id))
       const known = new Set(kept)
       const order = [...kept, ...next.order.filter((id) => !known.has(id))]
-      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter }
+      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter, quietDays }
     }
   }
-  return { ...next, filter }
+  return { ...next, filter, quietDays }
 })
 
 /** One row of the sidebar, by id across every filter. Notifies only when the row's object changes, which is when its `rev` does. */

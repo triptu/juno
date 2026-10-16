@@ -101,7 +101,7 @@ export function sidebarEmptyState(list: SidebarList, filter: SidebarFilter, ctx:
   const days = quietDaysOf(ctx)
   return {
     title: 'No recent topics here',
-    body: `Topics with activity in the last ${days} days show up here.`,
+    body: `Topics with activity in the last ${days} ${days === 1 ? 'day' : 'days'} show up here.`,
     action: 'view-all-topics',
     actionLabel: 'View all topics',
   }
