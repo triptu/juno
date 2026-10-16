@@ -140,7 +140,7 @@ test('a relaunch keeps many tabs and their drafts', async ({ juno, running, user
   await juno.waitForSync()
   // Recent threads get AI titles in the background; let them settle so the tab titles compared below are final.
   for (const title of [POSTGRES, RINA, ROADMAP]) {
-    await expect(juno.win.locator('[data-topic-row]', { hasText: title })).toHaveAttribute('data-title-source', 'ai', { timeout: 15_000 })
+    await expect(juno.sidebar.row(title).root).toHaveAttribute('data-title-source', 'ai', { timeout: 15_000 })
   }
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('Draft one')
