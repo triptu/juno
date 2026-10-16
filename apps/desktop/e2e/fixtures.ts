@@ -65,6 +65,8 @@ export interface LaunchOptions {
   readonly fakeAiDelayMillis?: number
   /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
   readonly codemode?: boolean
+  /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
+  readonly paced?: boolean
 }
 
 /**
@@ -89,6 +91,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
+  if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
 
   // Launch the package directory (like `electron .`), not the script, so
