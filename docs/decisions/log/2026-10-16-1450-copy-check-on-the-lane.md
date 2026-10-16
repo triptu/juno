@@ -1,0 +1,1 @@
+- 10-16 14:50 · orchestrator · The check before a copy's delete runs holding the send lane, just before the request leaves (`beforeSend`), so a delete of the kept message made while the copy's delete waited behind other writes is seen.

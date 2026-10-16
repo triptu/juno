@@ -26,8 +26,6 @@ const samples = 25
 const steps = 24
 // Directed schedules the harness does not replay, and why (README, "Conformance").
 const unmapped = {
-  pendingRoot: 'New chat thread roots: added after the harness, not yet mapped to fake Slack steps',
-  failedRoot: 'New chat thread roots: added after the harness, not yet mapped to fake Slack steps',
   uploadRetry: 'uploads: the harness sends no files',
   sameText: 'not in Juno\'s order: Juno claims the first post before the second is sent',
   actionOnDiscarded: 'not in Juno\'s order: Juno puts the edit into the refused row at once, before the discard',

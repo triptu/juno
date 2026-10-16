@@ -11,7 +11,8 @@
  * still pending is handled by its state (`posts.ts`):
  *
  * - `queued` or `failed`: Slack has not got it, so nothing is sent. An edit
- *   rewrites the pending row; a delete removes it. A failed post takes no
+ *   rewrites the pending row and drops an edit row left from while the post
+ *   was out; a delete removes it. A failed post takes no
  *   reaction.
  * - `sending` or `unknown`: Slack may have it. The row carries
  *   `depends_on = client_msg_id` and no ts; the worker finds the ts once
@@ -26,7 +27,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react'
 
@@ -98,7 +99,8 @@ const channelActions = (channel: string): Effect.Effect<ReadonlyArray<PendingAct
     return rows.map(toAction)
   })
 
-const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
+/** The row with `id` as it is now, or undefined once it ended. */
+export const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE id = ?`, [id])
@@ -208,6 +210,9 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
       const sql = yield* StoreWriter
       yield* sql`UPDATE pending_messages SET text = ${input.text}, blocks_json = ${input.blocksJson} WHERE client_msg_id = ${target.post.clientMsgId}`
+      // An edit queued while the post was out (it came back: a 429, or a lookup that did not find it) holds older
+      // text, and Slack does not have the post: the post now carries the newest text, so the row goes.
+      yield* deleteActions(actions.filter((action) => action.kind === 'edit'))
       yield* touch([postTopic(target.post)])
       return undefined
     }
@@ -352,10 +357,13 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
  * After a call Slack accepted. An edit ends unless a newer edit replaced
  * its text meanwhile (`rev`); a reaction ends unless the user toggled it
  * again, in which case Slack's state becomes the new `base` and the row is
- * sent again; a delete always ends. Answers whether the row ended.
+ * sent again; a delete always ends, and the user's delete of one of Juno's
+ * posts is recorded, so a network copy stored later goes too (`sent.ts`).
+ * Answers whether the row ended.
  */
 export const actionDone = (sent: PendingAction, now: number): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
+    if (sent.kind === 'delete' && sent.payload.clientMsgId !== null) yield* recordOwnDelete(sent.payload.clientMsgId, sent.payload.ts)
     const current = yield* readAction(sent.id)
     if (current === undefined) return true
     if (current.kind === 'edit' && current.payload.rev !== sent.payload.rev) return false

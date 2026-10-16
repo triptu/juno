@@ -172,6 +172,30 @@ describe('edit', () => {
     expect(actionRows(engine)).toHaveLength(0)
   })
 
+  // A post back in the queue (a 429 here; a lookup that finds it missing ends the same) is not in Slack, so a
+  // newer edit goes into the post itself. An edit row queued while it was out must not put the older text back.
+  it('keeps the newest text when a post comes back to the queue between two edits', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    valueOf(await sendMessage(engine.registry, eng, 'Draft one', MAIN))
+    const call = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the post at Slack')
+    const pending = rowWith(await rows((list) => rowWith(list, 'Draft one')?.pending === 'sending', 'sending'), 'Draft one')!
+    valueOf(await editMessage(engine.registry, refOf(pending), 'Edit while sending'))
+    await waitFor(() => (actionRows(engine).length === 1 ? true : undefined), WAIT_MS, 'the edit row waiting on the post')
+    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 2 })
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the 429')).id, 'answer')
+    const state = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(pending.clientMsgId!) as { state: string } | undefined)?.state)
+    await waitFor(() => (state() === 'queued' ? true : undefined), WAIT_MS, 'the post back in the queue')
+    valueOf(await editMessage(engine.registry, { channelId: 'C0ENG', ts: `pending:${pending.clientMsgId}`, clientMsgId: pending.clientMsgId! }, 'Edit while queued'))
+    engine.fake.gate(undefined)
+    await waitFor(() => (state() === undefined && actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the post and its edits settled')
+    await quiet(engine)
+    expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)?.text).toBe('Edit while queued')
+    await rows((list) => rowWith(list, 'Edit while queued')?.pending === undefined && rowWith(list, 'Edit while queued') !== undefined, 'the newest text shown')
+  })
+
   it('refuses to edit someone else’s message', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
@@ -339,12 +363,11 @@ describe('reactions', () => {
   })
 })
 
-// Found by the conformance replay (test/conformance). `outbox` ids are SQLite rowids, which are reused:
-// a delete that replaces an edit whose call is out can take the edit's id, and the edit's answer
-// (`actionDone`, which reads the row by id) then ends the delete as if it were the edit.
-// `it.fails` until that is fixed; then make it `it`.
+// Found by the conformance replay (test/conformance). `outbox` ids were SQLite rowids, which are reused:
+// a delete that replaced an edit whose call was out took the edit's id, and the edit's answer
+// (`actionDone`, which reads the row by id) ended the delete as if it were the edit. Ids are now never reused.
 describe('actions: a delete while an edit is out', () => {
-  it.fails('deletes the message once the edit has answered (fails: the delete is lost)', async () => {
+  it('deletes the message once the edit has answered', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')

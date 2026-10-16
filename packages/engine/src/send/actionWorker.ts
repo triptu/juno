@@ -24,9 +24,11 @@
  *   with backoff, also after a restart.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
- * posts (`@juno/sync` `sent.ts`), which wakes this worker. Just before
- * that delete goes out, one transaction checks again that it loses
- * nothing (`checkCopyDelete`) and cancels it otherwise. After the socket
+ * posts (`@juno/sync` `sent.ts`), which wakes this worker. Before that
+ * delete waits for the send lane, and again just before it goes out,
+ * holding the lane so no other write comes between, one transaction
+ * checks that it loses nothing (`checkCopyDelete`) and cancels it
+ * otherwise. After the socket
  * comes back, a copy's delete waits for the catch-up, at most
  * `COPY_CATCH_UP_MILLIS`; the check then also needs the copy's own topic
  * rechecked since the reconnect, so a delete of the kept message made
@@ -38,8 +40,22 @@
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
-import { actionDone, checkCopyDelete, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
-import { Outbox, type MirrorError } from '../outbox'
+import {
+  actionDone,
+  checkCopyDelete,
+  deferAction,
+  dropAction,
+  flushActions,
+  pendingActions,
+  placeOf,
+  readAction,
+  settleOnFailedPost,
+  storedMe,
+  type Acted,
+  type PendingAction,
+  type TopicFetcher,
+} from '@juno/sync'
+import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
 import { inStore } from './worker'
@@ -82,8 +98,12 @@ export class ActionWorker extends Context.Service<
       const reconnectedAt = yield* Ref.make<number | undefined>(undefined)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
 
-      /** The call for a row whose message has `ts`, and what Slack's acceptance stores. Undefined when there is nothing to send. */
-      const callFor = (action: PendingAction, ts: string, selfId: string): Effect.Effect<Acted, MirrorError> => {
+      /**
+       * The call for a row whose message has `ts`, and what Slack's acceptance
+       * stores. A delete's `check` runs holding the send lane, just before the
+       * request leaves; when it fails nothing is sent.
+       */
+      const callFor = (action: PendingAction, ts: string, selfId: string, check: Effect.Effect<void, NotSent>): Effect.Effect<Acted, MirrorError | NotSent> => {
         const { channel } = action
         switch (action.kind) {
           case 'edit': {
@@ -103,7 +123,9 @@ export class ActionWorker extends Context.Service<
               )
           }
           case 'delete':
-            return outbox.send((api) => api.call('chat.delete', { channel, ts: ts as Ts })).pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
+            return outbox
+              .sendChecked((api) => api.call('chat.delete', { channel, ts: ts as Ts }, { beforeSend: check }))
+              .pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
           case 'react': {
             const name = action.payload.name ?? ''
             const added = action.payload.want === true
@@ -135,20 +157,26 @@ export class ActionWorker extends Context.Service<
             yield* local(transaction(dropAction(action)))
             return false
           }
-          if (action.kind === 'delete') {
+          // A copy's delete is checked before it waits for the send lane, so a copy to keep is kept at once,
+          // and again holding the lane, so a change made while it waited is seen.
+          const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
-            if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return false
-          }
+            if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
+          })
+          if (action.kind === 'delete' && (yield* Effect.result(check))._tag === 'Failure') return false
           const selfId = (yield* local(storedMe))?.userId ?? ''
-          const result = yield* Effect.result(callFor(action, place.ts, selfId))
+          const result = yield* Effect.result(callFor(action, place.ts, selfId, check))
           const now = yield* Clock.currentTimeMillis
           const done = () => actionDone(action, now)
           if (result._tag === 'Success') {
             yield* fetcher.acted(result.success, done()).pipe(Effect.orDie)
             return false
           }
-          const error: MirrorError = result.failure
+          const error = result.failure
           switch (error._tag) {
+            // The check kept the copy and ended the row.
+            case 'NotSent':
+              return false
             case 'Rejected': {
               const acted = ALREADY_DONE.has(error.code) ? alreadyDone(action, place.ts) : undefined
               if (acted !== undefined) {
@@ -189,8 +217,11 @@ export class ActionWorker extends Context.Service<
           // A copy's delete waits for the catch-up, which wakes the worker, but not past this; then the check keeps the copy.
           const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + COPY_CATCH_UP_MILLIS
           let copyWait: number | undefined
-          for (const action of yield* local(pendingActions)) {
-            if (held.has(action.channel)) continue
+          for (const listed of yield* local(pendingActions)) {
+            if (held.has(listed.channel)) continue
+            // An earlier call in this pass may have taken a while: the row may have changed or ended since.
+            const action = yield* local(readAction(listed.id))
+            if (action === undefined) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
             if (!caughtUp && now < catchUpDeadline && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) {
@@ -198,6 +229,8 @@ export class ActionWorker extends Context.Service<
               continue
             }
             if (yield* run(open, fetcher, action)) waiting.add(action.id)
+            // A row that ended lets the channel's next row go in this pass, before rows of later channels.
+            else if ((yield* local(readAction(action.id))) === undefined) held.delete(action.channel)
           }
           // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
           const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null))
