@@ -1,4 +1,4 @@
-import { memo, Suspense } from 'react'
+import { memo, Suspense, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SettingsSection } from '@juno/contract'
 import { liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
@@ -55,6 +55,16 @@ function Section({ section }: { readonly section: SettingsSection }) {
 /** What a new tab opens, the peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
 function General() {
   const mirror = useAtomValue(mirrorReadsAtom)
+  const served = mirror._tag === 'Success' ? mirror.value.on : true
+  // The switch moves on the click; the saved value takes over once it agrees, or if the save fails.
+  const [shown, setShown] = useState<boolean | undefined>(undefined)
+  if (shown !== undefined && shown === served) setShown(undefined)
+  const changeMirror = (value: boolean) => {
+    setShown(value)
+    void runCommand(registry, prefsSet, { key: MIRROR_READS_PREF, value }).then((exit) => {
+      if (exit._tag === 'Failure') setShown(undefined)
+    })
+  }
   const catchUp = useAtomValue(readCatchUpAtom)
   const models = useAtomValue(modelsAtom)
   const modelPrefs = models._tag === 'Success' && typeof models.value === 'object' && models.value !== null && !Array.isArray(models.value) ? models.value : {}
@@ -65,8 +75,7 @@ function General() {
   }
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
-  return <SettingsGeneral mirrorReads={mirror._tag === 'Success' ? mirror.value.on : true}
-    onMirrorReadsChange={(value) => void runCommand(registry, prefsSet, { key: MIRROR_READS_PREF, value })}
+  return <SettingsGeneral mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
