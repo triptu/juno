@@ -60,7 +60,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const frequent = useAtomValue(frequentConversationsAtom)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // The files stay with the draft through every change of destination (spec section 9).
-  const files = useAttachments(tabId)
+  const files = useAttachments(tabId, { tabbable: false })
 
   useEffect(() => {
     inputRef.current?.focus()

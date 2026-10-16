@@ -7,6 +7,8 @@ import { IconButton } from '@juno/ui'
 export interface AttachButtonProps {
   /** The files picked in the system's file picker. */
   readonly onFiles: (files: ReadonlyArray<File>) => void
+  /** In the Tab order. New chat leaves it out, so Shift Tab goes from the composer to its pickers (SPEC 9). */
+  readonly tabbable?: boolean
 }
 
 /**
@@ -15,7 +17,7 @@ export interface AttachButtonProps {
  * the system's file picker; picking the same file twice works, since the
  * input is emptied after each pick.
  */
-export function AttachButton({ onFiles }: AttachButtonProps) {
+export function AttachButton({ onFiles, tabbable = true }: AttachButtonProps) {
   const input = useRef<HTMLInputElement>(null)
   const onChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? [])
@@ -24,7 +26,7 @@ export function AttachButton({ onFiles }: AttachButtonProps) {
   }
   return (
     <span {...stylex.props(styles.slot)}>
-      <IconButton icon={Plus} label="Attach files" size={28} iconSize={18} radius="full" variant="ghost" tone="subtle" data-attach="" onClick={() => input.current?.click()} />
+      <IconButton icon={Plus} label="Attach files" size={28} iconSize={18} radius="full" variant="ghost" tone="subtle" data-attach="" {...(tabbable ? {} : { tabIndex: -1 })} onClick={() => input.current?.click()} />
       <input ref={input} type="file" multiple tabIndex={-1} aria-hidden onChange={onChange} {...stylex.props(styles.input)} />
     </span>
   )
