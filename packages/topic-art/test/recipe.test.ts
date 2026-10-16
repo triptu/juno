@@ -2,7 +2,7 @@
 // a checked recipe or a quotable reason out; the canonical text reads back
 // unchanged; and nothing hostile in a reply reaches the rendered markup.
 import { describe, expect, it } from 'vitest'
-import { countElements, parseRecipe, renderArt, renderPebble, serialiseRecipe, type Recipe } from '../src/index'
+import { countElements, HUE_NAMES, parseRecipe, pebbleHue, renderArt, renderPebble, serialiseRecipe, type Recipe } from '../src/index'
 
 const database = `<svg viewBox="0 0 40 40" data-hue="teal">
   <path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/>
@@ -171,5 +171,23 @@ describe('the pebble', () => {
       for (const tag of tags) expect(ALLOWED_TAGS.has(tag), `tag ${tag}`).toBe(true)
       for (const attr of attrs) expect(ALLOWED_ATTRS.has(attr), `attribute ${attr}`).toBe(true)
     }
+  })
+})
+
+describe('the hue a topic is drawn in', () => {
+  it('is its pebble\'s hue, so the art keeps the placeholder\'s colour', () => {
+    const recipe = parsed(database)
+    for (const id of ['m:C0ENG', 't:C0ENG:1760000000.000100', 'm:C0HIRING', 't:D0MAYA:1.000001']) {
+      const hue = pebbleHue(id)
+      expect(renderPebble(id, 40)).toContain(`var(--tide-${hue}-base)`)
+      const art = renderArt(recipe, 40, hue)
+      expect(art).toContain(`var(--art-${hue}-ink)`)
+      expect(art.match(/--art-([a-z]+)-/g)!.every((name) => name === `--art-${hue}-`)).toBe(true)
+    }
+  })
+
+  it('spreads topics over every hue', () => {
+    const hues = new Set(Array.from({ length: 64 }, (_, index) => pebbleHue(`t:C0ENG:1760000000.${String(index).padStart(6, '0')}`)))
+    expect([...hues].sort()).toEqual([...HUE_NAMES].sort())
   })
 })

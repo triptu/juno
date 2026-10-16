@@ -267,14 +267,16 @@ Geometry, in `sizes`: `--focus-ring-width` 2px, `--focus-ring-offset` 2px, and `
 
 ### 1.9 Topic art
 
-The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, sky 235, periwinkle 275, plum 320, as OKLCH hue angles) times four roles a recipe may name, and five Tide tones for the placeholder. `@juno/topic-art` writes them as `var(--art-<hue>-<role>)` and `var(--tide-<hue>-<tone>)`; the values come from `docs/design/topic-art/v2/palette.mjs` (RAMP and TIDE_RAMP) and are written as `oklch()` so the browser maps chroma into gamut itself. Only the hue angle is shared between light and dark.
+The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, sky 235, periwinkle 275, plum 320, as OKLCH hue angles) times four roles a recipe may name, and five Tide tones for the placeholder. `@juno/topic-art` writes them as `var(--art-<hue>-<role>)` and `var(--tide-<hue>-<tone>)`, written as `oklch()` so the browser maps chroma into gamut itself. Only the hue angle is shared between light and dark.
+
+A drawing is painted in its topic's pebble hue (`pebbleHue(topicId)`), not the hue the model named, so a list spreads over all eight hues and the art keeps the colour of the pebble it replaces. The art roles are two-tone (`docs/design/topic-art/v3`, direction 4): the line and the soft fill both carry the hue. Lightness steps by hue (`LIFT` in `v3/directions.mjs`: amber +0.05, olive +0.04, sage +0.02, teal +0.01, coral 0, sky -0.02, plum -0.03, periwinkle -0.04; half of that for ink and the fills), and chroma is a share of the most sRGB holds at that lightness and hue, capped. The ranges below run over the eight hues; the exact values per hue are in `tokens.stylex.ts` and `themes.stylex.ts`, generated from `v3/directions.mjs`.
 
 | Role | Light (L, C) | Dark (L, C) | Use |
 | --- | --- | --- | --- |
-| `--art-<hue>-ink` | 0.43, 0.022 | 0.78, 0.028 | The line and dark fills. 7.6:1 or better on the sidebar in light, 9.1:1 in dark |
-| `--art-<hue>-soft` | 0.885, 0.038 | 0.36, 0.032 | One quiet flat area that gives the object mass |
-| `--art-<hue>-accent` | 0.60, 0.10 | 0.72, 0.085 | One small highlight, 3.6 to 3.9:1 light and 7.2 to 7.7:1 dark, never the only carrier of meaning |
-| `--art-<hue>-accent2` | 0.76, 0.06 | 0.56, 0.05 | A second, quieter highlight |
+| `--art-<hue>-ink` | 0.425 to 0.47, 0.052 to 0.08 | 0.755 to 0.80, 0.063 to 0.08 | The line and dark fills, tinted with the hue. 6.5 to 7.9:1 on the sidebar in light, 8.3 to 9.8:1 in dark: under an unread row's preview, far under the title |
+| `--art-<hue>-soft` | 0.806 to 0.86, 0.048 to 0.085 | 0.476 to 0.53, 0.054 to 0.085 | The flat area that gives the object mass and carries most of the hue. In dark a mid-tone, so a fill reads as a coloured surface, not a hole |
+| `--art-<hue>-accent` | 0.54 to 0.63, 0.083 to 0.14 | 0.74 to 0.785, 0.087 to 0.115 | One small highlight, 3.4 to 4.9:1 light and 7.8 to 9.4:1 dark, never the only carrier of meaning. Its chroma stays under the unread count's text (0.165 light, 0.146 dark) |
+| `--art-<hue>-accent2` | 0.696 to 0.75, 0.07 to 0.1 | 0.616 to 0.67, 0.063 to 0.09 | A second, quieter highlight |
 | `--tide-<hue>-base` | 0.905, 0.02 | 0.33, 0.012 | The pebble's ground |
 | `--tide-<hue>-soft` | 0.865, 0.028 | 0.37, 0.017 | The upper band of a three-band pebble |
 | `--tide-<hue>-mid` | 0.815, 0.036 | 0.415, 0.022 | The middle band |
@@ -283,7 +285,9 @@ The `art` group: eight hues (coral 32, amber 72, olive 112, sage 150, teal 185, 
 
 The dark Tide tones sit 0.045 above the study's (base 0.285 there): on the near-black sidebar (L 0.19) the study's pebbles read too dim. In dark they stay near neutral on purpose (chroma 0.012 to 0.026): at low lightness amber, olive and coral turn to mud at any real chroma, so the bands step in lightness instead.
 
-Checked again on 10-15 against the row's text (gallery `TopicRow/Tile/art-and-pebbles`, light and dark). On the sidebar, the title is 15.2:1 in light and 15.5:1 in dark, and the preview 4.8:1 and 6.9:1. The art's ink is 7.6 to 7.8:1 in light and 9.1 to 9.3:1 in dark, the same lightness step from the sidebar in both themes. The pebble bands are 1.25 to 2.15:1 in light and 1.5 to 2.9:1 in dark: further from the sidebar in lightness than in light, but still clearly quieter than the drawings and the text. Lower dark ramps (ground at 0.27 to 0.30) were tried side by side and only read murkier, so the values stay.
+Checked on 10-17 for the two-tone roles (`docs/design/topic-art/v3`, gallery `Sidebar/Art/every-row` and `TopicArt/Overview/every-hue`, light and dark): the title is 15.0:1 in light and 15.5:1 in dark, an unread preview 8.3:1 and 9.9:1, a read preview (muted) 4.8:1 and 6.9:1. The ink sits between the two previews, as it did before. Coral shares its hue angle with the default coral accent, so a coral drawing can sit beside a coral count; the count stays the stronger of the two (a filled pill, chroma 0.146 to 0.165 against the art's 0.14 at most, on a dot).
+
+Checked before that on 10-15 against the row's text (gallery `TopicRow/Tile/art-and-pebbles`, light and dark). On the sidebar, the title is 15.2:1 in light and 15.5:1 in dark, and the preview 4.8:1 and 6.9:1. The art's ink is 7.6 to 7.8:1 in light and 9.1 to 9.3:1 in dark, the same lightness step from the sidebar in both themes. The pebble bands are 1.25 to 2.15:1 in light and 1.5 to 2.9:1 in dark: further from the sidebar in lightness than in light, but still clearly quieter than the drawings and the text. Lower dark ramps (ground at 0.27 to 0.30) were tried side by side and only read murkier, so the values stay.
 
 ## 2. Typography
 

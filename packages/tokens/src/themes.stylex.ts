@@ -137,45 +137,47 @@ export const darkHues = stylex.createTheme(hues, {
 
 
 /**
- * Topic art on ink. Lines are a pale warm neutral a step below the text,
- * the soft fill and the accents sit near neutral. The Tide tones step in
- * lightness from 0.33, lifted from the study's 0.285 because the pebbles
- * read too dim on the near-black sidebar; the dark `pale` dot takes the
- * `deep` value, so it reads as a shadow where the light dot is a highlight.
+ * Topic art on ink. The fill is a mid-tone in the hue (L about 0.5), so in
+ * dark a drawing reads as a coloured object, not a pale outline round a dark
+ * hole; the line is a pale tint of the hue, under the preview text's
+ * contrast (docs/design/topic-art/v3). The Tide tones step in lightness
+ * from 0.33, lifted from the study's 0.285 because the pebbles read too dim
+ * on the near-black sidebar; the dark `pale` dot takes the `deep` value, so
+ * it reads as a shadow where the light dot is a highlight.
  */
 export const darkArt = stylex.createTheme(art, {
-  '--art-coral-ink': 'oklch(0.78 0.028 32)',
-  '--art-coral-soft': 'oklch(0.36 0.032 32)',
-  '--art-coral-accent': 'oklch(0.72 0.085 32)',
-  '--art-coral-accent2': 'oklch(0.56 0.05 32)',
-  '--art-amber-ink': 'oklch(0.78 0.028 72)',
-  '--art-amber-soft': 'oklch(0.36 0.032 72)',
-  '--art-amber-accent': 'oklch(0.72 0.085 72)',
-  '--art-amber-accent2': 'oklch(0.56 0.05 72)',
-  '--art-olive-ink': 'oklch(0.78 0.028 112)',
-  '--art-olive-soft': 'oklch(0.36 0.032 112)',
-  '--art-olive-accent': 'oklch(0.72 0.085 112)',
-  '--art-olive-accent2': 'oklch(0.56 0.05 112)',
-  '--art-sage-ink': 'oklch(0.78 0.028 150)',
-  '--art-sage-soft': 'oklch(0.36 0.032 150)',
-  '--art-sage-accent': 'oklch(0.72 0.085 150)',
-  '--art-sage-accent2': 'oklch(0.56 0.05 150)',
-  '--art-teal-ink': 'oklch(0.78 0.028 185)',
-  '--art-teal-soft': 'oklch(0.36 0.032 185)',
-  '--art-teal-accent': 'oklch(0.72 0.085 185)',
-  '--art-teal-accent2': 'oklch(0.56 0.05 185)',
-  '--art-sky-ink': 'oklch(0.78 0.028 235)',
-  '--art-sky-soft': 'oklch(0.36 0.032 235)',
-  '--art-sky-accent': 'oklch(0.72 0.085 235)',
-  '--art-sky-accent2': 'oklch(0.56 0.05 235)',
-  '--art-periwinkle-ink': 'oklch(0.78 0.028 275)',
-  '--art-periwinkle-soft': 'oklch(0.36 0.032 275)',
-  '--art-periwinkle-accent': 'oklch(0.72 0.085 275)',
-  '--art-periwinkle-accent2': 'oklch(0.56 0.05 275)',
-  '--art-plum-ink': 'oklch(0.78 0.028 320)',
-  '--art-plum-soft': 'oklch(0.36 0.032 320)',
-  '--art-plum-accent': 'oklch(0.72 0.085 320)',
-  '--art-plum-accent2': 'oklch(0.56 0.05 320)',
+  '--art-coral-ink': 'oklch(0.775 0.067 32)',
+  '--art-coral-soft': 'oklch(0.5 0.085 32)',
+  '--art-coral-accent': 'oklch(0.76 0.094 32)',
+  '--art-coral-accent2': 'oklch(0.64 0.09 32)',
+  '--art-amber-ink': 'oklch(0.8 0.08 72)',
+  '--art-amber-soft': 'oklch(0.53 0.068 72)',
+  '--art-amber-accent': 'oklch(0.785 0.109 72)',
+  '--art-amber-accent2': 'oklch(0.67 0.079 72)',
+  '--art-olive-ink': 'oklch(0.795 0.08 112)',
+  '--art-olive-soft': 'oklch(0.524 0.07 112)',
+  '--art-olive-accent': 'oklch(0.78 0.112 112)',
+  '--art-olive-accent2': 'oklch(0.664 0.081 112)',
+  '--art-sage-ink': 'oklch(0.785 0.08 150)',
+  '--art-sage-soft': 'oklch(0.512 0.085 150)',
+  '--art-sage-accent': 'oklch(0.77 0.115 150)',
+  '--art-sage-accent2': 'oklch(0.652 0.09 150)',
+  '--art-teal-ink': 'oklch(0.78 0.069 185)',
+  '--art-teal-soft': 'oklch(0.506 0.054 185)',
+  '--art-teal-accent': 'oklch(0.765 0.088 185)',
+  '--art-teal-accent2': 'oklch(0.646 0.063 185)',
+  '--art-sky-ink': 'oklch(0.765 0.071 235)',
+  '--art-sky-soft': 'oklch(0.488 0.062 235)',
+  '--art-sky-accent': 'oklch(0.75 0.098 235)',
+  '--art-sky-accent2': 'oklch(0.628 0.073 235)',
+  '--art-periwinkle-ink': 'oklch(0.755 0.063 275)',
+  '--art-periwinkle-soft': 'oklch(0.476 0.085 275)',
+  '--art-periwinkle-accent': 'oklch(0.74 0.087 275)',
+  '--art-periwinkle-accent2': 'oklch(0.616 0.09 275)',
+  '--art-plum-ink': 'oklch(0.76 0.08 320)',
+  '--art-plum-soft': 'oklch(0.482 0.085 320)',
+  '--art-plum-accent': 'oklch(0.745 0.115 320)',
+  '--art-plum-accent2': 'oklch(0.622 0.09 320)',
 
   '--tide-coral-base': 'oklch(0.33 0.012 32)',
   '--tide-coral-soft': 'oklch(0.37 0.017 32)',

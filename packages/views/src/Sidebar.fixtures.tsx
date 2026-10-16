@@ -4,6 +4,7 @@ import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { useFixtureControl } from './juno-chat/fixtures/control'
+import { artRows } from './fixtures/artRows'
 import { PrivacyOn } from './fixtures/privacy'
 import { art, hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
@@ -143,6 +144,21 @@ function ArtOffScreen() {
   )
 }
 
+/** Every row with its art, to judge the drawings as a set rather than one by one. */
+const artById = new Map(artRows.map((row) => [row.id, row]))
+const allArt = (overrides: Partial<SidebarProps> = {}) => (
+  <Sidebar {...chrome} {...overrides}>
+    <TopicList
+      sections={[{ id: 'recent', ids: artRows.map((row) => row.id) }]}
+      renderRow={(id) => {
+        const row = artById.get(id)!
+        return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === artRows[1]!.id} tabbable={id === artRows[1]!.id} onOpen={noop} onResolve={noop} />
+      }}
+      enterEmpty={false}
+    />
+  </Sidebar>
+)
+
 // The first rows a sync brings, for the states with rows.
 const firstRows = recentIds.slice(0, 4)
 
@@ -234,6 +250,8 @@ export default defineFixtures(
     // Art that arrives while its row is off screen shows whole when the row scrolls in.
     Art: {
       'off-screen': scene(() => <ArtOffScreen />),
+      'every-row': scene(() => allArt()),
+      'every-row-privacy': scene(() => <PrivacyOn>{allArt({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
     },
     // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
     // Sharing: turned on because the screen is shared, and the footer says so.

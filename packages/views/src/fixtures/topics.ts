@@ -53,7 +53,7 @@ type RowInput = Partial<Omit<TopicRow, 'preview' | 'channel'>> & {
   readonly ago: number
 }
 
-function row(input: RowInput): TopicRow {
+export function row(input: RowInput): TopicRow {
   const { sender, text, ago, ...rest } = input
   const at = NOW - ago * MINUTE
   return {
