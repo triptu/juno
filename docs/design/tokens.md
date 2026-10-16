@@ -465,6 +465,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--avatar-2xs` | 20px | Mention and To-picker rows; initials 9 |
 | `--avatar-3xs` | 18px | Avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
 | `--avatar-16` | 16px | A DM tab's photo in the tab icon slot; initials 7 (`--initials-16`) |
+| `--avatar-11` | 11px | A group DM member in a 16px tab icon (`GroupAvatar`); no initial fits, so the photo or the colour alone. In the 44px row tile the members use `--avatar-28` |
 
 ### Icons
 
@@ -487,7 +488,7 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 | Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
 | Compact | 80 / 99 | 8px | 1px | 13.5px |
 
-[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
+[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
 Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 

@@ -8,13 +8,14 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { TopicRow as TopicRowModel } from '@juno/contract'
+import type { Person, TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
   AvatarStack,
   Chip,
+  GroupAvatar,
   Icon,
   IconButton,
   pointerMoved,
@@ -67,14 +68,16 @@ const PRIVATE_TITLE = 'Private channel'
 
 /**
  * One sidebar row, chat style: the topic's art or the person's photo, then
- * the title and time, a one-line "Sender: text" preview with the @ and count
- * tags, and the meta line: the place with its Main and Reopened tags and a
- * Main row's new-thread count, the people talking in the unread messages,
- * and the Resolve check. Text takes three levels: the title, the preview
- * one step down, and the meta line and time a step below that. The
- * check sits in a slot that is always reserved and shows on hover or
- * keyboard focus, so nothing ever moves. The row activates on mouse down;
- * Resolve on click.
+ * the title and time, a one-line "Sender: text" preview ending with the
+ * people who wrote the unread messages beside the @ and count tags, and the
+ * meta line: the place with its Reopened tag. Text takes three levels: the
+ * title, the preview one step down, and the meta line and time a step below
+ * that. A Main (a channel's, a DM's or a group DM's) has no meta line and no
+ * Main tag: Main is the default and its title already names the place, so
+ * the row is two lines and shorter, and a Reopened tag or the new-thread
+ * count follows the title. The Resolve check overlays the end of the last
+ * line on hover or keyboard focus and takes no space, so nothing ever
+ * moves. The row activates on mouse down; Resolve on click.
  *
  * The row is a focusable list item, not a button: a button's children are
  * presentational, so the Resolve button inside it would be flattened away.
@@ -103,20 +106,93 @@ export const TopicRow = memo(function TopicRow({
   // The text keeps at least 4.5:1, so the row itself is never faded.
   const quiet = row.resolved || row.status === 'unsubscribed'
   const main = row.tags.includes('main')
+  const twoLine = isTwoLine(row)
   const reopened = row.tags.includes('reopened')
   const threads = main && newThreads > 0 ? newThreads : 0
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined)
-  const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => ({
-    id: person.id,
-    initials: initials(person.name),
-    name: person.name,
-    hue: hueFor(person.color, person.id),
-    ...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl }),
-  }))
+  const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
+  // Line three's tags, or line one's on a two-line row. Never a Main tag: Main is the default.
+  const tags = (
+    <>
+      {reopened ? (
+        <Chip variant="filled" title={REOPENED_TITLE}>
+          Reopened
+        </Chip>
+      ) : null}
+      {threads > 0 ? (
+        <span {...stylex.props(styles.threads)} title={threadsLabel}>
+          <Icon icon={ChatsCircle} size={13} />
+          <Text variant="meta" tone="muted" numeric>
+            {threads}
+          </Text>
+        </span>
+      ) : null}
+    </>
+  )
+  const resolve = resolvable ? (
+    <span {...stylex.props(styles.actionSlot, twoLine && styles.actionSlotLine2)}>
+      <IconButton
+        icon={Check}
+        label={`Resolve ${row.title}`}
+        {...tooltip('Resolve')}
+        size={22}
+        iconSize={13}
+        radius="full"
+        variant="raised"
+        tabIndex={tabbable ? 0 : -1}
+        onClick={() => onResolve(row.id)}
+      />
+    </span>
+  ) : null
+
+  const hasTrail = hasPeople || row.mentionsMe || unread
+  // The preview, then who wrote the unread messages beside the @ and the
+  // count, all at the line's end. Nothing is kept for any of them when
+  // absent: the preview takes the space.
+  const line2 = (
+    <span {...stylex.props(styles.line2, twoLine && resolvable && styles.underMask)}>
+      {/* The message sets the direction; the sender is isolated so a Latin
+          name before Arabic text, or the reverse, keeps its own order. */}
+      <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
+        {row.preview.text.length === 0 ? (
+          row.preview.sender
+        ) : previewNamesSender(row) ? (
+          <>
+            <bdi>{row.preview.sender}</bdi>: {row.preview.text}
+          </>
+        ) : (
+          row.preview.text
+        )}
+      </Text>
+      {hasTrail ? (
+        <span {...stylex.props(styles.trail)}>
+          {hasPeople ? (
+            <span {...stylex.props(styles.people)} data-row-part="people">
+              <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
+            </span>
+          ) : null}
+          {row.mentionsMe || unread ? (
+            <span {...stylex.props(styles.badges)} data-row-part="counts">
+              {row.mentionsMe ? (
+                <Chip variant="soft" title="Mentions you">
+                  @
+                </Chip>
+              ) : null}
+              {unread ? (
+                <Chip variant="count" numeric title={unreadLabel}>
+                  {countLabel(row.unreadCount, row.unreadExact)}
+                </Chip>
+              ) : null}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
+  )
 
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onPrefetch?.(row.id)
@@ -139,7 +215,8 @@ export const TopicRow = memo(function TopicRow({
       onFocus={onFocus}
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event), { disabled: renaming })}
-      {...stylex.props(styles.row, selected && styles.selected)}
+      data-row-lines={twoLine ? 2 : 3}
+      {...stylex.props(styles.row, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, quiet && styles.quietTile)}>
         <Tile row={row} />
@@ -168,6 +245,7 @@ export const TopicRow = memo(function TopicRow({
               {row.title}
             </Text>
           )}
+          {twoLine && (reopened || threads > 0) ? <span {...stylex.props(styles.titleTags)}>{tags}</span> : null}
           {row.tags.includes('unsubscribed') ? (
             <span {...stylex.props(styles.mutedIcon)}>
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
@@ -177,81 +255,30 @@ export const TopicRow = memo(function TopicRow({
             {time}
           </Text>
         </span>
-        <span {...stylex.props(styles.line2)}>
-          {/* The message sets the direction; the sender is isolated so a Latin
-              name before Arabic text, or the reverse, keeps its own order. */}
-          <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
-            {row.preview.text.length === 0 ? (
-              row.preview.sender
-            ) : (
-              <>
-                <bdi>{row.preview.sender}</bdi>: {row.preview.text}
-              </>
-            )}
-          </Text>
-          <span {...stylex.props(styles.badges)}>
-            <span {...stylex.props(styles.badgeSlot)}>
-              {row.mentionsMe ? (
-                <Chip variant="soft" title="Mentions you">
-                  @
-                </Chip>
-              ) : null}
-            </span>
-            <span {...stylex.props(styles.badgeSlot)}>
-              {unread ? (
-                <Chip variant="count" numeric title={unreadLabel}>
-                  {countLabel(row.unreadCount, row.unreadExact)}
-                </Chip>
-              ) : null}
-            </span>
+        {twoLine ? (
+          <span {...stylex.props(styles.line2Last)}>
+            {line2}
+            {resolve}
           </span>
-        </span>
-        <span {...stylex.props(styles.line3, hasPeople && styles.line3People)}>
-          <span {...stylex.props(styles.where, resolvable && !hasPeople && styles.whereUnderAction)}>
-            <span {...stylex.props(styles.place)}>
-              <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
-                <Icon icon={whereIcon(row)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
-              </span>
-              <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated data-row-part="place">
-                {row.channel.name}
-              </Text>
-            </span>
-            {main ? <Chip variant="outline">Main</Chip> : null}
-            {reopened ? (
-              <Chip variant="filled" title={REOPENED_TITLE}>
-                Reopened
-              </Chip>
-            ) : null}
-            {threads > 0 ? (
-              <span {...stylex.props(styles.threads)} title={threadsLabel}>
-                <Icon icon={ChatsCircle} size={13} />
-                <Text variant="meta" tone="muted" numeric>
-                  {threads}
+        ) : (
+          line2
+        )}
+        {twoLine ? null : (
+          <span {...stylex.props(styles.line3)}>
+            <span {...stylex.props(styles.where, resolvable && styles.whereUnderAction)}>
+              <span {...stylex.props(styles.place)}>
+                <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
+                  <Icon icon={whereIcon(row)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
+                </span>
+                <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated data-row-part="place">
+                  {row.channel.name}
                 </Text>
               </span>
-            ) : null}
+              {tags}
+            </span>
+            {resolve}
           </span>
-          {hasPeople ? (
-            <span {...stylex.props(styles.people, resolvable && styles.peopleUnderAction)}>
-              <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
-            </span>
-          ) : null}
-          {resolvable ? (
-            <span {...stylex.props(styles.actionSlot)}>
-              <IconButton
-                icon={Check}
-                label={`Resolve ${row.title}`}
-                {...tooltip('Resolve')}
-                size={22}
-                iconSize={13}
-                radius="full"
-                variant="raised"
-                tabIndex={tabbable ? 0 : -1}
-                onClick={() => onResolve(row.id)}
-              />
-            </span>
-          ) : null}
-        </span>
+        )}
       </span>
       {/* The counts and the @ are tags whose meaning is only in a tooltip; the
           row's description says it in words, before the preview. Hidden, so
@@ -267,7 +294,8 @@ export const TopicRow = memo(function TopicRow({
 
 /**
  * The tile (SPEC section 5, "Row anatomy"): a DM's Main is the person, so it
- * keeps the photo (two initials for a group DM); every other topic, a
+ * keeps the photo, and a group DM's Main two members' photos in a pair
+ * (two initials until the members are known); every other topic, a
  * channel's Main and threads inside DMs included, shows its art, or the
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
@@ -281,6 +309,8 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
     return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
+    const members = channel.members ?? []
+    if (members.length >= 2) return <GroupAvatar people={members.map((member) => stackPerson(member, true))} size={44} />
     return <Avatar kind="group" label={groupInitials(channel.name)} size={44} hue={hueFor(channel.color, channel.id)} />
   }
   return (
@@ -288,6 +318,33 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
       <TopicArt topicId={row.id} recipe={row.art} size={40} />
     </span>
   )
+}
+
+/**
+ * Every Main has two lines (SPEC section 5, "Row anatomy"): its title is the
+ * channel or the people, so the meta line would only repeat it.
+ */
+function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
+  return row.kind === 'main'
+}
+
+/**
+ * Whether the preview starts with "Sender:". Not in a one-to-one DM when the
+ * other person wrote it: the row already names them. "You:" stays.
+ */
+function previewNamesSender(row: TopicRowModel): boolean {
+  return row.channel.kind !== 'im' || row.preview.sender === 'You'
+}
+
+/** A person as the stack (18px, the 48px photo) or the group tile (28px, the 72px photo) draws them. */
+function stackPerson(person: Person, large = false): AvatarStackPerson {
+  return {
+    id: person.id,
+    initials: initials(person.name),
+    name: person.name,
+    hue: hueFor(person.color, person.id),
+    ...(person.avatarUrl === undefined ? {} : { src: (large ? undefined : person.avatarSmallUrl) || person.avatarUrl }),
+  }
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */
@@ -361,14 +418,21 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
-    // While Resolve shows over the end of a meta line with no people, the
-    // place text fades out under it instead of running beneath the button.
+    // While Resolve shows over the end of the last line, what reaches it
+    // (the place, or a two-line row's preview and counts) fades out under it
+    // instead of running beneath the button.
     '--row-place-mask': {
       default: 'none',
       ':hover': { default: null, [HOVER]: PLACE_MASK },
       ':focus-visible': PLACE_MASK,
       ':has(:focus-visible)': PLACE_MASK,
     },
+  },
+  // A Main: two lines, so a shorter fixed height and
+  // estimate. Known from the row's kind, never measured.
+  twoLineRow: {
+    height: `calc(${density['--density-row-two-line-estimate']} + 2 * ${density['--density-row-padding-block']})`,
+    containIntrinsicSize: `auto ${density['--density-row-two-line-estimate']}`,
   },
   // Light muted text fails contrast on the secondary fill (tokens.md 1.7);
   // the selected row points it at the value made for a fill, which keeps it
@@ -421,6 +485,13 @@ const styles = stylex.create({
     flexBasis: 'auto',
     minWidth: 0,
   },
+  // A two-line row's Reopened tag and thread count, after the title.
+  titleTags: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    flexShrink: 0,
+  },
   mutedIcon: {
     display: 'inline-flex',
     flexShrink: 0,
@@ -441,50 +512,48 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     minWidth: 0,
   },
+  // The last line of a two-line row, which Resolve overlays.
+  line2Last: {
+    position: 'relative',
+  },
   preview: {
     flexGrow: 1,
     minWidth: 0,
   },
-  badgeSlot: {
+  // The stack, then the @ and the count, at the preview line's end. They
+  // never shrink: the preview gives way.
+  trail: {
     display: 'inline-flex',
-    width: sizes['--control-28'],
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    flexShrink: 0,
+    paddingTop: spacing['--space-pixel'],
+  },
+  people: {
+    display: 'inline-flex',
+    alignItems: 'center',
     flexShrink: 0,
   },
-  // The stack takes only its own width and ends on the row's trailing
-  // edge, under the time and the counts. Without people there is no slot.
-  people: {
-    gridRow: 1,
-    gridColumn: 2,
-    display: 'inline-flex',
-    justifySelf: 'end',
-    alignItems: 'center',
-  },
-  // Resolve shows in the stack's place on hover or keyboard focus; only
-  // opacity changes, so nothing moves.
-  peopleUnderAction: {
-    opacity: 'calc(1 - var(--row-action-opacity))',
+  // On a two-line row Resolve overlays the preview line's end, and what
+  // reaches it fades out under it, as on the meta line.
+  underMask: {
+    maskImage: 'var(--row-place-mask)',
   },
   badges: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
     flexShrink: 0,
-    paddingTop: spacing['--space-pixel'],
   },
-  // The place and its tags on the left, the people sized to their content
-  // on the right. The tags follow the name, so they never float. Resolve
-  // overlays the end of the line, so it takes no space when hidden.
+  // The place and its tags in one run, so the tags never float. Resolve overlays the end of the line in the same
+  // cell, so it takes no space when hidden.
   line3: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     alignItems: 'center',
-    gap: spacing['--space-2'],
     minWidth: 0,
     marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
-  },
-  line3People: {
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
   },
   where: {
     gridRow: 1,
@@ -512,10 +581,10 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     flexShrink: 0,
   },
-  // Over the end of the line, across every column, so it adds no width.
+  // Over the end of the line, in the line's one cell, so it adds no width.
   actionSlot: {
     gridRow: 1,
-    gridColumn: '1 / -1',
+    gridColumn: 1,
     justifySelf: 'end',
     display: 'inline-flex',
     alignItems: 'center',
@@ -523,6 +592,14 @@ const styles = stylex.create({
     width: sizes['--control-22'],
     height: sizes['--control-22'],
     opacity: 'var(--row-action-opacity)',
+  },
+  // Line two is shorter than the button, so it is centred on the line
+  // without making it taller.
+  actionSlotLine2: {
+    position: 'absolute',
+    insetInlineEnd: 0,
+    insetBlock: 0,
+    marginBlock: 'auto',
   },
   whereUnderAction: {
     maskImage: 'var(--row-place-mask)',

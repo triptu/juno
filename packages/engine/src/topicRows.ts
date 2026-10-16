@@ -127,6 +127,14 @@ export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<stri
   for (const id of mentionedUserIds(columns.preview.rootText)) into.add(id)
 }
 
+/** A group DM tile shows at most this many members (it draws two; the third stands in for one without a photo). */
+const TILE_MEMBERS = 3
+
+/** A group DM's other members for its tile, in Slack's order; empty for any other kind. */
+export function tileMemberIds(columns: Pick<ParsedColumns, 'members'>, selfId: string | undefined): ReadonlyArray<string> {
+  return columns.members.filter((member) => member !== selfId).slice(0, TILE_MEMBERS)
+}
+
 export function channelInfoOf(
   row: Pick<JoinedRow, 'channel' | 'c_kind' | 'c_name' | 'c_user_id'>,
   columns: Pick<ParsedColumns, 'members'>,
@@ -157,8 +165,8 @@ export function artRefOf(row: Pick<JoinedRow, 'topic_id' | 'art_recipe' | 'art_s
   return { id: row.topic_id, recipe: aiAssist ? row.art_recipe : '' }
 }
 
-/** The wire's channel for a topic's channel. `partnerId` is the DM partner, a `Person` in the same refs. */
-export function channelRefOf(channel: ChannelInfo, partnerId: string | undefined): ChannelRef {
+/** The wire's channel for a topic's channel. `partnerId` is the DM partner and `memberIds` a group DM's members for its tile, `Person`s in the same refs. */
+export function channelRefOf(channel: ChannelInfo, partnerId: string | undefined, memberIds: ReadonlyArray<string> = []): ChannelRef {
   const label = channelLabel(channel)
   const style = defaultChannelStyle(channel.id, channel.kind)
   return {
@@ -170,6 +178,7 @@ export function channelRefOf(channel: ChannelInfo, partnerId: string | undefined
     icon: style.icon,
     color: style.color,
     ...(partnerId === undefined ? {} : { partnerId }),
+    ...(memberIds.length === 0 ? {} : { memberIds }),
   }
 }
 

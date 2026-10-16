@@ -25,7 +25,7 @@ export const Person = Schema.Struct({
 })
 export type Person = typeof Person.Type
 
-/** A channel as rows name it. `RowChannel` in `routes/topics.ts` is the same with the DM partner joined in. */
+/** A channel as rows name it. `RowChannel` in `routes/topics.ts` is the same with the DM partner and group members joined in. */
 export const ChannelRef = Schema.Struct({
   id: Schema.String,
   kind: ConversationKind,
@@ -40,6 +40,8 @@ export const ChannelRef = Schema.Struct({
   color: ChannelColor,
   /** The other person in a DM, a `Person` in the same refs. */
   partnerId: Schema.optionalKey(Schema.String),
+  /** A group DM's other members for its tile, at most three, `Person`s in the same refs. */
+  memberIds: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type ChannelRef = typeof ChannelRef.Type
 

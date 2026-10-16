@@ -1,0 +1,1 @@
+- 10-16 17:52 · dm-rows · Threads in a DM or a group DM keep three lines: their title is the thread's title, so the meta line's person glyph and name are the only place that says who the thread is with. They never had a Main tag.

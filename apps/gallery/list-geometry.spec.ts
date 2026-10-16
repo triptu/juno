@@ -157,3 +157,65 @@ test('Configure: a New or Changed mark is a tag after the tool’s name, on the 
   expect(rows).toHaveLength(2)
   for (const row of rows) expect(row).toEqual({ height: 56, after: true, middle: 0 })
 })
+
+test('every Main row (DM, group DM, channel) is two lines and shorter, with even padding; threads are three lines', async ({ page }) => {
+  await open(page, 'TopicRow', 'sidebar/mixed-rows')
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('[data-topic-row]')].map((row) => {
+      const box = row.getBoundingClientRect()
+      const body = row.children[1]!
+      const lines = [...body.children].map((line) => line.getBoundingClientRect())
+      const style = getComputedStyle(row)
+      return {
+        lines: Number(row.dataset.rowLines),
+        drawn: lines.length,
+        height: box.height,
+        // The lines fill the content box exactly: the fixed height is their sum.
+        fill: Math.round((lines.at(-1)!.bottom - box.top - parseFloat(style.paddingTop)) * 100) / 100,
+        content: box.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+        place: row.querySelector('[data-row-part="place"]') !== null,
+        main: [...row.querySelectorAll('span')].some((span) => span.children.length === 0 && span.textContent === 'Main'),
+      }
+    }),
+  )
+  // Maya's DM, Dev's DM, the group DM, a DM thread, #eng's Main, two channel threads.
+  expect(rows.map((row) => row.lines)).toEqual([2, 2, 2, 3, 2, 3, 3])
+  for (const row of rows) {
+    expect(row.drawn).toBe(row.lines)
+    expect(row.height).toBe(row.lines === 2 ? 64 : 88)
+    expect(row.fill).toBeGreaterThan(row.content - 1)
+    expect(row.fill).toBeLessThanOrEqual(row.content)
+    expect(row.place).toBe(row.lines === 3)
+  }
+  // No row says Main: it is the default.
+  expect(rows.some((row) => row.main)).toBe(false)
+})
+
+test('the people sit beside the count on the preview line, 8px before it, and show whole', async ({ page }) => {
+  await open(page, 'TopicRow', 'sidebar/mixed-rows')
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-topic-row]')].map((row) => {
+      const people = row.querySelector('[data-row-part="people"]')
+      const counts = row.querySelector('[data-row-part="counts"]')
+      const preview = row.querySelector('[data-row-part="preview"]')!.getBoundingClientRect()
+      const line = row.querySelector('[data-row-part="preview"]')!.parentElement!.getBoundingClientRect()
+      const middle = (box: DOMRect) => Math.round((box.top + box.height / 2) * 2) / 2
+      if (people === null) return { people: false, previewToEnd: Math.round(line.right - preview.right), counts: counts !== null }
+      const stack = people.getBoundingClientRect()
+      const count = counts!.getBoundingClientRect()
+      return {
+        people: true,
+        gap: Math.round((count.left - stack.right) * 100) / 100,
+        sameLine: middle(stack) === middle(count),
+        countAtEnd: Math.round(line.right - count.right),
+        whole: people.scrollWidth <= Math.ceil(stack.width),
+        previewBefore: preview.right <= stack.left,
+      }
+    }),
+  )
+  const withPeople = rows.filter((row) => row.people)
+  expect(withPeople.length).toBe(3)
+  for (const row of withPeople) expect(row).toMatchObject({ gap: 8, sameLine: true, countAtEnd: 0, whole: true, previewBefore: true })
+  // No people and no count: nothing is kept for them, the preview runs to the line's end.
+  for (const row of rows.filter((row) => !row.people && !row.counts)) expect(row.previewToEnd).toBe(0)
+})

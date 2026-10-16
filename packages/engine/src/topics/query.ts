@@ -70,6 +70,7 @@ import {
   parseColumns,
   personFrom,
   SHOWN_PARTICIPANTS,
+  tileMemberIds,
   topicFrom,
   TOPIC_COLUMNS,
   TOPIC_FROM,
@@ -526,19 +527,21 @@ function entryOf(
   }
   const info = channelInfoOf(row, columns, selfId, (id) => use(id).name)
   const partner = row.c_kind === 'im' && row.c_user_id !== null ? use(row.c_user_id) : undefined
+  const members = tileMemberIds(columns, selfId).map(use)
   // The meta line's people (SPEC section 5): the senders of the unread messages, never you, and none in a DM,
   // whose title already names everyone. The stack draws four; the rest are a count.
   const people = row.c_kind === 'im' || row.c_kind === 'mpim' ? [] : participants.filter((id) => id !== selfId)
   const shown = people.slice(0, SHOWN_PARTICIPANTS)
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
+  named.push(...members)
   const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
   const topic = topicFrom(row, columns, info)
   return {
     topic,
     title: resolveTitle(topic, { user: (id) => use(id).name, usergroup: (id) => usergroups?.get(id) }),
     people: used,
-    channel: channelRefOf(info, partner?.id),
+    channel: channelRefOf(info, partner?.id, members.map((member) => member.id)),
     named,
     participantIds: shown,
     moreParticipants: people.length - shown.length,

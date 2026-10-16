@@ -7,6 +7,7 @@ import type { FixtureSet } from './fixtures/define'
 import Avatar from './Avatar.fixtures'
 import AvatarButton from './AvatarButton.fixtures'
 import AvatarStack from './AvatarStack.fixtures'
+import GroupAvatar from './GroupAvatar.fixtures'
 import Button from './Button.fixtures'
 import Card from './Card.fixtures'
 import ChannelIcon from './ChannelIcon.fixtures'
@@ -49,6 +50,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Avatar,
   AvatarButton,
   AvatarStack,
+  GroupAvatar,
   Button,
   Card,
   ChannelIcon,

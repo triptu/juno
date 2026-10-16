@@ -875,6 +875,9 @@ export const sizes = stylex.defineVars({
   // in Comfortable) whatever it shows, so the off-screen estimate
   // (contain-intrinsic-size) is exact and rows never land on a fraction.
   '--row-topic-estimate': '66px',
+  // A Main row (a channel's, a DM's or a group DM's) has no meta line: the
+  // title and the preview only (64px in Comfortable).
+  '--row-topic-two-line-estimate': '42px',
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',
@@ -889,6 +892,8 @@ export const sizes = stylex.defineVars({
   '--avatar-20': '20px',
   '--avatar-18': '18px',
   '--avatar-16': '16px',
+  // A group DM's member in a 16px tab icon (GroupAvatar).
+  '--avatar-11': '11px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
 
@@ -952,6 +957,8 @@ export const density = stylex.defineVars({
   '--density-row-tile-zoom': '1',
   // The row's content-box estimate for off-screen rows.
   '--density-row-estimate': sizes['--row-topic-estimate'],
+  // The same for a row with no meta line (any Main).
+  '--density-row-two-line-estimate': sizes['--row-topic-two-line-estimate'],
   '--density-message-padding-block': '4px',
   // Above the first message of a sender group.
   '--density-message-group-gap': '12px',

@@ -87,10 +87,13 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   expect(at(RINA)).toBeLessThan(at(ROADMAP))
   expect(at(ROADMAP)).toBeLessThan(at(OFFSITE))
 
-  // A channel's Main, in the Automated view: the channel label as the title and the Main tag.
+  // A channel's Main, in the Automated view: the channel label as the title,
+  // two lines, and no Main tag or place line repeating it.
   await sidebar.selectView('Automated')
   const alerts = sidebar.row(ALERTS_MAIN)
-  await alerts.expectTag('Main')
+  await expect(alerts.root).toHaveAttribute('data-row-lines', '2')
+  await expect(alerts.root.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(alerts.root.locator('[data-row-part="place"]')).toHaveCount(0)
   // Nine unread, exactly: the boot's history page reaches back to the read pointer.
   await expect(alerts.root.getByTitle(/^9 unread$/)).toHaveText('9')
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
@@ -133,6 +136,31 @@ test('rows in a DM or a group DM show no participant stack', async ({ juno }) =>
     await expect(row).toBeVisible()
     await expect(row.getByRole('img')).toHaveCount(0)
   }
+})
+
+test('a DM’s Main row is the name and the message: no Main tag, no place line, no repeated name', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, win } = juno
+  await sidebar.filter('DMs')
+
+  const row = win.locator('[data-topic-id="m:D0MAYA"]')
+  fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'yep' })
+  const preview = row.locator('[data-row-part="preview"]')
+  // From the other person: the message alone, since the title names them.
+  await expect(preview).toHaveText('yep')
+  await expect(row.locator('[data-row-part="title"]')).toHaveText(/^Maya/)
+  await expect(row).toHaveAttribute('data-row-lines', '2')
+  await expect(row.locator('[data-row-part="place"]')).toHaveCount(0)
+  await expect(row.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(row.getByText(/Maya/)).toHaveCount(1)
+
+  // The group DM's tile is two of its members, not a circle of initials.
+  await expect(win.locator('[data-topic-id="m:G0MAYALEO"] [data-group-avatar] [data-kind="person"]')).toHaveCount(2)
+
+  // Your own message keeps "You:".
+  fake.injectMessage({ channel: 'D0MAYA', user: fake.selfId, text: 'its good' })
+  await expect(preview).toHaveText('You: its good')
 })
 
 test('the quick filters narrow the list and the Unread toggle hides read rows', async ({ juno }) => {

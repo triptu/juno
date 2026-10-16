@@ -48,6 +48,7 @@ interface Joined {
   readonly row: TopicRow
   readonly channel: ChannelRef | undefined
   readonly partner: Person | undefined
+  readonly members: ReadonlyArray<Person | undefined>
   readonly people: ReadonlyArray<Person | undefined>
   readonly art: string | undefined
 }
@@ -59,28 +60,35 @@ const joins = new WeakMap<TopicListRow, Joined>()
 const unknownChannel = (id: string): ChannelRef => ({ id, kind: 'public', name: id, label: id, tint: 'public', icon: 'hash', color: 'cyan' })
 const unknownPerson = (id: string): Person => ({ id, name: id, color: 'cyan' })
 
+/** The same objects in the same order. */
+const sameList = <A,>(a: ReadonlyArray<A>, b: ReadonlyArray<A>): boolean => a.length === b.length && a.every((item, i) => item === b[i])
+
 function joinRow(wire: TopicListRow, refs: WindowRefs): TopicRow {
   const channel = refs.channels.get(wire.channelId)
   const partner = channel?.partnerId === undefined ? undefined : refs.people.get(channel.partnerId)
+  const members = (channel?.memberIds ?? []).map((id) => refs.people.get(id))
   const people = wire.participantIds.map((id) => refs.people.get(id))
   // An empty recipe is the engine saying "not shown" (AI assist off); the row then has no art.
   const recipe = refs.art.get(wire.id)?.recipe
   const art = recipe === undefined || recipe === '' ? undefined : recipe
   const held = joins.get(wire)
-  if (held !== undefined && held.channel === channel && held.partner === partner && held.art === art && held.people.length === people.length && held.people.every((p, i) => p === people[i])) {
+  if (held !== undefined && held.channel === channel && held.partner === partner && sameList(held.members, members) && held.art === art && sameList(held.people, people)) {
     return held.row
   }
   const { channelId: _channelId, participantIds: _participantIds, ...fields } = wire
-  const { partnerId, ...channelFields } = channel ?? unknownChannel(wire.channelId)
-  const rowChannel: RowChannel =
-    partnerId === undefined ? channelFields : { ...channelFields, partner: partner ?? unknownPerson(partnerId) }
+  const { partnerId, memberIds, ...channelFields } = channel ?? unknownChannel(wire.channelId)
+  const rowChannel: RowChannel = {
+    ...channelFields,
+    ...(partnerId === undefined ? {} : { partner: partner ?? unknownPerson(partnerId) }),
+    ...(memberIds === undefined ? {} : { members: members.map((person, i) => person ?? unknownPerson(memberIds[i]!)) }),
+  }
   const row: TopicRow = {
     ...fields,
     channel: rowChannel,
     participants: people.map((person, i) => person ?? unknownPerson(wire.participantIds[i]!)),
     ...(art === undefined ? {} : { art }),
   }
-  joins.set(wire, { row, channel, partner, people, art })
+  joins.set(wire, { row, channel, partner, members, people, art })
   return row
 }
 

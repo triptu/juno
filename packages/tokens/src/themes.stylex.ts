@@ -480,6 +480,7 @@ export const compact = stylex.createTheme(density, {
   '--density-row-line-gap': '0px',
   '--density-row-tile-zoom': '0.8182',
   '--density-row-estimate': '64px',
+  '--density-row-two-line-estimate': '42px',
   '--density-message-padding-block': '2px',
   '--density-message-group-gap': '6px',
 })
