@@ -58,6 +58,7 @@ const readTabs = (page: Page) =>
         rect: [rect.x, rect.y, rect.width, rect.height].map((value) => Math.round(value * 100) / 100),
         fill: getComputedStyle(tab).backgroundColor,
         divider: divider === 1 && !covered,
+        hovered: box.matches(':hover'),
       }
     }),
   )
@@ -86,7 +87,10 @@ for (const theme of ['light', 'dark'] as const) {
 
     // Hover on the last tab: its fill changes, its divider goes, and nothing moves.
     await page.locator('[data-tab]').nth(2).hover()
+    // Reduced motion leaves a 0.01ms transition on the divider's opacity: let it land.
+    await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)))
     const hovered = await readTabs(page)
+    expect(hovered.map((tab) => tab.hovered)).toEqual([false, false, true])
     expect(hovered.map((tab) => tab.divider)).toEqual([false, false, false])
     expect(contrast(hovered[2]!.fill, tabs[2]!.fill)).toBeGreaterThanOrEqual(1.04)
     expect(contrast(hovered[2]!.fill, tabs[0]!.fill)).toBeGreaterThanOrEqual(1.04)
