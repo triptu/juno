@@ -16,7 +16,7 @@ import { HomeRoutes, NotSignedIn } from '@juno/contract'
 import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
-import { AiCredentials } from '../aiCredentials'
+import { aiWakes } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
 import { readHome, type HomeRun } from './query'
@@ -49,12 +49,12 @@ export const HomeHandlers = HomeRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
-    const credentials = yield* AiCredentials
+    const wakes = yield* aiWakes
     const scope = yield* Effect.scope
     /** Items asked about, by workspace, with the activity they were asked at, so one is asked once until its topic moves. */
     const asked = new Map<string, Map<string, string>>()
 
-    const rewrite = (open: OpenWorkspace, run: HomeRun, revision: number): Effect.Effect<void> => {
+    const rewrite = (open: OpenWorkspace, run: HomeRun, revision: string): Effect.Effect<void> => {
       const memory = asked.get(open.id) ?? new Map<string, string>()
       asked.set(open.id, memory)
       const due = run.rewritable.filter(({ item, row }) => memory.get(item.id) !== `${revision}:${row.last_activity_ts ?? ''}`)
@@ -91,7 +91,7 @@ export const HomeHandlers = HomeRoutes.toLayer(
     const view = () =>
       serveLiveValue(
         workspace.changes.pipe(
-          Stream.zipLatest(credentials.revisions),
+          Stream.zipLatest(wakes),
           Stream.switchMap(([open, revision]) =>
             open === undefined
               ? Stream.empty

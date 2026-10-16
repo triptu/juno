@@ -19,9 +19,10 @@ it('warms once after paint and enabling AI, without a model call', async () => {
     Layer.provideMerge(Workspace.layer),
     Layer.provide(AiCredentials.layer),
     Layer.provide(HostLink.layer(host)),
-    Layer.provide(EngineConfig.layer({ userData: dir, e2e: true, dev: false, ai: 'live', openRouterApiKey: 'fake-key' })),
+    Layer.provide(EngineConfig.layer({ userData: dir, e2e: true, dev: false, ai: 'live' })),
   ))
   try {
+    host.deliver({ _tag: 'aiKey', key: 'fake-key' })
     const open = await runtime.runPromise(Workspace.use(w => w.open('fake-team')))
     const enabled = (value: boolean) => runtime.runPromise(transaction(prefs.set('aiAssist', value)).pipe(Effect.provide(open.context)))
     await enabled(false)

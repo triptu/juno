@@ -26,11 +26,9 @@ export const EngineConfig = Schema.Struct({
   fakeSlackUrl: Schema.optionalKey(Schema.String),
   /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
   ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
-  /** The OpenRouter key, in memory, for the live provider. Absent means every AI task answers "no decision" (ADR 0006). */
-  openRouterApiKey: Schema.optionalKey(Schema.String),
   /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */
   fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: exercise the real credential lifecycle with the fake provider. */
+  /** Tests only: the fake provider answers only with an OpenRouter key from main (`aiKey`) and inside the spend cap, as the live one does. */
   fakeAiRequiresKey: Schema.optionalKey(Schema.Boolean),
 })
 export type EngineConfig = typeof EngineConfig.Type

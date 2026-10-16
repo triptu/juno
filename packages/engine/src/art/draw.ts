@@ -23,7 +23,7 @@ const RECENT_MESSAGES = 4
 /** Message text is cut here before it reaches the model; a drawing needs the subject, not the message. */
 const TEXT_CHARS = 240
 
-export type ArtOutcome = 'ok' | 'unsure' | 'failed' | 'missing-key' | 'timeout' | 'provider-error'
+export type ArtOutcome = 'ok' | 'unsure' | 'failed' | 'missing-key' | 'timeout' | 'provider-error' | 'budget'
 
 /** Rows the job and the command read: a topic joined as the sidebar sees it. */
 export const ART_SELECT = `${TOPIC_COLUMNS}, NULL AS channel_activity_ts ${TOPIC_FROM}`

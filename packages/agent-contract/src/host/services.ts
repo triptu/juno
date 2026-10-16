@@ -120,4 +120,26 @@ export const hostViewsUndo = Rpc.make('host.views.undo', { payload: { accountId:
 export const HostViewRpcs = RpcGroup.make(hostViewsList, hostViewsCreate, hostViewsUpdate, hostViewsDelete, hostViewsUndo)
 
 /** The whole AgentHost group, protocol `AGENT_HOST_PROTOCOL` (2). */
-export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs)
+/**
+ * The engine's own model calls (topic art, titles, Home, send checks) use the
+ * owner's OpenRouter key, so they spend inside the agent's daily cap (plan v3
+ * §5.4) on the `engine` path. Amounts are integer nanodollars. The host
+ * offers every open ask, now and on every change, until the agent answers
+ * it. The agent applies an ask once by its id, so a repeat is harmless.
+ */
+export const HostSpendAsk = Schema.Union([
+  /** Reserve `amount` under this id. */
+  Schema.TaggedStruct('reserve', { id: Schema.String, amount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+  /** Settle the reservation with this id: the reported cost, or null when it is unknown. */
+  Schema.TaggedStruct('settle', { id: Schema.String, actual: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))) }),
+])
+export type HostSpendAsk = typeof HostSpendAsk.Type
+export const hostSpendAsks = Rpc.make('host.spend.asks', { success: Schema.Array(HostSpendAsk), stream: true })
+/** The agent's answer to one ask: `reserved` or `blocked` for a reservation, `settled` for a settlement. */
+export const hostSpendAnswer = Rpc.make('host.spend.answer', {
+  payload: { id: Schema.String, ask: Schema.Literals(['reserve', 'settle']), result: Schema.Literals(['reserved', 'blocked', 'settled']) },
+  success: Schema.Void,
+})
+export const HostSpendRpcs = RpcGroup.make(hostSpendAsks, hostSpendAnswer)
+
+export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs, HostSpendRpcs)

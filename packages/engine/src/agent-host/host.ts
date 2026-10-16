@@ -9,6 +9,8 @@
  *   It is recorded as sent first (`recordSend`), so a second copy the
  *   network makes is deleted when Juno stores it (ADR 0014).
  * - `sent` asks Slack, not the store, for the reconcile lookup.
+ * - Spend asks come from `AiSpend`: the engine's model calls reserve and
+ *   settle in the agent's daily cap.
  * - The hours-start summaries come from the notification host, which
  *   holds them until the agent has appended them.
  * - Presence follows the engine phase, the AI assist pref, the clock against
@@ -23,6 +25,7 @@ import { defaultNotificationSettings, inHours, type NotificationSettings, type T
 import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
 import { recordSend, storedMe } from '@juno/sync'
+import { AiSpend } from '../aiSpend'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { NotificationHost } from '../notificationRuntime'
@@ -87,7 +90,7 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
     const config = yield* EngineConfig
@@ -97,6 +100,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const link = yield* SyncLink
     const phases = yield* PhaseSource
     const notificationHost = yield* NotificationHost
+    const spend = yield* AiSpend
 
     /** Runs a store read on the open workspace. A store failure is a bug, so it dies. */
     const inStore = <A, E>(effect: Effect.Effect<A, E, StoreServices>): Effect.Effect<A, Exclude<E, SqlError> | AgentHostError> =>
@@ -222,6 +226,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,
       ...(notificationHost.summaries === undefined ? {} : { summaries: notificationHost.summaries }),
+      spend: spend.host,
       schedule: {
         hours: inStore(watchHours),
         changes: watchChanges(workspace),

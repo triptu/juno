@@ -12,6 +12,7 @@ import { AiWarmup } from './aiWarmup'
 import { TitleJob } from './titleJob'
 import { AiProviderLive } from './ai'
 import { AiCredentials } from './aiCredentials'
+import { AiSpend } from './aiSpend'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
 import { HomeHandlers } from './home/handlers'
@@ -92,6 +93,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
+  Layer.provideMerge(AiSpend.layer),
   Layer.provideMerge(NotificationControl.layer),
   Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),

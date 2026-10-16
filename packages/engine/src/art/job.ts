@@ -21,7 +21,8 @@ import { quietDaysOf } from '@juno/domain'
 import { liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
-import { AiCredentials } from '../aiCredentials'
+import { AiCredentials, aiWakes } from '../aiCredentials'
+import { AiSpend } from '../aiSpend'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { ART_SELECT, drawTopic, type ArtOutcome } from './draw'
 import type { JoinedRow } from '../topicRows'
@@ -37,7 +38,7 @@ const DEBOUNCE = '1500 millis'
 /** After a call that did not finish, the topic waits this long, doubling each time, before it is asked about again. */
 const DEFER_BASE_MILLIS = 60_000
 const DEFER_CAP_MILLIS = 30 * 60_000
-/** With no key, nothing can succeed: the pass as a whole waits. */
+/** With no key or at the daily cap, nothing can succeed: the pass as a whole waits. */
 const NO_KEY_DEFER_MILLIS = 10 * 60_000
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_art', 'prefs', 'conversations', 'ignored_channels', 'thread_subs']
@@ -126,25 +127,29 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
             memory.deferred.delete(row.topic_id)
             return
           }
-          memory.unstoredToday += 1
           const at = yield* Clock.currentTimeMillis
-          if (outcome === 'missing-key') memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
-          else defer(memory, row.topic_id, at)
+          // No key, or the daily cap: nothing was sent, and nothing can succeed until a key or a link to the ledger wakes the job.
+          if (outcome === 'missing-key' || outcome === 'budget') {
+            memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
+            return
+          }
+          memory.unstoredToday += 1
+          defer(memory, row.topic_id, at)
         }),
       { concurrency: ART_CONCURRENCY, discard: true },
     )
   })
 
 /** Runs the job for the life of the engine. Requires the services; provides nothing. */
-export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials> = Layer.effectDiscard(
+export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend> = Layer.effectDiscard(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
-    const credentials = yield* AiCredentials
+    const wakes = yield* aiWakes
     let previous: OpenWorkspace | undefined
     let memory: Memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
     const passes = workspace.changes.pipe(
-      Stream.zipLatest(credentials.revisions),
+      Stream.zipLatest(wakes),
       Stream.switchMap(([open]) => {
         if (open === undefined) return Stream.empty
         if (previous !== open) memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }

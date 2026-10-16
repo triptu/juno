@@ -28,7 +28,8 @@ import { liveQuery, StoreReader, syncState, type InvalidationKeys, type SqlError
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
-import { AiCredentials } from '../aiCredentials'
+import { AiCredentials, aiWakes } from '../aiCredentials'
+import { AiSpend } from '../aiSpend'
 import { automatedViewState, candidates, classify, clearVerdict, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
 import { userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
@@ -137,13 +138,13 @@ const junoSample = (rows: ReadonlyArray<SampleRow>, selfId: string | undefined) 
   })
 
 /** Runs the job for the life of the engine. */
-export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials> = Layer.effectDiscard(
+export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend> = Layer.effectDiscard(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
-    const credentials = yield* AiCredentials
+    const wakes = yield* aiWakes
     const passes = workspace.changes.pipe(
-      Stream.zipLatest(credentials.revisions),
+      Stream.zipLatest(wakes),
       Stream.switchMap(([open]) => {
         if (open === undefined) return Stream.empty
         const memory: Memory = { seen: new Map(), deferred: new Map() }
