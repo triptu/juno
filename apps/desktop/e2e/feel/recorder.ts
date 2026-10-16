@@ -13,6 +13,8 @@ import type { CDPSession, Page } from '@playwright/test'
 
 /** What to read on every frame. `selector` finds the first visible match (hidden tabs stay in the page). */
 export type Probe =
+  /** Visible items, keyed so a later insertion cannot hide movement of an earlier item. */
+  | { readonly kind: 'boxes'; readonly name: string; readonly selector: string; readonly key: string }
   /** The viewport rectangle, transforms included. */
   | { readonly kind: 'rect'; readonly name: string; readonly selector: string }
   /** The layout box from the offset chain: ignores transforms, so a scale-in is not a move. */
@@ -59,7 +61,7 @@ export interface EdgeValue {
   readonly previousKey: string | null
 }
 
-export type ProbeValue = Rect | ScrollValue | EdgeValue | number | string | null
+export type ProbeValue = ReadonlyArray<Rect & { readonly key: string }> | Rect | ScrollValue | EdgeValue | number | string | null
 
 export interface ProbeFrame {
   /** Animation frame number within the recording, from 0. */
@@ -288,6 +290,12 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
       }
       const read = (probe: Probe): ProbeValue => {
         switch (probe.kind) {
+          case 'boxes': {
+            return [...document.querySelectorAll(probe.selector)].filter((el) => el.getClientRects().length > 0).map((el) => {
+              const { x, y, width, height } = el.getBoundingClientRect()
+              return { key: el.getAttribute(probe.key) ?? '', x, y, width, height }
+            })
+          }
           case 'rect': {
             const el = visible(probe.selector)
             if (el === null) return null

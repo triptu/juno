@@ -326,6 +326,12 @@ Location: `apps/desktop/perf/`, a separate Playwright project `perf` (`pnpm perf
 
 `pnpm test:feel` (`apps/desktop/e2e/feel/`, described in `docs/development.md`) checks the rules in section 4 that a timing cannot: content that arrives late does not move what is on screen, a topic opens at its position with no later jump, feedback shows in the next frame, a tab restores before its first paint, and no frame is empty between two states. It records frames and DOM probes per animation frame and counts frames rather than timing them, so it can fail the run on a loaded machine. Only its long-frame check uses durations (over 100 ms with the page's own work in it fails).
 
+The `home-first-sync` scenario records Home opening with history held, then
+releases pages until rows paint and completes sync. It checks the first Home
+frame's greeting and sync text, the reserved list box, and every painted row
+by identity on every frame, including sync completion. Rows must fill from
+the top, fit the reserved space, and never move or disappear.
+
 ### 7.4 Review checklist for any UI, list, IPC, query or startup change
 
 1. Does the interaction paint on the next frame? Trace it once.
