@@ -1,9 +1,6 @@
-import { mkdirSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
-import { openState, readRoutes, type Route } from './support'
+import { claimQueue, openState, readRoutes, type Route } from './support'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
@@ -12,7 +9,13 @@ import { openState, readRoutes, type Route } from './support'
  * shift the layout (see packages/testing for what counts as a shift).
  *
  * Motion is left on: reduced motion collapses transitions, which would hide
- * a shift that only a real transition produces.
+ * a shift that only a real transition produces. The guard waits out only the
+ * motion that can move a box (`motion: 'layout'`): every touch starts colour
+ * fades and the press scale, which cannot, and waiting for them was most of
+ * the run.
+ *
+ * The same walk checks the cursor rule on each state as it opens it, so the
+ * states are opened once for both.
  *
  * To look at one component: GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery
  */
@@ -46,28 +49,6 @@ const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMa
 /** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (pnpm remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? 12)
 
-/**
- * Hands out the next state no part has taken yet, in component order. The
- * parts take from one queue, so they finish together however long each
- * state takes. A claim is a directory: mkdir succeeds for one process only.
- */
-function claimNext(routes: ReadonlyArray<Route>, only: ReadonlyArray<string> | undefined): Route | undefined {
-  const queue = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local')
-  mkdirSync(queue, { recursive: true })
-  for (const [index, route] of routes.entries()) {
-    if (only && !only.includes(route.component)) continue
-    // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
-    if (shard && index % shard.total !== shard.index) continue
-    try {
-      mkdirSync(join(queue, encodeURIComponent(route.route)))
-      return route
-    } catch {
-      // Another part has it.
-    }
-  }
-  return undefined
-}
-
 async function targets(page: Page, route: Route): Promise<Locator[]> {
   // A disclosure that grows its content in place (Show more) moves what is under it on purpose.
   const all = page.locator(`[data-fixture-frame="${route.route}"]`).locator(interactive).and(page.locator(':not([data-expands-in-place] *)'))
@@ -82,19 +63,32 @@ async function targets(page: Page, route: Route): Promise<Locator[]> {
   return found
 }
 
+/** After a touch: code the touch started loading (a popover's content) has rendered, so what it moves is measured too. */
+const chunksLoaded = (page: Page) => page.waitForFunction(() => document.querySelector('[data-chunk-pending]') === null, null, { timeout: 15_000 })
+
 /** Touches one element every way a person can; returns what shifted, as readable text. */
 async function touch(page: Page, element: Locator): Promise<string[]> {
   const failures: string[] = []
   const check = async (what: string, action: () => Promise<unknown>) => {
     try {
-      await expectNoLayoutShift(page, action)
+      await expectNoLayoutShift(
+        page,
+        async () => {
+          await action()
+          await chunksLoaded(page)
+        },
+        { motion: 'layout' },
+      )
     } catch (error) {
       failures.push(`${what}: ${(error as Error).message}`)
     }
   }
 
-  await element.scrollIntoViewIfNeeded()
-  const box = await element.boundingBox()
+  // In one call, and without Playwright's actionability waits: the state is still, and they cost more than a touch.
+  const box = await element.evaluate((node) => {
+    node.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    return node.getClientRects().length > 0 ? node.getBoundingClientRect().toJSON() as DOMRect : null
+  })
   if (!box) return failures
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
@@ -112,20 +106,69 @@ async function touch(page: Page, element: Locator): Promise<string[]> {
   return failures
 }
 
+/**
+ * A hash of what the state drew: the frame, anything portalled beside the
+ * gallery's root, scroll positions and the attributes on <html> and <body>
+ * (privacy mode is one). Many interaction states exist only
+ * for a screenshot (the shot hovers or presses a selector) and draw the very
+ * DOM of another state; the guard touches every element itself, so one of
+ * them is enough.
+ */
+const drawn = (page: Page, route: Route) =>
+  page.evaluate(async (frameName) => {
+    const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)!
+    const scrolled = Array.from(frame.querySelectorAll('*'), (node, index) => (node.scrollTop || node.scrollLeft ? `${index}:${node.scrollTop},${node.scrollLeft}` : '')).filter(Boolean)
+    const portals = Array.from(document.body.children, (node) => (node.id === 'root' || node.tagName === 'SCRIPT' ? '' : node.outerHTML))
+    const attributes = [document.documentElement, document.body].flatMap((node) => node.getAttributeNames().map((name) => `${name}=${node.getAttribute(name)}`))
+    const text = [...attributes, frame.className, frame.getAttribute('style'), frame.innerHTML, ...portals, ...scrolled].join('\n')
+    const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text))
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  }, route.route)
+
+/**
+ * SPEC section 16: the arrow cursor everywhere, the text cursor only over
+ * editable or selectable text, never the pointer. An element may compute
+ * `cursor: text` only when it also computes `user-select: text`, or when it
+ * is part of a field (a label wrapping an input), which focuses the input
+ * wherever it is clicked. Links that open outside Juno are the one place the
+ * hand cursor is allowed.
+ */
+const cursorOffenders = (page: Page, route: Route) =>
+  page.evaluate((frameName) => {
+    const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
+    if (!frame) return ['no frame']
+    const bad: string[] = []
+    for (const element of Array.from(frame.querySelectorAll('*'))) {
+      const style = getComputedStyle(element)
+      const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
+      const external = element.closest('a[href^="http:"], a[href^="https:"], a[href^="mailto:"]') !== null
+      if (style.cursor === 'pointer' && !external) bad.push(describe())
+      const inField = element.closest('label') !== null && element.closest('label')!.querySelector('input, textarea') !== null
+      if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) bad.push(describe())
+    }
+    return bad
+  }, route.route)
+
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
 
-for (let shard = 0; shard < shards; shard++) {
+for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once
   // a page is open; each state is a step in the report.
-  test(`no interaction shifts the layout, in any state of any component (part ${shard + 1} of ${shards})`, async ({ page }) => {
-    // A part walks states until the queue is empty, at up to eight elements and six touches per state, waiting out the motion each touch starts.
+  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, async ({ page }) => {
+    // A part walks states until the queue is empty, at up to eight elements and six touches per state.
     test.setTimeout(15 * 60_000)
-    const routes = await readRoutes(page)
+    // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
+    const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
+    const queue = claimQueue('shift')
     const failures: string[] = []
-    for (let route = claimNext(routes, only); route !== undefined; route = claimNext(routes, only)) {
+    const cursors: string[] = []
+    for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
       const started = Date.now()
       await test.step(route.route, async () => {
         await openState(page, route)
+        for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
+        const shotOnly = route.frame.hover !== undefined || route.frame.press !== undefined || route.frame.focus !== undefined
+        if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
         for (const [index, element] of (await targets(page, route)).entries()) {
           for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
@@ -133,6 +176,7 @@ for (let shard = 0; shard < shards; shard++) {
       // A slow state holds up its part; name it so it can be looked at.
       if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
     }
+    expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')
   })
 }
@@ -440,12 +484,21 @@ test.describe('the guard itself', () => {
     })
   })
 
-  test('waits for a transition before it looks', async ({ page }) => {
-    await page.setContent(
-      frame('.b{display:block;width:100px;height:30px;transition:height 120ms}.b:hover{height:60px}p{margin:0}', '<button class="b">Slow</button><p>Below</p>'),
-    )
+  for (const motion of ['all', 'layout'] as const) {
+    test(`waits for a transition of a box before it looks (motion: ${motion})`, async ({ page }) => {
+      await page.setContent(
+        frame('.b{display:block;width:100px;height:30px;transition:height 120ms, color 1s}.b:hover{height:60px;color:red}p{margin:0}', '<button class="b">Slow</button><p>Below</p>'),
+      )
+      const box = (await page.locator('.b').boundingBox())!
+      await expect(expectNoLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10), { motion })).rejects.toThrow('dy 30')
+    })
+  }
+
+  test('with motion: layout, does not wait out a colour fade', async ({ page }) => {
+    await page.setContent(frame('.b{display:block;width:100px;height:30px;transition:color 2s}.b:hover{color:red}', '<button class="b">Fade</button>'))
     const box = (await page.locator('.b').boundingBox())!
-    await expect(expectNoLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10))).rejects.toThrow('dy 30')
+    const report = await measureLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10), { motion: 'layout' })
+    expect(report.waitedMs).toBeLessThan(1000)
   })
 })
 
