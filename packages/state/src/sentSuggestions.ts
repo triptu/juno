@@ -27,11 +27,22 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
   }
   // New chat becomes its sent topic as soon as the send command returns.
   const initial = visible()
+  // A finding that beats New chat to its topic waits for the topic to show.
+  let held: ClarityFinding | undefined
+  const current = () => registry.get(latestSentAtom) === sent.clientMsgId && !left && performance.now() - sent.sentAt < 1000
+  const show = (finding: ClarityFinding) => {
+    held = undefined
+    registry.set(sentSuggestionAtom, { ...sent, finding })
+  }
   const unsubscribe = registry.subscribe(tabsAtom, () => {
     const place = visible()
-    if (place?.kind === 'topic' && place.topicId === sent.topicId) return
+    if (place?.kind === 'topic' && place.topicId === sent.topicId) {
+      if (held !== undefined && current()) show(held)
+      return
+    }
     if (initial?.kind === 'newChat' && place?.kind === 'newChat') return
     left = true
+    held = undefined
     if (registry.get(sentSuggestionAtom)?.clientMsgId === sent.clientMsgId) dismissSentSuggestion(registry)
   })
   const cleanup = () => { unsubscribe(); clearTimeout(expiry) }
@@ -41,10 +52,12 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
   }, 8000)
   return (finding) => {
     const place = visible()
-    if (registry.get(latestSentAtom) !== sent.clientMsgId || finding === undefined || left || performance.now() - sent.sentAt >= 1000 || place?.kind !== 'topic' || place.topicId !== sent.topicId) {
+    if (finding === undefined || !current()) {
       cleanup()
       return
     }
-    registry.set(sentSuggestionAtom, { ...sent, finding })
+    if (place?.kind === 'topic' && place.topicId === sent.topicId) show(finding)
+    else if (initial?.kind === 'newChat' && place?.kind === 'newChat') held = finding
+    else cleanup()
   }
 }
