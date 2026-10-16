@@ -129,17 +129,18 @@ describe('the participant stack on a busy thread', () => {
     const engine = await liveEngine()
     const { fake } = engine
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Who can review the cutover runbook?' })
-    for (const user of ['U0TUSHAR', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0TUSHAR']) {
+    // Your reply reads the thread up to it, so the root is read; the five replies after it are not.
+    for (const user of ['U0TUSHAR', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0DEV']) {
       fake.injectMessage({ channel: 'C0ENG', user, threadTs: root.ts, text: 'I can take a section.' })
     }
     fake.followThread({ channel: 'C0ENG', threadTs: root.ts })
     const id = `t:C0ENG:${root.ts}`
     // Four people show while the replies are still arriving, so wait for the stack after the last one.
     const stack = (all: ReadonlyArray<TopicRow>) => all.find((r) => r.id === id)?.participants.map((p) => p.id).join()
-    const rows = await engine.rowsUntil((all) => stack(all) === 'U0JONAS,U0PRIYA,U0SAM,U0LEO', 'the busy thread with four people')
+    const rows = await engine.rowsUntil((all) => stack(all) === 'U0DEV,U0JONAS,U0PRIYA,U0SAM', 'the busy thread with four people')
     const row = rows.find((r) => r.id === id)!
-    expect(row.participants.map((p) => p.id)).toEqual(['U0JONAS', 'U0PRIYA', 'U0SAM', 'U0LEO'])
-    // Maya started the thread and is one more unread sender.
+    expect(row.participants.map((p) => p.id)).toEqual(['U0DEV', 'U0JONAS', 'U0PRIYA', 'U0SAM'])
+    // Leo is the fifth unread sender; Maya's root came before your reply, so it is read.
     expect(row.moreParticipants).toBe(1)
   })
 })
