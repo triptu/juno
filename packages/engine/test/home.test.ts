@@ -31,7 +31,7 @@ function burst(engine: RunningEngine, channel: string, threadTs: string, count =
 
 describe('Home', () => {
   it('answers a second subscription with the current value at once', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     const first = await homeUntil(engine, (view) => view.ready && view.items.length > 0, 'the first subscription')
     for (const unmount of unmounts.splice(0)) unmount()
     // A new subscription to the same engine: a second window, as a remount after the renderer's idle time would be.
@@ -40,7 +40,7 @@ describe('Home', () => {
   })
 
   it('with AI assist off, ranks what waits, where the user left off and what moved, and adds nothing from the assistant', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     valueOf(await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false }))
 
     const first = await homeUntil(engine, (view) => view.items.length > 0, 'a waiting item')
@@ -65,7 +65,7 @@ describe('Home', () => {
   })
 
   it('with AI assist on, adds a follow-up until Mark done, tidies up settled topics and rewrites a title line', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     // A second settled thread: a closing reply five minutes ago, so it has been idle long enough to score.
     const root = engine.fake.messages('C0ENG').find((message) => message.text?.startsWith('Unrelated: has anyone looked at the staging bill'))!
     const staging = `t:C0ENG:${root.ts}`

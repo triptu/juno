@@ -12,7 +12,7 @@ afterEach(async () => {
 })
 
 it('titles recent sidebar threads after sync without opening them and respects the daily budget after a key change', async () => {
-  const engine = await bootedEngine(engines)
+  const engine = await bootedEngine(engines, { aiJobs: true })
   const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
   expect(titled.filter(row => row.kind === 'thread').length).toBeGreaterThan(1)
   const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length

@@ -8,6 +8,8 @@ node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test
 
 `startTestEngine()` disables periodic sweeps (`sweepIntervalMillis: 0`). Boot, reconnect and `force_reload` still run normally. The fake configuration makes the follow pass due with every catch-up.
 
+The engine runs the fake AI, but its background AI jobs (titles, topic art, Home's AI items and title rewrites, Juno's Automated check) are off unless a test passes `aiJobs: true` to `startTestEngine()` or `bootedEngine()`. Without them a thread keeps its fallback title, no art is drawn, and the Automated job places only what its rules can, asking on Home about the rest as with AI assist off. A test that waits for a job's output opts in; `restart()` does not carry the option.
+
 - `phase('live')` waits for the interactive catch-up. The background follow pass can still be running.
 - `syncIdle()` waits for started sync cycles, including the follow pass, to finish. Call it after observing the phase for the operation you triggered. It does not wait for future cycles, socket events or command retries.
 - `handle.commandIdle()` waits for background command recovery fibers, including the lookup's local transaction. Await the command first so its recovery has been scheduled.

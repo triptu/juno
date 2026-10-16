@@ -59,7 +59,7 @@ const withReleases = { initial: (fake: FakeSlack) => (addReleases(fake), fake.si
 
 describe('the Automated view', () => {
   it('holds the bot channels when the first sync is live, and keeps them out of All', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     const views = await viewsUntil(engine, (list) => automatedOf(list) !== undefined, 'the Automated view')
     expect(automatedOf(views)).toMatchObject({ name: 'Automated', icon: 'robot', keepOutOfAll: true })
     expect(automatedOf(views)!.channels.map((c) => c.id).toSorted()).toEqual(['C0ALERTSPROD', 'C0DEPLOYS'])
@@ -73,7 +73,7 @@ describe('the Automated view', () => {
   })
 
   it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     const now = engine.fake.now()
     engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
     engine.fake.joinChannel({ channel: 'C0BUILDS' })
@@ -83,7 +83,7 @@ describe('the Automated view', () => {
   })
 
   it('asks about an ambiguous channel on Home; Move and Keep in All stick, and each undoes', async () => {
-    const engine = await bootedEngine(engines, withReleases)
+    const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true })
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
     // The reason is Juno's, from the fake AI.
@@ -111,7 +111,7 @@ describe('the Automated view', () => {
   })
 
   it('never moves back a channel the user took out, and stays deleted once deleted', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await bootedEngine(engines, { aiJobs: true })
     await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
     valueOf(await runCommand(engine.registry, viewsRemoveChannel, { id: 'automated', channel: 'C0ALERTSPROD' }))
     const views = await viewsUntil(engine, (list) => !holds(list, 'C0ALERTSPROD'), 'alerts taken out')
