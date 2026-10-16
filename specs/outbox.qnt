@@ -9,6 +9,7 @@ module outboxProtocol {
   type Fetch = { key: int, found: bool, kind: str }
 
   type State = {
+    parent: int -> int,
     created: Set[int], row: int -> str, stored: Set[int], discarded: Set[int],
     server: int -> int, request: int -> str, due: Set[int],
     events: Set[int], fetches: Set[Fetch], scan: Set[int],
@@ -45,7 +46,7 @@ module outboxProtocol {
   var turn: int
 
   action init = all {
-    s' = { created: Set(), row: drafts.mapBy(_ => "gone"), stored: Set(), discarded: Set(),
+    s' = { parent: drafts.mapBy(_ => 0), created: Set(), row: drafts.mapBy(_ => "gone"), stored: Set(), discarded: Set(),
       server: drafts.mapBy(_ => 0), request: drafts.mapBy(_ => "idle"), due: Set(),
       events: Set(), fetches: Set(), scan: Set(),
       online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
@@ -79,6 +80,15 @@ module outboxProtocol {
       due: s.due.union(Set(k)), label: "send", target: k }
   }
 
+  // New chat opens the root's local topic at send, including a failed root.
+  // A reply queued from that view keeps the root's outbox identity until
+  // writeMessage acknowledges it. No provisional timestamp goes to Slack.
+  action sendReply(k: int, root: int): bool = all {
+    not(s.sealed), not(s.created.contains(k)), s.created.contains(root), k != root,
+    s' = { ...s, created: s.created.union(Set(k)), parent: s.parent.set(k, root),
+      row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "sendReply", target: k }
+  }
+
   // Persist sending before the single HTTP attempt leaves. There is no
   // transport retry action. A crash before the call leaves is a dropped call.
   // The worker claims only while Juno sees the socket connected, so a send
@@ -86,6 +96,7 @@ module outboxProtocol {
   // happens to work.
   action claimWith(k: int, guard: bool): bool = all {
     s.online, not(guard) or s.connected,
+    s.parent.get(k) == 0 or s.stored.contains(s.parent.get(k)),
     s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
     s' = { ...s, row: s.row.set(k, "sending"), request: s.request.set(k, "transit"),
       due: s.due.exclude(Set(k)), claimedOffline: s.claimedOffline or not(s.connected),
@@ -424,7 +435,9 @@ module outboxProtocol {
   val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
   val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
-  val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
+  val repliesWaitForRoot = drafts.forall(k =>
+    s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
+  val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot
 
   action work = any {
@@ -459,6 +472,35 @@ module outboxProtocol {
 
   // Directed schedules stop at agreement, so the runner can require a
   // completion witness. The broken schedules use the same actions and inputs.
+  action failedRootStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) sendReply(2, 1) else
+    if (turn == 2) claim(1) else
+    if (turn == 3) refuse(1, false) else
+    if (turn == 4) refused(1) else
+    if (turn == 5) retry(1) else
+    if (turn == 6) claim(1) else
+    if (turn == 7) accept(1, false) else
+    if (turn == 8) answer(1) else
+    if (turn == 9) claim(2) else
+    if (turn == 10) accept(2, true) else
+    seal
+  ) }
+
+  action pendingRootStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) sendReply(2, 1) else
+    if (turn == 2) claim(1) else
+    if (turn == 3) accept(1, true) else
+    if (turn == 4) echo(1) else
+    if (turn == 5) answer(1) else
+    if (turn == 6) claim(2) else
+    if (turn == 7) accept(2, true) else
+    seal
+  ) }
+
   action blindRetryWith(guard: bool): bool = all { not(reachedAgreement), tick(
     if (s.sealed) progress else
     if (turn == 0) send(1) else

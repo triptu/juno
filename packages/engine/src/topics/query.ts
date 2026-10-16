@@ -179,7 +179,7 @@ export const settings = Effect.gen(function* () {
  * `topic_index_channel_activity`. No pointer counts nothing.
  */
 const NEW_THREADS = `CASE WHEN i.kind = 'main' THEN (SELECT count(*) FROM topic_index t
-      WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts) ELSE 0 END AS new_threads`
+      WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts AND NOT EXISTS (SELECT 1 FROM started_threads st WHERE st.topic_id = t.topic_id OR (st.channel = t.channel AND st.root_ts = t.root_ts))) ELSE 0 END AS new_threads`
 
 export const SELECT = `${TOPIC_COLUMNS}, ${NEW_THREADS},
     CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`

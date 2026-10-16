@@ -8,6 +8,7 @@ import type { Reaction } from '@juno/slack-schema'
 import { StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { syncKeys } from '../keys'
+import { acknowledgeStartedThread } from '../startedThreads'
 import { reconcilePost } from '../posts'
 import { reconcileSent } from '../sent'
 
@@ -22,9 +23,10 @@ export const readMessage = (channel: string, ts: string): Effect.Effect<MessageR
     return rows[0]
   })
 
-export const writeMessage = (row: MessageRow): Writer =>
+export const writeMessage = (message: MessageRow): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    const row = yield* acknowledgeStartedThread(message)
     yield* sql`INSERT INTO messages ${sql.insert(row as unknown as Record<string, unknown>)}
       ON CONFLICT (channel, ts) DO UPDATE SET
         thread_ts = excluded.thread_ts, user_id = excluded.user_id, bot_name = excluded.bot_name, bot_icon = excluded.bot_icon, subtype = excluded.subtype, text = excluded.text,

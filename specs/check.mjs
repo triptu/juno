@@ -352,13 +352,13 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']) {
+  for (const schedule of ['pendingRoot', 'failedRoot', 'answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
   if (!outboxOnly) {
     simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
-    for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
+    for (const schedule of ['authoredRoot', 'ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
       simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
     }
     simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')

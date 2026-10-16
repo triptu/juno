@@ -97,6 +97,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const sql = yield* StoreReader
     const { ctx, cutoff, aiAssist, selfId } = yield* settings(sql, now)
     const indexed = yield* sql.unsafe<JoinedRow>(`${TOPIC_COLUMNS}, NULL AS channel_activity_ts ${TOPIC_FROM} WHERE i.topic_id = ?`, [id])
+    if (id.startsWith('p:') && indexed[0] === undefined) return null
     const row = indexed[0] ?? (yield* bareRow(sql, id, target))
     if (row === undefined) return null
     const columns = parseColumns(row)
