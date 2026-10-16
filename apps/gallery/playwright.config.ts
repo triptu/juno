@@ -41,7 +41,8 @@ export default defineConfig({
   projects: [
     // Wide enough for the 240px switcher plus the widest frame (1400px).
     { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },
-    { name: 'behaviour', testMatch: ['behaviour.spec.ts', 'contrast.spec.ts', 'shift.spec.ts', '*geometry.spec.ts', 'attachment-images.spec.ts', 'settings.spec.ts', 'topic-art.spec.ts', 'focus-ring.spec.ts', 'tooltip.spec.ts'] },
+    // Every other spec, so a branch that adds one does not edit this line.
+    { name: 'behaviour', testMatch: '*.spec.ts', testIgnore: ['shots.spec.ts', '**/node_modules/**'] },
   ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,

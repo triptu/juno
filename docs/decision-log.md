@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 11:50 · tooling-1017 · The gallery's behaviour project matches every `*.spec.ts` except `shots.spec.ts`, so branches that add a spec no longer conflict on one config line.
 - 10-17 11:40 · tooling-1017 · Health tools get a time limit scaled by load and one retry on timeout, and a timeout is reported as a timeout, not as a finding; lint still fails then, since nothing was checked.
 - 10-17 11:25 · tooling-1017 · The T3 watcher reads 1 s after a change and backs off to 10 s, and wakes early on `t3_thread_wait` or an answer Juno sends; T3 Code has no change notification, and its wait only wakes on a run's end.
 - 10-17 11:04 · tooling-1017 · Every package Node runs by stripping types sets `erasableSyntaxOnly`, so `pnpm typecheck` catches parameter properties and enums before the agent's crash tests do.

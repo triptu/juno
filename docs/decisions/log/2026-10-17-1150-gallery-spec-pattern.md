@@ -1,0 +1,1 @@
+- 10-17 11:50 · tooling-1017 · The gallery's behaviour project matches every `*.spec.ts` except `shots.spec.ts`, so branches that add a spec no longer conflict on one config line.
