@@ -2,6 +2,9 @@
 // container and its rows would see while the user changes filters
 // (performance 5.3: old rows stay, the new window replaces them in one step,
 // unchanged rows keep their objects).
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   currentRowAtom,
@@ -15,6 +18,11 @@ import {
 } from '@juno/state'
 import type { TopicRow } from '@juno/contract'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
+import { apiCalls, bootedEngine, quiet } from './scenario'
+
+// Titles are the first words of the root message.
+const POSTGRES = 'Draft plan is in the doc'
+const ROADMAP = 'Proposal: cut offline mode and public'
 
 const engines: Array<RunningEngine> = []
 const unmounts: Array<() => void> = []
@@ -142,5 +150,46 @@ describe('the participant stack on a busy thread', () => {
     expect(row.participants.map((p) => p.id)).toEqual(['U0DEV', 'U0JONAS', 'U0PRIYA', 'U0SAM'])
     // Leo is the fifth unread sender; Maya's root came before your reply, so it is read.
     expect(row.moreParticipants).toBe(1)
+  })
+})
+
+describe('a store indexed by an older Juno', () => {
+  it('takes the unread senders from local messages on launch, with no history calls', async () => {
+    const first = await bootedEngine(engines)
+    const rows = await first.rowsUntil((all) => all.some((r) => r.title.startsWith(ROADMAP)), 'the roadmap thread')
+    const roadmap = rows.find((r) => r.title.startsWith(ROADMAP))!
+    const postgres = rows.find((r) => r.title.startsWith(POSTGRES))!
+    expect(roadmap.unreadCount).toBeGreaterThan(0)
+    expect(postgres.unreadCount).toBe(0)
+    const senders = roadmap.participants.map((p) => p.id)
+    expect(senders.length).toBeGreaterThan(0)
+
+    const { fake, userData } = first
+    const credentials = fake.credentials()
+    await quiet(first)
+    first.registry.dispose()
+    await first.handle.stop()
+    engines.splice(engines.indexOf(first), 1)
+    // As an older Juno left it: the latest senders on every row, read or not, and no index version.
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'))
+    db.prepare('UPDATE topic_index SET participants_json = ? WHERE topic_id = ?').run('["U0DEV","U0LEO"]', postgres.id)
+    db.prepare('UPDATE topic_index SET participants_json = ? WHERE topic_id = ?').run('[]', roadmap.id)
+    db.prepare("DELETE FROM sync_state WHERE key = 'index-version'").run()
+    db.close()
+
+    fake.resetCalls()
+    // The boot waits on Slack, so only the local upgrade can change the rows.
+    fake.holdNext({ method: 'client.userBoot', before: true })
+    fake.holdNext({ method: 'client.counts', before: true })
+    const second = await startTestEngine({ reuse: { userData, fake, credentials }, initial: () => credentials, recheckTopics: 0 })
+    engines.push({ ...second, stop: async () => { await second.stop(); await fake.close(); await rm(userData, { recursive: true, force: true }) } })
+    const after = await second.rowsUntil((all) => {
+      const people = (title: string) => all.find((r) => r.title.startsWith(title))?.participants.map((p) => p.id).join()
+      return people(POSTGRES) === '' && people(ROADMAP) === senders.join()
+    }, 'the rows re-indexed')
+    expect(after.find((r) => r.title.startsWith(POSTGRES))!.participants).toEqual([])
+    expect(apiCalls(second, 'conversations.history')).toEqual([])
+    expect(apiCalls(second, 'conversations.replies')).toEqual([])
+    fake.release()
   })
 })
