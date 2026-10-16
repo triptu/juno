@@ -34,7 +34,8 @@ Run these from the repo root.
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
-| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
+| `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 85 s on a remote machine. |
+| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
 | `pnpm flake <spec>` | Repeats desktop e2e, gallery or package tests many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
@@ -537,6 +538,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `tsconfig.base.json`, `scripts/affected.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs` | everything below, in full |
 | A file a vitest file reaches, or a package's `package.json`, `vitest.config.ts` or `tsconfig.json` | those vitest files (`pnpm test --passWithNoTests <files>`) |
 | `specs/` (not Markdown) | `pnpm specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
+| `specs/outbox.qnt`, the conformance generator, or code the replay reaches | `pnpm specs:conformance` |
 | A file a component's fixtures reach | `pnpm test:gallery` with `GALLERY_SHIFT_ONLY` set to those components (the behaviour tests run in full) |
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
