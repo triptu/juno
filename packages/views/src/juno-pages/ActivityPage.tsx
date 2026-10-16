@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, type ActivityAction, type ActivityRun, type ActivityPage as ActivityPageModel } from '@juno/agent-contract'
+import { chatCopy, type ActivityAction, type ActivityRun, type ActivityScriptCall, type ActivityPage as ActivityPageModel } from '@juno/agent-contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Chip, EmptyState, ListRow, Page, PageHeader, Surface, Text } from '@juno/ui'
 import { cell } from './cell'
@@ -28,6 +28,14 @@ const outcomeLabel: Record<ActivityAction['outcome'], string | undefined> = {
   unknown: "Can't tell",
   pending: 'Pending',
   none: undefined,
+}
+
+const scriptOutcomeLabel: Record<ActivityScriptCall['outcome'], string> = {
+  done: 'Done',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  refused: 'Refused',
+  unfinished: 'Did not finish',
 }
 
 /**
@@ -79,11 +87,7 @@ function Run({ run, now, onCopyDetails }: { readonly run: ActivityRun; readonly 
       </div>
       {rows.length === 0 ? (
         // A run with no actions has no card: its read line, if any, sits under the head.
-        run.reads === undefined ? null : (
-          <Text variant="meta" tone="muted" truncate>
-            {run.reads}
-          </Text>
-        )
+        run.reads === undefined ? null : <Reads run={run} />
       ) : (
         <Surface kind="group" role="list" aria-label="Actions">
           {rows.map((action, index) => (
@@ -135,14 +139,33 @@ function Run({ run, now, onCopyDetails }: { readonly run: ActivityRun; readonly 
           ))}
           {run.reads !== undefined ? (
             <ListRow role="listitem" minHeight={44} divider={false}>
-              <Text variant="meta" tone="muted" truncate>
-                {run.reads}
-              </Text>
+              <Reads run={run} />
             </ListRow>
           ) : null}
         </Surface>
       )}
     </section>
+  )
+}
+
+/** The folded read line, and under it each call the run's scripts made, with its arguments and outcome. */
+function Reads({ run }: { readonly run: ActivityRun }) {
+  return (
+    <span {...stylex.props(cell.lines)}>
+      <Text variant="meta" tone="muted" truncate>
+        {run.reads}
+      </Text>
+      {run.scriptCalls?.map((call, index) => (
+        <span key={index} data-activity-script-call={call.outcome} {...stylex.props(cell.line)}>
+          <Text variant="meta" tone="muted" truncate dir="auto">
+            {`${call.tool} ${call.args}`}
+          </Text>
+          <Text variant="meta" tone="muted">
+            {scriptOutcomeLabel[call.outcome]}
+          </Text>
+        </span>
+      ))}
+    </span>
   )
 }
 

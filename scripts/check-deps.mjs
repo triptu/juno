@@ -163,7 +163,8 @@ const unstable = [
 const thirdParty = [
   {
     label: 'pi-durable',
-    spec: /^@earendil-works\/(?:pi-durable|chord)(?:\/|$)/,
+    // pi-codemode is pi-durable's code mode sandbox (runtime/codemode.ts).
+    spec: /^@earendil-works\/(?:pi-durable|pi-codemode|chord)(?:\/|$)/,
     allow: ['packages/agent/src/runtime/', 'packages/agent-testing/'],
   },
   { label: 'pi-mcp', spec: /^@earendil-works\/pi-mcp(?:\/|$)/, allow: ['packages/agent/src/mcp/', 'packages/agent-testing/'] },

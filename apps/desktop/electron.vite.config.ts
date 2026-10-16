@@ -1,5 +1,6 @@
+import { readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { isBuiltin } from 'node:module'
+import { createRequire, isBuiltin } from 'node:module'
 import { dependencies } from './package.json'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
@@ -120,6 +121,23 @@ function runtimeImports(): Plugin {
   }
 }
 
+/**
+ * Writes the codemode sandbox's QuickJS binary next to agent.js. pi-codemode
+ * finds it in node_modules, which a packaged app does not have, so the agent
+ * passes this path instead (`src/agent/index.ts`). The worker is its own
+ * input, `codemode-worker`.
+ */
+function codemodeFiles(): Plugin {
+  // pi-codemode exports ESM only, so it is found by its folder, where pnpm links it for the agent.
+  const fromCodemode = createRequire(realpathSync(resolve(__dirname, '../../packages/agent/node_modules/@earendil-works/pi-codemode/package.json')))
+  return {
+    name: 'juno:codemode-files',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'quickjs.wasm', source: readFileSync(fromCodemode.resolve('quickjs-wasi/quickjs.wasm')) })
+    },
+  }
+}
+
 // electron-vite defaults every target to `minify: false`. Minified output is
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
 // holds the renderer to the budget in docs/performance.md.
@@ -145,15 +163,17 @@ const reactCompiler = [
 export default defineConfig({
   main: {
     define: { __JUNO_UPDATE_FEED_URL__: JSON.stringify(process.env.JUNO_UPDATE_FEED_URL ?? '') },
-    plugins: [externalize, runtimeImports()],
+    plugins: [externalize, runtimeImports(), codemodeFiles()],
     build: {
       minify,
       rollupOptions: {
-        // index.js is the main process; engine.js and agent.js are forked as utility processes.
+        // index.js is the main process; engine.js and agent.js are forked as utility processes;
+        // codemode-worker.js is the agent's codemode sandbox thread.
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           engine: resolve(__dirname, 'src/engine/index.ts'),
           agent: resolve(__dirname, 'src/agent/index.ts'),
+          'codemode-worker': resolve(__dirname, 'src/agent/codemode-worker.ts'),
         },
       },
     },

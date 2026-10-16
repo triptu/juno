@@ -10,8 +10,9 @@ module actionsProtocol {
   // ghost: "owner" when the owner's words are a reason for the call,
   // "untrusted" when only text the run read is (SPEC 13.9, auto-review).
   // `hint`: the server marked the tool read-only when Juno first saw it.
+  // `script`: a ghost, the intent came from a codemode script's child call (docs/research/codemode.md).
   type Intent = { id: int, rev: int, payload: Payload, tier: int, deduped: bool, source: int,
-    conn: bool, clean: bool, cause: str, hint: bool }
+    conn: bool, clean: bool, cause: str, hint: bool, script: bool }
   type Approval = { id: int, child: int, rev: int, digest: Payload, batch: int }
   // `review`: authorized with no click because the reviewer and the owner's rule allowed it.
   type Authorization = { id: int, intent: Intent, approval: int, consumed: bool, epoch: int, grant: bool, review: bool }
@@ -88,21 +89,29 @@ module actionsProtocol {
   val mayAuthorize = s.active and s.epoch == s.localEpoch and not(s.paused or s.off or s.crashed)
   def liveGrant(k: int): bool = s.grants.exists(g => g.target == k and g.opClass == 2 and g.source == s.gen)
   action idle = s' = { ...s, label: "blocked" }
-  action proposeWith(k: int, tier: int, deduped: bool, conn: bool, cause: str, hint: bool): bool = {
+  action proposeWith(k: int, tier: int, deduped: bool, conn: bool, cause: str, hint: bool, script: bool): bool = {
     val rev = s.current.get(k) + 1
     val p = { ...payload(k), args: rev, schema: s.schema, account: s.account,
       connection: s.connection, precondition: s.precondition }
     // Only a run that read untrusted text can propose a call that text alone asked for.
     if (cause == "untrusted" and s.clean) idle else
     s' = { ...s, intents: s.intents.union(Set({ id: k, rev: rev, payload: p, tier: tier, deduped: deduped, source: s.gen,
-      conn: conn, clean: s.clean, cause: cause, hint: hint })),
+      conn: conn, clean: s.clean, cause: cause, hint: hint, script: script })),
       current: s.current.set(k, rev), label: "propose", target: k }
   }
-  action propose(k: int, tier: int, deduped: bool): bool = proposeWith(k, tier, deduped, false, "owner", false)
+  action propose(k: int, tier: int, deduped: bool): bool = proposeWith(k, tier, deduped, false, "owner", false, false)
   // A connection tool call that is not on the read list (Tier 3).
-  action proposeConn(k: int, cause: str): bool = proposeWith(k, 3, false, true, cause, false)
+  action proposeConn(k: int, cause: str): bool = proposeWith(k, 3, false, true, cause, false, false)
   // The same, to a tool the server marked read-only at first sight.
-  action proposeHinted(k: int, cause: str): bool = proposeWith(k, 3, false, true, cause, true)
+  action proposeHinted(k: int, cause: str): bool = proposeWith(k, 3, false, true, cause, true, false)
+  // A codemode script's child call to a tool that is not a read. A script's callable tools are an
+  // explicit list of reads, and the host refuses any other name before the call reaches the action
+  // path, so it never becomes an intent and nothing can review or authorize it: writes keep the
+  // direct path. `scriptWrite` is the bug that lets it through as a connection call the owner's run
+  // asked for, which the reviewer would then judge like any other.
+  action scriptChild(k: int, bug: str): bool =
+    if (bug == "scriptWrite") proposeWith(k, 3, false, true, "owner", false, true)
+    else s' = { ...s, label: "scriptRefused", target: k }
   // The auto-review: one decision-model call per call, made once. It sees only
   // the owner's own words in the run and the proposed call, so a call that
   // only untrusted text asked for is "notAsked" whatever that text says.
@@ -435,6 +444,8 @@ module actionsProtocol {
   // Untrusted text never authorizes: a call that only text the run read asked
   // for is never run without a click, under any rule.
   val untrustedNeverAuthorizes = s.auths.forall(a => not(a.review) or a.intent.cause == "owner")
+  // A codemode script cannot authorize a write: nothing a script's child call becomes is ever authorized.
+  val scriptNeverAuthorizes = s.auths.forall(a => not(a.intent.script))
   // This is the local ownership authority only. WP4 deliberately disproves
   // the stronger cross-device interpretation without an external fence.
   val currentOwnerAuthorizes = newAuths.forall(a => before.active and a.epoch == before.epoch)
@@ -481,7 +492,7 @@ module actionsProtocol {
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
     scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick and pauseRevokesGrants and
-    redactionRevokesExposed and redactionKeepsUnrelated and reviewGated and untrustedNeverAuthorizes
+    redactionRevokesExposed and redactionKeepsUnrelated and reviewGated and untrustedNeverAuthorizes and scriptNeverAuthorizes
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -517,7 +528,7 @@ module actionsProtocol {
       authorizeDispatch(k), transportSend(k), destinationAccept(k), recordReceipt(k), lose(k), reject(k), reconcile(k, true, true),
       crash, startup(true), pause("pause"), resume, cancel(true), taint(true), grantWith(k, true),
       proposeSchedule, clickSchedule, scheduleFromClick(true), scheduleWith(true), scheduleFromMenu(true), queueWake, deleteSchedule, admitWake(""), startWake(true),
-      redact("scoped"), see, invalidate("schema"), seal,
+      redact("scoped"), see, invalidate("schema"), seal, scriptChild(k, ""),
       all { s.current.get(k) == 0, proposeConn(k, "owner") }, all { s.current.get(k) == 0, proposeConn(k, "untrusted") },
       all { s.current.get(k) == 0, proposeHinted(k, "owner") }, all { s.current.get(k) == 0, proposeHinted(k, "untrusted") },
       { nondet answer = Set("explicit", "implied", "notAsked", "failed").oneOf()
@@ -541,7 +552,7 @@ module actionsProtocol {
   pure def c(op: str, k: int): Command = { op: op, k: k }
   // The auto-review commands, apart so that `execute`'s chain stays within the simulator's nesting limit.
   pure val reviewOps = Set("conn", "connUntrusted", "connHinted", "reviewExplicit", "reviewNotAsked", "reviewIrreversible",
-    "reviewImplied", "reviewFailed", "alwaysRule", "neverRule", "toolAlways", "changeTool")
+    "reviewImplied", "reviewFailed", "alwaysRule", "neverRule", "toolAlways", "changeTool", "scriptChild", "scriptReview", "scriptAuthorize")
   action executeReview(k: int, op: str, bug: str): bool =
     if (op == "conn") proposeConn(k, "owner") else
     if (op == "connUntrusted") proposeConn(k, "untrusted") else
@@ -554,6 +565,10 @@ module actionsProtocol {
     if (op == "alwaysRule") setRule("always") else
     if (op == "neverRule") setRule("never") else
     if (op == "toolAlways") setToolRule("always") else
+    if (op == "scriptChild") scriptChild(k, bug) else
+    // Review and dispatch of whatever the script's call became: nothing, unless the bug let it through.
+    if (op == "scriptReview") { if (currentIntent(k) == Set()) idle else reviewWith(k, "explicit", true, bug) } else
+    if (op == "scriptAuthorize") { if (currentIntent(k) == Set()) idle else authorizeWith(k, bug) } else
     changeTool
   action execute(cmd: Command, bug: str): bool = {
     val k = cmd.k
@@ -825,10 +840,15 @@ module actionsProtocol {
   pure val ruleDuringReview = List(c("conn", 0), c("reviewExplicit", 0), c("toolAlways", 0), c("authorize", 0))
   action ruleDuringReviewStep = script(ruleDuringReview, "")
   action ruleDuringReviewBugStep = script(ruleDuringReview, "ruleAtReview")
-  action suiteInit = { nondet which = 0.to(59).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  // Codemode (10-16). A script's child call names a write the owner asked for: the host refuses it, so
+  // no review can run it. With the refusal missing, an explicit, reversible review would run it.
+  pure val scriptWrite = List(c("scriptChild", 0), c("scriptReview", 0), c("scriptAuthorize", 0))
+  action scriptWriteStep = script(scriptWrite, "")
+  action scriptWriteBugStep = script(scriptWrite, "scriptWrite")
+  action suiteInit = { nondet which = 0.to(60).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
     compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated,
-    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview).nth(scenario)
+    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview, scriptWrite).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -893,6 +913,7 @@ module actionsProtocol {
   val case57 = scenario == 57 and reachedAgreement and s.auths == Set()
   val case58 = scenario == 58 and reachedAgreement and s.auths == Set()
   val case59 = scenario == 59 and reachedAgreement and s.auths == Set()
+  val case60 = scenario == 60 and reachedAgreement and s.auths == Set() and s.intents == Set()
   // An explicit, reversible call the owner asked for runs once with no click, under Auto and under Never ask.
   action reviewedRunWitnessStep = script(List(c("conn", 0), c("reviewExplicit", 0), c("authorize", 0)), "")
   val reviewedRunSent = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => a.review) and s.receipts.size() == 1

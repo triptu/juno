@@ -789,8 +789,8 @@ the first sweep: art that arrives while a row is skipped by
 `content-visibility` keeps the row's old style, so the placeholder fades
 out (240 ms) when the row scrolls into view, not when the art arrived.
 That contradicts `TopicArt`'s rule that art present on the first paint
-shows at once. It is a small look issue, not a cost, and is not changed
-here. The scrollbar does not add a main-thread frame either: a sweep
+shows at once. It is a look issue, not a cost, and is fixed in the art
+fade section below. The scrollbar does not add a main-thread frame either: a sweep
 draws the same number of frames with the native one (237 to 283 against
 236 to 243 for the sidebar, 469 to 481 against 464 to 476 for All
 topics). Swapping it would change the look and buy nothing, so it needs no
@@ -887,6 +887,30 @@ and every structural ceiling passed. One gate run moves by about ±1.5 ms,
 so the interleaved A/B numbers above are the better measure of the fix.
 `pnpm test:feel -g scroll` (the scrolled tab restore) passed. Logs and
 traces are under `.juno-status/scroll-frames/`.
+
+### Art that arrives off screen (10-17)
+
+The 10-17 scroll pass found that a row whose art arrived while it was
+skipped by `content-visibility` played the placeholder's 240 ms fade when
+it scrolled into view, so rows came in looking as if they were loading.
+A CSS transition starts when the element's style is next computed, and a
+skipped row's style is not computed until it comes near the view.
+
+**Fix.** `TopicArt` no longer uses a transition. When the art arrives or
+goes, a layout effect starts a Web Animation on the placeholder layer.
+It runs on the document clock from that moment whether or not the row
+renders, so a row that renders later finds it finished and shows the art
+at full opacity on its first frame; a row on screen still fades. The
+layers set `transition-property: none`, because under reduced motion
+`global.css` gives every element a 0.01 ms transition, which drew one frame
+of the placeholder in the same way. Nothing runs per row while scrolling:
+the effect runs only when the art changes.
+
+The gallery test `apps/gallery/topic-art.spec.ts` gives the
+last row of a 30-row sidebar its art while the row is skipped, waits past
+the fade, scrolls it into view and reads the placeholder in the first
+frame drawn: opacity 0 and no running animation, with and without reduced
+motion. On the old code it read opacity 0.94 with a running transition.
 
 ### Engine speed measurements (2026-10-15)
 

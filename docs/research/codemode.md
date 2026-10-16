@@ -99,6 +99,49 @@ Juno's [Codex harness](../../packages/agent/src/providers/codex/harness.ts) alre
 3. Prove fake flows: discover one schema, parallel reads, preserve citations, throw after partial success, block every non-read child, demote a changed schema, stop during a call, restart during a read, and redact a consumed result. Check that raw or filtered untrusted data never authorizes anything. Verify OpenRouter's JSON tool path and the fake Codex loopback path.
 4. Package and test the worker and WASM in Electron. Measure latency, billed-token behaviour and task completion on the same synthetic workloads with direct tools and codemode. Ship the read-only flag only after those results support it. Coordinate future write support with `auto-review-1`; it is outside this adoption.
 
+## Implementation (codemode-1)
+
+**Observed.** Steps 2 to 4 of the plan above are built behind the `agent.codemode` flag, off by default (`AgentConfig.codemode`, set by main from `JUNO_AGENT_CODEMODE=1`). Step 1, narrowing `find_tools`, was already on main. The agent README's "Codemode for reads" lists the details. In short:
+
+- pi-durable's `./codemode` tool, unchanged, scoped in `runtime/codemode.ts`. A script's `api.agent()` lists only the explicit read list in `scripts/index.ts` (the six Slack reads and `connection_read`), its `api.executeTool()` refuses any other name, and the `pi.tool` hook refuses a script's child call that is not on the list. `connection_read` runs only tools on the reviewed read tier; a server's read-only mark is not enough. `models: false`, store writes dropped, no `env`.
+- Each child call's arguments and outcome are in `script_calls` and on the Activity page.
+- Message handles survive: a script's Slack read is the same host tool, so its lines carry `m1`, `m2` and citations resolve (`test/codemode.test.ts`, `e2e/juno-agent/codemode.spec.ts`).
+- Caps: 40 calls, 4 in flight, 60 s, 16 KB of result, 64 MB heap, 2 workers. The builder counts the codemode section and declaration.
+- Pause and AI off cancel a running script. pi waits for a child call to settle before the script ends, so reads now stop waiting when aborted (`abortable`); the result was not used, and the call is recorded as cancelled.
+- The worker file and `quickjs.wasm` ship next to `agent.js`. The built-app e2e test runs a real script; the packaged smoke test checks a probe script from the asar build.
+- `specs/agent-actions.qnt` gains `scriptNeverAuthorizes` and the `scriptWrite` pair.
+
+**Not done.** Codemode is not offered through the Codex harness. Restart during a script was not tested beyond pi's own replay. No live model was used, so how real models write scripts is **unknown**.
+
+## Measurement
+
+**Observed**, with the scripted model and fake servers only (`bench/codemode.ts`, one round, on 2026-10-16). Each eval case runs as written (direct) and with its Slack reads moved into one script that returns the same text. Three extra multi-step tasks read the fake Notion, Littlebird and T3 servers: discover, search twice, then fetch each hit. The direct version makes independent calls in parallel within a response. Littlebird's two meeting reads are configured as owner-reviewed, because its preset has no reviewed reads.
+
+Tokens are UTF-8 bytes / 4 (pi-ai's faux estimate), not a real tokenizer. Prompt tokens sum every chat request in the task. The scripted model gives the same answer whatever it is sent, so turns, sizes and success measure the tool path, not model behaviour. Success means every eval check passed (scripted judge), or for the connection tasks, the facts in the answer were in what the model read.
+
+| Set | Mode | Model turns | Prompt tokens | Completion tokens | Wall ms | Success |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| 20 eval cases | direct | 47 | 155,120 | 1,535 | 5,915 | 20/20 |
+| 20 eval cases | codemode | 46 | 198,290 | 1,954 | 8,609 | 20/20 |
+| Notion: two pages | direct | 4 | 10,068 | 196 | 424 | yes |
+| Notion: two pages | codemode | 3 | 8,915 | 247 | 727 | yes |
+| Littlebird: two meetings | direct | 4 | 10,051 | 198 | 506 | yes |
+| Littlebird: two meetings | codemode | 3 | 8,965 | 225 | 514 | yes |
+| T3: three running threads | direct | 4 | 10,714 | 206 | 972 | yes |
+| T3: three running threads | codemode | 3 | 9,091 | 228 | 1,813 | yes |
+| All 23 tasks | direct | 59 | 185,953 | 2,135 | 7,817 | 23/23 |
+| All 23 tasks | codemode | 55 | 225,261 | 2,654 | 11,663 | 23/23 |
+
+What the numbers say:
+
+- The codemode section and declaration add about 1,000 prompt tokens to every request, whether or not a script runs (`simple-arithmetic`: 3,130 to 4,112).
+- Most eval cases make one read per response, so a script saves no turn and costs that overhead plus about 30 completion tokens of code. Only `card-task-after-read`, with two read responses in a row, saves a turn, and it about breaks even on prompt tokens.
+- On the multi-step connection tasks, a script saves one of four turns and 11 to 15% of prompt tokens. It spends 10 to 25% more completion tokens on code.
+- Wall time is higher with codemode: about 100 to 300 ms per script for the worker and VM, more when it runs many calls (T3: 1,813 against 972 ms). Model latency, which dominates live runs, is not in these numbers; one fewer turn would save one model round trip.
+- Wall times are from a single round on a shared Mac and are noisy (`remember` direct took 679 ms with no script involved).
+
+**Inferred.** Codemode should stay off by default. Most of Juno's tasks need one read, and there it costs about a quarter more prompt tokens and is slower. It only pays off on multi-step reads, and there the saving is one turn and about an eighth of prompt tokens, measured on scripted answers. Before turning it on, measure live models: whether they write correct scripts, and whether the saved round trip outweighs the section's cost. Offering the codemode section only when a request is likely to need several reads would also remove most of the fixed cost.
+
 ## Reproduce the fixture measurement
 
 Use a fresh disposable agent directory **inside this worktree**, Node 26.11.1 and the frozen lockfile. The measurement used this procedure, with no live endpoints:
