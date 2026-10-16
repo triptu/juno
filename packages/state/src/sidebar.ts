@@ -167,7 +167,10 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
     // Finishing sync is not a reason to reorder a painted list. The next live
     // activity or an explicit filter change resumes the ordinary recency order.
     if (shown.meta === next.meta) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
-    if (syncing || quietDays > shown.quietDays) {
+    // A catch-up keeps a painted list in place. The first sync builds the list, so its rows take their places as they land
+    // and nothing re-sorts when it ends.
+    const firstSync = status._tag === 'Success' && 'first' in status.value.phase && status.value.phase.first === true
+    if ((syncing && !firstSync) || quietDays > shown.quietDays) {
       const kept = shown.order.filter((id) => next.rows.has(id))
       const known = new Set(kept)
       const order = [...kept, ...next.order.filter((id) => !known.has(id))]
