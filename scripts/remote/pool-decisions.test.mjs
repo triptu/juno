@@ -40,3 +40,7 @@ test('zero idle window still protects live and kept machines', () => {
 test('each release can set its idle window independently of the watcher', () => {
   assert.deepEqual(decide({ idleMs: 60_000, states: [state('short', { idleMs: 1000, lastUsed: now - 2000 }), state('long', { idleMs: 300_000, lastUsed: now - 120_000 })] }), ['short'])
 })
+
+test("Namespace's idle image builders do not count against the cap", () => {
+  assert.deepEqual(capacity([instance('tracked'), { cluster_id: 'builder', labels: { 'nsc.purpose': 'builder' }, shape: { virtual_cpu: 16 } }], [state('tracked')]), { tracked: 4, untracked: 0 })
+})

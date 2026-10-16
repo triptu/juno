@@ -20,7 +20,13 @@ export function machinesToDestroy({ instances, states, pending, owner, now, idle
   return [...result]
 }
 
-export function capacity(instances, states) {
+/**
+ * Cores in use against the cap. Namespace's image builders (nsc.purpose=builder)
+ * stay up idle after a build and are not ours to release; counting them would
+ * stop every run while they linger without saving their cost.
+ */
+export function capacity(allInstances, states) {
+  const instances = allInstances.filter((instance) => instance.labels?.['nsc.purpose'] !== 'builder')
   const ids = new Set(states.map((state) => state.id))
   // A create can finish after the inventory read and replace its pending reservation.
   const visible = new Set(instances.map((instance) => instance.cluster_id))
