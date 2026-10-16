@@ -169,7 +169,13 @@ describe('cold boot', () => {
     await quiet(engine)
     const history = apiCalls(engine, 'conversations.history')
     expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
-    expect(callMap(engine)).toEqual({
+    const { 'edge:users/info': namesCalls, ...calls } = callMap(engine)
+    // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
+    // on; a getView page or a preview search page names everyone on it in one call. The preview search runs beside
+    // history, so which of them first names a sender varies; never a call per row.
+    expect(namesCalls).toBeGreaterThanOrEqual(3)
+    expect(namesCalls).toBeLessThanOrEqual(4)
+    expect(calls).toEqual({
       'api:presence.set': 1,
       'api:auth.test': 1,
       'api:client.getWebSocketURL': 1,
@@ -184,11 +190,9 @@ describe('cold boot', () => {
       'api:conversations.history': activeMains,
       // The latest reply of the unfollowed threads with recent activity, for their preview.
       'api:conversations.replies': 2,
-      // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
-      'api:search.modules.messages': 2,
-      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
-      // on; a getView page names everyone on it in one call.
-      'edge:users/info': 4,
+      // The preview search after the quick start, then discovery over the window at the end of the cold boot:
+      // more than 50 messages each, so two pages each.
+      'api:search.modules.messages': 4,
       'edge:emojis/list': 1,
       // User group handles, once per boot.
       'api:usergroups.list': 1,
@@ -198,7 +202,7 @@ describe('cold boot', () => {
   })
 
   it('is usable after the quick steps, before any history, and fills in without a reload', async () => {
-    // Every history answer and the discovery search wait: the boot cannot get past its quick steps on its own.
+    // Every history answer and every search (the preview search, then discovery) wait: the boot cannot get past its quick steps on its own.
     const engine = await startTestEngine({
       initial: (fake) => {
         fake.holdNext({ method: 'conversations.history', times: 100 })
@@ -227,8 +231,10 @@ describe('cold boot', () => {
     engine.fake.release({ method: 'conversations.history' })
     await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
     await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
-    // The discovery search runs before the boot ends: held, it keeps the sync from reaching live.
-    await waitFor(() => (engine.fake.heldCount({ method: 'search.modules.messages' }) === 1 ? true : undefined), 10_000, 'the discovery search')
+    // The discovery search runs before the boot ends, beside the held preview search: held, they keep the sync from
+    // reaching live.
+    const discoveryHeld = () => engine.fake.heldCalls({ method: 'search.modules.messages' }).some((args) => args['_x_reason'] === 'discovery')
+    await waitFor(() => (discoveryHeld() ? true : undefined), 10_000, 'the discovery search')
     expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
     engine.fake.release()
     await engine.phase('live')
@@ -1015,7 +1021,8 @@ describe('cold boot details (review M3 finding 10)', () => {
   it('finishes a cold boot whose discovery sweep fails, and the next sweep searches the same gap', async () => {
     const engine = await startTestEngine({
       initial: (fake) => {
-        fake.forceError({ method: 'search.modules.messages', error: 'not_allowed' })
+        // The preview search after the quick start, then the discovery sweep.
+        fake.forceError({ method: 'search.modules.messages', error: 'not_allowed', times: 2 })
         return fake.signIn()
       },
     })
@@ -1023,7 +1030,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     await engine.phase('live', 30_000)
     await quiet(engine)
     const searches = () => apiCalls(engine, 'search.modules.messages')
-    expect(searches().map((c) => c.ok)).toEqual([false])
+    expect(searches().map((c) => [c.args['_x_reason'], c.ok])).toEqual([['previews', false], ['discovery', false]])
     engine.fake.resetCalls()
     engine.fake.dropSocket()
     await engine.phase('offline')

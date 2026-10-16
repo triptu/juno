@@ -16,8 +16,9 @@
  *   reserves in the daily spend cap (`AiSpend`).
  * - A call that did not finish waits a minute before its thread is asked
  *   again, and counts toward the budget until the day ends. No key or the
- *   cap stops the pass with no call counted; a key change or a link to the
- *   agent's ledger starts a new pass. AI assist off stops new calls.
+ *   cap stops the pass with no call counted; a key change, a link to the
+ *   agent's ledger or its word that it has room again (the owner raised the
+ *   cap) starts a new pass at once. AI assist off stops new calls.
  */
 import { AiProvider, cacheKeyOf, tasks } from '@juno/ai'
 import { quietDaysOf, type TopicId } from '@juno/domain'

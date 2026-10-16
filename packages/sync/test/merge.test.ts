@@ -88,6 +88,7 @@ describe('mergeMessage', () => {
     expect(match.applyReactions).toBe(false)
     expect(match.row).toMatchObject({ text: 'the plan', files_json: stored.files_json, blocks_json: stored.blocks_json, reply_count: 4 })
     expect(match.row.files_json).not.toBeNull()
+    expect(match.row.partial).toBe(0)
 
     // A reply stored without its thread learns it from the match.
     const orphan = toMessageRow(C, message({ ts: ts(2), text: 'a reply' }))
@@ -99,6 +100,11 @@ describe('mergeMessage', () => {
     const created = mergeMessage(undefined, message({ ts: ts(4), text: 'new', reactions: [{ name: 'eyes', users: ['U0LEO'], count: 1 }] }), C, partial(5))
     expect(created.row.text).toBe('new')
     expect(created.applyReactions).toBe(false)
+    // What a match created or filled stays partial until a page brings the whole message and its reactions.
+    expect([filled.row.partial, created.row.partial]).toEqual([1, 1])
+    const full = mergeMessage(created.row, message({ ts: ts(4), text: 'new', reactions: [{ name: 'eyes', users: ['U0LEO'], count: 1 }] }), C, page(6))
+    expect(full.row.partial).toBe(0)
+    expect(full.applyReactions).toBe(true)
   })
 
   it('a message the store already has verbatim is not a change', () => {

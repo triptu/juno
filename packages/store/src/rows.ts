@@ -30,6 +30,8 @@ export interface MessageRow {
   readonly latest_reply: string | null
   readonly reply_users_json: string | null
   readonly last_event_ts: string | null
+  /** 1 when the content came from a search match: no reactions, files or blocks yet (`@juno/sync` merge rules). */
+  readonly partial: Flag
   readonly version: number
 }
 

@@ -88,6 +88,8 @@ export class JunoHost extends Context.Service<
     readonly spend?: {
       readonly asks: Stream.Stream<ReadonlyArray<HostSpendAsk>>
       readonly answer: (answer: { readonly id: string; readonly ask: 'reserve' | 'settle'; readonly result: 'reserved' | 'blocked' | 'settled' }) => Effect.Effect<void>
+      /** The ledger may have room again; the jobs that stopped at the cap start a new pass. */
+      readonly room: Effect.Effect<void>
     }
     /** Records one of the agent's model calls in the AI activity log. Never fails; a record with no workspace open is dropped. */
     readonly ai?: { readonly record: (call: HostAiCall) => Effect.Effect<void> }

@@ -301,6 +301,7 @@ const regressions = [
   ['requestqueue', 'pauseWhileQueued', 'respectsPause', 'requestqueue-queued-pause'],
   ['requestqueue', 'methodSpacing', 'methodSpaced', 'requestqueue-method-spacing'],
   ['discovery', 'rootsFirst', 'noRedundantLookup', 'discovery-roots-first'],
+  ['discovery', 'partialOpen', 'openedHasFull', 'discovery-partial-open'],
   ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page'],
   ['follow', 'lateEvent', 'acceptedUnfollow', 'accepted-unsubscribe-late-event'],
   ['follow', 'pendingPage', 'acceptedUnfollow', 'accepted-unsubscribe-pending-page'],

@@ -126,7 +126,13 @@ export const hostSpendAnswer = Rpc.make('host.spend.answer', {
   payload: { id: Schema.String, ask: Schema.Literals(['reserve', 'settle']), result: Schema.Literals(['reserved', 'blocked', 'settled']) },
   success: Schema.Void,
 })
-export const HostSpendRpcs = RpcGroup.make(hostSpendAsks, hostSpendAnswer)
+/**
+ * The ledger may have room again: the cap went up, the owner allowed another
+ * dollar, or a release followed a refusal. The host wakes the background jobs
+ * that stopped at the cap, so they do not wait for their timer.
+ */
+export const hostSpendRoom = Rpc.make('host.spend.room', { success: Schema.Void })
+export const HostSpendRpcs = RpcGroup.make(hostSpendAsks, hostSpendAnswer, hostSpendRoom)
 
 /**
  * One model call for the AI activity log in Settings › Juno, or one the cap

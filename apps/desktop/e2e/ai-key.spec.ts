@@ -59,7 +59,7 @@ test('a saved key starts art and titles for recent topics, survives an engine re
     const afterRestart = post('Kafka retention. The consumer lag alert keeps firing overnight.')
     await expect(afterRestart).toHaveAttribute('data-title-source', 'ai', { timeout: 30_000 })
 
-    // A $0 daily cap blocks the engine's calls too; raising it lets the title through.
+    // A $0 daily cap blocks the engine's calls too; raising it wakes the title job, which does not wait for its 30 s timer.
     const cap = page.getByLabel('Daily cap in dollars')
     await cap.fill('0')
     await cap.press('Enter')
@@ -72,7 +72,7 @@ test('a saved key starts art and titles for recent topics, survives an engine re
     expect(await calls()).toEqual(capped)
     await cap.fill('2')
     await cap.press('Enter')
-    await expect(atCap).toHaveAttribute('data-title-source', 'ai', { timeout: 45_000 })
+    await expect(atCap).toHaveAttribute('data-title-source', 'ai', { timeout: 8_000 })
 
     // Removing the key stops new calls at once.
     await page.getByRole('button', { name: 'Remove', exact: true }).click()

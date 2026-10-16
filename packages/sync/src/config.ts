@@ -32,6 +32,8 @@ export interface SyncConfigShape {
   /** Matches per search page and pages per sweep. */
   readonly searchPageCount: number
   readonly searchMaxPages: number
+  /** Pages of the cold boot's preview search (`searchPreviews`), newest messages first. 0 skips it. */
+  readonly previewSearchPages: number
   /** Most history pages fetched for one conversation when catching up since a cursor. */
   readonly catchUpPages: number
   /** Wait before a failed boot is tried again. */
@@ -57,6 +59,7 @@ export const defaultSyncConfig: SyncConfigShape = {
   discovery: 'search',
   searchPageCount: 50,
   searchMaxPages: 3,
+  previewSearchPages: 2,
   catchUpPages: 5,
   bootRetryMillis: 30_000,
   recheckTopics: 10,

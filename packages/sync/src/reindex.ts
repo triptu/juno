@@ -21,6 +21,8 @@
  *   their history lands; a stored row with `message_count = 0` is
  *   provisional and keeps following `channel_reads` until history or an
  *   event replaces it, or a synced range without Main messages removes it.
+ *   Until a synced range exists, a Main with messages keeps at least the
+ *   activity `client.counts` reported, so a search preview does not move it down.
  */
 import {
   compareTs,
@@ -192,8 +194,11 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       countersActivity = latestReply ?? undefined
     } else {
       const range = yield* latestSyncedRange(channel)
-      const counts = yield* sql<{ has_unreads: 0 | 1; mention_count: number }>`SELECT has_unreads, mention_count FROM channel_reads WHERE channel = ${channel}`
+      const counts = yield* sql<{ has_unreads: 0 | 1; mention_count: number; latest: string | null }>`SELECT has_unreads, mention_count, latest FROM channel_reads WHERE channel = ${channel}`
       const kind = yield* sql<{ kind: string }>`SELECT kind FROM conversations WHERE id = ${channel}`
+      // Before history, the stored messages (a search preview, an event) may be older than the activity `client.counts`
+      // reported, and the row must not drop down the list until its history lands.
+      if (range === undefined) countersActivity = counts[0]?.latest ?? undefined
       historyComplete = range !== undefined && reads.lastReadTs !== undefined && compareTs(range.from_ts, reads.lastReadTs) <= 0
       if (!historyComplete && counts[0]?.has_unreads === 1) unreadFloor = 1
       const isDm = kind[0]?.kind === 'im' || kind[0]?.kind === 'mpim'

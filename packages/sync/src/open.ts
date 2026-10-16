@@ -7,8 +7,9 @@
  *
  * - A thread the first time: its replies from the root, in pages of 100,
  *   at most `OPEN_FETCH_MAX`; a very long thread starts at the read pointer
- *   instead, so every unread reply is stored. Once every reply is stored,
- *   later opens ask only for replies after the newest stored one.
+ *   instead, so every unread reply is stored. Once every reply is stored
+ *   in full (a search match is not), later opens ask only for replies after
+ *   the newest stored one.
  * - Main: `conversations.history` since the newest synced range (the newest
  *   page when there is none), then older pages until history reaches the
  *   read pointer, at most `OPEN_FETCH_MAX` messages. Each page records the
@@ -80,7 +81,7 @@ type RootContent = Pick<MessageRow, 'reply_count' | 'user_id' | 'text' | 'blocks
 
 interface ThreadCoverage {
   readonly root: RootContent | undefined
-  /** Live replies stored. */
+  /** Live replies stored in full: a search match (`partial`) lacks reactions, files and blocks, so it does not count. */
   readonly stored: number
   readonly newest: string | undefined
   readonly oldest: string | undefined
@@ -92,7 +93,7 @@ const threadCoverage = (channel: string, threadTs: string): Effect.Effect<Thread
     const root = yield* readMessage(channel, threadTs)
     const rows = yield* sql<{ n: number; newest: string | null; oldest: string | null }>`
       SELECT count(*) AS n, max(ts) AS newest, min(ts) AS oldest FROM messages
-      WHERE channel = ${channel} AND thread_ts = ${threadTs} AND ts <> ${threadTs} AND deleted = 0`
+      WHERE channel = ${channel} AND thread_ts = ${threadTs} AND ts <> ${threadTs} AND deleted = 0 AND partial = 0`
     return { root, stored: rows[0]?.n ?? 0, newest: rows[0]?.newest ?? undefined, oldest: rows[0]?.oldest ?? undefined }
   })
 
