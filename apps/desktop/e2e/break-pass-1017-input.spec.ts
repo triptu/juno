@@ -80,6 +80,8 @@ test('Enter right after typing in the conversation search picks the match', asyn
   await juno.signIn()
   await juno.waitForSync()
   await juno.tabs.menu('new-chat')
+  // As a person types once the new tab shows its composer.
+  await expect(juno.newChat.composer).toBeFocused()
   await juno.win.keyboard.type('Typed fast')
   await juno.win.keyboard.press('Enter')
   await expect(juno.newChat.search).toBeFocused()
@@ -89,6 +91,9 @@ test('Enter right after typing in the conversation search picks the match', asyn
   await expect(juno.newChat.composer).toBeFocused()
   await juno.win.keyboard.press('Enter')
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typed fast').length).toBe(1)
+  // Nothing typed went to the launch tab's New chat.
+  await juno.tabs.selectAt('New chat', 0)
+  await expect(juno.newChat.composer).toHaveValue('')
 })
 
 test('the inline edit field suggests emoji, and Esc there closes the list, not the edit', async ({ juno, fake }) => {
