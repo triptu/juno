@@ -326,7 +326,8 @@ function pageUrl(base: string, launch: Launch): string {
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
-  if (launch.privacy === true) url.searchParams.set('privacy', 'on')
+  // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
+  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacyBySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()

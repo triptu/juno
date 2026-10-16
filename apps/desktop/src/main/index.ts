@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
-import { Events, type NotificationTarget } from '@juno/contract'
+import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
@@ -15,6 +16,7 @@ import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { Notifier, type ShownNotification } from './notifier'
+import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
@@ -44,6 +46,29 @@ function updateLaunch(patch: Partial<Launch>): void {
   launch = { ...launch, ...patch }
   launchFile.write(launch)
 }
+
+/**
+ * Privacy mode changes here (SPEC section 5): from the renderer when the user
+ * toggles it (`bySharing` false), or from the screen watch when sharing
+ * starts or ends, which also tells the app window.
+ */
+function setPrivacy(privacy: boolean, bySharing: boolean, fromSharing: boolean): void {
+  updateLaunch({ privacy, privacyBySharing: bySharing })
+  setMenuPrivacy(privacy)
+  if (!fromSharing) return
+  const state: PrivacyState = { privacy, sharing: bySharing }
+  appWindow()?.webContents.send(Events.privacyChanged, state)
+}
+
+/** Under JUNO_E2E a test says whether the screen is shared (`junoTest.screenShared`); the real probe never runs. */
+let sharedForTests = false
+
+const screenWatch = createScreenWatch({
+  load: e2e ? () => Promise.resolve<ScreenProbe>(() => sharedForTests) : () => loadScreenProbe().then((loaded) => loaded?.probe),
+  enabled: () => launch.hideWhileSharing !== false,
+  privacy: () => ({ on: launch.privacy === true, bySharing: launch.privacyBySharing === true }),
+  setPrivacy: (privacy, bySharing) => setPrivacy(privacy, bySharing, true),
+})
 
 const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }))
 
@@ -155,13 +180,18 @@ app.whenReady().then(() => {
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
-    setPrivacy: (privacy) => {
-      updateLaunch({ privacy })
-      setMenuPrivacy(privacy)
-    },
+    // The user's own choice: sharing no longer owns the mode, so it stays as they set it.
+    setPrivacy: (privacy) => setPrivacy(privacy, false, false),
     setSidebar: (sidebar) => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
+    },
+    sharing: {
+      get: () => ({ hide: launch.hideWhileSharing !== false, available: screenWatch.available() }),
+      set: (hide) => {
+        updateLaunch({ hideWhileSharing: hide })
+        return { hide, available: screenWatch.available() }
+      },
     },
   })
 
@@ -185,8 +215,13 @@ app.whenReady().then(() => {
 
 function openWindow(): BrowserWindow {
   const window = createMainWindow(() => launch)
-  window.once('ready-to-show', () => supervisor.send({ _tag: 'painted' }))
+  window.once('ready-to-show', () => {
+    supervisor.send({ _tag: 'painted' })
+    // After the first paint, so loading koffi never delays it. Only while the window is open.
+    screenWatch.start()
+  })
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
+  window.on('closed', () => screenWatch.stop())
   return window
 }
 
@@ -195,6 +230,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  screenWatch.stop()
   updates.stop()
   supervisor.stop()
   agent.stop()
@@ -208,6 +244,16 @@ app.on('will-quit', (event) => {
   event.preventDefault()
   void pending.then(() => app.quit())
 })
+
+// The packaged smoke test (JUNO_E2E_SCREEN_PROBE): the real probe loads once from the asar and
+// writes which symbol it called, since tests otherwise use the seam above.
+if (e2e && process.env.JUNO_E2E_SCREEN_PROBE === '1') {
+  void app.whenReady().then(async () => {
+    const loaded = await loadScreenProbe()
+    const result = loaded === undefined ? { symbol: null } : { symbol: loaded.symbol, value: typeof loaded.probe() }
+    await writeFile(join(app.getPath('userData'), 'screen-watch-probe.json'), JSON.stringify(result))
+  })
+}
 
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
 // is out of reach, so main exposes what tests need to know about it.
@@ -228,6 +274,11 @@ if (e2e) {
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       wake: () => notifier.wake(),
+      // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
+      screenShared: (shared: boolean) => {
+        sharedForTests = shared
+        return screenWatch.poll()
+      },
     },
   })
 }

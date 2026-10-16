@@ -82,6 +82,17 @@ const bridge: JunoBridge = {
     setDensity: (density) => ipcRenderer.invoke(Channels.launchSetDensity, { density }),
     setPrivacy: (privacy) => ipcRenderer.invoke(Channels.launchSetPrivacy, { privacy }),
     setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),
+    onPrivacy: (listener) => {
+      const forward = (_event: unknown, state: unknown) => listener(state)
+      ipcRenderer.on(Events.privacyChanged, forward)
+      return () => {
+        ipcRenderer.off(Events.privacyChanged, forward)
+      }
+    },
+  },
+  sharing: {
+    get: () => ipcRenderer.invoke(Channels.sharingGet),
+    set: (hide) => ipcRenderer.invoke(Channels.sharingSet, { hide }),
   },
   contextMenu: {
     popup: (items, at) =>

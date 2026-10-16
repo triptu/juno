@@ -28,10 +28,15 @@ export interface SettingsGeneralProps {
   readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
+  /** Privacy mode turns on while the screen is shared (SPEC section 5). */
+  readonly hideWhileSharing: boolean
+  /** False where Juno cannot tell that the screen is shared: the switch is off and disabled. */
+  readonly sharingAvailable: boolean
+  readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Slack read mirroring and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, hideWhileSharing, sharingAvailable, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -59,6 +64,15 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
             {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
               : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
           </div>
+        </Surface>
+      </Section>
+      <Section heading="Screen sharing">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Hide message text while sharing the screen" checked={sharingAvailable && hideWhileSharing} disabled={!sharingAvailable}
+            onChange={(event) => onHideWhileSharingChange(event.currentTarget.checked)}
+            description={sharingAvailable
+              ? 'When another app starts recording or sharing the screen, Juno hides message text as ⌃⌘H does, and shows it again when that stops.'
+              : 'This Mac does not tell Juno when the screen is shared. Use ⌃⌘H to hide message text.'} />
         </Surface>
       </Section>
       <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">

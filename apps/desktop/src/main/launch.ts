@@ -22,6 +22,11 @@ export const Launch = Schema.Struct({
   density: Schema.optionalKey(DensitySchema),
   // Privacy mode (SPEC section 5): message text blurred for screen sharing. It stays on across a relaunch.
   privacy: Schema.optionalKey(Schema.Boolean),
+  // Privacy mode was turned on because the screen is being shared, and the user has not touched it
+  // since, so it turns off again when sharing ends, even after a relaunch (screenWatch.ts).
+  privacyBySharing: Schema.optionalKey(Schema.Boolean),
+  // Settings › General, "Hide message text while sharing the screen". On when absent.
+  hideWhileSharing: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
 })

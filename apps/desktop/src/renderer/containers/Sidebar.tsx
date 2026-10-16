@@ -7,6 +7,7 @@ import {
   notificationStatusAtom,
   popupContextMenu,
   privacyAtom,
+  privacySharingAtom,
   registry,
   setPresence,
   sidebarDotAtom,
@@ -103,6 +104,7 @@ export function Sidebar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
   const privacy = useAtomValue(privacyAtom)
+  const privacySharing = useAtomValue(privacySharingAtom)
   // Whether the list may still change: the engine is not live, or a sync cycle runs. Two booleans, so a status tick re-renders nothing.
   const connected = useAtomValue(connectionStateAtom, (state) => state === 'connected')
   const caughtUp = useAtomValue(engineStatusAtom, (engine) => engine._tag === 'Success' && engine.value.phase._tag === 'live' && !engine.value.syncing)
@@ -176,6 +178,7 @@ export function Sidebar() {
       onClearScope={clearScope}
       {...(syncStatus ? { status: <SyncNotice /> } : {})}
       privacy={privacy}
+      privacySharing={privacySharing}
       onPrivacyOff={() => setPrivacy(false)}
       syncing={!connected || !caughtUp}
     >

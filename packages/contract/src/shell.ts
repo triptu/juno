@@ -124,6 +124,18 @@ export const UpdateState = Schema.Union([
 ])
 export type UpdateState = typeof UpdateState.Type
 
+/**
+ * Privacy mode as main set it when sharing started or ended (SPEC section 5):
+ * `sharing` is true while the mode is on because the screen is shared, so
+ * the sidebar footer says why.
+ */
+export const PrivacyState = Schema.Struct({ privacy: Schema.Boolean, sharing: Schema.Boolean })
+export type PrivacyState = typeof PrivacyState.Type
+
+/** "Hide message text while sharing the screen": `available` is false where Juno cannot tell (the call is missing). */
+export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, available: Schema.Boolean })
+export type SharingSetting = typeof SharingSetting.Type
+
 /** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */
 export const DownloadResult = Schema.Literals(['saved', 'failed'])
 export type DownloadResult = typeof DownloadResult.Type
@@ -156,6 +168,8 @@ export const ShellRoutes = {
   [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },
   [Channels.launchSetPrivacy]: { input: Schema.Struct({ privacy: Schema.Boolean }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
+  [Channels.sharingGet]: { input: Schema.Void, output: SharingSetting },
+  [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },
