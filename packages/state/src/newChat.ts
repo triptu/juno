@@ -2,15 +2,17 @@
  * New chat (spec section 9): what each New chat tab holds, the pickers'
  * live queries. Sending is `send.ts`.
  *
- * A New chat tab keeps its draft and its destination in `newChatAtom(tabId)`
- * while the app runs, so they survive every change of destination and a
- * switch to another tab. The destination is a conversation and, inside it,
- * a thread or Main (no thread).
+ * A New chat tab keeps its draft and its destination in `newChatAtom(tabId)`,
+ * so they survive every change of destination and a switch to another tab.
+ * They are saved with the tab (`setNewChat` in `tabs.ts`) and read back from
+ * it after a restart, as a topic's draft is. The destination is a
+ * conversation and, inside it, a thread or Main (no thread).
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { newChatConversations, newChatThreads, newChatFrequent, type MentionPick, type PickConversation, type PickThread, type SendTarget } from '@juno/contract'
 import { liveQuery } from './atoms'
+import { savedNewChatAtom } from './tabs'
 
 export interface NewChat {
   /** The text as the field shows it. */
@@ -24,8 +26,16 @@ export interface NewChat {
 
 export const emptyNewChat: NewChat = { draft: '', mentions: [], conversation: undefined, thread: undefined }
 
-/** Each New chat tab's draft and destination, by tab id. */
-export const newChatAtom = Atom.family((_tabId: string) => Atom.make<NewChat>(emptyNewChat).pipe(Atom.keepAlive))
+/** Changed in this run of the app, by tab id. Until the first change, the saved one shows. */
+const changedNewChatAtom = Atom.family((_tabId: string) => Atom.make<NewChat | undefined>(undefined).pipe(Atom.keepAlive))
+
+/** Each New chat tab's draft and destination, by tab id. Write it with `setNewChat`, which also saves it. */
+export const newChatAtom = Atom.family((tabId: string) =>
+  Atom.writable(
+    (get): NewChat => get(changedNewChatAtom(tabId)) ?? get(savedNewChatAtom(tabId)) ?? emptyNewChat,
+    (ctx, value: NewChat) => ctx.set(changedNewChatAtom(tabId), value),
+  ).pipe(Atom.keepAlive),
+)
 
 /** Nothing written and nothing picked: ⌘N focuses this tab instead of opening another. */
 export const untouched = (chat: NewChat): boolean => chat.draft.trim() === '' && chat.conversation === undefined

@@ -69,6 +69,13 @@ describe('PiAiProvider decisions', () => {
     expect(faux.state.callCount).toBe(1)
   })
 
+  it('never retries a grammar request with invalid output', async () => {
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('grammar', { prose: 'rewrite it' }))])
+    const decision = await Effect.runPromise(provider.decide(tasks.grammarCheck, { draft: 'its broken' }))
+    expect(noDecision(decision)).toEqual({ reason: 'invalid-output', attempts: 1 })
+    expect(faux.state.callCount).toBe(1)
+  })
+
   it('retries once on invalid tool output, then takes the valid answer', async () => {
     const { provider, faux } = scripted([
       fauxAssistantMessage(fauxToolCall('route', { replyTo: 'not-a-topic', confidence: 0.8 })),
@@ -112,6 +119,35 @@ describe('PiAiProvider decisions', () => {
     const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
     expect(noDecision(decision)).toEqual({ reason: 'missing-key', attempts: 0 })
     expect(faux.state.callCount).toBe(0)
+  })
+
+  it('reserves before the request and settles the reported cost; at the cap it makes no request', async () => {
+    const asked: number[] = []
+    const settled: Array<number | undefined> = []
+    let open = true
+    const admit = (upper: number) => Effect.sync(() => {
+      asked.push(upper)
+      return open ? { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) } : { _tag: 'Blocked' as const }
+    })
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))], { ...chatConfig, admit })
+    const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
+    expect(decision).toMatchObject({ _tag: 'Decided' })
+    expect(asked).toHaveLength(1)
+    expect(asked[0]).toBeGreaterThanOrEqual(decision.meta.costUsd ?? 0)
+    expect(settled).toEqual([decision.meta.costUsd])
+    open = false
+    expect(noDecision(await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput)))).toEqual({ reason: 'budget', attempts: 0 })
+    expect(faux.state.callCount).toBe(1)
+    expect(settled).toHaveLength(1)
+  })
+
+  it('keeps the whole reservation when the cost is unknown: a timeout', async () => {
+    const settled: Array<number | undefined> = []
+    const admit = () => Effect.succeed({ _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) })
+    const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
+    const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
+    expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
+    expect(settled).toEqual([undefined])
   })
 
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {

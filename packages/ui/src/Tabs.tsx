@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { colors, layout, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
@@ -94,7 +94,8 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
     onClose?.()
   }
 
-  const activate = activateHandlers<HTMLDivElement>(onSelect)
+  // A press does not focus the tab: the page it shows takes focus, as in Safari. The keyboard still moves focus in the strip.
+  const activate = activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true })
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onClose !== undefined && event.target === event.currentTarget && (event.key === 'Delete' || event.key === 'Backspace')) {
       event.preventDefault()
@@ -141,6 +142,8 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
         <TabContent icon={icon} leading={leading} label={label} pinned={pinned} dot={dot} />
       </div>
       {onClose ? <TabClose id={closeId} label={closeLabel} active={active} onClose={close} /> : null}
+      <span aria-hidden data-tab-divider="" {...stylex.props(styles.divider)} />
+      <span aria-hidden data-tab-cover="" {...stylex.props(styles.cover)} />
     </div>
   )
 }
@@ -194,14 +197,36 @@ const styles = stylex.create({
     containerName: 'tab',
     WebkitAppRegion: 'no-drag',
   },
+  // Above its neighbours, so its shadow and its cover (below) paint over them.
   boxActive: {
+    zIndex: 1,
     color: colors['--foreground-default'],
+    '--tab-divider-opacity': '0',
+    '--tab-cover-opacity': '1',
   },
   // On the box, so the pointer on the close button still counts as on the tab.
   boxInactive: {
+    zIndex: { default: 'auto', ':hover': { default: null, [HOVER]: 1 } },
     color: {
       default: colors['--foreground-subtle'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
+    },
+    // The tab's fill, read by the tab and by what sits on it (the narrow
+    // close button's backing, the pinned dot's ring).
+    '--tab-fill': {
+      default: colors['--tab-strip'],
+      ':hover': { default: null, [HOVER]: colors['--tab-hover'] },
+    },
+    // A hovered tab hides its own divider and covers its right neighbour's.
+    // The first tab has nothing to its left.
+    '--tab-divider-opacity': {
+      default: '1',
+      ':first-child': '0',
+      ':hover': { default: null, [HOVER]: '0' },
+    },
+    '--tab-cover-opacity': {
+      default: '0',
+      ':hover': { default: null, [HOVER]: '1' },
     },
     // Read by the close button on a narrow tab: shown while the pointer or
     // the keyboard is on the tab.
@@ -244,15 +269,22 @@ const styles = stylex.create({
   tabClosableInactive: {
     paddingInlineEnd: { default: `calc(${spacing['--space-1-5']} + ${sizes['--control-20']} + ${spacing['--space-2']})`, [NARROW_TAB]: spacing['--space-1-5'] },
   },
+  // Lifted out of the strip and joined to the page below: the page's fill,
+  // a border on three sides and a shadow that falls only up and sideways.
   tabActive: {
     backgroundColor: colors['--background'],
-    borderTopColor: colors['--border-default'],
-    borderLeftColor: colors['--border-default'],
-    borderRightColor: colors['--border-default'],
+    borderTopColor: colors['--border-strong'],
+    borderLeftColor: colors['--border-strong'],
+    borderRightColor: colors['--border-strong'],
     borderBottomColor: colors['--background'],
+    boxShadow: shadows['--tab-shadow'],
     fontWeight: weights['--weight-medium'],
   },
+  // The strip's fill, or the hover fill, inside the transparent border, so
+  // the strip's bottom edge still runs under a hovered tab.
   tabInactive: {
+    backgroundColor: 'var(--tab-fill)',
+    backgroundClip: 'padding-box',
     fontWeight: weights['--weight-regular'],
   },
   tabPinned: {
@@ -289,7 +321,7 @@ const styles = stylex.create({
     height: sizes['--tab-unread-dot'],
     borderRadius: radii['--radius-full'],
     backgroundColor: colors['--foreground-muted'],
-    boxShadow: `0 0 0 ${PINNED_DOT_RING} ${colors['--background-subtle']}`,
+    boxShadow: `0 0 0 ${PINNED_DOT_RING} var(--tab-fill, ${colors['--background']})`,
     opacity: 0,
   },
   dotShown: {
@@ -315,7 +347,32 @@ const styles = stylex.create({
   // strip's own colour, so appearing moves nothing.
   closeInactive: {
     paddingInlineStart: { default: 0, [NARROW_TAB]: spacing['--space-1'] },
-    backgroundColor: { default: 'transparent', [NARROW_TAB]: colors['--background-subtle'] },
+    backgroundColor: { default: 'transparent', [NARROW_TAB]: 'var(--tab-fill)' },
     opacity: { default: 1, [NARROW_TAB]: 'var(--tab-close-opacity)' },
+  },
+  // The divider at the tab's start, between it and its left neighbour. It
+  // shows only between two inactive tabs that are not hovered: the tab hides
+  // its own, and a hovered or active left neighbour covers it.
+  divider: {
+    position: 'absolute',
+    insetInlineStart: 0,
+    top: `calc((${layout['--tab-height']} - ${sizes['--tab-divider-height']}) / 2)`,
+    width: '1px', // tokens-allow: A hairline divider.
+    height: sizes['--tab-divider-height'],
+    backgroundColor: colors['--tab-divider'],
+    opacity: 'var(--tab-divider-opacity)',
+    pointerEvents: 'none',
+  },
+  // One pixel of the strip just past the tab's end, over the right
+  // neighbour's divider. Shown while this tab is hovered or active.
+  cover: {
+    position: 'absolute',
+    insetInlineEnd: '-1px', // tokens-allow: Over the right neighbour's first pixel, where its divider is.
+    top: `calc((${layout['--tab-height']} - ${sizes['--tab-divider-height']}) / 2)`,
+    width: '1px', // tokens-allow: The width of the divider it covers.
+    height: sizes['--tab-divider-height'],
+    backgroundColor: colors['--tab-strip'],
+    opacity: 'var(--tab-cover-opacity)',
+    pointerEvents: 'none',
   },
 })

@@ -1,0 +1,1 @@
+- 10-16 12:38 · sidebar-row · Sidebar row text has three levels in both themes: title `--foreground-default`, preview the new `--foreground-secondary` (light 28% L, dark #C0BEB8), place and time `--foreground-muted`; unread no longer brightens the preview or time, only the title's weight and the count say unread.

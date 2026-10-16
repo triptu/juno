@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { frequentDestinations } from '../src/frequent'
+import { frequentDestinations, rankConversations } from '../src/frequent'
 
 const DAY = 86_400_000
 const now = 40 * DAY
@@ -34,5 +34,17 @@ describe('frequent destinations', () => {
   it('returns at most six destinations, including fill-ins', () => {
     expect(frequentDestinations(Array.from({ length: 10 }, (_, i) => channel(String(i), i)), [{ channel: '0', at: now }], now))
       .toEqual(['0', '9', '8', '7', '6', '5'])
+  })
+})
+
+describe('ranking conversations for the palette', () => {
+  it('counts visits like sends, so a conversation only read still ranks', () => {
+    const uses = [{ channel: 'read', at: now }, { channel: 'read', at: now - DAY }, { channel: 'sent', at: now - 2 * DAY }]
+    expect(rankConversations([channel('sent'), channel('read'), channel('idle', now)], uses, now)).toEqual(['read', 'sent', 'idle'])
+  })
+
+  it('puts unused names that start with the query before other unused ones, and returns them all', () => {
+    const conversations = [channel('a', now), channel('b', 1), channel('c', 2)]
+    expect(rankConversations(conversations, [{ channel: 'c', at: now }], now, new Set(['b']))).toEqual(['c', 'b', 'a'])
   })
 })

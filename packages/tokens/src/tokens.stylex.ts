@@ -55,11 +55,27 @@ export const colors = stylex.defineVars({
   '--border-strongest': 'hsla(48, 30%, 82%, 1)',
   '--input-border': 'hsla(48, 14%, 82%, 1)',
 
+  // The tab strip, a step below the sidebar so the page-coloured active tab
+  // stands out of it, as in Safari and Finder. Inactive tabs are the strip;
+  // a hovered one takes --tab-hover, and a thin divider separates two
+  // inactive neighbours.
+  '--tab-strip': 'hsla(48, 26%, 94%, 1)',
+  '--tab-hover': 'hsla(48, 24%, 90.5%, 1)',
+  '--tab-divider': 'hsla(48, 14%, 80%, 1)',
+
   // Foreground. Warm neutrals, never pure black. Muted is darkened from the
   // handoff's 52% to 42% lightness so meta text reaches 4.5:1 on paper.
   '--foreground-default': 'hsla(48, 15%, 12%, 1)',
   '--foreground-subtle': 'hsla(48, 8%, 35%, 1)',
   '--foreground-muted': 'hsla(48, 5%, 42%, 1)',
+  // The middle step of a list row's three text levels (title, this, meta):
+  // the sidebar preview. It sits between default and muted in both themes;
+  // subtle is too close to muted in light to read as its own level.
+  '--foreground-secondary': 'hsla(48, 8%, 28%, 1)',
+  // Muted text on a secondary fill (a selected row), where light muted
+  // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
+  // its step below the preview.
+  '--foreground-muted-on-fill': 'hsla(48, 8%, 35%, 1)',
 
   // Ink accent. The default accent theme points --hl at this.
   '--accent-default': 'hsla(48, 30%, 8%, 1)',
@@ -350,6 +366,9 @@ export const shadows = stylex.defineVars({
   // The Juno panel floating over the page: a hairline ring, a tight contact
   // shadow and two wide soft ones, so it lifts without a border.
   '--panel-shadow': '0 0 0 1px oklch(0 0 0 / 0.05), 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -6px oklch(0 0 0 / 0.08), 0 24px 56px -12px oklch(0 0 0 / 0.12)',
+  // The active tab lifted out of the strip: a soft shadow up and to the
+  // sides only, so nothing falls on the page it joins.
+  '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.08)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -818,8 +837,6 @@ export const sizes = stylex.defineVars({
   '--control-22': '22px',
   '--control-24': '24px',
   '--topic-time-width': '48px',
-  '--topic-people-width': '60px',
-  '--topic-tags-width': '76px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
   '--control-26': '26px',
@@ -885,8 +902,14 @@ export const sizes = stylex.defineVars({
   '--slider-width': '200px',
   '--unread-dot': '5px',
   '--tab-unread-dot': '6px',
+  // The divider between two inactive tabs, centred on their height.
+  '--tab-divider-height': '16px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // How far an outset ring reaches past its element: the width plus the
+  // offset. A box that clips (a scroller, paint containment) keeps this much
+  // room around its controls (ringRoom in @juno/ui).
+  '--focus-ring-room': 'calc(var(--focus-ring-width) + var(--focus-ring-offset))',
   // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
   '--privacy-blur': '6px',
 })

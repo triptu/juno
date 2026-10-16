@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ALERTS_MAIN = '#alerts-prod'
 
 test('privacy mode blurs previews from the account menu, hides notification text, survives a relaunch and turns off from the footer', async ({ juno, slack, fake, slackApp, userData, running }) => {

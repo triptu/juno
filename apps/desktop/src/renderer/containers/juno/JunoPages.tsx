@@ -1,7 +1,7 @@
 import { memo, useState, type ReactNode } from 'react'
 import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
-import { copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
+import { aiAssistOnAtom, copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
 import {
   activityPageAtom,
   agentProviderAtom,
@@ -173,6 +173,7 @@ const emptyDrafts: ProviderDrafts = { openRouterKey: '', baseUrl: '', customKey:
  */
 function Providers({ rejected }: { readonly rejected: boolean }) {
   const state = useAtomValue(agentProviderAtom)
+  const aiAssist = useAtomValue(aiAssistOnAtom)
   const [picked, setPicked] = useState<ProviderKind | undefined>(undefined)
   const [drafts, setDrafts] = useState<ProviderDrafts>(emptyDrafts)
   const [urlTouched, setUrlTouched] = useState(false)
@@ -196,6 +197,7 @@ function Providers({ rejected }: { readonly rejected: boolean }) {
   return (
     <ProviderSection
       state={state}
+      engineKeyMissing={aiAssist && state.openRouter.key === 'missing'}
       shown={shown}
       drafts={shownDrafts}
       {...(error === undefined ? {} : { error })}

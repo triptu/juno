@@ -3,6 +3,8 @@
 // the outbox; a failed upload keeps the text and the files for Retry; a
 // message's image opens in the viewer and a file downloads into Downloads.
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import type { Locator, Page } from '@playwright/test'
 import { samplePdf, samplePng } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -12,6 +14,8 @@ test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
+/** Shares four words with the staging bill thread in #eng. */
+const BILL_REPLY = 'the preview environments reaper should cut the staging bill'
 
 interface Upload {
   readonly name: string
@@ -48,6 +52,8 @@ async function drop(target: Locator, files: ReadonlyArray<Upload>): Promise<void
 
 const chips = (topic: TopicPane) => topic.root.locator('[data-composer]').getByRole('button', { name: /^Remove / })
 const chip = (topic: TopicPane, name: string) => topic.root.locator('[data-composer]').getByRole('button', { name: `Remove ${name}` })
+/** Waits until `count` of a pane's chips are staged. Enter does nothing while a file is still being read, so a send waits for this. */
+const staged = (pane: { readonly root: Locator }, count: number) => expect(pane.root.locator('[data-composer] [data-attachment="ready"]')).toHaveCount(count)
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
   await juno.signIn()
@@ -93,6 +99,7 @@ test('a file dropped on the topic is sent on its own as a file row with Download
   await drop(topic.list, [brief()])
   await expect(chip(topic, 'launch-brief.pdf')).toBeVisible()
   await expect(topic.root.locator('[data-composer]')).toContainText('launch-brief.pdf')
+  await staged(topic, 1)
   await topic.composer.press('Enter')
   await expect(chips(topic)).toHaveCount(0)
 
@@ -113,6 +120,7 @@ test('a file dropped on a reply composer is attached once and shared in that thr
   await juno.sidebar.row('Draft plan is in the doc').open()
   await drop(topic.composer, [brief()])
   await expect(chips(topic)).toHaveCount(1)
+  await staged(topic, 1)
   await topic.send('The launch brief')
   await topic.expectSent('The launch brief')
   const shares = fake.calls.filter((call) => call.method === 'files.share')
@@ -137,6 +145,7 @@ test('a removed chip is not sent, and the text row does not move', async ({ juno
   await expect(chips(topic)).toHaveCount(1)
   expect((await topic.composer.boundingBox())!.y).toBe(field!.y)
   await expect(topic.composer).toHaveValue('Two files, then one')
+  await staged(topic, 1)
 
   await topic.composer.press('Enter')
   await topic.expectSent('Two files, then one')
@@ -152,6 +161,7 @@ test('a failed upload keeps the text and the file for Retry, and is sent once', 
 
   await topic.root.locator('[data-composer] input[type="file"]').setInputFiles([chart()])
   await expect(chip(topic, 'chart.png')).toBeVisible()
+  await staged(topic, 1)
   fake.failUploads({ times: 1 })
   await topic.send('Retry this one')
   const failed = topic.failed('Retry this one')
@@ -180,6 +190,7 @@ test('a New chat keeps its files through a change of destination and sends them 
   await newChat.pickConversation('product', 'product')
   await expect(briefChip).toBeVisible()
   await expect(newChat.composer).toHaveValue('Brief for the launch')
+  await staged(newChat, 1)
 
   await newChat.send()
   await topic.expectSent('Brief for the launch')
@@ -221,16 +232,26 @@ test('Download saves the file into Downloads', async ({ juno }) => {
 })
 
 
-test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake }) => {
+test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
-  await topic.composer.fill('can you recieve the the report by friday')
+  // Wrong place is the one check before sending: wait for the typing pause's answer.
+  const since = Date.now()
+  await topic.composer.fill(BILL_REPLY)
+  await expect.poll(() => {
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+    try {
+      return (db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck' AND model != ''`).get() as { at: number | null }).at ?? 0
+    } finally {
+      db.close()
+    }
+  }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
   await topic.composer.press('Enter')
-  const fix = topic.root.getByRole('button', { name: /Fix and send/ })
-  await expect(fix).toBeVisible()
+  const post = topic.root.getByRole('button', { name: /Post in thread/ })
+  await expect(post).toBeVisible()
 
   // Hold the file read, as when the selected file is on a slow volume.
   await juno.win.evaluate(() => {
@@ -247,14 +268,14 @@ test('a send check keeps the draft while a newly attached file is still being re
   })
   await paste(topic.composer, [chart()])
   await expect(chip(topic, 'chart.png')).toBeVisible()
-  await fix.click()
-  await expect(topic.composer).toHaveValue('can you recieve the the report by friday')
-  await expect(fix).toBeVisible()
+  await post.click()
+  await expect(topic.composer).toHaveValue(BILL_REPLY)
+  await expect(post).toBeVisible()
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
 
   await juno.win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
   await expect(topic.root.locator('[data-composer] img[src^="juno://uploads/"]')).toHaveCount(1)
-  await fix.click()
-  await topic.expectSent('can you receive the report by friday?')
-  expect(fake.calls.filter((call) => call.method === 'files.share')).toHaveLength(1)
+  await post.click()
+  await expect(topic.composer).toHaveValue('')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length).toBe(1)
 })

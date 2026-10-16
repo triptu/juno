@@ -1,6 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, type HTMLAttributes, type ReactNode } from 'react'
 import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
+import { ringRoom } from './ringRoom'
 
 export interface PillRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'style' | 'className'> {
   readonly children?: ReactNode
@@ -12,7 +14,9 @@ export interface PillRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
  * wheel scrolls it sideways, and overscroll is contained, so a wheel or a
  * swipe over it never moves the list below or reaches Back and Forward. The
  * side it can scroll toward fades; a `scroll-state` container query shows
- * each fade, so no script watches the scroll.
+ * each fade, so no script watches the scroll. The row keeps room for the
+ * pills' focus rings on every side (ringRoom) and scrolls a pill that takes
+ * keyboard focus into view whole.
  */
 export function PillRow({ children, ...rest }: PillRowProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -31,7 +35,16 @@ export function PillRow({ children, ...rest }: PillRowProps) {
     return () => row.removeEventListener('wheel', onWheel)
   }, [])
   return (
-    <div ref={ref} data-pill-row="" {...rest} {...stylex.props(styles.row)}>
+    <div
+      ref={ref}
+      data-pill-row=""
+      {...rest}
+      onFocus={(event) => {
+        revealFocus(event)
+        rest.onFocus?.(event)
+      }}
+      {...stylex.props(styles.row, ringRoom.all)}
+    >
       <span aria-hidden {...stylex.props(styles.fade, styles.fadeStart)} />
       {children}
       <span aria-hidden {...stylex.props(styles.fade, styles.fadeEnd)} />
@@ -71,37 +84,42 @@ const styles = stylex.create({
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
-    height: sizes['--control-28'],
+    // The pills' height plus the ring's room above and below (ringRoom.all).
+    height: `calc(${sizes['--control-28']} + 2 * ${sizes['--focus-ring-room']})`,
     overflowX: 'auto',
     overflowY: 'hidden',
     overscrollBehavior: 'contain',
     scrollbarWidth: 'none',
     containerType: 'scroll-state',
   },
-  // Sticky at each end, over the pills, taking no room: the gradient fades the pills that run under it.
+  // Sticky at each end, over the pills, taking no room: the gradient fades
+  // the pills that run under it. Each also covers the ring's room past the
+  // row's end (ringRoom.all) in solid colour, so a pill half under the edge
+  // is cut where it was before the room; a focused pill rises above it.
   fade: {
     position: 'sticky',
     zIndex: 1,
     flexShrink: 0,
     alignSelf: 'stretch',
-    width: spacing['--space-4'],
+    width: `calc(${spacing['--space-4']} + ${sizes['--focus-ring-room']})`,
     pointerEvents: 'none',
     opacity: 0,
   },
   fadeStart: {
-    insetInlineStart: 0,
-    marginInlineEnd: `calc(-1 * ${spacing['--space-4']} - ${spacing['--space-0-5']})`,
-    backgroundImage: `linear-gradient(to right, ${colors['--background-subtle']}, transparent)`,
+    insetInlineStart: `calc(-1 * ${sizes['--focus-ring-room']})`,
+    marginInlineEnd: `calc(-1 * ${spacing['--space-4']} - ${sizes['--focus-ring-room']} - ${spacing['--space-0-5']})`,
+    backgroundImage: `linear-gradient(to right, ${colors['--background-subtle']} ${sizes['--focus-ring-room']}, transparent)`,
     opacity: { default: 0, [SCROLLS_START]: 1 },
   },
   fadeEnd: {
-    insetInlineEnd: 0,
-    marginInlineStart: `calc(-1 * ${spacing['--space-4']} - ${spacing['--space-0-5']})`,
-    backgroundImage: `linear-gradient(to left, ${colors['--background-subtle']}, transparent)`,
+    insetInlineEnd: `calc(-1 * ${sizes['--focus-ring-room']})`,
+    marginInlineStart: `calc(-1 * ${spacing['--space-4']} - ${sizes['--focus-ring-room']} - ${spacing['--space-0-5']})`,
+    backgroundImage: `linear-gradient(to left, ${colors['--background-subtle']} ${sizes['--focus-ring-room']}, transparent)`,
     opacity: { default: 0, [SCROLLS_END]: 1 },
   },
   pill: {
     position: 'relative',
+    zIndex: { default: 'auto', ':has(:focus-visible)': 2 },
     display: 'inline-flex',
     flexShrink: 0,
     maxWidth: layout['--filter-pill-max-width'],

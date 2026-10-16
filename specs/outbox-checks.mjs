@@ -8,11 +8,13 @@ export const outboxPairs = [
   ['answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
   ['actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
   ['actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
+  ['reactionOnGone', 'reactionsLand', 'outbox-reaction-on-gone'],
   ['offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
   ['networkCopy', 'shownOnce', 'outbox-network-copy'],
   ['sameText', 'keepsRealSends', 'outbox-same-text'],
   ['keptDeleted', 'keepsRealSends', 'outbox-kept-deleted'],
   ['copyReply', 'repliesKeepRoot', 'outbox-copy-reply'],
+  ['ownDelete', 'ownDeleteHolds', 'outbox-own-delete'],
   ['deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
   ['uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
 ]

@@ -41,9 +41,17 @@ export const darkColors = stylex.createTheme(colors, {
   '--border-strongest': '#4C4A47',
   '--input-border': '#464541',
 
+  // Below the sidebar (L 0.15); the hover at the sidebar's step (0.19), below the page (0.215), so the
+  // active tab stays the brightest. Contrast: docs/design/tokens.md 1.2.
+  '--tab-strip': '#0D0C0A',
+  '--tab-hover': '#151411',
+  '--tab-divider': '#3A3835',
+
   '--foreground-default': '#EEEBE2',
   '--foreground-subtle': '#C6C4BE',
   '--foreground-muted': '#A09E9A',
+  '--foreground-secondary': '#C0BEB8',
+  '--foreground-muted-on-fill': '#A09E9A',
 
   '--accent-default': 'hsla(48, 30%, 90%, 1)',
   '--accent-hover': 'hsla(48, 30%, 95%, 1)',
@@ -72,6 +80,7 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   // On ink a dark ring cannot separate; a faint light edge inside does, as on macOS.
   '--panel-shadow': 'inset 0 0 0 1px oklch(1 0 0 / 0.06), 0 0 0 1px oklch(0 0 0 / 0.5), 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 8px 24px -6px oklch(0 0 0 / 0.4), 0 24px 56px -12px oklch(0 0 0 / 0.5)',
+  '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.5)',
 })
 
 /** The accent picker's swatches in dark: the dark fills of the accent themes below. */

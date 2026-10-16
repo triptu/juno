@@ -355,6 +355,18 @@ export function noFlicker(region: string, label: string, options: Window = {}): 
   }
 }
 
+/** A `count` probe never reads 0 in the window: a list that never draws empty. */
+export function neverZero(probe: string, label: string, options: Window = {}): Check {
+  const name = `${label} never empty`
+  return (evidence) => {
+    const frames = framesIn(evidence.recording, options)
+    if (frames.length === 0) return fail(name, 'no frames', [])
+    const empty = frames.filter((frame) => frame.values[probe] === 0)
+    if (empty.length === 0) return pass(name, `${frames.length} frames, none empty`)
+    return fail(name, `${empty.length} of ${frames.length} frames had no rows (first at #${shot(evidence, empty[0]!)})`, shotsOf(evidence, empty).slice(0, 12))
+  }
+}
+
 /** A precondition of the scenario: without it the other checks prove nothing. */
 export function happened(label: string, test: (recording: Recording) => boolean): Check {
   const name = label

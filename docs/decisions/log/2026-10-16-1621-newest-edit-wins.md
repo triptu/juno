@@ -1,0 +1,1 @@
+- 10-16 16:21 · orchestrator · Editing a post that is back in the queue drops any edit row left from while it was out, so the newest edit text always wins.

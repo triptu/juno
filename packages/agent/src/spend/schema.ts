@@ -34,5 +34,19 @@ export const SPEND_MIGRATIONS: MigrationSet = {
     `CREATE TABLE provider_bounds (
       provider TEXT PRIMARY KEY, multiplier REAL NOT NULL CHECK (multiplier = 1.25)
     ) STRICT`,
+  ], [
+    // The engine's own model calls (topic art, titles, Home, send checks) spend inside the same cap.
+    `CREATE TABLE spend_reservations_next (
+      id TEXT PRIMARY KEY, day TEXT NOT NULL REFERENCES spend_days(day),
+      path TEXT NOT NULL CHECK (path IN ('chat', 'subagent', 'compaction', 'engine')),
+      amount INTEGER NOT NULL CHECK (amount >= 0),
+      state TEXT NOT NULL CHECK (state IN ('reserved', 'unknown', 'settled')),
+      actual INTEGER CHECK (actual >= 0),
+      CHECK ((state = 'settled') = (actual IS NOT NULL))
+    ) STRICT`,
+    'INSERT INTO spend_reservations_next SELECT id, day, path, amount, state, actual FROM spend_reservations',
+    'DROP TABLE spend_reservations',
+    'ALTER TABLE spend_reservations_next RENAME TO spend_reservations',
+    'CREATE INDEX spend_by_day ON spend_reservations(day)',
   ]],
 }

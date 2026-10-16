@@ -156,6 +156,16 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     const twice = await client.call('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })
     expect(twice.body).toEqual({ ok: false, error: 'already_reacted' })
     expect(await client.ok('reactions.remove', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })).toEqual({ ok: true })
+    // Strict like Slack: unknown names, a removal of nothing, and a ts no message has are refused.
+    const removedTwice = await client.call('reactions.remove', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })
+    expect(removedTwice.body).toEqual({ ok: false, error: 'no_reaction' })
+    const unknown = await client.call('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'thumbs_up' })
+    expect(unknown.body).toEqual({ ok: false, error: 'invalid_name' })
+    const noMessage = await client.call('reactions.add', { channel: opened.channel.id, timestamp: '1000000000.000100' as typeof posted.ts, name: '+1' })
+    expect(noMessage.body).toEqual({ ok: false, error: 'message_not_found' })
+    expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: '+1::skin-tone-2' })).toEqual({ ok: true })
+    fake.addEmoji({ name: 'shipit', url: 'https://example.invalid/shipit.png' })
+    expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'shipit' })).toEqual({ ok: true })
 
     const deleted = await client.ok('chat.delete', { channel: opened.channel.id, ts: posted.ts })
     expect(deleted.ts).toBe(posted.ts)
@@ -184,15 +194,18 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('edge users/info returns users and failed ids', async () => {
+  it('edge users/info returns users and failed ids, with photos as an avatar hash only', async () => {
     const raw = await client.edge('users/info', { ids: ['U0MAYA', 'U0NOBODY'] })
     const response = Schema.decodeUnknownSync(EdgeUsersInfoResponse)(raw)
     if (!response.ok) throw new Error(response.error)
     expect(response.results.map((u) => u.id)).toEqual(['U0MAYA'])
-    expect(response.results[0]?.profile?.image_72).toBe(`${fake.url}/avatars/U0MAYA.svg?size=72`)
+    const profile = response.results[0]!.profile!
+    expect(profile).toMatchObject({ avatar_hash: 'fakeu0maya', is_custom_image: true })
+    expect(profile.image_72).toBeUndefined()
     expect(response.failed_ids).toEqual(['U0NOBODY'])
-    expect((await fetch(response.results[0]!.profile!.image_72!)).status).toBe(401)
-    const avatar = await fetch(response.results[0]!.profile!.image_72!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
+    const photo = `${fake.url}/avatars/T0JUNO-U0MAYA-${profile.avatar_hash}-72`
+    expect((await fetch(photo)).status).toBe(401)
+    const avatar = await fetch(photo, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(avatar.headers.get('content-type')).toBe('image/svg+xml')
   })
 

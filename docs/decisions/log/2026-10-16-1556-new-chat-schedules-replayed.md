@@ -1,0 +1,1 @@
+- 10-16 15:56 · orchestrator · The New chat outbox schedules (`pendingRoot`, `failedRoot`) claim the root before the reply is queued, as Juno does, and the conformance run replays them.

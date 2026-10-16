@@ -9,7 +9,10 @@ import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
 import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiWarmup } from './aiWarmup'
+import { TitleJob } from './titleJob'
 import { AiProviderLive } from './ai'
+import { AiCredentials } from './aiCredentials'
+import { AiSpend } from './aiSpend'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
 import { HomeHandlers } from './home/handlers'
@@ -81,7 +84,7 @@ const EnginePhases = Layer.effectDiscard(
 )
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
-export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob, AutomatedJob, AiWarmup).pipe(
+export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, AutomatedJob, AiWarmup).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(Staging.layer),
@@ -89,6 +92,8 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, HomeJob, AutomatedJ
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(AiProviderLive),
+  Layer.provideMerge(AiCredentials.layer),
+  Layer.provideMerge(AiSpend.layer),
   Layer.provideMerge(NotificationControl.layer),
   Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),

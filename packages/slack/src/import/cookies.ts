@@ -58,6 +58,17 @@ interface CookieRow {
   is_httponly: number | bigint
 }
 
+/** How many cookies named `name` the file holds. Needs no password: names are stored in the clear. */
+export function cookieRowCount(file: string, name: string): number {
+  const db = new DatabaseSync(file, { readOnly: true })
+  try {
+    const row = db.prepare('SELECT COUNT(*) AS count FROM cookies WHERE name = ?').get(name) as { count: number } | undefined
+    return Number(row?.count ?? 0)
+  } finally {
+    db.close()
+  }
+}
+
 /**
  * Every cookie named `name` in the file, decrypted. Rows that fail to
  * decrypt are skipped: a wrong password yields no cookies, not garbage.

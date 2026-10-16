@@ -11,7 +11,8 @@
  * still pending is handled by its state (`posts.ts`):
  *
  * - `queued` or `failed`: Slack has not got it, so nothing is sent. An edit
- *   rewrites the pending row; a delete removes it. A failed post takes no
+ *   rewrites the pending row and drops an edit row left from while the post
+ *   was out; a delete removes it. A failed post takes no
  *   reaction.
  * - `sending` or `unknown`: Slack may have it. The row carries
  *   `depends_on = client_msg_id` and no ts; the worker finds the ts once
@@ -26,7 +27,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react'
 
@@ -46,6 +47,10 @@ export interface ActionPayload {
   readonly name?: string
   readonly want?: boolean
   readonly base?: boolean
+  /** `react`: Slack refused it with this code. The row is not sent again until the user retries; the view shows what Slack has. */
+  readonly failed?: string
+  /** `react`: it has waited past `STALL_MILLIS` without going out, and the view says so. */
+  readonly stalled?: boolean
 }
 
 export interface PendingAction {
@@ -58,6 +63,8 @@ export interface PendingAction {
   readonly attempts: number
   /** Epoch millis. */
   readonly nextAt: number
+  /** Epoch millis. */
+  readonly createdAt: number
 }
 
 interface ActionRow {
@@ -68,6 +75,7 @@ interface ActionRow {
   readonly payload_json: string
   readonly attempts: number
   readonly next_at: string | null
+  readonly created_at: string
 }
 
 const toAction = (row: ActionRow): PendingAction => ({
@@ -78,18 +86,20 @@ const toAction = (row: ActionRow): PendingAction => ({
   payload: JSON.parse(row.payload_json) as ActionPayload,
   attempts: row.attempts,
   nextAt: row.next_at === null ? 0 : Number(row.next_at),
+  createdAt: Number(row.created_at),
 })
 
-const COLUMNS = 'id, kind, target_key, depends_on, payload_json, attempts, next_at'
+const COLUMNS = 'id, kind, target_key, depends_on, payload_json, attempts, next_at, created_at'
 
-const touch = (topics: ReadonlyArray<string>) => Invalidation.use((i) => i.invalidate({ messages: [...topics] }))
+export const touch = (topics: ReadonlyArray<string>) => Invalidation.use((i) => i.invalidate({ messages: [...topics] }))
 
-/** Every pending action, oldest first. */
+/** Every pending action, oldest first. A refused reaction waits for the user, not the worker, and is left out. */
 export const pendingActions: Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> = Effect.gen(function* () {
   const sql = yield* StoreWriter
-  const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE kind IN ('edit', 'delete', 'react') ORDER BY id`)
+  const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE kind IN ('edit', 'delete', 'react') AND json_extract(payload_json, '$.failed') IS NULL ORDER BY id`)
   return rows.map(toAction)
 })
+
 
 const channelActions = (channel: string): Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
@@ -98,7 +108,8 @@ const channelActions = (channel: string): Effect.Effect<ReadonlyArray<PendingAct
     return rows.map(toAction)
   })
 
-const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
+/** The row with `id` as it is now, or undefined once it ended. */
+export const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE id = ?`, [id])
@@ -143,7 +154,7 @@ export const resolveTarget = (ref: MessageRef): Effect.Effect<ActionTarget | und
   })
 
 /** The rows that act on the message a target names. */
-const actionsOn = (target: ActionTarget): Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> =>
+export const actionsOn = (target: ActionTarget): Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const channel = target.kind === 'stored' ? target.row.channel : target.post.channel
     const ts = target.kind === 'stored' ? target.row.ts : undefined
@@ -153,12 +164,12 @@ const actionsOn = (target: ActionTarget): Effect.Effect<ReadonlyArray<PendingAct
     )
   })
 
-const targetFields = (target: ActionTarget): Pick<ActionPayload, 'ts' | 'clientMsgId' | 'topics'> & { readonly channel: string; readonly dependsOn: string | null } =>
+export const targetFields = (target: ActionTarget): Pick<ActionPayload, 'ts' | 'clientMsgId' | 'topics'> & { readonly channel: string; readonly dependsOn: string | null } =>
   target.kind === 'stored'
     ? { channel: target.row.channel, ts: target.row.ts, clientMsgId: target.row.client_msg_id, topics: messageTopics(target.row), dependsOn: null }
     : { channel: target.post.channel, ts: null, clientMsgId: target.post.clientMsgId, topics: [postTopic(target.post)], dependsOn: target.post.clientMsgId }
 
-const insertAction = (kind: ActionKind, channel: string, dependsOn: string | null, payload: ActionPayload, now: number) =>
+export const insertAction = (kind: ActionKind, channel: string, dependsOn: string | null, payload: ActionPayload, now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`INSERT INTO outbox (kind, target_key, payload_json, depends_on, created_at, next_at)
@@ -166,14 +177,14 @@ const insertAction = (kind: ActionKind, channel: string, dependsOn: string | nul
     yield* touch(payload.topics)
   })
 
-const writePayload = (action: PendingAction, payload: ActionPayload, now: number) =>
+export const writePayload = (action: PendingAction, payload: ActionPayload, now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify(payload)}, attempts = 0, next_at = ${String(now)}, last_error = NULL WHERE id = ${action.id}`
     yield* touch(payload.topics)
   })
 
-const deleteActions = (actions: ReadonlyArray<PendingAction>) =>
+export const deleteActions = (actions: ReadonlyArray<PendingAction>) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     for (const action of actions) {
@@ -208,6 +219,9 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
       const sql = yield* StoreWriter
       yield* sql`UPDATE pending_messages SET text = ${input.text}, blocks_json = ${input.blocksJson} WHERE client_msg_id = ${target.post.clientMsgId}`
+      // An edit queued while the post was out (it came back: a 429, or a lookup that did not find it) holds older
+      // text, and Slack does not have the post: the post now carries the newest text, so the row goes.
+      yield* deleteActions(actions.filter((action) => action.kind === 'edit'))
       yield* touch([postTopic(target.post)])
       return undefined
     }
@@ -266,46 +280,6 @@ export const queueCopyDelete = (row: MessageRow, now: number): Effect.Effect<boo
     return true
   })
 
-export interface ReactInput {
-  readonly ref: MessageRef
-  readonly name: string
-  /** Add the user's reaction, or take it away. */
-  readonly on: boolean
-  readonly now: number
-}
-
-/** Whether the store says the user has reacted with `name`. */
-const storedReaction = (row: MessageRow, name: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    const rows = yield* sql<{ me: 0 | 1 }>`SELECT me FROM reactions WHERE channel = ${row.channel} AND ts = ${row.ts} AND name = ${name}`
-    return rows[0]?.me === 1
-  })
-
-/**
- * A reaction toggled: the message's `react` row for `name` takes the
- * intent. A row whose intent is back to what Slack has is left for the
- * worker to drop unsent, so a toggle while a call is out stays ordered.
- */
-export const queueReaction = (input: ReactInput): Effect.Effect<ActionRefusal | undefined, SqlError, StoreWriter | Invalidation> =>
-  Effect.gen(function* () {
-    const target = yield* resolveTarget(input.ref)
-    if (target === undefined || (target.kind === 'stored' && target.row.deleted === 1)) return 'missing'
-    if (target.kind === 'pending' && target.post.state === 'failed') return 'not-sent'
-    const actions = yield* actionsOn(target)
-    if (actions.some((action) => action.kind === 'delete')) return 'missing'
-    const pending = actions.find((action) => action.kind === 'react' && action.payload.name === input.name)
-    if (pending !== undefined) {
-      if (pending.payload.want !== input.on) yield* writePayload(pending, { ...pending.payload, want: input.on }, input.now)
-      return undefined
-    }
-    const base = target.kind === 'stored' ? yield* storedReaction(target.row, input.name) : false
-    if (base === input.on) return undefined
-    const { channel, dependsOn, ...fields } = targetFields(target)
-    yield* insertAction('react', channel, dependsOn, { ...fields, name: input.name, want: input.on, base }, input.now)
-    return undefined
-  })
-
 // The worker's side
 
 /**
@@ -352,10 +326,13 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
  * After a call Slack accepted. An edit ends unless a newer edit replaced
  * its text meanwhile (`rev`); a reaction ends unless the user toggled it
  * again, in which case Slack's state becomes the new `base` and the row is
- * sent again; a delete always ends. Answers whether the row ended.
+ * sent again; a delete always ends, and the user's delete of one of Juno's
+ * posts is recorded, so a network copy stored later goes too (`sent.ts`).
+ * Answers whether the row ended.
  */
 export const actionDone = (sent: PendingAction, now: number): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
+    if (sent.kind === 'delete' && sent.payload.clientMsgId !== null) yield* recordOwnDelete(sent.payload.clientMsgId, sent.payload.ts)
     const current = yield* readAction(sent.id)
     if (current === undefined) return true
     if (current.kind === 'edit' && current.payload.rev !== sent.payload.rev) return false

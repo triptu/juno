@@ -9,6 +9,8 @@
  *   It is recorded as sent first (`recordSend`), so a second copy the
  *   network makes is deleted when Juno stores it (ADR 0014).
  * - `sent` asks Slack, not the store, for the reconcile lookup.
+ * - Spend asks come from `AiSpend`: the engine's model calls reserve and
+ *   settle in the agent's daily cap.
  * - Presence follows the engine phase, the AI assist pref, the clock against
  *   the notification and active hours the notifications engine reads
  *   (`@juno/notifications` settings), and the topic last shown.
@@ -21,6 +23,7 @@ import { defaultNotificationSettings, inHours, type NotificationSettings, type T
 import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
 import { recordSend, storedMe } from '@juno/sync'
+import { AiSpend } from '../aiSpend'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { resolve, undoResolve } from './resolve'
@@ -84,7 +87,7 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
     const config = yield* EngineConfig
@@ -93,6 +96,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const outbox = yield* Outbox
     const link = yield* SyncLink
     const phases = yield* PhaseSource
+    const spend = yield* AiSpend
 
     /** Runs a store read on the open workspace. A store failure is a bug, so it dies. */
     const inStore = <A, E>(effect: Effect.Effect<A, E, StoreServices>): Effect.Effect<A, Exclude<E, SqlError> | AgentHostError> =>
@@ -217,6 +221,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       resolve: (dispatch) => resolve(dispatch).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,
+      spend: spend.host,
       schedule: {
         hours: inStore(watchHours),
         changes: watchChanges(workspace),

@@ -22,6 +22,7 @@
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
 import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Effect, FiberSet, Scope, Stream } from 'effect'
+import { upgradeIndex } from './upgrade'
 import { applyOpened, applySent, type Acted } from './events'
 import type { FetchReport, OpenError } from './open'
 import { makeBootLoop } from './run/boot'
@@ -62,6 +63,12 @@ export interface RunSyncOptions {
    * engine sorts clear bot channels into Automated here). It must not fail.
    */
   readonly onBooted?: Effect.Effect<void>
+  /**
+   * Runs after the cold boot stored one conversation's history page, while
+   * the sidebar already shows rows (the engine sorts that conversation into
+   * Automated when it is clearly a bot channel). It must not fail.
+   */
+  readonly onHistory?: (channel: string) => Effect.Effect<void>
 }
 
 /**
@@ -99,6 +106,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 
-    yield* Effect.all([consumer, bootLoop, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    // Stored index rows from an older Juno take the current meaning from local messages, alongside the boot.
+    const upgrade = upgradeIndex(ctx).pipe(Effect.catchCause((cause) => Effect.logError('sync: index upgrade failed', { cause })))
+    yield* Effect.all([consumer, bootLoop, upgrade, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

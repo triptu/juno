@@ -19,6 +19,8 @@ Juno as the agent's host. It runs inside the engine and serves the whole AgentHo
 | `host.topics.resolve` | Tier 3 approved local resolve, through the user's topic command. One transaction stores the batch and its Undo; repeated dispatch returns the original result, even after Undo |
 | `host.topics.undoResolve` | Restores the recorded topic overlays and unread state once, for the signed-in account |
 | `host.notification.deliver` | `unsupported`: Juno has no OS notifier for the agent yet |
+| `host.spend.asks` | A stream: the engine's open spend asks (reserve an amount, or settle a reservation with its reported cost or unknown), then every change. Amounts are nanodollars on the agent ledger's `engine` path. No key and no model input |
+| `host.spend.answer` | The agent's answer to one ask: `reserved` or `blocked`, or `settled`; the host stops offering it |
 
 ## Single-attempt sends
 

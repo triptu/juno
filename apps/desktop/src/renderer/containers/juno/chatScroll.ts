@@ -116,35 +116,55 @@ export function useBubbleMeasure(items: ReadonlyArray<ChatItem>) {
   return { sentAtRef, newestBubbleId }
 }
 
-/** At the bottom, a new row (a bubble, the status bubble, a send) is scrolled into view before paint. */
+/**
+ * At the bottom, a change to the rows (a bubble, the status bubble, a send, a reaction) is scrolled into view
+ * before paint, and so is the list's box changing size (the window, the composer growing). The observer sees only
+ * the scroller's own box, and runs after layout and before the frame's paint.
+ */
 export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boolean>, positioned: boolean, items: ReadonlyArray<ChatItem>, moreBelow: boolean): void {
-  const last = items.at(-1)
-  const lastKey = last === undefined ? undefined : `${last._tag}:${anchorOf(last) ?? ''}`
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned) return
     if (pinnedRef.current && !moreBelow) scroller.scrollTop = scroller.scrollHeight
-  }, [positioned, lastKey, items.length, moreBelow, scrollRef, pinnedRef])
+  }, [positioned, items, moreBelow, scrollRef, pinnedRef])
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || !positioned || moreBelow) return
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight
+    })
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [positioned, moreBelow, scrollRef, pinnedRef])
 }
 
-/** The owner's scrolling lets go of the bottom; where the list comes to rest decides whether it holds again. */
+/**
+ * The owner's scrolling lets go of the bottom; where the list comes to rest decides whether it holds again. Only a
+ * scroll up and away from the end lets go: input that scrolls nothing, such as the wheel turned down at the end or
+ * a click on a bubble, ends no scroll, so nothing would hold the bottom again.
+ */
 export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boolean>, pageRef: RefObject<ChatPage>, setAtBottom: Dispatch<SetStateAction<boolean>>): void {
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
-    const letGo = () => {
-      pinnedRef.current = false
+    // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
+    let bottomTop = scroller.scrollTop
+    const onScroll = () => {
+      if (!pinnedRef.current) return
+      const top = scroller.scrollTop
+      if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
+      else bottomTop = top
     }
     const onScrollEnd = () => {
       const bottom = !pageRef.current.moreBelow && distanceFromBottom(scroller) <= BOTTOM_SLACK
       pinnedRef.current = bottom
+      if (bottom) bottomTop = scroller.scrollTop
       setAtBottom(bottom)
     }
-    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
-    for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
+    scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
     return () => {
-      for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
     }
   }, [scrollRef, pinnedRef, pageRef, setAtBottom])

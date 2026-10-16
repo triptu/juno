@@ -28,7 +28,9 @@
  *   socket while the user deletes the kept message on another device or
  *   someone replies to the copy. When a check fails the delete is
  *   cancelled, the copy is shown again, and `kept_copies` records why. If
- *   the kept message was deleted, the copy becomes the message.
+ *   the kept message was deleted on another device, the copy becomes the
+ *   message. If the user deleted it in Juno (`deleted_by_user`, or the
+ *   delete row still pending), the copy is deleted too.
  * - A post sent before a gap (a socket drop or the app closed) may have
  *   had its kept message deleted during the gap, which no event reports.
  *   Its copy's delete goes out only once the recheck after the gap has read
@@ -55,6 +57,7 @@ interface SentRow {
   readonly user_id: string
   readonly ts: string | null
   readonly sent_at: number
+  readonly deleted_by_user: 0 | 1
 }
 
 /** Why a copy is kept rather than deleted. */
@@ -68,7 +71,7 @@ interface KeptRow {
   readonly hidden: 0 | 1
 }
 
-const SENT_COLUMNS = 'client_msg_id, channel, user_id, ts, sent_at'
+const SENT_COLUMNS = 'client_msg_id, channel, user_id, ts, sent_at, deleted_by_user'
 
 const sentPost = (clientMsgId: string): Effect.Effect<SentRow | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
@@ -86,12 +89,28 @@ const copyOf = (row: MessageRow): Effect.Effect<SentRow | undefined, SqlError, S
     return sent
   })
 
+/**
+ * Whether the user deleted the kept message in Juno: Slack applied it, or
+ * the delete row is still pending. Its echo can be stored before the
+ * answer, so a pending row counts too.
+ */
+const deletedByUser = (sent: SentRow): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    if (sent.deleted_by_user === 1) return true
+    const sql = yield* StoreWriter
+    const rows = yield* sql<{ n: number }>`SELECT count(*) AS n FROM outbox WHERE kind = 'delete' AND target_key = ${sent.channel}
+      AND json_extract(payload_json, '$.clientMsgId') = ${sent.client_msg_id}
+      AND (json_extract(payload_json, '$.ts') IS NULL OR json_extract(payload_json, '$.ts') = ${sent.ts})`
+    return rows[0]!.n > 0
+  })
+
 /** Why deleting `copy` would lose something, or undefined when it is safe to delete. */
 const copyKeepReason = (copy: MessageRow, sent: SentRow): Effect.Effect<KeepReason | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const kept = (yield* sql<{ deleted: number }>`SELECT deleted FROM messages WHERE channel = ${sent.channel} AND ts = ${sent.ts}`)[0]
-    if (kept === undefined || kept.deleted === 1) return 'kept-deleted'
+    // Deleted on another device, the copy stays as the message; deleted by the user in Juno, the post is meant gone.
+    if ((kept === undefined || kept.deleted === 1) && !(yield* deletedByUser(sent))) return 'kept-deleted'
     if (copy.reply_count > 0) return 'replied'
     const others = yield* sql<{ n: number }>`SELECT count(*) AS n FROM reactions WHERE channel = ${copy.channel} AND ts = ${copy.ts} AND count > me`
     if ((others[0]?.n ?? 0) > 0) return 'reacted'
@@ -128,7 +147,7 @@ const copyDeleteOf = (row: MessageRow): Effect.Effect<PendingAction | undefined,
     const rows = yield* sql<{ id: number }>`SELECT id FROM outbox WHERE kind = 'delete' AND target_key = ${row.channel} AND depends_on IS NULL
       AND json_extract(payload_json, '$.ts') = ${row.ts} AND json_extract(payload_json, '$.clientMsgId') IS NULL`
     if (rows[0] === undefined) return undefined
-    return { id: rows[0].id, kind: 'delete', channel: row.channel, dependsOn: null, payload: { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, attempts: 0, nextAt: 0 }
+    return { id: rows[0].id, kind: 'delete', channel: row.channel, dependsOn: null, payload: { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, attempts: 0, nextAt: 0, createdAt: 0 }
   })
 
 /** The kept message of a sent post was deleted: a file copy hidden for it is shown and becomes the message. */
@@ -136,7 +155,7 @@ const showHiddenCopies = (kept: MessageRow): Effect.Effect<void, SqlError, Store
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const sent = kept.client_msg_id === null ? undefined : yield* sentPost(kept.client_msg_id)
-    if (sent === undefined || sent.ts !== kept.ts || sent.channel !== kept.channel) return
+    if (sent === undefined || sent.ts !== kept.ts || sent.channel !== kept.channel || (yield* deletedByUser(sent))) return
     const hidden = yield* sql<MessageRow>`SELECT m.* FROM kept_copies k JOIN messages m ON m.channel = k.channel AND m.ts = k.ts
       WHERE k.client_msg_id = ${sent.client_msg_id} AND k.hidden = 1 AND m.deleted = 0 ORDER BY m.ts LIMIT 1`
     const copy = hidden[0]

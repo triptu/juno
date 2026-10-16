@@ -18,6 +18,8 @@ export const RESEND = 'network-resend'
 /** The model's state variable `s`, decoded. */
 export interface S {
   readonly created: ReadonlySet<number>
+  /** The root a reply was queued under from New chat's pending thread, or 0. */
+  readonly parent?: ReadonlyMap<number, number>
   readonly row: ReadonlyMap<number, string>
   readonly stored: ReadonlySet<number>
   readonly server: ReadonlyMap<number, number>
@@ -74,12 +76,22 @@ const PENDING = new Set(['waiting', 'transit', 'accepted'])
 const held = (s: S, k: number) =>
   s.server.get(k)! + s.dup.get(k)! - s.deletes.get(k)! - ([...s.slack].some((c) => c.key === k && c.what === 'gone') ? 1 : 0)
 
-/** Whether the user's own delete of the draft's message reached Slack by `index`. The model counts it nowhere else. */
+/**
+ * Whether the user's own delete of the draft's message reached Slack by `index`. The model counts it nowhere
+ * else. A delete that replaced an edit whose call was out (`stale`) is not the call Slack accepted then.
+ */
 const userDeleted = (states: ReadonlyArray<TraceState>, index: number, k: number) =>
   states.slice(1, index + 1).some((state, i) => {
     const prev = sOf(states[i]!)
     const next = sOf(state)
-    return next.label === 'actAccept' && next.target === k && prev.actKind.get(k) === 'delete' && ![...prev.slack].some((c) => c.key === k && c.what === 'gone')
+    return (
+      next.label === 'actAccept' &&
+      next.target === k &&
+      prev.actKind.get(k) === 'delete' &&
+      !prev.stale.has(k) &&
+      // Once the copy is the message, the user's delete removes it.
+      (prev.kept.get(k) === 'copy' || ![...prev.slack].some((c) => c.key === k && c.what === 'gone'))
+    )
   })
 
 /**
@@ -119,7 +131,9 @@ export function expectedDraft(states: ReadonlyArray<TraceState>, index: number, 
     lookup,
     ...(waits ? { due: s.due.has(k) } : {}),
     slack: Math.max(0, held(s, k) - (userDeleted(states, index, k) ? 1 : 0)),
-    copy: s.copyRow.get(k)!,
+    // The copy that became the message goes with the user's delete, once its echo or answer is stored.
+    copy:
+      s.kept.get(k) === 'copy' && userDeleted(states, index, k) && (s.connected || s.act.get(k) === 'done') ? 'none' : s.copyRow.get(k)!,
     kept: s.kept.get(k)!,
     act: PENDING.has(act) ? `${act} ${s.actKind.get(k)}` : 'idle',
   }
@@ -131,6 +145,10 @@ export interface World {
   engine: RunningEngine
   readonly options: EngineOptions
   readonly ids: Record<Draft, string>
+  /** Each draft's channel: its own, or its root's for a reply (`sendReply`). */
+  readonly channel: Record<Draft, string>
+  /** Drafts sent as New chat thread roots, because a reply names them. */
+  readonly roots: ReadonlySet<Draft>
   /** The first message Juno stored for each draft. */
   readonly first: Map<Draft, string>
   /** Slack's message from Juno's own accepted call, and the network's copy. */
@@ -147,6 +165,18 @@ export interface World {
   offline: boolean
   edits: number
   readonly timer: ReturnType<typeof setInterval>
+}
+
+/**
+ * Each draft's channel, and the drafts sent as New chat thread roots: a reply (`sendReply`) lives in its
+ * root's channel. Lookups and edits are matched by channel, so a trace with a reply must have neither (the
+ * New chat schedules do not).
+ */
+export function channelsOf(trace: { readonly states: ReadonlyArray<TraceState> }): Pick<World, 'channel' | 'roots'> {
+  const parent = sOf(trace.states.at(-1)!).parent ?? new Map<number, number>()
+  const channel = { ...CHANNEL }
+  for (const k of DRAFTS) if ((parent.get(k) ?? 0) !== 0) channel[k] = CHANNEL[parent.get(k) as Draft]
+  return { channel, roots: new Set(DRAFTS.filter((k) => DRAFTS.some((j) => parent.get(j) === k))) }
 }
 
 export const draftOf = (world: World, id: string | undefined): Draft | undefined => DRAFTS.find((k) => world.ids[k] === id)
@@ -177,7 +207,7 @@ interface Store {
 
 export function readStore(world: World, k: Draft): Store {
   const id = world.ids[k]
-  const channel = CHANNEL[k]
+  const channel = world.channel[k]
   return readDb(world.engine, 'user.db', (db) => {
     const pending = db.prepare('SELECT state, next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { state: string; next_at: number } | undefined
     const row = pending?.state
@@ -201,10 +231,10 @@ export function readStore(world: World, k: Draft): Store {
 }
 
 export function storedMessages(world: World, k: Draft): ReadonlyArray<Stored> {
-  return readDb(world.engine, 'cache.db', (db) => db.prepare('SELECT ts, deleted FROM messages WHERE channel = ? AND client_msg_id = ?').all(CHANNEL[k], world.ids[k]) as Array<{ ts: string; deleted: number }>)
+  return readDb(world.engine, 'cache.db', (db) => db.prepare('SELECT ts, deleted FROM messages WHERE channel = ? AND client_msg_id = ?').all(world.channel[k], world.ids[k]) as Array<{ ts: string; deleted: number }>)
 }
 
-export const inSlack = (world: World, k: Draft) => world.engine.fake.messages(CHANNEL[k]).filter((m) => m.client_msg_id === world.ids[k])
+export const inSlack = (world: World, k: Draft) => world.engine.fake.messages(world.channel[k]).filter((m) => m.client_msg_id === world.ids[k])
 
 /** The copy's ts in Slack: the message with the draft's id that is not the first Juno stored (or not Juno's own call's). */
 export const copyInSlack = (world: World, k: Draft) => {

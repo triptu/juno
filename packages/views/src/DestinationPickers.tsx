@@ -33,6 +33,8 @@ export interface DestinationPickersProps {
   readonly conversations: PickConversations | undefined
   /** The thread list's rows (Main is added here); undefined while they load. */
   readonly threads: ReadonlyArray<PickThread> | undefined
+  /** The open list shows an earlier query's rows while the typed one's load. Enter waits for them. */
+  readonly loading?: boolean
   readonly now: number
   readonly onPickConversation: (conversation: PickConversation) => void
   /** A thread, or Main with `undefined`. */
@@ -183,6 +185,7 @@ const styles = stylex.create({
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
     transform: { default: 'none', ':active': `scale(${motion['--press-scale']})` },
     transitionProperty: 'transform',

@@ -97,7 +97,9 @@ export class SyncRunner extends Context.Service<
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
               // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated").
-              onBooted: sortClearCases.pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
+              onBooted: sortClearCases().pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
+              // The sidebar shows rows during the first sync; a clear bot channel leaves All once its history is here.
+              onHistory: (channel) => sortClearCases(channel).pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
             })
           }).pipe(
             Effect.provide(active.context),

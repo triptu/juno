@@ -83,6 +83,23 @@ it('keeps compaction inside both limits, and applies each $1 click only once for
   expect(ledger.snapshot()).toMatchObject({ cap: dollars(2), raises: 0, reserved: 0 })
 })
 
+it('keeps the engine calls inside half of the cap, counts them for chat, and applies a repeated reservation once (spec engineBudget)', () => {
+  const first = ledger.reserve('engine', dollars(0.6), 'engine-ask-1')
+  expect(first).toEqual({ kind: 'reserved', id: 'engine-ask-1' })
+  // The host offers an ask until the agent answers it: the repeat reserves nothing more.
+  expect(ledger.reserve('engine', dollars(0.6), 'engine-ask-1')).toEqual({ kind: 'reserved', id: 'engine-ask-1' })
+  expect(ledger.snapshot().reserved).toBe(dollars(0.6))
+  expect(ledger.reserve('engine', dollars(0.5), 'engine-ask-2').kind).toBe('blocked')
+  ledger.settle('engine-ask-1', dollars(0.1))
+  expect(ledger.reserve('engine', dollars(0.5), 'engine-ask-3').kind).toBe('reserved')
+  ledger.settle('engine-ask-3', undefined)
+  expect(ledger.reserve('engine', dollars(0.5), 'engine-ask-4').kind).toBe('blocked')
+  // Chat may use the rest of the cap, and no more.
+  expect(ledger.reserve('chat', dollars(1.4)).kind).toBe('reserved')
+  expect(ledger.reserve('chat', 1).kind).toBe('blocked')
+  invariant()
+})
+
 it('records a cost above its reservation as reported, and refuses new spend until the day is back under its cap or raised', async () => {
   const guard = h.guard()
   const { revision, context } = request()

@@ -16,16 +16,18 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
   await juno.waitForSync()
   const { tabs, newChat, topic, nav } = juno
 
+  // "+" opens a New chat beside the launch tab's.
   await tabs.newTabButton.click()
-  await tabs.expectActive('New chat')
+  await tabs.expectActiveAt('New chat', 1)
   await newChat.expectEmpty()
   await expect(newChat.composer).toBeFocused()
   await newChat.expectConversation('Pick a conversation')
   await newChat.expectThread('Any thread')
 
-  // "+" again focuses the untouched New chat instead of opening another.
+  // "+" again opens another New chat, beside the launch tab's and this one.
   await tabs.newTabButton.click()
-  await tabs.expectCount(1)
+  await tabs.expectCount(3)
+  await tabs.expectActiveAt('New chat', 2)
 
   await newChat.write('Cutover moves to Thursday night')
   // Enter with no destination opens the conversation picker and keeps the draft.
@@ -167,7 +169,8 @@ test('a New chat with a draft stays in the tab history when a topic opens over i
   await newChat.write('A long thought I do not want to lose')
   await sidebar.row('Draft plan is in the doc').open()
   await topic.expectTitle('Draft plan is in the doc')
-  await tabs.expectCount(1)
+  // The launch tab's New chat and this one, which now shows the topic.
+  await tabs.expectCount(2)
   await nav.back()
   await expect(newChat.composer).toHaveValue('A long thought I do not want to lose')
 })
