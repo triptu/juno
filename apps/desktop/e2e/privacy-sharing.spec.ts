@@ -8,7 +8,8 @@
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
-const RINA = 'Rina finished the onsite.'
+// No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
+const RINA = 'Rina finished the onsite'
 const SWITCH = 'Hide message text while sharing the screen'
 const ALWAYS_ON = "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text."
 

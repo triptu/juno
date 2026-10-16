@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures'
 
-const RINA = 'Rina finished the onsite.'
+// No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
+const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const SWITCH = 'Mark messages read in Slack too'
 const CATCH_UP = 'Mark earlier reads in Slack'
