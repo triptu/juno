@@ -34,7 +34,9 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   const env: NodeJS.ProcessEnv = { ...process.env, JUNO_E2E: '1', JUNO_USER_DATA: userData, JUNO_FAKE_SLACK_URL: fake.url,
     JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin,
     // The agent runs one script at start and writes the result: the QuickJS worker and binary load from the asar.
-    JUNO_AGENT_CODEMODE: '1' }
+    JUNO_AGENT_CODEMODE: '1',
+    // Main loads koffi from the asar and calls the screen watcher symbol once, then writes which one it found.
+    JUNO_E2E_SCREEN_PROBE: '1' }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.NODE_OPTIONS
   try {
@@ -88,6 +90,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
       }
     }
     expect(JSON.parse(await readFile(join(userData, 'agent', 'codemode-probe.json'), 'utf8'))).toEqual({ ok: true, value: 12 })
+    // koffi's .node is unpacked from the asar and loads in the signed app; SkyLight's name resolves.
+    expect(JSON.parse(await readFile(join(userData, 'screen-watch-probe.json'), 'utf8'))).toEqual({ symbol: 'SLSIsScreenWatcherPresent', value: 'boolean' })
     expect(timings).toHaveLength(5)
     const sorted = timings.toSorted((a, b) => a - b)
     const report = { samplesMs: timings, medianMs: sorted[2], minMs: sorted[0], maxMs: sorted[4] }
