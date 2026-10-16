@@ -3,14 +3,19 @@
  * 5.2, 5.8). Every page lands through `applyPage`, so the merge rules and
  * `reindexTopics` run the same way whatever brought the data.
  *
- * Cold boot, in order: `client.userBoot` and `users.prefs.get`,
- * `client.counts`, the followed threads from `subscriptions.thread.getView`
- * (10 per page live, paged back to the quiet window), one history page per active conversation (newest first,
- * background lane, skipping conversations an interrupted boot already
- * covered), unknown users from the edge, a latest-reply fetch for the
- * unfollowed threads with the most recent activity so their rows have a
- * preview, and the discovery sweep over the window so Main knows about
- * replies to roots older than the window.
+ * Cold boot, in order: `client.userBoot` with `users.prefs.get` beside it,
+ * `client.counts` (which also gives every conversation active in the window
+ * a provisional Main row), the people of the DMs, and the first page of
+ * followed threads from `subscriptions.thread.getView`, all on the
+ * interactive lane. Then the quick-start marker (`QUICK_START_KEY`): the
+ * sidebar shows rows from here on. The other `getView` pages (10 per page
+ * live, back to the quiet window) then run beside one history page per
+ * active conversation (newest first, background lane, skipping
+ * conversations an interrupted boot already covered). After history:
+ * unknown users from the edge, and beside each other a latest-reply fetch
+ * for the unfollowed threads with the most recent activity, so their rows
+ * have a preview, and the discovery sweep over the window, so Main knows
+ * about replies to roots older than the window.
  *
  * Warm boot: `client.userBoot`, a full `client.counts` (membership is
  * derived from it), history since the synced range for conversations whose
@@ -26,12 +31,13 @@ import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRe
 import type { Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
-import type { SyncContext } from './context'
+import { reindexOptions, type SyncContext } from './context'
 import { activeConversations, loadCounts } from './counts'
 import { discoverSince } from './discovery'
 import { readMetadata, storeMetadata } from './metadata'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
+import { reindexTopics } from './reindex'
 import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
@@ -50,6 +56,12 @@ import {
 } from './write'
 
 export const BOOT_KEY = 'boot'
+/**
+ * `sync_state.quickStart`: the cold boot's quick steps are done (workspace,
+ * membership, the people of the DMs, the first page of followed threads), so
+ * the sidebar's rows are its own and it shows them while the rest fills in.
+ */
+export const QUICK_START_KEY = 'quickStart'
 /** `sync_state.me`: the user and their user groups, so a command outside the sync re-indexes with the same mention rules. */
 export const ME_KEY = 'me'
 
@@ -97,8 +109,12 @@ const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
 const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive' | 'background' = 'interactive'): Effect.Effect<void, BootError, BootServices> =>
   readMetadata(ctx.metadata, (observed) => Effect.gen(function* () {
     const api = yield* SlackApi
-    const boot = yield* api.call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, { lane, reason: 'fetch-client-data' })
-    const prefs = withPrefs ? (yield* api.call('users.prefs.get', {}, { lane, reason: 'prefs' })).prefs : (boot.prefs ?? undefined)
+    // Independent calls: prefs goes beside userBoot.
+    const [boot, own] = yield* Effect.all([
+      api.call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, { lane, reason: 'fetch-client-data' }),
+      withPrefs ? Effect.map(api.call('users.prefs.get', {}, { lane, reason: 'prefs' }), (answer) => answer.prefs) : Effect.succeed(undefined),
+    ], { concurrency: 2 })
+    const prefs = withPrefs ? own : (boot.prefs ?? undefined)
     const selfId = ctx.me.userId
     ctx.me = { userId: selfId, usergroupIds: (boot.subteams?.self ?? []) as ReadonlyArray<UsergroupId> }
     yield* transaction(
@@ -137,9 +153,11 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, la
     yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
     const stored = yield* threadMessages(channel, root.ts)
     const replies = stored.filter((m) => m.ts !== root.ts && m.deleted === 0).length
-    // The view carries every unread reply, so coverage is complete from Slack's read pointer on.
+    // The view carries every unread reply, so coverage is complete from Slack's read pointer on. The row's count turns
+    // exact with it, so the thread is re-indexed in the same transaction rather than waiting for a later page to do it.
     const completeFrom = root.last_read ?? root.latest_reply ?? root.ts
-    yield* transaction(markRepliesComplete(channel, root.ts, replies >= root.reply_count, yield* Clock.currentTimeMillis, completeFrom))
+    const syncedAt = yield* Clock.currentTimeMillis
+    yield* transaction(Effect.andThen(markRepliesComplete(channel, root.ts, replies >= root.reply_count, syncedAt, completeFrom), reindexTopics([topic], reindexOptions(ctx))))
   })
 
 /**
@@ -158,7 +176,13 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, la
  */
 const loadThreadViews = (
   ctx: SyncContext,
-  options: { readonly until: Ts; readonly probe: boolean; readonly lane: 'interactive' | 'background' },
+  options: {
+    readonly until: Ts
+    readonly probe: boolean
+    readonly lane: 'interactive' | 'background'
+    /** Runs once, after the first page is stored: the cold boot's quick start ends here. */
+    readonly afterFirstPage?: Effect.Effect<void, BootError, BootServices>
+  },
 ): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
@@ -175,10 +199,13 @@ const loadThreadViews = (
         { limit: ctx.config.getViewPageLimit, ...(current === undefined ? {} : { current_ts: current }) },
         { lane: options.lane, reason: 'threads' },
       )
+      // Everyone on the page in one lookup, not one per thread, so the rows land named without a call each.
+      yield* nameFirst(ctx, page.threads.flatMap((view) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), options.lane)
       for (const view of page.threads) {
         listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
         yield* applyThreadView(ctx, view, requestedAt, options.lane)
       }
+      if (current === undefined && options.afterFirstPage !== undefined) yield* options.afterFirstPage
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
       if (lastActivity === undefined) {
@@ -381,22 +408,35 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
     const counts = yield* loadCounts(ctx, undefined)
+    const active = yield* activeConversations(counts.entries, start)
+    // A Main row from `client.counts` for each conversation history will read, so channels and DMs show before their pages land.
+    yield* transaction(reindexTopics(active.map((conversation) => mainTopicOf(conversation.id)), { ...reindexOptions(ctx), provisionalMain: true }))
     // Names before rows: the people of every DM and group DM, on the interactive lane.
     yield* fillUsers(ctx, 'interactive')
-    yield* loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive' })
-    const active = yield* activeConversations(counts.entries, start)
-    yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
-    let done = 0
-    for (const conversation of active) {
-      // A boot that failed half way left ranges behind; what they cover is not fetched again.
-      if (!(yield* covered(conversation.id, start, conversation.latest))) yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
-      yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
-      yield* Effect.yieldNow
-    }
+    // The quick start ends with the first page of followed threads; the other pages run beside history.
+    const quickStart = Effect.flatMap(Clock.currentTimeMillis, (at) => transaction(setSyncState(QUICK_START_KEY, { at })))
+    const threads = loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive', afterFirstPage: quickStart })
+    const history = Effect.gen(function* () {
+      yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
+      let done = 0
+      for (const conversation of active) {
+        // A boot that failed half way left ranges behind; what they cover is not fetched again.
+        if (!(yield* covered(conversation.id, start, conversation.latest))) {
+          yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
+          yield* ctx.onHistory(conversation.id)
+        }
+        yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
+        yield* Effect.yieldNow
+      }
+    })
+    yield* Effect.all([threads, history], { concurrency: 2, discard: true })
     yield* fillUsers(ctx)
-    yield* loadThreadPreviews(ctx, bootTs)
-    // Replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-    const discovered = yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
+    // Independent methods, so they run side by side: previews read replies, discovery searches.
+    // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
+    const [, discovered] = yield* Effect.all([
+      loadThreadPreviews(ctx, bootTs),
+      discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })),
+    ], { concurrency: 2 })
     yield* fillUsers(ctx)
     const state: BootState = {
       quietDays,

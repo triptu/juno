@@ -160,8 +160,8 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, quietDays }
   const status = get(engineStatusAtom)
   const syncing = status._tag !== 'Success' || status.value.syncing || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
+  // An empty cache's list waits for the quick start (membership, DM names, the first followed threads); then rows fill in as they land.
   if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter, quietDays }
-  if (shown?.meta.windowCovered === false && syncing) return shown
   const next = carryOver(shown, result.value)
   if (shown !== undefined && shown.filter === filter) {
     // Finishing sync is not a reason to reorder a painted list. The next live

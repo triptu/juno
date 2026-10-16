@@ -60,9 +60,9 @@ owner message quoting the card. It never approves the expired payload.
 
 `composerEmojiAtom(open)` reads workspace emoji only while a colon query is open.
 
-On an empty cache, the sidebar holds its first rows until cold sync and Automated classification finish. A cached window paints immediately. While catch-up fills the sidebar, existing rows retain their order and newly discovered rows append. The phase becoming live does not itself reorder the painted list. An explicit filter change or the next live activity uses the normal recency order again.
+On an empty cache, the sidebar holds its first rows until the cold boot's quick start (membership, the people of the DMs, the first page of followed threads) is stored; rows then fill in as the sync stores them, without a reload. A cached window paints immediately. While catch-up fills the sidebar, existing rows retain their order and newly discovered rows append. The phase becoming live does not itself reorder the painted list. An explicit filter change or the next live activity uses the normal recency order again.
 
-All topics also holds its first rows on an empty cache until cold sync completes; cached and filtered windows keep the existing snapshot handoff.
+All topics also holds its first rows on an empty cache until the quick start is stored; cached and filtered windows keep the existing snapshot handoff.
 
 New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
 

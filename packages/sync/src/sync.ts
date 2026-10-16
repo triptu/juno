@@ -62,6 +62,12 @@ export interface RunSyncOptions {
    * engine sorts clear bot channels into Automated here). It must not fail.
    */
   readonly onBooted?: Effect.Effect<void>
+  /**
+   * Runs after the cold boot stored one conversation's history page, while
+   * the sidebar already shows rows (the engine sorts that conversation into
+   * Automated when it is clearly a bot channel). It must not fail.
+   */
+  readonly onHistory?: (channel: string) => Effect.Effect<void>
 }
 
 /**

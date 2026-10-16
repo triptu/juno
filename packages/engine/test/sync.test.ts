@@ -187,12 +187,49 @@ describe('cold boot', () => {
       'api:conversations.replies': 2,
       // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
       'api:search.modules.messages': 2,
-      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear on.
-      'edge:users/info': 7,
+      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
+      // on; a getView page names everyone on it in one call.
+      'edge:users/info': 4,
       'edge:emojis/list': 1,
     })
     const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
     expect(new Set(asked).size).toBe(asked.length)
+  })
+
+  it('is usable after the quick steps, before any history, and fills in without a reload', async () => {
+    // Every history answer and the discovery search wait: the boot cannot get past its quick steps on its own.
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        fake.holdNext({ method: 'conversations.history', times: 100 })
+        fake.holdNext({ method: 'search.modules.messages', times: 10 })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.status('ready')
+    // The quick start is stored: the renderer shows the list from here on.
+    const window = await waitFor(() => {
+      const result = engine.registry.get(engine.topicsAtom())
+      return result._tag === 'Success' && result.value.meta.windowCovered === true ? result.value : undefined
+    }, 10_000, 'the quick start')
+    expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
+    const early = window.order.map((id) => window.rows.get(id)!)
+    // Followed threads from the first getView page, titled from their first words.
+    expect(early.some((row) => row.id.startsWith('t:') && row.title !== '')).toBe(true)
+    // Channels and DMs from client.counts alone: their time and an unread dot, no preview yet.
+    const alerts = early.find((row) => row.id === 'm:C0ALERTSPROD')!
+    expect(alerts).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
+    expect(early.find((row) => row.id === 'm:G0MAYALEO')!.preview.text).toBe('')
+
+    // History lands while the boot is still running: previews and exact counts arrive in the same list, and the
+    // bot channel is sorted into Automated as soon as its page is stored, before the boot ends.
+    engine.fake.release({ method: 'conversations.history' })
+    await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
+    await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
+    expect(engine.fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
+    expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
+    engine.fake.release()
+    await engine.phase('live')
   })
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
