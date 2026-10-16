@@ -267,6 +267,8 @@ export function createAgentSupervisor(
   // Two test apps play two Macs: each has a name, and the backup exports often enough to see the other.
   const deviceName = e2e ? process.env.JUNO_E2E_DEVICE_NAME : undefined
   const interval = e2e ? Number(process.env.JUNO_E2E_BACKUP_INTERVAL_MS) : Number.NaN
+  // The `agent.codemode` flag, off unless set.
+  const codemode = process.env.JUNO_AGENT_CODEMODE === '1'
   return new AgentSupervisor(
     {
       agentDir: join(app.getPath('userData'), 'agent'),
@@ -274,6 +276,7 @@ export function createAgentSupervisor(
       ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }),
       ...(deviceName === undefined ? {} : { deviceName }),
       ...(Number.isFinite(interval) && interval > 0 ? { backupIntervalMs: interval } : {}),
+      ...(codemode ? { codemode } : {}),
     },
     sendToEngine,
     engineReady,

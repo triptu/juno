@@ -50,6 +50,11 @@ export interface ToolRun {
 export interface ToolCall {
   /** pi's call id: stable when pi replays the call. */
   readonly callId: string
+  /**
+   * Aborted when pi aborts the call, as when Pause stops a script. A read may
+   * stop waiting then; a write must not, and must not claim it did not happen.
+   */
+  readonly signal?: AbortSignal
 }
 
 export interface ToolDefinition<Args> {
@@ -83,13 +88,26 @@ export function defineTool<Args>(tool: ToolDefinition<Args>): JunoTool {
     description: tool.description,
     parameters: tool.parameters,
     replay: tool.replay,
-    execute: async (args: Args, api: { readonly callId: string }) => {
-      const output = await tool.run(args, { callId: api.callId })
+    execute: async (args: Args, api: { readonly callId: string }, context?: { readonly abortSignal?: AbortSignal }) => {
+      const output = await tool.run(args, { callId: api.callId, ...(context?.abortSignal ? { signal: context.abortSignal } : {}) })
       return { output: [{ type: 'text', text: output.text }], ...(output.isError ? { isError: true } : {}) }
     },
   }
   return { name: tool.name, registration: registration as unknown as ToolRegistration, status: tool.status }
 }
+
+/** Stops waiting for `work` when `signal` aborts. Only for reads: the host may still answer, unseen. */
+export function abortable<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return work
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new Cancelled())
+    if (signal.aborted) return abort()
+    signal.addEventListener('abort', abort, { once: true })
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+  })
+}
+
+export class Cancelled extends Error {}
 
 /** The tool as the provider receives it, for the builder's count. */
 export function declaration(tool: ToolRegistration): string {

@@ -137,6 +137,20 @@ The router parses the stream and publishes each block once it closes: a bubble a
 
 **Testing.** `test/turns.test.ts` runs the engine in-process with `fakeProvider`; `test/turns-crash.test.ts` kills it mid-turn under the crash harness.
 
+## Codemode for reads
+
+Behind the `agent.codemode` flag (`TurnsOptions.codemode`; in the app `AgentConfig.codemode`, which main sets from `JUNO_AGENT_CODEMODE=1`), off by default. With it, the model also gets pi-durable's own `codemode` tool, which runs a model-written script in a QuickJS sandbox. Juno does not run scripts itself; `runtime/codemode.ts` scopes pi's tool, and `scripts/` decides what a script may call and records what it did. Research and measurements: `docs/research/codemode.md`.
+
+- **Only reads.** A script's tools are an explicit list (`scripts/index.ts`, `SCRIPT_READS`): the Slack reads and `connection_read`, a script-only tool (`callers: ['tools']`) that runs a connection tool only when it is on Juno's reviewed read tier, never a tool the server merely marked read-only. The tool's `api.agent()` lists only those, its `api.executeTool()` refuses any other name, and the `pi.tool` hook refuses a script's child call that is not on the list. Writes, proposals, memory, schedules, jobs, T3 starts, the Codex harness and `codemode` itself are not callable, so a script cannot start a script. Writes keep the direct path and the auto-review. `models: false`; `store()` writes are dropped and `load()` reads nothing; pi has no `env`, so no output files.
+- **Taint.** `codemode` taints the run before it runs, and each Slack read taints it again.
+- **Sources.** A script's Slack read is the same tool, so its lines keep their handles (`m1`, …) in the run's `sources` table; a bubble cites what the script returned as it would cite a direct read.
+- **Limits** (`SCRIPT_LIMITS`): 40 calls per script, 4 in flight, 60 s of wall time (the sandbox's deadline), 16 KB of result for the model, 64 MB of VM heap, 2 scripts at once (others wait for a worker). Over a limit the script gets an error it can read.
+- **Admission.** The builder counts the `codemode` section and declaration with Juno's own; a tool only scripts call is in the section, not counted twice.
+- **Audit** (`scripts/audit.ts`, `script_calls`). Each child call's arguments are written before it runs, and its outcome when it ends: done, failed, cancelled or refused. Activity shows a run's folded line ("Ran 1 script: 4 reads, 1 cancelled") and each call with its arguments and outcome; a call still running when its run ended shows "Did not finish".
+- **Pause and AI off** stop a running script, also one waiting for a worker: its unfinished reads stop waiting (`abortable`) and are recorded as cancelled, and the model gets a fixed line saying why. There is no chat Stop (SPEC 13.2).
+- **Packaging.** The app's build writes `quickjs.wasm` and `codemode-worker.js` next to `agent.js` and passes their paths (`apps/desktop/src/agent/index.ts`). Under Playwright with the flag on, the agent runs one script at start and writes `codemode-probe.json`; the packaged smoke test and `e2e/juno-agent/codemode.spec.ts` check it.
+- **Not yet.** Codemode is not offered through the Codex harness. `test/codemode.test.ts` covers the flows; `bench/codemode.ts` compares it with direct tools.
+
 ## Actions (WP15)
 
 Cards, clicks, dispatch and grants (plan v3 §6, §9, §12, §19.5; SPEC 13.3, 13.9; `specs/agent-actions.qnt`). `openTurns({ actions: { host, executors } })` opens them with the engine; `Turns.actions` is the service, and `startAgent` binds `host` to the AgentHost port.
