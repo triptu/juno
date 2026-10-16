@@ -2,6 +2,7 @@
 // where it goes, pick a thread first, change the destination, a preview that
 // never marks read, a first DM opened with conversations.open, and Home from
 // the sidebar.
+import { expectStableAnchor } from './shiftProbe'
 import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
@@ -39,17 +40,34 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
   await expect(newChat.composer).toBeFocused()
 
   const before = await newChat.field.boundingBox()
-  await newChat.send()
-  await topic.expectMessage('Cutover moves to Thursday night')
-  await tabs.expectActive('eng')
-  await expect(newChat.root).toHaveCount(0)
-  const after = await newChat.field.boundingBox()
-  expect(after).toEqual(before)
+  fake.holdNext({ method: 'chat.postMessage', before: true })
+  await expectStableAnchor(juno.win, '[data-topic-view] [data-message-row]', async () => {
+    await newChat.send()
+    await topic.expectMessage('Cutover moves to Thursday night')
+    await tabs.expectActive('Cutover moves to Thursday night')
+    await expect(newChat.root).toHaveCount(0)
+    expect(await newChat.field.boundingBox()).toEqual(before)
+    await expect(juno.sidebar.row('Cutover moves to Thursday night').root).toBeVisible()
+    await juno.sidebar.row('Cutover moves to Thursday night').expectUnread(0)
+    await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
+    await topic.composer.fill('An unfinished reply')
+    await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
+    fake.release()
+    await topic.expectSent('Cutover moves to Thursday night')
+  })
+  await expect(topic.composer).toHaveValue('An unfinished reply')
+  expect(await newChat.field.boundingBox()).toEqual(before)
+  await topic.send('second')
+  await topic.expectSent('second')
+  const root = fake.messages('C0ENG').find(message => message.text === 'Cutover moves to Thursday night')!
+  expect(fake.messages('C0ENG').find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
 
   const posted = fake.calls.filter((call) => call.method === 'chat.postMessage')
-  expect(posted.map((call) => call.args['channel'])).toEqual(['C0ENG'])
+  expect(posted.map((call) => call.args['channel'])).toEqual(['C0ENG', 'C0ENG'])
   // The New chat's entry became the topic: nothing to go back to in this new tab.
   await nav.expectCanGo(false, false)
+  await juno.sidebar.row('#eng').open()
+  await expect(topic.list.locator(`[data-thread-link="t:C0ENG:${root.ts}"]`)).toContainText('1 reply')
 })
 
 test('a thread picked first fills in the conversation, and the reply lands in the thread', async ({ juno, slack, fake }) => {
@@ -251,4 +269,26 @@ test('frequent destinations choose where a new message is sent', async ({ juno, 
   await juno.topic.expectMessage('The release checklist is ready.')
   await expect.poll(() => fake.messages('C0ENG').some(message => message.text === 'The release checklist is ready.')).toBe(true)
   expect(fake.calls.filter(call => call.method === 'chat.postMessage').map(call => call.args['channel'])).toEqual(['C0ENG'])
+})
+
+
+test('a new thread stays open when its root fails and is retried, including a queued reply', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.newChat.pickConversation('eng', 'eng')
+  fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
+  await juno.newChat.write('first')
+  await juno.newChat.send()
+  await juno.topic.expectTitle('first')
+  await expect(juno.topic.failed('first').row).toContainText('Not sent.')
+  await expect(juno.sidebar.row('first').root).toBeVisible()
+  await juno.topic.send('second')
+  await expect(juno.topic.message('second')).toHaveAttribute('data-pending', 'sending')
+  expect(fake.messages('C0ENG').some(message => message.text === 'second')).toBe(false)
+  await juno.topic.failed('first').retry()
+  await juno.topic.expectSent('first')
+  await juno.topic.expectSent('second')
+  await juno.topic.expectTitle('first')
+  const root = fake.messages('C0ENG').find(message => message.text === 'first')!
+  expect(fake.messages('C0ENG').find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
 })

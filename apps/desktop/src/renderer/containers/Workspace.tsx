@@ -83,7 +83,7 @@ function Page({ tab }: { readonly tab: Tab }) {
   const place = currentPlace(tab)
   switch (place.kind) {
     case 'topic':
-      return <TopicTab key={place.topicId} tabId={tab.id} id={place.topicId} />
+      return <TopicTab key={place.viewId ?? place.topicId} tabId={tab.id} id={place.viewId ?? place.topicId} />
     case 'newChat':
       return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':

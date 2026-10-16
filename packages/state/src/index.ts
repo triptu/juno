@@ -73,6 +73,7 @@ export {
   scrollSnapshotAtom,
   setPinned,
   settleNewChat,
+  acknowledgeTopic,
   tabByNumber,
   tabsAtom,
   tabShowing,

@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import type { FileView, TopicDetail } from '@juno/contract'
-import { discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
+import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent } from '@juno/views'
 import { closeTabById, openTopic } from './navigation'
@@ -73,6 +73,13 @@ export interface TopicTabProps {
 export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
+  const acknowledgedId = detail?.id
+  useEffect(() => {
+    if (acknowledgedId !== undefined && acknowledgedId !== id) {
+      updateTabs(registry, tabs => acknowledgeTopic(tabs, id, acknowledgedId))
+      if (registry.get(selectedTopicAtom) === id) registry.set(selectedTopicAtom, acknowledgedId)
+    }
+  }, [id, acknowledgedId])
   // A topic the store does not know (a saved tab whose topic is gone) closes its tab.
   useEffect(() => {
     if (detail === null) closeTabById(tabId)
@@ -145,18 +152,18 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   // The hooks run their effects in this order; keep it.
   const position = usePosition(list)
   const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, list, readOnly)
-  const loading = useTopicFetch(id, view)
+  const loading = useTopicFetch(detail.id, view)
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
   const files = useTopicFiles()
   useOpenPosition(position, view, readOnly, list, showWindow)
-  const flash = useMessageFlash(position, id, readOnly, list)
+  const flash = useMessageFlash(position, detail.id, readOnly, list)
   useHeldPosition(position, list)
   useFirstFrame(position, id, list, showWindow)
   useStickToBottom(position, list)
   useSendMeasure(list)
   useScrollRelease(position, view, readOnly)
-  const older = useOlderPages(position, id, view, list)
-  useMarkRead(id, readOnly, detail.unreadCount, position.positioned, focused, position.atBottom)
+  const older = useOlderPages(position, detail.id, view, list)
+  useMarkRead(detail.id, readOnly, detail.unreadCount, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll)
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer })
@@ -197,13 +204,13 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   if (readOnly) return messages
   const sent = () => {
     jump()
-    void markRead(id)
+    void markRead(detail.id)
   }
   return (
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
+      composer={<TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
       floating={<>{messageActions.floating}{files.viewer}</>}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}
