@@ -144,6 +144,11 @@ function codemodeFiles(): Plugin {
 // JUNO_UNMINIFIED=1 keeps function names for a CPU profile (scripts/perf-trace.mjs).
 const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('esbuild' as const)
 
+// JUNO_COVERAGE=1 writes source maps beside the bundles, without a comment in
+// them, so scripts/coverage-map.mjs can map what an e2e test ran back to the
+// source files (docs/development.md, "Affected tests").
+const sourcemap = process.env['JUNO_COVERAGE'] === '1' ? ('hidden' as const) : false
+
 // The React Compiler memoizes components and hooks at build time
 // (performance.md 5.4). It runs as a Babel plugin inside plugin-react 5, on
 // the workspace packages' source too. A component it cannot compile is left
@@ -166,6 +171,7 @@ export default defineConfig({
     plugins: [externalize, runtimeImports(), codemodeFiles()],
     build: {
       minify,
+      sourcemap,
       rollupOptions: {
         // index.js is the main process; engine.js and agent.js are forked as utility processes;
         // codemode-worker.js is the agent's codemode sandbox thread.
@@ -182,6 +188,7 @@ export default defineConfig({
     plugins: [externalize, runtimeImports()],
     build: {
       minify,
+      sourcemap,
       rollupOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
     },
   },
@@ -189,6 +196,7 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       minify,
+      sourcemap,
       rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') },
     },
     plugins: [

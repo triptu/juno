@@ -1,3 +1,5 @@
+// First, so coverage (test runs only) starts before the rest of the bundle runs.
+import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget } from '@juno/contract'
 import { join } from 'node:path'
@@ -22,6 +24,8 @@ import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from '.
 app.enableSandbox()
 
 const e2e = process.env.JUNO_E2E === '1'
+// Under JUNO_E2E_COVERAGE, record which renderer functions run (../coverage.ts).
+if (e2e) recordWindowCoverage(app)
 
 // Keep dev data apart from a packaged install. JUNO_USER_DATA lets tests
 // point at a throwaway directory. Both must be set before ready.
@@ -235,6 +239,7 @@ if (e2e) {
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       wake: () => notifier.wake(),
+      flushCoverage: () => flushAllCoverage(),
     },
   })
 }
