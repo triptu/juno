@@ -55,7 +55,7 @@ export function SignInView({ mode, busy, error, onCopyDetails, onSignIn, onImpor
             Use the Slack app's session
           </Button>
           <Text variant="meta" tone="muted" as="p">
-            macOS will ask for access to the Slack keychain item.
+            macOS will ask once for your Mac password so Juno can read Slack’s keychain item.
           </Text>
         </div>
       </div>
