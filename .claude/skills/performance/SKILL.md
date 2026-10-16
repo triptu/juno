@@ -54,6 +54,10 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 18. The shell paints with no data; `show` on `ready-to-show` with `backgroundColor` from the saved theme. The engine answers the first `topics.list` from `cache.db` before any Slack call. AI, notifications, emoji, lazy pages and prefetch run after the first sidebar paint. `juno://` has `codeCache: true`; `v8CacheOptions: 'bypassHeatCheck'`. Latin fonts are preloaded; fallback faces are size-adjusted. Background throttling stays on.
 19. Adding a dependency or a page to the initial bundle needs a before/after size from the bundle check.
 
+**Electron chrome**
+
+20. `-webkit-app-region` goes on title bar strips (`drag`) and on the container of each control group inside them (`no-drag`), never on a primitive or a row. It is inherited, and with a region on every control Chromium took about twice as long to apply each scroll offset and to finish each layout: 6 to 18 % of a scroll's frame work (`docs/performance.md` 8.5). The `app.spec.ts` title bar test fails above 20 region roots.
+
 ## Measure before you call it done
 
 - Instrument with `@juno/state/perf.ts` marks (`juno.topic-open`, `juno.tab-switch`, ...) so the DevTools "Juno" track and the harness see the change.

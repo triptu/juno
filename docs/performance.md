@@ -298,7 +298,7 @@ Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `a
 
 The scroll gate pools the frame work of two ordinary sweeps before taking the p95. Each ordinary sweep is followed by the same sweep with two background worker threads busy; the pooled held-clock p95 is recorded beside the ordinary one and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. Every sweep checks for visible placeholders, long animation frames and dropped frames; the ordinary sweeps still decide the 8.3 ms, long-frame and dropped-frame gates.
 
-The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile.
+The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile. `node scripts/perf-frames.mjs <dir>/<name>.trace.json [--sequence <n>]` splits a scroll sweep's frame work the way the gate counts it into stages (script, GC, input, applying the scroll offset, style, layout, prepaint, paint, layerize, commit), for all frames and for those over 8.3 ms, and lists the heaviest frames. Read stage sizes from a trace without extra categories: the invalidation-tracking categories make prepaint and DOM removal several times slower.
 
 Status: the fixture and the engine benchmark exist; the Playwright harness does not. `scripts/check-bundle-size.mjs` runs in `pnpm build`, the marks live in `@juno/state/perf`, `largeSeed()` in `@juno/fake-slack` is the fixture below (generated in about 5 s, never checked in), and `packages/engine/test/bench` boots the engine on it and reports the sidebar query time alone and inside the engine, the snapshot and delta sizes, the encode, clone and decode times and the inject-to-row time, with the load average (`JUNO_BENCH=1`). On Apple silicon the first run after an idle gap is about twice as slow as the same run on a busy CPU (power management), so `meta.queryMs` after an injected event is higher than the isolated time even on a quiet machine. First numbers are in `docs/architecture.md` section 16, M3. The rest of this section is the plan.
 
@@ -347,7 +347,7 @@ the top, fit the reserved space, and never move or disappear.
 
 - **One-frame budgets on a 60 Hz display (accepted 10-14).** The tab switch, the prefetched open and hover are budgeted at 16 ms p95, measured from the input to the frame presented. That includes the wait for the next refresh, which is uniform over one refresh interval: 8.3 ms at 120 Hz, 16.7 ms at 60 Hz. The perf scenario "frame floor" times a pointerdown that does no work at all; on the 60 Hz test machine it measured a median of 9.2 to 10.5 ms and a p95 of 15.8 to 16.9 ms over three runs of 30 presses. So at 60 Hz the 16 ms p95 is under the floor and no code can meet it. The proposal: a one-frame budget is one refresh interval plus 8 ms. At 120 Hz that is 16.3 ms, today's number; at 60 Hz it is 24.7 ms. The 8 ms is the work a 120 Hz frame allows, the same as the scroll budget, and it is what a regression would eat. `perf.spec.ts` applies this rule when the measured refresh interval is over 10 ms. The owner accepted it on 10-14 and section 1 states it.
 
-- **Sidebar scroll frame work.** The sidebar missed the 8.3 ms p95 on some sweeps of the 1,200-topic seed: 5 to 13 ms. Traces showed JavaScript in the scroll frames. Each wheel step slid a new row under the still pointer, and its `pointerenter` ran the topic prefetch (mount a subscription, evict the oldest, post to the engine) and the cut-off title check, which forced a style and layout. The garbage from the prefetches added collector pauses. Rows now skip that work when they move under a still pointer (`pointerMoved` in `@juno/ui`; a real move onto a row still warms it), and `perf.spec.ts` and `sidebar.spec.ts` fail if a scroll records a `juno.prefetch` mark. Measured in one exclusive run on the 60 Hz test machine, before then after: p95 work per frame went from 8.1 ms (first pass) and 9.8 ms (second pass) at load 4.1 to 4.3, to 7.5 ms and 6.2 ms at load 8.8 to 9.1. What is left is about 4 ms per wheel step over two frames: Chromium applying the scroll offset (`ScrollLayer`, about 1 ms), restyling the two rows whose `:hover` changes (an inherited custom property restyles every element in the row), `content-visibility` unlocking the rows that come near the viewport, and the fixed prepaint, paint and layerize cost of each frame. The custom `::-webkit-scrollbar` (global.css) adds one of the two frames: with a native scrollbar a step needs one main-thread frame, not two. Swapping it would change the scrollbar's look, so it is not done. Turning `content-visibility` off made frames slower.
+- **Sidebar scroll frame work.** The sidebar missed the 8.3 ms p95 on some sweeps of the 1,200-topic seed: 5 to 13 ms. Traces showed JavaScript in the scroll frames. Each wheel step slid a new row under the still pointer, and its `pointerenter` ran the topic prefetch (mount a subscription, evict the oldest, post to the engine) and the cut-off title check, which forced a style and layout. The garbage from the prefetches added collector pauses. Rows now skip that work when they move under a still pointer (`pointerMoved` in `@juno/ui`; a real move onto a row still warms it), and `perf.spec.ts` and `sidebar.spec.ts` fail if a scroll records a `juno.prefetch` mark. Measured in one exclusive run on the 60 Hz test machine, before then after: p95 work per frame went from 8.1 ms (first pass) and 9.8 ms (second pass) at load 4.1 to 4.3, to 7.5 ms and 6.2 ms at load 8.8 to 9.1. What is left is about 4 ms per wheel step over two frames: Chromium applying the scroll offset (`ScrollLayer`, about 1 ms), restyling the two rows whose `:hover` changes (an inherited custom property restyles every element in the row), `content-visibility` unlocking the rows that come near the viewport, and the fixed prepaint, paint and layerize cost of each frame. An earlier reading blamed the custom `::-webkit-scrollbar` (global.css) for one of the frames; measured on 10-17 it adds no main-thread frame and no work (section 8.5). Turning `content-visibility` off made frames slower.
 - **The hover toolbar on every message row (fixed 10-15).** Each row renders its toolbar (three quick reactions, a divider, up to four icon buttons), 21 elements, 70 % of an open topic's DOM (3,150 of 4,523 elements for 150 rows). It was hidden by opacity only, so every toolbar was styled and laid out whenever the list was: when a topic opened and on every frame of a sidebar drag, which reflows the message pane. With it removed altogether a prefetched open went from a median of 18.4 to 19.0 ms down to 17.4 ms, and the drag's p95 work per frame stopped crossing 8.3 ms (it did in 3 of 6 runs with the toolbar, 0 of 6 without). Now the toolbar's slot is `display: none` until the row is hovered, focused or held (`--row-toolbar-display` in `Message.tsx`); it is absolutely placed in a reserved slot, so showing it moves nothing. Interleaved, three runs each at load 2.5 to 4.5, before then after: drag p95 6.2, 5.5 and 10.2 ms, then 5.7, 5.6 and 5.6 ms; prefetched open median 18.3 to 19.7 ms, then 17.3 to 18.0 ms. The elements are still created (`perf.spec.ts` logs how many toolbars are laid out: one at most).
 - **Warm start (10-15).** Over its 500 ms median on every commit measured, back to the merge that first asserted it (`cbe20cc3`, 729 ms; 593 to 767 ms at five merges of 10-15, load 3 to 6), so it was not one of the 10-15 merges. Against a bare Electron app launched the same way (main to page start 241 ms, to first paint 302 ms), the scenario's log and main-process marks showed where Juno's start goes: 40 ms more to load main's bundle, 80 ms in `app.dock.setIcon` decoding the 1,024 px dev icon before the window opened, the window itself (about 80 ms, as in the bare app), then from the page start the bundle run by +70 ms, the shell by +90, the engine port by +95, the first sidebar snapshot by +150 and the rows by +190. The Dock icon is set only in an unpackaged run, so the packaged app never paid it; tests no longer do (`JUNO_E2E`). Interleaved, three runs each: median 629, 534 and 558 ms before, 469, 486 and 501 ms after. What is left near the budget: the renderer sends its first subscriptions only after it commits the shell (about 25 ms after the port is open; the engine answers in 1 to 2 ms), and Home renders on the start path when no tab is open (about 10 to 25 ms, measured by hiding it). Follow-up on 10-15 (`perf-fix-2`), measured against a bare Electron app and with startup traces: main's own module load is 9 ms, not 40 (the rest before it is Electron's start, as in the bare app), so lazy-loading main's chunks would save almost nothing. The renderer's time from page start to rows went from a median of 207 ms to 179 ms over 15 launches each (fastest 167 to 154 ms) with three changes: the font preload, the engine port asked for by the preload, and the sidebar's request sent before the shell renders. The engine answers the first `topics.list` 14 to 18 ms after the request; asking for a 40-row first window instead of 300 saved about 10 ms and was not done. Warm start on this machine still swings with load, because from main's creation to the page's start (Electron's own work, about 250 ms in a bare app) is what other processes slow down.
 - **Open miss: Juno chat scroll frame work (10-15).** The chat scenario (`perf.spec.ts`, "Juno chat", 320 rows, the window moving as it scrolls) measured a p95 of 9.0, 8.2, 6.9 and 10.7 ms of main-thread work per frame over four runs on the shared 60 Hz machine at load 2 to 5, with a median of 0.3 to 0.5 ms, no long animation frame and no dropped frame. The heavy frames are the layout and paint of rows coming into view. Bubble rows now take their own off-screen estimate, `--row-bubble-estimate` 38px, instead of the message row's 56px. The Juno panel opens on the newest 40 rows rather than 200, which brought `juno.panel-open` from a median of 22.3 ms to 13.7 ms (p95 20.3 ms, inside the 24.7 ms one-frame budget at 60 Hz). `pnpm perf` fails on the scroll number until it holds under 8.3 ms.
@@ -603,6 +603,173 @@ structural ceiling and dropped-frame limit passed. The exclusive lock was
 held throughout; load at each scroll reading was 3.4–4.5. This single run
 confirms the gates execute, not the cause of the ordinary tail. The log is
 `.juno-status/perf-gates-1017/scroll.log`.
+
+### 8.5 Scroll frame work beyond JavaScript (10-17)
+
+The four ordinary scroll gates failed with held-clock readings well inside
+7 ms. This pass asked where the rest of each frame goes, per list, and
+measured each suspect on its own.
+
+**Method.** Traces with `JUNO_TRACE_EXTRA=renderer,input,scheduler,`
+`disabled-by-default-devtools.timeline.invalidationTracking,`
+`disabled-by-default-blink.invalidation,disabled-by-default-cc.debug` showed
+what each frame does and why (which nodes were restyled, laid out or
+invalidated). Sizes come from traces with the default categories and no
+CPU profile, read with `scripts/perf-frames.mjs` (7.3): the invalidation
+categories made prepaint and DOM removal several times slower, and showed a
+5 ms `removeChild` per All topics step that does not exist without them
+(removing a row slot by hand takes under 0.1 ms). Each suspect was then
+measured in the running app, on the gate's own fixtures and sweeps, by
+injecting CSS or deleting the rules in question, alternating with the
+unchanged page: three ordinary and three held-clock sweeps per variant. The
+spread between reps of one variant is about ±1 ms of ordinary p95, so only
+moves larger than that, or a change in the total work per sweep, count.
+
+**Where the time goes.** Main-thread work in frames over 8.3 ms, ordinary
+sweeps, before the fix below (ms per heavy frame; the last stage holds the
+paint step's own time and the frame's untraced overhead):
+
+| Stage | Sidebar | All topics | Messages | Chat |
+| --- | --- | --- | --- | --- |
+| Script and GC | 1.1 | 2.9 | 1.7 | 0.9 |
+| Input and observers | 0.8 | 0.5 | 1.0 | 0.9 |
+| Applying the scroll offset (`ScrollLayer`) | 1.6 | 2.3 | 0.8 | 1.7 |
+| Style | 1.0 | 2.6 | 1.2 | 0.4 |
+| Layout, with post-layout tasks | 1.6 | 2.1 | 2.8 | 2.3 |
+| Prepaint | 0.7 | 0.5 | 0.8 | 0.4 |
+| Paint and frame overhead | 2.4 | 2.3 | 1.5 | 1.8 |
+| Layerize | 1.7 | 1.4 | 0.8 | 2.5 |
+| Commit | 0.1 | 0.1 | 0.2 | 0.2 |
+| Total | 11.0 | 14.7 | 10.8 | 11.1 |
+
+Raster, the compositor thread and the GPU process are not in the gate. They
+used 0.5 to 1 ms (compositor) and 1.3 to 3 ms (GPU) per heavy frame, and
+dropped frames stayed under 1 %. Paint caching works: 4 to 65 of 300 to 900
+display items are recorded again per paint.
+
+- **Sidebar.** A wheel step costs about four rendering frames. In the first,
+  the scroll offset is applied and the two rows whose `:hover` changes are
+  restyled. In the second, about six rows that come near the viewport leave
+  `content-visibility` skipping and get style, layout and prepaint. The
+  other two end the scroll gesture (each Playwright wheel step is a gesture
+  of its own) and skip the rows that left the viewport again. Every
+  rendering frame pays about 1 ms of layerize and 1 to 2 ms
+  of paint bookkeeping whatever changed. No single cost dominates.
+- **All topics.** The whole step lands in one frame: the virtualizer
+  re-renders with `flushSync` inside the scroll event, then reading the
+  scroll position forces style and layout, and the four new rows are styled
+  and laid out (about 86 elements and 120 layout objects).
+- **Messages.** Layout of the row that slides under the pointer, whose
+  toolbar is now displayed, and of rows leaving `content-visibility`
+  skipping.
+- **Chat.** Layerize and applying the scroll offset.
+
+**What each suspect is worth** (ordinary / held-clock pooled p95 of three
+sweeps, ms; each pair from one run, alternated):
+
+| Variant | Sidebar | All topics | Messages | Chat |
+| --- | --- | --- | --- | --- |
+| Unchanged | 11.3 / 6.3 | 16.2 / 7.1 | | |
+| No row hover (`pointer-events: none` on the list) | 11.1 / 5.6 | 16.1 / 6.8 | | |
+| Native scrollbar (`::-webkit-scrollbar` rules removed) | 11.2 / 5.0 | 16.4 / 6.5 | | |
+| `content-visibility: visible` on the rows | 11.7 / 5.1 | | | |
+| No art cross-fade | 11.3 / 5.3 | | | |
+| Unchanged | 11.0 / 5.1 | 16.2 / 6.7 | | |
+| No universal `::before`/`::after` rule | 10.5 / 6.0 | 16.1 / 6.8 | | |
+| Sticky header made static | 10.0 / 5.3 (no-op here) | 15.5 / 6.7 | | |
+| All of hover, `content-visibility`, art, pseudo rule | 11.1 / 5.0 | 15.7 / 6.9 | | |
+| Unchanged, with the fix below | | | 10.0 / 3.0 | 9.8 / 3.2 |
+| No row hover, with the fix | | | 10.9 / 3.0 | 9.9 / 3.2 |
+| `content-visibility: visible`, with the fix | | | 11.0 / 3.0 | 9.7 / 3.3 |
+| Unchanged | 11.9 / 5.2 | 16.9 / 6.5 | 11.0 / 3.0 | 10.5 / 3.5 |
+| **No app regions** | **11.0 / 4.5** | **14.3 / 5.7** | **10.7 / 3.5** | **9.2 / 2.6** |
+| Work per sweep without app regions | −14 % | −18 % | −6 % | −7 % |
+
+None of the candidates named earlier in section 8 moves the ordinary p95: not the
+hover restyle, not `content-visibility`, not the art fade, and not the custom
+scrollbar. The art fade runs only while the art job is still drawing, in
+the first sweep: art that arrives while a row is skipped by
+`content-visibility` keeps the row's old style, so the placeholder fades
+out (240 ms) when the row scrolls into view, not when the art arrived.
+That contradicts `TopicArt`'s rule that art present on the first paint
+shows at once. It is a small look issue, not a cost, and is not changed
+here. The scrollbar does not add a main-thread frame either: a sweep
+draws the same number of frames with the native one (237 to 283 against
+236 to 243 for the sidebar, 469 to 481 against 464 to 476 for All
+topics). Swapping it would change the look and buy nothing, so it needs no
+decision. Hiding the other pane's content (`visibility: hidden`) changed
+nothing, so the per-frame cost is not the size of the rest of the page.
+
+**Fix: app regions only on the title bars.** Every interactive primitive
+set `-webkit-app-region: no-drag` (`internal/interactive.ts`). The property
+is inherited, so about 1,000 elements of an ordinary page and 4,600 of an
+open topic carried a region, and every row, chip and button of a scrolling
+list moved one. Without them Chromium took about half as long to apply each
+scroll offset (sidebar 0.5 to 0.24 ms a frame, All topics 0.65 to 0.3, chat
+0.33 to 0.08) and less time after each layout. `no-drag` only matters inside
+a `drag` strip, and only the two title bars are drag strips. The tab
+strip's slots and the history group already opted out on their containers.
+The sidebar's icon group now does too, and the primitives set nothing. The
+`app.spec.ts` title bar test checks that every control over a drag strip is
+covered, and that regions start on fewer than 20 elements.
+Overlays that cover the window (image viewer, sheets) keep their controls
+below the title bar height, and popovers and option lists keep their own
+`no-drag`.
+
+**Measured, not shipped: no `flushSync` in All topics.** With the
+virtualizer's `useFlushSync: false` the new rows render one frame after the
+scroll, inside the 6-row overscan. Ordinary p95 went from 16.6 to 13.6 ms
+(4 reps each, 15.4 to 17.3 against 11.8 to 14.0) and held-clock from 6.1 to
+5.8 ms, but the work per sweep rose by 19 % (2,226 to 2,644 ms), because
+each extra rendering frame pays its fixed cost again. It still misses
+8.3 ms, and a fling faster than the overscan per frame would show empty
+space for a frame. Left as is.
+
+**The rest is the clock.** The same sweeps run 2 to 3.5 times faster with
+the cores held up (messages 10.0 against 3.0 ms). The renderer's main
+thread runs at user-interactive priority (47), so this is not a
+backgrounded window. Each wheel step is a burst of 3 to 9 ms after about
+90 ms of idle, and the CPU runs the burst at a low clock. With the fix, the
+held-clock p95 is 2.6 to 5.7 ms, inside the budget, and no
+change tried here brings the ordinary reading under 8.3 ms. That needs a
+decision (below).
+
+**The long animation frames in All topics.** Five long frames in the traced
+run, matched to the trace by time: four are the first or second wheel step
+of a sweep, 36 to 380 ms after it starts, which follows the 3 s idle gap.
+That step does the usual work (two hover rows and one new slot to restyle)
+but every stage runs 5 to 13 times slower: 10.6 ms to apply the scroll
+offset against 0.8 ms later, 8.6 ms of style for four elements. The other is
+a major garbage collection (32 to 50 ms, mostly marking) that lands on a
+step. LoAF entries show no scripts and no blocking time for both kinds,
+since neither is a script. The four in the gated run of 10-17 have the same shape (no scripts; 56 to 225 ms; two with a wheel event in them and two without), but that run saved no traces, so they are matched by shape, not by time.
+
+**Decision for the owner.** The ordinary gate drives the list with 200 px
+wheel steps 100 ms apart, each its own scroll gesture. A trackpad on a
+120 Hz display sends a delta every frame within one gesture, which keeps the
+clock up and moves a few pixels at a time. Options: keep the gate as it is
+and accept that it fails on clock alone, or add a continuous-gesture sweep
+(CDP `Input.synthesizeScrollGesture` or per-frame wheel deltas) as the
+ordinary case and keep the stepped sweep as a reported number. This pass
+changes neither the gate nor any budget.
+
+**Gate results.** `pnpm perf -g scroll`, before and after the fix, back
+to back on the quiet Mac under the exclusive lock (load 2.5 to 3.4), ms,
+ordinary / held-clock pooled p95:
+
+| List | Before | After | Budget |
+| --- | --- | --- | --- |
+| Sidebar | 12.1 / 5.0 | 9.3 / 3.9 | 8.3 / 7 |
+| All topics | 14.9 / 6.1 | 14.9 / 5.3 | 8.3 / 7 |
+| Messages | 10.5 / 2.6 | 9.9 / 2.9 | 8.3 / 7 |
+| Chat | 11.9 / 3.6 | 10.3 / 3.3 | 8.3 / 7 |
+
+All held-clock gates pass and all ordinary gates still fail. Neither run
+recorded a long animation frame; dropped frames were 0 to 2 per sweep set,
+and every structural ceiling passed. One gate run moves by about ±1.5 ms,
+so the interleaved A/B numbers above are the better measure of the fix.
+`pnpm test:feel -g scroll` (the scrolled tab restore) passed. Logs and
+traces are under `.juno-status/scroll-frames/`.
 
 ### Engine speed measurements (2026-10-15)
 
