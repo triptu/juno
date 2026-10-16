@@ -109,17 +109,16 @@ const junoPage = (
   </JunoChatFrame>
 )
 
-/** The strip as the app runs it: a press selects the tab, and a drop moves it. */
+/** The strip with a drop that moves the tab. The tab being dragged is active, as a press in the app makes it; a press here selects nothing, so pressing moves nothing. */
 function Reorderable() {
   const [order, setOrder] = useState<ReadonlyArray<WorkspaceTab>>(mixedTabs)
-  const [active, setActive] = useState<string>(tabs.postgres.id)
   const move = (id: string, index: number) =>
     setOrder((current) => {
       const tab = current.find((other) => other.id === id)
       return tab === undefined ? current : current.filter((other) => other !== tab).toSpliced(index, 0, tab)
     })
   return (
-    <Workspace {...base} tabs={order} activeId={active} onSelectTab={setActive} onMoveTab={move}>
+    <Workspace {...base} tabs={order} activeId={tabs.dev.id} onMoveTab={move}>
       {postgresPage}
     </Workspace>
   )

@@ -1780,7 +1780,7 @@ export class TabStrip {
 
   /** What a screen reader last heard about a tab's move. */
   get announcement(): Locator {
-    return this.win.locator('section[aria-label="Workspace"] > [role="status"]')
+    return this.win.locator('[data-tab-announce]')
   }
 
   /** The art or photo in a tab's icon slot. */

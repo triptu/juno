@@ -186,7 +186,8 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
           />
         ))}
       </TabStrip>
-      <span ref={status} role="status" {...stylex.props(styles.announce)}>
+      {/* A live region without the status role, so it is not taken for the app's toasts. */}
+      <span ref={status} aria-live="polite" aria-atomic="true" data-tab-announce="" {...stylex.props(styles.announce)}>
         {movedText(tabs, moved)}
       </span>
     </>
