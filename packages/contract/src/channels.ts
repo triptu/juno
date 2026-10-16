@@ -99,7 +99,8 @@ export const Events = {
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
- * Juno's last action, and Settings (⌘,), which opens Settings.
+ * Juno's last action, Settings (⌘,), which opens Settings, and Help › Show
+ * the Tour, which opens the tour (SPEC 4.1).
  */
 export type MenuCommand =
   /** ⌘T: a new tab with what Settings › General chooses. */
@@ -119,6 +120,8 @@ export type MenuCommand =
   | 'palette.toggle'
   | 'edit.undo'
   | 'settings.open'
+  /** Help › Show the Tour. No shortcut. */
+  | 'tour.show'
 
 /**
  * The app menu's shortcuts, in Electron's accelerator form. Main registers

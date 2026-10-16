@@ -12,6 +12,7 @@ import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { CircleHalf } from '@phosphor-icons/react/dist/icons/CircleHalf'
+import { Compass } from '@phosphor-icons/react/dist/icons/Compass'
 import { EnvelopeSimple } from '@phosphor-icons/react/dist/icons/EnvelopeSimple'
 import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
@@ -87,6 +88,7 @@ export type PaletteIconName =
   | 'backup'
   | 'about'
   | 'ai-activity'
+  | 'tour'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -128,6 +130,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   backup: HardDrives,
   about: Info,
   'ai-activity': Pulse,
+  tour: Compass,
 }
 
 export interface PaletteItem {

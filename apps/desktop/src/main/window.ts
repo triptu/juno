@@ -319,6 +319,8 @@ function setAppMenu(state: MenuState, rebuild = false): void {
       { label: 'View', submenu: view },
       { label: 'Go', submenu: go },
       { role: 'window', submenu: windowItems },
+      // The tour (SPEC 4.1), again whenever the owner wants it.
+      { role: 'help', submenu: [{ id: 'tour', label: 'Show the Tour', click: (_item, window) => tabCommand(window, 'tour.show') }] },
     ]),
   )
 }

@@ -1,6 +1,6 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, setTabExpiry, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, setTabExpiry, showTour, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -51,7 +51,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
     case 'backup':
       return <JunoBackup />
     case 'about':
-      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<EngineStatus />} />
+      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<EngineStatus />} onShowTour={() => showTour(registry)} />
   }
 }
 

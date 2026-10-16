@@ -67,6 +67,7 @@ import {
   selectedTopicAtom,
   setPinned,
   settleNewChat,
+  showTour,
   signedInAtom,
   slackLink,
   tabByNumber,
@@ -637,6 +638,8 @@ export function runMenuCommand(command: MenuCommand): void {
       return
     case 'settings.open':
       return openSettings()
+    case 'tour.show':
+      return showTour(registry)
     default: {
       const number = Number(command.slice('tab.select.'.length))
       if (paletteTakesTabNumber(number)) return
