@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { test } from 'node:test'
 import { healthBaseline, healthRegressions } from './health-ratchet.mjs'
 import { collectSizeReport } from './health-size.mjs'
+import { runTool, timeLimit, ToolTimeout } from './health-run.mjs'
 
 function report() {
   return {
@@ -57,6 +58,33 @@ test('failed tools and invalid baselines cannot pass or become a baseline', () =
   const baseline = healthBaseline(report())
   baseline.counts.unusedFiles = null
   assert.throws(() => healthRegressions(report(), baseline), /Invalid health count/)
+})
+
+test('a timed-out tool is reported as a timeout, not as a failure or a finding', () => {
+  const late = { ...report(), complete: false, errors: [{ tool: 'knip', message: 'knip timed out', timedOut: true }] }
+  const [failure] = healthRegressions(late, healthBaseline(report()))
+  assert.match(failure, /timed out \(knip\); no finding was checked/)
+  late.errors.push({ tool: 'jscpd', message: 'jscpd: bad config' })
+  assert.match(healthRegressions(late, healthBaseline(report()))[0], /failed; fix the report errors/)
+})
+
+test('the time limit grows with the load', () => {
+  assert.equal(timeLimit(20_000, 2, 8), 20_000)
+  assert.equal(timeLimit(20_000, 16, 8), 40_000)
+  assert.equal(timeLimit(20_000, 200, 8), 120_000)
+})
+
+test('a tool that runs out of time is tried once more, then reported as a timeout', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'juno-health-run-'))
+  try {
+    const tries = join(directory, 'tries')
+    writeFileSync(tries, '')
+    const slow = `require('node:fs').appendFileSync(${JSON.stringify(tries)}, 'x'); setTimeout(() => {}, 60_000)`
+    await assert.rejects(runTool('slow', process.execPath, ['-e', slow], {}, 300), (error) => error instanceof ToolTimeout && /slow timed out after .* This is not a finding/.test(error.message))
+    assert.equal(readFileSync(tries, 'utf8'), 'xx')
+    await assert.rejects(runTool('broken', process.execPath, ['-e', 'process.exit(3)'], {}, 5000), (error) => !(error instanceof ToolTimeout) && error.message.startsWith('broken: '))
+    assert.equal(await runTool('quick', process.execPath, ['-e', 'console.log("ok")'], {}, 5000), 'ok\n')
+  } finally { rmSync(directory, { recursive: true, force: true }) }
 })
 
 test('size identities survive line moves and body edits, and distinguish callbacks', () => {

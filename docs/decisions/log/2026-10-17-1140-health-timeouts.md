@@ -1,0 +1,1 @@
+- 10-17 11:40 · tooling-1017 · Health tools get a time limit scaled by load and one retry on timeout, and a timeout is reported as a timeout, not as a finding; lint still fails then, since nothing was checked.
