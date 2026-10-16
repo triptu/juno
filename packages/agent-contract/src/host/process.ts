@@ -17,6 +17,8 @@ export const AgentConfig = Schema.Struct({
   deviceName: Schema.optionalKey(Schema.String),
   /** Under Playwright only: how often the backup exports what changed. Otherwise once a minute. */
   backupIntervalMs: Schema.optionalKey(Schema.Number),
+  /** The `agent.codemode` flag: the model may run read-only scripts (docs/research/codemode.md). Off when absent. */
+  codemode: Schema.optionalKey(Schema.Boolean),
 })
 export type AgentConfig = typeof AgentConfig.Type
 
