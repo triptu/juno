@@ -178,8 +178,8 @@ export default defineFixtures(
     },
     // The unified Home (docs/design/home-merged/round-4): All topics in the New chat button's place; Home and Juno left in the nav.
     'Unified Home': {
-      'all-topics-button': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'home' }), { height: 260 }),
-      'all-topics-current': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'all-topics' }), { height: 260 }),
+      'all-topics-button': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'home' })),
+      'all-topics-current': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'all-topics' })),
       'all-topics-tooltip': scene(
         () => (
           <>
@@ -187,7 +187,7 @@ export default defineFixtures(
             <TooltipLayer />
           </>
         ),
-        { height: 260, tooltip: '[aria-label="All topics"]' },
+        { tooltip: '[aria-label="All topics"]' },
       ),
     },
     // The filter row as scrollable pills (inventory 2.3): it never grows taller than the row of three.
