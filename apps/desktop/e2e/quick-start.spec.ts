@@ -47,6 +47,8 @@ large('first sign-in shows threads, channels and DMs within the budget, then fil
   // A channel's Main is titled with its name; a thread with the first words of its root.
   expect(first.some((title) => title.startsWith('#'))).toBe(true)
   expect(first.some((title) => !title.startsWith('#') && title.split(' ').length >= 3)).toBe(true)
+  // The tour opens over the app after a first sign-in (SPEC 4.1); it is not what this measures.
+  await juno.tour.skip()
   await sidebar.filter('DMs')
   await expect(sidebar.rows.first()).toBeVisible()
   await sidebar.filter('All')

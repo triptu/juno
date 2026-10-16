@@ -625,6 +625,7 @@ export class Juno {
   readonly peek: PeekPopover
   readonly privacy: PrivacyMode
   readonly palette: PaletteDriver
+  readonly tour: TourDriver
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -644,6 +645,7 @@ export class Juno {
     this.peek = new PeekPopover(win)
     this.privacy = new PrivacyMode(app, win)
     this.palette = new PaletteDriver(app, win)
+    this.tour = new TourDriver(app, win)
   }
 
   /**
@@ -751,12 +753,20 @@ export class Juno {
     return this.clipboard()
   }
 
+  /** The sign-in page as a first sign-in shows it, rather than "Slack signed you out". */
+  private get firstSignIn(): Locator {
+    return this.win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })
+  }
+
   /**
    * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
    * that opens, and waits for the app to come back signed in. Then skips
-   * "Set up Juno" unless `skipSetUp` is false.
+   * "Set up Juno" and, after a first sign-in, the tour, unless `skipSetUp`
+   * is false.
    */
   async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
+    await expect(this.signInButton).toBeVisible({ timeout: 15_000 })
+    const first = await this.firstSignIn.isVisible()
     const opened = this.app.waitForEvent('window')
     await this.signInButton.click()
     const page = await opened
@@ -764,6 +774,7 @@ export class Juno {
     await page.getByPlaceholder('Password').fill('password')
     await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
     if (options.skipSetUp !== false) await this.skipSetUp()
+    if (options.skipSetUp !== false && first) await this.tour.skip()
   }
 
   /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
@@ -788,10 +799,17 @@ export class Juno {
     await page.close()
   }
 
-  /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */
+  /**
+   * Clicks "Use the Slack app's session" and skips "Set up Juno" and, after
+   * a first sign-in, the tour, unless `skipSetUp` is false (as for an
+   * import that fails). The app reads the fixture directory it was launched with.
+   */
   async importFromSlackApp(options: { readonly skipSetUp?: boolean } = {}): Promise<void> {
+    await expect(this.importButton).toBeVisible({ timeout: 15_000 })
+    const first = await this.firstSignIn.isVisible()
     await this.importButton.click()
     if (options.skipSetUp !== false) await this.skipSetUp()
+    if (options.skipSetUp !== false && first) await this.tour.skip()
   }
 
   /** How many times main asked the keychain for a Slack password; outside tests, each may be a macOS prompt. */
@@ -1933,6 +1951,7 @@ export type AppMenuItem =
   | 'juno'
   | 'search'
   | 'undo'
+  | 'tour'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | 'tab-last'
 
@@ -1942,6 +1961,61 @@ async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<
     if (!item) throw new Error(`No menu item ${itemId}`)
     item.click(undefined, BrowserWindow.getAllWindows()[0])
   }, id)
+}
+
+/** The tour (SPEC 4.1): the sheet over the app after a first sign-in, and again from Help, ⌘K or Settings › About. */
+export class TourDriver {
+  readonly root: Locator
+
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {
+    this.root = win.getByRole('dialog', { name: 'Tour of Juno' })
+  }
+
+  /** The step on screen: its heading is the one visible. */
+  get heading(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  get next(): Locator {
+    return this.root.locator('[data-tour-next]')
+  }
+
+  get back(): Locator {
+    return this.root.getByRole('button', { name: 'Back', exact: true })
+  }
+
+  /** The dot for step `n`, counted from 1. */
+  dot(n: number): Locator {
+    return this.root.getByRole('group', { name: 'Steps' }).getByRole('button', { name: new RegExp(`^Step ${n} of `) })
+  }
+
+  async expectOpen(): Promise<void> {
+    await expect(this.root).toBeVisible({ timeout: 15_000 })
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  async expectStep(heading: string): Promise<void> {
+    await expect(this.heading).toHaveText(heading)
+  }
+
+  /** Help › Show the Tour, through its app menu item. */
+  async openFromHelp(): Promise<void> {
+    await clickAppMenu(this.app, 'tour')
+    await this.expectOpen()
+  }
+
+  /** Waits for the tour a first sign-in opens, and closes it with Esc. */
+  async skip(): Promise<void> {
+    await this.expectOpen()
+    await this.win.keyboard.press('Escape')
+    await this.expectClosed()
+  }
 }
 
 /** ⌘K (spec section 10): the search and command palette. */
