@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import type { IgnoredChannel } from '@juno/contract'
+import type { IgnoredChannel, SendCheckPref } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
@@ -8,6 +8,10 @@ import { IgnoredChannels } from './IgnoredChannels'
 import { QuietWindowSetting } from './QuietWindowSetting'
 import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
+
+// The sections of Settings that are the app's own (SPEC 14). Notifications,
+// Juno, Connections and Backup & This Mac are their own pages. Each section
+// is a settings page with its title; `SettingsPage` puts the list beside it.
 
 export type SharingDetection = 'available' | 'missing' | 'alwaysOn'
 
@@ -17,14 +21,18 @@ const SHARING_LINE: Record<SharingDetection, string> = {
   alwaysOn: "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text.",
 }
 
-// The sections of Settings that are the app's own (SPEC 14). Notifications,
-// Juno, Connections and Backup & This Mac are their own pages. Each section
-// is a settings page with its title; `SettingsPage` puts the list beside it.
+const checkLabels: Record<SendCheckPref, string> = {
+  wrongPlace: 'Wrong place', typos: 'Typos and doubled words', capitalI: 'Capital i',
+  questionMarks: 'Question marks', longSentences: 'Long sentences', grammar: 'Grammar (uses AI)',
+}
 
 export interface SettingsGeneralProps {
   /** How many days of activity the sidebar shows (1, 3, 7 or 14). */
   readonly quietDays: number
   readonly onQuietDaysChange: (days: number) => void
+  readonly checks: ReadonlyArray<{ readonly key: SendCheckPref; readonly enabled: boolean }>
+  readonly grammarUnavailable?: string | undefined
+  readonly onCheckChange: (key: SendCheckPref, enabled: boolean) => void
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
@@ -46,8 +54,8 @@ export interface SettingsGeneralProps {
   readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -82,6 +90,14 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
           <Checkbox role="switch" label="Hide message text while sharing the screen" checked={sharingDetection !== 'missing' && hideWhileSharing} disabled={sharingDetection === 'missing'}
             onChange={(event) => onHideWhileSharingChange(event.currentTarget.checked)}
             description={SHARING_LINE[sharingDetection]} />
+        </Surface>
+      </Section>
+      <Section heading="Message checks" sub="Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <div {...stylex.props(styles.stack)}>
+            {checks.map(({ key, enabled }) => <Checkbox key={key} label={checkLabels[key]} checked={enabled && !(key === 'grammar' && grammarUnavailable)} disabled={key === 'grammar' && grammarUnavailable !== undefined} onChange={(event) => onCheckChange(key, event.currentTarget.checked)} />)}
+            {grammarUnavailable && <Text variant="meta" tone="muted" as="p">{grammarUnavailable}</Text>}
+          </div>
         </Surface>
       </Section>
       <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">

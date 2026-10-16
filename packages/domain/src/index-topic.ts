@@ -35,7 +35,12 @@ export interface IndexedTopic {
   readonly rootTs?: Ts
 }
 
-export const MAX_PARTICIPANTS = 4
+/**
+ * How many of the latest unread messages name the row's people (SPEC section
+ * 5, "Row anatomy"). Their distinct senders are stored, most recent first;
+ * the row shows four and counts the rest.
+ */
+export const PARTICIPANT_WINDOW = 15
 
 export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   const live = input.messages.filter((m) => !m.deleted).toSorted((a, b) => compareTs(a.ts, b.ts))
@@ -48,9 +53,10 @@ export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   const unreadCount = Math.max(unread.length, markedUnread ? 1 : 0)
   const mentionsMe = unread.some((m) => messageMentionsMeDirectly(messageBody(m, input.lookups), input.me))
 
+  // The people talking in what you have not read: senders of the latest unread messages, never you. A read topic has none.
   const participants: UserId[] = []
-  for (let i = live.length - 1; i >= 0 && participants.length < MAX_PARTICIPANTS; i--) {
-    const id = live[i]?.userId
+  for (let i = unread.length - 1; i >= Math.max(0, unread.length - PARTICIPANT_WINDOW); i--) {
+    const id = unread[i]?.userId
     if (id !== undefined && id !== input.me.userId && !participants.includes(id)) participants.push(id)
   }
 

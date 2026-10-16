@@ -46,6 +46,7 @@ Run these from the repo root.
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
+| `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
 | `pnpm agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `pnpm test`). `pnpm agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
 
@@ -76,7 +77,7 @@ their original order when timestamps match.
 
 ## Batch merges
 
-Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories (batch merges and the migration order check).
 
 Fetch `origin/main`, then run from the repository root:
 
@@ -437,8 +438,10 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
+| Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `pnpm test:gallery` |
 | No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
 | Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
+| No focus ring cut off by a scroller or paint containment, tabbing through the main surfaces in light and dark (`GALLERY_RING_ONLY=Sidebar` for one, `*` for every component) | `apps/gallery/focus-ring.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `pnpm test:feel` |
 
@@ -704,6 +707,12 @@ Causes found so far (2026-10-15):
 
 - **A source-link jump kept the bottom hold until `scrollend`.** A reply committed before that event pulled the topic back to the bottom. A source jump releases the bottom hold before calling `scrollIntoView`. It lays out the rows around the target before measuring it, then holds the cited row in place. The e2e test defers `scrollend` until a reply is drawn and requires the cited row to stay at exactly the same vertical position.
 
+- **A copy's delete retried inside its call across a socket drop.** `SlackApi.call` retries `internal_error` itself, and each try runs the copy check again. A try that came after the reconnect, before the catch-up ended, kept the copy as not rechecked, so the duplicate stayed (5 of 100 remote, 20 of 30 on a loaded Mac). The check now leaves the row waiting for the catch-up, as the worker's pass does (`actionWorker.ts`).
+
+- **A command that cancelled a topic open.** A topic open applies once the topic can paint (`show` in `navigation.ts`). ⌘J right after the click still saw the Juno tab, opened it again, and that change cancelled the waiting open: the topic never showed (1 of 80 at 8 workers). The Juno shortcuts now decide after the navigation already asked for (`afterNavigation`).
+
+- **A list item read at its threshold.** Home shows "moved a lot" from `MOVED_A_LOT_MIN` (8) new replies, so a test that injects nine and waits for the item can read it at eight. Wait for the value the test asserts.
+
 ## Machine shapes
 
 `pnpm remote` picks a cost-conscious shape for each script (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
@@ -890,3 +899,7 @@ At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remo
 `expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
 
 Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep `JUNO_REMOTE_MAX_VCPU` at 24 or lower.
+
+## Scheduled full run
+
+`pnpm verify:main` runs every suite against `main` (`--ref <ref>` for another): it checks the ref out into a temporary detached worktree, so nothing local is sent, and runs `test`, `specs:check` with no cache (every Quint run), `test:gallery` and `test:desktop` through `pnpm remote` at the same time. It writes a summary to `.juno-status/verify-main.md` and `.json` (each suite's result, time, log and the failing tests it names) and the full logs to `.juno-status/verify-main/<run>/`, and exits 1 if a suite failed. `--with-mac` also runs the e2e tests tagged `@mac` on this Mac, which takes a heavy-job slot. `perf` and `test:feel` are not part of it. The first run (2026-10-15) passed in 170 s of wall time: `test` 170 s, `specs:check` 146 s, `test:gallery` 74 s, `test:desktop` 114 s.

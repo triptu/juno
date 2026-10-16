@@ -29,8 +29,8 @@ const MAIN_ID = 'pick-main'
 const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
 
 /**
- * Enter while the rows for the typed query are still loading picks the first
- * row once they land, so a name typed and entered at once is not lost. Typing
+ * Enter while the rows for the typed query are still loading (none yet, or
+ * an earlier query's still shown) picks the first row once they land, so a name typed and entered at once is not lost. Typing
  * again drops the waiting Enter.
  */
 function usePendingEnter(loading: boolean, ids: ReadonlyArray<string>, pick: (id: string) => void, onKeyDown: (event: KeyboardEvent<HTMLElement>) => void, onQuery: (query: string) => void) {
@@ -62,7 +62,7 @@ function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (i
   return [chosen !== undefined && ids.includes(chosen) ? chosen : ids[0], setChosen]
 }
 
-export function ConversationList({ query, onQuery, conversations, onPickConversation, onOpen }: DestinationPickersProps) {
+export function ConversationList({ query, onQuery, conversations, loading = false, onPickConversation, onOpen }: DestinationPickersProps) {
   const sections: ReadonlyArray<readonly [string, ReadonlyArray<PickConversation>]> =
     conversations === undefined
       ? []
@@ -79,7 +79,7 @@ export function ConversationList({ query, onQuery, conversations, onPickConversa
     if (row !== undefined) onPickConversation(row)
   }
   const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
-  const search = usePendingEnter(conversations === undefined, ids, pick, keys, onQuery)
+  const search = usePendingEnter(loading || conversations === undefined, ids, pick, keys, onQuery)
   return (
     <>
       <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search people and channels" onKeyDown={search.onKeyDown} activeId={activeId} />
@@ -115,14 +115,14 @@ export function ConversationList({ query, onQuery, conversations, onPickConversa
   )
 }
 
-export function ThreadList({ query, onQuery, conversation, threads, now, onPickThread, onOpen }: DestinationPickersProps) {
+export function ThreadList({ query, onQuery, conversation, threads, loading = false, now, onPickThread, onOpen }: DestinationPickersProps) {
   const main = conversation !== undefined && 'main'.startsWith(query.trim().toLowerCase())
   const rows = threads ?? []
   const ids = [...(main ? [MAIN_ID] : []), ...rows.map((row) => rowId('thread', row.id))]
   const [activeId, setActive] = useActive(ids)
   const pick = (id: string) => (id === MAIN_ID ? onPickThread(undefined) : onPickThread(rows[ids.indexOf(id) - (main ? 1 : 0)]))
   const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
-  const search = usePendingEnter(threads === undefined, ids, pick, keys, onQuery)
+  const search = usePendingEnter(loading || threads === undefined, ids, pick, keys, onQuery)
   return (
     <>
       <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search threads" onKeyDown={search.onKeyDown} activeId={activeId} />

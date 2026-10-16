@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · Attach files is out of New chat's Tab order, so Shift Tab goes from the composer to the thread picker in one step (SPEC 9). It works by pointer; there is no shortcut.

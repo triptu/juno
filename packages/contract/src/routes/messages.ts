@@ -54,6 +54,21 @@ export const ReactionView = Schema.Struct({
 export type ReactionView = typeof ReactionView.Type
 
 /**
+ * The user's own reaction change that Slack has not taken (architecture
+ * 5.7). `failed`: Slack refused it; the chip shows what Slack has, and the
+ * message offers Retry and Dismiss. `waiting`: it has not gone out for a
+ * while (no connection, or its message is still being sent); the chip
+ * shows the change.
+ */
+export const ReactionIssue = Schema.Struct({
+  name: Schema.String,
+  /** The change asked for: add (`true`) or remove. */
+  on: Schema.Boolean,
+  state: Schema.Literals(['failed', 'waiting']),
+})
+export type ReactionIssue = typeof ReactionIssue.Type
+
+/**
  * A thumbnail the view can show at once with `aspect-ratio: width / height`
  * (performance 3.3: late images never move what the user reads).
  * `src` is `juno://files/<file id>/<variant>?url=<encoded Slack thumb url>`:
@@ -157,6 +172,8 @@ export const MessageView = Schema.Struct({
   /** The thread's root, the first row of a thread. */
   root: Schema.Boolean,
   reactions: Schema.Array(ReactionView),
+  /** The newest of the user's reaction changes Slack has not taken, when there is one. */
+  reactionIssue: Schema.optionalKey(ReactionIssue),
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),

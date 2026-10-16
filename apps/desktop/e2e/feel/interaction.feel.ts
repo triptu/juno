@@ -7,7 +7,7 @@ import { tag } from './pane'
 import type { Probe, ProbeFrame } from './recorder'
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 const look = (selector: string): Probe[] => [{ kind: 'look', name: 'look', selector }]
 

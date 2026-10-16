@@ -197,10 +197,15 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     if (message !== undefined) actions.react(message, name)
   }
 
+  const onSetReaction = (ts: string, name: string, on: boolean) => {
+    const message = rowMessage(ts)
+    if (message !== undefined) actions.react(message, name, on)
+  }
+
   const onMessageMenu = (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
     const message = rowMessage(ts)
     if (message !== undefined) void actions.menu(message, { x: at.clientX, y: at.clientY }, onSender)
   }
 
-  return { onRowKey, selectNewest, onToggleReaction, onMessageMenu }
+  return { onRowKey, selectNewest, onToggleReaction, onSetReaction, onMessageMenu }
 }

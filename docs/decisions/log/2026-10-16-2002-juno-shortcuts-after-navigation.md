@@ -1,0 +1,1 @@
+- 10-16 20:02 · flakes-1017 · ⌘J, Ask Juno and Tell Juno choose between the panel and the tab after the navigation asked for before them has applied, so they no longer cancel a topic open that waits for its first paint.

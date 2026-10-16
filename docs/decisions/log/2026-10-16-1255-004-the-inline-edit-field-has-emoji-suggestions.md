@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · The inline edit field has the composer's :emoji: suggestions; Esc there closes the list, not the edit.

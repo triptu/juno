@@ -82,6 +82,7 @@ export {
   tabTopic,
   topicPlace,
   updateTabs,
+  setNewChat,
   type OpenOptions,
   type JunoTabPage,
   type Place,
@@ -211,7 +212,9 @@ export {
   PALETTE_RECENT,
   PALETTE_RESULTS,
   PALETTE_SLACK_RESULTS,
+  paletteConversationsAtom,
   paletteOpenAtom,
+  paletteTabAtom,
   readCommand,
   searchAtom,
   searchSlackMessages,
@@ -229,3 +232,7 @@ export {
   uploadProgressAtom,
   type Attachment,
 } from './attachments'
+
+export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
+
+export { sentSuggestionAtom, dismissSentSuggestion } from './sentSuggestions'

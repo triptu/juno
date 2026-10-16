@@ -58,7 +58,8 @@ describe('Home', () => {
 
     const staging = threadId(engine.fake, 'C0ENG', 'Unrelated: has anyone looked at the staging bill')
     burst(engine, 'C0ENG', staging.split(':')[2]!)
-    const moved = await homeUntil(engine, (view) => kinds(view).includes('moved'), 'moved a lot')
+    // The item shows from MOVED_A_LOT_MIN replies on, before the last of the nine is stored.
+    const moved = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'moved' && item.newCount === 9), 'moved a lot, all nine stored')
     expect(kinds(moved)).toEqual(['waiting', 'resume', 'moved'])
     expect(moved.items[2]).toMatchObject({ id: `moved:${staging}`, title: 'Moved a lot since you looked', newCount: 9 })
     expect(moved.items.every((item) => item.aiTitle === undefined)).toBe(true)

@@ -1,0 +1,1 @@
+- 10-16 16:05 · orchestrator · Enter while an attached file is still being read sends once the file is ready, shown as sending, instead of doing nothing. A silently ignored Enter loses what the user asked for. To do after send-checks lands, since both touch TopicComposer.

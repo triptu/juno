@@ -49,3 +49,5 @@ The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `U
 - `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.
 
 New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
+
+The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over own sends and topic visits (`topic_visits`), uncapped before its 12 rows, then by activity; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.

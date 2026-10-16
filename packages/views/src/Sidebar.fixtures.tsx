@@ -251,6 +251,11 @@ export default defineFixtures(
       'unread-focus': scene(() => full(), { focus: '[aria-label="Unread only"]' }),
       'view-hover': scene(() => full(viewChrome), { hover: '[data-view-pill="vdesign"]' }),
       'nav-focus': scene(() => full(), { focus: '[aria-label="Pages"] [role="button"]:nth-of-type(2)' }),
+      // The first pill sits on the row's start edge; its ring must show whole.
+      'filter-focus': scene(() => full(viewChrome), { focus: '[aria-label="Quick filters"] [aria-label="All"]' }),
+      // A view pill half under the row's end: keyboard focus scrolls it in, ring and all.
+      'view-focus': scene(() => full(viewChrome), { focus: '[data-view-pill="vfriends"]' }),
+      'row-focus': scene(() => full({}, { selected: rows.postgres.id }), { focus: '[data-topic-row][tabindex="0"]' }),
     },
   },
   frame,

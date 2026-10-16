@@ -8,6 +8,47 @@
  */
 import { Context, Layer } from 'effect'
 
+/**
+ * Background lane spacing (research section 6, "Request pacing policy").
+ * Each method has its own clock, so independent methods run side by side;
+ * `totalMillis` is a ceiling over all of them. A 429 doubles one method's
+ * interval from its own base.
+ */
+interface BackgroundPacing {
+  /** Least time between any two background starts: the ceiling over every method. */
+  readonly totalMillis: number
+  /** Least time between two starts of a method `methods` does not list. */
+  readonly methodMillis: number
+  /** Per-method spacing, by queue key: the Web API method name, or `edge:<method>`. */
+  readonly methods: Readonly<Record<string, number>>
+}
+
+/**
+ * The defaults. No method starts more often than before per-method pacing
+ * (40 a minute each, measured live without a 429), and every rate stays
+ * below Slack's published tier for the public method of the same name:
+ * - `conversations.history` and `conversations.replies`: 40 a minute
+ *   (Tier 3 is 50+). 147 history and 114 replies calls ran live at this rate
+ *   with no 429 (research section 10).
+ * - `search.modules.messages`: 10 a minute (`search.messages` is Tier 2,
+ *   20+). A sweep reads at most three pages.
+ * - `edge:users/info`: 20 a minute (edge limits unknown). Each call names up
+ *   to 100 people, so a boot makes a handful.
+ * - any other method: 20 a minute. These are rare on the background lane
+ *   (the follow pass, lookups, emoji, a reconnect's metadata).
+ * - all methods together: 120 a minute.
+ */
+const defaultBackgroundPacing: BackgroundPacing = {
+  totalMillis: 500,
+  methodMillis: 3_000,
+  methods: {
+    'conversations.history': 1_500,
+    'conversations.replies': 1_500,
+    'search.modules.messages': 6_000,
+    'edge:users/info': 3_000,
+  },
+}
+
 export interface SlackConfigShape {
   /** Replaces `<workspace url>/api`. Tests point it at the fake. */
   readonly apiBaseUrl?: string
@@ -29,7 +70,9 @@ export interface SlackConfigShape {
   readonly lanes: {
     readonly interactiveConcurrency: number
     readonly backgroundConcurrency: number
-    /** Override total and per-method background spacing; zero disables pacing in fake-server tests. */
+    /** Background spacing per method and in total (`defaultBackgroundPacing`). */
+    readonly backgroundPacing: BackgroundPacing
+    /** Replaces every background spacing, total and per method, with one value; zero disables pacing in fake-server tests. */
     readonly backgroundMinIntervalMillis?: number
     /** Interactive token refill interval (capacity 20); zero disables it in fake-server tests. */
     readonly interactiveRefillIntervalMillis?: number
@@ -65,6 +108,7 @@ export const defaultSlackConfig: SlackConfigShape = {
   lanes: {
     interactiveConcurrency: 3,
     backgroundConcurrency: 2,
+    backgroundPacing: defaultBackgroundPacing,
     sendConcurrency: 1,
   },
   socket: {

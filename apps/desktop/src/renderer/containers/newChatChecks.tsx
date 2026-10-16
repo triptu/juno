@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { audienceCheck, type PickConversation, type SendTarget } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, precheckMessage, registry } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, precheckMessage, registry, sendCheckPrefsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning } from '@juno/views'
 import SendCheckPanel from './SendCheckPanel'
@@ -9,6 +9,7 @@ import { afterCheck, choose, type CheckBar, type Destination, type Outcome } fro
 /** Checks use only a channel already picked. Enter reads cached findings, never a model. */
 export function useNewChatChecks(text: string, target: SendTarget | undefined, deliver: (text: string, to: Destination) => void, conversation: PickConversation | undefined) {
   const enabled = useAtomValue(aiAssistOnAtom)
+  const wrongPlace = useAtomValue(sendCheckPrefsAtom).some((check) => check.key === 'wrongPlace' && check.enabled)
   const checking = useRef<object | undefined>(undefined)
   const channelId = target?.kind === 'channel' ? target.channelId : undefined
   const threadTs = target?.kind === 'channel' ? target.threadTs : undefined
@@ -31,7 +32,7 @@ export function useNewChatChecks(text: string, target: SendTarget | undefined, d
   useEffect(() => {
     if (!enabled || channelId === undefined || text.trim() === '') return
     const timer = setTimeout(() => {
-      if (threadTs === undefined) precheckMessage(registry, channelId, text)
+      precheckMessage(registry, channelId, text, threadTs)
       const found = conversation === undefined ? undefined : audienceCheck(text, conversation)
       if (found !== undefined) setWarning({ key, message: found.message })
     }, 400)
@@ -50,7 +51,8 @@ export function useNewChatChecks(text: string, target: SendTarget | undefined, d
   const send = () => {
     if (bar !== undefined) return pick('primary')
     if (checking.current !== undefined) return
-    if (!enabled || channelId === undefined || text.trim() === '') return deliver(text, { kind: 'here' })
+    // Only Wrong place runs before sending, and only in Main. Anything else sends at once.
+    if (!enabled || !wrongPlace || channelId === undefined || threadTs !== undefined || text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)

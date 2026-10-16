@@ -16,6 +16,7 @@ import {
   type Context as PiContext,
   type Message as PiMessage,
   type Model,
+  type ModelCost,
   type Static,
   type Tool,
   type TSchema,
@@ -32,6 +33,12 @@ const DECISION_MAX_TOKENS = 1024
 const GENERATION_MAX_TOKENS = 2048
 /** A drawing is 400 to 900 bytes, but a reasoning model spends most of its output thinking before it (median 600 to 1,000 tokens). */
 const ART_MAX_TOKENS = 4096
+/** A slug outside pi-ai's price table reserves this much per call and settles as unknown, so it still counts against the cap. */
+const UNPRICED_RESERVATION_USD = 0.05
+/** Tokens of framing per message, as in the agent's bound (`@juno/agent-memory` `upper`). */
+const FRAMING_TOKENS = 64
+/** Room for a retry's message with the checker's reason. */
+const RETRY_MESSAGE_BYTES = 2048
 
 type Outcome<A> =
   | { readonly kind: 'ok'; readonly value: A }
@@ -57,6 +64,7 @@ interface Call<A> {
   readonly modelId: string
   readonly priced: boolean
   readonly timeoutMillis: number
+  readonly maxAttempts?: number
   readonly started: number
   /** One attempt. `previous` is the failed first attempt, so the retry can change shape. */
   readonly attempt: (previous: Outcome<A> | undefined, cost: { usd: number }) => Effect.Effect<Outcome<A>>
@@ -146,7 +154,9 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       if (classifierSlug !== undefined) {
         const { model, priced } = resolveClassifier(models, classifierSlug)
         if (!config.apiKey) return noKey(model.id, started)
-        return yield* run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: classifyAttempt(task, input, model, config.apiKey) })
+        const upper = upperUsd(model.cost, priced, JSON.stringify(task.classify!.ask(input)), DECISION_MAX_TOKENS)
+        return yield* admitted(config, model.id, priced, upper,
+          run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: classifyAttempt(task, input, model, config.apiKey) }))
       }
       const { model, priced } = resolveModel(models, modelFor(task.tier, config))
       if (!config.apiKey) return noKey(model.id, started)
@@ -155,7 +165,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         model,
         tool,
         toolChoice: task.tier === 'decision' ? 'forced' : 'auto',
-        maxTokens: task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS,
+        maxTokens: task.maxTokens ?? (task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS),
         context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))], tools: [tool] },
         read: (message) => {
           const call = message.content.find((c) => c.type === 'toolCall' && c.name === tool.name)
@@ -164,7 +174,8 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
         },
       }
-      return yield* run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) })
+      return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
+        run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
   const generate: AiProviderShape['generate'] = <I>(task: TextTask<I>, input: I) =>
@@ -188,10 +199,52 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
         },
       }
-      return yield* run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) })
+      return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
+        run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
   return { decide, generate }
+}
+
+/**
+ * The most a call's two attempts can cost: every input byte as a token at the
+ * dearest input rate, the retry's copy of the first answer and its message,
+ * and both outputs at the cap. Rounded up by the ledger.
+ */
+export function upperUsd(cost: ModelCost, priced: boolean, input: string, maxTokens: number): number {
+  if (!priced) return UNPRICED_RESERVATION_USD
+  const rates = [cost, ...(cost.tiers ?? [])]
+  const inputRate = Math.max(...rates.flatMap((rate) => [rate.input, rate.cacheRead, rate.cacheWrite]))
+  const outputRate = Math.max(...rates.map((rate) => rate.output))
+  const first = new TextEncoder().encode(input).length + 2 * FRAMING_TOKENS
+  const retry = first + 4 * maxTokens + RETRY_MESSAGE_BYTES + 2 * FRAMING_TOKENS
+  return ((first + retry) * inputRate + 2 * maxTokens * outputRate) / 1_000_000
+}
+
+/** A 401, 403 or 429 comes before any output, so nothing was billed for that attempt. */
+function refusedBeforeOutput(detail: string | undefined): boolean {
+  if (detail === undefined) return false
+  return /^(401|403|429)\b/.test(detail) || /\((401|403|429)\):/.test(detail) || /rate.?limit/i.test(detail)
+}
+
+/** What to settle: the reported cost when it is known, else `undefined`, which keeps the reservation. */
+function settledUsd<A>(decision: Decision<A>, priced: boolean): number | undefined {
+  if (!priced) return undefined
+  if (decision._tag === 'Decided' || decision.reason === 'invalid-output') return decision.meta.costUsd
+  if (decision.reason === 'provider-error' && refusedBeforeOutput(decision.detail)) return decision.meta.costUsd ?? 0
+  return undefined
+}
+
+/** Reserves the call's upper cost when the config has a cap, and settles it however the call ends. */
+function admitted<A>(config: AiConfig, modelId: string, priced: boolean, upper: number, call: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
+  const admit = config.admit
+  if (admit === undefined) return call
+  return Effect.gen(function* () {
+    const started = Date.now()
+    const admission = yield* admit(upper)
+    if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', meta: { model: modelId, latencyMillis: Date.now() - started, attempts: 0 } } as Decision<A>
+    return yield* call.pipe(Effect.onExit((exit) => admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced) : undefined)))
+  })
 }
 
 /** Two attempts at most, inside the task's timeout. */
@@ -206,7 +259,7 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
       })
     const twice = Effect.gen(function* () {
       const first = yield* once(undefined)
-      if (first.kind === 'ok' || first.kind === 'timeout') return first
+      if (call.maxAttempts === 1 || first.kind === 'ok' || first.kind === 'timeout') return first
       return yield* once(first)
     })
     const outcome = yield* Effect.timeoutOption(twice, call.timeoutMillis)

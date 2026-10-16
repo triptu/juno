@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, decodeMentions, encodeMentions, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
@@ -89,6 +89,8 @@ function LoadedComposer({
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
+  const wrongPlace = useAtomValue(sendCheckPrefsAtom).some((check) => check.key === 'wrongPlace' && check.enabled)
+  const routeChecked = aiAssist && wrongPlace && detail.kind === 'main'
   const [start] = useState(() => decodeMentions(initial))
   const [text, setText] = useState(start.text)
   const [picks, setPicks] = useState(start.picks)
@@ -128,10 +130,16 @@ function LoadedComposer({
   })
   // The tab hid or closed: write what is typed now.
   useEffect(() => () => flushRef.current(), [])
-  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
-  // text when this tab shows again, unless this field has typing of its own or has focus.
+  // Typed in since this tab last showed: a draft change from the store is then this field's own echo.
+  const typedSinceShown = useRef(false)
   useEffect(() => {
-    if (unsaved.current !== undefined || document.activeElement === field.current || latest === encoded(text)) return
+    typedSinceShown.current = false
+  }, [])
+  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
+  // text when this tab shows again, unless this field has typing of its own. A field that has focus takes it
+  // only until it is typed in, so a tab whose press gave it focus still takes the other tab's newer draft.
+  useEffect(() => {
+    if (unsaved.current !== undefined || (document.activeElement === field.current && typedSinceShown.current) || latest === encoded(text)) return
     const next = decodeMentions(latest)
     picked.current = next.picks
     setPicks(next.picks)
@@ -143,7 +151,7 @@ function LoadedComposer({
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
     preloadBar()
-    if (aiAssist && detail.kind === 'main' && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text)
+    if (aiAssist && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text, detail.kind === 'thread' ? detail.rootTs : undefined)
     // Once per mount: later drafts are asked about as typing pauses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -154,6 +162,7 @@ function LoadedComposer({
   }
 
   const change = (next: string) => {
+    typedSinceShown.current = true
     setText(next)
     // Editing closes the bar and drops a check still running: Enter checks the new text.
     setBar(undefined)
@@ -164,7 +173,7 @@ function LoadedComposer({
       setPaused(next)
       flush()
       // The model answers the wrong-place question now, so Enter never waits for it.
-      if (aiAssist && detail.kind === 'main' && next.trim() !== '') precheckMessage(registry, detail.channel.id, next)
+      if (aiAssist && next.trim() !== '') precheckMessage(registry, detail.channel.id, next, detail.kind === 'thread' ? detail.rootTs : undefined)
     }, DRAFT_SAVE_MS)
   }
 
@@ -204,8 +213,8 @@ function LoadedComposer({
     // A file is still on its way to the engine: Enter waits for it.
     if (files.files.some((file) => file.state === 'staging')) return
     markSend()
-    // Files with no text have nothing to check.
-    if (!aiAssist || text.trim() === '') return deliver(text, { kind: 'here' })
+    // Only Wrong place runs before sending, and only in Main. Anything else sends at once.
+    if (!routeChecked || text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)

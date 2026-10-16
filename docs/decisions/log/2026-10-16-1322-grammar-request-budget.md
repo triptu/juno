@@ -1,0 +1,1 @@
+- 10-16 13:22 · Juno · Give post-send grammar one 700 ms attempt with 256 output tokens, mask protected text, and reserve each Juno message id against a persisted 500-call daily cap before calling. Keep Luna provisional: the 40-case fake study passes, but no engine key is available for the requested live model comparison.

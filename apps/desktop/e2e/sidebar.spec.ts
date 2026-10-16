@@ -16,7 +16,7 @@ test.describe.configure({ timeout: 60_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 const ALERTS_MAIN = '#alerts-prod'
@@ -63,8 +63,8 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await postgres.expectRead()
   await postgres.expectPreview('Dev: Booked 2–4pm. Will post results here.')
   await postgres.expectChannel('eng')
-  // The participant stack names everyone but you (the fake's display names are first names).
-  await expect(postgres.root.getByRole('img', { name: 'Dev, Leo', exact: true })).toBeVisible()
+  // Read, so no people: the stack names only who is talking in unread messages.
+  await expect(postgres.root.getByRole('img', { name: /Dev|Leo/ })).toHaveCount(0)
 
   // A thread with an unread mention: semibold title, the @ tag, then the count.
   const rina = sidebar.row(RINA)
@@ -99,6 +99,25 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // Both groups have unread topics, so both dots show.
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', true)
+})
+
+test('the stack shows who wrote the unread replies, and nobody once the topic is read', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const postgres = juno.sidebar.row(POSTGRES)
+  await postgres.expectRead()
+
+  slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
+  slack.as('Maya').replyIn(POSTGRES, 'Rollback steps are in the doc')
+  await postgres.expectUnread(2)
+  // Most recent first; the fake's display names are first names.
+  const stack = postgres.root.getByRole('img', { name: 'Maya, Leo', exact: true })
+  await expect(stack).toBeVisible()
+
+  await postgres.open()
+  await postgres.expectRead()
+  await expect(stack).toHaveCount(0)
+  await expect(postgres.root.getByRole('img', { name: /Maya|Leo/ })).toHaveCount(0)
 })
 
 test('rows in a DM or a group DM show no participant stack', async ({ juno }) => {
@@ -178,7 +197,7 @@ test('the empty state offers to clear the filters, and shows at once when it was
   await sidebar.row(POSTGRES).expectVisible()
 })
 
-test('during the first sync the list says Juno is getting the topics, not that it is quiet', async ({ juno, fake }) => {
+test('during the first sync the list says Juno is getting the topics, then shows rows before history lands', async ({ juno, fake }) => {
   // Hold the first boot call, so nothing has arrived when the window opens.
   fake.holdNext({ method: 'client.userBoot', before: true })
   fake.holdNext({ method: 'conversations.history', before: true })
@@ -199,12 +218,19 @@ test('during the first sync the list says Juno is getting the topics, not that i
   expect(listBox).not.toBeNull()
   expect(cardBox).not.toBeNull()
   expect(cardBox!.y).toBeGreaterThan(listBox!.y + listBox!.height)
+  fake.release({ method: 'client.userBoot' })
+  await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
+  await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
+  // The quick start is done: rows show while history is still held, and the card stays until the sync ends.
+  await sidebar.expectRows()
+  await expect(sidebar.syncStatus).toHaveText('Syncing with Slack')
+  // Rows take their places while history lands; the discovery search after it waits, so the sync cannot end yet.
+  fake.holdNext({ method: 'search.modules.messages', before: true })
+  fake.release({ method: 'conversations.history' })
+  await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
+  // The card goes when the sync ends; nothing above the list moves.
   await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
-    fake.release({ method: 'client.userBoot' })
-    await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
-    await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
-    await sidebar.expectEmpty('Getting your topics')
-    fake.release({ method: 'conversations.history' })
+    fake.release({ method: 'search.modules.messages' })
     await juno.waitForSync()
     await sidebar.row(POSTGRES).expectVisible()
   })

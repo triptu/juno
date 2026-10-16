@@ -112,7 +112,7 @@ test('in the panel, Enter takes an emoji suggestion and Esc closes the list, not
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
   const list = juno.win.getByRole('listbox', { name: 'Emoji' })
-  await panel.composer.pressSequentially('nice :thumbsu')
+  await panel.composer.pressSequentially('nice :thumbs')
   await expect(list).toBeVisible()
   await panel.composer.press('Enter')
   await expect(panel.composer).toHaveValue(/^nice 👍 $/)

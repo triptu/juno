@@ -7,7 +7,7 @@ import { numeric as numericStyles, variants as typeVariants, weight as weightSty
 
 export type { TextVariant, Weight }
 
-export type TextTone = 'inherit' | 'default' | 'subtle' | 'muted' | 'accent' | 'danger'
+export type TextTone = 'inherit' | 'default' | 'secondary' | 'subtle' | 'muted' | 'accent' | 'danger'
 
 export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className'> {
   /** The type role: family, size, weight, line height and tracking. Default `ui`. */
@@ -145,6 +145,7 @@ const styles = stylex.create({
 const tones = stylex.create({
   inherit: { color: 'inherit' },
   default: { color: colors['--foreground-default'] },
+  secondary: { color: colors['--foreground-secondary'] },
   subtle: { color: colors['--foreground-subtle'] },
   muted: { color: colors['--foreground-muted'] },
   accent: { color: accent['--hl-text'] },

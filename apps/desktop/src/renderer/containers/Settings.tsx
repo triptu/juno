@@ -1,6 +1,6 @@
 import { memo, Suspense, useEffect, useState } from 'react'
-import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
+import { getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -54,6 +54,21 @@ function Section({ section }: { readonly section: SettingsSection }) {
 
 /** What a new tab opens, the peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
 function General() {
+  const servedChecks = useAtomValue(sendCheckPrefsAtom)
+  // Each check moves on the click too, until its saved value agrees or the save fails.
+  const [shownChecks, setShownChecks] = useState<Partial<Record<SendCheckPref, boolean>>>({})
+  const settled = servedChecks.filter(({ key, enabled }) => shownChecks[key] === enabled)
+  if (settled.length > 0) setShownChecks(Object.fromEntries(Object.entries(shownChecks).filter(([key]) => !settled.some((check) => check.key === key))))
+  const checks = servedChecks.map(({ key, enabled }) => ({ key, enabled: shownChecks[key] ?? enabled }))
+  const changeCheck = (key: SendCheckPref, enabled: boolean) => {
+    setShownChecks((shown) => ({ ...shown, [key]: enabled }))
+    void setSendCheckPref(registry, key, enabled).then((exit) => {
+      if (exit._tag === 'Failure') setShownChecks((shown) => Object.fromEntries(Object.entries(shown).filter(([shownKey]) => shownKey !== key)))
+    })
+  }
+  const available = useAtomValue(aiAvailableAtom)
+  const aiAssist = useAtomValue(aiAssistOnAtom)
+  const grammarUnavailable = !aiAssist ? 'Turn on AI assist to check grammar.' : available._tag !== 'Success' || !available.value ? 'Add an OpenRouter key to check grammar.' : undefined
   const mirror = useAtomValue(mirrorReadsAtom)
   const served = mirror._tag === 'Success' ? mirror.value.on : true
   // The switch moves on the click; the saved value takes over once it agrees, or if the save fails.
@@ -79,7 +94,9 @@ function General() {
   const [sharing, setSharing] = useSharingSetting()
   return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
-    onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
+    onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
+    checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
+    newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /**

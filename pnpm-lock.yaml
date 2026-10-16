@@ -181,6 +181,9 @@ importers:
       '@juno/slack-schema':
         specifier: workspace:*
         version: link:packages/slack-schema
+      '@juno/state':
+        specifier: workspace:*
+        version: link:packages/state
       '@juno/store':
         specifier: workspace:*
         version: link:packages/store

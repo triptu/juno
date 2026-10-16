@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
 
 export interface TabStripProps {
   readonly label?: string
@@ -29,13 +30,15 @@ export interface TabStripProps {
  * a horizontal scroller with no visible scrollbar, as wide as the tabs need
  * and no wider, so `trailing` follows the last tab and the rest of the
  * strip is free to drag the window by. The active tab scrolls itself into
- * view when it changes, like browser tabs.
+ * view when it changes, like browser tabs, and a tab that takes keyboard
+ * focus scrolls into view whole. Tabs draw the inset ring, so the strip
+ * needs no room around them.
  */
 export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
   return (
     <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} {...stylex.props(styles.scroller)}>
         {children}
       </div>
       {trailing ? (
@@ -58,7 +61,10 @@ const styles = stylex.create({
     boxSizing: 'border-box',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-2-5'],
-    backgroundColor: colors['--background-subtle'],
+    backgroundColor: colors['--tab-strip'],
+    // The strip's own buttons ("+", and Back and Forward with the sidebar
+    // hidden) hover with the tabs' fill; the usual one is the strip's.
+    '--surface-hover': colors['--tab-hover'],
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-default'],
@@ -81,10 +87,11 @@ const styles = stylex.create({
   // The tabs scroll sideways inside the strip. The scroller hangs 1px over
   // the strip's bottom border so the active tab can paint across it. It
   // takes only the tabs' width, and shrinks to scroll once they overflow.
+  // Tabs touch, as in Safari and Finder; dividers separate inactive ones.
   scroller: {
     display: 'flex',
     alignItems: 'flex-end',
-    gap: spacing['--space-0-5'],
+    gap: 0,
     flexGrow: 0,
     flexShrink: 1,
     minWidth: 0,

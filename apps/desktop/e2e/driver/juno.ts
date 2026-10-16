@@ -733,6 +733,18 @@ export class Juno {
     return this.win.getByRole('button', { name: "Use the Slack app's session" })
   }
 
+  /** The quiet button beside a failed import's line. */
+  get copyDetailsButton() {
+    return this.win.getByRole('button', { name: 'Copy details', exact: true })
+  }
+
+  /** Clicks "Copy details" and returns what it put on the clipboard. */
+  async copySignInDetails(): Promise<string> {
+    await this.copyDetailsButton.click()
+    await expect.poll(() => this.clipboard(), { timeout: 5_000 }).toContain('Juno: Slack app import')
+    return this.clipboard()
+  }
+
   /**
    * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
    * that opens, and waits for the app to come back signed in. Then skips
@@ -1893,6 +1905,24 @@ export class PaletteDriver {
     await expect(this.input).toBeFocused()
   }
 
+  /** One of the two tabs in the segmented control. */
+  tab(name: 'Conversations' | 'Messages'): Locator {
+    return this.root.getByRole('radio', { name })
+  }
+
+  async expectTab(name: 'Conversations' | 'Messages'): Promise<void> {
+    await expect(this.tab(name)).toHaveAttribute('aria-checked', 'true')
+    await expect(this.input).toBeFocused()
+  }
+
+  /** ⌘K, then Tab to the Messages tab: the message search. */
+  async openMessages(): Promise<void> {
+    await this.open()
+    await this.expectTab('Conversations')
+    await this.press('Tab')
+    await this.expectTab('Messages')
+  }
+
   async expectClosed(): Promise<void> {
     await expect(this.root).toHaveCount(0)
   }
@@ -1915,8 +1945,8 @@ export class PaletteDriver {
     await this.input.press(key)
   }
 
-  /** A section of rows: Recent, Results or Juno. */
-  section(heading: 'Recent' | 'Results' | 'Juno'): Locator {
+  /** A section of rows: Frequent, Conversations, Commands, the open topic's name, Recent, Results or Juno. */
+  section(heading: string): Locator {
     return this.root.getByRole('group', { name: heading })
   }
 

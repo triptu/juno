@@ -52,7 +52,7 @@ Scheduled and Remembers snapshots also carry revisions, because their WP7 rows d
 
 ## Host contracts
 
-`AgentHostRpcs` is the whole AgentHost group, protocol 2 (`AGENT_HOST_PROTOCOL`): the hello (`HostHelloRpcs`), `HostReadRpcs`, `HostActionRpcs`, `HostPresenceRpcs` and `HostNotificationRpcs`. Protocol 1, the hello alone, is gone.
+`AgentHostRpcs` is the whole AgentHost group, protocol 2 (`AGENT_HOST_PROTOCOL`): the hello (`HostHelloRpcs`), `HostReadRpcs`, `HostActionRpcs`, `HostPresenceRpcs`, `HostNotificationRpcs`, `HostScheduleRpcs`, `HostViewRpcs` and `HostSpendRpcs`. Protocol 1, the hello alone, is gone.
 
 Reads cover Slack search/history/replies/people and Juno topics. Presence streams the current account, online and AI state, quiet hours and the current “this” topic. Dispatch carries the exact executable identity, digest and already-consumed authorization/attempt ids, with `mode: single-attempt`. Duplicate submissions of the same authorization must return its stored attempt. A transport loss remains unknown. A negative send lookup cannot prove failure. Notification delivery has an id and respects the notification gate independently of action admission.
 

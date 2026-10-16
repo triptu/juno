@@ -7,7 +7,7 @@ import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test as chatTest } from './chat'
 
-const THREAD = 'Review the rollout checklist 1.'
+const THREAD = 'Review the rollout checklist 1'
 const LINKED = 'Review the rollout checklist 220.'
 
 /** Searches for the linked message, then cites it as a source. */

@@ -298,9 +298,9 @@ describe('send', () => {
     expect(inSlack(engine, id)).toBe(1)
   })
 
-  // Found by the conformance replay (test/conformance): the worker checks the socket once per pass, so
-  // after a post that answers once the socket has dropped, the next queued post goes out while Juno is offline.
-  it.fails('waits out a lost connection that comes while another post is out (fails: the check is per pass)', async () => {
+  // Found by the conformance replay (test/conformance): the worker checked the socket once per pass, so
+  // after a post that answered once the socket had dropped, the next queued post went out while Juno was offline.
+  it('waits out a lost connection that comes while another post is out', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')
@@ -312,6 +312,8 @@ describe('send', () => {
     valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'Queued behind it', 'm:C0PRODUCT'))
     engine.fake.goOnline()
     const first = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the first post at Slack')
+    // The post goes as soon as the socket is back, before the catch-up ends: wait for it, so `offline` below is the new drop.
+    await engine.phase('live', 30_000)
     engine.fake.goOffline()
     await engine.phase('offline')
     engine.fake.decide(first.id, 'run')

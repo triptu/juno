@@ -1,0 +1,1 @@
+- 10-16 14:49 · Tushar · Every New chat command (⌘T, +, ⌘N, the sidebar's New chat, ⌘K's message to someone never messaged) opens a new tab, even when a New chat tab is open; a New chat sent to a topic another tab shows stays in its own tab. Settings stays one tab, and a plain open still focuses a tab that shows the place (⌘-click opens another).

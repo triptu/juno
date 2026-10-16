@@ -20,9 +20,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { editMessage, registry, type MessageWindow } from '@juno/state'
-import { InlineEdit, type MessageActions } from '@juno/views'
+import { InlineEdit, type InlineEditProps, type MessageActions } from '@juno/views'
+import { useEmojiSuggestions } from './emojiSuggestions'
 import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
+import { useSentSuggestion } from './topic/sentSuggestion'
 import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
@@ -40,12 +42,15 @@ export interface MessageActionsInput {
 }
 
 export interface MessageActionsOutput {
+  readonly suggestion: ReturnType<typeof useSentSuggestion>
   readonly actions: MessageActions
   readonly activeMessage: string | undefined
   readonly confirmingDelete: string | undefined
   readonly editing: { readonly ts: string; readonly editor: ReactNode } | undefined
   readonly onRowKey: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onToggleReaction: (ts: string, name: string) => void
+  /** Retry (`on` as asked) or Dismiss (the opposite) on a reaction Slack refused. */
+  readonly onSetReaction: (ts: string, name: string, on: boolean) => void
   /** A right-click on a row, or on its sender's name or avatar. */
   readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
   /** ↑ in an empty composer. */
@@ -96,6 +101,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   'use no memo'
   const channel = detail.channel.id
   const { editing, setEditing, confirming, setConfirming, latest } = useEditState(detail, list)
+  const suggestion = useSentSuggestion(detail.id, list, setEditing, editing)
   const [picker, setPicker] = useState<Picker | undefined>(undefined)
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   useEffect(preloadPicker, [])
@@ -113,7 +119,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       : {
           ts: editing.ts,
           editor: (
-            <InlineEdit
+            <EditField
               value={editing.text}
               onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
               onCancel={() => {
@@ -136,10 +142,29 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
 
   return {
     actions,
+    suggestion,
     ...rowHandlers(actions, rowMessage, latest, scrollRef, composer),
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
     floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer),
   }
+}
+
+/** The inline edit field with the composer's `:emoji:` suggestions (SPEC 8). */
+function EditField({ value, onChange, onSave, onCancel }: Pick<InlineEditProps, 'value' | 'onSave' | 'onCancel'> & { readonly onChange: (value: string) => void }) {
+  const field = useRef<HTMLTextAreaElement>(null)
+  const emoji = useEmojiSuggestions({ text: value, onChange, field })
+  return (
+    <InlineEdit
+      value={value}
+      onChange={emoji.onChange}
+      onSave={onSave}
+      onCancel={onCancel}
+      fieldRef={field}
+      onFieldKey={emoji.onFieldKey}
+      onCaret={emoji.onCaret}
+      {...(emoji.mention === undefined ? {} : { mention: emoji.mention })}
+    />
+  )
 }

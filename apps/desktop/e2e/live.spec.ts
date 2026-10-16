@@ -54,7 +54,7 @@ test.describe('scrolled up', () => {
       await fake.close()
     },
   })
-  const THREAD = 'Review the rollout checklist 1.'
+  const THREAD = 'Review the rollout checklist 1'
 
   longTest('a reply shows "1 new message" and stays unread until Jump to latest', async ({ juno, slack }) => {
     await juno.signIn()

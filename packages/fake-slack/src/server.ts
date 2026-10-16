@@ -17,7 +17,7 @@ import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, ty
 import { mimetypeOf } from './files.ts'
 import { ApiError, handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
-import type { Workspace } from './state.ts'
+import { edgeUserObject, type Workspace } from './state.ts'
 
 export interface Session {
   readonly cookie: string
@@ -102,6 +102,7 @@ export class FakeServer {
   #frameHold: ReadonlySet<string> | undefined
   #frameWhere: ((frame: RtmFrame) => boolean) | undefined
   #fileDelayMs = 0
+  #latencyMs = 0
   #failedUploads = 0
   #uploadsBeforeFailing = 0
   readonly #heldFrames: RtmFrame[] = []
@@ -318,6 +319,15 @@ export class FakeServer {
     this.#fileDelayMs = ms
   }
 
+  /** Every Web API and edge call waits `ms` before it runs, like the network and Slack's own time. 0 turns it off. */
+  setLatency(ms: number): void {
+    this.#latencyMs = ms
+  }
+
+  #wait(): Promise<void> | undefined {
+    return this.#latencyMs > 0 ? new Promise((resolve) => setTimeout(resolve, this.#latencyMs)) : undefined
+  }
+
   /** After `after` more upload POSTs succeed, the next `times` answer HTTP 500 and store nothing. */
   failUploads(times: number, after = 0): void {
     this.#failedUploads = times
@@ -467,7 +477,9 @@ export class FakeServer {
       const cookie = parseCookies(request.headers.cookie)['d']
       const session = cookie === undefined ? undefined : this.sessions.get(cookie)
       if (session === undefined || session.expired) return json(response, 401, { ok: false, error: 'not_authed' })
-      return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
+      // `<id>.svg`, or `<team>-<user>-<avatar_hash>-<size>` as `team.avatar_base_url` photos are spelled.
+      const name = path.slice('/avatars/'.length)
+      return this.#avatar(/^T[A-Z0-9]+-[UW][A-Z0-9]+-[^-]+-\d+$/.test(name) ? name.split('-')[1]! : name.replace(/\.svg$/, ''), response)
     }
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))
@@ -479,6 +491,7 @@ export class FakeServer {
 
   async #api(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const fields = parseFields(request.headers['content-type'], await readBody(request))
+    await this.#wait()
     const record = (status: number, body: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'api', method, args: redact(fields), status, ok: body.ok, ...(body.error === undefined ? {} : { error: body.error }) })
       json(response, status, body)
@@ -557,6 +570,7 @@ export class FakeServer {
 
   async #edge(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = parseJson(await readBody(request))
+    await this.#wait()
     const record = async (status: number, payload: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'edge', method, args: redact(stringify(body)), status, ok: payload.ok, ...(payload.error === undefined ? {} : { error: payload.error }) })
       await this.#hold(this.#holds, `edge:${method}`, redact(stringify(body)))
@@ -580,7 +594,7 @@ export class FakeServer {
       return record(200, { ok: false, error: 'invalid_arguments' })
     }
     const ids = args.ids ?? Object.keys(args.updated_ids ?? {})
-    const results = ids.flatMap((id) => this.workspace.users.get(id) ?? [])
+    const results = ids.flatMap((id) => this.workspace.users.get(id) ?? []).map(edgeUserObject)
     const failed = ids.filter((id) => !this.workspace.users.has(id))
     await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
   }

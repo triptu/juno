@@ -11,7 +11,7 @@ import { Juno } from './driver/juno'
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
@@ -155,7 +155,7 @@ test.describe('one topic in two tabs', () => {
       await fake.close()
     },
   })
-  const THREAD = 'Review the rollout checklist 1.'
+  const THREAD = 'Review the rollout checklist 1'
 
   longTest('each tab keeps its own scroll position', async ({ juno }) => {
     await juno.signIn()
@@ -222,9 +222,10 @@ test('closing the last tab opens a new tab: a New chat, or Home once Settings sa
   await expect(tabs.tab('Home')).toHaveCount(homes + 1)
   await juno.home.expectShown()
 
-  // ⌘N is always a New chat (the untouched one is focused).
+  // ⌘N is always a New chat, in a new tab.
+  const chats = await tabs.tab('New chat').count()
   await tabs.menu('new-chat')
-  await tabs.expectActive('New chat')
+  await tabs.expectActiveAt('New chat', chats)
 
   // Closing every tab leaves one Home.
   await tabs.contextMenu(POSTGRES, 'close-all')

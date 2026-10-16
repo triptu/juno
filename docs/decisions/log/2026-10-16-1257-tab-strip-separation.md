@@ -1,0 +1,1 @@
+- 10-16 12:57 · tabs-palette · Tab strip: the strip and inactive tabs take `--tab-strip`, a step below the sidebar; tabs touch, a hovered one fills `--tab-hover`, a 1px divider separates two inactive tabs and hides next to the active or a hovered tab, and the active tab is lifted with a stronger border and an upward shadow, as in Safari and Finder.

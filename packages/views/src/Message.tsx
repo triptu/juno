@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
-import type { FileView, MessageView, Person } from '@juno/contract'
+import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, Button, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
@@ -63,11 +63,14 @@ export interface MessageProps {
   readonly active?: boolean
   readonly confirmingDelete?: boolean
   /** The inline edit field, in place of the body while the message is edited. */
+  readonly suggestion?: { readonly label: string; readonly onEdit: () => void } | undefined
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
+  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** The row took keyboard focus: the list moves its tabbable row here. */
   readonly onFocus?: (ts: string) => void
   /** Retry on a failed send, with its `clientMsgId`. */
@@ -150,10 +153,12 @@ export const Message = memo(function Message({
   active = false,
   confirmingDelete = false,
   editor,
+  suggestion,
   onOpenThread,
   onChannel,
   onLink,
   onToggleReaction,
+  onSetReaction,
   onFocus,
   onRetry,
   onDiscard,
@@ -201,9 +206,18 @@ export const Message = memo(function Message({
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
+        editor !== undefined && styles.rowEditing,
         message.mentionsMe && styles.rowMention,
       )}
     >
+      {suggestion !== undefined && editor === undefined ? (
+        <span {...stylex.props(styles.suggestion)}>
+          <Surface kind="toolbar" padding="xs" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestionBar}>
+            <Text variant="meta" tone="default" as="span" truncate sx={styles.suggestionLabel}>{suggestion.label}</Text>
+            <Button variant="ghost" size="sm" onClick={suggestion.onEdit}>Edit</Button>
+          </Surface>
+        </span>
+      ) : null}
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
@@ -251,6 +265,7 @@ export const Message = memo(function Message({
           progress={pending === 'sending' ? progress : undefined}
         />
         <Reactions reactions={message.reactions} onToggle={toggle} />
+        {message.reactionIssue !== undefined ? <ReactionIssueLine ts={message.ts} issue={message.reactionIssue} onSet={onSetReaction} /> : null}
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
@@ -270,12 +285,64 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined && suggestion === undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
   )
 })
 
+/**
+ * The user's reaction change Slack has not taken. Refused: what Slack has
+ * is shown, with Retry and Dismiss. Waiting long: one quiet line.
+ */
+function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly issue: ReactionIssue; readonly onSet: ((ts: string, name: string, on: boolean) => void) | undefined }) {
+  if (issue.state === 'waiting') {
+    return (
+      <Text variant="meta" tone="muted" as="p" data-reaction-issue="waiting" sx={styles.failed}>
+        Reaction not sent yet.
+      </Text>
+    )
+  }
+  return (
+    <Text variant="meta" tone="muted" as="p" data-reaction-issue="failed" sx={styles.failed}>
+      <span {...stylex.props(styles.failedIcon)}>
+        <Icon icon={WarningCircle} size={14} weight="bold" />
+      </span>
+      <Text variant="meta" tone="danger" as="span">
+        {issue.on ? 'Reaction not added.' : 'Reaction not removed.'}
+      </Text>{' '}
+      <TextButton tone="default" onClick={() => onSet?.(ts, issue.name, issue.on)}>
+        Retry
+      </TextButton>
+      {' · '}
+      <TextButton tone="muted" onClick={() => onSet?.(ts, issue.name, !issue.on)}>
+        Dismiss
+      </TextButton>
+    </Text>
+  )
+}
+
 const styles = stylex.create({
+  // Over the end of the row before, as a narrow row's toolbar is, so the
+  // message it is about stays readable and nothing reserves space for it.
+  suggestion: {
+    position: 'absolute',
+    top: `calc(-1 * ${layout['--toolbar-height']})`,
+    right: spacing['--space-2'],
+    zIndex: z['--z-toolbar'],
+    display: 'flex',
+    maxWidth: '80%',
+  },
+  suggestionBar: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1'],
+    minWidth: 0,
+  },
+  suggestionLabel: {
+    paddingInline: spacing['--space-2'],
+    minWidth: 0,
+    userSelect: 'none',
+  },
   row: {
     position: 'relative',
     display: 'flex',
@@ -332,6 +399,12 @@ const styles = stylex.create({
     },
   },
   rowEager: {
+    contentVisibility: 'visible',
+  },
+  // The edit field's emoji suggestions open above it, past the row's edge:
+  // the one row being edited drops paint containment so they are not clipped.
+  rowEditing: {
+    contain: 'layout style',
     contentVisibility: 'visible',
   },
   // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.
