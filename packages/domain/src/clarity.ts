@@ -56,6 +56,14 @@ const QUESTION_OPENER = /^(can|could|would|should|what|when|where|why|how|is|are
 export const LONG_SENTENCE_WORDS = 40
 const MIN_QUESTION_WORDS = 4
 
+export interface ClarityPrefs {
+  readonly typos?: boolean
+  /** Off unless true: lowercase "i" and "im" stay lowercase. */
+  readonly capitalI?: boolean
+  readonly questionMarks?: boolean
+  readonly longSentences?: boolean
+}
+
 export type FixKind = 'typo' | 'doubled' | 'capital-i' | 'question-mark'
 
 export interface ClarityFix {
@@ -83,7 +91,7 @@ export interface ClarityResult {
 
 type Segment = { readonly text: string; readonly protect: boolean }
 
-const PROTECTED = /(`[^`\n]*`|https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+|[@#][\w'-]+(?: [A-Z][\w'-]+)*|:[a-z0-9_+\-']+(?:::skin-tone-[2-6])?:)/g
+const PROTECTED = /(\[[^\]\n]*\]\([^)\n]*\)|<[^>]+>|`+[^`\n]*(?:`+|$)|https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+|[@#][\w'-]+(?: [A-Z][\w'-]+)*|:[a-z0-9_+\-']+(?:::skin-tone-[2-6])?:)/g
 
 /** Splits a line into editable text and spans the check must not touch. */
 function segments(line: string): Segment[] {
@@ -103,21 +111,22 @@ function matchCase(original: string, replacement: string): string {
   return /^[A-Z]/.test(original) ? replacement.charAt(0).toUpperCase() + replacement.slice(1) : replacement
 }
 
-function fixEditable(text: string, fixes: ClarityFix[]): string {
+function fixEditable(text: string, fixes: ClarityFix[], prefs: ClarityPrefs): string {
   let out = text.replace(/\b([A-Za-z']+)\b/g, (word) => {
-    const to = TYPOS[word.toLowerCase()]
+    const to = prefs.typos === false ? undefined : TYPOS[word.toLowerCase()]
     if (to === undefined) return word
-    const replacement = matchCase(word, to)
+    const replacement = prefs.capitalI !== true && word === word.toLowerCase() && to.startsWith('I') ? to.toLowerCase() : matchCase(word, to)
     if (replacement === word) return word
     fixes.push({ kind: 'typo', from: word, to: replacement, label: `${word} → ${replacement}` })
     return replacement
   })
   out = out.replace(/\b([A-Za-z]+)\s+\1\b/gi, (whole, word: string) => {
-    if (DOUBLE_OK.has(word.toLowerCase())) return whole
+    if (prefs.typos === false || DOUBLE_OK.has(word.toLowerCase())) return whole
     fixes.push({ kind: 'doubled', from: whole, to: word, label: `${whole} → ${word}` })
     return word
   })
   out = out.replace(/(^|\s)i(?=$|[\s,!?;:']|\.(?!e\b))/g, (_whole, before: string) => {
+    if (prefs.capitalI !== true) return `${before}i`
     fixes.push({ kind: 'capital-i', from: 'i', to: 'I', label: 'i → I' })
     return `${before}I`
   })
@@ -150,13 +159,13 @@ function wordCount(text: string): number {
 }
 
 /** Runs the check. Returns `undefined` when there is nothing to say, so the message just sends. */
-export function clarityCheck(text: string): ClarityResult | undefined {
+export function clarityCheck(text: string, prefs: ClarityPrefs = {}): ClarityResult | undefined {
   const fixes: ClarityFix[] = []
   const lines = classifyLines(text)
   const fixedLines = lines.map((line) => {
     if (line.kind !== 'text') return line.raw
     return segments(line.raw)
-      .map((s) => (s.protect ? s.text : fixEditable(s.text, fixes)))
+      .map((s) => (s.protect ? s.text : fixEditable(s.text, fixes, prefs)))
       .join('')
   })
 
@@ -167,7 +176,7 @@ export function clarityCheck(text: string): ClarityResult | undefined {
   // The last sentence decides: "Did you get it? Yes." is not a question.
   const lastSentence = bodyText.split(/[.!?]+/).map((s) => s.trim()).filter((s) => s.length > 0).at(-1) ?? ''
   const bodyLooksLikeQuestion = QUESTION_OPENER.test(lastSentence) && wordCount(lastSentence) >= MIN_QUESTION_WORDS && !/\?\s*$/.test(bodyText)
-  if (bodyLooksLikeQuestion) {
+  if (prefs.questionMarks !== false && bodyLooksLikeQuestion) {
     let lastText = -1
     fixedLines.forEach((l, i) => {
       if (lines[i]?.kind === 'text' && l.trim().length > 0) lastText = i
@@ -181,7 +190,7 @@ export function clarityCheck(text: string): ClarityResult | undefined {
   }
 
   const longest = Math.max(0, ...bodyText.split(/[.!?]+/).map((s) => wordCount(s)))
-  const longSentence = longest > LONG_SENTENCE_WORDS
+  const longSentence = prefs.longSentences !== false && longest > LONG_SENTENCE_WORDS
   const note = longSentence ? `One sentence runs over ${LONG_SENTENCE_WORDS} words.` : undefined
 
   const unique = fixes.filter((fix, i) => fixes.findIndex((f) => f.label === fix.label) === i)
@@ -211,4 +220,21 @@ export function clarityCheck(text: string): ClarityResult | undefined {
     primaryLabel: 'Fix and send',
     secondaryLabel: 'Send as is',
   }
+}
+
+/** Editable ranges shared by local and grammar checks. Offsets are UTF-16, like string.slice. */
+export function editableRanges(text: string): ReadonlyArray<{ readonly start: number; readonly end: number }> {
+  const ranges: { start: number; end: number }[] = []
+  let offset = 0
+  for (const line of classifyLines(text)) {
+    if (line.kind === 'text') {
+      let start = offset
+      for (const segment of segments(line.raw)) {
+        if (!segment.protect) ranges.push({ start, end: start + segment.text.length })
+        start += segment.text.length
+      }
+    }
+    offset += line.raw.length + 1
+  }
+  return ranges
 }

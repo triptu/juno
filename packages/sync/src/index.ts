@@ -10,7 +10,7 @@ export { syncConfigLayer, type SyncConfigShape } from './config'
 
 export { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow } from './merge'
 export { reindexAll, reindexTopics, type StoredPreview } from './reindex'
-export { BOOT_KEY, storedMe } from './boot'
+export { BOOT_KEY, QUICK_START_KEY, storedMe } from './boot'
 export {
   beginPendingFollow,
   clearThreadSub,
@@ -64,13 +64,13 @@ export {
   placeOf,
   queueDelete,
   queueEdit,
-  queueReaction,
   resolveTarget,
   settleOnFailedPost,
   type ActionRefusal,
   type MessageRef,
   type PendingAction,
 } from './actions'
+export { failReaction, isFailed, markStalled, queueReaction } from './reactions'
 export { checkCopyDelete } from './sent'
 
 export { startThread } from './startedThreads'

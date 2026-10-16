@@ -1,0 +1,1 @@
+- 10-16 20:25 · Tushar · Dropped Google and company SSO in the embedded sign-in for now ("google sign in isn't important"); the Slack app session import is the path to make work, with a copyable diagnostic report when it fails.

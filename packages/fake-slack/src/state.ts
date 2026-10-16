@@ -738,3 +738,17 @@ function omitReactions(message: Message): Message {
   const { reactions: _reactions, ...rest } = message
   return rest
 }
+
+const PHOTO_SIZES = ['image_24', 'image_32', 'image_48', 'image_72', 'image_192', 'image_512', 'image_1024'] as const
+
+/**
+ * A user as the edge `users/info` and `client.userBoot` return it: no
+ * `image_*` photo urls, only `avatar_hash`, plus `image_original` for a
+ * custom photo (observed live). The web `users.list` keeps them.
+ */
+export function edgeUserObject(user: User): User {
+  if (user.profile === undefined) return user
+  const profile: Record<string, unknown> = { ...user.profile }
+  for (const key of PHOTO_SIZES) delete profile[key]
+  return { ...user, profile: profile as User['profile'] }
+}

@@ -14,14 +14,23 @@
  *   cancel.
  * - The call goes out through `Outbox.send`. Unlike a post these calls can
  *   be repeated safely: an edit sets the text again, and Slack's answers to
- *   a repeat (`message_not_found` after a delete, `already_reacted`,
- *   `no_reaction`) mean the change is there.
+ *   a repeat (`message_not_found` after a delete, `already_reacted` after an
+ *   add, `no_reaction` after a remove) mean the change is there. For a
+ *   reaction `message_not_found` is a refusal: Slack does not have the
+ *   message, so it does not have the reaction either.
  * - Success stores the change as the socket event would and ends the row in
  *   the same transaction (`TopicFetcher.acted`), unless the user changed it
- *   again meanwhile, when it is sent again. A refusal ends the row, so the
- *   message shows what Slack has. No answer, Slack's own trouble
- *   (`internal_error` and friends), a rate limit or no session: tried again
- *   with backoff, also after a restart.
+ *   again meanwhile, when it is sent again. A refused edit or delete ends
+ *   the row, so the message shows what Slack has. A refused reaction stays
+ *   as `failed`: the chip shows what Slack has and the message offers Retry
+ *   and Dismiss. No answer, Slack's own trouble (`internal_error` and
+ *   friends), a rate limit or no session: tried again with backoff, also
+ *   after a restart.
+ * - A reaction that has not gone out after `STALL_MILLIS` (its post is
+ *   still being sent, an earlier change in the channel holds it, or it
+ *   keeps failing to reach Slack) is marked, and the message says it is not
+ *   sent yet. A row whose run fails with a defect is put off with backoff,
+ *   so it never holds back the rows after it.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
  * posts (`@juno/sync` `sent.ts`), which wakes this worker. Before that
@@ -37,7 +46,7 @@
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
-import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
+import { Cause, Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
 import {
@@ -45,7 +54,10 @@ import {
   checkCopyDelete,
   deferAction,
   dropAction,
+  failReaction,
   flushActions,
+  isFailed,
+  markStalled,
   pendingActions,
   placeOf,
   readAction,
@@ -55,6 +67,7 @@ import {
   type PendingAction,
   type TopicFetcher,
 } from '@juno/sync'
+import { EngineConfig } from '../config'
 import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
@@ -73,10 +86,22 @@ const PASS_RETRY_MILLIS = 5_000
 const COPY_CATCH_UP_MILLIS = 2 * 60_000
 /** How often a row waiting for its post looks again, besides the wakes from the send commands. */
 const DEPENDENCY_POLL_MILLIS = 250
+/** How long a reaction may wait without going out before the view says it is not sent yet. */
+const STALL_MILLIS = 30_000
 /** Refusals Slack gives for its own trouble: tried again later, like no answer. */
 const TRANSIENT = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable', 'ratelimited'])
-/** Answers that mean a repeated call found its change already made. */
-const ALREADY_DONE = new Set(['message_not_found', 'already_reacted', 'no_reaction'])
+
+/** Whether Slack's refusal means a repeated call found its change already made. */
+const alreadyDone = (action: PendingAction, code: string): boolean => {
+  switch (action.kind) {
+    case 'delete':
+      return code === 'message_not_found'
+    case 'react':
+      return code === (action.payload.want === true ? 'already_reacted' : 'no_reaction')
+    case 'edit':
+      return false
+  }
+}
 
 export class ActionWorker extends Context.Service<
   ActionWorker,
@@ -85,9 +110,10 @@ export class ActionWorker extends Context.Service<
     readonly wake: Effect.Effect<void>
   }
 >()('juno/engine/send/ActionWorker') {
-  static readonly layer: Layer.Layer<ActionWorker, never, Workspace | Outbox | SyncLink> = Layer.effect(
+  static readonly layer: Layer.Layer<ActionWorker, never, Workspace | Outbox | SyncLink | EngineConfig> = Layer.effect(
     ActionWorker,
     Effect.gen(function* () {
+      const stallMillis = (yield* EngineConfig).actionStallMillis ?? STALL_MILLIS
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -161,6 +187,11 @@ export class ActionWorker extends Context.Service<
           // and again holding the lane, so a change made while it waited is seen.
           const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
+            // The call retries Slack's own trouble itself, so a retry can come after a socket drop. Until the
+            // catch-up ends or its deadline passes, the row waits for it, as in `pass`, rather than keep the copy.
+            if (!gap.caughtUp && isCopyDelete(action) && (!(yield* link.online) || (yield* Clock.currentTimeMillis) < (gap.reconnectedAt ?? 0) + COPY_CATCH_UP_MILLIS)) {
+              return yield* new NotSent()
+            }
             if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
           })
           if (action.kind === 'delete' && (yield* Effect.result(check))._tag === 'Failure') return false
@@ -178,9 +209,8 @@ export class ActionWorker extends Context.Service<
             case 'NotSent':
               return false
             case 'Rejected': {
-              const acted = ALREADY_DONE.has(error.code) ? alreadyDone(action, place.ts) : undefined
-              if (acted !== undefined) {
-                yield* fetcher.acted(acted, done()).pipe(Effect.orDie)
+              if (alreadyDone(action, error.code)) {
+                yield* fetcher.acted(actedAlready(action, place.ts), done()).pipe(Effect.orDie)
                 return false
               }
               if (TRANSIENT.has(error.code)) {
@@ -188,7 +218,7 @@ export class ActionWorker extends Context.Service<
                 return false
               }
               yield* Effect.logWarning('send: Slack refused a message change', { kind: action.kind, code: error.code })
-              yield* local(transaction(dropAction(action)))
+              yield* local(transaction(action.kind === 'react' ? failReaction(action, error.code) : dropAction(action)))
               return false
             }
             case 'RateLimited':
@@ -221,21 +251,39 @@ export class ActionWorker extends Context.Service<
             if (held.has(listed.channel)) continue
             // An earlier call in this pass may have taken a while: the row may have changed or ended since.
             const action = yield* local(readAction(listed.id))
-            if (action === undefined) continue
+            if (action === undefined || isFailed(action)) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
-            if (!caughtUp && now < catchUpDeadline && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) {
+            if (!caughtUp && now < catchUpDeadline && isCopyDelete(action)) {
               copyWait = catchUpDeadline
               continue
             }
-            if (yield* run(open, fetcher, action)) waiting.add(action.id)
+            // A defect in one row's run is logged and the row put off, so the rows after it still go.
+            const ran = yield* run(open, fetcher, action).pipe(
+              Effect.catchCause((cause) =>
+                Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.gen(function* () {
+                  yield* Effect.logError('send: action failed to run', { kind: action.kind, cause })
+                  yield* local(transaction(deferAction(action, (yield* Clock.currentTimeMillis) + backoff(action.attempts), 'defect')))
+                  return false
+                }),
+              ),
+            )
+            if (ran) waiting.add(action.id)
             // A row that ended lets the channel's next row go in this pass, before rows of later channels.
             else if ((yield* local(readAction(action.id))) === undefined) held.delete(action.channel)
           }
+          // A reaction still pending after `STALL_MILLIS` is marked once, so the view says it is not sent yet.
+          const checkedAt = yield* Clock.currentTimeMillis
+          const stalls: Array<number> = []
+          for (const action of yield* local(pendingActions)) {
+            if (action.kind !== 'react' || action.payload.stalled === true) continue
+            if (checkedAt - action.createdAt >= stallMillis) yield* local(transaction(markStalled(action)))
+            else stalls.push(action.createdAt + stallMillis)
+          }
           // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
-          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null))
+          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && isCopyDelete(action)))
           const after = yield* Clock.currentTimeMillis
-          const due = [...rest.map((action) => action.nextAt), ...(copyWait === undefined ? [] : [copyWait])]
+          const due = [...rest.map((action) => action.nextAt), ...stalls, ...(copyWait === undefined ? [] : [copyWait])]
           const next = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - after)
           // A row waiting for its post looks again soon; the post's own settling does not wake this worker.
           return waiting.size === 0 ? next : Math.min(next ?? DEPENDENCY_POLL_MILLIS, DEPENDENCY_POLL_MILLIS)
@@ -274,12 +322,13 @@ export class ActionWorker extends Context.Service<
   )
 }
 
-/** What the call stores when Slack says the change was already made. */
-const alreadyDone = (action: PendingAction, ts: string): Acted | undefined =>
-  action.kind === 'delete'
-    ? ({ kind: 'deleted', channel: action.channel, ts } as const)
-    : action.kind === 'react'
-      ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
-      : undefined
+/** A copy's delete: it names the copy by ts alone, with no post to wait on (`@juno/sync` `sent.ts`). */
+const isCopyDelete = (action: PendingAction): boolean => action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null
+
+/** What the call stores when Slack says the change was already made (`alreadyDone`). */
+const actedAlready = (action: PendingAction, ts: string): Acted =>
+  action.kind === 'react'
+    ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
+    : ({ kind: 'deleted', channel: action.channel, ts } as const)
 
 const backoff = (attempts: number): number => Math.min(1000 * 2 ** attempts, MAX_BACKOFF_MILLIS)

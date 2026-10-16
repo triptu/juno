@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
@@ -92,6 +92,8 @@ function LoadedComposer({
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
+  const wrongPlace = useAtomValue(sendCheckPrefsAtom).some((check) => check.key === 'wrongPlace' && check.enabled)
+  const routeChecked = aiAssist && wrongPlace && detail.kind === 'main'
   const [start] = useState(() => decodeDraft(initial))
   const [text, setText] = useState(start.text)
   const [picks, setPicks] = useState(start.picks)
@@ -155,7 +157,7 @@ function LoadedComposer({
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
     preloadBar()
-    if (aiAssist && detail.kind === 'main' && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text)
+    if (aiAssist && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text, detail.kind === 'thread' ? detail.rootTs : undefined)
     // Once per mount: later drafts are asked about as typing pauses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -178,7 +180,7 @@ function LoadedComposer({
       setPaused(next)
       flush()
       // The model answers the wrong-place question now, so Enter never waits for it.
-      if (aiAssist && detail.kind === 'main' && next.trim() !== '') precheckMessage(registry, detail.channel.id, next)
+      if (aiAssist && next.trim() !== '') precheckMessage(registry, detail.channel.id, next, detail.kind === 'thread' ? detail.rootTs : undefined)
     }, DRAFT_SAVE_MS)
   }
 
@@ -225,8 +227,8 @@ function LoadedComposer({
     // A file is still on its way to the engine: Enter waits for it.
     if (files.files.some((file) => file.state === 'staging')) return
     markSend()
-    // Files with no text have nothing to check.
-    if (!aiAssist || text.trim() === '') return deliver(text, { kind: 'here' })
+    // Only Wrong place runs before sending, and only in Main. Anything else sends at once.
+    if (!routeChecked || text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)

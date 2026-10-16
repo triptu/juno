@@ -13,7 +13,8 @@
  *   name first, a preview that asked): `wantUsers` wakes `nameUsers`, a
  *   fiber that fetches them in small batches.
  *
- * The end of every boot and catch-up runs `fillUsers` again as a sweep.
+ * The end of every boot and catch-up runs `fillUsers` again as a sweep. The
+ * sweep also asks, once a session, for stored users that have no photo.
  * Live, the edge answers every id it is asked about, Slack Connect users
  * included (research section 10, "Users").
  */
@@ -86,6 +87,20 @@ export const unknownUserIds = (): Effect.Effect<ReadonlyArray<string>, SqlError,
     const mentioning = yield* sql<{ text: string }>`SELECT text FROM messages WHERE text LIKE '%<@%'`
     for (const row of mentioning) for (const match of row.text.matchAll(MENTION)) ids.add(match[1]!)
     return yield* unstored([...ids].filter((id) => USER_ID.test(id)))
+  })
+
+/**
+ * Stored users without a photo, not yet asked about in this session. Rows
+ * written before photos were built from `avatar_hash` have none; the
+ * background sweep asks for them once, so they fill in without a re-sync.
+ */
+const photolessUserIds = (ctx: SyncContext): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const rows = yield* sql<{ id: string }>`SELECT id FROM users WHERE avatar_url IS NULL`
+    const ids = rows.map((row) => row.id).filter((id) => !ctx.photoless.has(id) && !ctx.unknownUsers.has(id) && USER_ID.test(id))
+    for (const id of ids) ctx.photoless.add(id)
+    return ids
   })
 
 /** Fetches `ids` in chunks on `lane`, stores them and re-indexes the topics that were waiting for a name. */
@@ -165,8 +180,9 @@ export const fillUsers = (ctx: SyncContext, lane: Lane = 'background'): Effect.E
     if (stored.length > 0) yield* transaction(reindexTopics(takeWaiting(ctx, stored), reindexOptions(ctx)))
     for (const id of missing) ids.add(id)
     for (const id of ctx.unknownUsers) ids.delete(id)
-    if (lane === 'interactive') yield* fetchSoon(ctx, [...ids])
-    else yield* fetchUsers(ctx, [...ids], lane)
+    if (lane === 'interactive') return yield* fetchSoon(ctx, [...ids])
+    for (const id of yield* photolessUserIds(ctx)) ids.add(id)
+    yield* fetchUsers(ctx, [...ids], lane)
   })
 
 /**

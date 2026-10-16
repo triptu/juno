@@ -60,6 +60,8 @@ export const SignInFailureKind = Schema.Literals([
   'no-token',
   /** No Slack app data on this Mac. */
   'no-slack-app',
+  /** The Slack app is installed but holds no signed-in workspace. */
+  'slack-signed-out',
   /** The keychain password could not be read or did not decrypt the cookie. */
   'keychain',
   /** The token and cookie were found but Slack rejected them. */
@@ -74,6 +76,8 @@ export type SignInFailureKind = typeof SignInFailureKind.Type
 export class SignInFailed extends Schema.TaggedError<SignInFailed>()('SignInFailed', {
   kind: SignInFailureKind,
   message: Schema.String,
+  /** What was checked and where it stopped, for "Copy details". Names, paths and versions only: never a secret or a value. */
+  details: Schema.optionalKey(Schema.String),
 }) {}
 
 /** The signed-in person from the users cache, updated with their profile. */

@@ -18,12 +18,18 @@ module outboxProtocol {
     claimedOffline: bool,
     label: str, target: int,
     // One action row per message (edit, delete or reaction toggle): none,
-    // waiting, transit, accepted, done or dropped. Kind `change` stands for
-    // an edit or a reaction toggle; `delete` replaces them. `stale` holds rows
-    // whose intent changed while a call was out. `actSent` records every
-    // action call that left Juno; `acted` every message Slack applied one to.
+    // waiting, transit, accepted, done, dropped, or failed (a reaction Slack
+    // refused, shown with Retry and Dismiss until the user picks one). Kind
+    // `change` is an edit, `react` a reaction toggle; `delete` replaces them.
+    // `stale` holds rows whose intent changed while a call was out.
+    // `actSent` records every action call that left Juno; `acted` every
+    // message Slack applied one to.
     act: int -> str, actKind: int -> str, stale: Set[int],
     actSent: Set[int], acted: Set[int],
+    // Messages another client deleted, as far as Slack's answers to action
+    // calls go (the copy rules use `slack` instead). `phantom`: reactions
+    // Juno counted as made on a message Slack no longer had (the bug).
+    missing: Set[int], phantom: Set[int],
     // Copies the network made of an accepted post (0 or 1) and copies Juno
     // deleted. `copyRow`: none, hidden (stored hidden, its delete row
     // waits), shown (the bug: listed as a second message) or kept (its
@@ -51,7 +57,7 @@ module outboxProtocol {
       events: Set(), fetches: Set(), scan: Set(),
       online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
-      actSent: Set(), acted: Set(),
+      actSent: Set(), acted: Set(), missing: Set(), phantom: Set(),
       dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none"),
       kept: drafts.mapBy(_ => "first"), slack: Set(), seen: Set(), inStep: true,
       gapped: Set(), rechecked: Set() },
@@ -353,11 +359,17 @@ module outboxProtocol {
   action runAction(k: int): bool = runActionWith(k, true)
   // Slack applies the call. A repeat is harmless: an edit sets the text, a
   // missing message counts as deleted, already_reacted and no_reaction count
-  // as done.
-  action actAccept(k: int): bool = all {
-    s.act.get(k) == "transit",
-    s' = { ...s, act: s.act.set(k, "accepted"), acted: s.acted.union(Set(k)), label: "actAccept", target: k }
+  // as done. A reaction on a message Slack does not have is refused
+  // (`message_not_found`); with the guard off Juno counts it as made.
+  action actAcceptWith(k: int, guard: bool): bool = {
+    val gone = s.actKind.get(k) == "react" and s.missing.contains(k)
+    all {
+      s.act.get(k) == "transit", not(guard and gone),
+      s' = { ...s, act: s.act.set(k, "accepted"), acted: s.acted.union(Set(k)),
+        phantom: if (gone) s.phantom.union(Set(k)) else s.phantom, label: "actAccept", target: k }
+    }
   }
+  action actAccept(k: int): bool = actAcceptWith(k, true)
   // The answer is stored as the socket event would store it, and the row
   // ends in the same transaction unless its intent changed meanwhile.
   action actAnswer(k: int): bool = all {
@@ -370,11 +382,23 @@ module outboxProtocol {
     not(s.sealed), actInFlight(k),
     s' = { ...s, act: s.act.set(k, "waiting"), label: "actFail", target: k }
   }
-  // A refusal ends the row; the view shows the stored message again.
+  // A refusal ends an edit or delete row; the view shows the stored message
+  // again. A refused reaction stays as `failed`: the chip shows what Slack
+  // has, and the message offers Retry (a new `queueAction`) and Dismiss.
   action actRefuse(k: int): bool = all {
     not(s.sealed), s.act.get(k) == "transit",
-    s' = { ...s, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)),
+    s' = { ...s, act: s.act.set(k, if (s.actKind.get(k) == "react") "failed" else "dropped"), stale: s.stale.exclude(Set(k)),
       label: "actRefuse", target: k }
+  }
+  // Dismiss on a refused reaction: the row ends without a call.
+  action dismissAction(k: int): bool = all {
+    s.act.get(k) == "failed",
+    s' = { ...s, act: s.act.set(k, "dropped"), label: "dismissAction", target: k }
+  }
+  // Another client deletes the stored message; only action answers see it.
+  action deleteElsewhere(k: int): bool = all {
+    not(s.sealed), s.stored.contains(k), not(s.missing.contains(k)),
+    s' = { ...s, missing: s.missing.union(Set(k)), label: "deleteElsewhere", target: k }
   }
   // A dependent action ends without a call when its post failed or was
   // discarded. On a failed post an edit goes into the row's text, a reaction
@@ -453,11 +477,15 @@ module outboxProtocol {
   val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
   val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
+  // Juno never shows a reaction as made that Slack refused.
+  val reactionsLand = s.phantom == Set()
+  // Only a reaction waits for the user after a refusal.
+  val failedOnlyReactions = drafts.forall(k => s.act.get(k) == "failed" implies s.actKind.get(k) == "react")
   val repliesWaitForRoot = drafts.forall(k =>
     s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
   val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
-    ownDeleteHolds
+    ownDeleteHolds and reactionsLand and failedOnlyReactions
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
@@ -474,10 +502,10 @@ module outboxProtocol {
   action input = {
     nondet k = drafts.oneOf()
     nondet later = Set(true, false).oneOf()
-    nondet kind = Set("change", "delete").oneOf()
+    nondet kind = Set("change", "react", "delete").oneOf()
     any {
       send(k), refuse(k, later), drop(k), resend(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
-      queueAction(k, kind), actFail(k), actRefuse(k), remoteChange(k, "gone"), remoteChange(k, "reply"),
+      queueAction(k, kind), actFail(k), actRefuse(k), dismissAction(k), deleteElsewhere(k), remoteChange(k, "gone"), remoteChange(k, "reply"),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
     }
@@ -646,6 +674,25 @@ module outboxProtocol {
     seal
   ) }
   action actionBeforeStoreStep = actionBeforeStoreWith(true)
+
+  // A reaction on a stored message that another client deleted meanwhile:
+  // Slack refuses it, the row waits as failed, and the user dismisses it.
+  // The bug counts `message_not_found` as the reaction made.
+  action reactionOnGoneWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, false) else
+    if (turn == 3) answer(1) else
+    if (turn == 4) queueAction(1, "react") else
+    if (turn == 5) deleteElsewhere(1) else
+    if (turn == 6) runAction(1) else
+    if (turn == 7) (if (guard) actRefuse(1) else actAcceptWith(1, false)) else
+    if (turn == 8) (if (guard) dismissAction(1) else actAnswer(1)) else
+    seal
+  ) }
+  action reactionOnGoneStep = reactionOnGoneWith(true)
+  action reactionOnGoneBugStep = reactionOnGoneWith(false)
   action actionBeforeStoreBugStep = actionBeforeStoreWith(false)
 
   // The post is refused and the user deletes the draft while an edit waits

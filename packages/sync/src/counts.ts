@@ -1,6 +1,6 @@
 import { millisToTs, type Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
-import type { Channel, ClientCountsArgs, CountEntry } from '@juno/slack-schema'
+import type { Channel, ClientCountsArgs, CountEntry, ThreadCounts } from '@juno/slack-schema'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
@@ -25,7 +25,7 @@ import type { BootError, BootServices } from './boot'
  * socket was down) is fetched with `conversations.info` first, so the
  * membership write has a row to land on.
  */
-export const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined, lane: 'interactive' | 'background' = 'interactive'): Effect.Effect<{ entries: ReadonlyArray<CountEntry>; fetched: number | undefined }, BootError, BootServices> =>
+export const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined, lane: 'interactive' | 'background' = 'interactive'): Effect.Effect<Counts, BootError, BootServices> =>
   readMetadata(ctx.metadata, (observed) => Effect.gen(function* () {
     const api = yield* SlackApi
     const args: ClientCountsArgs = { thread_counts_by_channel: true, ...(sinceFetched === undefined ? {} : { counts_last_fetched: sinceFetched }) }
@@ -54,8 +54,15 @@ export const loadCounts = (ctx: SyncContext, sinceFetched: number | undefined, l
         }
       }),
     )
-    return { entries, fetched: counts.counts_last_fetched }
+    return { entries, fetched: counts.counts_last_fetched, threads: counts.threads }
   }))
+
+export interface Counts {
+  readonly entries: ReadonlyArray<CountEntry>
+  readonly fetched: number | undefined
+  /** Followed threads with unread replies and mentions, by channel. */
+  readonly threads: ThreadCounts
+}
 
 /** Ids among `ids` with no `conversations` row. */
 const unknownConversations = (ids: ReadonlyArray<string>): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
@@ -74,6 +81,35 @@ interface Active {
   readonly id: string
   readonly latest: Ts
 }
+
+/**
+ * The cold boot's history order (owner, 2026-10-16): DMs and group DMs
+ * first, then conversations with an unread mention of the user (in Main or
+ * a followed thread), then those with unread replies in a followed thread,
+ * then the ones where the store already holds the user's own messages (most
+ * first), then the rest. Newest first within each tier. Order only: every
+ * conversation is still read once.
+ */
+export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, counts: Counts): Effect.Effect<ReadonlyArray<Active>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    if (active.length === 0) return active
+    const sql = yield* StoreWriter
+    const ids = active.map((conversation) => conversation.id)
+    const kinds = new Map((yield* sql<{ id: string; kind: string }>`SELECT id, kind FROM conversations WHERE id IN ${sql.in(ids)}`).map((row) => [row.id, row.kind]))
+    const own = new Map((yield* sql<{ channel: string; n: number }>`
+      SELECT channel, count(*) AS n FROM messages WHERE user_id = ${ctx.me.userId} AND deleted = 0 GROUP BY channel`).map((row) => [row.channel, row.n]))
+    const entries = new Map(counts.entries.map((entry) => [entry.id, entry]))
+    const tier = (id: string): number => {
+      const kind = kinds.get(id)
+      if (kind === 'im' || kind === 'mpim') return 0
+      const entry = entries.get(id)
+      if ((entry?.has_unreads === true && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 1
+      if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 2
+      return own.has(id) ? 3 : 4
+    }
+    // A stable sort: `active` is newest first, and stays so within a tier.
+    return active.toSorted((a, b) => tier(a.id) - tier(b.id) || (tier(a.id) === 3 ? (own.get(b.id) ?? 0) - (own.get(a.id) ?? 0) : 0))
+  })
 
 /** Member conversations with activity inside the window, newest first. */
 export const activeConversations = (entries: ReadonlyArray<CountEntry>, start: Ts): Effect.Effect<ReadonlyArray<Active>, SqlError, StoreWriter> =>

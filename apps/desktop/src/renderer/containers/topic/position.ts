@@ -131,15 +131,16 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
   }, [positioned, first, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef])
 
-  // A wider or narrower window reflows the rows; at the bottom, stay there. Resize runs before the frame's paint.
+  // The list's box changes size (the window, the composer growing, the Juno panel beside it); at the bottom, stay
+  // there. The observer sees only the scroller's own box, and runs after layout and before the frame's paint.
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
-    const onResize = () => {
+    const observer = new ResizeObserver(() => {
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    })
+    observer.observe(scroller)
+    return () => observer.disconnect()
   }, [scrollRef, pinRef, pinnedTopRef])
 }
 
@@ -193,7 +194,11 @@ export function useSendMeasure(list: MessageWindow): void {
   }, [last, list.rows])
 }
 
-/** The user's own scrolling lets go of the pin; where the list comes to rest decides the next one. */
+/**
+ * The user's own scrolling lets go of the pin; where the list comes to rest decides the next one. Input lets go of
+ * a held row. The bottom is let go only by a scroll up and away from the end: input that scrolls nothing, such as
+ * the wheel turned down at the end or a click on a message, ends no scroll, so nothing would hold the bottom again.
+ */
 export function useScrollRelease(position: Position, view: string, readOnly: boolean): void {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, lastRef, atEndRef } = position
@@ -201,7 +206,15 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const scroller = scrollRef.current
     if (scroller === null) return
     const letGo = () => {
-      pinRef.current = undefined
+      if (pinRef.current?.kind === 'row') pinRef.current = undefined
+    }
+    // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
+    let bottomTop = scroller.scrollTop
+    const onScroll = () => {
+      if (pinRef.current?.kind !== 'bottom') return
+      const top = scroller.scrollTop
+      if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
+      else bottomTop = top
     }
     const record = () => {
       if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
@@ -210,8 +223,10 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
-      if (bottom) pinRef.current = { kind: 'bottom' }
-      else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
+      if (bottom) {
+        pinRef.current = { kind: 'bottom' }
+        bottomTop = scroller.scrollTop
+      } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
@@ -219,6 +234,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
+    scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
     // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
     // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
@@ -226,6 +242,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       stopLeaving()
     }

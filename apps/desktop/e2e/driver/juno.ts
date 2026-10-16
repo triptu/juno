@@ -738,6 +738,18 @@ export class Juno {
     return this.win.getByRole('button', { name: "Use the Slack app's session" })
   }
 
+  /** The quiet button beside a failed import's line. */
+  get copyDetailsButton() {
+    return this.win.getByRole('button', { name: 'Copy details', exact: true })
+  }
+
+  /** Clicks "Copy details" and returns what it put on the clipboard. */
+  async copySignInDetails(): Promise<string> {
+    await this.copyDetailsButton.click()
+    await expect.poll(() => this.clipboard(), { timeout: 5_000 }).toContain('Juno: Slack app import')
+    return this.clipboard()
+  }
+
   /**
    * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
    * that opens, and waits for the app to come back signed in. Then skips

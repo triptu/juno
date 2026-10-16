@@ -162,6 +162,8 @@ export interface EngineOptions {
   readonly bootRetryMillis?: number
   /** How many topics the recheck after a drop reads (the app reads 10). */
   readonly recheckTopics?: number
+  /** How long a reaction waits unsent before the message says so (the app waits 30 s). */
+  readonly actionStallMillis?: number
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
@@ -179,7 +181,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   const transport = memoryTransport()
   let cycles = 0
   let pendingCycles = 0
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake' }, {
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }) }, {
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,
