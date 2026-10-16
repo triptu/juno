@@ -179,7 +179,7 @@ Other organisation facts:
 - Chromium switches: `disable-pinch`, `disable-renderer-backgrounding`, optional `ignore-connections-limit`, `enable-logging=stderr`, `log-file`, `remote-debugging-port=8315` in dev (`main:66470-66489`). Blink features `ExperimentalJSProfiler` enabled (`main:66427`). `LSEnvironment MallocNanoZone=0` in `Info.plist`.
 - Protocol handlers: `slack` URL scheme + `LSApplicationQueriesSchemes slack`, `app://` for local pages, `slack-webapp-dev` privileged scheme in dev (`main:41717`, `66064-66073`).
 - Child-process isolation for native addons: `macos-notification-state` and `media-access-status` are called in a forked script (`call-get-*-entry-point.bundle.cjs`) rather than in main.
-- App data layout: everything under `~/Library/Application Support/Slack` (Chromium profile + `storage/root-state.json` + `local-settings.json` + `logs/` + `sentry/`), `userData` renamed per environment (`SlackDevEnv`, `SlackDevMode`) so dev and prod never share cookies.
+- App data layout (the App Store build keeps the same tree in `~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack`; `slack-data-access.md` section 1 has both paths and the `Network/Cookies` case): everything under `~/Library/Application Support/Slack` (Chromium profile + `storage/root-state.json` + `local-settings.json` + `logs/` + `sentry/`), `userData` renamed per environment (`SlackDevEnv`, `SlackDevMode`) so dev and prod never share cookies.
 - Haptics and text prefs: `activateTouchpadHaptics` via `navigator.vibrate` shim; `READ_SYSTEM_TEXT_PREFERENCES` and `TEXT_PREFERENCES_CHANGED` for macOS text settings; `systemPreferences.subscribeNotification` for system events (`main:60887`).
 
 ### Inferred

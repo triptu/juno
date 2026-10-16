@@ -33,6 +33,12 @@ Observed
 - Local storage of credentials on this machine:
   - `~/Library/Application Support/Slack/Local Storage/leveldb/*.ldb|*.log`, origin `https://app.slack.com`, key `localConfig_v2`. Value is a JSON string. Read/written by `shared` module `xLyU` (`getLocalConfig`, `createLocalConfigFacade`).
   - `~/Library/Application Support/Slack/Cookies` (SQLite, table `cookies`). Slack cookies present on host `.slack.com`: `b`, `d` (Secure, HttpOnly, SameSite=Lax, ~1 year expiry, `encrypted_value` ~291 bytes), `lc`, `ssb_instance_id`, `tz`, `ui`, `utm`. `value` is empty; everything is in `encrypted_value`.
+  - Where the data lives depends on the install (read from Slack 4.52.178's `main.bundle.cjs`, file names only):
+    - Direct download from slack.com: `~/Library/Application Support/Slack`. Not sandboxed (its entitlements have no `com.apple.security.app-sandbox`). This Mac has this install.
+    - Mac App Store build (`process.mas`): the sandbox container, `~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack`. Both builds have the bundle id `com.tinyspeck.slackmacgap`, hence the container name. The direct build's main process migrates from this path on first launch: when the container has `Cookies` and the direct profile has no `storage` and no `Local Storage`, it copies `Cookies`, `storage/slack-*` and every `Local Storage` entry across.
+    - The cookie store is `Network/Cookies` on newer Chromium and `Cookies` on older. Slack's own helper returns `<userData>/Network/Cookies` when it exists, else `<userData>/Cookies`, and its diagnostics check the two in that order. Either may have a `-journal` file beside it. On this Mac (Electron in Slack 4.52.178) it is still `Cookies` plus `Cookies-journal`.
+    - The App Store build also keeps an `auth-cookie-backup` file in its `userData` (section "Cookie hardening" in `slack-desktop-shell.md`); Juno does not read it.
+  - Keychain item: generic password, service "Slack Safe Storage", account "Slack", in the login keychain (metadata checked on the direct install). Electron names it after the app name, which is "Slack" in both builds, and Slack's App Store to direct migration copies the cookie file across unchanged, which only works if both builds use the same key. So the App Store build is expected to use the same item; this is not yet checked on an App Store install.
   - IndexedDB `https_app.slack.com_0.indexeddb.leveldb` holds a `reduxPersistence` database (persisted redux stores: channels, members, messages, prefs, etc.). Local Storage also holds `persist-v1::<TEAM_ID>::<USER_ID>::<storeKey>` entries (drafts, expandables, accessibility).
 
 localConfig_v2 shape (observed keys; other keys inferred from `_z(teamId, key)` reads):
@@ -68,6 +74,7 @@ Observed live
 Unknown
 
 - Token lifetime and whether `xoxc-` rotates; the client has an `auth.test` fetcher and a "refetch credentials" path (`handleTeamAuthentication` in `shared`) but the refresh mechanism itself lives in the desktop shell/sign-in flow, outside these bundles.
+- Whether the App Store build's "Slack Safe Storage" item is readable with `security find-generic-password` from another app (it should be, since Chromium uses the legacy login keychain API, but no App Store install was available to check).
 - Whether `fp` (fingerprint) is validated server-side. It is a 2-character hash from FingerprintJS components; the client always sends it.
 
 ## 2. Boot sequence
