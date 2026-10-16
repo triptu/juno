@@ -158,7 +158,7 @@ test('Configure: a New or Changed mark is a tag after the tool’s name, on the 
   for (const row of rows) expect(row).toEqual({ height: 56, after: true, middle: 0 })
 })
 
-test('a DM’s Main row is two lines and shorter, with even padding; every other row is three lines', async ({ page }) => {
+test('every Main row (DM, group DM, channel) is two lines and shorter, with even padding; threads are three lines', async ({ page }) => {
   await open(page, 'TopicRow', 'sidebar/mixed-rows')
   const rows = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>('[data-topic-row]')].map((row) => {
@@ -178,7 +178,8 @@ test('a DM’s Main row is two lines and shorter, with even padding; every other
       }
     }),
   )
-  expect(rows.map((row) => row.lines)).toEqual([2, 2, 2, 3, 3, 3, 3])
+  // Maya's DM, Dev's DM, the group DM, a DM thread, #eng's Main, two channel threads.
+  expect(rows.map((row) => row.lines)).toEqual([2, 2, 2, 3, 2, 3, 3])
   for (const row of rows) {
     expect(row.drawn).toBe(row.lines)
     expect(row.height).toBe(row.lines === 2 ? 64 : 88)
@@ -186,7 +187,8 @@ test('a DM’s Main row is two lines and shorter, with even padding; every other
     expect(row.fill).toBeLessThanOrEqual(row.content)
     expect(row.place).toBe(row.lines === 3)
   }
-  expect(rows.slice(0, 3).some((row) => row.main)).toBe(false)
+  // No row says Main: it is the default.
+  expect(rows.some((row) => row.main)).toBe(false)
 })
 
 test('the people sit beside the count on the preview line, 8px before it, and show whole', async ({ page }) => {

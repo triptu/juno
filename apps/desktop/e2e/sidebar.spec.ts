@@ -87,10 +87,13 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   expect(at(RINA)).toBeLessThan(at(ROADMAP))
   expect(at(ROADMAP)).toBeLessThan(at(OFFSITE))
 
-  // A channel's Main, in the Automated view: the channel label as the title and the Main tag.
+  // A channel's Main, in the Automated view: the channel label as the title,
+  // two lines, and no Main tag or place line repeating it.
   await sidebar.selectView('Automated')
   const alerts = sidebar.row(ALERTS_MAIN)
-  await alerts.expectTag('Main')
+  await expect(alerts.root).toHaveAttribute('data-row-lines', '2')
+  await expect(alerts.root.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(alerts.root.locator('[data-row-part="place"]')).toHaveCount(0)
   // Nine unread, exactly: the boot's history page reaches back to the read pointer.
   await expect(alerts.root.getByTitle(/^9 unread$/)).toHaveText('9')
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
@@ -151,6 +154,9 @@ test('a DM’s Main row is the name and the message: no Main tag, no place line,
   await expect(row.locator('[data-row-part="place"]')).toHaveCount(0)
   await expect(row.getByText('Main', { exact: true })).toHaveCount(0)
   await expect(row.getByText(/Maya/)).toHaveCount(1)
+
+  // The group DM's tile is two of its members, not a circle of initials.
+  await expect(win.locator('[data-topic-id="m:G0MAYALEO"] [data-group-avatar] [data-kind="person"]')).toHaveCount(2)
 
   // Your own message keeps "You:".
   fake.injectMessage({ channel: 'D0MAYA', user: fake.selfId, text: 'its good' })

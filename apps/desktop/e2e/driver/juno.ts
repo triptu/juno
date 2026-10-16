@@ -191,7 +191,7 @@ export class SidebarRow {
     await expect(this.root.locator('[title="Mentions you"]')).toHaveText('@')
   }
 
-  async expectTag(tag: 'Main' | 'Reopened'): Promise<void> {
+  async expectTag(tag: 'Reopened'): Promise<void> {
     await expect(this.root.getByText(tag, { exact: true })).toBeVisible()
   }
 
