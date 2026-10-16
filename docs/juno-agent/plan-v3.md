@@ -402,7 +402,7 @@ Fakes for all three servers (WP10) mirror the shapes above. Real adapters are bu
 The chat's rows: owner bubble, Juno bubble (one per marked block), card, ending line, the status bubble (only during a run), notes and separators.
 
 - **Owner bubbles**: option B from `docs/design/juno-chat/README.md` (O4): an accent tint, `--hl-bubble`, with `--foreground-default` text. `--radius-bubble` 16, with the 4 px tail on the last bubble of a group. Max width 76%, 14 px text, padding 8×12.
-- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. Plain text, any length; each arrives whole. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
+- **Juno bubbles** use `--surface-hover`, with the 28 px mark beside the last bubble of a group. A small markdown subset (bold, italic, code, lists, short headings; SPEC 13.1), any length; each arrives whole. Recall answers cite the day ("On 12 Mar you said …") with a link that scrolls to the message.
 - **Groups** are formed by sender within 2 minutes **and the same origin**. A proactive group carries an 11 px uppercase label ("SCHEDULED · DAILY CATCH-UP") with "Why this?" and one quiet action: "Pause schedule" or "Mute updates". Neither stops a job (B5).
 - **Cards:** Column width up to 560 px, `--radius-card` 20. Light theme: the wide soft shadow. Dark theme: the ring from `docs/design/dark-theme/`. Laid out at full height, with a `--duration-appear` fade.
 - **Status bubble:** three dots looping over `--duration-pop` (static under reduced motion), 13 px status text with a 150 ms cross-fade. No Stop (O1).
