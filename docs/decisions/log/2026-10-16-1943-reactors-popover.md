@@ -1,0 +1,1 @@
+- 10-16 19:43 · reactors · The reaction card is a small popover in `@juno/views` with the tooltip's delay and look, in a portal so row paint containment does not clip it; `views` takes `react-dom` as `ui` does. It moves to the Tooltip primitive's timing once `tooltips-views` lands, which shows labels only.

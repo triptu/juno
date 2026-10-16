@@ -4,28 +4,17 @@ import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
 import type { MouseEvent } from 'react'
+import { DEFAULT_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Divider, EmojiButton, IconButton, Surface, Text } from '@juno/ui'
 import type { MenuAnchor } from './header/HeaderControls'
-
-export interface QuickReaction {
-  /** Slack's name, for example `+1`. */
-  readonly name: string
-  readonly unicode: string
-}
-
-/** The three one-click reactions (SPEC section 7): 👍 ✅ 👀. */
-export const quickReactions: ReadonlyArray<QuickReaction> = [
-  { name: '+1', unicode: '👍' },
-  { name: 'white_check_mark', unicode: '✅' },
-  { name: 'eyes', unicode: '👀' },
-]
 
 export interface HoverToolbarProps {
   /** Main only: adds Start thread or Open thread. */
   readonly main?: boolean
   /** The message already has a thread. */
   readonly hasThread?: boolean
+  /** The quick reactions, in order (SPEC 7): up to seven; 👍 ✅ 👀 by default. */
   readonly reactions?: ReadonlyArray<QuickReaction>
   readonly onReact?: (name: string) => void
   /** Opens the emoji picker under the toolbar's bottom right corner. */
@@ -49,6 +38,21 @@ function below(event: MouseEvent<HTMLElement>): MenuAnchor {
   return { x: box.right, y: box.bottom }
 }
 
+// In a message row (the `message` container in `Message.tsx`), quick reaction
+// i shows only while the row is wide enough for the Main toolbar with i + 1
+// reactions: 133px of buttons, rule and padding, plus 30px a reaction (a 28px
+// button and its 2px gap). So a narrow row drops reactions from the end and
+// the toolbar never runs past the row's start; More reactions always shows.
+const FITS = [
+  '@container message (width < 163px)',
+  '@container message (width < 193px)',
+  '@container message (width < 223px)',
+  '@container message (width < 253px)',
+  '@container message (width < 283px)',
+  '@container message (width < 313px)',
+  '@container message (width < 343px)',
+] as const
+
 /**
  * The toolbar that appears over a hovered or focused message (inventory
  * 6.5): quick reactions, More reactions (the emoji picker), Quote, in Main
@@ -56,7 +60,7 @@ function below(event: MouseEvent<HTMLElement>): MenuAnchor {
  * reserves its place, so showing it moves nothing. While a delete waits for
  * its confirm, the toolbar holds the question instead.
  */
-export function HoverToolbar({ main = false, hasThread = false, reactions = quickReactions, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
+export function HoverToolbar({ main = false, hasThread = false, reactions = DEFAULT_QUICK_REACTIONS, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
   if (confirmDelete !== undefined) {
     return (
       <Surface kind="toolbar" padding="xs" role="group" aria-label="Delete this message?" data-delete-confirm="" sx={[styles.toolbar, styles.confirm]}>
@@ -74,8 +78,10 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = quic
   }
   return (
     <Surface kind="toolbar" padding="xs" role="toolbar" aria-label="Message actions" sx={styles.toolbar}>
-      {reactions.map((reaction) => (
-        <EmojiButton key={reaction.name} emoji={reaction.unicode} label={`React ${reaction.unicode}`} tabIndex={tabIndex} onClick={onReact === undefined ? undefined : () => onReact(reaction.name)} />
+      {reactions.map((reaction, i) => (
+        <span key={reaction.name} data-quick-reaction={reaction.name} {...stylex.props(fitAt[Math.min(i, fitAt.length - 1)])}>
+          <EmojiButton emoji={reaction.unicode} {...(reaction.url === undefined ? {} : { src: reaction.url })} label={`React ${reaction.url === undefined ? reaction.unicode : `:${reaction.name}:`}`} tabIndex={tabIndex} onClick={onReact === undefined ? undefined : () => onReact(reaction.name)} />
+        </span>
       ))}
       <span {...stylex.props(styles.separator)}>
         <Divider vertical inset="none" />
@@ -109,3 +115,15 @@ const styles = stylex.create({
     marginInline: spacing['--space-0-5'],
   },
 })
+
+// Each reaction's wrapper adds no box of its own; it leaves when the row is too narrow (FITS).
+const fits = stylex.create({
+  0: { display: { default: 'contents', [FITS[0]]: 'none' } },
+  1: { display: { default: 'contents', [FITS[1]]: 'none' } },
+  2: { display: { default: 'contents', [FITS[2]]: 'none' } },
+  3: { display: { default: 'contents', [FITS[3]]: 'none' } },
+  4: { display: { default: 'contents', [FITS[4]]: 'none' } },
+  5: { display: { default: 'contents', [FITS[5]]: 'none' } },
+  6: { display: { default: 'contents', [FITS[6]]: 'none' } },
+})
+const fitAt = [fits[0], fits[1], fits[2], fits[3], fits[4], fits[5], fits[6]]

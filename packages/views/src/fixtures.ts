@@ -30,8 +30,10 @@ import SettingsPage from './SettingsPage.fixtures'
 import NewTabSetting from './NewTabSetting.fixtures'
 import TopicSwitcher from './TopicSwitcher.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
+import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
+import ReactorsCard from './ReactorsCard.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
 import SessionView from './SessionView.fixtures'
 import SetUpJunoView from './SetUpJunoView.fixtures'
@@ -115,6 +117,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewTabSetting,
   TopicSwitcher,
   PeekKeySetting,
+  QuickReactionsSetting,
   PeekView,
   OwnerBubble,
   SettingsPage,
@@ -126,6 +129,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   RecoveryPhraseSheet: phraseSheet,
   ReactionPicker,
   Reactions,
+  ReactorsCard,
   RemembersPage,
   RemoveCard: removeCard,
   RemoveSheet,

@@ -39,6 +39,7 @@ export { Text } from './Text'
 export { Textarea, type TextareaMark } from './Textarea'
 export { TextField } from './TextField'
 export { Toast, ToastRegion } from './Toast'
+export { TooltipLayer, tooltip } from './Tooltip'
 export { TopicArt } from './TopicArt'
 export {
   accentLabels,

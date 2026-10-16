@@ -1,5 +1,5 @@
 import { useDeferredValue, useState } from 'react'
-import type { PickConversation } from '@juno/contract'
+import type { PickConversation, ViewColor } from '@juno/contract'
 import { pickConversationsAtom, viewsAtom, type ViewSheetState } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { ViewSheet as ViewSheetView, type ViewIconName, type ViewSheetConversation } from '@juno/views'
@@ -23,6 +23,7 @@ export function ViewSheet({ sheet }: { readonly sheet: ViewSheetState }) {
   const editing = useAtomValue(viewsAtom, (views) => (sheet.mode === 'edit' ? views.find((view) => view.id === sheet.id) : undefined))
   const [name, setName] = useState(editing?.name ?? '')
   const [icon, setIcon] = useState<ViewIconName | undefined>(editing?.icon)
+  const [color, setColor] = useState<ViewColor | undefined>(editing?.color)
   const [keepOutOfAll, setKeepOutOfAll] = useState(editing?.keepOutOfAll ?? false)
   const [chosen, setChosen] = useState<ReadonlyArray<ViewSheetConversation>>(() => {
     const byJuno = new Set(editing?.addedByJuno)
@@ -42,6 +43,7 @@ export function ViewSheet({ sheet }: { readonly sheet: ViewSheetState }) {
       ...(editing === undefined ? {} : { id: editing.id }),
       name,
       ...(icon === undefined ? {} : { icon }),
+      color: color ?? null,
       keepOutOfAll,
       channels: chosen.map((c) => c.id),
     })
@@ -51,12 +53,14 @@ export function ViewSheet({ sheet }: { readonly sheet: ViewSheetState }) {
       mode={sheet.mode}
       name={name}
       icon={icon}
+      color={color}
       keepOutOfAll={keepOutOfAll}
       chosen={chosen}
       query={query}
       results={results}
       onNameChange={setName}
       onIconChange={setIcon}
+      onColorChange={setColor}
       onKeepOutOfAllChange={setKeepOutOfAll}
       onQueryChange={setQuery}
       onToggle={toggle}

@@ -1,4 +1,5 @@
 import { defineFixtures, fixture } from '@juno/ui'
+import { fiveQuickReactions, sevenQuickReactions } from './fixtures/quickReactions'
 import { HoverToolbar } from './HoverToolbar'
 
 const noop = () => {}
@@ -7,6 +8,12 @@ export default defineFixtures(HoverToolbar, {
   Where: {
     thread: fixture({ onMore: noop }),
     main: fixture({ main: true, onMore: noop }),
+  },
+  // Chosen in Settings › Appearance: up to seven, custom emoji too.
+  Reactions: {
+    five: fixture({ main: true, reactions: fiveQuickReactions, onMore: noop }),
+    seven: fixture({ main: true, reactions: sevenQuickReactions, onMore: noop }),
+    one: fixture({ main: true, reactions: fiveQuickReactions.slice(0, 1), onMore: noop }),
   },
   // Delete on your own message asks once, in the toolbar's place (ADR 0010).
   Confirm: {

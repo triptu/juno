@@ -152,6 +152,22 @@ Ink stays neutral, as everywhere else. The quick filters show no counts, only th
 | Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
 | Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 8.96 | 9.89 | 8.01 | 7.79 | 8.52 |
 
+### 1.3a Icon tints
+
+`iconTints` (`--icon-tint-<accent>`, `--icon-tint-neutral`) colour a sidebar view's icon (SPEC 5, Views). Each is its accent's `--hl-text`, light and dark (`darkIconTints` in themes.stylex.ts), so it reads on the sidebar and on a selected pill's `--secondary-default` fill; neutral is `--foreground-muted`, the plain pill icon. An icon needs 3:1 (WCAG 1.4.11); measured, WCAG 2:
+
+| Tint | On sidebar, light | On selected fill, light | On sidebar, dark | On selected fill, dark |
+| --- | --- | --- | --- | --- |
+| Neutral | 4.82 | 4.39 | 6.89 | 5.01 |
+| Coral | 5.74 | 5.22 | 9.08 | 6.60 |
+| Near-black (ink) | 16.84 | 15.31 | 15.30 | 11.12 |
+| Marigold | 6.41 | 5.83 | 10.35 | 7.52 |
+| Teal | 6.37 | 5.79 | 9.96 | 7.24 |
+| Midnight blue | 13.32 | 12.11 | 9.33 | 6.78 |
+| Dark emerald | 6.53 | 5.93 | 9.80 | 7.12 |
+| Claret | 9.60 | 8.73 | 9.06 | 6.59 |
+| Cyan | 5.81 | 5.28 | 10.39 | 7.55 |
+
 ### 1.4 Context tints (public / private / DM)
 
 Always derived from the base palette so they follow dark mode. Formulas from the prototype; hex measured in Chromium.
@@ -398,7 +414,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
+| `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
+| `--reactors-min-width` | 160px: the narrowest the reaction chip's card of who reacted gets; it grows to `--menu-width` |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
@@ -412,8 +430,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
-| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
-| `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
+| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
+| `--toolbar-height` | 36px. The message hover toolbar's height. It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 223px with More (M6b) |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Images next to each other share a two-column grid this wide, cells 177 × 120, gap 6. File cards are `--thumb-max-width` wide |
 
 ### Controls
@@ -510,6 +528,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
 | `--z-toast` | 45 | Toast |
+| `--z-tooltip` | 50 | Tooltip, over everything |
 
 ## 8. Motion
 

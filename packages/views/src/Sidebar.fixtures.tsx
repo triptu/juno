@@ -1,4 +1,4 @@
-import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
+import { defineFixtures, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useState } from 'react'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
@@ -41,6 +41,15 @@ const views: ReadonlyArray<SidebarViewPill> = [
   { id: 'vlong', name: 'Customer escalations and incident follow-ups', mention: true },
   { id: 'vfriends', name: 'Friends', icon: 'heart', mention: false },
 ]
+// The same views with coloured icons (the name pills have no icon to colour).
+const colouredViews: ReadonlyArray<SidebarViewPill> = [
+  { id: 'automated', name: 'Automated', icon: 'robot', color: 'teal', mention: true },
+  { id: 'vwork', name: 'Work', icon: 'briefcase', color: 'midnight', mention: false },
+  { id: 'vfriends', name: 'Friends', icon: 'heart', color: 'claret', mention: false },
+  { id: 'vrelease', name: 'Releases', icon: 'rocket', color: 'marigold', mention: false },
+  { id: 'vbugs', name: 'Bugs', icon: 'bug', color: 'coral', mention: false },
+  { id: 'vdesign', name: 'Design crit', mention: false },
+]
 const viewChrome = { views, onFilterView: noop, onNewView: noop, onViewMenu: noop, onMoveView: noop, onCloseViewSheet: noop } as const
 
 const sheetProps: ViewSheetProps = {
@@ -61,6 +70,7 @@ const sheetProps: ViewSheetProps = {
   ],
   onNameChange: noop,
   onIconChange: noop,
+  onColorChange: noop,
   onKeepOutOfAllChange: noop,
   onQueryChange: noop,
   onToggle: noop,
@@ -156,6 +166,10 @@ export default defineFixtures(
       'view-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: false, view: 'automated' } }, { sections: [{ id: 'recent', ids: [rows.alertsMain.id] }] })),
       'name-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: true, view: 'vdesign' } }, { sections: [{ id: 'recent', ids: [rows.roadmap.id] }] })),
       'no-views': scene(() => full({ ...viewChrome, views: [] })),
+      coloured: scene(() => full({ ...viewChrome, views: colouredViews })),
+      // A coloured icon keeps its colour on the selected pill's fill.
+      'coloured-selected': scene(() => full({ ...viewChrome, views: colouredViews, filter: { kind: 'all', unreadOnly: false, view: 'vwork' } }, { sections: [{ id: 'recent', ids: [rows.roadmap.id] }] })),
+      'sheet-colour': scene(() => full({ ...viewChrome, views: colouredViews.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} color="teal" /> })),
       'sheet-new': scene(() => full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} /> })),
       'sheet-edit': scene(() =>
         full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} mode="edit" name="Design crit" icon={undefined} keepOutOfAll={false} query="" chosen={sheetProps.chosen.slice(0, 1)} /> }),
@@ -225,6 +239,27 @@ export default defineFixtures(
     Privacy: {
       on: scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop }, { selected: rows.postgres.id })}</PrivacyOn>),
       'row-hover': scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>, { hover: '[data-topic-row]:nth-of-type(2)' }),
+    },
+    // The title bar's and the pills' tooltips (primitives, Tooltip): the shot waits out the hover delay.
+    Tooltips: {
+      back: scene(
+        () => (
+          <>
+            {full()}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[aria-label="Back ⌘["]' },
+      ),
+      'view-pill': scene(
+        () => (
+          <>
+            {full({ ...viewChrome, views: colouredViews })}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[data-view-pill="vwork"]' },
+      ),
     },
     'Account menu': {
       open: scene(() =>

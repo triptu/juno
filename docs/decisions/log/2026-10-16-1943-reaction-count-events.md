@@ -1,0 +1,1 @@
+- 10-16 19:43 · reactors · A reaction event moves the stored count by one, never below the users known, instead of setting it to the users known, so a partial users list keeps Slack's count.

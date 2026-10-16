@@ -4,6 +4,7 @@ import { accent, colors, radii, shadows, sizes, spacing, weights } from '@juno/t
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { interactive } from './internal/interactive'
+import { tintColors, type IconTint } from './internal/tint'
 import { variants as typeVariants } from './internal/type'
 
 /**
@@ -25,6 +26,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   readonly tone?: ButtonTone
   readonly iconStart?: PhosphorIcon
   readonly iconEnd?: PhosphorIcon
+  /** Draws `iconStart` in an accent's colour (a sidebar view's icon). The icon keeps it on hover and when pressed. */
+  readonly iconTint?: IconTint
   /** Icon weight override; `fill` for a check that has landed. Default by size. */
   readonly iconWeight?: IconWeight
   /** Trailing keyboard hint, for example "↵". */
@@ -85,6 +88,7 @@ export function Button({
   tone = 'default',
   iconStart,
   iconEnd,
+  iconTint,
   iconWeight,
   kbd,
   pressed,
@@ -123,7 +127,13 @@ export function Button({
         disabled && interactive.dimmed,
       )}
     >
-      {iconStart ? <Icon icon={iconStart} {...iconProps} /> : null}
+      {iconStart === undefined ? null : iconTint === undefined ? (
+        <Icon icon={iconStart} {...iconProps} />
+      ) : (
+        <span data-icon-tint={iconTint} {...stylex.props(styles.tint, tintColors[iconTint])}>
+          <Icon icon={iconStart} {...iconProps} />
+        </span>
+      )}
       {children !== undefined && children !== null ? <span {...stylex.props(styles.label)}>{children}</span> : null}
       {iconEnd ? <Icon icon={iconEnd} {...iconProps} /> : null}
       {kbd ? <Kbd>{kbd}</Kbd> : null}
@@ -132,6 +142,9 @@ export function Button({
 }
 
 const styles = stylex.create({
+  tint: {
+    display: 'inline-flex',
+  },
   base: {
     display: 'inline-flex',
     alignItems: 'center',

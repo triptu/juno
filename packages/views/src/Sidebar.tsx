@@ -11,6 +11,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
+import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
@@ -25,7 +26,9 @@ import {
   PillRow,
   Popover,
   Text,
+  tooltip,
   viewIcons,
+  type AccentName,
   type ActivateEvent,
   type HueName,
   type ViewIconName,
@@ -54,6 +57,8 @@ export interface SidebarViewPill {
   readonly name: string
   /** Shown instead of the name, which becomes the tooltip and the accessible name. */
   readonly icon?: ViewIconName | undefined
+  /** The icon's colour, an accent; undefined is neutral. */
+  readonly color?: AccentName | undefined
   /** One of its topics has an unread mention of the user. */
   readonly mention: boolean
 }
@@ -183,8 +188,8 @@ export function Sidebar({
         <div {...stylex.props(styles.titlebar)}>
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
-            <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
-            <IconButton icon={NotePencil} label="New chat ⌘N" size={30} onClick={onNewChat} />
+            <IconButton icon={MagnifyingGlass} label="Search" shortcut={menuKeys('palette.toggle')} size={30} onClick={onSearch} />
+            <IconButton icon={NotePencil} label="New chat" shortcut={menuKeys('chat.new')} size={30} onClick={onNewChat} />
             <span {...stylex.props(styles.account)}>
               <Popover
                 open={accountMenuOpen}
@@ -263,7 +268,7 @@ export function Sidebar({
                 <Button
                   variant="filter"
                   iconStart={Hash}
-                  title="Channels"
+                  {...tooltip('Channels')}
                   aria-label={channelsDot ? 'Channels, unread' : 'Channels'}
                   pressed={kind === 'channels'}
                   {...activateHandlers<HTMLButtonElement>(() => onFilterKind('channels'))}
@@ -273,7 +278,7 @@ export function Sidebar({
                 <Button
                   variant="filter"
                   iconStart={User}
-                  title="DMs"
+                  {...tooltip('DMs')}
                   aria-label={dmsDot ? 'DMs, unread' : 'DMs'}
                   pressed={kind === 'dms'}
                   {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}
@@ -283,7 +288,7 @@ export function Sidebar({
             </PillRow>
             {onNewView === undefined ? null : (
               <FilterPill>
-                <Button variant="filter" iconStart={Plus} title="New view" aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
+                <Button variant="filter" iconStart={Plus} {...tooltip('New view')} aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
               </FilterPill>
             )}
             <span {...stylex.props(styles.unread)}>
@@ -291,7 +296,7 @@ export function Sidebar({
               <Button
                 variant="filter"
                 iconStart={Notification}
-                title="Unread only"
+                {...tooltip('Unread only')}
                 aria-label="Unread only"
                 pressed={filter.unreadOnly}
                 {...activateHandlers<HTMLButtonElement>(() => onToggleUnread())}
@@ -370,7 +375,8 @@ function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: Vi
           variant="filter"
           data-view-pill={view.id}
           aria-label={name}
-          {...(icon === undefined ? {} : { iconStart: icon, title: view.name })}
+          {...(icon === undefined ? {} : { iconStart: icon, ...tooltip(view.name) })}
+          {...(icon === undefined || view.color === undefined ? {} : { iconTint: view.color })}
           pressed={on}
           draggable={onMoveView !== undefined}
           onContextMenu={(event: MouseEvent<HTMLButtonElement>) => {

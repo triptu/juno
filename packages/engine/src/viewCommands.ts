@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto'
 import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, type AutomatedPlace, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
-import { AUTOMATED_VIEW_ID, viewName, type ViewIcon } from '@juno/domain'
+import { AUTOMATED_VIEW_ID, viewName, type ViewColor, type ViewIcon } from '@juno/domain'
 import { invalidate, keys, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { leaveAutomated, moveToAutomated, placedByHand, setVerdict } from './automatedView'
 import { channelInfoOf, channelRefOf, userName, type UserRow } from './topicRows'
@@ -24,6 +24,7 @@ interface ViewRow {
   readonly id: string
   readonly name: string
   readonly icon: string | null
+  readonly color: string | null
   readonly position: number
   readonly keep_out_of_all: number
 }
@@ -32,6 +33,7 @@ const savedOf = (row: ViewRow, channels: ReadonlyArray<string>): SavedView => ({
   id: row.id,
   name: row.name,
   ...(row.icon === null ? {} : { icon: row.icon as ViewIcon }),
+  ...(row.color === null ? {} : { color: row.color as ViewColor }),
   keepOutOfAll: row.keep_out_of_all === 1,
   channels,
   position: row.position,
@@ -41,7 +43,7 @@ const savedOf = (row: ViewRow, channels: ReadonlyArray<string>): SavedView => ({
 export const readView = (id: string): Effect.Effect<SavedView | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const row = (yield* sql<ViewRow>`SELECT id, name, icon, position, keep_out_of_all FROM sidebar_views WHERE id = ${id}`)[0]
+    const row = (yield* sql<ViewRow>`SELECT id, name, icon, color, position, keep_out_of_all FROM sidebar_views WHERE id = ${id}`)[0]
     if (row === undefined) return undefined
     const channels = yield* sql<{ channel: string }>`SELECT channel FROM sidebar_view_channels WHERE view_id = ${id} ORDER BY added_at, channel`
     return savedOf(row, channels.map((c) => c.channel))
@@ -80,7 +82,8 @@ export const saveView = (draft: ViewDraft) =>
         if (draft.id !== undefined) {
           const before = yield* readView(draft.id)
           if (before === undefined) return undefined
-          yield* sql`UPDATE sidebar_views SET name = ${name}, icon = ${icon}, keep_out_of_all = ${keep} WHERE id = ${draft.id}`
+          const color = draft.color === undefined ? (before.color ?? null) : draft.color
+          yield* sql`UPDATE sidebar_views SET name = ${name}, icon = ${icon}, color = ${color}, keep_out_of_all = ${keep} WHERE id = ${draft.id}`
           // Conversations that stay keep their place; the rest go.
           const kept = new Set(draft.channels)
           const previousChannels = yield* sql<{ channel: string }>`SELECT channel FROM sidebar_view_channels WHERE view_id = ${draft.id}`
@@ -96,7 +99,7 @@ export const saveView = (draft: ViewDraft) =>
         }
         const id = `v${randomUUID().replaceAll('-', '').slice(0, 12)}`
         const last = (yield* sql<{ position: number | null }>`SELECT max(position) AS position FROM sidebar_views`)[0]?.position ?? -1
-        yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at) VALUES (${id}, ${name}, ${icon}, ${last + 1}, ${keep}, ${String(now)})`
+        yield* sql`INSERT INTO sidebar_views (id, name, icon, color, position, keep_out_of_all, created_at) VALUES (${id}, ${name}, ${icon}, ${draft.color ?? null}, ${last + 1}, ${keep}, ${String(now)})`
         yield* writeChannels(id, draft.channels, now)
         yield* placedByHand(id, [...new Set(draft.channels)].map((channel) => ({ channel, member: true })), now)
         return { id, before: null, after: (yield* readView(id))! }
@@ -129,8 +132,8 @@ export const restoreView = (view: SavedView) =>
     Effect.gen(function* () {
       const sql = yield* StoreWriter
       if ((yield* sql<{ id: string }>`SELECT id FROM sidebar_views WHERE id = ${view.id}`).length > 0) return {}
-      yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at)
-        VALUES (${view.id}, ${view.name}, ${view.icon ?? null}, ${view.position}, ${view.keepOutOfAll ? 1 : 0}, ${String(now)})`
+      yield* sql`INSERT INTO sidebar_views (id, name, icon, color, position, keep_out_of_all, created_at)
+        VALUES (${view.id}, ${view.name}, ${view.icon ?? null}, ${view.color ?? null}, ${view.position}, ${view.keepOutOfAll ? 1 : 0}, ${String(now)})`
       yield* writeChannels(view.id, view.channels, now)
       return {} satisfies CommandResult
     }),
@@ -207,7 +210,7 @@ interface MemberRow extends ViewRow {
 /** Every view in pill order, with the conversations the store knows, named as rows name them. */
 export const listViews: Effect.Effect<ReadonlyArray<SidebarView>, SqlError, StoreReader> = Effect.gen(function* () {
   const sql = yield* StoreReader
-  const rows = yield* sql<MemberRow>`SELECT v.id, v.name, v.icon, v.position, v.keep_out_of_all, vc.channel,
+  const rows = yield* sql<MemberRow>`SELECT v.id, v.name, v.icon, v.color, v.position, v.keep_out_of_all, vc.channel,
       c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members
     FROM sidebar_views v
     LEFT JOIN sidebar_view_channels vc ON vc.view_id = v.id
@@ -238,6 +241,7 @@ export const listViews: Effect.Effect<ReadonlyArray<SidebarView>, SqlError, Stor
         id: row.id,
         name: row.name,
         ...(row.icon === null ? {} : { icon: row.icon as ViewIcon }),
+        ...(row.color === null ? {} : { color: row.color as ViewColor }),
         keepOutOfAll: row.keep_out_of_all === 1,
         channels: [],
         ...(row.id === AUTOMATED_VIEW_ID ? { addedByJuno: byJuno } : {}),
@@ -264,7 +268,7 @@ export const undoView = (id: string, expected: SavedView | null, restore: SavedV
   inWorkspace((now) => Effect.gen(function* () {
     const current = (yield* readView(id)) ?? null
     const same = (a: SavedView | null, b: SavedView | null) => a === null || b === null ? a === b :
-      a.id === b.id && a.name === b.name && a.icon === b.icon && a.keepOutOfAll === b.keepOutOfAll && a.position === b.position &&
+      a.id === b.id && a.name === b.name && a.icon === b.icon && a.color === b.color && a.keepOutOfAll === b.keepOutOfAll && a.position === b.position &&
       a.channels.toSorted().join('\0') === b.channels.toSorted().join('\0')
     if (same(current, restore)) return true
     if (!same(current, expected)) return false
@@ -272,8 +276,8 @@ export const undoView = (id: string, expected: SavedView | null, restore: SavedV
     yield* sql`DELETE FROM sidebar_view_channels WHERE view_id = ${id}`
     yield* sql`DELETE FROM sidebar_views WHERE id = ${id}`
     if (restore !== null) {
-      yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at)
-        VALUES (${id}, ${restore.name}, ${restore.icon ?? null}, ${restore.position}, ${restore.keepOutOfAll ? 1 : 0}, ${String(now)})`
+      yield* sql`INSERT INTO sidebar_views (id, name, icon, color, position, keep_out_of_all, created_at)
+        VALUES (${id}, ${restore.name}, ${restore.icon ?? null}, ${restore.color ?? null}, ${restore.position}, ${restore.keepOutOfAll ? 1 : 0}, ${String(now)})`
       yield* writeChannels(id, restore.channels, now)
     }
     return true
