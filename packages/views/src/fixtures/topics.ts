@@ -89,10 +89,10 @@ export const channels = {
   maya: { id: 'D0MAYA', kind: 'im', name: 'Maya Chen', label: 'Maya Chen', tint: 'dm', icon: 'hash', color: 'claret', partner: people.maya },
   sam: { id: 'D0SAM', kind: 'im', name: 'Sam Okafor', label: 'Sam Okafor', tint: 'dm', icon: 'hash', color: 'emeraldDark', partner: people.sam },
   dev: { id: 'D0DEV', kind: 'im', name: 'Dev Patel', label: 'Dev Patel', tint: 'dm', icon: 'hash', color: 'cyan', partner: people.dev },
-  group: { id: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo', label: 'Maya, Leo', tint: 'dm', icon: 'hash', color: 'midnight' },
+  group: { id: 'G0MAYALEO', kind: 'mpim', name: 'Maya, Leo', label: 'Maya, Leo', tint: 'dm', icon: 'hash', color: 'midnight', members: [people.maya, people.leo] },
   mohammed: { id: 'D0MOHAMMED', kind: 'im', name: 'محمد', label: 'محمد', tint: 'dm', icon: 'hash', color: 'jordy', partner: people.mohammed },
   unicorn: { id: 'D0UNICORN', kind: 'im', name: '🦄 Unicorn', label: '🦄 Unicorn', tint: 'dm', icon: 'hash', color: 'plum', partner: people.unicorn },
-  emojiGroup: { id: 'G0EMOJI', kind: 'mpim', name: '🎉, 🦄 Unicorn, Ana', label: '🎉, 🦄 Unicorn, Ana', tint: 'dm', icon: 'hash', color: 'rose' },
+  emojiGroup: { id: 'G0EMOJI', kind: 'mpim', name: '🎉, 🦄 Unicorn, Ana', label: '🎉, 🦄 Unicorn, Ana', tint: 'dm', icon: 'hash', color: 'rose', members: [people.party, people.unicorn] },
   vendors: { id: 'C0VENDORS', kind: 'private', name: 'vendor-contracts-and-renewals', label: '#vendor-contracts-and-renewals', tint: 'private', icon: 'compass', color: 'midnight' },
 } as const satisfies Record<string, TopicRow['channel']>
 

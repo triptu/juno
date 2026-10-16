@@ -8,13 +8,14 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { TopicRow as TopicRowModel } from '@juno/contract'
+import type { Person, TopicRow as TopicRowModel } from '@juno/contract'
 import { accent, colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
   AvatarStack,
   Chip,
+  GroupAvatar,
   Icon,
   IconButton,
   pointerMoved,
@@ -68,11 +69,11 @@ const PRIVATE_TITLE = 'Private channel'
  * One sidebar row, chat style: the topic's art or the person's photo, then
  * the title and time, a one-line "Sender: text" preview ending with the
  * people who wrote the unread messages beside the @ and count tags, and the
- * meta line: the place with its Main and Reopened tags and a Main row's
- * new-thread count. Text takes three levels: the title, the preview one step down,
- * and the meta line and time a step below that. A DM's or group DM's Main
- * has no meta line: its title names the people and its tile is their
- * photo, so the row is two lines and shorter, and a Reopened tag or thread
+ * meta line: the place with its Reopened tag. Text takes three levels: the
+ * title, the preview one step down, and the meta line and time a step below
+ * that. A Main (a channel's, a DM's or a group DM's) has no meta line and no
+ * Main tag: Main is the default and its title already names the place, so
+ * the row is two lines and shorter, and a Reopened tag or the new-thread
  * count follows the title. The Resolve check overlays the end of the last
  * line on hover or keyboard focus and takes no space, so nothing ever
  * moves. The row activates on mouse down; Resolve on click.
@@ -110,19 +111,12 @@ export const TopicRow = memo(function TopicRow({
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined)
-  const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => ({
-    id: person.id,
-    initials: initials(person.name),
-    name: person.name,
-    hue: hueFor(person.color, person.id),
-    ...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl }),
-  }))
+  const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
-  // Line three's tags, or line one's on a two-line row.
+  // Line three's tags, or line one's on a two-line row. Never a Main tag: Main is the default.
   const tags = (
     <>
-      {main && !twoLine ? <Chip variant="outline">Main</Chip> : null}
       {reopened ? (
         <Chip variant="filled" title={REOPENED_TITLE}>
           Reopened
@@ -299,7 +293,8 @@ export const TopicRow = memo(function TopicRow({
 
 /**
  * The tile (SPEC section 5, "Row anatomy"): a DM's Main is the person, so it
- * keeps the photo (two initials for a group DM); every other topic, a
+ * keeps the photo, and a group DM's Main two members' photos in a pair
+ * (two initials until the members are known); every other topic, a
  * channel's Main and threads inside DMs included, shows its art, or the
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
@@ -313,6 +308,8 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
     return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
+    const members = channel.members ?? []
+    if (members.length >= 2) return <GroupAvatar people={members.map((member) => stackPerson(member, true))} size={44} />
     return <Avatar kind="group" label={groupInitials(channel.name)} size={44} hue={hueFor(channel.color, channel.id)} />
   }
   return (
@@ -323,12 +320,11 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
 }
 
 /**
- * A DM's or group DM's Main has two lines (SPEC section 5, "Row anatomy"):
- * the title already names the people and the photo says it is a DM, so the
- * meta line would only repeat them.
+ * Every Main has two lines (SPEC section 5, "Row anatomy"): its title is the
+ * channel or the people, so the meta line would only repeat it.
  */
-function isTwoLine(row: Pick<TopicRowModel, 'kind' | 'channel'>): boolean {
-  return row.kind === 'main' && (row.channel.kind === 'im' || row.channel.kind === 'mpim')
+function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
+  return row.kind === 'main'
 }
 
 /**
@@ -337,6 +333,17 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind' | 'channel'>): boolean {
  */
 function previewNamesSender(row: TopicRowModel): boolean {
   return row.channel.kind !== 'im' || row.preview.sender === 'You'
+}
+
+/** A person as the stack (18px, the 48px photo) or the group tile (28px, the 72px photo) draws them. */
+function stackPerson(person: Person, large = false): AvatarStackPerson {
+  return {
+    id: person.id,
+    initials: initials(person.name),
+    name: person.name,
+    hue: hueFor(person.color, person.id),
+    ...(person.avatarUrl === undefined ? {} : { src: (large ? undefined : person.avatarSmallUrl) || person.avatarUrl }),
+  }
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */
@@ -420,7 +427,7 @@ const styles = stylex.create({
       ':has(:focus-visible)': PLACE_MASK,
     },
   },
-  // A DM's or group DM's Main: two lines, so a shorter fixed height and
+  // A Main: two lines, so a shorter fixed height and
   // estimate. Known from the row's kind, never measured.
   twoLineRow: {
     height: `calc(${density['--density-row-two-line-estimate']} + 2 * ${density['--density-row-padding-block']})`,

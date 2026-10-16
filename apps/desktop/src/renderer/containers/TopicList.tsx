@@ -29,7 +29,7 @@ import { editSelectedView } from './viewActions'
  * Rows in the first commit of a new list. The rest mount in a transition
  * after that frame is painted, so the first rows paint in one short frame
  * (performance.md 3.2). Enough to fill a tall window at the shortest row
- * (a DM's Main in Compact, 58px).
+ * (a Main in Compact, 58px).
  */
 const FIRST_ROWS = 32
 
