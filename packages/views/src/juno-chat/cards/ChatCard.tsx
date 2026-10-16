@@ -53,7 +53,8 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
       <div {...stylex.props(styles.inner, padding === 'tight' && styles.innerTight)}>
       <div {...stylex.props(styles.header, padding === 'tight' && styles.headerTight)}>
         <span {...stylex.props(styles.title)}>
-          <Text variant="meta" weight="medium" tone="subtle" truncate>
+          {/* The kind is a short name and never cuts; the source after it takes the ellipsis. */}
+          <Text variant="meta" weight="medium" tone="subtle" sx={styles.kind}>
             {label ?? chatCopy.card.kind[kind]}
           </Text>
           {source !== undefined ? (
@@ -234,6 +235,10 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'baseline',
     minWidth: 0,
+  },
+  kind: {
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
   dot: {
     whiteSpace: 'pre',

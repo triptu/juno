@@ -1,0 +1,1 @@
+- 10-17 04:17 · narrow-fixes · A context pill never gets narrower than its icon and kind; in a tight row its name takes the ellipsis. A card's kind label never cuts, and a Send message row puts "in {topic}" under the pill when both do not fit.

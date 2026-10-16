@@ -36,17 +36,19 @@ const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 
  * The tinted pill that says where a topic lives. The owner maps the
  * conversation kind to a tint, an icon and a label (that rule lives in
  * `@juno/domain`); the pill only draws them. It shrinks with its row: the
- * name takes an ellipsis, the icon and the kind keep their size.
+ * name takes an ellipsis, the icon and the kind keep their size, and the
+ * pill never gets narrower than those two, so nothing spills out of it.
  */
 export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label }: ContextPillProps) {
+  const kind = showKind && kindLabel ? kindLabel : undefined
   const content = (
     <>
       <Icon icon={icon} size={iconBySize[size]} />
       <span {...stylex.props(styles.name)}>{name}</span>
-      {showKind && kindLabel ? (
+      {kind !== undefined ? (
         <span {...stylex.props(styles.kind)}>
           <span aria-hidden>{' · '}</span>
-          {kindLabel}
+          {kind}
         </span>
       ) : null}
     </>
@@ -58,22 +60,25 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
         title={kindLabel}
         aria-label={label}
         onClick={onClick}
-        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
       >
         {content}
       </button>
     )
   }
   return (
-    <span title={kindLabel} {...stylex.props(styles.base, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
+    <span title={kindLabel} {...stylex.props(styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
       {content}
     </span>
   )
 }
 
 const styles = stylex.create({
+  // A grid, so that the name's track gives way to zero while the icon's and
+  // the kind's keep their width: its min-content is icon + kind + padding.
   base: {
-    display: 'inline-flex',
+    display: 'inline-grid',
+    gridTemplateColumns: 'auto minmax(0, max-content)',
     alignItems: 'center',
     flexShrink: 1,
     gap: spacing['--space-1-5'],
@@ -82,8 +87,11 @@ const styles = stylex.create({
     whiteSpace: 'nowrap',
     userSelect: 'none',
     verticalAlign: 'middle',
-    minWidth: 0,
+    minWidth: 'min-content',
     maxWidth: '100%',
+  },
+  withKind: {
+    gridTemplateColumns: 'auto minmax(0, max-content) auto',
   },
   name: {
     overflow: 'hidden',
@@ -92,7 +100,6 @@ const styles = stylex.create({
   },
   kind: {
     fontWeight: weights['--weight-regular'],
-    flexShrink: 0,
   },
 })
 

@@ -78,7 +78,7 @@ function Row({
       <div {...stylex.props(styles.where)}>
         <ContextPill tint={message.target.tint} icon={placeIconFor(message.target)} name={message.target.name} kindLabel={message.target.kindLabel} showKind size={22} />
         {message.inTopic !== undefined ? (
-          <Text variant="meta" tone="muted" truncate>
+          <Text variant="meta" tone="muted" truncate sx={styles.inTopic}>
             {copy.inTopic(message.inTopic.title)}
           </Text>
         ) : null}
@@ -122,13 +122,22 @@ const styles = stylex.create({
       ':first-child': 'transparent',
     },
   },
+  // The pill first; "in {topic}" beside it while it fits, else on a line of its own, where it takes the ellipsis.
   where: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: spacing['--space-2'],
+    columnGap: spacing['--space-2'],
+    rowGap: spacing['--space-1'],
     minWidth: 0,
     minHeight: sizes['--control-22'],
     userSelect: 'none',
+  },
+  inTopic: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    maxWidth: '100%',
   },
   // The same box as the card textarea (its type setting, two rows, padding 8 10, a 1px edge), with the edge gone.
   sentText: {
