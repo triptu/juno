@@ -1,0 +1,1 @@
+- 10-16 14:40 · sidebar-row · Resolve overlays the end of a row's meta line instead of keeping a 22px slot: on hover or focus the stack fades out under it, or the place text fades out where there is no stack.
