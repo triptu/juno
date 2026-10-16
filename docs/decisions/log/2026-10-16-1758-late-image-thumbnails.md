@@ -1,0 +1,1 @@
+- 10-16 17:58 · upload-preview · A sent image shows its staged copy until Slack's thumbnails are stored; images stored without thumbnails are refetched with `files.info` up to four times on the background lane, and stored thumbnails are never replaced by a copy without them.
