@@ -22,10 +22,18 @@ const tweet: Extract<BodyBlock, { kind: 'attachment' }> = {
   footer: [{ kind: 'text', text: 'X · Oct 16 at 10:30' }], footerIcon: icon,
 }
 
+// A shared Slack message: the sender, their words once, and where it was posted with the time.
+const shared: BodyBlock = {
+  kind: 'attachment', tint: 'neutral', author: { name: 'Maya', icon }, title: [],
+  blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: 'Can someone look at the staging deploy before the release goes out?' }] }],
+  footer: [{ kind: 'text', text: 'Thread in Slack conversation · ' }, { kind: 'date', timestamp: 1792178160, format: '{date_short} at {time}', fallback: '' }],
+}
+
 export default defineFixtures(MessageBody, {
   pr: state(pr),
   'x-image': state({ ...tweet, blocks: [...tweet.blocks, { kind: 'image', url: previewImage, alt: 'Experiment results', width: 600, height: 400 }] }),
   'x-text': state(tweet),
+  'shared-message': state({ kind: 'paragraph', children: [{ kind: 'text', text: 'Worth a look' }] }, shared),
   'failed-image': state({ ...tweet, blocks: [...tweet.blocks, { kind: 'image', url: 'data:image/png;base64,AAAA', alt: 'Unavailable preview', width: 1200, height: 630 }] }),
   youtube: state({ ...tweet, author: { name: 'Example Studio', icon }, title: [{ kind: 'link', url: 'https://example.test/watch/demo', text: 'How the demo works' }], blocks: [{ kind: 'image', url: previewImage, alt: 'Demo preview', width: 640, height: 360 }], footer: [{ kind: 'text', text: 'YouTube' }] }),
   generic: state({ ...pr, tint: 'neutral', title: [{ kind: 'link', url: 'https://example.test/article/1', text: 'A useful observation' }], blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: 'The summary supplied by the page.' }] }, { kind: 'image', url: previewImage, alt: 'Article preview', width: 800, height: 420 }], footer: [{ kind: 'text', text: 'Example Journal' }] }),

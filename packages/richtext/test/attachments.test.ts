@@ -58,3 +58,28 @@ it('keeps unfurl author, text, service icon and source link through decoding', (
   })
   expect(plainText(body)).toContain('Small experiments make the next decision clearer.')
 })
+
+describe('a shared Slack message', () => {
+  const words = 'Can someone look at the staging deploy?'
+  const richText = [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: words }] }] }]
+  const shared = {
+    is_msg_unfurl: true, author_name: 'Maya', author_icon: 'https://example.test/maya.png',
+    from_url: 'https://example.test/archives/C0ENG/p1792178160000100', ts: '1792178160.000100',
+    footer: 'Thread in Slack conversation', fallback: `[October 16th, 2026 10:26 PM] Maya: ${words}`, text: words, mrkdwn_in: ['text'],
+  }
+  const count = (text: string) => text.split(words).length - 1
+
+  it('shows its words once when they come as message blocks and text', () => {
+    const body = parse({ text: '', attachments: [{ ...shared, message_blocks: [{ team: 'T0', channel: 'C0ENG', ts: shared.ts, message: { blocks: richText } }] }] })
+    expect(count(plainText(body))).toBe(1)
+    expect(body.blocks[0]).toMatchObject({ kind: 'attachment', author: { name: 'Maya' } })
+  })
+
+  it('shows its words once when they come as attachment blocks and text', () => {
+    expect(count(plainText(parse({ attachments: [{ ...shared, blocks: richText }] })))).toBe(1)
+  })
+
+  it('falls back to the text when it has no blocks', () => {
+    expect(count(plainText(parse({ attachments: [shared] })))).toBe(1)
+  })
+})

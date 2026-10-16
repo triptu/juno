@@ -36,6 +36,11 @@ test('photos load in messages and sidebar stacks and unfurls keep text when imag
   await expect(failed).toContainText('The description remains readable.')
   await expect(failed.locator('section[aria-label="Attachment"] img')).toHaveCount(0)
   await expect(juno.topic.message('Preview xText')).toContainText('A text-only update from the test workspace.')
+  // A shared message's words come as blocks and as text; they show once.
+  const shared = juno.topic.message('Preview shared')
+  await shared.scrollIntoViewIfNeeded()
+  await expect(shared.locator('section[aria-label="Attachment"]')).toContainText('Thread in Slack conversation')
+  expect(((await shared.textContent()) ?? '').split('Shared words appear once.').length - 1).toBe(1)
   await juno.accountMenu.open()
   const accountPhoto = juno.accountMenu.root.locator('img[src^="juno://files/avatar"]')
   await expect.poll(() => accountPhoto.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.naturalWidth > 0))).toBe(true)

@@ -7,8 +7,12 @@ import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
 export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extract<Block, { kind: 'attachment' }> {
   const blocks: ContentBlock[] = []
   if (attachment.pretext) blocks.push(...mrkdwnBlocks(attachment.pretext, lookups))
-  blocks.push(...bodyFromBlocks(attachment.blocks ?? [], lookups).blocks)
-  if (attachment.text) blocks.push(...mrkdwnBlocks(attachment.text, lookups))
+  // A shared Slack message carries its words twice, as blocks and as `text`.
+  // Blocks win when they give anything, as they do for a message's own body.
+  const shared = (attachment.message_blocks ?? []).flatMap((part) => part.message?.blocks ?? [])
+  const rich = bodyFromBlocks([...(attachment.blocks ?? []), ...shared], lookups).blocks
+  blocks.push(...rich)
+  if (attachment.text && rich.length === 0) blocks.push(...mrkdwnBlocks(attachment.text, lookups))
   if (attachment.fields?.length) blocks.push({ kind: 'fields', items: attachment.fields.map((f) => mrkdwnInlines([f.title && `*${f.title}*`, f.value].filter(Boolean).join('\n'), lookups)) })
   const url = attachment.image_url || attachment.thumb_url
   if (url) blocks.push({ kind: 'image', url, alt: attachment.title || 'Attachment image', ...(attachment.image_width && attachment.image_height ? { width: attachment.image_width, height: attachment.image_height } : {}) })

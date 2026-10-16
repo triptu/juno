@@ -1,0 +1,1 @@
+- 10-17 00:55 · ui-fixes-1017 · Inside an attachment, blocks (its own and a shared message's message_blocks) win over mrkdwn text, as on a message's body, so a shared message's words show once.
