@@ -1218,13 +1218,13 @@ export class AllTopicsPane {
     return this.win.getByRole('dialog', { name: 'Pick a place' }).getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
   }
 
-  /** Opens the place picker, types `query`, and picks the row that starts with `name` ("Anywhere" clears the place). */
+  /** Opens the place picker, types `query`, and picks the row whose name starts with the word `name` ("Anywhere" clears the place). */
   async filterPlace(query: string, name: string): Promise<void> {
     await this.placeButton.click()
     await this.placeSearch.fill(query)
     await this.placeOption(name).click()
     await expect(this.placeSearch).toBeHidden()
-    await expect(this.placeButton).toHaveAccessibleName(`Where: ${name}`)
+    await expect(this.placeButton).toHaveAccessibleName(new RegExp(`^Where: ${escapeRegExp(name)}(\\s|$)`))
   }
 
   async sort(label: 'Most recent' | 'Oldest first' | 'Most messages'): Promise<void> {

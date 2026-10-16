@@ -123,7 +123,7 @@ test('the place picker searches conversations by word, and a pick narrows the li
   // With Channels on, the picker offers no DMs.
   await allTopics.placeButton.click()
   await allTopics.placeSearch.fill('maya')
-  await expect(allTopics.placeOption('Maya Chen')).toHaveCount(0)
+  await expect(allTopics.placeOption('Maya')).toHaveCount(0)
   await allTopics.placeSearch.press('Escape')
   await expect(allTopics.placeSearch).toBeHidden()
   await expect(allTopics.placeButton).toBeFocused()
@@ -132,7 +132,7 @@ test('the place picker searches conversations by word, and a pick narrows the li
   await allTopics.filterKind('All')
   await allTopics.placeButton.click()
   await allTopics.placeSearch.fill('leo maya')
-  await expect(allTopics.placeOption('Maya Chen')).toHaveCount(0)
+  await expect(allTopics.placeOption('Maya')).toHaveCount(0)
   await allTopics.placeSearch.press('ArrowDown')
   await allTopics.placeSearch.press('ArrowUp')
   await allTopics.placeSearch.press('Enter')
@@ -143,7 +143,7 @@ test('the place picker searches conversations by word, and a pick narrows the li
   expect(await allTopics.titles()).toHaveLength(1)
 
   // A DM by the person's name: the list narrows to that DM's topics.
-  await allTopics.filterPlace('maya', 'Maya Chen')
+  await allTopics.filterPlace('maya', 'Maya')
   await allTopics.row(OFFSITE).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.filterPlace('any', 'Anywhere')
