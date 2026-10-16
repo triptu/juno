@@ -30,6 +30,11 @@ export function mentionedUserIds(text: string | undefined): ReadonlyArray<string
   return text === undefined ? [] : [...text.matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)].map((match) => match[1]!)
 }
 
+/** The user groups Slack's `text` mentions (`<!subteam^S…>`), so a caller can load their handles first. */
+export function mentionedUsergroupIds(text: string | undefined): ReadonlyArray<string> {
+  return text === undefined ? [] : [...text.matchAll(/<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g)].map((match) => match[1]!)
+}
+
 /**
  * The first `count` words of a message's Slack text, with an ellipsis when it was cut.
  * A cut that lands on the end of a sentence keeps the sentence and adds no

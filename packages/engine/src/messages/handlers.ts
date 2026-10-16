@@ -116,13 +116,13 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: pendingThread(payload.id) === undefined ? [payload.id] : [`channel:${target.channel}`], users: [], conversations: [], emoji: [], topic_overlay: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: [payload.id] }
+        const keys: InvalidationKeys = { messages: pendingThread(payload.id) === undefined ? [payload.id] : [`channel:${target.channel}`], users: [], conversations: [], usergroups: [], emoji: [], topic_overlay: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation
           // Names and emoji are looked up per body; drop them before the run the same change triggers.
           yield* Effect.acquireRelease(
-            Effect.sync(() => invalidation.subscribeUnsafe(['users', 'conversations', 'emoji'], () => forgetLookups(cache))),
+            Effect.sync(() => invalidation.subscribeUnsafe(['users', 'conversations', 'usergroups', 'emoji'], () => forgetLookups(cache))),
             (cancel) => Effect.sync(cancel),
           )
           return Effect.flatMap(resolveStartedThread(payload.id), id => listMessages(targetOf(id)!, range, cache))

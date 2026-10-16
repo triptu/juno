@@ -58,6 +58,7 @@ import {
   type TopicStatus,
 } from '@juno/domain'
 import type { ChannelRef, Person, TopicArt, TopicCounts, TopicListRow } from '@juno/contract'
+import type { UsergroupName } from '@juno/richtext'
 import { StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Effect } from 'effect'
@@ -93,6 +94,8 @@ import {
  *   `forgetUsers` whenever the `users` table changes; the handler does it
  *   from a synchronous invalidation handler, so the forget always lands
  *   before the run that the same change triggers.
+ * - `usergroups`: every user group, read once a fallback title mentions
+ *   one. `forgetUsergroups` drops it and the entries when the table changes.
  * Make one per subscription and workspace with `makeRowCache()`. A run
  * replaces `entries` with one window. People and users are retained while
  * their source map is unchanged, up to the people the windows have named.
@@ -105,6 +108,8 @@ export interface RowCache {
   users: Map<string, UserRow | null> | undefined
   /** The users map the last run read people from, to tell whether any person can have changed since. */
   usersRead: Map<string, UserRow | null> | undefined
+  /** User groups by id, once a title needed one. */
+  usergroups: ReadonlyMap<string, UsergroupName> | undefined
 }
 
 export interface CacheEntry {
@@ -133,11 +138,18 @@ export const makeRowCache = (options?: { readonly keepUsers?: boolean }): RowCac
   keepUsers: options?.keepUsers === true,
   users: undefined,
   usersRead: undefined,
+  usergroups: undefined,
 })
 
 /** Drops the users a `keepUsers` cache has read, so the next run reads them again. */
 export function forgetUsers(cache: RowCache): void {
   cache.users = undefined
+}
+
+/** Drops the user groups and every built topic, so titles that name a group are built again. Groups change rarely. */
+export function forgetUsergroups(cache: RowCache): void {
+  cache.usergroups = undefined
+  cache.entries = new Map()
 }
 
 export interface ListFilter {
@@ -421,6 +433,16 @@ export const shapeRows = (
       return person
     }
 
+    // A fallback title can mention a user group ("<!subteam^S…>" in the root's text): read the groups once.
+    if (cache.usergroups === undefined && joined.some((row) => row.preview_json?.includes('<!subteam^') === true)) {
+      const groups = new Map<string, UsergroupName>()
+      for (const group of yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups`) {
+        groups.set(group.id, { handle: group.handle, ...(group.name === null ? {} : { name: group.name }) })
+      }
+      cache.usergroups = groups
+    }
+    const usergroups = cache.usergroups
+
     // Build or reuse the domain topic of every row.
     const next = new Map<string, CacheEntry>()
     const entries: Array<CacheEntry> = []
@@ -432,7 +454,7 @@ export const shapeRows = (
       const entry: CacheEntry =
         hit !== undefined && sameSource(hit.source, row) && (peopleHold || samePeople(hit.people, personOf))
           ? hit
-          : { ...entryOf(row, columns, selfId, personOf), source: row, parsed: columns }
+          : { ...entryOf(row, columns, selfId, personOf, usergroups), source: row, parsed: columns }
       next.set(row.topic_id, entry)
       entries.push(entry)
     }
@@ -482,6 +504,7 @@ function entryOf(
   columns: ParsedColumns,
   selfId: string | undefined,
   personOf: (id: string) => Person,
+  usergroups: ReadonlyMap<string, UsergroupName> | undefined,
 ): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'moreParticipants' | 'sender' | 'title'> {
   const { participants, preview } = columns
   const used: Array<Person> = []
@@ -502,7 +525,7 @@ function entryOf(
   const topic = topicFrom(row, columns, info)
   return {
     topic,
-    title: resolveTitle(topic, { user: (id) => use(id).name }),
+    title: resolveTitle(topic, { user: (id) => use(id).name, usergroup: (id) => usergroups?.get(id) }),
     people: used,
     channel: channelRefOf(info, partner?.id),
     named,
