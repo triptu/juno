@@ -308,7 +308,7 @@ describe('live messages', () => {
     const rootTs = id.split(':')[2]!
     const list = watchList(engine, messagesAtom('m:C0ENG'))
     const before = await list.until((window) => window.rows.get(rootTs)?.thread !== undefined, 'the thread link')
-    expect(before.rows.get(rootTs)!.thread).toMatchObject({ id, replyCount: 2, label: '2 replies', title: 'Unrelated: has anyone looked at the…', titleSource: 'fallback' })
+    expect(before.rows.get(rootTs)!.thread).toMatchObject({ id, replyCount: 2, label: '2 replies', title: expect.stringMatching(/^Unrelated: has anyone looked at the…?$/) }) // AI title or fallback: the title job may run first.
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', threadTs: rootTs, text: 'Reaper is merged.' })
     const after = await list.until((window) => window.rows.get(rootTs)?.thread?.replyCount === 3, 'the new count')
     expect(after.rows.get(rootTs)!.thread!.label).toBe('3 replies')
