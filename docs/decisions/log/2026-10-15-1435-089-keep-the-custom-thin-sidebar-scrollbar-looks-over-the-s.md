@@ -1,0 +1,1 @@
+- 10-15 14:35 · Tushar · Keep the custom thin sidebar scrollbar (looks over the small speed gain). Sidebar left and right insets must match exactly; the scrollbar sits inside the margin. Spacing is measured, not eyeballed, with geometry checks.

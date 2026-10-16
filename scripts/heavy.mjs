@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 // `--queue <name>` uses a separate lock with its own two slots, for short jobs
-// that must not pile up but should not wait behind test runs (typecheck).
+// that must not pile up but should not wait behind test runs.
 const queueAt = process.argv[2] === '--queue' ? process.argv[3] : undefined
 const rest = process.argv.slice(queueAt ? 4 : 2)
 const flags = rest.slice(0, rest.findIndex((arg) => !arg.startsWith('--')) === -1 ? rest.length : rest.findIndex((arg) => !arg.startsWith('--')))

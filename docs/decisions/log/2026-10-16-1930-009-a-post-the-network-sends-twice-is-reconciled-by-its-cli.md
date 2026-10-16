@@ -1,0 +1,1 @@
+- 10-16 19:30 · orchestrator · A post the network sends twice is reconciled by its client message id: the copy is hidden and deleted through the outbox; a copy with replies stays (ADR 0014).

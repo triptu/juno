@@ -1,0 +1,1 @@
+- 10-15 14:20 · orchestrator · Merged topic art follow-ups: Redraw in the topic menu with Undo (`art.restore`), hidden with AI off and on a DM's Main. The dark pebble art checked out against row text (art lines 9.1:1, pebbles 1.5 to 2.9:1); darker variants looked murkier, so tokens are unchanged. Started a flake hunt for the recurring sidebar, theme, Home-title and e2e flakes.

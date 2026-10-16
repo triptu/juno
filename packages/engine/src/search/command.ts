@@ -33,7 +33,7 @@ interface Context extends CommandContext {
 const readContext = (sql: SqlClient.SqlClient) =>
   Effect.gen(function* () {
     // Full names, as labels say them ("Send to Maya Chen"). People you talk to most recently come first: the grammar breaks first-name ties by this order.
-    const people = yield* sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url, d.id AS dm
+    const people = yield* sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url, d.id AS dm
       FROM users u
       LEFT JOIN conversations d ON d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
       LEFT JOIN topic_index t ON t.topic_id = 'm:' || d.id

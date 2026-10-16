@@ -45,7 +45,7 @@ export type JunoTabPage = Exclude<JunoPage, 'settings' | 'connections'>
 
 /** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
 export type Place =
-  | { readonly kind: 'topic'; readonly topicId: string }
+  | { readonly kind: 'topic'; readonly topicId: string; readonly viewId?: string }
   | { readonly kind: 'newChat' }
   | { readonly kind: 'home' }
   | { readonly kind: 'allTopics' }
@@ -235,6 +235,20 @@ export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs 
   return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: sentHistory(tab.history, topicId) }) }
 }
 
+/** Replace an acknowledged topic throughout history without replacing its mounted view. */
+export function acknowledgeTopic(tabs: Tabs, pendingId: string, topicId: string): Tabs {
+  const references = (tab: Tab) => tab.history.entries.some(place => place.kind === 'topic' && place.topicId === pendingId)
+  const change = (tab: Tab): Tab => {
+    if (!references(tab)) return tab
+    return { ...tab, history: { ...tab.history, entries: tab.history.entries.map(place =>
+      place.kind === 'topic' && place.topicId === pendingId ? { ...place, topicId, viewId: pendingId } : place) } }
+  }
+  if (!tabs.tabs.some(references) && !tabs.closed.some(entry => references(entry.tab))) return tabs
+  const changed = tabs.tabs.map(change)
+  const closed = tabs.closed.map(entry => ({ ...entry, tab: change(entry.tab) }))
+  return { ...tabs, tabs: changed, closed }
+}
+
 /** The history with its New chat entry replaced by the topic it sent to. */
 function sentHistory(history: TabHistory, topicId: string): TabHistory {
   const entries = [...history.entries.slice(0, history.index), topicPlace(topicId)]
@@ -363,7 +377,7 @@ export function dividerIndex(order: ReadonlyArray<string>, lastReadTs: string | 
 export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String, viewId: Schema.optionalKey(Schema.String) }),
   Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'juno']) }),
   Schema.Struct({ kind: Schema.Literal('settings'), section: SettingsSectionSchema }),
   // Saved before Settings was one page: Notifications, Preferences, and Settings › Juno and Connections as Juno pages.

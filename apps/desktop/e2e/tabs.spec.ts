@@ -178,9 +178,9 @@ test.describe('one topic in two tabs', () => {
     await topic.expectAtBottom()
     await tabs.selectAt(THREAD, 1)
     await tabs.expectActiveAt(THREAD, 1)
-    const back = await topic.firstVisibleRow()
-    expect(back.ts).toBe(up.ts)
-    expect(back.top).toBeCloseTo(up.top, 0)
+    // The row that was first in view is back where it was. Which row counts as first can flip on a
+    // sub-pixel when a row edge sits on the list's top, so the same row is followed instead.
+    expect(await topic.rowTop(up.ts)).toBeCloseTo(up.top, 0)
 
     // A plain open focuses the tab that was active last, without moving it.
     await tabs.selectAt(THREAD, 0)

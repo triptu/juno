@@ -55,7 +55,7 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
     FROM channels_fts f JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
     WHERE channels_fts MATCH ${query} AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, c.id LIMIT ${places}`
   // The full name first: search is for telling apart people who share a first name.
-  const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url,
+  const people = sql<UserRow & { readonly dm: string | null }>`SELECT u.id, u.name, COALESCE(NULLIF(u.real_name, ''), NULLIF(u.display_name, '')) AS display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url,
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
         AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
@@ -79,7 +79,7 @@ export const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
     const users = new Map<string, UserRow>()
     if (ids.size === 0) return users
-    const rows = yield* sql<UserRow>`SELECT id, name, NULLIF(display_name, '') AS display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`
+    const rows = yield* sql<UserRow>`SELECT id, name, NULLIF(display_name, '') AS display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...ids])}`
     for (const row of rows) users.set(row.id, row)
     return users
   })

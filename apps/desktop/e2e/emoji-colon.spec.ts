@@ -53,8 +53,8 @@ test('New chat supports Tab and leaves colons inside words alone', async ({ juno
 })
 
 test('workspace emoji and aliases show images and send shortcodes', async ({ juno, fake }) => {
-  fake.workspace.emoji.set('juno_wave', { name: 'juno_wave', url: `${fake.url}/avatars/U0MAYA.svg` })
-  fake.workspace.emoji.set('juno_hello', { name: 'juno_hello', alias_for: 'juno_wave' })
+  fake.workspace.emoji.set('juno_wave', { name: 'juno_wave', value: `${fake.url}/avatars/U0MAYA.svg` })
+  fake.workspace.emoji.set('juno_hello', { name: 'juno_hello', value: 'alias:juno_wave', alias: 'juno_wave', is_alias: true })
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()

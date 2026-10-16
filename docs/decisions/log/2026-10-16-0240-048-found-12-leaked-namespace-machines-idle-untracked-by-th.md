@@ -1,0 +1,1 @@
+- 10-16 02:40 · orchestrator · Found 12 leaked Namespace machines (idle, untracked by the pool) holding the 64 vCPU cap, which blocked every remote run for 30+ minutes and cost money. Destroyed them; a Codex agent is fixing the leak at its root, and the sweep now checks the pool.

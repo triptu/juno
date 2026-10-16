@@ -1,0 +1,1 @@
+- 10-15 00:55 · Tushar · Find what makes the test suites slow and run tests on remote Linux machines; he can set up Namespace devboxes. A test-infra agent measures and fixes the suites and plans `pnpm remote <script>`; feel and perf stay on the Mac.

@@ -24,7 +24,7 @@ The renderer's bridge to the engine: the port client and every atom. The only pa
 - `renamingAtom`, `rowRenamingAtom(id)` and `headerRenamingAtom(id)` in `src/rename.ts`: which title is a field for Rename.
 - Sidebar state in `src/sidebar.ts`, none of it persisted. The list container and its rows read only these:
   - `sidebarFilterAtom` (kind, unread, scope) and `selectedTopicAtom`.
-  - `sidebarListAtom`: the window shown, a `SidebarWindow` (`ListWindow<TopicRow>` plus the `filter` it belongs to). After a filter change it keeps the old window until the new filter's first snapshot arrives, then replaces it in one update, never with an empty list in between. A row whose `rev` is unchanged keeps its object across the swap.
+  - `sidebarListAtom`: the window shown, a `SidebarWindow` (`ListWindow<TopicRow>` plus the `filter` it belongs to). After a filter change it keeps the old window until the new filter's first snapshot arrives, then replaces it in one update, never with an empty list in between. A row whose `rev` and read state are unchanged keeps its object across the swap. Read-dependent lists retain previously visible open topics until no tab currently shows them; retained rows keep their place and take live read state from `topicAtom`. Filter changes clear retention.
   - `sidebarSectionsAtom`: `{ ready, pinned, recent, total, filter }`, the shown window's ids split into Pinned and Recent. Equal splits do not notify. Use its `filter`, not `sidebarFilterAtom`, to pick the empty state.
   - `sidebarRowAtom(id)`: one row, keyed by id alone, so a row keeps its atom and its component across filters and notifies only when its object changes.
   - `focusedTopicAtom`: the row that had focus last. The list container sets it when a row gets focus.
@@ -65,3 +65,5 @@ On an empty cache, the sidebar holds its first rows until cold sync and Automate
 All topics also holds its first rows on an empty cache until cold sync completes; cached and filtered windows keep the existing snapshot handoff.
 
 New chat’s `newChat.frequent` live query returns up to six local conversations, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity (DMs first). Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
+
+A New chat thread keeps its pending `viewId` when `acknowledgeTopic` replaces the topic ID in open and closed tab history. The view key preserves the message subscription, composer and scroll position; it is saved with the tab for reopening.

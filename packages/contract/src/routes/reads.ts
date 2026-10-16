@@ -16,7 +16,7 @@
  * `reads.mirror` is the setting that lets marks reach Slack, as it applies
  * to the open workspace. It is the workspace preference `MIRROR_READS_PREF`,
  * written with `prefs.set { key: 'reads.mirror', value: true | false }`.
- * Unset, it is on against the fake Slack and off against a real workspace.
+ * Unset, it is on for every workspace.
  * Turning it off drops marks that have not been sent yet.
  */
 import { Schema } from 'effect'
@@ -64,4 +64,7 @@ export const MIRROR_READS_PREF = 'reads.mirror'
 /** The mirror setting of the open workspace, with its default applied. Sends nothing while no workspace is open. */
 export const readsMirror = liveValueRoute('reads.mirror', { value: MirrorSetting })
 
-export const ReadsRoutes = RpcGroup.make(readsMarkRead, readsMarkUnread, readsMirror)
+export const readsCatchUpStatus = liveValueRoute('reads.catchUpStatus', { value: Schema.Struct({ available: Schema.Number, pending: Schema.Number }) })
+export const readsCatchUp = Rpc.make('reads.catchUp', { success: Schema.Void, error: NotSignedIn })
+
+export const ReadsRoutes = RpcGroup.make(readsMarkRead, readsMarkUnread, readsMirror, readsCatchUpStatus, readsCatchUp)

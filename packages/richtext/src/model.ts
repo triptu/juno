@@ -47,6 +47,8 @@ export type ContentBlock =
 
 export type Block = ContentBlock | {
   readonly kind: 'attachment'
+  readonly author?: { readonly name: string; readonly icon?: string }
+  readonly footerIcon?: string
   readonly tint: 'neutral' | 'info' | 'success' | 'warning' | 'danger'
   readonly title: ReadonlyArray<Inline>
   readonly blocks: ReadonlyArray<ContentBlock>
@@ -72,6 +74,8 @@ export interface Lookups {
   readonly usergroup?: (id: string) => string | undefined
   /** Image url for a custom emoji name. */
   readonly emoji?: (name: string) => string | undefined
+  /** The standard emoji a custom alias names, for an alias with no image of its own. */
+  readonly emojiAlias?: (name: string) => string | undefined
 }
 
 /** All inline runs of a body in reading order, including list items. */

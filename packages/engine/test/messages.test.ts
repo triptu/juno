@@ -323,11 +323,11 @@ describe('live messages', () => {
     const sidebarBefore = new Map(sidebar.map((row) => [row.id, row]))
     const leo = engine.fake.workspace.users.get('U0LEO')!
     const photo = `${engine.fake.url}/avatars/U0LEO-new.png`
-    const updated = { ...leo, profile: { ...leo.profile, image_72: photo } }
+    const updated = { ...leo, profile: { ...leo.profile, image_72: photo, image_48: `${photo}?size=48`, image_192: `${photo}?size=192` } }
     engine.fake.workspace.users.set('U0LEO', updated)
     engine.fake.workspace.emit({ type: 'user_change', user: updated } as Parameters<typeof engine.fake.workspace.emit>[0])
-
     const after = await list.until((window) => window.refs.people.get('U0LEO')?.avatarUrl === photo, 'the new photo in refs')
+    expect(after.refs.people.get('U0LEO')).toMatchObject({ avatarSmallUrl: `${photo}?size=48`, avatarLargeUrl: `${photo}?size=192` })
     expect(changedRows(before, after)).toEqual([])
     // The sidebar rows that show Leo show the new photo with the same rev.
     const shown = await engine.rowsUntil((rows) => rows.some((row) => row.participants.some((p) => p.id === 'U0LEO' && p.avatarUrl === photo)), 'the new photo in the sidebar')

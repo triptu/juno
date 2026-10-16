@@ -1,3 +1,4 @@
+import avatarSizes from './202610171000_avatar_sizes'
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import integrationSearch from './202610160300_integration_search'
@@ -18,7 +19,7 @@ import mainWindow from './202610141000_main_window'
  * mirror is disposable, so its migrations only ever run on an empty file and
  * never transform data (ADR 0008).
  */
-export const CACHE_SCHEMA_VERSION = 9
+export const CACHE_SCHEMA_VERSION = 10
 
 /** Migrations for `cache.db`, keyed `<timestamp>_<name>`. */
 export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {
@@ -32,4 +33,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610160300_integration_search': integrationSearch,
   '202610160310_frequent_sends': frequentSends,
   '202610170910_rechecked_topics': recheckedTopics,
+  '202610171000_avatar_sizes': avatarSizes,
 }

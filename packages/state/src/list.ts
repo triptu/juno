@@ -94,7 +94,7 @@ function upsertAll<A extends { readonly id: string }>(
   return next
 }
 
-export const samePerson = (a: Person, b: Person): boolean => a === b || (a.id === b.id && a.name === b.name && a.avatarUrl === b.avatarUrl && a.color === b.color)
+export const samePerson = (a: Person, b: Person): boolean => a === b || (a.id === b.id && a.name === b.name && a.avatarUrl === b.avatarUrl && a.avatarSmallUrl === b.avatarSmallUrl && a.avatarLargeUrl === b.avatarLargeUrl && a.color === b.color)
 
 const sameChannel = (a: ChannelRef, b: ChannelRef): boolean =>
   a === b ||

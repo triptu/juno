@@ -17,10 +17,14 @@ declare global {
   }
 }
 
-/** Samples screen coordinates on every frame, including shifts hidden by Chromium's recent-input grace period. */
-export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>): Promise<void> {
+/**
+ * Samples screen coordinates on every frame, including shifts hidden by Chromium's recent-input grace period.
+ * `edge: 'bottom'` samples the anchor's bottom-left corner instead of its top-left: a row that grows while the list
+ * holds its bottom (stick to bottom) keeps its bottom edge.
+ */
+export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom' } = {}): Promise<void> {
   await waitForLayoutReady(page)
-  await page.evaluate((target) => {
+  await page.evaluate(({ target, edge }) => {
     if (!PerformanceObserver.supportedEntryTypes.includes('layout-shift')) throw new Error('layout-shift observer unavailable')
     const shifts: Array<{ value: number; sources: string[] }> = []
     const collect = (entries: PerformanceEntry[]) => {
@@ -40,8 +44,8 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
       anchor ??= Array.from(document.querySelectorAll(target)).find((node) => node.getClientRects().length > 0 && node.getBoundingClientRect().bottom > 0 && node.getBoundingClientRect().top < innerHeight)
       if (anchor !== undefined) {
         if (!anchor.isConnected) throw new Error('The anchor was removed')
-        const { x, y } = anchor.getBoundingClientRect()
-        samples.push({ x, y })
+        const { x, y, bottom } = anchor.getBoundingClientRect()
+        samples.push({ x, y: edge === 'bottom' ? bottom : y })
       }
     }
     const tick = () => {
@@ -50,7 +54,7 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
     }
     window.junoShiftProbe = { shifts, observer, drain: () => collect(observer.takeRecords()), samples, sample, stop: () => cancelAnimationFrame(frame) }
     tick()
-  }, selector)
+  }, { target: selector, edge: options.edge ?? 'top' })
   try {
     await action()
     await waitForLayoutReady(page)

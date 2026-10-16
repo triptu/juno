@@ -35,7 +35,7 @@ export const syncKeys = {
   topic: (id: string) => ({ topics: [id] }) satisfies InvalidationKeys,
   messages: (topicId: string) => ({ messages: [topicId] }) satisfies InvalidationKeys,
   /** Every topic that shows the message (`messageTopics`): a root edit re-runs both Main and its thread. */
-  messagesOf: (row: Parameters<typeof messageTopics>[0]) => ({ messages: messageTopics(row) }) satisfies InvalidationKeys,
+  messagesOf: (row: Parameters<typeof messageTopics>[0]) => ({ messages: [...messageTopics(row), `channel:${row.channel}`] }) satisfies InvalidationKeys,
   conversations: ['conversations'] satisfies InvalidationKeys,
   users: ['users'] satisfies InvalidationKeys,
   team: ['team'] satisfies InvalidationKeys,

@@ -1,0 +1,1 @@
+- 10-14 02:20 · Tushar · Juno Agent defaults: Sonnet 5.5 for chat, Haiku 5.5 for compaction, $2/day; a Settings picker for the chat model across the latest Sonnet, Opus, Muse, Sol and Grok models. MCP: Littlebird at mcp.littlebird.ai (OAuth) and T3 Code's local MCP (no auth).

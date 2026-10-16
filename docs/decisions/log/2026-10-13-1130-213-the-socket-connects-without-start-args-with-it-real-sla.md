@@ -1,0 +1,1 @@
+- 10-13 11:30 · Orchestrator · The socket connects without `start_args` (with it, real Slack never sends hello). Membership and read state come from `client.counts`, not `client.userBoot` (observed live).

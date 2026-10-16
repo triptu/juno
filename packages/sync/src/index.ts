@@ -72,3 +72,5 @@ export {
   type PendingAction,
 } from './actions'
 export { checkCopyDelete } from './sent'
+
+export { startThread } from './startedThreads'

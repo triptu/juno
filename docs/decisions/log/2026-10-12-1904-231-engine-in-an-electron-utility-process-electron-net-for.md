@@ -1,0 +1,1 @@
+- 10-12 19:04 · Orchestrator · Engine in an Electron utility process; Electron `net` for Slack calls; two SQLite databases per workspace (disposable cache and durable user data); field-level merge rules.

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { MessageView } from '@juno/contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
+import { conversation } from './fixtures/conversation'
 import {
   emojiOnly,
   failedFile,
@@ -139,6 +140,8 @@ export default defineFixtures(
       'more-above': state({ items: thread, main: false, older: 'more' }),
     },
     Main: {
+      // Real-data shapes in Main, where every row could get a thread link: the density check (message-geometry.spec.ts).
+      conversation: state({ items: conversation, main: true, onToggleReaction: noop }),
       'thread-links': state({ items: mainStream, main: true }),
       'main-new-divider': state({ items: mainStream.slice(4), main: true, dividerBefore: mainDividerBefore }),
     },

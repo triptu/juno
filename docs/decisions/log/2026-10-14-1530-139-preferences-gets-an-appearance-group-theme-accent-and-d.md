@@ -1,0 +1,1 @@
+- 10-14 15:30 · Tushar · Preferences gets an Appearance group: theme, accent and density (two levels; the default is the roomier one).

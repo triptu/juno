@@ -1,0 +1,1 @@
+- 10-15 21:15 · orchestrator · Merged agent-quality-4: the router also reads the short `<src m3>` citation form (Haiku sources 83% over three runs, within noise of 82%). Started the WP17 wiring (MCP manager in agent startup, keychain and OAuth bridge, Connections page, presets for Notion, Littlebird and T3 Code) and WP21 (ownership and backup).

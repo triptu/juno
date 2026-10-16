@@ -1,0 +1,1 @@
+- 10-13 12:52 · Tushar · Confirmed: unfollowed threads start as read at first sign-in.

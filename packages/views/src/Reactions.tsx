@@ -29,20 +29,20 @@ export function Reactions({ reactions, onToggle }: ReactionsProps) {
           )
         const label = `${reaction.count} ${reaction.unicode ?? `:${reaction.name}:`}${reaction.me ? ', including you' : ''}`
         const content = (
-          <>
+          <span {...stylex.props(styles.content)}>
             {emoji}
             <span>{reaction.count}</span>
-          </>
+          </span>
         )
         // The emoji is hidden and the title is not read reliably, so the item carries the words.
         return onToggle === undefined ? (
-          <span role="listitem" aria-label={label} key={reaction.name} {...stylex.props(styles.item)}>
+          <span role="listitem" aria-label={label} key={reaction.name}>
             <Chip variant={reaction.me ? 'soft' : 'outline'} size={24} numeric title={label}>
               {content}
             </Chip>
           </span>
         ) : (
-          <span role="listitem" key={reaction.name} {...stylex.props(styles.item)}>
+          <span role="listitem" key={reaction.name}>
             <Chip interactive variant="surface" size={24} numeric pressed={reaction.me} title={label} aria-label={label} onClick={() => onToggle(reaction.name)}>
               {content}
             </Chip>
@@ -56,16 +56,15 @@ export function Reactions({ reactions, onToggle }: ReactionsProps) {
 const styles = stylex.create({
   row: {
     display: 'flex',
-    flexWrap: 'nowrap',
-    overflowX: 'auto',
-    scrollbarWidth: 'none',
-    maxWidth: '100%',
+    flexWrap: 'wrap',
     gap: spacing['--space-1'],
     marginTop: spacing['--space-1-5'],
   },
-  item: {
-    display: 'flex',
-    flexShrink: 0,
+  // The emoji and its count, apart at the chip's gap (inventory 6.4).
+  content: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1'],
   },
   image: {
     width: CHIP_EMOJI_SIZE,

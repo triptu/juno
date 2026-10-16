@@ -1,0 +1,1 @@
+- 10-14 15:30 · Tushar · New: a New chat icon opens a blank conversation with a destination picker above the composer (conversation, then thread with Main as default; the thread picker works on its own and fills in the conversation). Picking a destination shows its messages above; after the first send the picker goes away and the tab becomes that topic.

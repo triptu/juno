@@ -17,7 +17,7 @@ import { join, parse } from 'node:path'
 import type { DownloadResult } from '@juno/contract'
 import { SLACK_PARTITION } from './signInWindow'
 
-const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com']
+const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com', 'secure.gravatar.com']
 
 /** The thumbnail url of a `juno://files` request when it points at a host Juno may fetch from, else undefined. */
 export function thumbnailUrl(request: URL, extraOrigin: string | undefined): URL | undefined {
@@ -29,6 +29,7 @@ export function thumbnailUrl(request: URL, extraOrigin: string | undefined): URL
 function slackFileUrl(raw: string, extraOrigin: string | undefined): URL | undefined {
   try {
     const url = new URL(raw)
+    if (url.username || url.password) return undefined
     if (url.protocol === 'https:' && (SLACK_FILE_HOSTS.includes(url.hostname) || url.hostname.endsWith('.slack-edge.com'))) return url
     if (extraOrigin !== undefined && url.origin === extraOrigin) return url
   } catch {
@@ -39,13 +40,46 @@ function slackFileUrl(raw: string, extraOrigin: string | undefined): URL | undef
 
 /** Serves one thumbnail. Anything but an image answers 404, so a Slack sign-in page never reaches an `<img>`. */
 export async function serveThumbnail(request: URL, extraOrigin: string | undefined): Promise<Response> {
-  const url = thumbnailUrl(request, extraOrigin)
+  let url = thumbnailUrl(request, extraOrigin)
   if (url === undefined) return new Response('Not found', { status: 404 })
   try {
-    const response = await electronSession.fromPartition(SLACK_PARTITION).fetch(url.toString(), { credentials: 'include' })
+    const session = electronSession.fromPartition(SLACK_PARTITION)
+    const signal = AbortSignal.timeout(15_000)
+    let response = await session.fetch(url.toString(), { credentials: 'include', redirect: 'manual', signal })
+    for (let redirects = 0; response.status >= 300 && response.status < 400 && redirects < 3; redirects++) {
+      const location = response.headers.get('location')
+      await response.body?.cancel()
+      url = location === null ? undefined : slackFileUrl(new URL(location, url).toString(), extraOrigin)
+      if (url === undefined) return new Response('Not found', { status: 404 })
+      response = await session.fetch(url.toString(), { credentials: 'include', redirect: 'manual', signal })
+    }
     const type = response.headers.get('content-type') ?? ''
-    if (!response.ok || !type.startsWith('image/')) return new Response('Not found', { status: 404 })
-    return new Response(response.body, { status: 200, headers: { 'content-type': type, 'cache-control': 'private, max-age=86400' } })
+    if (request.host === 'files' && request.pathname !== '/avatar') {
+      if (!response.ok || !type.startsWith('image/')) {
+        await response.body?.cancel()
+        return new Response('Not found', { status: 404 })
+      }
+      return new Response(response.body, { headers: { 'content-type': type, 'cache-control': 'private, max-age=86400' } })
+    }
+    const maxBytes = 8 * 1024 * 1024
+    if (!response.ok || !type.startsWith('image/') || Number(response.headers.get('content-length')) > maxBytes || response.body === null) {
+      await response.body?.cancel()
+      return new Response('Not found', { status: 404 })
+    }
+    const reader = response.body.getReader()
+    const chunks: Uint8Array[] = []
+    let length = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      length += value.byteLength
+      if (length > maxBytes) {
+        await reader.cancel()
+        return new Response('Not found', { status: 404 })
+      }
+      chunks.push(value)
+    }
+    return new Response(Buffer.concat(chunks), { status: 200, headers: { 'content-type': type, 'cache-control': 'private, max-age=86400' } })
   } catch {
     return new Response('Not found', { status: 404 })
   }

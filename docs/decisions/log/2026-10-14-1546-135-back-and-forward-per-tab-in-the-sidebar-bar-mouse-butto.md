@@ -1,0 +1,1 @@
+- 10-14 15:46 · Tushar · Back and Forward per tab in the sidebar bar (⌘[ ⌘], mouse buttons, three-finger swipe), a sidebar that resizes (280 to 480px) and hides (⌃⌘S), a tab menu with Pin tab and the close variants, ⌘⇧T and the browser tab shortcuts, and a soft dot on tabs with unread.

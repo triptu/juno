@@ -1,0 +1,1 @@
+- 10-16 11:53 · tooling · Run affected typechecks locally with pinned Bun 1.4.3 and a separate result cache; use remote TypeScript for unsupported configs and retain TypeScript for full and merge checks. Compare both tools with typecheck:parity.

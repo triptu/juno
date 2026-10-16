@@ -431,3 +431,4 @@ export { writeSlackAppFixture } from './slackApp.ts'
 export { largeSeed, LARGE_SEED_DEFAULTS } from './seeds/large.ts'
 
 export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './seeds/topic300.ts'
+export { unfurlFixtures } from './unfurls.ts'

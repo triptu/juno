@@ -1,0 +1,1 @@
+- 10-17 00:55 · orchestrator · Slack pacing: background calls are capped at 40 per minute in total; interactive calls burst to 20 and refill at 2 per second; a 429 backoff halves again after five quiet minutes.

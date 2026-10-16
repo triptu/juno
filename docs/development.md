@@ -22,7 +22,9 @@ Run these from the repo root.
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
-| `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
+| `pnpm typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
+| `pnpm typecheck:tsc` | Manual TypeScript check of every project. |
+| `pnpm typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
 | `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
@@ -54,6 +56,63 @@ The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/
 Before calling work done: `pnpm affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
+
+## Decision log
+
+Add one file per decision under `docs/decisions/log/`, named
+`YYYY-MM-DD-HHMM-slug.md` using local IST time and a distinct descriptive slug.
+Keep the existing one-line format, for example:
+
+```md
+- 10-17 00:55 · orchestrator · Record decisions in separate fragments to avoid merge conflicts.
+```
+
+Run `node scripts/decision-log.mjs` and commit both the fragment and generated
+`docs/decision-log.md`. Never edit the generated log by hand. Lint checks that it
+matches the fragments. The builder sorts newest first, then by filename for ties;
+`~` in a reconstructed entry's time stays in its text. The status page reads the
+built file. Historical fragments use a numeric prefix in the slug to preserve
+their original order when timestamps match.
+
+## Batch merges
+
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+
+Fetch `origin/main`, then run from the repository root:
+
+```sh
+node scripts/batch-merge.mjs branch-one branch-two
+node scripts/batch-merge.mjs --continue batch-1
+node scripts/batch-merge.mjs --continue batch-1 --push
+```
+
+The script creates `batch-N` from the current `origin/main` in
+`.claude/worktrees/batch-N`, pins the input branch tips, and merges them in order.
+At a source conflict it prints the branch and files. Resolve and `git add` them
+in that worktree, then use `--continue batch-N` from the original worktree. You
+can also commit the resolution yourself. An aborted merge must be redone before
+continuing. Progress and command output stay in `.juno-status/batches/` in the
+original worktree; read `batch-N.log` while checks run.
+
+Generated-file conflicts use a temporary copy of the batch's version. After all
+merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
+decision log, runs `pnpm health:baseline`, and commits generated changes. Review
+the baseline diff: regeneration records the merged tree's current health,
+including any increases. Then it runs one `pnpm affected --base <base-commit>`
+against the pinned `origin/main` commit. A failed command retains the worktree;
+fix the cause, commit source fixes, and continue to rerun checks.
+
+Nothing pushes without `--push`. Publishing checks commit messages for attribution
+lines, requires clean files and the checked commit, and uses a normal push to
+`origin/main`. If main advanced, start a new batch after fetching. A successful
+push removes the worktree; the batch branch and logs remain. Continuing a checked
+batch reruns checks before publishing.
+
+`--dry-run branch-one branch-two` performs local merges, installation and
+regeneration, but only prints the affected plan. Dry-run batches cannot push.
+Remove a discarded worktree with `git worktree remove <path>`, then delete its
+batch branch with `git branch -D batch-N`. If a process was killed, remove its
+`.juno-status/batches/active.lock` only after confirming it has stopped.
 
 ## Codebase health
 
@@ -298,7 +357,7 @@ milliseconds only, and writes redacted shapes to `--out DIR` (a temporary direct
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
 `-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
 `users/info` about every person the newest conversations reference and reads one page of each
-users list (about 14 calls). A full run is about 34 calls. The
+users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
 
 ## The live sync dry run
@@ -379,6 +438,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
 | No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
+| Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `pnpm test:feel` |
 
@@ -503,33 +563,21 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and parity comparison. Routine checks use Bun 1.4.3, installed as an exact root devDependency. `pnpm exec bun` resolves the pinned binary; the global Bun install is not used.
 
-Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
+`pnpm typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 29 project configs support Bun.
 
-- **Skips what passed.** A project's key is a hash of its package's files, the files of every workspace package it depends on (directly or not), its tsconfig chain, `tsconfig.base.json`, the lockfile and the TypeScript version. A passing key is recorded in the system temp folder (`juno-cache/typecheck`), shared by every worktree; `pnpm remote typecheck` brings its results back. An unchanged project costs nothing. `--no-cache` checks everything.
-- **Incremental.** A project that runs uses `tsc --incremental`, with its build info in the package's `node_modules/.cache/tsc/`, so only what changed is checked again.
-- **Queued.** At most `JUNO_TYPECHECK_JOBS` (default 2) tsc processes in one run, and at most two at once on the Mac across every worktree (a separate `typecheck` queue in `scripts/heavy.mjs`, apart from the test slots).
-
-TypeScript 7 against 5.9.3 (2026-10-15), the same `pnpm typecheck --no-cache` with no build info, run back to back on the Mac at load 6 to 24: 102 s and 54 s with 7.0.2, against 511 s and 341 s with 5.9.3. The peak memory of the tsc processes (two at once) was about the same: 961 and 975 MB against 970 and 904 MB. One project alone (`apps/desktop` web) took 5.2 s and up to 910 MB with 7.0.2, against 64 to 91 s and up to 505 MB with 5.9.3; a warm incremental run took 0.5 s against 8 to 12.5 s. On a 16x32 machine with nothing cached the whole typecheck takes 5.5 s (14.5 s with 5.9.3).
-
-Earlier timings, all with TypeScript 5.9.3 (2026-10-15):
-
-| Run | Old `pnpm -r typecheck` | `pnpm typecheck` |
-| --- | --- | --- |
-| Mac, quiet (load 3 to 5), nothing cached or built | 35.6 s | 36.6 s (same work, two tsc at once) |
-| Mac, quiet, incremental build info only (`--no-cache`) | 35.6 s | 15.4 s |
-| Mac, nothing changed | 35.6 s | 3.9 s |
-| Mac, one engine test file changed (5 projects) | 35.6 s | 8.2 s |
-| Mac, a dozen worktrees at once | over 30 minutes (reported) | at most two tsc on the Mac; the rest wait or are cached |
-| 16x32 remote, nothing cached | 34 s | 14.5 s |
-| 16x32 remote, all cached | | 0.0 s (about 30 s end to end, warm) |
+`pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
+## Local Bun checks
+
+`pnpm affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
+
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those, each suite on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
+`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
 An import graph over `apps/` and `packages/` decides what each change reaches: relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
@@ -543,7 +591,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
 | Only e2e spec files | `pnpm test:desktop <those files>` |
-| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck` remotely, when a project's key has not passed; it checks only those projects |
+| Any `.ts`, `.tsx` or config a typecheck project reads | `pnpm typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
 | Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
@@ -556,10 +604,11 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 `pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
-- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. A reaper starts before acquisition and reconciles the workspace every 30 seconds, as does each acquisition. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. Processes share successful inventory for up to five seconds, invalidated before and after creates and destroys; newer machine records still reserve capacity. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two retries with two- and four-second backoffs. Known partial instances are destroyed first. Ambiguous attempts retain their reservation and attempt label for up to five minutes so reconciliation can destroy late arrivals. Authentication and configuration errors still fail. Exhausted infrastructure failures use exit 255 and `infraFailure` in the log summary.
+- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
+- **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. The head request holds available cores until it can start; later small jobs cannot fill those gaps. Job end times are unknown, so the pool does not let jobs pass a blocked head, including warm-machine requests. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The cap stays at most 24 vCPU; a lower `JUNO_REMOTE_MAX_VCPU` is honored.
+- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. The first acquisition starts a shared daemon (an upgrade of the reaper watcher). It owns inventory and admission, polling once five seconds after the previous reconciliation finishes; slow calls never overlap. Clients publish requests in the pool’s `queue/` directory and read their answers without calling Namespace. The daemon exits after six minutes when there are no requests or machines to reconcile. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. During each daemon tick, reconciliation and admission share one snapshot. Newer machine records and pending creates still reserve capacity. If the daemon dies or cannot start, clients use the same durable queue and decision lock in direct mode, sharing successful inventory for up to five seconds and invalidating it before and after creates and destroys. A reservation identifies its request, so recovering an unanswered request cannot allocate it twice. Failed destroys remain recorded for the daemon to verify on its next poll. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two retries with two- and four-second backoffs. Known partial instances are destroyed first. Ambiguous attempts retain their reservation and attempt label for up to five minutes so reconciliation can destroy late arrivals. Authentication and configuration errors still fail. Exhausted infrastructure failures use exit 255 and `infraFailure` in the log summary.
 - **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 24 vCPU since 10-16, to hold cost down; the Team plan allows 64). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
 - **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1.44 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
@@ -661,7 +710,7 @@ Causes found so far (2026-10-15):
 
 | Script | Shape | Script time | Why not smaller or bigger |
 | --- | --- | --- | --- |
-| `typecheck`, `lint`, `test:agent*` | 2x4 | typecheck with nothing cached 31 s (5.5 s on 16x32) | small and short; a bigger machine costs more than it saves |
+| `lint`, `test:agent*` | 2x4 | | small and short; a bigger machine costs more than it saves |
 | `test` | 2x4 | 262 s in the current full suite; 156 s on 4x8 | uses less script compute in this pilot but takes longer; see the measurements below |
 | `test:gallery`, some components | 4x8 | a few components take under a minute | |
 | `test:gallery`, every component | 8x16, including `pnpm affected` | 132–146 s at 78–87% busy; 215 s at 73% on 4x8 | four cores miss three minutes; selected components still use 4x8 |
@@ -701,7 +750,7 @@ Both wall times include waiting for machines, because other worktrees still on 1
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts. `pnpm test:health` and `pnpm test:remote-pool` skip the queue: they are small Node tests that should not wait behind perf or package runs.
 
 
 ## Releasing

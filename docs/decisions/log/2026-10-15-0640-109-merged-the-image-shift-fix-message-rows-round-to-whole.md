@@ -1,0 +1,1 @@
+- 10-15 06:40 · orchestrator · Merged the image-shift fix: message rows round to whole pixels, and a row's header and margin no longer depend on its place in the list, so late images and older pages move nothing. The long-thread test passes 10 of 10, and the feel suite's long-thread flicker is gone.

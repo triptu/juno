@@ -4,6 +4,10 @@
 // unchanged rows keep their objects).
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  activateTab,
+  openPlace,
+  topicPlace,
+  updateTabs,
   currentRowAtom,
   defaultTopicListFilter,
   selectedTopicAtom,
@@ -83,6 +87,23 @@ describe('the sidebar list across filter changes', () => {
     const back = registry.get(sidebarListAtom)
     expect(back.filter.kind).toBe('all')
     expect(back.rows.get(shared)).toBe(all.rows.get(shared))
+  })
+
+  it('keeps the same sidebar window when switching tabs with nothing retained', async () => {
+    const engine = await liveEngine()
+    const { registry } = engine
+    const { shown } = watchList(engine)
+    const all = await shown('all')
+    const [first, second] = all.order
+    const tabs = updateTabs(registry, (current) =>
+      openPlace(openPlace(current, topicPlace(first!)), topicPlace(second!), { newTab: true }),
+    )
+    const before = registry.get(sidebarListAtom)
+    expect(before.retained?.size ?? 0).toBe(0)
+
+    const switched = updateTabs(registry, (current) => activateTab(current, tabs.tabs[0]!.id))
+    expect(switched.active).not.toBe(tabs.active)
+    expect(registry.get(sidebarListAtom)).toBe(before)
   })
 
   it('marks one row tabbable: the first, or the selection while it is shown', async () => {

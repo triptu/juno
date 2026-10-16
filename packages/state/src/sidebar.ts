@@ -20,7 +20,10 @@
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import type { RowChannel, TopicRow } from '@juno/contract'
+import type { RowChannel, TopicDetail, TopicRow } from '@juno/contract'
+import { ignoredChannelsAtom } from './ignored'
+import { topicAtom } from './messages'
+import { tabsAtom, tabTopic, type Tabs } from './tabs'
 import { engineStatusAtom } from './engine'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
@@ -61,6 +64,8 @@ export const nowAtom = Atom.make<number>((get) => {
 export interface SidebarWindow extends ListWindow<TopicRow> {
   /** The filter of these rows. It lags `sidebarFilterAtom` until the new filter's first snapshot arrives. */
   readonly filter: TopicListFilter
+  /** Rows held for open tabs, including those that become unread again. */
+  readonly retained?: ReadonlySet<string>
 }
 
 /**
@@ -96,12 +101,56 @@ function sameChannel(a: RowChannel, b: RowChannel): boolean {
   return partners && a.id === b.id && a.kind === b.kind && a.name === b.name && a.label === b.label && a.tint === b.tint && a.icon === b.icon && a.color === b.color
 }
 
+/** Keep previously visible read-dependent rows while a tab still shows them. */
+export function retainOpenTopics(
+  shown: SidebarWindow,
+  next: SidebarWindow,
+  tabs: Tabs,
+  details: ReadonlyMap<string, TopicDetail | null>,
+): SidebarWindow {
+  const open = new Set(tabs.tabs.map(tabTopic))
+  let retainedRows: Map<string, TopicRow> | undefined
+  const retained = new Set<string>()
+  for (const id of shown.order) {
+    if (!open.has(id)) continue
+    if (next.rows.has(id)) {
+      if (shown.retained?.has(id)) retained.add(id)
+      continue
+    }
+    const old = shown.rows.get(id)!
+    if (!shown.filter.unreadOnly && !shown.retained?.has(id) && old.unreadCount === 0 && !old.mentionsMe) continue
+    const detail = details.get(id)
+    if (detail === null || (detail !== undefined && (detail.resolved && !detail.pinned || old.subscribed && !detail.subscribed))) continue
+    retained.add(id)
+    // The filtered query no longer carries this row. Its open topic's live
+    // header supplies read state, including marks from another Slack client.
+    retainedRows ??= new Map(next.rows)
+    retainedRows.set(id, detail === undefined || (old.unreadCount === detail.unreadCount && old.unreadExact === detail.unreadExact && old.mentionsMe === detail.mentionsMe)
+      ? old
+      : { ...old, unreadCount: detail.unreadCount, unreadExact: detail.unreadExact, mentionsMe: detail.mentionsMe })
+  }
+  if (retained.size === 0 && !shown.retained?.size) return next
+  const rows = retainedRows ?? next.rows
+  const kept = shown.order.filter((id) => rows.has(id))
+  const known = new Set(kept)
+  const order = [...kept, ...next.order.filter((id) => !known.has(id))]
+  const orderUnchanged = sameOrder(shown.order, order)
+  if (orderUnchanged && retained.size === (shown.retained?.size ?? 0) &&
+    [...retained].every((id) => shown.retained?.has(id)) &&
+    rows.size === shown.rows.size && [...rows].every(([id, row]) => shown.rows.get(id) === row) &&
+    next.meta === shown.meta && next.refs === shown.refs) return shown
+  return {
+    ...next, rows, order: orderUnchanged ? shown.order : order,
+    filter: shown.filter, retained,
+  }
+}
+
 /**
  * The window the sidebar shows: the current filter's once it has a
  * snapshot, otherwise the last one shown. `meta.seq` is 0 only before the
  * first snapshot ever. Reading it subscribes to the current filter's list.
  */
-export const sidebarListAtom = Atom.make((get): SidebarWindow => {
+const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const filter = get(sidebarFilterAtom)
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
@@ -123,6 +172,28 @@ export const sidebarListAtom = Atom.make((get): SidebarWindow => {
     }
   }
   return { ...next, filter }
+})
+
+/** The source window plus previously visible topics still shown by a tab. */
+export const sidebarListAtom = Atom.make((get): SidebarWindow => {
+  const next = get(sidebarSourceAtom)
+  const tabs = get(tabsAtom)
+  const shown = Option.getOrUndefined(get.self<SidebarWindow>())
+  if (shown === undefined || shown.filter !== next.filter) return next
+  const details = new Map<string, TopicDetail | null>()
+  const candidates = tabs.tabs.map(tabTopic).filter((id): id is string =>
+    id !== undefined && shown.rows.has(id) && !next.rows.has(id),
+  )
+  const ignored = candidates.length > 0 ? get(ignoredChannelsAtom) : undefined
+  for (const id of candidates) {
+    if (ignored !== undefined && AsyncResult.isSuccess(ignored) && ignored.value.some((channel) => channel.id === shown.rows.get(id)!.channel.id)) {
+      details.set(id, null)
+    } else {
+      const detail = get(topicAtom(id))
+      if (AsyncResult.isSuccess(detail)) details.set(id, detail.value)
+    }
+  }
+  return retainOpenTopics(shown, next, tabs, details)
 })
 
 /** One row of the sidebar, by id across every filter. Notifies only when the row's object changes, which is when its `rev` does. */

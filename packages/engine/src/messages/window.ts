@@ -85,7 +85,9 @@ export function pendingStatement(target: WindowTarget): Statement {
   const columns = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state'
   return target.kind === 'main'
     ? { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts IS NULL ORDER BY created_at, client_msg_id`, params: [target.channel] }
-    : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }
+    : target.threadTs.startsWith('pending:')
+      ? { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND (client_msg_id = ? OR thread_ts = ?) ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs.slice(8), target.threadTs] }
+      : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }
 }
 
 /** Juno's own edits, deletes and reactions in a channel that Slack has not confirmed (architecture 5.7), through `outbox_target`. */

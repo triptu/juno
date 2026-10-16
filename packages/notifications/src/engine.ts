@@ -1,8 +1,8 @@
 import { AiProvider, urgencyGate } from '@juno/ai'
-import { channelLabel, inHours, localTime, nextHoursStart, decideNotification, hoursStartSummary, scheduledPresence, type NotificationDecision, type Presence } from '@juno/domain'
+import { channelLabel, localTime, decideNotification, scheduledPresence, type NotificationDecision, type Presence } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
-import { Candidate, Judgement, type Notifier, type SummarySource } from './model'
+import { Candidate, Judgement, type Notifier } from './model'
 import { readSettings } from './settings'
 
 interface Row {
@@ -31,11 +31,10 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   let scheduled: Presence | undefined
   const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
-  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision, due: number | undefined) =>
+  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision) =>
     Effect.gen(function* () {
       yield* sql`UPDATE notification_log SET outcome = ${decision.outcome},
-        reason = CASE WHEN suppressed_at IS NULL THEN ${decision.reason} ELSE ${decision.reason + ". Topic is visible in a focused window"} END,
-        summary_due_at = ${decision.outcome === 'summary' && due !== undefined ? new Date(due).toISOString() : null} WHERE id = ${id}`
+        reason = CASE WHEN suppressed_at IS NULL THEN ${decision.reason} ELSE ${decision.reason + ". Topic is visible in a focused window"} END WHERE id = ${id}`
       if (decision.outcome !== 'now') return
       // Claim before the external effect. A repeated event or settings pass cannot ring twice.
       const focused = yield* notifier.viewing(candidate.topicId)
@@ -66,15 +65,13 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
       decision = decideNotification({ ...candidate, at: localTime(now) }, settings, { aiAssist: judgement !== undefined, userName: () => candidate.senderName }, judgement)
     }
     if ('needsJudgement' in decision) return
-    const due = nextHoursStart(now, settings.notificationHours)
     const rows = yield* sql<{ id: number }>`INSERT INTO notification_log
-      (at, channel, ts, topic_id, preview, outcome, reason, candidate_json, judgement_json, summary_due_at)
+      (at, channel, ts, topic_id, preview, outcome, reason, candidate_json, judgement_json)
       VALUES (${new Date(now).toISOString()}, ${candidate.channel.id}, ${candidate.ts}, ${candidate.topicId}, ${candidate.text},
-        ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${judgement === undefined ? null : JSON.stringify(judgement)},
-        ${decision.outcome === 'summary' && due !== undefined ? new Date(due).toISOString() : null})
+        ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${judgement === undefined ? null : JSON.stringify(judgement)})
       ON CONFLICT(channel, ts) DO NOTHING RETURNING id`
     const row = rows[0]
-    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision, due)
+    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision)
     yield* logChanged
   })
 
@@ -89,41 +86,9 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
       const judgement = row.judgement_json === null ? undefined : Schema.decodeUnknownSync(Judgement)(JSON.parse(row.judgement_json))
       const at = new Date(row.at).getTime()
       const decision = decideNotification({ ...candidate, at: localTime(at) }, settings, { aiAssist: aiAssist && judgement !== undefined, userName: () => candidate.senderName }, judgement)
-      if (!('needsJudgement' in decision)) yield* storeDecision(row.id, candidate, now, decision, nextHoursStart(at, settings.notificationHours))
+      if (!('needsJudgement' in decision)) yield* storeDecision(row.id, candidate, now, decision)
     }
-    // Older summaries keep their judgement. A schedule edit only moves a future or disabled start.
-    const next = inHours(localTime(now), settings.notificationHours) ? now : nextHoursStart(now, settings.notificationHours)
-    yield* sql`UPDATE notification_log SET summary_due_at = ${next === undefined ? null : new Date(next).toISOString()}
-      WHERE outcome = 'summary' AND delivered_at IS NULL AND suppressed_at IS NULL
-      AND (summary_due_at IS NULL OR summary_due_at > ${new Date(now).toISOString()})`
     yield* logChanged
-  })
-
-  const summarize = Effect.gen(function* () {
-    const now = new Date(yield* Clock.currentTimeMillis).toISOString()
-    const rows = yield* sql<Row>`SELECT * FROM notification_log WHERE outcome = 'summary' AND delivered_at IS NULL AND suppressed_at IS NULL
-      AND summary_due_at <= ${now} AND candidate_json IS NOT NULL ORDER BY at, id`
-    const candidates = rows.map((row) => Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json)))
-    const summary = hoursStartSummary(rows.map((row, n) => ({ decision: { outcome: row.outcome, reason: row.reason }, where: channelLabel(candidates[n]!.channel) })))
-    const first = rows[0]
-    if (summary === undefined || first === undefined) return
-    const sources: ReadonlyArray<SummarySource> = rows.map((row, n) => {
-      const candidate = candidates[n]!
-      const place = channelLabel(candidate.channel)
-      // A DM's place is the person already.
-      const sender = candidate.senderName !== undefined && candidate.senderName !== place ? candidate.senderName : undefined
-      return { channelId: row.channel, ts: row.ts, topicId: row.topic_id, place, ...(sender === undefined ? {} : { sender }) }
-    })
-    const source = sources[0]
-    if (source === undefined) return
-    const id = `summary:${rows.map((row) => row.id).join(',')}`
-    const { aiAssist } = yield* configuration
-    const target = aiAssist
-      ? { kind: 'summary' as const, id: yield* notifier.summary({ id, at: now, sources, ...summary }) }
-      : { kind: 'message' as const, source: { channelId: source.channelId, ts: source.ts, topicId: source.topicId } }
-    yield* sql`UPDATE notification_log SET delivered_at = ${now} WHERE id IN ${sql.in(rows.map((row) => row.id))}`
-    yield* logChanged
-    yield* notifier.show({ id, ...summary, target })
   })
 
   const tick = (force: boolean) => Effect.gen(function* () {
@@ -135,7 +100,6 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
         yield* SubscriptionRef.set(current, next)
       }
     }
-    yield* summarize
   })
 
   return {

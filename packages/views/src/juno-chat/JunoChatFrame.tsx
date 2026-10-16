@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { accent, colors, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Popover } from '@juno/ui'
+import { Popover, rootDuration } from '@juno/ui'
 import { ReactionPicker } from './ReactionPicker'
 
 export interface JunoChatFrameProps {
@@ -56,7 +56,7 @@ export function JunoChatFrame({ header, children, pill, composer, picker, column
 /** The `--duration-appear` value in milliseconds, read once. */
 let appearMs: number | undefined
 function appearDuration(): number {
-  appearMs ??= Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--duration-appear')) || 0
+  appearMs ??= rootDuration('--duration-appear')
   return appearMs
 }
 
@@ -76,8 +76,10 @@ const styles = stylex.create({
     minHeight: 0,
     backgroundColor: colors['--background'],
   },
+  // On the panel's own surface, with Juno's bubbles lifted off it.
   panel: {
     backgroundColor: 'transparent',
+    '--juno-bubble-bg': colors['--panel-bubble'],
   },
   middle: {
     position: 'relative',

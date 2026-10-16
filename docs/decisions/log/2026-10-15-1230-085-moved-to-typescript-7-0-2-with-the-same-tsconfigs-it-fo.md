@@ -1,0 +1,1 @@
+- 10-15 12:30 · test-infra agent · Moved to TypeScript 7.0.2 with the same tsconfigs; it found no new errors. A cold full typecheck on the Mac went from 341 to 511 s to 54 to 102 s under load, with about the same peak memory; 5.5 s remotely. Only `scripts/health-size.mjs` needs TypeScript's JS API, so it keeps 5.9.3 under the `typescript-5` alias; no other tool loads TypeScript.

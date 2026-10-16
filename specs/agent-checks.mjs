@@ -60,6 +60,7 @@ export const actionCases = [
   ['hintAlways', 'reviewGated'],
   ['freshNever', 'reviewGated'],
   ['ruleDuringReview', 'reviewGated'],
+  ['scriptWrite', 'scriptNeverAuthorizes'],
 ]
 
 export const recoveryCases = [

@@ -29,7 +29,7 @@ export type PersonMenuAction = 'ask-juno'
 export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
 
 export type MenuItem<A extends string> =
-  | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string; readonly checked?: boolean }
+  | { readonly type: 'item'; readonly id: A; readonly label: string; readonly hint?: string; readonly checked?: boolean; readonly sublabel?: string }
   | { readonly type: 'separator' }
   | { readonly type: 'submenu'; readonly label: string; readonly hint?: string; readonly items: ReadonlyArray<MenuItem<A>> }
 
@@ -129,6 +129,18 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
 function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction> {
   const choice = (level: NotifyChoice): MenuItem<NotifyAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
   return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+}
+
+/**
+ * The header's Follow menu on a thread you do not follow (SPEC 5 and 7):
+ * the two Notify me choices that follow it, When it matters (the default)
+ * first, with a line under it saying what it means.
+ */
+export function followMenuItems(): ReadonlyArray<MenuItem<NotifyAction>> {
+  return [
+    { type: 'item', id: 'notify-matters', label: notifyLabels.matters, sublabel: 'Juno decides when to notify you' },
+    { type: 'item', id: 'notify-every', label: notifyLabels.every },
+  ]
 }
 
 /** How a toast names a choice: "#design-review: Never". */

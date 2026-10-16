@@ -463,7 +463,12 @@ export class FakeServer {
       }
       return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', response)
     }
-    if (path.startsWith('/avatars/') && method === 'GET') return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
+    if (path.startsWith('/avatars/') && method === 'GET') {
+      const cookie = parseCookies(request.headers.cookie)['d']
+      const session = cookie === undefined ? undefined : this.sessions.get(cookie)
+      if (session === undefined || session.expired) return json(response, 401, { ok: false, error: 'not_authed' })
+      return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
+    }
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))
     if (path === '/signin' && method === 'POST') return this.#signIn(request, response)

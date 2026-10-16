@@ -52,7 +52,7 @@ const mentionTargets = (text: string, blocksJson: string | null): Effect.Effect<
     const sql = yield* StoreWriter
     const userIds = idsIn(USER_ID, [text, blocksJson])
     const channelIds = idsIn(CHANNEL_ID, [text, blocksJson])
-    const users = userIds.length === 0 ? [] : yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(userIds)}`
+    const users = userIds.length === 0 ? [] : yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(userIds)}`
     const channels = channelIds.length === 0 ? [] : yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(channelIds)}`
     return {
       people: users.map((user) => ({ id: user.id, name: userName(user.id, user) })),

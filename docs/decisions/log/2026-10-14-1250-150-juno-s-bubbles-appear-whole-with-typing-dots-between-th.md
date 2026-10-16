@@ -1,0 +1,1 @@
+- 10-14 12:50 · Tushar · Juno's bubbles appear whole with typing dots between; the target is the first bubble within 2.5 s. Only text the model marks for the owner becomes a bubble (a block format in its output, not a tool call per bubble, which would cost an extra model request); the chat is not a literal transcript.

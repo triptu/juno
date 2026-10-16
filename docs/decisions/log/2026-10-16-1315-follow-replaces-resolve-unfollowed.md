@@ -1,0 +1,1 @@
+- 10-16 13:15 · follow-header · The topic header shows Follow (a bell) instead of Resolve on a thread you do not follow; its native menu offers When it matters (first, with a one-line hint) and Every message, and runs the Notify me path, so undo, the toast and ⌘Z are the same.

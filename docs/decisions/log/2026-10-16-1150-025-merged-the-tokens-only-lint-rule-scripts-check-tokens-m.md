@@ -1,0 +1,1 @@
+- 10-16 11:50 · orchestrator · Merged the tokens-only lint rule: `scripts/check-tokens.mjs` (about 0.4 s) fails on raw colours and lengths in `stylex.create` across ui, views and the renderer. It found 41: 27 now use tokens, 14 are documented geometry exceptions, and five tokens were added. No visual change (112 gallery checks pass).

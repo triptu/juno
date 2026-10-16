@@ -145,7 +145,7 @@ const messageRef = (world: World, k: Draft) => {
   const store = readStore(world, k)
   const live = storedMessages(world, k).filter((m) => m.deleted === 0)
   const ts = live.find((m) => m.ts === store.sentTs)?.ts ?? live[0]?.ts ?? `pending:${world.ids[k]}`
-  return { channelId: CHANNEL[k], ts, clientMsgId: world.ids[k] }
+  return { channelId: world.channel[k], ts, clientMsgId: world.ids[k] }
 }
 
 /** One step the harness drives, with the model's states on either side of it. */
@@ -209,10 +209,10 @@ function queueAction(world: World, { prev, next, k, state }: Step) {
 function remoteChange(world: World, { prev, next, k }: Step) {
   const { fake } = world.engine
   const change = [...next.slack].find((c) => c.key === k && ![...prev.slack].some((p) => p.key === c.key && p.what === c.what))!
-  if (change.what === 'gone') return fake.deleteMessage({ channel: CHANNEL[k], ts: world.first.get(k)! })
+  if (change.what === 'gone') return fake.deleteMessage({ channel: world.channel[k], ts: world.first.get(k)! })
   const copy = copyInSlack(world, k)
   if (copy === undefined) throw new Error(`draft ${k} has no copy in Slack`)
-  fake.injectMessage({ channel: CHANNEL[k], user: 'U0MAYA', text: 'A reply to the copy', threadTs: copy })
+  fake.injectMessage({ channel: world.channel[k], user: 'U0MAYA', text: 'A reply to the copy', threadTs: copy })
 }
 
 async function accept(world: World, { next, k }: Step) {
@@ -248,7 +248,27 @@ const answerPost = (outcome: 'answer' | 'lose'): Drive => async (world, { k }) =
 
 /** How the harness drives each step of the world, by the model's action. */
 const drive: Readonly<Record<string, Drive>> = {
-  send: (world, { k }) => command(runCommand(world.engine.registry, messagesSend, { to: { kind: 'channel', channelId: CHANNEL[k] }, text: TEXT, clientMsgId: world.ids[k] }), 'send'),
+  // A draft a reply names goes as a New chat thread root, so the reply can name it before Slack has it.
+  send: (world, { k }) =>
+    command(
+      runCommand(world.engine.registry, messagesSend, {
+        to: { kind: 'channel', channelId: world.channel[k] },
+        text: TEXT,
+        clientMsgId: world.ids[k],
+        ...(world.roots.has(k) ? { startThread: true } : {}),
+      }),
+      'send',
+    ),
+  // A reply queued in the root's pending thread: it names the root by its `client_msg_id`.
+  sendReply: (world, { next, k }) =>
+    command(
+      runCommand(world.engine.registry, messagesSend, {
+        to: { kind: 'channel', channelId: world.channel[k], threadTs: `pending:${world.ids[next.parent!.get(k) as Draft]}` },
+        text: TEXT,
+        clientMsgId: world.ids[k],
+      }),
+      'sendReply',
+    ),
   accept,
   refuse: async (world, { next, k }) =>
     decideBefore(world, await postCall(world, k, 'before'), next.request.get(k) === 'later' ? { error: 'ratelimited', status: 429, retryAfter: 1 } : { error: 'restricted_action' }, `the post of draft ${k}`),
@@ -331,10 +351,20 @@ export const outboxSpec: Spec<World, View> = {
     // A catch-up that reads no topic again needs a recheck that reads none.
     const covers = trace.states.every((state) => sOf(state).label !== 'catchUp' || sOf(state).rechecked.size > 0)
     const options: EngineOptions = covers ? {} : { recheckTopics: 0 }
+    // A reply lives in its root's channel. Lookups and edits are matched by channel, so a trace with a
+    // reply must have neither (the New chat schedules do not).
+    const parent = sOf(trace.states.at(-1)!).parent ?? new Map<number, number>()
+    const channel = { ...CHANNEL }
+    for (const k of DRAFTS) {
+      const root = parent.get(k) ?? 0
+      if (root !== 0) channel[k] = CHANNEL[root as Draft]
+    }
     const world: World = {
       engine: await bootedEngine([], options),
       options,
       ids: { 1: crypto.randomUUID(), 2: crypto.randomUUID() },
+      channel,
+      roots: new Set(DRAFTS.filter((k) => DRAFTS.some((j) => parent.get(j) === k))),
       first: new Map(),
       post: new Map(),
       copy: new Map(),

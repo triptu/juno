@@ -1,0 +1,1 @@
+- 10-14 09:49 · Orchestrator · Juno Agent spend: when a provider bills more than was reserved, the ledger records the true cost and refuses every new reservation until midnight or a raise. Recording less than charged to stay under the cap would hide real money. Found by the actions spec (`overReportStep`).

@@ -1,0 +1,1 @@
+- 10-14 14:05 · Tushar · Peek: hold a key over a sidebar row to see the topic in a popover to the right, without opening it or marking it read (M5). The key defaults to ⌥ Option because it works while typing; Space is the alternative in Preferences. Fn is not offered because macOS does not report it to apps reliably.

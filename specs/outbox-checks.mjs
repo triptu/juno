@@ -18,4 +18,4 @@ export const outboxPairs = [
   ['uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
 ]
 // Corrected schedules with no broken variant.
-export const outboxSchedules = ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']
+export const outboxSchedules = ['pendingRoot', 'failedRoot', 'answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']

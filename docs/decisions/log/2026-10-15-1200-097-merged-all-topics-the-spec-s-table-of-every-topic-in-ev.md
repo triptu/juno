@@ -1,0 +1,1 @@
+- 10-15 12:00 · orchestrator · Merged All topics: the spec's table of every topic in every member conversation (ignored channels excluded), with status chips, kind, place, sort and a word-prefix text filter, windowed 200 rows at a time; opens in 18 ms p95, scroll 7.2 ms p95 per frame. Rows use the sidebar's menu and actions with Undo.

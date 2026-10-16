@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   decideNotification,
   defaultNotificationSettings,
-  hoursStartSummary,
   inHours,
   nextSwitch,
   nextHoursStart,
@@ -55,12 +54,12 @@ describe('notification decision', () => {
     ['Every message comes through outside notification hours', candidate({ senderId: mayaId, at: at(MON, 22) }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
     ['inside hours, Juno says it needs you', candidate(), ai, urgent, { outcome: 'now', reason: 'Juno: asks you to approve the release before 2pm' }],
     ['inside hours, Juno says it can wait', candidate(), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
-    ['outside hours, what would have notified goes into the summary', candidate({ at: at(MON, 19) }), ai, urgent, { outcome: 'summary', reason: 'Outside your notification hours. Juno: asks you to approve the release before 2pm' }],
+    ['outside hours, what would have notified is held', candidate({ at: at(MON, 19) }), ai, urgent, { outcome: 'hold', reason: 'Outside your notification hours. Juno: asks you to approve the release before 2pm' }],
     ['outside hours, what can wait is held', candidate({ at: at(SAT, 12) }), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
     ['AI assist off: a DM notifies', candidate({ channel: maya }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
     ['AI assist off: a mention notifies', candidate({ mentionsMe: true }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
     ['AI assist off: anything else holds', candidate(), aiOff, undefined, { outcome: 'hold', reason: 'AI assist is off, so only DMs and mentions notify you' }],
-    ['AI assist off: a DM outside hours goes into the summary', candidate({ channel: maya, at: at(MON, 7) }), aiOff, undefined, { outcome: 'summary', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' }],
+    ['AI assist off: a DM outside hours is held', candidate({ channel: maya, at: at(MON, 7) }), aiOff, undefined, { outcome: 'hold', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' }],
   ] as const)('%s', (_name, message, context, judgement, expected) => {
     expect(decideNotification(message, settings, context, judgement)).toEqual(expected)
   })
@@ -87,31 +86,8 @@ describe('what decided a message', () => {
     expect(decideWithCause(thread, threads, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'thread', id: 't:C0HIRING:1.0' } } })
     expect(decideWithCause(candidate({ senderId: mayaId }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'person', id: mayaId } } })
     expect(decideWithCause(candidate({ channel: eng }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'channel', id: eng.id } } })
-    expect(decideWithCause(candidate({ at: at(SAT, 12) }), settings, ai, { notify: true, reason: 'asks you' })).toMatchObject({ decision: { outcome: 'summary' }, cause: { kind: 'hours' } })
+    expect(decideWithCause(candidate({ at: at(SAT, 12) }), settings, ai, { notify: true, reason: 'asks you' })).toMatchObject({ decision: { outcome: 'hold' }, cause: { kind: 'hours' } })
     expect(decideWithCause(candidate(), settings, ai, { notify: false, reason: 'chatter' })).toEqual({ decision: { outcome: 'hold', reason: 'Juno: chatter' }, cause: { kind: 'juno' } })
-  })
-})
-
-describe('the summary when notification hours start', () => {
-  const summary = { outcome: 'summary', reason: '' } as const
-  const hold = { outcome: 'hold', reason: '' } as const
-
-  it('counts only messages kept for it, and names where they are', () => {
-    expect(hoursStartSummary([{ decision: summary, where: '#eng' }, { decision: hold, where: '#random' }])).toEqual({ title: '1 message needs you', body: 'In #eng' })
-    expect(
-      hoursStartSummary([
-        { decision: summary, where: '#eng' },
-        { decision: summary, where: 'Maya Chen' },
-        { decision: summary, where: '#eng' },
-        { decision: summary, where: '#hiring' },
-      ]),
-    ).toEqual({ title: '4 messages need you', body: 'In #eng, Maya Chen and #hiring' })
-    expect(hoursStartSummary(['#a', '#b', '#c', '#d', '#e'].map((where) => ({ decision: summary, where })))).toEqual({ title: '5 messages need you', body: 'In #a, #b, #c and 2 more' })
-  })
-
-  it('sends nothing when nothing needed the owner', () => {
-    expect(hoursStartSummary([{ decision: hold, where: '#random' }])).toBeUndefined()
-    expect(hoursStartSummary([])).toBeUndefined()
   })
 })
 

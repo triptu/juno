@@ -1,0 +1,1 @@
+- 10-13 23:38 · Tushar · Opening a topic marks it read; later messages mark read only at the bottom of a focused window; stealth never marks.

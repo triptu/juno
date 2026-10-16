@@ -12,7 +12,7 @@
  *   m3 #eng (C0ENG) ts 1760500000.000004 in thread 1760500000.000001, Maya Chen: It times out…
  */
 import type { AgentHostError, HostMessagePage, HostChannel, TopicLink } from '@juno/agent-contract'
-import { defineTool, type JunoTool } from '../request/tool'
+import { abortable, Cancelled, defineTool, type JunoTool } from '../request/tool'
 import type { SourceRef } from './sources'
 
 type Page = typeof HostMessagePage.Type
@@ -50,10 +50,11 @@ const reasons: Record<string, string> = {
 }
 
 /** A failed read is told to the model in fixed words, never with the host's error body. */
-async function read(f: () => Promise<string>): Promise<{ readonly text: string; readonly isError?: boolean }> {
+async function read(f: () => Promise<string>, signal?: AbortSignal): Promise<{ readonly text: string; readonly isError?: boolean }> {
   try {
-    return { text: await f() }
+    return { text: await abortable(f(), signal) }
   } catch (error) {
+    if (error instanceof Cancelled) return { text: 'The read was cancelled.', isError: true }
     const reason = (error as Partial<typeof AgentHostError.Type>)?.reason
     return { text: (reason && reasons[reason]) ?? 'Slack could not be read.', isError: true }
   }
@@ -73,7 +74,7 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       parameters: { type: 'object', properties: { query: string('The search') }, required: ['query'], additionalProperties: false },
       replay: 'safe',
       status: (n) => (n === 1 ? 'Searching Slack' : `Searching Slack, ${plural(n, 'search', 'searches')}`),
-      run: ({ query }) => read(async () => lines(await host.search(query), handles)),
+      run: ({ query }, call) => read(async () => lines(await host.search(query), handles), call.signal),
     }),
     defineTool<{ readonly channel: string }>({
       name: 'slack_history',
@@ -81,7 +82,7 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       parameters: { type: 'object', properties: { channel: string('The channel id') }, required: ['channel'], additionalProperties: false },
       replay: 'safe',
       status: (n) => `Reading ${plural(n, 'conversation', 'conversations')}`,
-      run: ({ channel }) => read(async () => lines(await host.history(channel), handles)),
+      run: ({ channel }, call) => read(async () => lines(await host.history(channel), handles), call.signal),
     }),
     defineTool<{ readonly channel: string; readonly thread: string }>({
       name: 'slack_replies',
@@ -94,7 +95,7 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       },
       replay: 'safe',
       status: (n) => `Reading ${plural(n, 'thread', 'threads')}`,
-      run: ({ channel, thread }) => read(async () => lines(await host.replies(channel, thread), handles)),
+      run: ({ channel, thread }, call) => read(async () => lines(await host.replies(channel, thread), handles), call.signal),
     }),
     defineTool<Record<string, never>>({
       name: 'slack_topics',
@@ -102,11 +103,11 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       parameters: { type: 'object', properties: {}, additionalProperties: false },
       replay: 'safe',
       status: () => 'Reading topics',
-      run: () =>
+      run: (_, call) =>
         read(async () => {
           const { topics } = await host.topics()
           return topics.length === 0 ? 'No topics.' : topics.map((t) => `${t.topicId} ${t.title} (${t.where})`).join('\n')
-        }),
+        }, call.signal),
     }),
     defineTool<{ readonly user: string }>({
       name: 'slack_person',
@@ -114,11 +115,11 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       parameters: { type: 'object', properties: { user: string('The user id') }, required: ['user'], additionalProperties: false },
       replay: 'safe',
       status: (n) => `Looking up ${plural(n, 'person', 'people')}`,
-      run: ({ user }) =>
+      run: ({ user }, call) =>
         read(async () => {
           const person = await host.person(user)
           return `${person.id}: ${person.name} (${person.displayName})`
-        }),
+        }, call.signal),
     }),
   ]
   const directory = host.channels
@@ -127,7 +128,7 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
     ...(directory === undefined ? [] : [{ ...defineTool<{ readonly pattern: string }>({
       name: 'slack_channels', description: 'Find all cached channels by case-insensitive name glob (* matches any text, ? one character). For every alerts channel use *alerts*. Returns only channel ids and names, no message content.',
       parameters: { type: 'object', properties: { pattern: string('Channel name glob') }, required: ['pattern'], additionalProperties: false },
-      replay: 'safe', status: () => 'Finding channels', run: ({ pattern }) => read(async () => JSON.stringify(await directory(pattern))),
+      replay: 'safe', status: () => 'Finding channels', run: ({ pattern }, call) => read(async () => JSON.stringify(await directory(pattern)), call.signal),
     }), taints: false }]),
   ]
 }

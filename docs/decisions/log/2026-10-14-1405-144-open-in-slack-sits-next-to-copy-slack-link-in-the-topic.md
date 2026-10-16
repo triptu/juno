@@ -1,0 +1,1 @@
+- 10-14 14:05 · Tushar · Open in Slack sits next to Copy Slack link in the topic menu and the message's More menu (M5).

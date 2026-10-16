@@ -1,14 +1,11 @@
 /**
  * Where the chat's list is scrolled (see `JunoChat`): the open position,
- * holding the bottom, the edges that move the window, read marks and the
- * notification's target. `JunoChat` calls these hooks in this file's order,
+ * holding the bottom, the edges that move the window, and read marks. `JunoChat` calls these hooks in this file's order,
  * which is the order their effects run in.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
-import { junoChatTargetAtom, registry } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
-import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { junoCommands, takePanelOpenStart } from './actions'
 import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
@@ -21,6 +18,18 @@ const DIVIDER_GAP = 80
 const EDGE_MARGIN = '800px 0px'
 /** A Juno bubble is read once fully on screen in the focused chat this long (SPEC 13.1). */
 const READ_AFTER_MS = 1000
+/** The shortest a chat row with a bubble is: one line and its group gap. */
+const MIN_ROW_HEIGHT = 32
+
+/**
+ * Rows at the end the list lays out in full: enough to fill the window however short they are. At their
+ * 38px estimate, rows in view grow as they are first drawn, after the open position is set, and push the
+ * newest message below the fold; laid out in full, the bottom set before paint holds. `innerHeight` does
+ * not force a layout.
+ */
+function tailRows(): number {
+  return Math.ceil(window.innerHeight / MIN_ROW_HEIGHT) + 2
+}
 
 const distanceFromBottom = (scroller: HTMLElement) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
 
@@ -55,11 +64,13 @@ export function scrollToRow(scrollRef: Scroller, pinnedRef: RefObject<boolean>, 
 /**
  * Whether the list holds the bottom, where it opened, and the newest Juno row seen there. The open
  * position is set before the first frame with rows is painted: the tab at the "New" divider, else the bottom.
+ * `eagerTail` is how many rows at the end are laid out in full, so that position holds (`tailRows`).
  */
 export function useChatPosition(column: 'page' | 'panel', loaded: boolean, items: ReadonlyArray<ChatItem>, scrollRef: Scroller, anchorRef: RefObject<HTMLDivElement | null>) {
   // Hold the bottom: true while the owner is at the end, or after a send.
   const pinnedRef = useRef(true)
   const [positioned, setPositioned] = useState(false)
+  const [eagerTail] = useState(tailRows)
   const [atBottom, setAtBottom] = useState(true)
   // The newest of Juno's rows seen at the bottom; one that arrives while scrolled up shows the pill.
   const newestJuno = items.findLast((item) => item._tag === 'juno' || item._tag === 'card')
@@ -85,7 +96,7 @@ export function useChatPosition(column: 'page' | 'panel', loaded: boolean, items
     const opened = column === 'panel' ? takePanelOpenStart() : undefined
     if (opened !== undefined) afterPaint(() => measure('juno.panel-open', opened))
   }, [column, positioned, loaded, scrollRef, anchorRef])
-  return { pinnedRef, positioned, atBottom, setAtBottom, unseen }
+  return { pinnedRef, positioned, atBottom, setAtBottom, unseen, eagerTail }
 }
 
 /**
@@ -205,29 +216,4 @@ export function useReadMarks(scrollRef: Scroller, positioned: boolean, items: Re
       if (timer !== undefined) clearTimeout(timer)
     }
   }, [positioned, items, scrollRef])
-}
-
-/**
- * A notification asked the tab for a message (the hours-start summary): the window moves to it if it is not
- * in it, then it scrolls into view and flashes. Before paint, so the open position does not show first. Each
- * request is taken once; one for a message the agent has not appended yet waits for it.
- */
-export function useChatTarget(column: 'page' | 'panel', positioned: boolean, items: ReadonlyArray<ChatItem>, scrollRef: Scroller, pinnedRef: RefObject<boolean>, setWindow: SetWindow): void {
-  const chatTarget = useAtomValue(junoChatTargetAtom)
-  const targetTaken = useRef(0)
-  const targetAsked = useRef(0)
-  useLayoutEffect(() => {
-    if (column !== 'page' || chatTarget === undefined || chatTarget.n <= targetTaken.current || !positioned) return
-    const scroller = scrollRef.current
-    const target = { _tag: 'bubble', id: chatTarget.id as BubbleId } as const
-    if (scroller === null || rowOf(scroller, target) === null) {
-      if (targetAsked.current === chatTarget.n) return
-      targetAsked.current = chatTarget.n
-      setWindow({ _tag: 'around', anchor: target.id, before: OVERLAP, limit: WINDOW })
-      return
-    }
-    targetTaken.current = chatTarget.n
-    if (registry.get(junoChatTargetAtom)?.n === chatTarget.n) registry.set(junoChatTargetAtom, undefined)
-    scrollToRow(scrollRef, pinnedRef, target)
-  }, [column, chatTarget, positioned, items, scrollRef, pinnedRef, setWindow])
 }

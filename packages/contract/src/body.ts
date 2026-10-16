@@ -90,6 +90,8 @@ export const BodyBlock = Schema.Union([
   ContentBlock,
   Schema.Struct({
     kind: Schema.Literal('attachment'),
+    author: Schema.optionalKey(Schema.Struct({ name: Schema.String, icon: Schema.optionalKey(Schema.String) })),
+    footerIcon: Schema.optionalKey(Schema.String),
     tint: Schema.Literals(['neutral', 'info', 'success', 'warning', 'danger']),
     title: Schema.Array(BodyInline),
     blocks: Schema.Array(ContentBlock),

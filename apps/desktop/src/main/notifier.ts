@@ -3,8 +3,7 @@
  *
  * The engine decides; main only shows. `notify` shows one notification,
  * once per id, and a click brings the window forward and hands the target
- * to the renderer, which opens the topic at the message (or, for the
- * hours-start summary, the Juno chat once it exists). `badge` sets the
+ * to the renderer, which opens the topic at the message. `badge` sets the
  * dock's `•` while any topic has an unread mention.
  *
  * The renderer says which topic it shows and whether its window has focus;

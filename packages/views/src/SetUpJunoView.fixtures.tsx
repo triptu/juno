@@ -31,22 +31,14 @@ export default defineFixtures(
       saving: state({ drafts: typed, busy: 'save' }),
       'getting-models': state({ saved: true }),
       'model-chosen': state({ saved: true, models: settings.chatModels, model: 'Claude Sonnet' }),
-      // Codex is not installed: two choices.
-      'no-codex': state({ codex: 'missing' }),
     },
     Custom: {
       empty: state({ shown: 'custom' }),
       'model-typed': state({ shown: 'custom', drafts: { openRouterKey: '', baseUrl: 'http://localhost:11434/v1', customKey: '' }, saved: true, modelTyped: true, model: 'llama3.3' }),
     },
-    Codex: {
-      'signed-out': state({ shown: 'codex' }),
-      'signing-in': state({ shown: 'codex', busy: 'codex' }),
-      'signed-in': state({ shown: 'codex', codex: 'signedIn', saved: true, models: [{ family: 'GPT Sol', resolved: 'GPT-6.1 Sol', provider: 'codex', selected: true }], model: 'codex:GPT Sol' }),
-    },
     Failure: {
       'not-a-key': state({ drafts: { ...typed, openRouterKey: 'two words' }, error: 'That is not a key. Keys have no spaces.' }),
       'bad-url': state({ shown: 'custom', drafts: { openRouterKey: '', baseUrl: 'localhost', customKey: '' }, error: 'Enter an http or https address.' }),
-      'codex-signed-out': state({ shown: 'codex', error: 'Codex did not finish signing in. Try again.' }),
     },
   },
   { width: 760, height: 640, surface: 'background' },

@@ -78,8 +78,6 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'host.schedule.changes': [null, undefined],
   'host.presence': [null, { online: true, aiEnabled: true, quietHours: false, ownerActive: true, accountId: 'account', thisTopic: null }],
   'host.notification.deliver': [{ id: 'notification', title: 'Example', body: 'Example', deliver: 'digest' }, 'held'],
-  'host.notification.summaries': [null, [{ id: 'team:summary:1,2', at: 1, title: '2 messages need you', sources: [{ channelId: 'C1', ts: '1.000001', place: '#eng', sender: 'Maya Chen' }, { channelId: 'D1', ts: '2.000001', place: 'Leo Park' }] }]],
-  'host.notification.summaryTaken': [{ id: 'team:summary:1,2' }, undefined],
 }
 
 function roundTrip<S extends Schema.Codec<unknown, unknown>>(schema: S, value: unknown) {

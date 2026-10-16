@@ -18,6 +18,8 @@ export const RESEND = 'network-resend'
 /** The model's state variable `s`, decoded. */
 export interface S {
   readonly created: ReadonlySet<number>
+  /** The root a reply was queued under from New chat's pending thread, or 0. */
+  readonly parent?: ReadonlyMap<number, number>
   readonly row: ReadonlyMap<number, string>
   readonly stored: ReadonlySet<number>
   readonly server: ReadonlyMap<number, number>
@@ -143,6 +145,10 @@ export interface World {
   engine: RunningEngine
   readonly options: EngineOptions
   readonly ids: Record<Draft, string>
+  /** Each draft's channel: its own, or its root's for a reply (`sendReply`). */
+  readonly channel: Record<Draft, string>
+  /** Drafts sent as New chat thread roots, because a reply names them. */
+  readonly roots: ReadonlySet<Draft>
   /** The first message Juno stored for each draft. */
   readonly first: Map<Draft, string>
   /** Slack's message from Juno's own accepted call, and the network's copy. */
@@ -189,7 +195,7 @@ interface Store {
 
 export function readStore(world: World, k: Draft): Store {
   const id = world.ids[k]
-  const channel = CHANNEL[k]
+  const channel = world.channel[k]
   return readDb(world.engine, 'user.db', (db) => {
     const pending = db.prepare('SELECT state, next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { state: string; next_at: number } | undefined
     const row = pending?.state
@@ -213,10 +219,10 @@ export function readStore(world: World, k: Draft): Store {
 }
 
 export function storedMessages(world: World, k: Draft): ReadonlyArray<Stored> {
-  return readDb(world.engine, 'cache.db', (db) => db.prepare('SELECT ts, deleted FROM messages WHERE channel = ? AND client_msg_id = ?').all(CHANNEL[k], world.ids[k]) as Array<{ ts: string; deleted: number }>)
+  return readDb(world.engine, 'cache.db', (db) => db.prepare('SELECT ts, deleted FROM messages WHERE channel = ? AND client_msg_id = ?').all(world.channel[k], world.ids[k]) as Array<{ ts: string; deleted: number }>)
 }
 
-export const inSlack = (world: World, k: Draft) => world.engine.fake.messages(CHANNEL[k]).filter((m) => m.client_msg_id === world.ids[k])
+export const inSlack = (world: World, k: Draft) => world.engine.fake.messages(world.channel[k]).filter((m) => m.client_msg_id === world.ids[k])
 
 /** The copy's ts in Slack: the message with the draft's id that is not the first Juno stored (or not Juno's own call's). */
 export const copyInSlack = (world: World, k: Draft) => {

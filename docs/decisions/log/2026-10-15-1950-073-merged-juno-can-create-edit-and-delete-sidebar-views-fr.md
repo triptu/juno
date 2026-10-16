@@ -1,0 +1,1 @@
+- 10-15 19:50 · orchestrator · Merged: Juno can create, edit and delete sidebar views from your words ("make a Bots view with every alerts channel"), finding channels by name; the change applies at once with an Undo that survives a restart, and becomes a Change card if the run read Slack. 175 agent tests pass.

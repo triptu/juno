@@ -15,6 +15,8 @@ export default {
     '.': {
       entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
+      // typecheck-bun resolves the pinned executable through bun/package.json.
+      ignoreDependencies: ['bun'],
     },
     // Knip reads every package.json exports map and discovers test/config entries
     // through its Vitest plugin. Package scripts also cover the AI eval entries.

@@ -1,0 +1,1 @@
+- 10-16 12:50 · Tushar · The Namespace bill reached about $200 in one day. The remote pool now caps at 24 vCPU (was 64) and keeps at most one idle machine for 1 minute (was two for 5). The infra agent is breaking down where the money went, and adding a self-hosted runner for Tushar's Windows gaming laptop (WSL2 or Ubuntu, Docker, SSH over Tailscale) that is used before Namespace.

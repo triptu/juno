@@ -1,0 +1,1 @@
+- 10-16 21:00 · orchestrator · The sidebar's first-sync progress lives in the sidebar header: a 2px bar on the header's bottom edge that takes no space, and "Syncing N of M" in a fixed slot. Nothing below the header moves when sync starts or ends.

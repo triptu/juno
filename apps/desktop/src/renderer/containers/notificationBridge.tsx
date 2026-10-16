@@ -6,24 +6,21 @@
  * setting's call, Tell Juno for Juno's.
  */
 import { useEffect } from 'react'
-import { summaryBubbleId } from '@juno/agent-contract'
 import type { NotificationTarget } from '@juno/contract'
-import { activeTab, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, registry, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
+import { activeTab, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { WhyPopover } from '@juno/views'
 import { openTopicAt } from './navigation'
-import { openJunoAt, tellJunoAbout } from './juno/actions'
+import { tellJunoAbout } from './juno/actions'
 import { messageQuote } from './juno/topicContext'
 import { changeFromWhy, closeWhy } from './notifyActions'
 
 /**
  * A clicked notification: the topic at its message, which flashes, also in a
- * tab that already shows it. The hours-start summary opens the Juno tab at
- * its message; with AI assist off by then, its first message.
+ * tab that already shows it.
  */
 function open(target: NotificationTarget): void {
-  if (target._tag === 'summary' && registry.get(junoAvailableAtom)) return openJunoAt(summaryBubbleId(target.id))
-  const source = target._tag === 'message' ? target.source : target.first
+  const source = target.source
   openTopicAt(source.topicId, source.ts, { flash: true })
 }
 

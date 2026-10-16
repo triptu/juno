@@ -1,0 +1,1 @@
+- 10-14 13:35 · Tushar · New feature Slack lacks: a schedule for presence (away or active by time of day), beside the manual switch. Juno sets it with `presence.set` while running and applies the current state on launch or wake. Designed together with the notification timing in the notifications pass.

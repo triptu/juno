@@ -10,6 +10,7 @@ function leaf(item: ContextMenuLeaf): ContextMenuLeaf {
     label: item.label,
     ...(item.enabled === undefined ? {} : { enabled: item.enabled }),
     ...(item.checked === undefined ? {} : { checked: item.checked }),
+    ...(item.sublabel === undefined ? {} : { sublabel: item.sublabel }),
     ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator }),
   }
 }

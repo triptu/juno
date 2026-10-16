@@ -1,0 +1,1 @@
+- 10-14 15:30 · Tushar · Keep the interface dead simple: anything Juno can do from the owner's words happens in chat, per-item choices live in that item's menu, and settings stay few.

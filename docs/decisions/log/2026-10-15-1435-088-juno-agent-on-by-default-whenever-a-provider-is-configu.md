@@ -1,0 +1,1 @@
+- 10-15 14:35 · Tushar · Juno Agent on by default whenever a provider is configured. Providers in Settings › Juno: OpenRouter key, or one generic OpenAI-compatible endpoint (base URL, key, model) for local models or other services.

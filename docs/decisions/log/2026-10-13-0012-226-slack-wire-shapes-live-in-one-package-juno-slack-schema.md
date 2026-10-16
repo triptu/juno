@@ -1,0 +1,1 @@
+- 10-13 00:12 · Orchestrator · Slack wire shapes live in one package, `@juno/slack-schema`, with one branded `Ts` (from the M1 code review).

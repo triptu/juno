@@ -1,0 +1,1 @@
+- 10-12 23:16 · Orchestrator · Lists use in-flow rows with `content-visibility: auto`. `@tanstack/react-virtual` is the only allowed virtualization library.

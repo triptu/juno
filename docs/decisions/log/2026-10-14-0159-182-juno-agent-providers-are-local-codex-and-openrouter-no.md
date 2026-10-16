@@ -1,0 +1,1 @@
+- 10-14 01:59 · Tushar · Juno Agent: providers are local Codex and OpenRouter (no Claude Code subscription); proactive messages only about things he set up; v1 sync is one writer plus encrypted backup and movable ownership; no click needed for read-only lookups, OS notifications, self-scheduling and starting T3 Code sessions.

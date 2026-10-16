@@ -1,9 +1,11 @@
 // Read state end to end (architecture 5.6, specs/readstate.qnt): the read
 // commands over the port, the sidebar rows they change, and what reaches
 // the fake Slack.
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { prefsSet, readsMarkRead, readsMarkUnread, type TopicRow, type UndoCommand } from '@juno/contract'
-import { mirrorReadsAtom, runCommand, type TopicListFilter } from '@juno/state'
+import { prefsSet, readsCatchUp, readsMarkRead, readsMarkUnread, type TopicRow, type UndoCommand } from '@juno/contract'
+import { mirrorReadsAtom, readCatchUpAtom, runCommand, type TopicListFilter } from '@juno/state'
 import { sleep, waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine as boot, quiet, readDb, restart, threadId, tsOf, valueOf } from './scenario'
 
@@ -253,5 +255,59 @@ describe('nothing marks by itself', () => {
     await engine.phase('live', 30_000)
     await quiet(engine)
     expect(marks(engine)).toEqual([])
+  })
+})
+
+
+describe('read catch-up', () => {
+  it('queues only earlier local reads, once, through the mark worker', async () => {
+    const engine = await bootedEngine()
+    valueOf(await setMirror(engine, false))
+    const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
+    const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
+    valueOf(await markRead(engine, ALERTS_MAIN))
+    valueOf(await markRead(engine, roadmap))
+    valueOf(await markRead(engine, checkout))
+    valueOf(await markUnread(engine, 'm:C0ENG'))
+    await quiet(engine)
+    expect(marks(engine)).toHaveLength(0)
+    valueOf(await setMirror(engine, true))
+    const unmount = engine.registry.mount(readCatchUpAtom)
+    await waitFor(() => {
+      const state = engine.registry.get(readCatchUpAtom)
+      return state._tag === 'Success' && state.value.available === 2 ? true : undefined
+    }, 10_000, 'two eligible earlier reads')
+    engine.fake.resetCalls()
+    valueOf(await runCommand(engine.registry, readsCatchUp, undefined))
+    await waitFor(() => marks(engine).length === 2 ? true : undefined, 15_000, 'both catch-up marks')
+    await waitFor(() => {
+      const state = engine.registry.get(readCatchUpAtom)
+      return state._tag === 'Success' && state.value.pending === 0 && state.value.available === 0 ? true : undefined
+    }, 10_000, 'catch-up finished')
+    expect(engine.fake.workspace.reads.get(ALERTS)).toBe(storedPointer(engine, ALERTS_MAIN))
+    expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(storedPointer(engine, roadmap))
+    valueOf(await runCommand(engine.registry, readsCatchUp, undefined))
+    await quiet(engine)
+    expect(marks(engine)).toHaveLength(2)
+    unmount()
+  })
+
+  it('catches up an existing install with an unset preference once across restarts', async () => {
+    const first = await bootedEngine()
+    valueOf(await setMirror(first, false))
+    valueOf(await markRead(first, ALERTS_MAIN))
+    const pointer = storedPointer(first, ALERTS_MAIN)
+    const next = await restart(engines, first, () => {
+      // Reproduce the pre-migration install while its engine is stopped.
+      const db = new DatabaseSync(join(first.userData, 'workspaces', first.fake.workspace.team.id, 'user.db'))
+      try {
+        db.prepare("DELETE FROM prefs WHERE key IN ('reads.mirror', 'reads.mirrorDefaultApplied', 'reads.mirrorCatchUp')").run()
+      } finally { db.close() }
+    })
+    await waitFor(() => next.fake.workspace.reads.get(ALERTS) === pointer ? true : undefined, 15_000, 'automatic migration')
+    expect(marks(next)).toHaveLength(1)
+    const again = await restart(engines, next)
+    await quiet(again)
+    expect(marks(again)).toHaveLength(0)
   })
 })

@@ -1,0 +1,1 @@
+- 10-13 17:56 · Tushar · Formal specs in Quint for the concurrent sync protocols: follow/unfollow and read state first (after the M3 sync fixes), then merge ordering and the outbox before M6. Model checker in CI; specs generate event orderings for the convergence test; changing sync behaviour means updating the spec.

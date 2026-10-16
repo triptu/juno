@@ -1,0 +1,1 @@
+- 10-14 15:30 · Tushar · New: Juno can open as a right sidebar on any topic and knows what you are looking at, so you can talk about it in place.

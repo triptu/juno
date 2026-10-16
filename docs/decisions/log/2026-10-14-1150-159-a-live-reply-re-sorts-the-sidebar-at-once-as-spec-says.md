@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · A live reply re-sorts the sidebar at once, as SPEC says. No hold while hovering.

@@ -1,0 +1,1 @@
+- 10-12 ~17:45 · Tushar · Build Juno on Electron, React, TypeScript, StyleX, Effect and pi-ai with OpenRouter, as a monorepo, by reverse engineering Slack's own client.

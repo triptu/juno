@@ -63,6 +63,8 @@ export interface LaunchOptions {
   readonly backupIntervalMs?: number
   /** How long the engine's fake AI takes to answer; past a task's timeout it gives no answer. */
   readonly fakeAiDelayMillis?: number
+  /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
+  readonly codemode?: boolean
 }
 
 /**
@@ -86,6 +88,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
+  if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
 
   // Launch the package directory (like `electron .`), not the script, so

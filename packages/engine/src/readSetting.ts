@@ -1,18 +1,12 @@
-/**
- * The mirror setting (owner decision 10-13, M4 plan question 4): whether
- * read marks reach Slack. It is the workspace preference `reads.mirror`.
- * Unset, it is on against the fake Slack (`EngineConfig.fakeSlackUrl`) and
- * off against a real workspace, so marks stay in Juno until the owner turns
- * it on.
- */
+/** Workspace read mirroring defaults on; an explicit false keeps marks local. */
 import { Effect } from 'effect'
 import { MIRROR_READS_PREF, type MirrorSetting } from '@juno/contract'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import type { EngineConfig } from '@juno/contract'
 
-const decide = (stored: string | undefined, config: EngineConfig): MirrorSetting => {
+const decide = (stored: string | undefined, _config: EngineConfig): MirrorSetting => {
   const value = stored === undefined ? undefined : (JSON.parse(stored) as unknown)
-  return typeof value === 'boolean' ? { on: value, explicit: true } : { on: config.fakeSlackUrl !== undefined, explicit: false }
+  return typeof value === 'boolean' ? { on: value, explicit: true } : { on: true, explicit: false }
 }
 
 /** The setting, read on the writer inside a command's or the worker's transaction. */

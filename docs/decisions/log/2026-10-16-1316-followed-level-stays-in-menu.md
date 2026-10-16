@@ -1,0 +1,1 @@
+- 10-16 13:16 · follow-header · A followed thread's Notify me level is shown only in ⋯ › Notify me, not in the header; once followed, the island's job is Resolve.
