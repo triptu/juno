@@ -45,7 +45,6 @@ export const chatCopy = {
   },
   /** The Juno panel (SPEC 7, inventory 12.1). */
   panel: {
-    catchMeUp: 'Catch me up',
     openInTab: 'Open in a tab',
     close: 'Close Juno ⌘J',
     removeQuote: 'Remove quote',

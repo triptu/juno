@@ -82,7 +82,7 @@ const panel = (context: JunoPanelContextProps, items: Parameters<typeof JunoChat
   </JunoChatFrame>
 )
 
-const junoPanel = panel({ onCatchMeUp: noop })
+const junoPanel = panel({})
 const selection = { text: 'We could use logical replication for the cutover and keep the old primary as a fallback.', sender: 'Leo Park' }
 
 const junoPage = (
@@ -135,8 +135,8 @@ export default defineFixtures(
       'juno-panel-selection': workspace({ side: panel({ selection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
       // Ask Juno about a person: the line names them instead of the topic.
       'juno-panel-about': workspace({ side: panel({ about: { _tag: 'person', userId: 'U0MAYA', name: 'Maya Chen' }, onRemoveAbout: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
-      // Nothing said yet: the empty chat with its suggestion chips, and Catch me up above the composer.
-      'juno-panel-empty': workspace({ side: panel({ onCatchMeUp: noop }, []) }, postgresPanelPage, { width: 1200, height: 720 }),
+      // Nothing said yet: the empty chat with its suggestion chips.
+      'juno-panel-empty': workspace({ side: panel({}, []) }, postgresPanelPage, { width: 1200, height: 720 }),
       // The panel gives way to keep the topic 480px wide, down to its 360px minimum.
       'juno-panel-gives-way': workspace({ side: junoPanel }, postgresPanelPage, { width: 900, height: 640 }),
       // Under that the panel covers the topic, which shows through it.

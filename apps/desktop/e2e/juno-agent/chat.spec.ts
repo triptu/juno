@@ -188,19 +188,6 @@ test('the panel is open in one tab and closed in another, and each keeps its sta
   await expect(panel).toHaveCount(0)
 })
 
-test('a topic opened at its "new" divider offers Catch me up in the panel, once', async ({ juno, model }) => {
-  await ready(juno)
-  await setWindowWidth(juno, 1400)
-  await juno.sidebar.row(RINA).open()
-  await juno.topic.expectNew(2)
-  await juno.tabs.menu('juno')
-  const panel = JunoChatPane.panel(juno.win)
-  await juno.win.locator('[data-catch-me-up]').click()
-  await panel.expectJuno('You said: Catch me up')
-  expect(model.inputs().at(-1)!).toMatch(/ new-from="[^"]+"/)
-  await expect(juno.win.locator('[data-catch-me-up]')).toHaveCount(0)
-})
-
 test('Ask Juno in a person menu opens the panel with an About chip, and the message is about that person', async ({ juno, model }) => {
   await ready(juno)
   await setWindowWidth(juno, 1400)

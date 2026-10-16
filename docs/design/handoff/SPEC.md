@@ -188,7 +188,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
 
 - **Style.** Flat Slack-style messages. Consecutive messages from the same person group under one header.
 - **Stable geometry.** Messages reserve one line for reactions and Main reserves a thread-link line. Reactions overflow horizontally instead of adding height. Sender names and the Threads counter keep fixed-width slots while data arrives. Home enters by opacity only; its greeting and rows stay in their final positions.
-- **Where it opens.** A topic opens at a "N new" divider when it has unread messages, otherwise at the bottom. There is no summary card at the divider; "Catch me up" in the Juno panel does that.
+- **Where it opens.** A topic opens at a "N new" divider when it has unread messages, otherwise at the bottom. There is no summary card at the divider; to catch up, ask Juno in the panel.
 - **Mentions.** @people and #channels render as soft chips. Mentions of you get the accent colour and a lightly tinted message background. Clicking a #channel filters the sidebar to it.
 - **Hover toolbar:**  Reactions are toggleable chips under the message.
   - Three one-click reactions (👍 ✅ 👀).
@@ -221,7 +221,6 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 - **What Juno knows.** With each message sent from the panel, Juno gets the topic (its id, title, channel and kind), the messages on screen, the "new" divider's position, and your text selection in the topic if there is one. "This" means that topic.
 - **Context line.** One quiet line above the panel's composer says what Juno sees: the channel's kind icon and "eng · Main" or "eng · {topic title}". While text is selected in the topic it adds "+ selection", with the selected words as its tooltip and an x to remove it. The topic itself cannot be removed.
 - **Ask Juno about a person or channel.** Ask Juno in a person's or channel's menu (section 5) opens the panel, or the Juno tab when no topic tab is active, with the composer focused and the context line reading "About Maya Chen" or "About #eng", with an x to remove it. You type the question. The message carries that person or channel in place of the topic and the messages on screen, and its About line names them. A chip holds only a name, so it does not count as reading Slack; Juno then reads what it needs with its read tools.
-- **Catch me up.** When the topic opened at a "new" divider, a suggestion chip above the context line reads "Catch me up". It is an action, not a reply: a quiet outlined pill with a small icon, on the composer's edge. Clicking it sends it. This replaces the catch-up card that used to sit at the divider. What Juno answers, and how long, is up to the model.
 - **Trust.** Anything Juno reads from the topic, the selection included, is Slack content. A message sent from the panel therefore counts as having read Slack in that run, and the untrusted-content rule (13.9) applies: work that would need no click proposes a card instead, with a Because line.
 - **AI assist off.** The Juno button is hidden, and so are Ask Juno and Tell me if nobody replies in the menus.
 
@@ -334,7 +333,7 @@ Juno is also the assistant's name. It is one long chat with one assistant that r
 - **Replies.** You can reply to a Juno bubble or card (hover › Reply, or right-click › Reply). The composer shows the quote above the field, and your bubble shows a one-line quote above it; a click scrolls to the original. Juno gets the quoted item in full. Juno can reply to one of your messages when it helps, with the same quote. A reply sent while Juno is working joins the work like any message.
 - **A reaction or a reply is never a click.** A thumbs up under a Send message card does not send, and "send it" as a reply to a card does not send either; only the card's button does (13.3). Neither pins anything (13.8).
 - **"This"** means the topic you were last viewing.
-- **Empty state.** "What do you need?" with the seated-j illustration, one line on what Juno can do, and four suggestion chips, the same quiet outlined pills with a small icon as Catch me up in the panel, with verb-first text. Clicking one sends it.
+- **Empty state.** "What do you need?" with the seated-j illustration, one line on what Juno can do, and four suggestion chips, quiet outlined pills with a small icon and verb-first text. Clicking one sends it.
 - **Composer.** Enter sends, Shift Enter adds a line. The chat works like a text conversation: you can send while Juno is working, and Juno reads the message at its next step (13.5).
 - **Context menu on a message:** Copy, React, Reply (on Juno's), Remember this (on your own messages), Remove. Remember this pins the selected text when there is a selection inside the message, otherwise the whole message; it is disabled when that is longer than a sentence (280 bytes). Remove opens a local sheet (13.8) that works in every state, including paused, offline and AI off.
 - **Read.** A Juno bubble counts as read once it has been fully on screen in the focused chat for one second. Opening the chat does not read what is below the fold.

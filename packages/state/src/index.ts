@@ -171,7 +171,6 @@ export {
   type ToastContent,
 } from './undo'
 export {
-  catchUpDoneAtom,
   flashMessage,
   focusJunoComposer,
   JUNO_TAB_ABOUT,

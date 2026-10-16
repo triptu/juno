@@ -1,5 +1,5 @@
 import { useEmojiSuggestions } from '../emojiSuggestions'
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { chatCopy, type ChatPage, type Quote, type SendContext } from '@juno/agent-contract'
 import { junoDraftAtom, nowAtom, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -19,14 +19,12 @@ export interface JunoChatProps {
   readonly header: (banner: ChatPage['banner']) => ReactNode
   /** What the next message is about, read at send time (the panel's topic, an About chip). */
   readonly contextOf?: () => SendContext | undefined
-  /** Above the composer field: the panel's selection quote, About chip and Catch me up. */
+  /** In the composer field's top: the panel's context chips. */
   readonly composerContext?: ReactNode
   /** A message went out, with the context it carried. */
   readonly onSent?: (context: SendContext | undefined) => void
   /** Esc in the empty composer. */
   readonly onEscape?: () => void
-  /** For the panel's Catch me up: sends `text` as if typed. */
-  readonly sendRef?: RefObject<((text: string) => void) | null>
 }
 
 /**
@@ -48,7 +46,7 @@ export interface JunoChatProps {
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
  */
-export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
+export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape }: JunoChatProps) {
   const agent = useAgentState()
   const { page, pageRef, current, loaded, setWindow } = useChatWindow(column, agent)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -71,7 +69,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const emojiSuggestions = useEmojiSuggestions({ text: draft, onChange: setDraft, field: inputRef })
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
   useFocusRequest(column, inputRef)
-  const { toBottom, send } = useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
+  const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
   useChatTarget(column, positioned, items, scrollRef, pinnedRef, setWindow)
