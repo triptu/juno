@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · A New chat tab's text, mentions and destination are saved with the tab and come back after a restart, as a topic draft does. Attachments are not saved.

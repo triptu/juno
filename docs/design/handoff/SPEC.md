@@ -151,7 +151,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 - Everything opens in the **current tab**, the header's topic switcher included (section 7). A new tab opens only on ⌘-click, ⌘ Enter or "Open in new tab".
 - A plain open of a topic or page that another tab shows focuses that tab, the one active last if several do, so the sidebar's selection stays one place. ⌘-click and "Open in new tab" always open a new tab, so the same topic, Home, All topics or Juno can show in several tabs.
-- **One place in several tabs.** Each tab keeps its own scroll position, "N new" divider, composer focus and selection. Everything else is shared: the messages, the read state, the Juno chat and the draft of each topic. Two Juno tabs show the same chat, and a message sent in one shows in both. Two tabs on one topic can sit at different places in it.
+- **One place in several tabs.** Each tab keeps its own scroll position, "N new" divider, composer focus and selection. A press on a tab gives its page focus (the composer it had, or its composer), as in Safari; the keyboard keeps focus in the strip. Everything else is shared: the messages, the read state, the Juno chat and the draft of each topic. Two Juno tabs show the same chat, and a message sent in one shows in both. Two tabs on one topic can sit at different places in it.
 - **New tabs.** The "+" button and ⌘T open a new tab with a New chat (section 9), or Home when Settings › General says so ("New tabs open": New chat, the default, or Home). ⌘N and the sidebar's New chat button always open a New chat. Closing the last tab opens a new tab the same way, so there is never no tab.
 - Tabs carry the topic's art and title, or the channel name for a Main thread. Closing a tab focuses its neighbour.
 - **Unread dot.** A tab whose topic has unread messages shows a small soft grey dot after its title, the same grey as unread counts. One style for all unread, mentions included. The active tab never shows it, since opening marks read.
@@ -228,7 +228,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 - **Mentions.** Typing @ suggests people and # suggests channels, with arrow keys and Enter or Tab to pick.
 - **Audience check.** When what you type reads like hiring or people details and the channel is public, a quiet amber line warns you as you type.
 
-- **Emoji suggestions.** In every composer, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then prefix, then substring. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
+- **Emoji suggestions.** In every composer and the inline edit field, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then common emoji (👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌, in that order), then prefix, then substring, so `:thumbs` offers 👍 first. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
 
 ### Checks on send
 
@@ -261,7 +261,7 @@ A conversation where you write first and choose where it goes, with frequent des
   - Changing the conversation sets the thread back to Main.
 - **The conversation picker is the context pill.** Once chosen it takes the pill's look for its kind (neutral, amber for private, blue for DMs), so where the message will go is visible while you write, the same as in a topic (section 7).
 - **Preview.** When no frequent destinations are available, picking a destination fills the space above with that topic's latest messages, opened at the bottom. The preview is read-only: no hover toolbar, no reactions, and nothing is marked read, as with peek. Changing the destination swaps the preview at once. A person you have never messaged shows "This is the start of your conversation with Jonas Weber."
-- **The draft is kept** through every change of destination, attachments included. Closing the tab with a draft shows "Draft closed · Undo".
+- **The draft is kept** through every change of destination, attachments included. The text and destination are saved with the tab and come back after a restart. Closing the tab with a draft shows "Draft closed · Undo".
 - **Sending.** Enter with no destination opens the conversation picker and keeps the draft; Enter after picking sends. The send checks (section 8) run as usual: the wrong-place check in Main can move the message into a thread, and the audience check reads the chosen channel. A person you have never messaged gets a DM opened first, then the message.
 - **After the first send** the pickers go away and the tab becomes that topic: its header, title and messages, marked read as when you open it. If that topic was already open in another tab, that tab is focused and the New chat tab closes.
 - **Not in v1:** starting a new group DM from here, and sending to several places at once.

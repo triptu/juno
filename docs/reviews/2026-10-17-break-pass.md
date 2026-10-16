@@ -58,7 +58,24 @@ The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts` and
 
 ## Open findings
 
-Ranked by how much a daily user would feel them.
+Ranked by how much a daily user would feel them. All six were fixed in a
+second round on the same branch, as the owner decided (the decision log has
+one line for each):
+
+1. Emoji suggestions rank the common emoji 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌 after
+   recent use and before name order.
+2. A New chat tab's text, mentions and destination are saved with the tab
+   (`setNewChat`, the `newChat` field of a saved tab). Attachments are not.
+3. A press on a tab no longer focuses the tab; its page takes focus, the
+   element it had or else its composer. Arrow keys in the strip still move
+   focus there.
+4. Attach files has `tabIndex -1` in New chat only.
+5. The inline edit field has the emoji suggestions, above the field.
+6. New chat's pickers keep the last rows while a query loads (`useHeld` in
+   `NewChat.tsx`); a feel scenario, `new-chat-picker-typing`, checks that
+   the list never has zero rows while a search is typed.
+
+The findings as first written:
 
 1. **`:thumbs` and Enter gives 👎.** With no recent use, matches in the
    prefix tier are in name order, so `thumbsdown` comes before `thumbsup`.
@@ -139,7 +156,8 @@ These were tried and behaved as the spec says:
 
 `pnpm affected` passed after the fixes: typecheck, lint, the unit tests, the
 gallery and the whole desktop e2e on four remote shards. The New chat
-relaunch test is marked `test.fail()` until finding 2 is fixed.
+relaunch test was marked `test.fail()` until finding 2 was fixed; it now
+passes.
 
 ## Not covered
 

@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · Emoji suggestions rank by recent use, then the common emoji 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌, then prefix, then substring, so :thumbs offers 👍 before 👎.

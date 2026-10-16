@@ -171,9 +171,7 @@ test('a relaunch keeps many tabs and their drafts', async ({ juno, running, user
   }
 })
 
-// Open finding: a New chat's draft and destination live only while the app runs (`newChatAtom`).
 test('a relaunch keeps a New chat tab with its destination and draft', async ({ juno, running, userData, fake, slackApp }) => {
-  test.fail()
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
@@ -286,9 +284,7 @@ test('New chat works from the keyboard alone: write, pick with Enter, send', asy
   await juno.newChat.expectConversation('eng')
   await expect(juno.newChat.composer).toBeFocused()
   await expect(juno.newChat.composer).toHaveValue('Keyboard only')
-  // Shift Tab reaches Attach files, then the thread picker; Esc from its list goes back without a change.
-  await juno.win.keyboard.press('Shift+Tab')
-  await expect(juno.newChat.root.getByRole('button', { name: 'Attach files' })).toBeFocused()
+  // Shift Tab reaches the thread picker (Attach files is out of the Tab order); Esc from its list goes back without a change.
   await juno.win.keyboard.press('Shift+Tab')
   await expect(juno.newChat.threadButton).toBeFocused()
   await juno.win.keyboard.press('Enter')
@@ -296,7 +292,6 @@ test('New chat works from the keyboard alone: write, pick with Enter, send', asy
   await juno.win.keyboard.press('Escape')
   await expect(juno.newChat.threadButton).toBeFocused()
   await juno.newChat.expectThread('Main')
-  await juno.win.keyboard.press('Tab')
   await juno.win.keyboard.press('Tab')
   await expect(juno.newChat.composer).toBeFocused()
   await juno.win.keyboard.press('Enter')
@@ -350,4 +345,59 @@ test('Enter right after typing in the conversation search picks the match', asyn
   await expect(juno.newChat.composer).toBeFocused()
   await juno.win.keyboard.press('Enter')
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typed fast').length).toBe(1)
+})
+
+test('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.sidebar.row(RINA).openInNewTab()
+  // Never focused in this tab: the press focuses its composer.
+  await juno.tabs.select(POSTGRES)
+  await expect(juno.topic.composer).toBeFocused()
+  await juno.win.keyboard.type('Typed after a click')
+  await expect(juno.topic.composer).toHaveValue('Typed after a click')
+  // From the sidebar, a press on the active tab focuses its page too.
+  await juno.sidebar.row(POSTGRES).focus()
+  await juno.tabs.select(POSTGRES)
+  await expect(juno.topic.composer).toBeFocused()
+  // Arrow keys in the strip move the selection and keep focus on the tabs.
+  await juno.tabs.tab(POSTGRES).focus()
+  await juno.win.keyboard.press('ArrowRight')
+  await juno.tabs.expectActive('Rina')
+  await juno.tabs.expectFocused('Rina')
+})
+
+test('the inline edit field suggests emoji, and Esc there closes the list, not the edit', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.send('Edit with emoji')
+  await juno.topic.expectSent('Edit with emoji')
+  await juno.topic.chooseInMessageMenu('Edit with emoji', 'edit')
+  const edit = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
+  await expect(edit).toBeFocused()
+  await edit.pressSequentially(' :tad')
+  const list = juno.win.getByRole('listbox', { name: 'Emoji' })
+  await expect(list).toBeVisible()
+  await expect(list).toBeInViewport({ ratio: 1 })
+  await edit.press('Escape')
+  await expect(list).toHaveCount(0)
+  await expect(edit).toBeVisible()
+  await edit.pressSequentially('a')
+  await expect(list).toBeVisible()
+  await edit.press('Enter')
+  await expect(edit).toHaveValue('Edit with emoji 🎉 ')
+  await edit.press('Enter')
+  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Edit with emoji 🎉')).toBe(true)
+})
+
+test(':thumbs offers 👍 first, before any recent use', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.composer.pressSequentially(':thumbs')
+  await expect(juno.topic.suggestions.getByRole('option').first()).toHaveAccessibleName(':thumbsup:')
+  await juno.topic.composer.press('Enter')
+  await expect(juno.topic.composer).toHaveValue('👍 ')
 })
