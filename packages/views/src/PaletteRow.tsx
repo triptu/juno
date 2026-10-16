@@ -230,24 +230,26 @@ function Glyph({ item }: { readonly item: PaletteItem }) {
   if (item.person !== undefined) {
     return <Avatar size={20} label={initials(item.person.name)} hue={hueFor(item.person.color, item.person.id)} {...(item.person.avatarUrl === undefined ? {} : { src: item.person.avatarUrl })} />
   }
-  if (item.accent !== undefined) {
-    return (
-      <span aria-hidden="true" {...stylex.props(styles.accentSlot)}>
-        <span {...stylex.props(styles.accentDot, accentDots[item.accent])} />
-      </span>
-    )
-  }
-  return <Icon icon={icons[item.icon]} size={16} />
+  return (
+    <span aria-hidden="true" {...stylex.props(styles.glyphSlot, item.compact === true && styles.glyphSlotCompact)}>
+      {item.accent !== undefined ? <span {...stylex.props(styles.accentDot, accentDots[item.accent])} /> : <Icon icon={icons[item.icon]} size={16} />}
+    </span>
+  )
 }
 
 const styles = stylex.create({
-  // The 20px slot an avatar takes, so a dot row's label lines up with the others.
-  accentSlot: {
+  glyphSlot: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
     width: sizes['--icon-16'],
     height: sizes['--icon-16'],
+  },
+  // One-line rows can hold a DM's 20px avatar, so every glyph there takes 20px and the names line up.
+  glyphSlotCompact: {
+    width: sizes['--icon-20'],
+    height: sizes['--icon-20'],
   },
   accentDot: {
     width: sizes['--icon-12'],
