@@ -255,7 +255,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 Only **Wrong place** can stop a send. In Main, typing pauses compare the draft with the last 3–4 open topics. Enter reads a ready answer only. A confident match offers “Looks like a reply to *Staging bill doubled since August*”, with **Post in thread** or **Send to Main**. No ready answer means send. This check stays before sending because it chooses where the message goes. The audience warning remains a non-blocking typing hint.
 
-All text fixes run **after sending**, only for messages sent from Juno. Enter never waits for grammar. Messages above 1,000 Unicode characters are skipped entirely. Code blocks, inline code, quotes, links, emails and mentions are excluded from checks and masked from the model input.
+All text fixes show **after sending**, only for messages sent from Juno. Enter never waits for grammar. Messages above 1,000 Unicode characters are skipped entirely. Code blocks, inline code, quotes, links, emails and mentions are excluded from checks and masked from the model input.
 
 - **Typos and doubled words:** the local typo table and accidental repeated words. Turning it off also suppresses doubled-word findings from grammar.
 - **Capital i:** standalone lowercase “i” to “I”. Off by default, so lowercase style is never flagged unless the user turns it on; grammar never flags lowercase style.
@@ -263,7 +263,7 @@ All text fixes run **after sending**, only for messages sent from Juno. Enter ne
 - **Long sentences:** note a sentence over 40 words, without rewriting it.
 - **Grammar (uses AI):** clear it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, missing or doubled words, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Validated minimal word edits cannot change surrounding prose.
 
-Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. The local pass and one grammar request start after the send is accepted; no typing-pause grammar requests or retries. Grammar has a 700 ms request deadline, leaving room for delivery and paint within the one-second display window. Calls count against a persisted 500-call daily limit, including failed requests, and record known cost in AI spend.
+Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. No model answers within one second (`docs/research/grammar-post-send.md`), so the grammar request starts when typing pauses, for the draft as it will be sent, and the second after sending usually has its answer already. Each exact text is asked once, with no retries; its answer is cached by the text. Typing again stops the request that pause started, and the next pause asks about the new text. A request for the text being sent runs to its end. A send with no pause before it starts the request then. The request deadline is 3 seconds; the suggestion still shows only within the one-second window, and nothing ever holds Enter. The local pass starts after the send is accepted. Every grammar request, including failed and stopped ones, counts against a persisted 500-call daily limit, is spent as background work in the AI spend cap, and is recorded in the AI activity log.
 
 A finding appears only within one second of sending and while the user is still on that topic with the app visible. Leaving the topic, late answers or missing rows drop it silently, without a badge, queue or later popup. The quiet overlay on the sent message shows the small fix, such as “its → it's”, and one action: **Edit**. It reserves no space and never moves other messages. Edit opens the existing inline editor with the fixes as an unsaved draft; only the user's Save changes the message. Esc dismisses the suggestion. Ignoring it dismisses it after eight seconds. A changed message cannot receive an old suggestion.
 
@@ -591,7 +591,7 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 | Topic titles | Generation | New thread, and on drift | Always, with no marker |
 | Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | Likely reply to one of them |
 | Local checks | Pure rules | On send, according to each preference | Concrete fixes or a long sentence found |
-| Grammar check | Decision, minimal span edits | After a Juno send, one 700 ms request | Within one second, still on the visible topic; clear errors only |
+| Grammar check | Decision, minimal span edits | Typing pause (or the send, without one), one 3 s request per exact text; read after a Juno send | Within one second of sending, still on the visible topic; clear errors only |
 | Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
 | Settled, suggest resolve | Decision | Each new message | High score |
 | Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |

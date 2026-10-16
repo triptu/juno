@@ -17,9 +17,14 @@
  *   the outbox sends it. A message Slack may not have yet waits for it
  *   (`depends_on`). Neither has an undo (ADR 0010).
  * - `messages.react`: adds or removes the user's reaction, the same way.
- * - `messages.precheck`: while typing pauses in Main, asks the route model
+ * - `messages.precheck`: while typing pauses, starts the grammar request for
+ *   the draft as it would be sent (`grammarCheck`), so the second after
+ *   sending usually has its answer. In Main it also asks the route model
  *   whether the draft reads like a reply to one of the channel's latest
- *   topics (`routeCheck`) and stores the answer. Answers once it is stored.
+ *   topics (`routeCheck`) and stores the answer. Answers once the route
+ *   answer is stored; grammar goes on in the background.
+ * - `messages.precheckStop`: the draft changed after a pause, so the grammar
+ *   request that pause started stops, unless that text was sent.
  * - `messages.check`: the checks on send (spec section 8), run on Enter
  *   before `messages.send`. It never waits for a model: the wrong-place
  *   finding is the precheck's stored answer for this exact draft, if there
@@ -136,9 +141,18 @@ export const messagesCheck = Rpc.make('messages.check', {
   success: SendCheck,
 })
 
-/** Wrong-place question, asked while typing pauses so `messages.check` finds the answer. */
+/**
+ * Asked while typing pauses: the wrong-place question, so `messages.check` finds the answer, and grammar, so
+ * `messages.postcheck` does. `message` is the draft as it will be sent, when that differs from `text`.
+ */
 export const messagesPrecheck = Rpc.make('messages.precheck', {
-  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String), text: Schema.String },
+  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String), text: Schema.String, message: Schema.optionalKey(Schema.String) },
+  success: Schema.Void,
+})
+
+/** The composer at this place changed after a pause: its grammar request stops unless its text was sent. */
+export const messagesPrecheckStop = Rpc.make('messages.precheckStop', {
+  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String) },
   success: Schema.Void,
 })
 
@@ -154,4 +168,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPrecheckStop, messagesPostcheck, draftsGet, draftsSet)
