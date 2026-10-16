@@ -432,7 +432,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
-| `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 2.9) |
+| `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 1.2) |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
