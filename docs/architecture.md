@@ -230,6 +230,7 @@ synced_ranges   (channel, from_ts, to_ts, PK(channel, from_ts))   -- explicit, n
 thread_cursors  (channel, thread_ts, PK, replies_complete, synced_at, complete_from)
 topic_index     (topic_id PK, channel, kind, last_activity_ts, message_count, participants_json,
                  root_ts, unread_count, unread_exact, mentions_me, preview_json, rev)
+                -- participants_json: distinct senders of the last 15 unread messages, newest first, never you; [] when read
 sync_state      (key PK, value_json)
 rechecked_topics (topic_id PK, requested_at, from_ts, to_ts)   -- the span the last recheck read per topic (ADR 0014)
 ai_cache        (task, key, PK, input_hash, output_json, model, cost_usd, created_at)

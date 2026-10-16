@@ -82,6 +82,8 @@ const TopicRowFields = {
   subscribed: Schema.Boolean,
   /** Main rows: threads started in the channel since Main was last read ("2 new threads"). 0 for a thread, and for a Main never read. */
   newThreads: Schema.Int,
+  /** People talking in the unread messages beyond the four the row names, for the stack's "+N". Absent when none. */
+  moreParticipants: Schema.optionalKey(Schema.Int),
   lastActivityTs: Schema.String,
   /** Epoch milliseconds of `lastActivityTs`, for the relative time. */
   lastActivityAt: Schema.Number,
@@ -96,7 +98,11 @@ const TopicRowFields = {
 export const TopicRow = Schema.Struct({
   ...TopicRowFields,
   channel: RowChannel,
-  /** Most recent first, at most four. */
+  /**
+   * The senders of the topic's latest unread messages (at most the last 15),
+   * most recent first, at most four, never you. Empty when the topic is read
+   * and in DMs.
+   */
   participants: Schema.Array(Person),
   /**
    * The topic's art as a recipe (`@juno/topic-art`), joined from the
@@ -117,7 +123,7 @@ export type TopicRow = typeof TopicRow.Type
 export const TopicListRow = Schema.Struct({
   ...TopicRowFields,
   channelId: Schema.String,
-  /** Most recent first, at most four. */
+  /** The ids of `TopicRow.participants`: unread senders, most recent first, at most four. */
   participantIds: Schema.Array(Schema.String),
 })
 export type TopicListRow = typeof TopicListRow.Type

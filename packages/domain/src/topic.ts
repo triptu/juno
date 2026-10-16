@@ -29,7 +29,7 @@ export interface TopicActivity {
   /** False when local history may not cover everything since the read pointer. */
   readonly unreadExact?: boolean
   readonly mentionsMe: boolean
-  /** Most recent first, never you. */
+  /** Senders of the latest unread messages (`PARTICIPANT_WINDOW`), most recent first, never you. Empty when read. */
   readonly participants: ReadonlyArray<UserId>
 }
 

@@ -125,7 +125,7 @@ describe('the sidebar rows across a profile change', () => {
 })
 
 describe('the participant stack on a busy thread', () => {
-  it('shows four people other than you, most recent first, though you posted last', async () => {
+  it('shows four unread senders other than you, most recent first, and counts the rest', async () => {
     const engine = await liveEngine()
     const { fake } = engine
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Who can review the cutover runbook?' })
@@ -137,6 +137,9 @@ describe('the participant stack on a busy thread', () => {
     // Four people show while the replies are still arriving, so wait for the stack after the last one.
     const stack = (all: ReadonlyArray<TopicRow>) => all.find((r) => r.id === id)?.participants.map((p) => p.id).join()
     const rows = await engine.rowsUntil((all) => stack(all) === 'U0JONAS,U0PRIYA,U0SAM,U0LEO', 'the busy thread with four people')
-    expect(rows.find((r) => r.id === id)!.participants.map((p) => p.id)).toEqual(['U0JONAS', 'U0PRIYA', 'U0SAM', 'U0LEO'])
+    const row = rows.find((r) => r.id === id)!
+    expect(row.participants.map((p) => p.id)).toEqual(['U0JONAS', 'U0PRIYA', 'U0SAM', 'U0LEO'])
+    // Maya started the thread and is one more unread sender.
+    expect(row.moreParticipants).toBe(1)
   })
 })

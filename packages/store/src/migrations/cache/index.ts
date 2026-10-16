@@ -16,9 +16,10 @@ import mainWindow from './202610141000_main_window'
  * with a different version is deleted and recreated when the store opens, and
  * the engine re-syncs. Bump it with every change to the cache migrations; the
  * mirror is disposable, so its migrations only ever run on an empty file and
- * never transform data (ADR 0008).
+ * never transform data (ADR 0008). Also bump it when a stored column changes
+ * meaning: 10 is `topic_index.participants_json` holding the unread senders.
  */
-export const CACHE_SCHEMA_VERSION = 9
+export const CACHE_SCHEMA_VERSION = 10
 
 /** Migrations for `cache.db`, keyed `<timestamp>_<name>`. */
 export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {

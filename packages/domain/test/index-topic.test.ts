@@ -15,14 +15,30 @@ const reply1: IndexMessage = { ts: ts(NOW - 2 * HOUR), userId: mayaId, text: '&g
 const reply2: IndexMessage = { ts: ts(NOW - HOUR), userId: me, text: 'On it.' }
 
 describe('topic index row', () => {
-  it('computes activity, participants and the preview from the messages', () => {
+  it('computes activity and the preview from the messages', () => {
     const row = indexTopic(input([reply2, root, reply1], { reads: { lastReadTs: reply2.ts, markedUnread: false, pendingLocalWrite: false } }))
     expect(row).toEqual({
-      activity: { lastActivityTs: reply2.ts, messageCount: 3, unreadCount: 0, unreadExact: true, mentionsMe: false, participants: [mayaId, leoId] },
+      activity: { lastActivityTs: reply2.ts, messageCount: 3, unreadCount: 0, unreadExact: true, mentionsMe: false, participants: [] },
       preview: { sender: 'You', text: 'On it.' },
       rootTs: root.ts,
       rootText: 'Has anyone looked at the staging bill?',
     })
+  })
+
+  it('names the senders of the unread messages, most recent first, never me, and nobody once read', () => {
+    const nothingRead = indexTopic(input([root, reply1, reply2]))
+    expect(nothingRead?.activity.participants).toEqual([mayaId, leoId])
+    const partlyRead = indexTopic(input([root, reply1, reply2], { reads: { lastReadTs: root.ts, markedUnread: false, pendingLocalWrite: false } }))
+    expect(partlyRead?.activity.participants).toEqual([mayaId])
+    const read = indexTopic(input([root, reply1, reply2], { reads: { lastReadTs: reply2.ts, markedUnread: true, pendingLocalWrite: false } }))
+    expect(read?.activity.participants).toEqual([])
+  })
+
+  it('looks at the last 15 unread messages for the people', () => {
+    const early = { ts: ts(NOW - 5 * HOUR), userId: leoId, text: 'First.' }
+    const later = Array.from({ length: 15 }, (_, i): IndexMessage => ({ ts: ts(NOW - 4 * HOUR + i * 60_000), userId: mayaId, text: `Reply ${i}` }))
+    expect(indexTopic(input([early, ...later]))?.activity.participants).toEqual([mayaId])
+    expect(indexTopic(input([early, ...later.slice(1)]))?.activity.participants).toEqual([mayaId, leoId])
   })
 
   it('counts unread messages after the read pointer, never my own', () => {
