@@ -49,7 +49,9 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--tab-strip` | `hsla(48, 26%, 94%, 1)` | #F4F2EC | redesign 10-16 | The tab strip and inactive tabs. 1.08:1 under the active tab, so tabs read apart (inventory 4) |
 | `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
 | `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
-| `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the image viewer: the page at 94%, so only the picture reads |
+| `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the media viewer: the page at 94%, so only the picture reads |
+| `--media-scrim` | `rgba(20, 19, 16, 0.5)` | | media viewer 10-16 | Over a picture: the "+N" on the last tile of a message's grid, and a video's play badge. Not themed: it sits on the picture |
+| `--media-scrim-foreground` | `hsla(48, 20%, 98%, 1)` | | media viewer 10-16 | The "+N" and the play glyph on `--media-scrim` |
 
 ### 1.2 Base palette, dark
 
@@ -89,7 +91,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--accent-foreground-muted` | `hsla(48, 10%, 10%, 1)` | | | css |
 | `--danger` | #F8767E | 0.72 | 6.6:1 page, 5.8:1 cards (the light red is 3.0:1 on ink) | redesign |
 | `--overlay` | `rgba(0, 0, 0, 0.5)` | | | redesign |
-| `--overlay-viewer` | `rgba(27, 25, 22, 0.94)` | | The page (#1B1916) at 94%, behind the image viewer | redesign |
+| `--overlay-viewer` | `rgba(27, 25, 22, 0.94)` | | The page (#1B1916) at 94%, behind the media viewer | redesign |
 
 Dark-only overrides on other groups: `--tint-resolved-fg` takes 52% of the green instead of 70% (1.5); `--avatar-bg-mix` 32% and `--avatar-fg-mix` 46% instead of 24% / 62% (1.6); the shadows (6); the accent swatches (1.3). `BrowserWindow.backgroundColor` in `apps/desktop/src/main/launch.ts` repeats `--background` for both themes.
 
@@ -412,7 +414,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
 | `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
 | `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
-| `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Images next to each other share a two-column grid this wide, cells 177 × 120, gap 6. File cards are `--thumb-max-width` wide |
+| `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Several images in a message are one grid of this size, two columns, gap 6. File cards are `--thumb-max-width` wide |
+| `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
+| `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
 
 ### Controls
 

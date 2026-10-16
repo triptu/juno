@@ -128,7 +128,7 @@ test('another person\'s image that arrives without thumbnails fills in after the
   await topic.expectTitle('Main')
 
   fake.holdThumbnails()
-  fake.injectImage({ channel: 'C0ENG', user: 'U0MAYA', name: 'whiteboard.png', width: 800, height: 600, text: 'Whiteboard from today' })
+  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', images: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
   const row = topic.message('Whiteboard from today')
   await expect(row.getByRole('button', { name: 'Download whiteboard.png' })).toBeVisible()
   // The first try finds no thumbnails yet; Slack makes them without an event, and a later try brings them.
@@ -318,4 +318,57 @@ test('a send check keeps the draft while a newly attached file is still being re
   await fix.click()
   await topic.expectSent('can you receive the report by friday?')
   expect(fake.calls.filter((call) => call.method === 'files.share')).toHaveLength(1)
+})
+
+// A message's images make a grid in the message; any of them opens the media viewer at it, with every one in a
+// filmstrip along the bottom. ← and → move and stop at the ends, the strip shows the one clicked, and Esc closes
+// with focus back on the tile that opened it.
+test('several images open in the viewer at the one clicked, and the keys and the filmstrip move through them', async ({ juno, win, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  const names = ['rack-front.png', 'rack-back.png', 'cable-map.png', 'patch-panel.png']
+  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos from the rack move', images: names.map((name, index) => ({ name, width: 800 + index * 100, height: 600 })) })
+  const row = topic.message('Photos from the rack move')
+  const grid = row.locator('[data-thumbnail-grid]')
+  await expect(grid).toHaveAttribute('data-count', '4')
+  await expect(grid.locator('[data-thumbnail]')).toHaveCount(4)
+  expect(await grid.boundingBox()).toMatchObject({ width: 360, height: 240 })
+
+  const third = row.getByRole('button', { name: 'Open cable-map.png' })
+  await third.click()
+  const viewer = win.getByRole('dialog')
+  await expect(viewer).toBeVisible()
+  const current = viewer.locator('[data-viewer-item]')
+  const strip = viewer.getByRole('group', { name: 'All pictures in this message' })
+  await expect(current).toHaveAttribute('data-viewer-item', '3')
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('cable-map.png')
+  await expect(viewer.locator('[data-viewer-meta]')).toContainText('3 of 4')
+  await expect(strip.getByRole('button')).toHaveCount(4)
+  await expect(strip.getByRole('button', { name: 'Show cable-map.png' })).toHaveAttribute('aria-current', 'true')
+
+  await win.keyboard.press('ArrowRight')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await expect(viewer.getByRole('button', { name: 'Next' })).toBeDisabled()
+  await win.keyboard.press('ArrowRight')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await win.keyboard.press('ArrowLeft')
+  await expect(current).toHaveAttribute('data-viewer-item', '3')
+
+  await strip.getByRole('button', { name: 'Show rack-front.png' }).click()
+  await expect(current).toHaveAttribute('data-viewer-item', '1')
+  await expect(strip.getByRole('button', { name: 'Show rack-front.png' })).toHaveAttribute('aria-current', 'true')
+  await expect(viewer.getByRole('button', { name: 'Previous' })).toBeDisabled()
+  await win.keyboard.press('End')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await win.keyboard.press('Home')
+  await expect(current).toHaveAttribute('data-viewer-item', '1')
+  await expect.poll(() => current.locator('img[alt="rack-front.png"]').evaluate((image: HTMLImageElement) => image.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
+
+  await win.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+  await expect(third).toBeFocused()
 })

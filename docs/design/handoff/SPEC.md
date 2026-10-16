@@ -235,6 +235,14 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 - **Emoji suggestions.** In every composer and the inline edit field, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then common emoji (👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌, in that order), then prefix, then substring, so `:thumbs` offers 👍 first. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
 
+### Images and the media viewer
+
+- **In the message.** One image or video shows as a picture at its own aspect ratio, at most 360 × 240. Several show as one block where the first of them is, always 360 × 240: two side by side, three with the first taking the left column, four in a 2 × 2 grid, and more as "+N" on the fourth tile. Every box is sized before the bytes arrive. A video shows its poster with a play badge. Other files, a PDF among them, keep their cards. A sent image shows the local copy until Slack has made its thumbnail, then Slack's, in the same box.
+- **Opening.** Clicking any picture opens the media viewer at it, over the whole window, on a dimmed backdrop in the theme. The item shows large, fitted to the window at its own aspect ratio; the thumbnail fills that box at once and the full image fades in over it, so nothing moves. A video plays in place.
+- **Moving.** Along the bottom, a filmstrip shows every image and video of that message in order, the current one marked; clicking one shows it. ← and → move one item and stop at the ends, Home and End go to the first and last, and arrows at the sides do the same. With one item there is no strip and no arrows. A new item fades in over about 150 ms, at once with reduced motion. The next and previous full images are fetched ahead.
+- **Header.** The file name, the sender and the time ("Priya Shah · 9:12 · 3 of 4"), then Download, Open in default app (Preview for images), Copy image, and Close.
+- **Closing.** Esc, Close or a click on the backdrop closes it, and focus goes back to the picture that opened it.
+
 ### Checks on send
 
 Pressing Enter runs fast checks before anything goes out. If they find nothing, the message just sends. If they flag something, a compact bar appears inside the composer. Enter takes the first option and Esc returns to editing.

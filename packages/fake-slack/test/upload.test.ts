@@ -195,7 +195,7 @@ describe('seeded files', () => {
     expect(echo.files?.[0]?.original_w).toBeUndefined()
     expect((await client.ok('files.info', { file })).file.thumb_360).toBeUndefined()
 
-    const other = fake.injectImage({ channel: 'C0ENG', name: 'board.png', width: 400, height: 300 })
+    const other = fake.injectImages({ channel: 'C0ENG', images: [{ name: 'board.png', width: 400, height: 300 }] })
     expect(other.files?.[0]?.thumb_360).toBeUndefined()
 
     fake.releaseThumbnails()

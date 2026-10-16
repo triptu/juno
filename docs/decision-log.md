@@ -14,6 +14,7 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 - 10-16 20:40 · orchestrator · Set up Juno loads on demand to keep the startup bundle under 1000 KB.
 - 10-16 20:00 · orchestrator · Local desktop tests rebuild first when sources changed (Playwright global setup with build-cached), after a stale build made a fixed bug look live.
 - 10-16 19:30 · orchestrator · A post the network sends twice is reconciled by its client message id: the copy is hidden and deleted through the outbox; a copy with replies stays (ADR 0014).
+- 10-16 18:40 · upload-preview · A message's images and videos are one 360 × 240 block (2 side by side, 3 with the first tall, 4 in 2 × 2, more as "+N" on the fourth) and open a media viewer with a filmstrip of the whole message; other files keep their cards; Open uses the default app through a temporary copy; the viewer's open shares the 50 ms overlay budget.
 - 10-16 18:30 · orchestrator · Background Slack calls stay at 40 per minute per method, below the published 50, because the session token is shared with the official client.
 - 10-16 17:58 · upload-preview · A sent image shows its staged copy until Slack's thumbnails are stored; images stored without thumbnails are refetched with `files.info` up to four times on the background lane, and stored thumbnails are never replaced by a copy without them.
 - 10-16 16:21 · orchestrator · Editing a post that is back in the queue drops any edit row left from while it was out, so the newest edit text always wins.

@@ -269,6 +269,61 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
   within('home open, p95', open.p95, 50)
 })
 
+// pointerdown on a picture in a message to the first presented frame that
+// shows the media viewer with its item and filmstrip (performance.md section
+// 1, "Media viewer open"). The viewer's chunk is preloaded once a topic has
+// painted, so this is the overlay's own cost.
+test('media viewer open: a picture in a message to the viewer painted', async ({ juno, win, fake }) => {
+  test.setTimeout(180_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, topic } = juno
+  await sidebar.row('#eng').open()
+  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos for the viewer check', images: Array.from({ length: 6 }, (_, index) => ({ name: `photo-${index + 1}.png`, width: 1200, height: 800 + index * 40 })) })
+  const row = topic.message('Photos for the viewer check')
+  const tiles = row.locator('[data-thumbnail]')
+  await expect(tiles).toHaveCount(4)
+  const samples: number[] = []
+  for (let i = 0; i < 16; i++) {
+    const tile = tiles.nth(i % 4)
+    await tile.evaluate((node) => {
+      const w = window as unknown as { __viewerSample?: Promise<number> }
+      w.__viewerSample = new Promise((resolve) => {
+        node.addEventListener(
+          'pointerdown',
+          (event) => {
+            const start = event.timeStamp
+            const shown = () => document.querySelector('[data-media-viewer] [data-viewer-item]') !== null && document.querySelector('[data-media-viewer] [data-filmstrip]') !== null
+            const frame = () => requestAnimationFrame(() => {
+              if (!shown()) return frame()
+              setTimeout(() => {
+                const end = performance.now()
+                performance.measure('juno.viewer-open', { start, end })
+                resolve(end - start)
+              }, 0)
+            })
+            frame()
+          },
+          { once: true },
+        )
+      })
+    })
+    const box = (await tile.boundingBox())!
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    const measureOpen = async () => {
+      await press(win)
+      samples.push(await win.evaluate(() => (window as unknown as { __viewerSample: Promise<number> }).__viewerSample))
+    }
+    if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, `viewer-open-${i}`, measureOpen)
+    else await measureOpen()
+    await win.keyboard.press('Escape')
+    await expect(win.locator('[data-media-viewer]')).toHaveCount(0)
+    await win.waitForTimeout(200)
+  }
+  const open = stats('media viewer open (pointerdown on a picture) to the viewer painted', samples)
+  within('media viewer open, p95', open.p95, 50)
+})
+
 test('live update: a reply from another client to pixels', async ({ juno, fake }) => {
   test.setTimeout(120_000)
   await juno.signIn()

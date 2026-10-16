@@ -313,7 +313,7 @@ export class FakeSlack {
   }
 
   /**
-   * Files uploaded from now on, and images from `injectImage`, come without
+   * Files uploaded from now on, and images from `injectImages`, come without
    * thumbnails and without a size, on the message and from `files.info`, as
    * live Slack's echo of a fresh upload does, until `releaseThumbnails`.
    */
@@ -344,16 +344,19 @@ export class FakeSlack {
     for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, event_ts: ws.eventTs() })
   }
 
-  /** A message from another user with one PNG of `width` × `height`. Without thumbnails while `holdThumbnails` is on. Emits the socket events. */
-  injectImage(input: { channel: string; user?: string; name: string; width: number; height: number; text?: string }): Message {
+  /** A message from another user with PNGs of the sizes given, in order. Without thumbnails while `holdThumbnails` is on. Emits the socket events. */
+  injectImages(input: { channel: string; user?: string; text?: string; images: ReadonlyArray<{ name: string; width: number; height: number }> }): Message {
     const ws = this.workspace
     const user = input.user ?? 'U0MAYA'
-    const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
-    const bytes = samplePng(input.width, input.height)
-    const stored = { id, name: input.name, length: bytes.length, user, created: ws.clock.now(), bytes, mimetype: 'image/png', ...(ws.holdThumbnails ? { thumbsHeld: true } : {}) }
-    ws.files.set(id, stored)
     const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
-    return ws.post({ channel: input.channel, user, ...(input.text === undefined ? {} : { text: input.text }), files: [fileObject(this.server.url, stored, isPublic)] })
+    const files = input.images.map((each) => {
+      const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+      const bytes = samplePng(each.width, each.height)
+      const stored = { id, name: each.name, length: bytes.length, user, created: ws.clock.now(), bytes, mimetype: 'image/png', ...(ws.holdThumbnails ? { thumbsHeld: true } : {}) }
+      ws.files.set(id, stored)
+      return fileObject(this.server.url, stored, isPublic)
+    })
+    return ws.post({ channel: input.channel, user, ...(input.text === undefined ? {} : { text: input.text }), files })
   }
 
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
@@ -450,7 +453,7 @@ export class FakeSlack {
       failUploads: (i) => this.failUploads(i),
       holdThumbnails: () => this.holdThumbnails(),
       releaseThumbnails: (i) => this.releaseThumbnails(i),
-      injectImage: (i) => this.injectImage(i),
+      injectImages: (i) => this.injectImages(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),
