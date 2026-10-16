@@ -13,7 +13,7 @@ export {
   defaultAllTopicsFilter,
   type AllTopicsLayout,
 } from './allTopics'
-export { mirrorReadsAtom, shouldMarkRead } from './reads'
+export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
 export {

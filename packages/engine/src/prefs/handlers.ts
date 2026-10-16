@@ -1,12 +1,14 @@
-import { PrefsRoutes, NotSignedIn } from '@juno/contract'
+import { PrefsRoutes, NotSignedIn, MIRROR_READS_PREF } from '@juno/contract'
 import { keys, liveQuery, prefs, transaction } from '@juno/store'
 import { Effect, Schema, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
+import { MarkWorker } from '../markWorker'
 import { Workspace } from '../workspace'
 
 export const PrefsHandlers = PrefsRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
+    const worker = yield* MarkWorker
     return {
       'prefs.get': ({ key }) => {
         const runs = workspace.changes.pipe(
@@ -22,6 +24,7 @@ export const PrefsHandlers = PrefsRoutes.toLayer(
         const open = yield* workspace.current
         if (open === undefined) return yield* new NotSignedIn()
         yield* transaction(prefs.set(key, value)).pipe(Effect.provide(open.context), Effect.orDie)
+        if (key === MIRROR_READS_PREF) yield* worker.wake
       }),
     }
   }),

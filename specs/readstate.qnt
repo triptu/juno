@@ -31,6 +31,7 @@ module readProtocol {
   type Fetch = { key: int, value: int, at: int, kind: str }
 
   var s: {
+    mirrorOn: bool, mirrorCaughtUp: bool, localOnly: bool, catchUpFloor: int -> int,
     clock: int, eventClock: int,
     local: int -> int, unread: int -> bool,
     server: int -> int, serverAt: int -> int,
@@ -50,6 +51,7 @@ module readProtocol {
 
   action init = all {
     s' = {
+      mirrorOn: true, mirrorCaughtUp: false, localOnly: false, catchUpFloor: topics.mapBy(_ => -1),
       clock: 0, eventClock: 0,
       local: topics.mapBy(_ => 2), unread: topics.mapBy(_ => false),
       server: topics.mapBy(_ => 2), serverAt: topics.mapBy(_ => 0),
@@ -71,7 +73,7 @@ module readProtocol {
   // observation clock. A mirrored topic gets (or keeps) its one pending row,
   // whose intent is replaced: marks coalesce to the last.
   action localChange(k: int, value: int, flag: bool): bool = {
-    val mirrors = mirrored.contains(k)
+    val mirrors = s.mirrorOn and mirrored.contains(k)
     all {
       not(s.sealed), s.local.get(k) != value or s.unread.get(k) != flag,
       s' = { ...s, clock: s.clock + 1,
@@ -80,6 +82,7 @@ module readProtocol {
         pending: if (mirrors) s.pending.union(Set(k)) else s.pending,
         commanded: if (mirrors) s.commanded.union(Set(k)) else s.commanded,
         intent: s.intent.set(k, value), intentUnread: s.intentUnread.set(k, flag),
+        catchUpFloor: s.catchUpFloor.set(k, -1),
         gen: s.gen.set(k, s.gen.get(k) + 1),
         marksQueued: s.marksQueued + (if (mirrors) 1 else 0),
         label: "localChange", target: k }
@@ -88,6 +91,33 @@ module readProtocol {
   // Mark read never moves the pointer back.
   action markRead(k: int, upTo: int): bool = localChange(k, if (upTo > s.local.get(k)) upTo else s.local.get(k), false)
   action markUnread(k: int, value: int): bool = localChange(k, value, true)
+
+  // The preference changes future marks. The worker drops unsent rows when off.
+  action mirrorSwitch(on: bool): bool = all {
+    not(s.sealed), s.mirrorOn != on, s.pending.size() == 0,
+    s' = { ...s, mirrorOn: on, localOnly: true, label: "mirrorSwitch" }
+  }
+  // One-time opt-in or default migration. Only known, forward pointers queue.
+  action mirrorCatchUpWith(guard: bool): bool = {
+    val ahead = mirrored.filter(k => s.slackSeen.get(k) >= 0 and
+      (not(guard) or s.local.get(k) > s.slackSeen.get(k)) and not(s.unread.get(k)) and not(s.pending.contains(k)))
+    all {
+      not(s.sealed), s.mirrorOn, not(s.mirrorCaughtUp), ahead.size() > 0,
+      s' = { ...s, mirrorCaughtUp: true, localOnly: false, clock: s.clock + 1,
+        pending: s.pending.union(ahead), commanded: s.commanded.union(ahead),
+        intent: topics.mapBy(k => if (ahead.contains(k)) s.local.get(k) else s.intent.get(k)),
+        intentUnread: topics.mapBy(k => if (ahead.contains(k)) false else s.intentUnread.get(k)),
+        gen: topics.mapBy(k => s.gen.get(k) + (if (ahead.contains(k)) 1 else 0)),
+        observedAt: topics.mapBy(k => if (ahead.contains(k)) s.clock + 1 else s.observedAt.get(k)),
+        catchUpFloor: topics.mapBy(k => if (ahead.contains(k)) s.slackSeen.get(k) else s.catchUpFloor.get(k)),
+        marksQueued: s.marksQueued + ahead.size(), label: "mirrorCatchUp" }
+    }
+  }
+  action mirrorCatchUp = mirrorCatchUpWith(true)
+  // A catch-up's intent never goes backwards from Slack's known pointer.
+  // Slack has no compare-and-set mark: unseen concurrent remote writes are outside this guarantee.
+  val catchUpNeverBackwards = topics.forall(k => s.catchUpFloor.get(k) >= 0 implies
+    s.intent.get(k) > s.catchUpFloor.get(k))
 
   // Peeking at a topic changes nothing.
   action peek(k: int): bool = all {
@@ -238,7 +268,7 @@ module readProtocol {
   val settledWork = s.pending.size() == 0 and s.events.size() == 0 and s.fetches.size() == 0 and s.refresh.size() == 0
   val quiet = s.connected and settledWork and not(s.catchup) and s.scan.size() == 0
   val agreed = mirrored.forall(k => s.local.get(k) == s.server.get(k))
-  val quietAgreement = quiet implies agreed
+  val quietAgreement = (quiet and s.mirrorOn and not(s.localOnly)) implies agreed
   // A pending mark keeps its pointer and flag visible.
   val pendingIntentWins = topics.forall(k => s.pending.contains(k) implies
     (s.local.get(k) == s.intent.get(k) and s.unread.get(k) == s.intentUnread.get(k)))
@@ -258,7 +288,7 @@ module readProtocol {
   val reachedAgreement = s.sealed and quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = pendingIntentWins and localUnreadProtected and acceptedMarkKept and acceptedUnreadProtected and
-    quietAgreement and peekNeverMarks and drainBound
+    quietAgreement and peekNeverMarks and drainBound and catchUpNeverBackwards
 
   action work(fetchGuard: bool, eventGuard: bool): bool = any {
     reconnect, finishCatchup,
@@ -298,6 +328,22 @@ module readProtocol {
   // drains with the real rules; the sealed branch comes first so a later
   // label never re-enters the script.
   action finish = seal
+
+  action mirrorCatchUpSchedule(guard: bool): bool = tick(
+    if (s.sealed) progress(true, true) else
+    if (s.label == "init") officialMark(1, 0) else
+    if (s.label == "officialMark") { nondet e = s.events.oneOf(); deliver(e) } else
+    if (s.label == "deliver") mirrorSwitch(false) else
+    if (s.label == "mirrorSwitch" and not(s.mirrorOn)) markRead(1, 2) else
+    if (s.label == "localChange") mirrorSwitch(true) else
+    if (s.label == "mirrorSwitch") mirrorCatchUpWith(guard) else
+    if (s.label == "mirrorCatchUp") accept(1, false) else
+    if (s.label == "accept") respond(1) else
+    finish
+  )
+
+  action mirrorCatchUpStep = mirrorCatchUpSchedule(true)
+  action mirrorCatchUpBugStep = mirrorCatchUpSchedule(false)
 
   // Five marks before the worker sends make one call; a mark while one is in
   // flight makes one more, with the newest intent.
