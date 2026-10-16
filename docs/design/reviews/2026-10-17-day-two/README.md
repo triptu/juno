@@ -125,17 +125,29 @@ The Change card reads Apply (primary), then Dismiss. Every card puts its main ac
 
 - Compare: `compare/14-change-card-buttons-*`, and `after/14b-schedule-card-*`.
 
-### 13. Smaller observations. Low. Three fixed, one open.
+### 13. Smaller observations. Low. Fixed.
 
 - **Avatar menu. Fixed.** Sign out was centred under the Session block (`before/AccountMenu-sections-with-session-light`). The session block is a column, and Sign out is pulled back by its padding and border so its text starts on the account line's edge, at the menu's inset. The gallery's account menu now uses the app's `SessionView` instead of its own copy. Compare: `compare/16-account-menu-*`.
-- **Copy. Open (Q6).** General › AI assist says "Turn this off to use the decision chat model." This review suggested "Off uses your chat model for these decisions.", but that wording is wrong. With the classifier off, those decisions go to the `decision` model (`packages/ai/src/config.ts`, GPT-6 Luna by default), not the Chat model chosen in Settings › Juno, and the UI has no setting for the decision model. "Your chat model" would point people at the wrong setting. The copy is unchanged until the owner picks wording, for example "Off uses a small chat model for these decisions."
+- **Copy. Fixed (Q6, decided 10-17).** General › AI assist says "Turn this off to use the decision chat model." This review suggested "Off uses your chat model for these decisions.", but that wording is wrong. With the classifier off, those decisions go to the `decision` model (`packages/ai/src/config.ts`, GPT-6 Luna by default), not the Chat model chosen in Settings › Juno, and the UI has no setting for the decision model. "Your chat model" would point people at the wrong setting. The owner chose "Off uses a small chat model for these decisions.", which is now the copy.
 - **Configure sheet. Fixed.** Rows were 55.7px, and a row's rule sat on the list's bottom edge over the sheet's padding. Rows are now 56px (`--tool-row-height`: a 20px name line, a 16px description line, 8px above and below), and the list is seven rows tall. Each rule is drawn above its row, after the header's, so at rest the list ends on a row's edge with no rule. Compare: `compare/17-configure-*`.
 - **Sidebar times. Fixed.** Times sat left-aligned in a 48px slot, so "Yesterday" ended 12px from the edge and "4m" about 40px away. The slot is now at least 48px and aligned to its end, so every time ends at the row's trailing inset. Compare: `compare/18-sidebar-times-*`.
 - **Test drift, not a design defect.** `shift.spec.ts` › "a message's first chip grows it at its bottom" fails on `batch-3`. Main has replaced it with "uses its reserved line", which matches SPEC "Stable geometry" and the code, but `batch-3` still carries the older copy. It clears when `batch-3` takes main's version. The reserved line is also why a message with a thread link has a blank line above the link (`before/Message-interaction-hover-toolbar-main-light`), which SPEC asks for.
 
+### 14. Configure's New and Changed marks were a plain third line. Low. Fixed.
+
+The auto-review fix (`fix-auto-review-2`) marks a tool that is new or whose schema changed. The mark was a plain grey third line under the description ("New", "Changed"), set in the same type as the description, and it made those rows 69px tall against 56px for the rest (`before/19-configure-*`).
+
+`fix-auto-review-2` could not be merged as a branch. Its ref is gone, and its tip (`c88202b4`) reached main through `batch-4`, which does not contain `batch-3`. A merge would have pulled in main's work and conflicted with `batch-3` in Home, `state/home.ts`, SPEC and the decision log, which are other branches' changes. The branch's five commits (and main's `c713b2d5`, which updates the Configure geometry count) were cherry-picked instead, with `-x`. The only conflict was this sheet's row, against finding 13's grid change.
+
+**Fix.** The mark is a size-20 `Chip` after the tool's name, on the name's line: "New" filled and "Changed" outline. That is the convention the Juno pages already use, where a server's state chip on Connections is filled when all is well and outline when it asks for a look. The row stays 56px. The rule above each row is now a 1px inset hairline, not a border, so the two lines sit on whole pixels (10 + 20 + 16 + 10). `list-geometry.spec.ts` checks that the tag follows the name, shares its middle, and leaves the row at 56px. `data-tool-mark` is unchanged for the e2e.
+
+The locked reasons stay a line under the description. They are sentences ("Juno never merges, buys or force-pushes."), and the Auto-review column already says the short form, Not offered or Always ask, so a tag would repeat it. A locked row has three lines and is 72px.
+
+- Compare: `compare/19-configure-never-ask-*`, `compare/19-configure-changed-and-new-*`. The before shots were taken in the gallery at this branch before the change; the shot path in the request was not on disk.
+
 ## Questions for the owner
 
-Q1 to Q5 were decided on 10-17 with the suggested answers, as decisions the owner can override, and are built. Q6 is new.
+Q1 to Q6 were decided on 10-17 with the suggested answers, as decisions the owner can override, and are built.
 
 | | Question | Answer |
 | --- | --- | --- |
@@ -144,7 +156,7 @@ Q1 to Q5 were decided on 10-17 with the suggested answers, as decisions the owne
 | Q3 | What height are two-line picker rows? | 44, with a fixed 20px title line and 16px meta line. Decided 10-17. |
 | Q4 | Main's icon in the switcher? | Drop it. Decided 10-17. |
 | Q5 | Default button first or last in Juno cards? | Last, as on the Mac. Decided 10-17. |
-| Q6 | What should General › AI assist say about turning the classifier off? | Name what actually runs: "Off uses a small chat model for these decisions." Open. |
+| Q6 | What should General › AI assist say about turning the classifier off? | "Off uses a small chat model for these decisions." Decided 10-17. |
 
 ## Commits
 
@@ -167,6 +179,9 @@ Q1 to Q5 were decided on 10-17 with the suggested answers, as decisions the owne
 | `44505c1b` | End sidebar times at the row's trailing edge (finding 13) |
 | `98d7c3a9` | Focus the active tab in the narrow strip's focus state (finding 8) |
 | `2fca2337` | Split the tab strip from the tab, and the tab's parts into small components (lint's size limits) |
+| `f36bd96e`…`2714e268` | The five `fix-auto-review-2` commits, cherry-picked from `c88202b4` (finding 14) |
+| `dbd2ec95` | Main's Configure geometry count, cherry-picked from `c713b2d5` (finding 14) |
+| `0a406fb6` | Show Configure's New and Changed marks as a tag after the tool's name (finding 14) |
 
 ## Verification
 
