@@ -23,3 +23,7 @@ Cold and warm typecheck runs used the same solution config: a temporary root con
 Use Bun's test runner for the pure `@juno/domain` suite: it ran the existing tests unchanged and was more than 11× faster on cold runs and about 25× faster on warm runs. Keep pnpm for installation because the Electron native binary was missing. Keep oxlint because Bun has no comparable standalone linter. Bun check is about 10× faster in this full-build measurement and matched the injected errors, but it has no build cache and the error probe is not proof of complete checker parity; keep the existing project-cached typecheck path for now.
 
 These are local tool timings, not app performance measurements. Typecheck timings varied substantially between runs, and install timings include local package-cache effects.
+
+## Adopted for local feedback
+
+On 2026-10-16, `pnpm affected` switched to pinned Bun for supported projects, with a separate result cache and remote TypeScript fallback for unsupported configs. Full and merge checks retain TypeScript. `pnpm typecheck:parity` compares both tools across the shared project list. See [Local Bun checks](../development.md#local-bun-checks) for the commands and fallback rules.

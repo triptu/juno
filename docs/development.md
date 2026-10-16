@@ -22,6 +22,8 @@ Run these from the repo root.
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
+| `pnpm typecheck:bun` | Checks pending Bun-compatible projects locally through the typecheck queue. `pnpm affected` also schedules any TypeScript fallback. |
+| `pnpm typecheck:parity` | Compares Bun and TypeScript diagnostics across all projects without result caches. |
 | `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
 | `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
@@ -559,7 +561,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). The local Bun planner also uses that alias to read inherited compiler options. No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
 
 Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
 
@@ -583,9 +585,21 @@ Earlier timings, all with TypeScript 5.9.3 (2026-10-15):
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
+## Local Bun checks
+
+Bun 1.4.3 is an exact root devDependency installed by pnpm, including its approved postinstall. `pnpm exec bun` uses this binary on Darwin ARM64 and Linux x64. The global Bun install is not used. The remote image installs the same pin and checks its version during the build.
+
+`pnpm affected` runs `pnpm typecheck:bun` before starting the other steps. It gets the project list and input hashes from `scripts/typecheck.mjs --projects-json`, writes a temporary solution config referencing the pending projects, and runs `bun check -b --no-pretty --all`. Errors use `file(line,column): error TS…` locations that VS Code can open. A type error stops the run before remote suites start. The local check uses the machine-wide typecheck queue.
+
+Passing Bun results live in a separate `juno-cache/typecheck-bun` directory. Their keys include the existing project input hash, the pinned Bun version and both checker scripts. Bun itself has no incremental build cache. Its results never populate the TypeScript cache. `--no-cache` bypasses result caches.
+
+The planner reads effective compiler options, including inherited options and project references. Plugins, emit requirements, declaration options, composite builds or config parse errors send that project to remote `pnpm typecheck --projects <JSON config list>`, which uses `tsc -b` for the selected configs. A passing TypeScript cache key skips that fallback. All 29 current configs support Bun. `--local` also runs fallback TypeScript locally.
+
+`pnpm typecheck`, scheduled main verification and `batch-merge.mjs` keep the existing authoritative TypeScript checks. `pnpm typecheck:parity` runs Bun and `tsc -b --force` against one solution containing all projects. It compares unique diagnostic locations, codes and full messages, ignoring duplicates and timing summaries. Matching errors count as parity; different errors or a tool failure fail the command. Parity bypasses result caches and refuses unsupported configs rather than reporting a partial comparison.
+
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those, each suite on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
+`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
 An import graph over `apps/` and `packages/` decides what each change reaches: relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
@@ -598,7 +612,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
 | Only e2e spec files | `pnpm test:desktop <those files>` |
-| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck` remotely, when a project's key has not passed; it checks only those projects |
+| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck:bun` locally for pending projects, with remote TypeScript fallback for unsupported configs |
 | Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
@@ -611,7 +625,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 `pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
 - **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. The head request holds available cores until it can start; later small jobs cannot fill those gaps. Job end times are unknown, so the pool does not let jobs pass a blocked head, including warm-machine requests. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The cap stays at most 24 vCPU; a lower `JUNO_REMOTE_MAX_VCPU` is honored.
