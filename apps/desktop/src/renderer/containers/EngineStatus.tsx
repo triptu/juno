@@ -57,7 +57,7 @@ function restart(): void {
 }
 
 /**
- * The line under the sidebar's filters: why the rows may be behind Slack
+ * The fixed secondary line in the sidebar header: why the rows may be behind Slack
  * (`syncNoticeAtom`), with Restart when the engine stopped; otherwise,
  * during the first sync, its progress (`syncProgressAtom`); otherwise
  * nothing.

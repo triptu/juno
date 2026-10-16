@@ -320,12 +320,18 @@ const regressions = [
   ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
   ['outbox', 'networkCopy', 'shownOnce', 'outbox-network-copy'],
   ['outbox', 'sameText', 'keepsRealSends', 'outbox-same-text'],
+  ['outbox', 'keptDeleted', 'keepsRealSends', 'outbox-kept-deleted'],
+  ['outbox', 'copyReply', 'repliesKeepRoot', 'outbox-copy-reply'],
+  ['outbox', 'deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
+  ['outbox', 'uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
   ['metadata', 'staleRename', 'eventWins', 'metadata-stale-rename'],
   ['metadata', 'staleMembership', 'eventWins', 'metadata-stale-membership'],
   ['metadata', 'staleArchive', 'eventWins', 'metadata-stale-archive'],
+  ['metadata', 'ownDm', 'quietAgreement', 'metadata-own-dm'],
+  ['metadata', 'partial', 'quietAgreement', 'metadata-partial'],
   ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
 ]
 // Specs whose corrected runs must reach their drained agreement.

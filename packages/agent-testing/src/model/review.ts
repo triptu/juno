@@ -32,7 +32,7 @@ export function fakeReview(request: FakeReviewRequest): FakeReviewAnswers {
   const words = request.state.call.tool.toLowerCase().split(/[^a-z]+/)
   const owner = request.state.owner.join('\n').toLowerCase()
   const action = words.find((word) => ACTIONS.includes(word))
-  const intent: FakeIntent = owner.trim() === '' ? 'notAsked' : action !== undefined && owner.includes(action) ? 'explicit' : 'implied'
+  const intent: FakeIntent = owner.trim() === '' ? 'notAsked' : action !== undefined && owner.match(/[a-z0-9_-]+/g)?.includes(action) === true ? 'explicit' : 'implied'
   const risk: FakeRisk = words.some((w) => ['delete', 'remove', 'archive', 'trash'].includes(w)) ? 'delete'
     : words.some((w) => ['send', 'post', 'publish'].includes(w)) ? 'send' : 'reversible'
   return { intent, risk }

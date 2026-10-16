@@ -95,7 +95,7 @@ test('a sender name resolves without moving the timestamp or message', async ({ 
   })
 })
 
-test('a Main message gains a thread link without moving', async ({ juno, win, slack, fake }) => {
+test('a Main message gains a thread link without moving, and the header stays put', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const channel = slack.channel('deploys')
@@ -104,16 +104,17 @@ test('a Main message gains a thread link without moving', async ({ juno, win, sl
   await win.getByRole('button', { name: 'Automated', exact: true }).click()
   await juno.sidebar.row('#deploys').open()
   await juno.topic.expectMessage('A new Main message for the thread slot')
-  const threads = juno.topic.header.getByRole('button', { name: /^Threads/ })
-  await expect(threads).toHaveAttribute('aria-label', 'Threads')
-  const counter = threads.locator('svg')
-  const counterBefore = await counter.boundingBox()
+  // Main's threads are behind the title's switcher now; the right island (⋯ and Juno) must not move either.
+  const island = juno.topic.header.locator('[data-island="right"]')
+  const islandBefore = await island.boundingBox()
   await expectStableAnchor(win, `[data-message-row="${root.ts}"]`, async () => {
     fake.injectMessage({ channel, user, threadTs: root.ts, text: 'A reply arriving after Main paints' })
     await expect(juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)).toBeVisible()
-    await expect(threads).toHaveAttribute('aria-label', 'Threads, 1')
-    expect(await counter.boundingBox()).toEqual(counterBefore)
+    expect(await island.boundingBox()).toEqual(islandBefore)
   })
+  // The new thread is in the switcher.
+  const switcher = await juno.topic.openSwitcher()
+  await expect(switcher.row('A new Main message')).toBeVisible()
 })
 
 test('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, fake }) => {
@@ -136,6 +137,8 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
   await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
+  // A launch opens a New chat tab; Home, which this waits on, is one click away.
+  await juno.home.navItem.click()
   await expect(win.locator('[data-topic-row]')).toHaveCount(0)
   await expectStableAnchor(win, '[data-topic-row]', async () => {
     fake.release({ method: 'subscriptions.thread.getView' })
@@ -150,10 +153,13 @@ for (const destination of ['Home', 'All topics'] as const) {
     fake.holdNext({ method: 'subscriptions.thread.getView' })
     await juno.signIn()
     await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
+    // A launch opens a New chat tab: open the page under test from the sidebar.
     if (destination === 'All topics') await juno.allTopics.open()
+    else await juno.home.navItem.click()
     const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
     await expect(win.locator(selector)).toHaveCount(0)
-    await expectStableAnchor(win, selector, async () => {
+    const anchor = destination === 'Home' ? '[data-home-scene]' : selector
+    await expectStableAnchor(win, anchor, async () => {
       fake.release({ method: 'subscriptions.thread.getView' })
       await expect(win.locator('[data-topic-row]').first()).toBeVisible()
       await expect(win.locator(selector).first()).toBeVisible()
@@ -165,6 +171,8 @@ test('Home rows painted during the first sync stay fixed as later history pages 
   const method = 'conversations.history'
   fake.holdNext({ method })
   await juno.signIn()
+  // A launch opens a New chat tab; open Home from the sidebar while the sync runs.
+  await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   // Let pages land one at a time until Home paints a row while the sync still runs.
   await expect

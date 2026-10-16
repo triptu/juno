@@ -1,6 +1,7 @@
+import { sendMessage } from '@juno/state'
 import { afterEach, describe, expect, it } from 'vitest'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { bootedEngine, readDb } from './scenario'
+import { bootedEngine, readDb, valueOf } from './scenario'
 
 const engines: RunningEngine[] = []
 afterEach(async () => {
@@ -8,7 +9,7 @@ afterEach(async () => {
 })
 
 function conversation(engine: RunningEngine, id = 'C0ENG') {
-  return readDb(engine, 'cache.db', (db) => db.prepare('SELECT name, is_member, is_archived, topic FROM conversations WHERE id = ?').get(id))
+  return readDb(engine, 'cache.db', (db) => db.prepare('SELECT name, is_member, is_archived, topic, purpose FROM conversations WHERE id = ?').get(id))
 }
 
 async function holdRefresh(engine: RunningEngine, method: string) {
@@ -92,5 +93,33 @@ describe('conversation observation fence', () => {
     await finish(engine)
     expect(conversation(engine)).toMatchObject({ is_member: 0 })
     expect(conversation(engine, 'C0PRODUCT')).toMatchObject({ is_member: 1 })
+  })
+})
+
+it('keeps an own DM open when an older counts snapshot lands without its socket echo', async () => {
+  const engine = await bootedEngine(engines)
+  await holdRefresh(engine, 'client.counts')
+  engine.fake.holdFrames({ types: ['im_created', 'im_open'] })
+  const { topicId } = valueOf(await sendMessage(engine.registry, { kind: 'person', userId: 'U0JONAS' }, 'Hello'))
+  expect(conversation(engine, topicId.slice(2))).toMatchObject({ is_member: 1 })
+  await finish(engine)
+  expect(conversation(engine, topicId.slice(2))).toMatchObject({ is_member: 1 })
+  engine.fake.releaseFrames({ drop: true })
+})
+
+it('leaves omitted topic and purpose to the snapshot while a partial event changes the name', async () => {
+  const engine = await bootedEngine(engines)
+  const channel = engine.fake.workspace.conversations.get('C0ENG')!
+  channel.topic = 'New topic'
+  channel.purpose = 'New purpose'
+  await holdRefresh(engine, 'client.userBoot')
+  engine.fake.emitFrame({ type: 'channel_created', channel: { id: 'C0ENG', name: 'renamed' } })
+  await engine.rowsUntil((rows) => rows.some((r) => r.title === '#renamed'), 'partial event applied')
+  await finish(engine)
+  expect(conversation(engine)).toMatchObject({ name: 'renamed', topic: 'New topic', purpose: 'New purpose' })
+  engine.fake.emitFrame({ type: 'channel_created', channel: { id: 'C0ENG', topic: { value: '' }, purpose: { value: '' } } })
+  await waitFor(() => {
+    const row = conversation(engine) as { topic: string; purpose: string }
+    return row.topic === '' && row.purpose === '' ? true : undefined
   })
 })

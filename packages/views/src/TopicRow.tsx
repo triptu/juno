@@ -212,7 +212,7 @@ export const TopicRow = memo(function TopicRow({
             </Text>
           </span>
           <span {...stylex.props(styles.people)}>
-            <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} />
+            {people.length > 0 ? <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} /> : null}
           </span>
           <span {...stylex.props(styles.tags)}>
             {main ? <Chip variant="outline">Main</Chip> : null}

@@ -20,7 +20,7 @@ import {
   type Ts,
 } from '@juno/domain'
 import { conversationKind, type Channel, type CountEntry, type Im, type Reaction, type Team, type User } from '@juno/slack-schema'
-import { Invalidation, StoreWriter, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
+import { Invalidation, StoreWriter, syncedRanges, type ConversationRow, type MessageRow, type SqlError, type UserRow } from '@juno/store'
 import { Effect } from 'effect'
 import { syncKeys } from './keys'
 import { reconcilePost } from './posts'
@@ -414,6 +414,7 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
           WHEN thread_cursors.complete_from IS NULL THEN excluded.complete_from
           WHEN excluded.complete_from < thread_cursors.complete_from THEN excluded.complete_from
           ELSE thread_cursors.complete_from END`
+    yield* invalidate({ thread_cursors: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
   })
 
 /**
@@ -424,11 +425,12 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
  * was last in step and marks their coverage again from Slack's pointer, and
  * a followed thread with no activity since then missed nothing.
  */
-export const endEventCoverage: Effect.Effect<void, SqlError, StoreWriter> = Effect.gen(function* () {
+export const endEventCoverage: Writer = Effect.gen(function* () {
   const sql = yield* StoreWriter
   yield* sql`UPDATE thread_cursors SET complete_from = NULL
     WHERE complete_from IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)`
+  yield* invalidate(['thread_cursors'])
 })
 
 // Read state (architecture 5.6, specs/readstate.qnt). The rules are `@juno/domain`'s
@@ -754,21 +756,7 @@ export const setIgnored = (channel: string, at: string | null): Effect.Effect<bo
 
 /** The synced range a page covered, merged with the ranges it touches. */
 export const addSyncedRange = (channel: string, fromTs: string, toTs: string): Writer =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    const touching = yield* sql<{ from_ts: string; to_ts: string }>`
-      SELECT from_ts, to_ts FROM synced_ranges WHERE channel = ${channel} AND from_ts <= ${toTs} AND to_ts >= ${fromTs}`
-    let from = fromTs
-    let to = toTs
-    for (const r of touching) {
-      if (compareTs(r.from_ts, from) < 0) from = r.from_ts
-      if (compareTs(r.to_ts, to) > 0) to = r.to_ts
-    }
-    if (touching.length > 0) {
-      yield* sql`DELETE FROM synced_ranges WHERE channel = ${channel} AND from_ts IN ${sql.in(touching.map((r) => r.from_ts))}`
-    }
-    yield* sql`INSERT INTO synced_ranges (channel, from_ts, to_ts) VALUES (${channel}, ${from}, ${to})`
-  })
+  syncedRanges.add({ channel, from_ts: fromTs, to_ts: toTs })
 
 export const latestSyncedRange = (channel: string): Effect.Effect<{ from_ts: string; to_ts: string } | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {

@@ -41,8 +41,8 @@ export interface HomeProps {
   readonly onBrowseAll?: (event: ActivateEvent) => void
   /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
-  /** Rows the list keeps room for, so a row that lands later moves nothing (the first sync). */
-  readonly slots?: number
+  /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
+  readonly reservedItems?: number
 }
 
 /**
@@ -51,7 +51,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false, slots = 0 }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false, reservedItems = 0 }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -69,8 +69,8 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             {line}
           </Text>
         </div>
-        {items.length === 0 && slots === 0 ? null : (
-          <ul aria-labelledby={headingId} data-home-slots={slots > 0 ? slots : undefined} {...stylex.props(styles.items, slots > 0 && styles.slots(slots, slots - 1), ...part())}>
+        {items.length === 0 && reservedItems === 0 ? null : (
+          <ul aria-labelledby={headingId} {...stylex.props(styles.items, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
             {items.map((item) => (
               <HomeRow
                 key={item.id}
@@ -95,8 +95,8 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             <Kbd look="key">⌘J</Kbd>
           </button>
         )}
-        {caughtUp && onBrowseAll !== undefined ? (
-          <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, ...part())}>
+        {(caughtUp || reservedItems > 0) && onBrowseAll !== undefined ? (
+          <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, !caughtUp && styles.hidden, ...part())}>
             Browse all topics
           </button>
         ) : null}
@@ -256,6 +256,8 @@ const styles = stylex.create({
   line: {
     marginTop: spacing['--space-1-5'],
   },
+  hidden: { visibility: 'hidden' },
+  itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {
     display: 'flex',
     flexDirection: 'column',
@@ -267,10 +269,6 @@ const styles = stylex.create({
     padding: 0,
     listStyle: 'none',
   },
-  // Room for `rows` rows and the `gaps` between them.
-  slots: (rows: number, gaps: number) => ({
-    minHeight: `calc(${rows} * ${sizes['--row-52']} + ${gaps} * ${spacing['--space-0-5']})`,
-  }),
   // The row is the hover and focus surface; its link and its button sit side by side inside it.
   row: {
     display: 'flex',

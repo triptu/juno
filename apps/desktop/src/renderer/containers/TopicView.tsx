@@ -160,8 +160,8 @@ function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop:
 /**
  * The rows laid out in full rather than at their size estimate, so the
  * position set before the first paint is where they end up: a window's
- * worth around the open position, a window's worth of an older page above
- * the row held while it goes in (`heldAt`), and the last window's worth,
+ * worth around the open position, a window's worth around
+ * the row held during a source jump or an older page (`heldAt`), and the last window's worth,
  * where new messages arrive and the bottom is held. A page row drawn at its
  * estimate between the top of the view and the held row would grow a frame
  * later and move what is on screen; the page's rows are new, so laying them
@@ -171,7 +171,7 @@ function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop:
 function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
   const eager = new Set<string>()
   for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
-  for (let i = Math.max(0, heldAt - rows); i < heldAt; i++) eager.add(order[i]!)
+  for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)
   return eager
 }
@@ -376,6 +376,8 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   useEffect(preloadViewer, [])
   // The position to hold (`Pin`), and the scrollTop it last set.
   const pin = useRef<Pin | undefined>(undefined)
+  // The row held after a source jump or while an older page went in above it.
+  const [heldAt, setHeldAt] = useState<string | undefined>(undefined)
   const pinnedTop = useRef(0)
   // The rows and window size the bottom was held for.
   const heldFor = useRef<{ readonly rows: MessageWindow['rows']; readonly size: string } | undefined>(undefined)
@@ -427,6 +429,7 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
       const row = scroller.querySelector(rowSelector(flash.ts))
       if (row === null || flash.n <= flashTaken.current) return
       flashTaken.current = flash.n
+      setHeldAt(flash.ts)
       if (registry.get(messageFlashAtom(id))?.n === flash.n) registry.set(messageFlashAtom(id), undefined)
       const box = row.getBoundingClientRect()
       const view = scroller.getBoundingClientRect()
@@ -435,6 +438,8 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
         pin.current = undefined
         row.scrollIntoView({ block: 'center', behavior: 'instant' })
       }
+      pin.current = { kind: 'row', element: row, offset: row.getBoundingClientRect().top - view.top }
+      pinnedTop.current = scroller.scrollTop
       flashChatRow(row)
     })
   }, [id, readOnly, flash, positioned, list.rows])
@@ -529,8 +534,6 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   // Older pages. A thread whose root is in the window has nothing older.
   const [complete, setComplete] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
-  // The row held in view while the last older page went in above it.
-  const [heldAt, setHeldAt] = useState<string | undefined>(undefined)
   const rootShown = first !== undefined && list.rows.get(first)?.root === true
   const windowFull = list.order.length >= list.spec.limit
   const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull) ? 'none' : 'more'
@@ -618,7 +621,8 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
   const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)))
   const from = drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
-  const eager = eagerRows(list.order, openAt, heldAt === undefined ? -1 : list.order.indexOf(heldAt), rows)
+  const held = flash?.ts ?? heldAt
+  const eager = eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows)
 
   const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
   // The user's own messages, sent or still sending, are never new to them.

@@ -1,3 +1,4 @@
+import { expectStableAnchor } from './shiftProbe'
 // Realtime hardening (M7, architecture 5.1, 5.8 and 2.5): what changes in
 // Slack while the socket is down reaches the open topic once it is back,
 // Slack's rate limits slow Juno down without stopping it, a message written
@@ -159,3 +160,17 @@ for (const change of ['rename', 'leave', 'archive'] as const) {
     } else await expect(juno.sidebar.row(ENG_MAIN).root).toHaveCount(0)
   })
 }
+
+test('header notices replace the same slot without moving the pages below', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.allTopics.open()
+  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
+    fake.goOffline()
+    await juno.sidebar.expectSyncStatus("You're offline")
+    for (const method of ['client.counts', 'conversations.history', 'subscriptions.thread.getView', 'search.modules.messages']) fake.force429({ method, retryAfter: 6 })
+    fake.goOnline()
+    await juno.sidebar.expectSyncStatus('Slack asked us to slow down')
+    await juno.sidebar.expectNoSyncStatus(60_000)
+  })
+})

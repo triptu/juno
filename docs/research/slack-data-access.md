@@ -229,6 +229,7 @@ Files
   - The snippet path (not the composer) puts `channel, thread_ts, client_msg_id, intro, blocks, broadcast` on `files.completeUpload` instead and skips `files.share`.
 - **Files on a message** (renderer reads): `id, name, title, mimetype, filetype, size, mode, created, url_private, url_private_download, permalink, original_w/h, image_exif_rotation, alt_txt, thumb_tiny`, square `thumb_64/80/160` without sizes, `thumb_360/480/720/800/960/1024` each with `_w/_h`, `thumb_360_gif/480_gif`, `thumb_pdf(_w/_h)`, `thumb_video(_w/_h)`, `mp4`, `aac`, `converted_pdf`. `getThumbSrcForFile` prefers `thumb_pdf`, then 1024 (box over 480), 960 (over 360), 720, 480, 360. The full image is `url_private`, or the largest thumbnail when the EXIF rotation is over 1 or the original size is missing (rotation over 4 swaps `original_w/h`). `url_private` is a plain `<img src>` relying on the `d` cookie (same site as `app.slack.com`); no token, no `?t=`.
 - Unknown: the upload host and whether its url is signed; the answers of `files.share` and `files.completeUpload` (the client reads neither); whether `files.share` before `file_created` (Juno shares right after `completeUpload`) is accepted or leaves the message without thumbnails until a later `file_change`; whether `reply_broadcast` is honoured (the client sends `broadcast`); whether the upload POST minds the `d` cookie that Juno's session sends with it.
+- Unknown: what `chat.delete` does to a message posted by `files.share` when another message (the network copy's twin, same `client_msg_id`) shares the same files. It may leave the files, or remove them from the other message too. Until this is checked in the private test channel, Juno never deletes a network copy of a post with files: it hides it locally and records it in `kept_copies` as "file copy kept until verified" (ADR 0014). To check: share a file with `files.share`, call `files.share` again with the same ids and `client_msg_id`, delete one message with `chat.delete`, then read the other with `conversations.history` and the file with `files.info`.
 
 
 Activity / mentions (`boot-async`, `fetchActivityFeed` thunk; fetcher `activityFeedFetcher`)
@@ -340,13 +341,15 @@ Inferred
 
 - Slack applies Tier limits per method and per token; the client's 60 s default backoff on 429 is a good default for Juno.
 
-### Background pacing policy (2026-10-15)
+### Request pacing policy (2026-10-17)
 
 The published [history](https://docs.slack.dev/reference/methods/conversations.history/) and [replies](https://docs.slack.dev/reference/methods/conversations.replies/) methods have Tier 3 limits (50+ per minute) for Marketplace and internal customer-built apps. Those pages also document a separate 1/minute policy for affected commercially distributed non-Marketplace apps. Neither policy establishes the limit of the internal `xoxc` session Juno uses. The live runs above only establish that 40/minute caused no 429.
 
-Juno spaces background starts 1,500 ms apart per method (40 per minute), independently for each method. This is the rate the live runs measured as safe. It stays below the published 50 per minute because the session token is shared with the official Slack client, which needs room for its own calls. A 429 retains Retry-After and doubles that method's spacing for the session, capped at 60 s. No recovery ramp is assumed without more live evidence. Test overrides can disable spacing.
+Juno spaces all background starts 1,500 ms apart in total (40/minute), and retains a separate 1,500 ms minimum for each method. The 298-call live run measured about 40/minute across all methods, not per method. This is evidence for a conservative background budget, not a guarantee for the internal session token shared with the official client.
 
-The earlier live run made 147 history calls and 114 replies calls. The gain comes from admitting methods independently and from discovery metadata, not from a faster per-method rate.
+Interactive reads use a separate token bucket: capacity 20, refill one token every 500 ms (2/second). Reconnect refetches beyond that allowance queue; waits release lane permits and recheck the method pause before dispatch. The send lane remains one in flight. The interactive budget is a local policy for normal use and bounded bursts, not a measured Slack allowance. The fake can inject method or global 429s but does not enforce a measured throughput limit.
+
+A 429 retains Retry-After and doubles that method's background interval once per active pause window, capped at 60 s. Every 429 resets its quiet timer. After five minutes without another 429 the interval halves, then halves every further five quiet minutes down to 1,500 ms. Existing start deadlines are retained. Interactive calls fail fast only for a method pause longer than five seconds, not because their token bucket is empty. Test overrides can disable background spacing and interactive refill waits independently.
 
 `subscriptions.thread.getView` cannot be paged in parallel from the known API: `current_ts` is the last preceding page's `latest_reply`, not an offset or an independently obtainable cursor. Guessing timestamps risks gaps when activity is uneven or moves between requests. The existing sequential pass remains; increasing `limit` does not remove its 10-row cap.
 

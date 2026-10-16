@@ -7,6 +7,7 @@ import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
 import { AiProvider } from '@juno/ai'
 import { Effect, Stream } from 'effect'
+import { SyncLink } from '../syncLink'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
@@ -20,6 +21,7 @@ import { PostWorker } from './worker'
 
 export const SendHandlers = SendRoutes.toLayer(
   Effect.gen(function* () {
+    const sync = yield* SyncLink
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const worker = yield* PostWorker
@@ -27,9 +29,10 @@ export const SendHandlers = SendRoutes.toLayer(
     const staging = yield* Staging
     const ai = yield* AiProvider
     const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
-    const provide = <A, E>(effect: Effect.Effect<A, E, Workspace | Outbox | Staging>) =>
+    const provide = <A, E>(effect: Effect.Effect<A, E, Workspace | Outbox | Staging | SyncLink>) =>
       effect.pipe(
         Effect.provideService(Workspace, workspace),
+        Effect.provideService(SyncLink, sync),
         Effect.provideService(Outbox, outbox),
         Effect.provideService(Staging, staging),
         Effect.tap(() => Effect.andThen(worker.wake, actions.wake)),

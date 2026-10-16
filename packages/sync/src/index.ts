@@ -53,7 +53,7 @@ export {
   type PendingFile,
   type PendingPost,
 } from './posts'
-export { applyOpened, type Acted } from './events'
+export { type Acted } from './events'
 export {
   actionDone,
   deferAction,
@@ -70,3 +70,4 @@ export {
   type MessageRef,
   type PendingAction,
 } from './actions'
+export { checkCopyDelete } from './sent'

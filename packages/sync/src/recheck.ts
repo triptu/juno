@@ -17,6 +17,11 @@
  *   after the request (its event raced the page) is never inferred deleted.
  *   A thread page does not infer its root: the root is Main's, and Main's
  *   page covers it.
+ *
+ * Each recheck records when it began (`sync_state` `recheck`), and each
+ * topic the span its page covered (`rechecked_topics`), after the
+ * deletions it found are stored. A network copy's delete that waited
+ * across the gap goes out only if its own topic is covered (ADR 0014).
  */
 import { millisToTs, parseTopicId, type Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
@@ -26,6 +31,8 @@ import { Clock, Effect } from 'effect'
 import type { BootError, BootServices } from './boot'
 import { awaitEarlierFetches, type SyncContext } from './context'
 import { writeDeleted } from './events'
+import { RECHECK_KEY } from './sent'
+import { setSyncState } from './write'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 
 export interface RecheckOptions {
@@ -77,7 +84,8 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
   Effect.gen(function* () {
     const api = yield* SlackApi
     const known = yield* storedSince(target, from)
-    const requestedAt = millisToTs(yield* Clock.currentTimeMillis)
+    const requestedMillis = yield* Clock.currentTimeMillis
+    const requestedAt = millisToTs(requestedMillis)
     const limit = ctx.config.historyPageLimit
     const page =
       target.kind === 'main'
@@ -100,9 +108,15 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
     const inSpan = (ts: string) => !page.has_more || edge === undefined || (target.kind === 'main' ? compareTs(ts, edge) >= 0 : compareTs(ts, edge) <= 0)
     const present = new Set<string>(page.messages.map((message) => message.ts))
     const gone = known.filter((ts) => inSpan(ts) && !present.has(ts))
-    if (gone.length === 0) return
+    const sql = yield* StoreWriter
+    const fromTs = target.kind === 'main' && page.has_more && edge !== undefined ? edge : from
+    const toTs = target.kind === 'thread' && page.has_more && edge !== undefined ? edge : null
     yield* transaction(
-      Effect.forEach(gone, (ts) => writeDeleted(ctx, target.channel, ts, { kind: 'page', requestedAt }), { discard: true }),
+      Effect.gen(function* () {
+        yield* Effect.forEach(gone, (ts) => writeDeleted(ctx, target.channel, ts, { kind: 'page', requestedAt }), { discard: true })
+        yield* sql`INSERT INTO rechecked_topics (topic_id, requested_at, from_ts, to_ts) VALUES (${topic}, ${requestedMillis}, ${fromTs}, ${toTs})
+          ON CONFLICT (topic_id) DO UPDATE SET requested_at = excluded.requested_at, from_ts = excluded.from_ts, to_ts = excluded.to_ts`
+      }),
     )
   })
 
@@ -115,6 +129,7 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
 export const recheck = (ctx: SyncContext, options: RecheckOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     yield* awaitEarlierFetches(ctx)
+    yield* transaction(setSyncState(RECHECK_KEY, { startedAt: yield* Clock.currentTimeMillis }))
     const from = millisToTs(options.since - ctx.config.recheckLookbackMillis)
     for (const target of yield* targets(ctx, options.first, from)) {
       yield* recheckOne(ctx, target, from).pipe(

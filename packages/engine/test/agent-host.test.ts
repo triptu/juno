@@ -383,6 +383,7 @@ describe('the AgentHost port', () => {
     expect(await ok(agent.client['host.outbox.send'](cancelled))).toEqual({ _tag: 'failed', attemptId: cancelled.attemptId, reason: 'cancelled' })
     expect(engine.fake.callCount('chat.postMessage')).toBe(0)
 
+    engine.main.network.resend = true
     const cut = send(account, 'Engine stopped mid-send')
     engine.fake.holdNext({ method: 'chat.postMessage' })
     const pending = Effect.runPromiseExit(agent.client['host.outbox.send'](cut))

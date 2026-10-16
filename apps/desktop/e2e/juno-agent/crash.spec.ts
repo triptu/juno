@@ -19,9 +19,9 @@ import { addServer, agentReady, card, expectArmedCrash, expectKilled, launchArme
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
-const NOTE = 'save a note'
+const NOTE = 'save a note about the address'
 
-/** "save a note on <server>" proposes an outward Littlebird write; "forget my first message" a removal; the rest is echoed. */
+/** The note request proposes a Littlebird write; "forget my first message" proposes a removal; the rest is echoed. */
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   if (request.toolResult !== undefined) {
     if (request.toolResult.includes('Proposed Change card')) return '<say>The note is ready for you to review.</say>'

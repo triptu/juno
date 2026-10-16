@@ -6,7 +6,9 @@
 // Inputs:
 //   .juno-status/now.json   { "updated": "...", "needsYou": [{ "title", "detail" }],
 //                             "running": [{ "name", "model", "detail", "since" }],
-//                             "next": ["..."] }   (local, not committed)
+//                             "next": ["..." or { name, detail }],
+//                             "pendingDecisions": ["..."], "ideas": ["..." or { name, detail }] }
+//                           (local, not committed)
 //   docs/decision-log.md    the committed decision log
 //   git log --all           recent commits on every branch, including agent worktrees
 //
@@ -83,7 +85,12 @@ const running = now.running?.length
       .join('')}</ul>`
   : `<p class="empty">No agents running.</p>`
 
-const next = now.next?.length ? `<ol class="next">${now.next.map((n) => `<li>${inline(n)}</li>`).join('')}</ol>` : ''
+// A list item is a plain string or { name, detail }.
+const item = (n) => (typeof n === 'string' ? inline(n) : `<strong>${inline(n.name ?? '')}</strong>${n.detail ? ` · ${inline(n.detail)}` : ''}`)
+const next = now.next?.length ? `<ol class="next">${now.next.map((n) => `<li>${item(n)}</li>`).join('')}</ol>` : ''
+// Calls the orchestrator made that the owner may want to override.
+const pending = now.pendingDecisions?.length ? `<ul class="next">${now.pendingDecisions.map((n) => `<li>${item(n)}</li>`).join('')}</ul>` : ''
+const ideas = now.ideas?.length ? `<ul class="next">${now.ideas.map((n) => `<li>${item(n)}</li>`).join('')}</ul>` : ''
 
 const healthBody = health
   ? (() => {
@@ -153,8 +160,9 @@ const html = `<!doctype html>
 <body><main>
 <header><h1>Juno status</h1><span class="meta">updated ${esc(now.updated ?? generated)} · page built ${esc(generated)} · reloads every 20 s</span></header>
 ${section('Needs you', needs, now.needsYou?.length ?? 0)}
+${pending ? section('Decided for you, override if you disagree', pending, now.pendingDecisions.length) : ''}
 <div class="grid">
-  <div>${section('Running now', running, now.running?.length ?? 0)}${next ? section('Up next', next) : ''}${section('Codebase health', healthBody)}</div>
+  <div>${section('Running now', running, now.running?.length ?? 0)}${next ? section('Up next', next) : ''}${ideas ? section('Ideas', ideas, now.ideas.length) : ''}${section('Codebase health', healthBody)}</div>
   <div>${section('Decisions', `<table>${decisionRows}</table>`, decisions.length)}</div>
 </div>
 ${section('Commits', `<table>${commitRows}</table>`, commits.length)}

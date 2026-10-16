@@ -28,6 +28,14 @@ Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfte
 - Import `@juno/fake-slack` in `src`. The fake is a test-only dependency (`testDeps`).
 - Retry a fatal auth error or a decode error.
 
+## Request pacing
+
+Juno spaces all background starts 1,500 ms apart in total (40/minute), and retains a separate 1,500 ms minimum for each method. The 298-call live run measured about 40/minute across all methods, not per method. This is evidence for a conservative background budget, not a guarantee for the internal session token shared with the official client.
+
+Interactive reads use a separate token bucket: capacity 20, refill one token every 500 ms (2/second). Reconnect refetches beyond that allowance queue; waits release lane permits and recheck the method pause before dispatch. The send lane remains one in flight. The interactive budget is a local policy for normal use and bounded bursts, not a measured Slack allowance. The fake can inject method or global 429s but does not enforce a measured throughput limit.
+
+A 429 retains Retry-After and doubles that method's background interval once per active pause window, capped at 60 s. Every 429 resets its quiet timer. After five minutes without another 429 the interval halves, then halves every further five quiet minutes down to 1,500 ms. Existing start deadlines are retained. Interactive calls fail fast only for a method pause longer than five seconds, not because their token bucket is empty. Test overrides can disable background spacing and interactive refill waits independently.
+
 ## Testing
 
 `pnpm --filter @juno/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the per-method background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.

@@ -109,7 +109,7 @@ export interface SidebarProps {
   readonly onCloseViewSheet?: () => void
   readonly onToggleUnread: () => void
   readonly onClearScope: () => void
-  /** A status line under the filters, when the list may be behind Slack (`EngineNotice`). */
+  /** The fixed secondary header line, for sync progress or a connection notice. */
   readonly status?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
@@ -122,9 +122,9 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search, New chat and the account button, the nav items, a hairline, the quick
- * filters with their dots and the Unread toggle, a status line when the
- * list may be behind Slack, the scope chip when scoped, the list the
+ * space, Search, New chat, the account button and a fixed status line,
+ * the nav items, a hairline, the quick filters with their dots and the
+ * Unread toggle, the scope chip when scoped, the list the
  * owner renders into it, and, only while privacy mode is on, a footer that
  * says so with a Show button.
  */
@@ -175,34 +175,37 @@ export function Sidebar({
         }
   return (
     <aside aria-label="Sidebar" aria-busy={syncing} {...stylex.props(styles.root)}>
-      <header aria-label="Sidebar title bar" {...stylex.props(styles.titlebar)}>
-        {titlebarLeading}
-        <div {...stylex.props(styles.icons)}>
-          <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
-          <IconButton icon={NotePencil} label="New chat ⌘N" size={30} onClick={onNewChat} />
-          <span {...stylex.props(styles.account)}>
-            <Popover
-              open={accountMenuOpen}
-              onClose={() => onAccountMenu(false)}
-              width="browse"
-              placement="bottom-end"
-              role="dialog"
-              label="Account"
-              anchor={
-                <AvatarButton
-                  label="Account and settings"
-                  initials={account.initials}
-                  hue={account.hue}
-                  open={accountMenuOpen}
-                  onClick={() => onAccountMenu(!accountMenuOpen)}
-                  {...(account.avatarUrl === undefined ? {} : { src: account.avatarUrl })}
-                />
-              }
-            >
-              {accountMenu}
-            </Popover>
-          </span>
+      <header aria-label="Sidebar title bar" {...stylex.props(styles.header)}>
+        <div {...stylex.props(styles.titlebar)}>
+          {titlebarLeading}
+          <div {...stylex.props(styles.icons)}>
+            <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
+            <IconButton icon={NotePencil} label="New chat ⌘N" size={30} onClick={onNewChat} />
+            <span {...stylex.props(styles.account)}>
+              <Popover
+                open={accountMenuOpen}
+                onClose={() => onAccountMenu(false)}
+                width="browse"
+                placement="bottom-end"
+                role="dialog"
+                label="Account"
+                anchor={
+                  <AvatarButton
+                    label="Account and settings"
+                    initials={account.initials}
+                    hue={account.hue}
+                    open={accountMenuOpen}
+                    onClick={() => onAccountMenu(!accountMenuOpen)}
+                    {...(account.avatarUrl === undefined ? {} : { src: account.avatarUrl })}
+                  />
+                }
+              >
+                {accountMenu}
+              </Popover>
+            </span>
+          </div>
         </div>
+        <div {...stylex.props(styles.status)}>{status}</div>
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
@@ -296,8 +299,6 @@ export function Sidebar({
       >
         {viewSheet}
       </Popover>
-
-      {status}
 
       {scope ? (
         <div {...stylex.props(styles.scope)}>
@@ -419,6 +420,8 @@ const styles = stylex.create({
   // The traffic lights sit at the left of this strip (main positions them),
   // then the leading controls; the strip drags the window and the buttons
   // inside opt out.
+  header: { flexShrink: 0 },
+  status: { height: spacing['--space-4'], lineHeight: spacing['--space-4'] },
   titlebar: {
     display: 'flex',
     alignItems: 'center',

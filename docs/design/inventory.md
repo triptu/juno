@@ -49,6 +49,8 @@ Conventions that apply everywhere (SPEC §16):
 
 Right-aligned group, gap 2px, inside the 44px bar.
 
+The header always reserves a secondary text slot below the icon bar: meta text, `--space-4` (16px) height and line height, with `--space-4` horizontal inset. It is empty when there is no status. During the first sync it says "Syncing", then "Syncing N of M". Offline, rate-limit and stopped notices use this same single line; their explanation is the tooltip, and stopped offers Restart inline. The progress bar is `--space-0-5` (2px), absolutely positioned along the header's bottom edge, with no layout space. No status transition changes the header height or moves the navigation, filters or list.
+
 | Button | Icon | Size | Accessible name | Action |
 | --- | --- | --- | --- | --- |
 | Search | `search` 16 | 30×30, radius 8 | "Search ⌘K" | Opens ⌘K palette |

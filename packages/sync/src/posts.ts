@@ -244,6 +244,7 @@ export const recordSend = (clientMsgId: string, channel: string, userId: string)
     const sql = yield* StoreWriter
     const now = yield* Clock.currentTimeMillis
     yield* sql`DELETE FROM sent_posts WHERE sent_at < ${now - KEEP_MILLIS}`
+    yield* sql`DELETE FROM kept_copies WHERE kept_at < ${now - KEEP_MILLIS}`
     yield* sql`INSERT INTO sent_posts (client_msg_id, channel, user_id, ts, sent_at) VALUES (${clientMsgId}, ${channel}, ${userId}, NULL, ${now})
       ON CONFLICT (client_msg_id) DO NOTHING`
   })

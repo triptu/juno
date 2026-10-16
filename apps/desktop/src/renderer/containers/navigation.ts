@@ -313,9 +313,11 @@ function keepsNewChat(tabs: Tabs): boolean {
 export function openNewChat(): void {
   const blank = registry.get(tabsAtom).tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
   if (blank !== undefined) {
-    switchToTab(blank.id)
-    // Already on screen, its composer may have lost focus: ask for it again.
-    afterPaint(() => newChatFocus.forEach((focus) => focus(blank.id)))
+    // Already on screen, its composer may have lost focus: ask for it now. Not after the next paint, which on a
+    // still page can come only after the user's next key and steal focus from what that key opened. A hidden tab
+    // shown again focuses its composer by itself.
+    if (registry.get(tabsAtom).active === blank.id) newChatFocus.forEach((focus) => focus(blank.id))
+    else switchToTab(blank.id)
     return
   }
   show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
