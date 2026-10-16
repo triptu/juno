@@ -6,12 +6,16 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, machinesToDestroy, pendingVcpu, orphanGraceMs } from './pool-decisions.mjs'
+import { capacity, machinesToDestroy, mayPass, pendingVcpu, orphanGraceMs } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
-const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 1) * 60_000
-const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 1)
+// Warm machines between runs: docs/development.md, "Current cost controls".
+const defaultIdleMinutes = 8
+export const idleMinutes = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? defaultIdleMinutes)
+const idleMs = idleMinutes * 60_000
+const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2)
+const holdMs = Number(process.env.JUNO_REMOTE_HOLD_SECONDS ?? 120) * 1000
 const maxVcpu = Math.min(24, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24))
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
@@ -128,17 +132,17 @@ export function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 9) return
+    if (alive(pid) && version >= 10) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
       if (!/\/scripts\/remote\/pool\.mjs --watch\s*$/.test(command)) return
       try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
     }
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
     child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '9')
+    writeFileSync(versionFile, '10')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -248,7 +252,7 @@ function queue() {
 }
 function daemonAlive() {
   try {
-    return Number(readFileSync(join(dir, 'watcher.version'), 'utf8')) >= 9 && alive(Number(readFileSync(join(dir, 'watcher.pid'), 'utf8')))
+    return Number(readFileSync(join(dir, 'watcher.version'), 'utf8')) >= 10 && alive(Number(readFileSync(join(dir, 'watcher.pid'), 'utf8')))
   } catch { return false }
 }
 
@@ -284,12 +288,17 @@ function admit(request, instances) {
   write(pending)
   return { pending }
 }
+// A request that does not fit leaves free cores to later requests that fit,
+// until it has waited JUNO_REMOTE_HOLD_SECONDS (default 120); then it holds
+// them so it is not starved.
 function dispatch(instances) {
+  const blocked = []
   for (const request of queue()) {
     if (request.result || request.error) continue
+    if (!mayPass(blocked, Date.now(), holdMs)) break
     const result = admit(request, instances)
-    if (!result) break
-    writeRequest({ ...request, result })
+    if (result) writeRequest({ ...request, result })
+    else blocked.push(request)
   }
 }
 const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th')}`

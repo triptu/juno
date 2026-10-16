@@ -1,5 +1,10 @@
 export const orphanGraceMs = 5 * 60_000
 
+/** Whether a later request may be admitted past the waiting ones in `blocked`. */
+export function mayPass(blocked, now, holdMs) {
+  return blocked.every((request) => now - request.created < holdMs)
+}
+
 /** Inputs carry liveness observations; this function never contacts Namespace. */
 export function machinesToDestroy({ instances, states, pending, owner, now, idleMs, lifetimeMs }) {
   const tracked = new Map(states.map((state) => [state.id, state]))

@@ -287,7 +287,7 @@ else process.exit(2);
   chmodSync(join(dir, 'nsc'), 0o755)
 }
 
-test('daemon owns inventory, holds capacity for the queue head, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
+async function poolHarness(extraEnv = {}) {
   const { spawn } = await import('node:child_process')
   const { mkdirSync, readdirSync } = await import('node:fs')
   const dir = mkdtempSync(join(tmpdir(), 'juno-pool-daemon-'))
@@ -296,7 +296,7 @@ test('daemon owns inventory, holds capacity for the queue head, and survives a c
   mkdirSync(instances)
   writePoolNamespace(dir)
   const children = []
-  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: instances, TEST_CALLS: join(dir, 'lists'), JUNO_REMOTE_MAX_VCPU: '8', JUNO_REMOTE_IDLE_MINUTES: '0' }
+  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: instances, TEST_CALLS: join(dir, 'lists'), JUNO_REMOTE_MAX_VCPU: '8', JUNO_REMOTE_IDLE_MINUTES: '0', ...extraEnv }
   const waitFor = async (predicate) => {
     const deadline = Date.now() + 35_000
     while (!predicate()) {
@@ -325,6 +325,12 @@ if (!destroy(job.id)) throw new Error('destroy failed');
     children.push(item)
     return item
   }
+  return { dir, poolDir, instances, children, waitFor, run }
+}
+
+test('daemon owns inventory, holds capacity for a queue head past its hold, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
+  const { readdirSync } = await import('node:fs')
+  const { dir, poolDir, instances, children, waitFor, run } = await poolHarness({ JUNO_REMOTE_HOLD_SECONDS: '0' })
   let daemon
   try {
     const blocker = run('blocker', 2, true)
@@ -362,6 +368,24 @@ if (!destroy(job.id)) throw new Error('destroy failed');
   } finally {
     for (const { child } of children) if (child.exitCode === null) child.kill('SIGKILL')
     if (daemon) { try { process.kill(daemon, 'SIGKILL') } catch { /* Already exited. */ } }
+    await Promise.all(children.map((item) => item.done))
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a waiting request leaves free cores to a later one that fits', { timeout: 60_000 }, async () => {
+  const { dir, children, waitFor, run } = await poolHarness()
+  try {
+    const blocker = run('blocker', 2, true)
+    await waitFor(() => blocker.output.includes('creating'))
+    const head = run('head', 8)
+    await waitFor(() => head.output.includes('waiting: 1st'))
+    const small = run('small', 2)
+    await waitFor(() => small.output.includes('acquired'))
+    assert(!head.output.includes('acquired'))
+  } finally {
+    for (const { child } of children) if (child.exitCode === null) child.kill('SIGKILL')
+    try { process.kill(Number(readFileSync(join(dir, 'juno-remote-pool', 'watcher.pid'), 'utf8')), 'SIGKILL') } catch { /* Already exited. */ }
     await Promise.all(children.map((item) => item.done))
     rmSync(dir, { recursive: true, force: true })
   }
