@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 import type { BodyBlock, BodyInline } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
 import { Button } from '@juno/ui'
-import { thumbnailBox } from './FileCard'
+import { thumbnailBox } from './MediaGrid'
 
 type Attachment = Extract<BodyBlock, { kind: 'attachment' }>
 

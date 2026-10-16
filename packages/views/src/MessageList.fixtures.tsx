@@ -22,10 +22,9 @@ import {
   uploadFailed,
   uploading,
   withDownloads,
-  albumOf,
-  mediaAndPdf,
   withFiles,
 } from './fixtures/messages'
+import { albumOf, mediaAndPdf } from './fixtures/media'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
