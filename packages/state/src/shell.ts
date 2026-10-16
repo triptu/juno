@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationTarget, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Density, ResolvedTheme, Theme } from '@juno/contract'
@@ -81,13 +81,40 @@ export const densityAtom = Atom.make<Density>(savedDensity())
 
 /**
  * Privacy mode (SPEC section 5): message text is blurred, for screen sharing.
- * Starts as saved (`?privacy=on`), so a relaunch mid-share never shows text.
+ * Starts as saved (`?privacy=on`, or `sharing`), so a relaunch mid-share never shows text.
  */
-export const privacyAtom = Atom.make<boolean>(launchParam('privacy') === 'on')
+export const privacyAtom = Atom.make<boolean>(launchParam('privacy') === 'on' || launchParam('privacy') === 'sharing')
+
+/** Privacy mode is on because main saw the screen being shared, and the user has not touched it since. */
+export const privacySharingAtom = Atom.make<boolean>(launchParam('privacy') === 'sharing')
 
 /** Tells main, which remembers it for the next launch and hides notification text while it is on. */
 export function persistPrivacy(privacy: boolean): void {
   window.juno.launch.setPrivacy(privacy).catch(() => {})
+}
+
+const decodePrivacy = Schema.decodeUnknownOption(PrivacyState)
+
+/** Calls `listener` each time main turns privacy mode on or off because sharing started or ended. Returns the unsubscribe. */
+export function onSharingPrivacy(listener: (state: PrivacyState) => void): () => void {
+  return window.juno.launch.onPrivacy((value) => {
+    const state = decodePrivacy(value)
+    if (state._tag === 'Some') listener(state.value)
+  })
+}
+
+const decodeSharing = Schema.decodeUnknownOption(SharingSetting)
+
+/** "Hide message text while sharing the screen", as main holds it; undefined if main did not answer. */
+export async function getSharingSetting(): Promise<SharingSetting | undefined> {
+  const decoded = decodeSharing(await window.juno.sharing.get().catch(() => undefined))
+  return decoded._tag === 'Some' ? decoded.value : undefined
+}
+
+/** Turns hiding while sharing on or off; resolves with the setting after, or undefined if main did not answer. */
+export async function setSharingSetting(hide: boolean): Promise<SharingSetting | undefined> {
+  const decoded = decodeSharing(await window.juno.sharing.set(hide).catch(() => undefined))
+  return decoded._tag === 'Some' ? decoded.value : undefined
 }
 
 /** Tells main, so the next launch's first render already uses this density. */
@@ -149,7 +176,7 @@ export function editUndo(): void {
   window.juno.shell.editUndo().catch(() => {})
 }
 
-/** Opens an http or https link in the browser. */
+/** Opens an http, https or mailto link outside the app (main refuses any other). */
 export function openExternal(url: string): void {
   window.juno.shell.openExternal(url).catch(() => {})
 }

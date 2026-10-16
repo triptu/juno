@@ -1,7 +1,7 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
 import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from '@juno/slack-schema'
 import type { ContentBlock as Block, Inline, ListStyle, Lookups } from './model'
-import { channelInline, dateInline, emojiInline, inlineText, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
+import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
 
 /**
@@ -15,7 +15,7 @@ function unknownText(raw: Readonly<Record<string, unknown>>): string {
 function inlineFromElement(el: RichTextInline, lookups: Lookups): Inline[] {
   switch (el.type) {
     case 'text':
-      return textRuns(el.text, toStyle(el.style))
+      return linkedRuns(el.text, toStyle(el.style))
     case 'user':
       return [userInline(el.user_id, lookups)]
     case 'channel':

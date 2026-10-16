@@ -16,6 +16,20 @@ afterEach(async () => {
 })
 
 describe('control API', () => {
+  it('lists user groups, deleted ones only with include_disabled, and putUsergroup emits subteam events', async () => {
+    const live = await client.ok('usergroups.list', {})
+    expect(live.usergroups.map((g) => g.handle)).toEqual(['platform', 'design-crew'])
+    const all = await client.ok('usergroups.list', { include_disabled: true })
+    expect(all.usergroups.find((g) => g.handle === 'old-ops')?.date_delete).toBeGreaterThan(0)
+    const socket = await client.connect()
+    fake.putUsergroup({ id: 'S0PLATFORM', handle: 'platform-core', name: 'Platform core' })
+    const updated = await socket.next(isType('subteam_updated'))
+    expect(updated).toMatchObject({ type: 'subteam_updated', subteam: { id: 'S0PLATFORM', handle: 'platform-core' } })
+    fake.putUsergroup({ id: 'S0NEW', handle: 'new-group', name: 'New group' })
+    expect(await socket.next(isType('subteam_created'))).toMatchObject({ subteam: { id: 'S0NEW' } })
+    socket.close()
+  })
+
   it('forceError answers the next call of a method with ok: false before the handler runs, then recovers', async () => {
     fake.forceError({ method: 'subscriptions.thread.add', error: 'internal_error' })
     const root = fake.messages('C0ENG').find((m) => m.text?.startsWith('checkout.spec'))!

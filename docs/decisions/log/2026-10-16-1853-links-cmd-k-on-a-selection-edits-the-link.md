@@ -1,0 +1,1 @@
+- 10-16 18:53 · links · ⌘K with words selected in a topic composer opens the link editor instead of the palette; with nothing selected it stays the palette.

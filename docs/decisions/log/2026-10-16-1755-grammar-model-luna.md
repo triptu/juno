@@ -1,0 +1,1 @@
+- 10-16 17:55 · orchestrator · Grammar after sending keeps GPT Luna as its model. The owner left the choice to us, and his OpenRouter key is not on the build Mac to run the live comparison; Luna passed the 40-case study and is fast.

@@ -12,7 +12,12 @@
  * - `newChat.ranked`: the ⌘K Conversations tab (spec section 10). DMs,
  *   group DMs and channels by own sends and topic visits, decayed like
  *   `newChat.frequent`, then activity; with text, the conversations the
- *   picker finds for it, ranked the same way.
+ *   picker finds for it, by how well they match, then ranked the same way.
+ *
+ * With text, both search by words (`conversation-search.ts` in
+ * `@juno/domain`): each typed word matches the start of a word of the
+ * name, a person's names or a channel's words, in any order, then inside
+ * a word, then with one typo.
  * - `newChat.threads`: the thread picker's rows. With a channel, its
  *   threads by latest activity, followed or not; without one, recent
  *   threads from everywhere. Main is not a row: the renderer puts it first.
@@ -42,6 +47,8 @@ export const PickConversation = Schema.Struct({
   person: Schema.optionalKey(Person),
   /** Juno holds no message in it: "No messages yet" for a person. */
   empty: Schema.Boolean,
+  /** With text, the parts of `name` the text matched, as [start, end) offsets, for the row to highlight. */
+  highlight: Schema.optionalKey(Schema.Array(Schema.Tuple([Schema.Int, Schema.Int]))),
 })
 export type PickConversation = typeof PickConversation.Type
 

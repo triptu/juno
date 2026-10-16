@@ -13,6 +13,7 @@ import type {
   Message,
   Reaction,
   RtmFrame,
+  Subteam,
   Team,
   ThreadCounts,
   ThreadSubscription,
@@ -100,6 +101,8 @@ export class Workspace {
   prefs: UserPrefs = {}
   /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
   selfUsergroups: Array<string> = []
+  /** Every user group of the workspace, deleted ones too (`date_delete` > 0), as `usergroups.list` returns them. */
+  readonly usergroups = new Map<string, Subteam>()
   /** The self user's `manual_presence`: `active` (Slack's automatic mode) or `away`. */
   manualPresence: 'active' | 'away' = 'active'
   readonly clock: Clock
@@ -121,6 +124,33 @@ export class Workspace {
   onEvent(listener: (frame: RtmFrame) => void): () => void {
     this.#listeners.add(listener)
     return () => this.#listeners.delete(listener)
+  }
+
+  /** Adds or changes a user group, with `subteam_created` or `subteam_updated` (a deleted group is an update with `date_delete`). */
+  putUsergroup(input: { id: string; handle: string; name: string; deleted?: boolean }, emit = true): Subteam {
+    const now = Math.floor(this.clock.now() / 1000)
+    const known = this.usergroups.get(input.id)
+    const group: Subteam = {
+      id: input.id,
+      team_id: this.team.id,
+      name: input.name,
+      handle: input.handle,
+      description: '',
+      is_usergroup: true,
+      is_subteam: true,
+      is_external: false,
+      user_count: 0,
+      date_create: known?.date_create ?? now,
+      date_update: now,
+      date_delete: input.deleted === true ? now : 0,
+      created_by: this.selfId,
+      updated_by: this.selfId,
+      deleted_by: null,
+      auto_type: null,
+    }
+    this.usergroups.set(group.id, group)
+    if (emit) this.emit({ type: known === undefined ? 'subteam_created' : 'subteam_updated', subteam: group, event_ts: this.eventTs() })
+    return group
   }
 
   emit(frame: RtmFrame): void {
@@ -741,4 +771,18 @@ function stripRoot(root: Message): Omit<Message, 'root'> {
 function omitReactions(message: Message): Message {
   const { reactions: _reactions, ...rest } = message
   return rest
+}
+
+const PHOTO_SIZES = ['image_24', 'image_32', 'image_48', 'image_72', 'image_192', 'image_512', 'image_1024'] as const
+
+/**
+ * A user as the edge `users/info` and `client.userBoot` return it: no
+ * `image_*` photo urls, only `avatar_hash`, plus `image_original` for a
+ * custom photo (observed live). The web `users.list` keeps them.
+ */
+export function edgeUserObject(user: User): User {
+  if (user.profile === undefined) return user
+  const profile: Record<string, unknown> = { ...user.profile }
+  for (const key of PHOTO_SIZES) delete profile[key]
+  return { ...user, profile: profile as User['profile'] }
 }

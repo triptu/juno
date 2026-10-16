@@ -8,8 +8,9 @@
  *   `https://app.slack.com`. An older value goes into a table file
  *   (`000005.ldb`) and the newest into the log (`000007.log`), so a reader
  *   has to handle both formats and pick by sequence number.
- * - `Cookies`: a Chromium cookie store with the `d` cookie encrypted the way
- *   Chromium encrypts it on macOS under the given "keychain" password.
+ * - `Cookies` (or `Network/Cookies`, as newer Chromium writes it): a Chromium
+ *   cookie store with the `d` cookie encrypted the way Chromium encrypts it on
+ *   macOS under the given "keychain" password.
  *
  * The leveldb writer here is for fixtures only: one data block, no
  * compression, no filter block, no manifest. The reader in `@juno/slack`
@@ -17,7 +18,7 @@
  */
 import { createCipheriv, createHash, pbkdf2Sync } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 export interface SlackAppFixtureTeam {
@@ -39,6 +40,12 @@ export interface SlackAppFixtureOptions {
   readonly keychainPassword: string
   /** A stale team record written before `team`, to prove the newest wins. Default: a copy of `team` with an old token. */
   readonly staleTeam?: SlackAppFixtureTeam
+  /** Where the cookie store goes. Default: `Cookies`. */
+  readonly cookiesFile?: 'Cookies' | 'Network/Cookies'
+  /** Leave out the `d` cookie, as a Slack app that was signed out does. */
+  readonly signedOut?: boolean
+  /** Write the newest `localConfig_v2` with no teams. */
+  readonly emptyTeams?: boolean
 }
 
 const ORIGIN = 'https://app.slack.com'
@@ -51,9 +58,12 @@ export async function writeSlackAppFixture(dir: string, options: SlackAppFixture
   const key = storageKey(ORIGIN, LOCAL_CONFIG_KEY)
   // Sequence numbers: the table holds the older write, the log the newer.
   await writeFile(join(leveldb, '000005.ldb'), tableFile([{ key, value: storageValue(localConfigJson(stale)), sequence: 10n }]))
-  await writeFile(join(leveldb, '000007.log'), logFile(20n, [{ key, value: storageValue(localConfigJson(options.team)) }]))
+  const newest = options.emptyTeams === true ? JSON.stringify({ teams: {}, orderedTeamIds: [] }) : localConfigJson(options.team)
+  await writeFile(join(leveldb, '000007.log'), logFile(20n, [{ key, value: storageValue(newest) }]))
   await writeFile(join(leveldb, 'CURRENT'), 'MANIFEST-000001\n')
-  writeCookies(join(dir, 'Cookies'), options)
+  const cookies = join(dir, ...(options.cookiesFile ?? 'Cookies').split('/'))
+  await mkdir(dirname(cookies), { recursive: true })
+  writeCookies(cookies, options)
 }
 
 export function localConfigJson(team: SlackAppFixtureTeam): string {
@@ -218,7 +228,7 @@ function writeCookies(file: string, options: SlackAppFixtureOptions): void {
     const secure = url.protocol === 'https:' ? 1 : 0
     const row = (name: string, value: string, httpOnly: number) =>
       insert.run(0, hostKey, name, encrypt(value), expires, secure, httpOnly, secure ? 2 : 1, url.port === '' ? (secure ? 443 : 80) : Number(url.port))
-    row('d', options.cookie, 1)
+    if (options.signedOut !== true) row('d', options.cookie, 1)
     row('b', 'fixture-b', 0)
     row('lc', '0', 0)
   } finally {

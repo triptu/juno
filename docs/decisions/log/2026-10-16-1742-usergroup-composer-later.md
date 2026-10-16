@@ -1,0 +1,1 @@
+- 10-16 17:42 · usergroups · The composer's @ picker does not suggest user groups yet: it needs a new pick kind, a `<!subteam^S…>` wire token in `composeOutgoing`, a suggestions route, and changes to state, views and two containers. Follow-up.

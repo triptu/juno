@@ -18,7 +18,8 @@
     "test:package": "node ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
   },
   "dependencies": {
-    "electron-updater": "6.8.3"
+    "electron-updater": "6.8.3",
+    "koffi": "3.3.3"
   },
   "devDependencies": {
     "@electron/fuses": "1.8.0",

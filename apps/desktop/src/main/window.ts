@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, type MenuCommand } from '@juno/contract'
+import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
 
@@ -67,15 +67,21 @@ export function appWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => mainWindows.has(window) && !window.isDestroyed())
 }
 
+/**
+ * What the page starts with: the saved launch values, with privacy mode as it is now. The screen
+ * watch may have turned it on (`privacySharing`), which is not saved, so only a reload sees it.
+ */
+export type PageLaunch = Launch & { readonly privacySharing?: boolean }
+
 /** Each app window's way to read the current launch values, for a reload. */
-const launchOf = new WeakMap<BaseWindow, () => Launch>()
+const launchOf = new WeakMap<BaseWindow, () => PageLaunch>()
 
 /**
  * `launch` reads the current launch values: the page takes its first state
  * (theme, privacy, sidebar) from its URL, so a reload builds the URL again
  * rather than loading the one the window opened with.
  */
-export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
+export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow {
   const launch = currentLaunch()
   const window = createWindow({
     title: 'Juno',
@@ -106,7 +112,7 @@ export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
 }
 
 /** The app page for `launch`. electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server. */
-function appPageUrl(launch: Launch): string {
+function appPageUrl(launch: PageLaunch): string {
   const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
   return pageUrl(devUrl || APP_URL, launch)
 }
@@ -224,11 +230,11 @@ function setAppMenu(state: MenuState, rebuild = false): void {
   if (menuState !== undefined && !rebuild) return
   menuState = state
   const view: MenuItemConstructorOptions[] = [
-    command('toggle-sidebar', state.sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', 'Control+Command+S', 'sidebar.toggle'),
+    command('toggle-sidebar', state.sidebarHidden ? 'Show Sidebar' : 'Hide Sidebar', menuShortcuts['sidebar.toggle'], 'sidebar.toggle'),
     // Privacy mode (SPEC section 5): blurs message text for screen sharing.
-    command('toggle-privacy', state.privacy ? 'Show Message Text' : 'Hide Message Text', 'Control+Command+H', 'privacy.toggle'),
+    command('toggle-privacy', state.privacy ? 'Show Message Text' : 'Hide Message Text', menuShortcuts['privacy.toggle'], 'privacy.toggle'),
     // In a topic tab ⌘J opens or closes the Juno panel; elsewhere it opens the Juno tab.
-    command('juno', 'Juno', 'CommandOrControl+J', 'juno.toggle'),
+    command('juno', 'Juno', menuShortcuts['juno.toggle'], 'juno.toggle'),
     { type: 'separator' },
     { id: 'reload', label: 'Reload', accelerator: 'CommandOrControl+R', click: (_item, window) => reload(window, false) },
     { id: 'force-reload', label: 'Force Reload', accelerator: 'Shift+CommandOrControl+R', click: (_item, window) => reload(window, true) },
@@ -245,17 +251,17 @@ function setAppMenu(state: MenuState, rebuild = false): void {
   // ⌘N and ⌘T both open a new tab (a New chat, spec section 9). ⌘W closes
   // the tab, not the window; ⌘⇧W closes the window.
   const file: MenuItemConstructorOptions[] = [
-    command('new-chat', 'New Chat', 'CommandOrControl+N', 'chat.new'),
-    command('new-tab', 'New Tab', 'CommandOrControl+T', 'tab.new'),
-    command('reopen-tab', 'Reopen Closed Tab', 'CommandOrControl+Shift+T', 'tab.reopen'),
+    command('new-chat', 'New Chat', menuShortcuts['chat.new'], 'chat.new'),
+    command('new-tab', 'New Tab', menuShortcuts['tab.new'], 'tab.new'),
+    command('reopen-tab', 'Reopen Closed Tab', menuShortcuts['tab.reopen'], 'tab.reopen'),
     { type: 'separator' },
-    command('close-tab', 'Close Tab', 'CommandOrControl+W', 'tab.close'),
+    command('close-tab', 'Close Tab', menuShortcuts['tab.close'], 'tab.close'),
     { role: 'close', accelerator: 'CommandOrControl+Shift+W' },
   ]
   // Undo has no role: the renderer undoes typing in a text field that has
   // text, and otherwise Juno's last action (architecture, shortcuts).
   const edit: MenuItemConstructorOptions[] = [
-    command('undo', 'Undo', 'CommandOrControl+Z', 'edit.undo'),
+    command('undo', 'Undo', menuShortcuts['edit.undo'], 'edit.undo'),
     { role: 'redo' },
     { type: 'separator' },
     { role: 'cut' },
@@ -266,18 +272,18 @@ function setAppMenu(state: MenuState, rebuild = false): void {
     { role: 'selectAll' },
   ]
   const go: MenuItemConstructorOptions[] = [
-    command('back', 'Back', 'CommandOrControl+[', 'history.back'),
-    command('forward', 'Forward', 'CommandOrControl+]', 'history.forward'),
+    command('back', 'Back', menuShortcuts['history.back'], 'history.back'),
+    command('forward', 'Forward', menuShortcuts['history.forward'], 'history.forward'),
     { type: 'separator' },
     // ⌘K (SPEC section 10) opens the palette, and closes it again.
-    command('search', 'Search…', 'CommandOrControl+K', 'palette.toggle'),
+    command('search', 'Search…', menuShortcuts['palette.toggle'], 'palette.toggle'),
   ]
   const windowItems: MenuItemConstructorOptions[] = [
     { role: 'minimize' },
     { role: 'zoom' },
     { type: 'separator' },
-    command('previous-tab', 'Show Previous Tab', 'CommandOrControl+Shift+[', 'tab.previous'),
-    command('next-tab', 'Show Next Tab', 'CommandOrControl+Shift+]', 'tab.next'),
+    command('previous-tab', 'Show Previous Tab', menuShortcuts['tab.previous'], 'tab.previous'),
+    command('next-tab', 'Show Next Tab', menuShortcuts['tab.next'], 'tab.next'),
     command('previous-tab-control', 'Show Previous Tab', 'Control+Shift+Tab', 'tab.previous', true),
     command('next-tab-control', 'Show Next Tab', 'Control+Tab', 'tab.next', true),
     // ⌘1 to ⌘8 by position, ⌘9 the last tab, as in browsers. Hidden, as Safari hides them.
@@ -295,7 +301,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
               submenu: [
                 { role: 'about' },
                 { type: 'separator' },
-                command('settings', 'Settings…', 'CommandOrControl+,', 'settings.open'),
+                command('settings', 'Settings…', menuShortcuts['settings.open'], 'settings.open'),
                 { type: 'separator' },
                 { role: 'services' },
                 { type: 'separator' },
@@ -321,12 +327,13 @@ function setAppMenu(state: MenuState, rebuild = false): void {
  * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
  * accent, density and privacy mode, and the saved sidebar.
  */
-function pageUrl(base: string, launch: Launch): string {
+function pageUrl(base: string, launch: PageLaunch): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
-  if (launch.privacy === true) url.searchParams.set('privacy', 'on')
+  // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
+  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()

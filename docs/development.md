@@ -46,6 +46,7 @@ Run these from the repo root.
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
+| `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
 | `pnpm agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `pnpm test`). `pnpm agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
 
@@ -76,7 +77,7 @@ their original order when timestamps match.
 
 ## Batch merges
 
-Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories (batch merges and the migration order check).
 
 Fetch `origin/main`, then run from the repository root:
 
@@ -98,8 +99,9 @@ Generated-file conflicts use a temporary copy of the batch's version. After all
 merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
 decision log, runs `pnpm health:baseline`, and commits generated changes. Review
 the baseline diff: regeneration records the merged tree's current health,
-including any increases. Then it runs one `pnpm affected --base <base-commit>`
-against the pinned `origin/main` commit. A failed command retains the worktree;
+including any increases. Then it runs `pnpm typecheck`, `pnpm lint` and
+`pnpm remote test` (the unit tests on one machine); the full suites run on main
+afterwards (see "Testing"). A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
@@ -109,7 +111,7 @@ push removes the worktree; the batch branch and logs remain. Continuing a checke
 batch reruns checks before publishing.
 
 `--dry-run branch-one branch-two` performs local merges, installation and
-regeneration, but only prints the affected plan. Dry-run batches cannot push.
+regeneration, but runs no checks. Dry-run batches cannot push.
 Remove a discarded worktree with `git worktree remove <path>`, then delete its
 batch branch with `git branch -D batch-N`. If a process was killed, remove its
 `.juno-status/batches/active.lock` only after confirming it has stopped.
@@ -440,6 +442,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `pnpm test:gallery` |
 | No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
 | Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
+| No focus ring cut off by a scroller or paint containment, tabbing through the main surfaces in light and dark (`GALLERY_RING_ONLY=Sidebar` for one, `*` for every component) | `apps/gallery/focus-ring.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `pnpm test:feel` |
 
@@ -576,6 +579,21 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 
 `pnpm affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
 
+## Testing
+
+Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
+
+**Agents.** Before reporting, an agent runs `pnpm typecheck`, `pnpm lint`, the unit test files its change reaches (`pnpm remote test <files>`), the e2e spec files it added or changed plus those for the feature it changed (`pnpm remote test:desktop <files>`), gallery shots for the components it changed (`GALLERY_SHIFT_ONLY=<names> pnpm remote test:gallery`), and `pnpm specs:check` only when it changed a spec or the code the spec models. One remote run at a time per agent. Bare `pnpm affected` is not used until it selects narrowly again (below).
+
+**Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
+
+**The CI keeper.** One agent owns main's health. It runs the full suites on main (one machine per suite) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green.
+
+**Work in progress** (this section changes as each lands):
+- One machine per run: a suite runs on one machine and builds the app once, instead of four desktop shards that each build it. Shards stay for the scheduled full run only.
+- Test selection by coverage: the full run records which source files each e2e spec and gallery component exercises, and `pnpm affected` runs only the specs whose recorded files changed.
+- A faster suite: slow, redundant or misplaced tests are merged, moved to faster layers or removed.
+
 ## Affected tests
 
 `pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
@@ -705,6 +723,12 @@ Causes found so far (2026-10-15):
 
 - **A source-link jump kept the bottom hold until `scrollend`.** A reply committed before that event pulled the topic back to the bottom. A source jump releases the bottom hold before calling `scrollIntoView`. It lays out the rows around the target before measuring it, then holds the cited row in place. The e2e test defers `scrollend` until a reply is drawn and requires the cited row to stay at exactly the same vertical position.
 
+- **A copy's delete retried inside its call across a socket drop.** `SlackApi.call` retries `internal_error` itself, and each try runs the copy check again. A try that came after the reconnect, before the catch-up ended, kept the copy as not rechecked, so the duplicate stayed (5 of 100 remote, 20 of 30 on a loaded Mac). The check now leaves the row waiting for the catch-up, as the worker's pass does (`actionWorker.ts`).
+
+- **A command that cancelled a topic open.** A topic open applies once the topic can paint (`show` in `navigation.ts`). ⌘J right after the click still saw the Juno tab, opened it again, and that change cancelled the waiting open: the topic never showed (1 of 80 at 8 workers). The Juno shortcuts now decide after the navigation already asked for (`afterNavigation`).
+
+- **A list item read at its threshold.** Home shows "moved a lot" from `MOVED_A_LOT_MIN` (8) new replies, so a test that injects nine and waits for the item can read it at eight. Wait for the value the test asserts.
+
 ## Machine shapes
 
 `pnpm remote` picks a cost-conscious shape for each script (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
@@ -768,8 +792,11 @@ Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
-files and koffi are explicitly unpacked. Only `electron-updater` and its runtime
-dependencies ship as node_modules; application dependencies are bundled by Vite.
+files and koffi are explicitly unpacked. koffi (main's screen watch, ADR 0015) is
+a Node-API module, so it needs no rebuild per Electron version; its prebuilt
+binary comes from `@koromix/koffi-darwin-arm64`, its install script is denied in
+`pnpm-workspace.yaml`, and its C++ sources and docs are left out of the app.
+Only `electron-updater`, koffi and their runtime dependencies ship as node_modules; application dependencies are bundled by Vite.
 Source maps are excluded. Codex uses the separately installed `codex` executable;
 its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
 
@@ -888,3 +915,7 @@ At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remo
 `expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
 
 Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep `JUNO_REMOTE_MAX_VCPU` at 24 or lower.
+
+## Scheduled full run
+
+`pnpm verify:main` runs every suite against `main` (`--ref <ref>` for another): it checks the ref out into a temporary detached worktree, so nothing local is sent, and runs `test`, `specs:check` with no cache (every Quint run), `test:gallery` and `test:desktop` through `pnpm remote` at the same time. It writes a summary to `.juno-status/verify-main.md` and `.json` (each suite's result, time, log and the failing tests it names) and the full logs to `.juno-status/verify-main/<run>/`, and exits 1 if a suite failed. `--with-mac` also runs the e2e tests tagged `@mac` on this Mac, which takes a heavy-job slot. `perf` and `test:feel` are not part of it. The first run (2026-10-15) passed in 170 s of wall time: `test` 170 s, `specs:check` 146 s, `test:gallery` 74 s, `test:desktop` 114 s.

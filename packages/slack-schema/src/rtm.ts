@@ -13,7 +13,7 @@ import { Ts } from './ts.ts'
 import { Channel, Im } from './conversations.ts'
 import { Message, MessageFields, StructuralSubtypes } from './message.ts'
 import { ThreadSubscription } from './threads.ts'
-import { User } from './users.ts'
+import { Subteam, User } from './users.ts'
 
 const opt = S.optionalKey
 
@@ -265,6 +265,32 @@ export const UserChangeEvent = S.Struct({
 })
 export type UserChangeEvent = typeof UserChangeEvent.Type
 
+// User groups. Created and updated frames carry the whole group; a deleted group is an update with `date_delete` set.
+
+export const SubteamEvent = S.Struct({
+  type: S.Literals(['subteam_created', 'subteam_updated']),
+  subteam: Subteam,
+  event_ts: opt(Ts),
+})
+export type SubteamEvent = typeof SubteamEvent.Type
+
+export const SubteamMembersChangedEvent = S.Struct({
+  type: S.Literal('subteam_members_changed'),
+  subteam_id: S.String,
+  added_users: opt(S.Array(S.String)),
+  removed_users: opt(S.Array(S.String)),
+  event_ts: opt(Ts),
+})
+export type SubteamMembersChangedEvent = typeof SubteamMembersChangedEvent.Type
+
+/** The signed-in user joined or left a group. */
+export const SubteamSelfEvent = S.Struct({
+  type: S.Literals(['subteam_self_added', 'subteam_self_removed']),
+  subteam_id: S.String,
+  event_ts: opt(Ts),
+})
+export type SubteamSelfEvent = typeof SubteamSelfEvent.Type
+
 export const PrefChangeEvent = S.Struct({ type: S.Literal('pref_change'), name: S.String, value: S.Unknown })
 export type PrefChangeEvent = typeof PrefChangeEvent.Type
 
@@ -332,6 +358,9 @@ export const KnownFrames = [
   ImEvent,
   MemberEvent,
   UserChangeEvent,
+  SubteamEvent,
+  SubteamMembersChangedEvent,
+  SubteamSelfEvent,
   PrefChangeEvent,
   FileEvent,
   DesktopNotificationEvent,

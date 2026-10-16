@@ -1,15 +1,18 @@
 /**
- * The ⌘K commands (spec section 10, inventory 9): the global ones, and the
- * ones for the topic in the active tab, grouped under its name. They show
- * in the Conversations tab when the text matches them, or all of them after
- * a leading ">". Each reuses the action the rest of the app runs: the theme
- * and accent of Settings › Appearance, the tab and New chat commands, the
- * account menu's presence and privacy, and the topic menu.
+ * The ⌘K commands (spec section 10, inventory 9): the pages, the Settings
+ * sections and the global commands, and the ones for the topic in the
+ * active tab, grouped under its name. They show in the Conversations tab
+ * when the text matches them, or all of them after a leading ">". Each
+ * reuses the action the rest of the app runs: the sidebar's pages, the Juno
+ * menu's pages, Settings by section, the theme and accent of Settings ›
+ * Appearance, the tab and New chat commands, the account menu's presence
+ * and privacy, and the topic menu.
  */
 import { AccentSchema, type Accent, type SettingsSection, type Theme } from '@juno/contract'
 import {
   accentAtom,
   activeTab,
+  currentPlace,
   junoAvailableAtom,
   junoPanelOpenAtom,
   notificationStatusAtom,
@@ -21,26 +24,46 @@ import {
   tabsAtom,
   tabTopic,
   themeAtom,
+  type OpenOptions,
 } from '@juno/state'
+import { chatCopy } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { closeJunoPanel, openPanel } from './juno/actions'
-import { openNewChat, openNewTab, openSettings, openTopic } from './navigation'
+import { openAllTopics, openHome, openJuno, openJunoPage, openNewChat, openNewTab, openSettings, openTopic } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
 
-/** A command row and what running it does. `words` are matched with the label. `stays`: it moves nothing, so focus goes back to where it was. */
+/** Where a global row shows: under Pages, Settings or Commands. */
+export type CommandGroup = 'pages' | 'settings' | 'commands'
+
+/** The global groups, in the palette's order. */
+export const commandGroups: ReadonlyArray<{ readonly group: CommandGroup; readonly heading: string }> = [
+  { group: 'pages', heading: 'Pages' },
+  { group: 'settings', heading: 'Settings' },
+  { group: 'commands', heading: 'Commands' },
+]
+
+/**
+ * A command row and what running it does. `words` are matched with the
+ * label. `family` names the rows it belongs with ("theme", "settings"):
+ * text that names it shows every row of the family. `stays`: it moves
+ * nothing, so focus goes back to where it was.
+ */
 export interface CommandRow extends PaletteItem {
   readonly words: string
-  readonly run: () => void
+  readonly group: CommandGroup
+  readonly family?: string
+  readonly run: (options: OpenOptions) => void
   readonly stays?: boolean
 }
 
-const row = (id: string, icon: PaletteIconName, label: string, words: string, run: () => void, extra: Partial<CommandRow> = {}): CommandRow => ({
+const row = (id: string, icon: PaletteIconName, label: string, words: string, run: (options: OpenOptions) => void, extra: Partial<CommandRow> = {}): CommandRow => ({
   id: `cmd:${id}`,
   icon,
   label,
   words,
+  group: 'commands',
   compact: true,
   run,
   ...extra,
@@ -54,6 +77,19 @@ const themes: ReadonlyArray<{ readonly theme: Theme; readonly label: string; rea
   { theme: 'system', label: 'Match system', icon: 'theme-system' },
 ]
 
+/** Each Settings section's icon, as its list shows it, and other words for it. */
+const sectionLook: Record<SettingsSection, { readonly icon: PaletteIconName; readonly words: string }> = {
+  general: { icon: 'settings', words: 'new tab startup' },
+  appearance: { icon: 'appearance', words: 'theme accent colour color dark light' },
+  notifications: { icon: 'notifications', words: 'alerts sounds badges quiet hours' },
+  ignored: { icon: 'ignored', words: 'muted hidden channels' },
+  juno: { icon: 'juno', words: 'ai assistant provider key model spend' },
+  connections: { icon: 'connections', words: 'juno servers tools integrations' },
+  backup: { icon: 'backup', words: 'recovery restore move mac' },
+  about: { icon: 'about', words: 'version update' },
+  'ai-activity': { icon: 'ai-activity', words: 'ai calls log cost spend models audit' },
+}
+
 function setTheme(theme: Theme): void {
   registry.set(themeAtom, theme)
   persistTheme(theme)
@@ -64,6 +100,35 @@ function setAccent(accent: Accent): void {
   persistAccent(accent)
 }
 
+/** The Juno chat is open: the active tab shows it, or its panel. */
+function junoChatOpen(): boolean {
+  const tab = activeTab(registry.get(tabsAtom))
+  return tab !== undefined && (currentPlace(tab).kind === 'juno' || registry.get(junoPanelOpenAtom))
+}
+
+/**
+ * The app's pages (SPEC 6): each opens in the current tab, or focuses a
+ * tab that shows it; ⌘Enter opens it in a new tab. Juno's Connections and
+ * Settings are Settings sections, so they are listed there.
+ */
+function pageRows(): ReadonlyArray<CommandRow> {
+  const page = { group: 'pages', family: 'pages go', opensTab: true } as const
+  const juno = { ...page, family: 'pages go juno' } as const
+  const junoPage = (id: 'scheduled' | 'remembers' | 'memory' | 'activity', words: string) =>
+    row(`page-${id}`, 'juno', chatCopy.pageTitles[id], `juno ${words}`, (options) => openJunoPage(id, options), juno)
+  return [
+    row('page-home', 'home', 'Home', 'start greeting', openHome, page),
+    row('page-all-topics', 'all-topics', 'All topics', 'everything browse list threads', openAllTopics, page),
+    row('page-juno', 'juno', 'Juno', 'ai assistant chat ask', openJuno, juno),
+    row('new-chat', 'new-chat', 'New chat', 'message write compose dm', openNewChat, { group: 'pages', family: 'pages go', hint: '⌘N' }),
+    junoPage('scheduled', 'schedule reminders later'),
+    junoPage('remembers', 'memory remember facts'),
+    ...(junoChatOpen() ? [junoPage('memory', 'chat')] : []),
+    junoPage('activity', 'log history work'),
+    row('page-settings', 'settings', 'Settings', 'preferences options', () => openSettings(), { group: 'pages', family: 'pages go settings', hint: '⌘,' }),
+  ]
+}
+
 /** The commands that do not need a topic, as things are now: the current theme and accent say "Current". */
 export function globalCommands(): ReadonlyArray<CommandRow> {
   const theme = registry.get(themeAtom)
@@ -72,11 +137,13 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
   const status = registry.get(notificationStatusAtom)
   const presence = status._tag === 'Success' ? status.value.presence : null
   return [
-    ...themes.map((option) => row(`theme-${option.theme}`, option.icon, `Theme: ${option.label}`, 'appearance mode', () => setTheme(option.theme), { ...stays, ...(option.theme === theme ? { sub: 'Current' } : {}) })),
-    ...AccentSchema.literals.map((name) => row(`accent-${name}`, 'theme-system', `Accent: ${accentLabels[name]}`, 'colour color appearance', () => setAccent(name), { ...stays, accent: name, ...(name === accent ? { sub: 'Current' } : {}) })),
+    ...pageRows(),
+    ...settingsSections.map(({ section, label }) =>
+      row(`settings-${section}`, sectionLook[section].icon, `Settings: ${label}`, sectionLook[section].words, (options) => openSettings(section, options), { group: 'settings', family: 'settings preferences' }),
+    ),
+    ...themes.map((option) => row(`theme-${option.theme}`, option.icon, `Theme: ${option.label}`, 'appearance mode', () => setTheme(option.theme), { ...stays, family: 'theme', ...(option.theme === theme ? { sub: 'Current' } : {}) })),
+    ...AccentSchema.literals.map((name) => row(`accent-${name}`, 'theme-system', `Accent: ${accentLabels[name]}`, 'appearance', () => setAccent(name), { ...stays, family: 'accent colour color', accent: name, ...(name === accent ? { sub: 'Current' } : {}) })),
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
-    row('new-chat', 'new-chat', 'New chat', 'message write compose', openNewChat, { hint: '⌘N' }),
-    ...settingsSections.map(({ section, label }) => row(`settings-${section}`, 'settings', `Settings: ${label}`, 'preferences', () => openSettings(section as SettingsSection))),
     privacy
       ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: '⌃⌘H' })
       : row('privacy', 'hide-text', 'Hide message text', 'privacy mode screen share blur', () => setPrivacy(true), { ...stays, hint: '⌃⌘H' }),
@@ -120,18 +187,36 @@ export function topicCommands(): { readonly heading: string; readonly rows: Read
 
 const wordsOf = (text: string) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word !== '')
 
+/** A family word shorter than this is named only in full, so "set" does not list every Settings section. */
+const FAMILY_PREFIX = 4
+
+/** Every typed word is one of the row's family words, or the start of one. */
+function namesFamily(candidate: CommandRow, typed: ReadonlyArray<string>): boolean {
+  if (candidate.family === undefined) return false
+  const family = wordsOf(candidate.family)
+  return typed.every((word) => family.some((own) => own === word || (word.length >= FAMILY_PREFIX && own.startsWith(word))))
+}
+
+/** The label starts with the text, word by word: "theme light" starts "Theme: Light". */
+export function labelStartsWith(candidate: CommandRow, text: string): boolean {
+  const label = wordsOf(candidate.label)
+  return wordsOf(text).every((word, at) => label[at]?.startsWith(word) === true)
+}
+
 /**
  * The commands that match `text`: every typed word starts a word of the
- * label or its extra words. Labels that start with the text come first;
- * otherwise the order stays as defined.
+ * label, its extra words or its family. Labels that start with the text
+ * come first; otherwise the order stays as defined. At most `max` are kept,
+ * except the rows of a family the text names, which all show.
  */
-export function matchCommands(rows: ReadonlyArray<CommandRow>, text: string): ReadonlyArray<CommandRow> {
+export function matchCommands(rows: ReadonlyArray<CommandRow>, text: string, max = Infinity): ReadonlyArray<CommandRow> {
   const typed = wordsOf(text)
   if (typed.length === 0) return rows
-  const whole = text.trim().toLowerCase()
   const found = rows.filter((candidate) => {
-    const words = wordsOf(`${candidate.label} ${candidate.words}`)
+    const words = wordsOf(`${candidate.label} ${candidate.words} ${candidate.family ?? ''}`)
     return typed.every((word) => words.some((own) => own.startsWith(word)))
   })
-  return found.toSorted((a, b) => Number(b.label.toLowerCase().startsWith(whole)) - Number(a.label.toLowerCase().startsWith(whole)))
+  const ranked = found.toSorted((a, b) => Number(labelStartsWith(b, text)) - Number(labelStartsWith(a, text)))
+  let left = max
+  return ranked.filter((candidate) => namesFamily(candidate, typed) || left-- > 0)
 }

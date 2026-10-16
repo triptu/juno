@@ -10,7 +10,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
-import { JUNO_PANEL_WIDTH } from '@juno/contract/channels'
+import { JUNO_PANEL_WIDTH, menuKeys } from '@juno/contract/channels'
 import { chat, colors, layout, radii, shadows, spacing, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 
@@ -117,7 +117,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
   }
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label={`${newTabLabel} ⌘T`} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}

@@ -1,0 +1,1 @@
+- 10-16 17:53 · orchestrator · In ⌘K, text that names a family of commands (settings, preferences, theme, accent, juno, pages, go) shows the whole family rather than four rows; a family word counts in full, or by a start of at least four letters, so "set" does not list every Settings section.

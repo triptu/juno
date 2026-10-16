@@ -81,6 +81,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
   // The current item: at full strength, with the accent drawn inside its edge (the focus ring stays outside).

@@ -299,6 +299,7 @@ if (process.argv[2] === '--verify-agent') {
 
 const regressions = [
   ['requestqueue', 'pauseWhileQueued', 'respectsPause', 'requestqueue-queued-pause'],
+  ['requestqueue', 'methodSpacing', 'methodSpaced', 'requestqueue-method-spacing'],
   ['discovery', 'rootsFirst', 'noRedundantLookup', 'discovery-roots-first'],
   ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page'],
   ['follow', 'lateEvent', 'acceptedUnfollow', 'accepted-unsubscribe-late-event'],

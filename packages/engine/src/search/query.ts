@@ -1,6 +1,6 @@
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
-import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
-import { messageBody, plainText, type Lookups, type MessageContent } from '@juno/richtext'
+import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mentionedUsergroupIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { messageBody, plainText, type Lookups, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -125,11 +125,24 @@ const topicTitle = (hit: Pick<TopicHit, 'kind' | 'named_title' | 'title'>, place
     ? mainLabel({ id: place.id as ChannelId, kind: place.kind, name: place.name })
     : hit.named_title || firstWords(hit.title, FALLBACK_TITLE_WORDS, lookups) || place.label
 
-/** Names for the people the fallback titles of `texts` mention. */
+/** Handles for the user groups `texts` mention. */
+const readUsergroups = (sql: SqlClient.SqlClient, texts: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const ids = [...new Set(texts.flatMap((text) => mentionedUsergroupIds(text)))]
+    const groups = new Map<string, UsergroupName>()
+    if (ids.length === 0) return groups
+    for (const row of yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in(ids)}`) {
+      groups.set(row.id, { handle: row.handle, ...(row.name === null ? {} : { name: row.name }) })
+    }
+    return groups
+  })
+
+/** Names for the people and groups the fallback titles of `texts` mention. */
 const titleLookups = (sql: SqlClient.SqlClient, texts: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const users = yield* readUsers(sql, new Set(texts.flatMap((text) => mentionedUserIds(text))))
-    return { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined) } satisfies Lookups
+    const groups = yield* readUsergroups(sql, texts)
+    return { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined), usergroup: (id: string) => groups.get(id) } satisfies Lookups
   })
 
 /** One line, for a result's sub line. */
@@ -162,7 +175,8 @@ export const messageResults = (
     const channelNames = new Map(
       channelIds.length === 0 ? [] : (yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(channelIds)}`).map((row) => [row.id, row.name ?? row.id]),
     )
-    const lookups = { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined), channel: (id: string) => channelNames.get(id) }
+    const groups = yield* readUsergroups(sql, [...hits.map((hit) => hit.text), ...[...titles.values()].map((known) => known.title)])
+    const lookups = { user: (id: string) => (users.has(id) ? userName(id, users.get(id)) : undefined), channel: (id: string) => channelNames.get(id), usergroup: (id: string) => groups.get(id) }
     return hits.map((hit): SearchMessage => {
       const place = placeOf(places, hit.channel)
       const known = titles.get(hit.topicId)

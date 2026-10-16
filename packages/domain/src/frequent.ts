@@ -10,13 +10,13 @@ interface Destination {
 }
 
 /** One use of a conversation: an own send, or a visit to one of its topics, at epoch milliseconds. */
-interface Use {
+export interface Use {
   readonly channel: string
   readonly at: number
 }
 
 /** Each use in the last 30 days counts `0.5 ^ (age_in_days / 7)`; with the latest use, by conversation. */
-function scoresOf(uses: ReadonlyArray<Use>, now: number): Map<string, { score: number; latest: number }> {
+export function scoresOf(uses: ReadonlyArray<Use>, now: number): Map<string, { score: number; latest: number }> {
   const scores = new Map<string, { score: number; latest: number }>()
   for (const { channel, at } of uses) {
     const age = (now - at) / DAY

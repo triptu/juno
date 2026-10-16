@@ -5,7 +5,24 @@ import { Prohibit } from '@phosphor-icons/react/dist/icons/Prohibit'
 import { useState, type FormEvent } from 'react'
 import type { ConversationKind } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, Icon, IconButton, OptionList, OptionRow, Text, TextField, useOptionListKeys, viewIconNames, viewIcons, type ViewIconName } from '@juno/ui'
+import {
+  accentLabels,
+  accentNames,
+  Button,
+  Checkbox,
+  Icon,
+  IconButton,
+  OptionList,
+  OptionRow,
+  Swatch,
+  Text,
+  TextField,
+  useOptionListKeys,
+  viewIconNames,
+  viewIcons,
+  type AccentName,
+  type ViewIconName,
+} from '@juno/ui'
 import { kindIcon } from './look'
 
 /** A conversation the sheet lists: chosen, or a match for the search. */
@@ -23,6 +40,8 @@ export interface ViewSheetProps {
   readonly mode: 'new' | 'edit'
   readonly name: string
   readonly icon?: ViewIconName | undefined
+  /** The icon's colour, an accent; undefined is neutral. */
+  readonly color?: AccentName | undefined
   readonly keepOutOfAll: boolean
   /** The view's conversations, in the order they were added. */
   readonly chosen: ReadonlyArray<ViewSheetConversation>
@@ -31,6 +50,7 @@ export interface ViewSheetProps {
   readonly results: ReadonlyArray<ViewSheetConversation>
   readonly onNameChange: (name: string) => void
   readonly onIconChange: (icon: ViewIconName | undefined) => void
+  readonly onColorChange: (color: AccentName | undefined) => void
   readonly onKeepOutOfAllChange: (keep: boolean) => void
   readonly onQueryChange: (query: string) => void
   /** Adds the conversation, or removes it when chosen. */
@@ -70,7 +90,7 @@ const rowId = (id: string) => `view-sheet-${id}`
 
 /**
  * The view sheet (spec section 5 "Views", inventory 2.3): the name, an
- * optional icon, the conversations through a search, and Keep these out of
+ * optional icon and its colour, the conversations through a search, and Keep these out of
  * All. Nothing else. The owner holds the draft and saves it; the sheet
  * changes nothing until Save. Enter in the name saves, Escape cancels (the
  * popover that holds it closes on Escape).
@@ -79,12 +99,14 @@ export function ViewSheet({
   mode,
   name,
   icon,
+  color,
   keepOutOfAll,
   chosen,
   query,
   results,
   onNameChange,
   onIconChange,
+  onColorChange,
   onKeepOutOfAllChange,
   onQueryChange,
   onToggle,
@@ -143,8 +165,22 @@ export function ViewSheet({
               iconSize={14}
               variant={icon === each ? 'secondary' : 'ghost'}
               tone={icon === each ? 'default' : 'subtle'}
+              {...(icon === each && color !== undefined ? { iconTint: color } : {})}
               onClick={() => onIconChange(each)}
             />
+          ))}
+        </div>
+      </div>
+
+      {/* The colour is the icon's; the chosen icon above shows it. */}
+      <div {...stylex.props(styles.field)}>
+        <Text variant="meta" tone="muted" weight="medium" as="span">
+          Colour
+        </Text>
+        <div role="radiogroup" aria-label="Colour" data-view-colors="" {...stylex.props(styles.colors)}>
+          <Swatch tint="neutral" label="Neutral" selected={color === undefined} onClick={() => onColorChange(undefined)} />
+          {accentNames.map((each) => (
+            <Swatch key={each} tint={each} label={accentLabels[each]} selected={color === each} onClick={() => onColorChange(each)} />
           ))}
         </div>
       </div>
@@ -229,6 +265,14 @@ const styles = stylex.create({
     display: 'flex',
     flexWrap: 'wrap',
     gap: spacing['--space-0-5'],
+  },
+  // Nine swatches on one line across the sheet. The selected ring reaches 4px past the disc; the inset keeps it inside.
+  colors: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: spacing['--space-1'],
+    paddingInline: spacing['--space-1'],
+    paddingBlock: spacing['--space-1'],
   },
   list: {
     maxHeight: layout['--view-sheet-list-max-height'],

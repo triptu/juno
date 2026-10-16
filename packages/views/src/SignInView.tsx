@@ -10,6 +10,8 @@ export interface SignInViewProps {
   readonly busy?: 'window' | 'import'
   /** One short sentence about the last failed attempt. */
   readonly error?: string
+  /** The failure has a report: a quiet "Copy details" button puts it on the clipboard. */
+  readonly onCopyDetails?: () => void
   readonly onSignIn: () => void
   readonly onImport: () => void
 }
@@ -20,7 +22,7 @@ export interface SignInViewProps {
  * that reads the installed Slack app's session, and a quiet line for what
  * went wrong. This is the one surface where Juno speaks in the first person.
  */
-export function SignInView({ mode, busy, error, onSignIn, onImport }: SignInViewProps) {
+export function SignInView({ mode, busy, error, onCopyDetails, onSignIn, onImport }: SignInViewProps) {
   const waiting = busy !== undefined
   const expired = mode === 'expired'
   const status = waiting
@@ -34,6 +36,15 @@ export function SignInView({ mode, busy, error, onSignIn, onImport }: SignInView
       title={expired ? 'Slack signed you out' : "Hi, I'm Juno"}
       body={expired ? 'Sign in again to pick up where you left off. Your topics and settings are kept.' : "Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you."}
       {...(status === undefined ? {} : { status })}
+      {...(status?.tone === 'danger' && onCopyDetails !== undefined
+        ? {
+            statusAction: (
+              <Button variant="ghost" size="xs" tone="subtle" onClick={onCopyDetails}>
+                Copy details
+              </Button>
+            ),
+          }
+        : {})}
     >
       <div {...stylex.props(styles.actions)}>
         <Button variant="primary" size="2xl" onClick={onSignIn} disabled={waiting}>

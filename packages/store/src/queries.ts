@@ -16,6 +16,7 @@ export const keys = {
   prefs: ['prefs'] satisfies InvalidationKeys,
   topicArt: ['topic_art'] satisfies InvalidationKeys,
   aiCache: ['ai_cache'] satisfies InvalidationKeys,
+  aiCalls: ['ai_calls'] satisfies InvalidationKeys,
   topicVisits: ['topic_visits'] satisfies InvalidationKeys,
   followUps: ['follow_ups'] satisfies InvalidationKeys,
   sidebarViews: ['sidebar_views'] satisfies InvalidationKeys,

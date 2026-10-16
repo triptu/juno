@@ -15,7 +15,7 @@
     "typecheck:tsc": "node scripts/typecheck.mjs",
     "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive node scripts/typecheck-bun.mjs --parity",
     "typecheck:bun": "node scripts/typecheck-bun.mjs",
-    "lint": "oxlint . && node scripts/decision-log.mjs --check && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
+    "lint": "oxlint . && node scripts/decision-log.mjs --check && node scripts/check-cache-epoch.mjs && node scripts/check-migration-order.mjs && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
     "health:knip": "knip --config knip.config.mjs --no-exit-code",
@@ -34,6 +34,7 @@
     "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
     "probe:live": "node scripts/probe-live.ts",
+    "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
     "ai:eval": "pnpm --filter @juno/ai eval",
     "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
@@ -54,7 +55,7 @@
     "test:package": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
-    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs"
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",
@@ -62,6 +63,7 @@
     "@juno/fake-slack": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/slack-schema": "workspace:*",
+    "@juno/state": "workspace:*",
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
     "@types/node": "24.19.2",

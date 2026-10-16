@@ -88,6 +88,72 @@ function failedMessage(model: Model<Api>, failure: ProviderFailure, partial?: As
     errorMessage: code(failure.ending, failure.rateLimited),
   }
 }
+/**
+ * One model request as the AI activity log records it (`HostAiCall` in the
+ * engine's log). Never text: only the request's shape, outcome and cost.
+ */
+export interface GuardCall {
+  readonly path: SpendPath
+  readonly sessionId: string | undefined
+  readonly provider: string
+  readonly model: string
+  readonly at: number
+  readonly durationMs: number
+  readonly outcome: 'ok' | 'error' | 'blocked' | 'cancelled' | 'timeout'
+  /** Why it was not ok, as a short code. '' when ok. */
+  readonly kind: string
+  /** The HTTP status of a provider error, when there was one. Never the error's body. */
+  readonly message: string
+  readonly inputTokens: number | null
+  readonly outputTokens: number | null
+  readonly costUsd: number | null
+  readonly outputChars: number
+  readonly toolCalls: number
+}
+
+/** The log's outcome for a failed request. */
+function failureOutcome(failure: ProviderFailure): Pick<GuardCall, 'outcome' | 'kind'> {
+  const ending = failure.ending
+  if (ending._tag === 'interrupted') return { outcome: 'cancelled', kind: 'interrupted' }
+  if (ending._tag === 'blocked') return { outcome: 'blocked', kind: ending.reason === 'budget' ? 'cap' : 'too-large' }
+  if (ending._tag === 'failed' && ending.reason === 'missingKey') return { outcome: 'blocked', kind: 'no-key' }
+  if (ending._tag === 'failed') return { outcome: 'error', kind: ending.reason }
+  return { outcome: 'error', kind: ending._tag }
+}
+
+type CallBase = Pick<GuardCall, 'path' | 'sessionId' | 'provider' | 'model' | 'at'>
+
+/** A request that finished: its usage when the provider reported any, and the shape of its answer. */
+function doneCall(base: CallBase, message: AssistantMessage): GuardCall {
+  const usage = message.usage
+  const reported = usage.totalTokens > 0
+  const cost = usage.cost.total
+  const shape = progressOf(message)
+  return {
+    ...base, durationMs: Date.now() - base.at, outcome: 'ok', kind: '', message: '',
+    inputTokens: reported ? usage.input + usage.cacheRead + usage.cacheWrite : null, outputTokens: reported ? usage.output : null,
+    costUsd: reported && Number.isFinite(cost) && cost >= 0 ? cost : null,
+    outputChars: shape.text.length, toolCalls: shape.toolCalls,
+  }
+}
+
+/** A request that did not finish. Of a provider's error only the HTTP status is kept. */
+function failedCall(base: CallBase, failure: ProviderFailure, error: unknown): GuardCall {
+  const status = error === undefined || error instanceof AdmissionError ? undefined : httpStatus(error instanceof Error ? error.message : String(error))
+  return {
+    ...base, durationMs: Date.now() - base.at, ...failureOutcome(failure), message: status === undefined ? '' : `HTTP ${status}`,
+    inputTokens: null, outputTokens: null, costUsd: null, outputChars: 0, toolCalls: 0,
+  }
+}
+
+/** Ends `outer` with a whole answer (Codex's), and gives its record. */
+function answerWhole(outer: ReturnType<typeof createAssistantMessageEventStream>, base: CallBase, message: AssistantMessage): GuardCall {
+  if (message.stopReason === 'error') outer.push({ type: 'error', reason: 'error', error: message })
+  else outer.push({ type: 'done', reason: message.stopReason === 'toolUse' ? 'toolUse' : 'stop', message })
+  outer.end(message)
+  return message.stopReason === 'error' ? failedCall(base, providerFailure(message.errorMessage ?? 'failed'), undefined) : doneCall(base, message)
+}
+
 export interface GuardOptions {
   readonly store: Store
   readonly transport: Models
@@ -113,6 +179,16 @@ export function createProviderGuard(options: GuardOptions) {
     return input
   }
   const models = createModels()
+  const listeners = new Set<(call: GuardCall) => void>()
+  const tell = (call: GuardCall) => {
+    for (const listener of listeners) {
+      try {
+        listener(call)
+      } catch {
+        // A listener's failure never reaches the request.
+      }
+    }
+  }
   const stream = (requested: Model<Api>, context: Context, streamOptions?: SimpleStreamOptions) => {
     const outer = createAssistantMessageEventStream()
     // Copy synchronously: callers cannot mutate the admitted request while auth awaits.
@@ -121,7 +197,8 @@ export function createProviderGuard(options: GuardOptions) {
     const pending = stamps.get(key)
     const stamp = pending?.shift()
     if (!pending?.length) stamps.delete(key)
-    void (async () => {
+    const base: CallBase = { path: stamp?.path ?? 'chat', sessionId: streamOptions?.sessionId, provider: requested.provider, model: requested.id, at: Date.now() }
+    void (async (): Promise<GuardCall> => {
       let reservation: string | undefined
       let partial: AssistantMessage | undefined
       let started = false
@@ -133,13 +210,7 @@ export function createProviderGuard(options: GuardOptions) {
         const model = requested.provider === 'openai-codex' && harness ? requested : transport.getModel(requested.provider, requested.id)
         if (!model || !stamp) throw new AdmissionError({ _tag: 'interrupted' })
         bound = check(model, copy, stamp.revision)
-        if (model.provider === 'openai-codex' && harness) {
-          const message = harness.response(model, copy, stamp.revision, stamp.observe)
-          if (message.stopReason === 'error') outer.push({ type: 'error', reason: 'error', error: message })
-          else outer.push({ type: 'done', reason: message.stopReason === 'toolUse' ? 'toolUse' : 'stop', message })
-          outer.end(message)
-          return
-        }
+        if (model.provider === 'openai-codex' && harness) return answerWhole(outer, base, harness.response(model, copy, stamp.revision, stamp.observe))
         const held = spend.reserve(stamp.path, reservationCost(model, bound))
         if (held.kind === 'blocked') throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
         reservation = held.id
@@ -182,7 +253,7 @@ export function createProviderGuard(options: GuardOptions) {
             stamp.observe?.(progressOf(event.message))
             outer.push(event)
             outer.end(event.message)
-            return
+            return doneCall(base, event.message)
           }
           partial = event.partial
           started = true
@@ -199,8 +270,9 @@ export function createProviderGuard(options: GuardOptions) {
         outer.push({ type: 'error', reason: 'error', error: message })
         outer.end(message)
         options.onFailure?.(failure)
+        return failedCall(base, failure, error)
       }
-    })()
+    })().then(tell)
     return outer
   }
   const admitHarness = (revision: Revision, model: Model<Api>, prompt: string): string => {
@@ -227,6 +299,11 @@ export function createProviderGuard(options: GuardOptions) {
     /** Takes the transport's model list again, after the picker's catalogue changed. */
     refreshModels: register,
     spend,
+    /** Hears every request the guard ends, for the AI activity log. Returns the way to stop hearing. */
+    onCall: (listener: (call: GuardCall) => void): (() => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
     /**
      * Called only by the trusted builder hook, after persisting any emergency
      * merge. Pass the admitted `Request` (it is a `Revision`) and the context

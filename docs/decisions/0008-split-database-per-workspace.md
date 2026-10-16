@@ -20,3 +20,7 @@ v1 put the Slack mirror, the derived index and the data that cannot be rebuilt (
 - Multi-workspace is a directory switch, not a query rewrite.
 - Live queries and commands keep running during backfill; the engine benchmark checks the budget.
 - Two connections and `ATTACH` mean the store module must be explicit about which client each query uses; the `StoreReader` and `StoreWriter` services make that a type, not a convention.
+
+## Note, 2026-10-16: updates keep the cache
+
+The rule above made every cache schema change a version bump, so nearly every update deleted `cache.db` and synced everything from Slack again (the version went from 1 to 10 in four days). The owner decided that updates keep the cache. Cache schema changes are now ordinary migrations that run on the existing file through the Migrator, as `user.db`'s do, and follow the rules in the store README ("Cache migrations"). `PRAGMA user_version` now holds `CACHE_RESET_EPOCH`, kept at 10 so existing caches are not reset by this change. Only a change of the epoch deletes the file, for a change that truly cannot be migrated, and it needs a decision fragment that says why (`scripts/check-cache-epoch.mjs`). A damaged cache, "Reset local cache" and sign-out still delete it as before.

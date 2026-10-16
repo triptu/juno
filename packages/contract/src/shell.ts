@@ -16,7 +16,7 @@ export type ResolvedTheme = Exclude<Theme, 'system'>
 export const DEFAULT_THEME: Theme = 'system'
 
 /** The sections of Settings (SPEC 14), in the order its list shows them. */
-export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'juno', 'connections', 'backup', 'about'])
+export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'juno', 'ai-activity', 'connections', 'backup', 'about'])
 export type SettingsSection = typeof SettingsSectionSchema.Type
 
 /** Settings › Appearance › Density (inventory 3.3). */
@@ -124,6 +124,21 @@ export const UpdateState = Schema.Union([
 ])
 export type UpdateState = typeof UpdateState.Type
 
+/**
+ * Privacy mode as main set it when sharing started or ended (SPEC section 5):
+ * `sharing` is true while the mode is on because the screen is shared, so
+ * the sidebar footer says why.
+ */
+export const PrivacyState = Schema.Struct({ privacy: Schema.Boolean, sharing: Schema.Boolean })
+export type PrivacyState = typeof PrivacyState.Type
+
+/**
+ * "Hide message text while sharing the screen", and whether Juno can tell: `missing` where the
+ * call is not there, `alwaysOn` while another app captures the screen all the time.
+ */
+export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, detection: Schema.Literals(['available', 'missing', 'alwaysOn']) })
+export type SharingSetting = typeof SharingSetting.Type
+
 /** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */
 export const DownloadResult = Schema.Literals(['saved', 'failed'])
 export type DownloadResult = typeof DownloadResult.Type
@@ -156,6 +171,8 @@ export const ShellRoutes = {
   [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },
   [Channels.launchSetPrivacy]: { input: Schema.Struct({ privacy: Schema.Boolean }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
+  [Channels.sharingGet]: { input: Schema.Void, output: SharingSetting },
+  [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

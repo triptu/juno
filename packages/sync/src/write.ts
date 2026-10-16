@@ -7,6 +7,7 @@
 
 export * from './write/messages'
 export * from './write/users'
+export * from './write/usergroups'
 export * from './write/conversations'
 export * from './write/team'
 export * from './write/channel-reads'

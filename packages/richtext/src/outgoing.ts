@@ -8,9 +8,17 @@
  * `MentionTargets` saying who they are. This turns either into one
  * `rich_text` block (sections and quotes) and a mrkdwn `text` fallback with
  * `<@U…>` / `<#C…|name>` encodings.
+ *
+ * Links go the way Slack's client sends them (research section 5): a URL
+ * typed with its scheme is `{ type: "link", url }` and `<url>`; an address
+ * or a bare domain gets its scheme and keeps what was typed as `text`
+ * (`<http://example.com|example.com>`); a link the composer put on some
+ * words arrives as `<url|label>` and goes as `{ type: "link", url, text }`.
  */
 import type { RichTextBlock, RichTextElement, RichTextInline } from '@juno/slack-schema'
 import { emojiUnicode, isKnownEmoji } from './emoji'
+import { unescapeMrkdwn } from './from-mrkdwn'
+import { findLinks } from './links'
 
 export interface MentionTargets {
   /** People the composer may have inserted, with their display name. */
@@ -19,6 +27,8 @@ export interface MentionTargets {
   readonly channels?: ReadonlyArray<{ readonly id: string; readonly name: string }>
   /** Custom emoji names the workspace knows. Shortcodes in the table are always converted. */
   readonly customEmoji?: (name: string) => boolean
+  /** Links on words the edited message had: where `text` stands in an edit, it links to `url` again. */
+  readonly links?: ReadonlyArray<{ readonly text: string; readonly url: string }>
 }
 
 export interface OutgoingMessage {
@@ -32,6 +42,7 @@ type Token =
   | { readonly kind: 'channel'; readonly id: string; readonly name: string }
   | { readonly kind: 'broadcast'; readonly range: 'here' | 'channel' | 'everyone' }
   | { readonly kind: 'emoji'; readonly name: string }
+  | { readonly kind: 'link'; readonly url: string; readonly text?: string }
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -39,17 +50,50 @@ function escapeRegExp(s: string): string {
 
 const EMOJI_RE = /:([a-z0-9_+\-']+(?:::skin-tone-[2-6])?):/g
 
-/** A person or channel the composer picked, as it sends them. The name is what the field showed. */
-const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>/g
+/**
+ * A person or channel the composer picked, or a link it put on some words,
+ * as it sends them. The name is what the field showed; a link's label is
+ * escaped as in mrkdwn (`encodeLinks` in `@juno/domain`).
+ */
+const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>|<((?:https?:\/\/|mailto:)[^|>\s]+)\|([^>]+)>/g
 
 function tokenizeLine(line: string, targets: MentionTargets): Token[] {
   const out: Token[] = []
   let last = 0
   for (const m of line.matchAll(WIRE_TOKEN)) {
-    if (m.index > last) out.push(...tokenizeText(line.slice(last, m.index), targets))
+    if (m.index > last) out.push(...tokenizeLinks(line.slice(last, m.index), targets))
     if (m[1] !== undefined) out.push({ kind: 'user', id: m[1], name: m[2] ?? m[1] })
-    else out.push({ kind: 'channel', id: m[3]!, name: m[4] ?? m[3]! })
+    else if (m[3] !== undefined) out.push({ kind: 'channel', id: m[3], name: m[4] ?? m[3] })
+    else out.push({ kind: 'link', url: m[5]!, text: unescapeMrkdwn(m[6]!) })
     last = m.index + m[0].length
+  }
+  if (last < line.length) out.push(...tokenizeLinks(line.slice(last), targets))
+  return out
+}
+
+/** The URLs, addresses and domains in `line`, and an edit's linked words, before mentions and emoji are looked for. */
+function tokenizeLinks(line: string, targets: MentionTargets): Token[] {
+  const found: Array<{ readonly start: number; readonly end: number; readonly token: Token }> = findLinks(line).map((link) => ({
+    start: link.start,
+    end: link.end,
+    token: link.hasScheme ? { kind: 'link', url: link.url } : { kind: 'link', url: link.url, text: link.text },
+  }))
+  // Longest first, so a longer label wins where two overlap.
+  for (const target of [...(targets.links ?? [])].sort((a, b) => b.text.length - a.text.length)) {
+    if (target.text.trim() === '') continue
+    for (let at = line.indexOf(target.text); at >= 0; at = line.indexOf(target.text, at + target.text.length)) {
+      const end = at + target.text.length
+      if (found.some((f) => at < f.end && end > f.start)) continue
+      found.push({ start: at, end, token: target.text === target.url ? { kind: 'link', url: target.url } : { kind: 'link', url: target.url, text: target.text } })
+    }
+  }
+  found.sort((a, b) => a.start - b.start)
+  const out: Token[] = []
+  let last = 0
+  for (const f of found) {
+    if (f.start > last) out.push(...tokenizeText(line.slice(last, f.start), targets))
+    out.push(f.token)
+    last = f.end
   }
   if (last < line.length) out.push(...tokenizeText(line.slice(last), targets))
   return out
@@ -129,6 +173,8 @@ function toElement(token: Token): RichTextInline {
       const unicode = emojiUnicode(token.name)
       return unicode === undefined ? { type: 'emoji', name: token.name } : { type: 'emoji', name: token.name, unicode: hexOf(unicode) }
     }
+    case 'link':
+      return token.text === undefined ? { type: 'link', url: token.url } : { type: 'link', url: token.url, text: token.text }
   }
 }
 
@@ -154,6 +200,8 @@ function toMrkdwn(token: Token): string {
       return `<!${token.range}>`
     case 'emoji':
       return `:${token.name}:`
+    case 'link':
+      return token.text === undefined ? `<${escapeText(token.url)}>` : `<${escapeText(token.url)}|${escapeText(token.text)}>`
   }
 }
 

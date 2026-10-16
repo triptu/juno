@@ -1,0 +1,1 @@
+- 10-16 21:18 · ai-audit · Redraw says why it made no drawing (AI assist off, the daily cap, no key, no answer from the agent's spend check, the model too slow, a provider error, an unusable drawing), and a redraw whose drawing is unusable keeps the one shown instead of storing a failed attempt.

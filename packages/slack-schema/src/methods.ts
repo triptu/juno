@@ -53,7 +53,7 @@ import {
   FilesInfoFields,
 } from './files.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
-import { AuthTestArgs, AuthTestFields } from './users.ts'
+import { AuthTestArgs, AuthTestFields, UsergroupsListArgs, UsergroupsListFields } from './users.ts'
 import {
   ThreadGetViewArgs,
   ThreadGetViewFields,
@@ -102,6 +102,7 @@ export const Methods = {
   'files.getUploadURL': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
   'files.completeUpload': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),
   'files.share': method(FilesShareArgs, FilesShareFields),
+  'usergroups.list': method(UsergroupsListArgs, UsergroupsListFields),
   'files.info': method(FilesInfoArgs, FilesInfoFields),
 } as const
 

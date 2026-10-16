@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
-    "bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/bench.ts"
+    "bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/bench.ts",
+    "grammar:bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/grammar-bench.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.2.0",

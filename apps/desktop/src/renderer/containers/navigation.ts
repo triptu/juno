@@ -229,6 +229,14 @@ let queue: Promise<void> = Promise.resolve()
 /** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
 
+/**
+ * Runs `f` once the changes asked for so far have applied. A topic open waits for the topic to paint, so a
+ * command that depends on the place, such as ⌘J right after a click on a topic, acts on the place chosen last.
+ */
+export function afterNavigation(f: () => void): void {
+  void queue.then(f)
+}
+
 /** A topic a change brings on screen. A fresh open waits on the topic's own view; a tab coming back on its view. */
 interface Arriving {
   readonly id: string

@@ -26,6 +26,7 @@ export { FilterPill, PillRow } from './PillRow'
 export { viewIconNames, viewIcons, type ViewIconName } from './viewIcons'
 export { Popover } from './Popover'
 export { ProgressRing } from './ProgressRing'
+export { ringRoom } from './ringRoom'
 export { ScrollArea } from './ScrollArea'
 export { Segmented } from './Segmented'
 export { Select } from './Select'
@@ -38,6 +39,7 @@ export { Text } from './Text'
 export { Textarea, type TextareaMark } from './Textarea'
 export { TextField } from './TextField'
 export { Toast, ToastRegion } from './Toast'
+export { TooltipLayer, tooltip } from './Tooltip'
 export { TopicArt } from './TopicArt'
 export {
   accentLabels,
@@ -56,6 +58,7 @@ export {
 export { firstGrapheme } from './internal/grapheme'
 export { pointerMoved } from './internal/pointer'
 export { activateHandlers, type ActivateEvent } from './internal/activate'
+export { revealFocus } from './internal/revealFocus'
 
 export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'
 export { chunk } from './chunks'

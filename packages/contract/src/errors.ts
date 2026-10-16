@@ -26,8 +26,13 @@ export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
   id: Schema.String,
 }) {}
 
+/**
+ * Why an AI command made nothing: AI assist off, the daily cap reached, no
+ * OpenRouter key, the agent's spend ledger not answering, the model too slow,
+ * an error from the provider, or an answer that was not usable.
+ */
 export class AiUnavailable extends Schema.TaggedError<AiUnavailable>()('AiUnavailable', {
-  reason: Schema.Literals(['off', 'budget', 'provider']),
+  reason: Schema.Literals(['off', 'budget', 'no-key', 'no-agent', 'timeout', 'provider', 'invalid']),
 }) {}
 
 export class Invalid extends Schema.TaggedError<Invalid>()('Invalid', {

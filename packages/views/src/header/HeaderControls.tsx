@@ -3,8 +3,9 @@ import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
+import { menuKeys } from '@juno/contract/channels'
 import { accent, colors, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { Icon, IconButton, type PhosphorIcon } from '@juno/ui'
+import { Icon, IconButton, tooltip, type PhosphorIcon } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -117,7 +118,7 @@ export function IslandButton({ reserveCount = false, icon, label, reserve, narro
     <button
       type="button"
       aria-label={name ?? label}
-      title={name ?? label}
+      {...tooltip(name ?? label)}
       aria-haspopup={popup}
       aria-expanded={expanded}
       onClick={(event) => onClick(underRightIsland(event.currentTarget))}
@@ -180,7 +181,7 @@ export interface JunoToggleProps {
 
 /** The right island's Juno button: opens and closes the Juno panel (⌘J does the same). */
 export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
-  return <IconButton icon={Sparkle} label="Juno ⌘J" size={28} iconSize={16} iconWeight="duotone" radius="full" variant="island" pressed={pressed} onClick={onToggle} />
+  return <IconButton icon={Sparkle} label="Juno" shortcut={menuKeys('juno.toggle')} size={28} iconSize={16} iconWeight="duotone" radius="full" variant="island" pressed={pressed} onClick={onToggle} />
 }
 
 const styles = stylex.create({
@@ -216,6 +217,7 @@ const styles = stylex.create({
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
   title: {

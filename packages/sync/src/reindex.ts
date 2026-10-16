@@ -14,6 +14,13 @@
  *   as false unless the read pointer is at or past `latest_reply`;
  * - Main takes `has_unreads` and `mention_count` from `client.counts` and is
  *   exact only when a synced range covers everything since the read pointer.
+ * - A Main with no stored message and no synced range yet can be provisional:
+ *   `client.counts`' `latest` is its activity, its unread flag is a dot and
+ *   its preview is empty. The cold boot asks for one (`provisionalMain`) for
+ *   every conversation active in the window, so channels and DMs show before
+ *   their history lands; a stored row with `message_count = 0` is
+ *   provisional and keeps following `channel_reads` until history or an
+ *   event replaces it, or a synced range without Main messages removes it.
  */
 import {
   compareTs,
@@ -24,6 +31,7 @@ import {
   type IndexInput,
   type IndexMessage,
   type Me,
+  type ReadState,
   type Ts,
   type UserId,
 } from '@juno/domain'
@@ -37,6 +45,10 @@ export interface ReindexOptions {
   readonly me: Me
   /** A sender or a mention had no row in `users`. The caller fetches the user and re-indexes the topic. */
   readonly onMissingUser?: (userId: string, topicId: string) => void
+  /** A user group mention had no row in `usergroups`. The caller re-indexes the topic once the groups arrive. */
+  readonly onMissingUsergroup?: (topicId: string) => void
+  /** Give a Main with nothing stored a provisional row from `client.counts` (cold boot). An existing provisional row is kept without it. */
+  readonly provisionalMain?: boolean
 }
 
 /**
@@ -56,6 +68,7 @@ export const ROOT_TEXT_CHARS = 240
 
 const MENTION = /<@([A-Z0-9]+)(?:\|[^>]*)?>/g
 const CHANNEL_MENTION = /<#([A-Z0-9]+)(?:\|[^>]*)?>/g
+const USERGROUP_MENTION = /<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g
 
 /** Recomputes the index rows for `ids`. Returns the ids whose row changed. */
 export const reindexTopics = (
@@ -104,16 +117,18 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const reads = yield* readState(id)
     const root = parsed.kind === 'thread' ? rows.find((r) => r.ts === parsed.threadTs) : undefined
 
-    // Names for the preview: the latest live message's sender and mentions.
+    // Names for the preview: the latest live message's sender and mentions. The root's text is stored raw and named at read time.
     const live = rows.filter((r) => r.deleted === 0)
     let latest: MessageRow | undefined
     for (const row of live) if (latest === undefined || compareTs(row.ts, latest.ts) > 0) latest = row
     const userIds = new Set<string>()
     const channelIds = new Set<string>()
+    const usergroupIds = new Set<string>()
     if (latest !== undefined) {
       if (latest.user_id !== null) userIds.add(latest.user_id)
       for (const match of latest.text.matchAll(MENTION)) userIds.add(match[1]!)
       for (const match of latest.text.matchAll(CHANNEL_MENTION)) channelIds.add(match[1]!)
+      for (const match of latest.text.matchAll(USERGROUP_MENTION)) usergroupIds.add(match[1]!)
     }
     const users = new Map<string, string>()
     if (userIds.size > 0) {
@@ -126,6 +141,12 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       const found = yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in([...channelIds])}`
       for (const c of found) if (c.name !== null) channels.set(c.id, c.name)
     }
+    const usergroups = new Map<string, { readonly handle: string; readonly name?: string }>()
+    if (usergroupIds.size > 0) {
+      const found = yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in([...usergroupIds])}`
+      for (const group of found) usergroups.set(group.id, { handle: group.handle, ...(group.name === null ? {} : { name: group.name }) })
+      if (found.length < usergroupIds.size) options.onMissingUsergroup?.(id)
+    }
     const missing = (userId: string) => {
       options.onMissingUser?.(userId, id)
       return undefined
@@ -134,6 +155,8 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       me: options.me.userId,
       user: (userId) => users.get(userId) ?? missing(userId),
       channel: (channelId) => channels.get(channelId),
+      usergroup: (groupId) => usergroups.get(groupId),
+      ...(options.me.usergroupIds === undefined ? {} : { myUsergroups: options.me.usergroupIds }),
     }
     const senderName = (userId: UserId | undefined) => (userId === undefined ? 'Unknown' : (users.get(userId) ?? missing(userId) ?? UNKNOWN_PERSON))
 
@@ -184,6 +207,10 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
 
     const existing = (yield* sql<TopicIndexRow>`SELECT * FROM topic_index WHERE topic_id = ${id}`)[0]
+    if (indexed === undefined && parsed.kind === 'main' && live.length === 0 && (options.provisionalMain === true || existing?.message_count === 0)) {
+      const provisional = yield* provisionalMain(id, channel, reads, existing)
+      if (provisional !== undefined) return yield* writeRow(id, provisional, existing)
+    }
     if (indexed === undefined) {
       if (existing === undefined) return false
       yield* sql`DELETE FROM topic_index WHERE topic_id = ${id}`
@@ -213,8 +240,14 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       preview_json: JSON.stringify(preview),
       rev: existing === undefined ? 1 : existing.rev + 1,
     }
-    if (existing !== undefined && sameIndexRow(existing, next)) return false
+    return yield* writeRow(id, next, existing)
+  })
 
+/** Writes `next` unless it equals `existing`, bumping `rev`, and fires the topic's key. */
+const writeRow = (id: string, next: TopicIndexRow, existing: TopicIndexRow | undefined): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    if (existing !== undefined && sameIndexRow(existing, next)) return false
     yield* sql`INSERT INTO topic_index ${sql.insert(next as unknown as Record<string, unknown>)}
       ON CONFLICT (topic_id) DO UPDATE SET channel = excluded.channel, kind = excluded.kind, last_activity_ts = excluded.last_activity_ts,
         message_count = excluded.message_count, participants_json = excluded.participants_json, root_ts = excluded.root_ts,
@@ -222,6 +255,45 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         preview_json = excluded.preview_json, rev = excluded.rev`
     yield* Invalidation.use((i) => i.invalidate(syncKeys.topic(id)))
     return true
+  })
+
+/**
+ * A Main row from `client.counts` alone, before any of its messages are
+ * stored: activity at `latest`, unread as a dot while Slack says it has
+ * unreads past Juno's pointer, no preview. Undefined once a synced range
+ * exists (history found no Main message) or when counts gave no `latest`.
+ */
+const provisionalMain = (
+  id: string,
+  channel: string,
+  reads: ReadState,
+  existing: TopicIndexRow | undefined,
+): Effect.Effect<TopicIndexRow | undefined, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    if ((yield* latestSyncedRange(channel)) !== undefined) return undefined
+    const counts = (yield* sql<{ latest: string | null; has_unreads: 0 | 1; mention_count: number; kind: string | null }>`
+      SELECT r.latest, r.has_unreads, r.mention_count, c.kind FROM channel_reads r LEFT JOIN conversations c ON c.id = r.channel
+      WHERE r.channel = ${channel}`)[0]
+    if (counts === undefined || counts.latest === null) return undefined
+    const pointer = reads.lastReadTs
+    const unread = reads.markedUnread || (counts.has_unreads === 1 && (pointer === undefined || compareTs(counts.latest, pointer) > 0))
+    const isDm = counts.kind === 'im' || counts.kind === 'mpim'
+    const preview: StoredPreview = { sender: '', text: '' }
+    return {
+      topic_id: id,
+      channel,
+      kind: 'main',
+      last_activity_ts: counts.latest,
+      message_count: 0,
+      participants_json: '[]',
+      root_ts: null,
+      unread_count: unread ? 1 : 0,
+      unread_exact: unread ? 0 : 1,
+      mentions_me: unread && !isDm && counts.mention_count > 0 ? 1 : 0,
+      preview_json: JSON.stringify(preview),
+      rev: existing === undefined ? 1 : existing.rev + 1,
+    }
   })
 
 function sameIndexRow(a: TopicIndexRow, b: TopicIndexRow): boolean {

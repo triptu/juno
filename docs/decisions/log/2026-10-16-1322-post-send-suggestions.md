@@ -1,0 +1,1 @@
+- 10-16 13:22 · Juno · Keep only ready wrong-place routing before send; move all text fixes after sending, skip messages over 1,000 Unicode characters, and show a transient message overlay only within one second on the same visible topic. Edit opens an unsaved draft; nothing reserves space or changes without Save.

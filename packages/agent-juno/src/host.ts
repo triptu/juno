@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostAiCall, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -89,6 +89,8 @@ export class JunoHost extends Context.Service<
       readonly asks: Stream.Stream<ReadonlyArray<HostSpendAsk>>
       readonly answer: (answer: { readonly id: string; readonly ask: 'reserve' | 'settle'; readonly result: 'reserved' | 'blocked' | 'settled' }) => Effect.Effect<void>
     }
+    /** Records one of the agent's model calls in the AI activity log. Never fails; a record with no workspace open is dropped. */
+    readonly ai?: { readonly record: (call: HostAiCall) => Effect.Effect<void> }
     readonly schedule?: {
       readonly check: (conversation: typeof WatchConversation.Type, refresh: boolean) => Effect.Effect<typeof WatchSnapshot.Type, AgentHostError>
       readonly hours: Effect.Effect<typeof WatchHours.Type, AgentHostError>

@@ -7,7 +7,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
 - Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
 - Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, `duotone` only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations).
-- Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`.
+- Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`. It must show whole: a box that clips (overflow other than visible, or paint containment) gives the controls at its edge `ringRoom` (`--focus-ring-room` of padding taken back by a negative margin; a fixed size adds the room), and a scroller passes `revealFocus` as its `onFocus` so a control half under its edge scrolls in whole when it takes keyboard focus (`PillRow`, `TabStrip`, `ScrollArea` and `Page` do). Items that fill a scroller edge to edge take the inset ring instead. A scroller that is not a Tab stop of its own (its rows are driven from a field) sets `tabIndex={-1}`, since Chromium makes a scroller with no focusable children a Tab stop.
 - Icon-only controls require an accessible name (`label`).
 - Sizes, colours, radii and durations come from tokens; no literal values in components.
 - `user-select: none` by default; text-bearing primitives (Text `selectable`, TextField, Textarea, CodeBlock) opt in.
@@ -29,6 +29,7 @@ One component for every clickable control with a label. Radius, text size and ic
 | `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 8 / 12 / pill / pill / pill (the 22px row Resolve is a label-sized control and the 32px and taller buttons are pills; 28 and 30 stay rounded rectangles so they nest in cards and toolbars), text 12 / 13 / 13.5 and icon 13 / 14 / 16 derive from the size |
 | `tone` | `default`, `subtle`, `muted` | Text colour for ghost and outline; hover turns default |
 | `iconStart`, `iconEnd` | Phosphor icon | Weight by size; `iconWeight` overrides (`fill` for a check that has landed) |
+| `iconTint` | an accent name or `neutral` | Draws `iconStart` in that colour from the `iconTints` tokens, on hover and when pressed too (a sidebar view's icon) |
 | `kbd` | string | Trailing mono hint ("↵", "⌘J") |
 | `pressed` | boolean | Toggle state (Pin, filters); sets `aria-pressed` |
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
@@ -42,7 +43,7 @@ The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 1
 
 ## 3. IconButton
 
-Button with only an icon. `label` is required and doubles as the tooltip (`noTooltip` turns the tooltip off).
+Button with only an icon. `label` is required and doubles as the tooltip (`noTooltip` turns the tooltip off). `shortcut` ("⌘[") shows as keycaps in the tooltip and ends the accessible name ("Back ⌘["). `iconTint` colours the icon as on Button.
 
 | Prop | Values |
 | --- | --- |
@@ -67,7 +68,7 @@ Channels are `ChannelIcon` (section 4a).
 
 `ChannelIcon` is the square tile for a channel: a chosen Phosphor icon, or the first letter of `name`, on a chosen colour, in the same hue mix as avatars so tiles and initials sit together in a row. `icon` is one of `channelIconNames` (24 plain objects that read at 16px: hash, megaphone, chats, rocket, code, bug, wrench, flask, shield, lightning, globe, compass, flag, star, heart, leaf, coffee, gift, trophy, book, briefcase, calendar, camera, truck; `channelIcons` maps a name to its component), `color` one of `channelColorNames` (the eight person hues). `defaultChannelLook(id)` is what a channel gets before anyone changes it: a colour hashed from its id and no icon, so a list of untouched channels still tells them apart by letter. `size` as Avatar; radius 16 / 12 / 12 / 8 / 7 / 6 / 5 by size. `label` for the accessible name when the channel name is not visible beside it. The choice is client-only (SPEC §3) and the view that changes it is `ChannelIconPicker` in `@juno/views`.
 
-`Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too.
+`Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too. `tint` draws an icon tint (`iconTints`, `neutral` included) with the check in the page colour (the view sheet's Colour). The label is the tooltip.
 
 `DayToggles`: seven 28px round toggle buttons, Monday first ("M T W T F S S", each named by its day, `aria-pressed`), in a group named by `label`. An on day is filled with `--secondary-default`; an off day is muted text. `days` uses 0 for Sunday, as `Date.getDay`. The Notifications page's hours rows use it.
 
@@ -172,6 +173,18 @@ Mono 12.5 lh 1.6 inside a `Surface inset`, pre-wrap, max-height 150 with contain
 `Surface card` with a meta header (`kindIcon` + `kind`, `·`, `sourceIcon` + `source`, `onDismiss` 22px IconButton), `title` (15/600), `body` (13.5 subtle), `children` (prompt block, reply options) and `actions` (wrapping Button row). Used by assistant cards (For you, its first user, is removed); the settled hint uses `Surface card` directly.
 
 ---
+
+## 14a. Tooltip
+
+`TooltipLayer`, mounted once at the app's root, is the only tooltip. An element asks for one with `tooltip(label, keys?)`, which returns `data-tooltip` attributes to spread on it; `IconButton`, `EmojiButton`, `AvatarButton` and `Swatch` do it from their `label`. The browser's `title` tooltip is kept only for text that is cut off and for content (times, file names).
+
+- One delegated listener on the document, so nothing is mounted per control. It shows after 700ms of hover or of keyboard focus (`:focus-visible`), like macOS; once one has shown, a neighbour's shows at once for 600ms.
+- Hides on mouse down (and stays hidden until the pointer leaves that control), on scroll, on Esc, on a drag and when the window loses focus. A control whose menu is open (`aria-expanded="true"`) shows none.
+- Under the control, 6px away, or over it when there is no room below; never on it. Moved in to stay 8px inside the window, or inside a `data-tooltip-bounds` ancestor (the gallery frame). Fixed in a portal on `body`, `--z-tooltip`, so it moves nothing.
+- `--surface-raised`, `--pop-shadow`, radius 6, padding 4 / 8, meta type in the default colour, at most `--tooltip-max-width` (280) wide. Keys sit 8px after the label as 16px keycaps, one per modifier (⌃ ⌘ S), `--secondary-default` with subtle mono text. Fades in over `--duration-fast` the first time; warm ones appear at once.
+- `role="tooltip"`; the control's `aria-describedby` points at it while it shows.
+
+Shortcuts come from `menuShortcuts` in `@juno/contract` (the app menu's accelerators) through `menuKeys('history.back')`, so a key changes in one place.
 
 ## What is not a primitive
 

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
-import { Events, type NotificationTarget } from '@juno/contract'
+import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
@@ -7,7 +8,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
-import { contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
@@ -15,6 +16,7 @@ import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { Notifier, type ShownNotification } from './notifier'
+import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
@@ -44,6 +46,43 @@ function updateLaunch(patch: Partial<Launch>): void {
   launch = { ...launch, ...patch }
   launchFile.write(launch)
 }
+
+/**
+ * The screen watch turned privacy mode on and the user has not touched it since. Kept in memory
+ * only: on launch the mode is what the user left it as (`launch.privacy`).
+ */
+let privacyBySharing = false
+
+/** Privacy mode now: the user's choice, or on because sharing started. */
+const privacyOn = () => launch.privacy === true || privacyBySharing
+
+/** The user toggled privacy mode: it is theirs now, saved for the next launch. */
+function setUserPrivacy(privacy: boolean): void {
+  privacyBySharing = false
+  updateLaunch({ privacy })
+  setMenuPrivacy(privacy)
+}
+
+/** Sharing started or ended (screenWatch.ts): the mode changes without being saved, and the app window is told. */
+function setSharingPrivacy(bySharing: boolean): void {
+  privacyBySharing = bySharing
+  setMenuPrivacy(privacyOn())
+  const state: PrivacyState = { privacy: privacyOn(), sharing: bySharing }
+  appWindow()?.webContents.send(Events.privacyChanged, state)
+}
+
+/** Under JUNO_E2E a test says whether the screen is shared (`junoTest.screenShared`); the real probe never runs. */
+let sharedForTests = e2e && process.env.JUNO_E2E_SCREEN_SHARED === '1'
+/** And moves the screen watch's clock on (`junoTest.screenWatchElapse`), to reach the always-on limit. */
+let screenClockForTests = 0
+
+const screenWatch = createScreenWatch({
+  load: e2e ? () => Promise.resolve<ScreenProbe>(() => sharedForTests) : () => loadScreenProbe().then((loaded) => loaded?.probe),
+  enabled: () => launch.hideWhileSharing !== false,
+  privacy: () => ({ on: privacyOn(), bySharing: privacyBySharing }),
+  setPrivacy: (_privacy, bySharing) => setSharingPrivacy(bySharing),
+  now: () => Date.now() + screenClockForTests,
+})
 
 const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }))
 
@@ -95,7 +134,7 @@ const notifier = new Notifier({
   },
   open: openTarget,
   send: (message) => supervisor.send(message),
-  privacy: () => launch.privacy === true,
+  privacy: privacyOn,
 })
 supervisor.onReady(() => notifier.engineReady())
 
@@ -163,13 +202,18 @@ app.whenReady().then(() => {
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
-    setPrivacy: (privacy) => {
-      updateLaunch({ privacy })
-      setMenuPrivacy(privacy)
-    },
+    // The user's own choice: sharing no longer owns the mode, so it stays as they set it.
+    setPrivacy: setUserPrivacy,
     setSidebar: (sidebar) => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
+    },
+    sharing: {
+      get: () => ({ hide: launch.hideWhileSharing !== false, detection: screenWatch.detection() }),
+      set: (hide) => {
+        updateLaunch({ hideWhileSharing: hide })
+        return { hide, detection: screenWatch.detection() }
+      },
     },
   })
 
@@ -192,9 +236,14 @@ app.whenReady().then(() => {
 })
 
 function openWindow(): BrowserWindow {
-  const window = createMainWindow(() => launch)
-  window.once('ready-to-show', () => supervisor.send({ _tag: 'painted' }))
+  const window = createMainWindow(() => ({ ...launch, privacy: privacyOn(), privacySharing: privacyBySharing }))
+  window.once('ready-to-show', () => {
+    supervisor.send({ _tag: 'painted' })
+    // After the first paint, so loading koffi never delays it. Only while the window is open.
+    screenWatch.start()
+  })
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
+  window.on('closed', () => screenWatch.stop())
   return window
 }
 
@@ -203,6 +252,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  screenWatch.stop()
   updates.stop()
   supervisor.stop()
   agent.stop()
@@ -217,6 +267,16 @@ app.on('will-quit', (event) => {
   void pending.then(() => app.quit())
 })
 
+// The packaged smoke test (JUNO_E2E_SCREEN_PROBE): the real probe loads once from the asar and
+// writes which symbol it called, since tests otherwise use the seam above.
+if (e2e && process.env.JUNO_E2E_SCREEN_PROBE === '1') {
+  void app.whenReady().then(async () => {
+    const loaded = await loadScreenProbe()
+    const result = loaded === undefined ? { symbol: null } : { symbol: loaded.symbol, value: typeof loaded.probe() }
+    await writeFile(join(app.getPath('userData'), 'screen-watch-probe.json'), JSON.stringify(result))
+  })
+}
+
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
 // is out of reach, so main exposes what tests need to know about it.
 if (e2e) {
@@ -229,6 +289,7 @@ if (e2e) {
       contextMenu: contextMenuForTests,
       folder: folderForTests,
       slackLinks: slackLinksForTests,
+      browserLinks: browserLinksForTests,
       downloads: downloadsForTests,
       opened: openedForTests,
       copiedImages: () => copiedForTests.images,
@@ -239,6 +300,14 @@ if (e2e) {
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       wake: () => notifier.wake(),
+      // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
+      screenShared: (shared: boolean) => {
+        sharedForTests = shared
+        return screenWatch.poll()
+      },
+      screenWatchElapse: (ms: number) => {
+        screenClockForTests += ms
+      },
     },
   })
 }

@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { Effect } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
 import { viewsDelete, type TopicRow, type UndoCommand } from '@juno/contract'
-import { CONVERSATIONS, SELF_ID, startFakeSlack } from '@juno/fake-slack'
+import { CONVERSATIONS, largeSeed, SELF_ID, startFakeSlack } from '@juno/fake-slack'
 import { prefs, Store, workspacePaths } from '@juno/store'
 import { runCommand, topicCountsAtom } from '@juno/state'
 import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
@@ -186,13 +186,81 @@ describe('cold boot', () => {
       'api:conversations.replies': 2,
       // Discovery over the window at the end of the cold boot: more than 50 thread messages, so two pages.
       'api:search.modules.messages': 2,
-      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear on.
-      'edge:users/info': 7,
+      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
+      // on; a getView page names everyone on it in one call.
+      'edge:users/info': 4,
       'edge:emojis/list': 1,
+      // User group handles, once per boot.
+      'api:usergroups.list': 1,
     })
     const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
     expect(new Set(asked).size).toBe(asked.length)
   })
+
+  it('is usable after the quick steps, before any history, and fills in without a reload', async () => {
+    // Every history answer and the discovery search wait: the boot cannot get past its quick steps on its own.
+    const engine = await startTestEngine({
+      initial: (fake) => {
+        fake.holdNext({ method: 'conversations.history', times: 100 })
+        fake.holdNext({ method: 'search.modules.messages', times: 10 })
+        return fake.signIn()
+      },
+    })
+    engines.push(engine)
+    await engine.status('ready')
+    // The quick start is stored: the renderer shows the list from here on.
+    const window = await waitFor(() => {
+      const result = engine.registry.get(engine.topicsAtom())
+      return result._tag === 'Success' && result.value.meta.windowCovered === true ? result.value : undefined
+    }, 10_000, 'the quick start')
+    expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
+    const early = window.order.map((id) => window.rows.get(id)!)
+    // Followed threads from the first getView page, titled from their first words.
+    expect(early.some((row) => row.id.startsWith('t:') && row.title !== '')).toBe(true)
+    // Channels and DMs from client.counts alone: their time and an unread dot, no preview yet.
+    const alerts = early.find((row) => row.id === 'm:C0ALERTSPROD')!
+    expect(alerts).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
+    expect(early.find((row) => row.id === 'm:G0MAYALEO')!.preview.text).toBe('')
+
+    // History lands while the boot is still running: previews and exact counts arrive in the same list, and the
+    // bot channel is sorted into Automated as soon as its page is stored, before the boot ends.
+    engine.fake.release({ method: 'conversations.history' })
+    await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
+    await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
+    // The discovery search runs before the boot ends: held, it keeps the sync from reaching live.
+    await waitFor(() => (engine.fake.heldCount({ method: 'search.modules.messages' }) === 1 ? true : undefined), 10_000, 'the discovery search')
+    expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
+    engine.fake.release()
+    await engine.phase('live')
+  })
+
+  it('reads DMs, mentions and unread followed threads before the bulk of channels', async () => {
+    const engine = await bootedEngine({
+      fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) },
+    })
+    const ws = engine.fake.workspace
+    const threads = ws.threadCounts()
+    const members = [...ws.conversations.values()].filter((c) => c.members.has(SELF_ID))
+    const direct = new Set(members.filter((c) => c.kind === 'im' || c.kind === 'mpim').map((c) => c.id))
+    const mentioned = new Set(members.filter((c) => {
+      const entry = ws.countEntry(c)
+      return !direct.has(c.id) && ((entry.has_unreads && entry.mention_count > 0) || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0)
+    }).map((c) => c.id))
+    // Channels with nothing for the user: no unread mention or followed reply, and no message of their own.
+    const bulk = new Set(members.filter((c) =>
+      !direct.has(c.id) && !mentioned.has(c.id) && (threads.unread_count_by_channel?.[c.id] ?? 0) === 0 && !ws.main(c.id).some((m) => m.user === SELF_ID),
+    ).map((c) => c.id))
+    const order = apiCalls(engine, 'conversations.history').map((call) => call.args['channel']!)
+    const positions = (ids: ReadonlySet<string>) => order.flatMap((id, i) => (ids.has(id) ? [i] : []))
+    const firstBulk = Math.min(...positions(bulk))
+    expect(positions(direct).length).toBeGreaterThan(0)
+    expect(positions(mentioned).length).toBeGreaterThan(0)
+    expect(positions(bulk).length).toBeGreaterThan(0)
+    expect(Math.max(...positions(direct))).toBeLessThan(firstBulk)
+    expect(Math.max(...positions(mentioned))).toBeLessThan(firstBulk)
+    // DMs come before mentions.
+    expect(Math.max(...positions(direct))).toBeLessThan(Math.min(...positions(mentioned)))
+  }, 120_000)
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
     const engine = await bootedEngine()
@@ -310,6 +378,8 @@ describe('warm boot', () => {
       'api:auth.test': 1,
       'api:api.getFlannelHttpUrl': 1,
       'edge:emojis/list': 1,
+      // User group handles, once per boot.
+      'api:usergroups.list': 1,
       'api:client.getWebSocketURL': 1,
       'api:client.userBoot': 1,
       'api:client.counts': 1,
