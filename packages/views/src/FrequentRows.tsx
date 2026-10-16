@@ -32,5 +32,5 @@ export default function FrequentRows({ conversations, selected, onPick }: Freque
 function DestinationMark({ conversation }: { readonly conversation: PickConversation }) {
   const person = conversation.person
   if (person === undefined) return <Icon icon={conversation.kind === 'mpim' ? Users : Hash} size={15} />
-  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl })} />
+  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
 }

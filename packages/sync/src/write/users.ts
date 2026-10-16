@@ -18,7 +18,9 @@ export const toUserRow = (user: User): UserRow => ({
   name: user.name ?? null,
   display_name: displayName(user),
   real_name: user.profile?.real_name ?? user.real_name ?? null,
-  avatar_url: user.profile?.image_72 ?? user.profile?.image_48 ?? user.profile?.image_192 ?? null,
+  avatar_small_url: user.profile?.image_48 || null,
+  avatar_large_url: user.profile?.image_192 || null,
+  avatar_url: user.profile?.image_72 || user.profile?.image_192 || user.profile?.image_48 || null,
   tz: user.tz ?? null,
   is_bot: user.is_bot === true ? 1 : 0,
   deleted: user.deleted === true ? 1 : 0,
@@ -33,7 +35,7 @@ export const upsertUsers = (users: ReadonlyArray<User>): Writer =>
       const row = toUserRow(user)
       yield* sql`INSERT INTO users ${sql.insert(row as unknown as Record<string, unknown>)}
         ON CONFLICT (id) DO UPDATE SET name = excluded.name, display_name = excluded.display_name, real_name = excluded.real_name,
-          avatar_url = excluded.avatar_url, tz = excluded.tz, is_bot = excluded.is_bot, deleted = excluded.deleted, updated = excluded.updated`
+          avatar_url = excluded.avatar_url, avatar_small_url = excluded.avatar_small_url, avatar_large_url = excluded.avatar_large_url, tz = excluded.tz, is_bot = excluded.is_bot, deleted = excluded.deleted, updated = excluded.updated`
     }
     yield* invalidate(syncKeys.users)
   })

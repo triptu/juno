@@ -52,6 +52,8 @@ export interface UserRow {
   readonly name: string | null
   readonly display_name: string | null
   readonly real_name: string | null
+  readonly avatar_small_url?: string | null
+  readonly avatar_large_url?: string | null
   readonly avatar_url: string | null
   readonly tz: string | null
   readonly is_bot: Flag

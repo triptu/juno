@@ -139,7 +139,7 @@ export function ThreadList({ query, onQuery, conversation, threads, now, onPickT
 function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
   const person = conversation.person
   if (person === undefined) return <Icon icon={kindIcon(conversation.kind)} size={15} />
-  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl })} />
+  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
 }
 
 const styles = stylex.create({

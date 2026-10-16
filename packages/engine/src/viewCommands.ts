@@ -224,7 +224,7 @@ export const listViews: Effect.Effect<ReadonlyArray<SidebarView>, SqlError, Stor
     for (const id of ids) userIds.add(id)
   }
   const users = new Map<string, UserRow>()
-  if (userIds.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
+  if (userIds.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
   const nameOf = (id: string) => userName(id, users.get(id))
   const byJuno = rows.some((row) => row.id === AUTOMATED_VIEW_ID)
     ? (yield* sql<{ channel: string }>`SELECT channel FROM automated_channels WHERE verdict = 'automated' AND by IN ('rules', 'juno')`).map((row) => row.channel)
