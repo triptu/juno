@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { MESSAGE_WINDOW_MAX } from '@juno/contract'
-import { loadOlderMessages, messageWindowSpecAtom, registry } from '@juno/state'
+import { loadOlderMessages, messageWindowSpecAtom, registry, type MessageWindow } from '@juno/state'
 import type { OlderStatus } from '@juno/views'
-import type { Position, TopicScope } from './position'
+import type { Position } from './position'
 import { rowInView, rowSelector } from './scroll'
 
 /** Rows each older page adds to the window. */
@@ -15,7 +15,7 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
  * widens; scroll anchoring keeps the rows in view still. A thread whose root is in the window has nothing older.
  * Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
-export function useOlderPages(position: Position, { id, view, list }: TopicScope): OlderStatus {
+export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow): OlderStatus {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, drawnAll, setHeldAt } = position
   const first = list.order[0]

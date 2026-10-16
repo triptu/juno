@@ -4,9 +4,11 @@
  * owns the state; the hooks after it each keep one rule, and `Topic` calls
  * them in this file's order, which is the order their effects run in.
  *
- * The hooks that only run effects opt out of the React Compiler (`'use no
- * memo'`): their effects fire by their dependency lists either way, and the
- * memo code would only add to the initial bundle (performance 1).
+ * The hooks opt out of the React Compiler (`'use no memo'`): the effects
+ * fire by their dependency lists either way, `usePosition` returns state and
+ * refs the topic reads one by one, and `useJumpToLatest` keeps its function
+ * with `useCallback`. The memo code would only add to the initial bundle
+ * (performance 1).
  */
 import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { bottomWindow, messageFlashAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, type MessageWindow } from '@juno/state'
@@ -17,15 +19,6 @@ import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
 import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowSelector, snapshotOf, type Pin } from './scroll'
 
-/** The topic a list belongs to, as the hooks below read it. */
-export interface TopicScope {
-  readonly id: string
-  /** Whose window and scroll position these are (see `TopicProps`). */
-  readonly view: string
-  readonly readOnly: boolean
-  readonly list: MessageWindow
-}
-
 /** The list's ends. `atEnd`: the window holds the newest message (no anchor). */
 function edgesOf(list: MessageWindow) {
   return { first: list.order[0], last: list.order.at(-1), atEnd: list.spec.anchor === undefined }
@@ -33,6 +26,7 @@ function edgesOf(list: MessageWindow) {
 
 /** The list's scroll state, shared by the hooks below. Its refs and setters keep their identity, so the hooks' dependency lists name them without effect. */
 export function usePosition(list: MessageWindow) {
+  'use no memo'
   const scrollRef = useRef<HTMLElement>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const [positioned, setPositioned] = useState(false)
@@ -62,7 +56,7 @@ export function usePosition(list: MessageWindow) {
 export type Position = ReturnType<typeof usePosition>
 
 /** The open position, before the first frame with rows is painted. */
-export function useOpenPosition(position: Position, { view, readOnly, list }: TopicScope, showWindow: boolean): void {
+export function useOpenPosition(position: Position, view: string, readOnly: boolean, list: MessageWindow, showWindow: boolean): void {
   'use no memo'
   const { scrollRef, anchorRef, pinRef, pinnedTopRef, heldForRef, positioned, setPositioned, setAtBottom, setFar, setSeenTs } = position
   const { last, atEnd } = edgesOf(list)
@@ -96,7 +90,7 @@ export function useOpenPosition(position: Position, { view, readOnly, list }: To
  * window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
  * again (`<Activity>` runs its effects again) does not jump back to it.
  */
-export function useMessageFlash(position: Position, { id, readOnly, list }: TopicScope) {
+export function useMessageFlash(position: Position, id: string, readOnly: boolean, list: MessageWindow) {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, positioned, setHeldAt } = position
   const flash = useAtomValue(messageFlashAtom(id))
@@ -150,7 +144,7 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
 }
 
 /** The first frame: measures the open, then draws the rows above it once it is on screen. */
-export function useFirstFrame(position: Position, { id, list }: TopicScope, showWindow: boolean): void {
+export function useFirstFrame(position: Position, id: string, list: MessageWindow, showWindow: boolean): void {
   'use no memo'
   const { positioned, drawnAll, setDrawnAll } = position
   // `juno.topic-open` (or `juno.tab-switch` back to an unmounted tab): to the first frame with the header and the list in place.
@@ -200,7 +194,7 @@ export function useSendMeasure(list: MessageWindow): void {
 }
 
 /** The user's own scrolling lets go of the pin; where the list comes to rest decides the next one. */
-export function useScrollRelease(position: Position, { view, readOnly }: TopicScope): void {
+export function useScrollRelease(position: Position, view: string, readOnly: boolean): void {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, lastRef, atEndRef } = position
   useEffect(() => {
@@ -238,8 +232,9 @@ export function useScrollRelease(position: Position, { view, readOnly }: TopicSc
   }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, lastRef, atEndRef])
 }
 
-/** Back to the newest message: the pill's jump, and after a send. A new function only when the newest row or the window's end changes. */
-export function useJumpToLatest(position: Position, { view, list }: TopicScope): () => void {
+/** Back to the newest message: the pill's jump, and after a send. A new function only when the newest row or the window's end changes (`useCallback`). */
+export function useJumpToLatest(position: Position, view: string, list: MessageWindow): () => void {
+  'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs } = position
   const { last, atEnd } = edgesOf(list)
   return useCallback(() => {

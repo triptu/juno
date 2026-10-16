@@ -149,9 +149,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
 type MessageCommands = ReturnType<typeof useMessageCommands>
 
 /** The row keys, the reaction toggle, the row menu and ↑ in an empty composer. */
-export function rowHandlers(actions: MessageCommands, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
-  const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
-
+export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
   const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
     const message = rowMessage(ts)
     if (message === undefined) return
@@ -204,5 +202,5 @@ export function rowHandlers(actions: MessageCommands, latest: Latest, scrollRef:
     if (message !== undefined) void actions.menu(message, { x: at.clientX, y: at.clientY }, onSender)
   }
 
-  return { rowMessage, onRowKey, selectNewest, onToggleReaction, onMessageMenu }
+  return { onRowKey, selectNewest, onToggleReaction, onMessageMenu }
 }

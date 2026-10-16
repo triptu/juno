@@ -19,11 +19,11 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import type { MessageWindow } from '@juno/state'
-import type { MessageActions } from '@juno/views'
-import { landedTs } from './messageRows'
+import { editMessage, registry, type MessageWindow } from '@juno/state'
+import { InlineEdit, type MessageActions } from '@juno/views'
+import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
-import { editingRowOf, floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
+import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
 export interface ComposerHandle {
@@ -101,20 +101,45 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   useEffect(preloadPicker, [])
 
   const actions = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage })
-  const { rowMessage, onRowKey, selectNewest, onToggleReaction, onMessageMenu } = rowHandlers(actions, latest, scrollRef, composer)
+  const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)
   usePickerDismiss(picker, setPicker)
 
+  // The edit field in place of the row's body. Saving keeps it until the window has the new text.
+  const editingRow =
+    editing === undefined
+      ? undefined
+      : {
+          ts: editing.ts,
+          editor: (
+            <InlineEdit
+              value={editing.text}
+              onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
+              onCancel={() => {
+                setEditing(undefined)
+                composer.current?.focus()
+              }}
+              onSave={() => {
+                const message = rowMessage(editing.ts)
+                if (message === undefined || editing.savedRev !== undefined || editing.text.trim() === '') return
+                composer.current?.focus()
+                if (editing.text === message.editText) return setEditing(undefined)
+                setEditing({ ...editing, savedRev: message.rev })
+                void editMessage(registry, refOf(channel, message), editing.text).then((exit) => {
+                  if (exit._tag === 'Failure') setEditing(undefined)
+                })
+              }}
+            />
+          ),
+        }
+
   return {
     actions,
+    ...rowHandlers(actions, rowMessage, latest, scrollRef, composer),
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
-    editing: editingRowOf({ channel, editing, setEditing, rowMessage, composer }),
-    onRowKey,
-    onToggleReaction,
-    onMessageMenu,
-    selectNewest,
-    floating: floatingOf({ picker, setPicker, selection, setSelection, rowMessage, react: actions.react, scrollRef, composer }),
+    editing: editingRow,
+    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer),
   }
 }

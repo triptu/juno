@@ -51,6 +51,7 @@ export function useDivider(id: string, lastReadTs: string | undefined, list: Mes
 
 /** What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again. `slow`: still asking after 300 ms. */
 export function useTopicFetch(id: string, view: string) {
+  'use no memo'
   const [fetchState, setFetchState] = useState<FetchState>('pending')
   const fetched = useRef(false)
   useEffect(() => {
@@ -91,7 +92,7 @@ export function listStatus(showWindow: boolean, list: MessageWindow, { fetchStat
  * The read rule (`shouldMarkRead`). Opening, and showing the tab again, marks the topic read; after
  * that, the bottom of a focused window does. A preview never does.
  */
-export function useMarkRead(id: string, readOnly: boolean, unread: number, { positioned, focused, atBottom }: { readonly positioned: boolean; readonly focused: boolean; readonly atBottom: boolean }): void {
+export function useMarkRead(id: string, readOnly: boolean, unread: number, positioned: boolean, focused: boolean, atBottom: boolean): void {
   'use no memo'
   useEffect(() => {
     if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)

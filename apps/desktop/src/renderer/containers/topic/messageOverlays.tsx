@@ -1,16 +1,14 @@
 /**
  * What a topic's message actions draw over the list (see `../messageActions`):
- * the emoji picker, the selection's Quote button and the edit field. Its
+ * the emoji picker and the selection's Quote button. Its
  * hooks stay out of the React Compiler, as `useMessageActions` does.
  */
 import { lazy, Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { MessageView } from '@juno/contract'
-import { editMessage, registry } from '@juno/state'
-import { Floating, InlineEdit, SelectionQuote } from '@juno/views'
+import { Floating, SelectionQuote } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
-import { refOf } from '../messageRows'
 import { recentEmoji } from '../recentEmoji'
-import { focusRow, middleOf, type Editing, type Picker } from './messageCommands'
+import { focusRow, middleOf, type Picker } from './messageCommands'
 
 const EmojiPickerPanel = lazy(() => import('../EmojiPickerPanel'))
 
@@ -85,19 +83,17 @@ export function usePickerDismiss(picker: Picker | undefined, setPicker: Dispatch
   }, [picker, setPicker])
 }
 
-interface FloatingInput {
-  readonly picker: Picker | undefined
-  readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
-  readonly selection: Selection | undefined
-  readonly setSelection: Dispatch<SetStateAction<Selection | undefined>>
-  readonly rowMessage: (ts: string) => MessageView | undefined
-  readonly react: (message: MessageView, name: string) => void
-  readonly scrollRef: RefObject<HTMLElement | null>
-  readonly composer: RefObject<ComposerHandle | null>
-}
-
 /** The emoji picker or the selection's Quote button, for `TopicView`'s floating slot. */
-export function floatingOf({ picker, setPicker, selection, setSelection, rowMessage, react, scrollRef, composer }: FloatingInput) {
+export function floatingOf(
+  picker: Picker | undefined,
+  setPicker: Dispatch<SetStateAction<Picker | undefined>>,
+  selection: Selection | undefined,
+  setSelection: Dispatch<SetStateAction<Selection | undefined>>,
+  rowMessage: (ts: string) => MessageView | undefined,
+  react: (message: MessageView, name: string) => void,
+  scrollRef: RefObject<HTMLElement | null>,
+  composer: RefObject<ComposerHandle | null>,
+) {
   const quoteSelection = () => {
     const current = window.getSelection()
     const text = current?.toString().trim() ?? ''
@@ -128,41 +124,4 @@ export function floatingOf({ picker, setPicker, selection, setSelection, rowMess
       <SelectionQuote onQuote={quoteSelection} />
     </Floating>
   ) : null
-}
-
-interface EditorInput {
-  readonly channel: string
-  readonly editing: Editing | undefined
-  readonly setEditing: Dispatch<SetStateAction<Editing | undefined>>
-  readonly rowMessage: (ts: string) => MessageView | undefined
-  readonly composer: RefObject<ComposerHandle | null>
-}
-
-/** The edit field in place of the row's body. Saving keeps it until the window has the new text. */
-export function editingRowOf({ channel, editing, setEditing, rowMessage, composer }: EditorInput) {
-  return editing === undefined
-    ? undefined
-    : {
-        ts: editing.ts,
-        editor: (
-          <InlineEdit
-            value={editing.text}
-            onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
-            onCancel={() => {
-              setEditing(undefined)
-              composer.current?.focus()
-            }}
-            onSave={() => {
-              const message = rowMessage(editing.ts)
-              if (message === undefined || editing.savedRev !== undefined || editing.text.trim() === '') return
-              composer.current?.focus()
-              if (editing.text === message.editText) return setEditing(undefined)
-              setEditing({ ...editing, savedRev: message.rev })
-              void editMessage(registry, refOf(channel, message), editing.text).then((exit) => {
-                if (exit._tag === 'Failure') setEditing(undefined)
-              })
-            }}
-          />
-        ),
-      }
 }
