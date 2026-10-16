@@ -4,8 +4,8 @@
 // at least one copy of the post.
 import { afterEach, describe, expect, it } from 'vitest'
 import type { MessageView } from '@juno/contract'
-import { messagesAtom, sendMessage, type ListWindow } from '@juno/state'
-import { waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { deleteMessage, messagesAtom, sendMessage, type ListWindow } from '@juno/state'
+import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, quiet, readDb, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -82,9 +82,6 @@ describe('send: a copy whose delete waits', () => {
     return { id, kept, copy, rows }
   }
 
-  const deletesLeft = (engine: RunningEngine) =>
-    readDb(engine, 'user.db', (db) => (db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'delete'`).get() as { n: number }).n)
-
   it('keeps a copy that another person replied to while its delete waited', async () => {
     const engine = await booted()
     const { copy } = await copyWithSlowDelete(engine, 'Copy that gets a reply', 3)
@@ -133,6 +130,9 @@ async function copyAcrossDrop(engine: RunningEngine, text: string, failures: num
   return id
 }
 
+const deletesLeft = (engine: RunningEngine) =>
+  readDb(engine, 'user.db', (db) => (db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'delete'`).get() as { n: number }).n)
+
 const keptCopy = (engine: RunningEngine) =>
   readDb(engine, 'user.db', (db) => db.prepare('SELECT reason, hidden FROM kept_copies').get() as { reason: string; hidden: number } | undefined)
 
@@ -158,5 +158,67 @@ describe('send: a copy whose delete waits across a reconnect', () => {
     await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the copy deleted')
     expect(apiCalls(engine, 'conversations.history').some((call) => call.args['_x_reason'] === 'recheck' && call.args['channel'] === 'C0ENG')).toBe(true)
     expect(keptCopy(engine)).toBeUndefined()
+  })
+})
+
+// Found by the conformance replay (test/conformance): the check before a copy's delete runs before the
+// call waits for the send lane, which runs one write at a time. A change made while it waits is not seen,
+// and Slack ends with no copy of the post. `it.fails` until that is fixed; then make it `it`.
+describe('send: a copy whose delete waits for the send lane', () => {
+  it.fails('keeps the copy when the user deletes the kept message while the delete waits behind a slow post (fails: both go)', async () => {
+    const engine = await booted()
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const id = await post(engine, 'Copy behind a slow post')
+    await rows(settled('Copy behind a slow post'), 'the answer stored')
+    engine.main.network.resend = false
+    const kept = readDb(engine, 'user.db', (db) => (db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id) as { ts: string }).ts)
+    // A post to #product that Slack is slow to answer holds the send lane.
+    engine.fake.gate((method, args) => method === 'chat.postMessage' && args['channel'] === 'C0PRODUCT')
+    expect(valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'A slow post', 'm:C0PRODUCT'))).toEqual({ topicId: 'm:C0PRODUCT' })
+    await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the slow post at Slack')
+    // The copy's echo arrives: it is hidden, its delete is checked and waits for the lane.
+    engine.fake.releaseFrames()
+    await waitFor(() => (deletesLeft(engine) === 1 ? true : undefined), WAIT_MS, 'the copy delete queued')
+    await sleep(1_000)
+    // On the phone the user deletes the message Juno kept.
+    engine.fake.deleteMessage({ channel: 'C0ENG', ts: kept })
+    await waitFor(
+      () => (readDb(engine, 'cache.db', (db) => (db.prepare('SELECT deleted FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', kept) as { deleted: number } | undefined)?.deleted) === 1 ? true : undefined),
+      WAIT_MS,
+      'the delete from the phone stored',
+    )
+    engine.fake.gate(undefined)
+    await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete row settled')
+    expect(inSlack(engine, id)).toBe(1)
+  })
+})
+
+// Found by the conformance replay (test/conformance): the check that keeps a copy whose kept message was
+// deleted cannot tell the user's own delete from one made on another device. `it.fails` until fixed.
+describe('send: the user deletes a message before Juno has seen its copy', () => {
+  it.fails('deletes the copy too, and does not show it as the message (fails: the copy comes back)', async () => {
+    const engine = await booted()
+    engine.main.network.resend = true
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const id = await post(engine, 'Deleted by its sender')
+    await rows(settled('Deleted by its sender'), 'the answer stored')
+    engine.main.network.resend = false
+    const kept = readDb(engine, 'user.db', (db) => (db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id) as { ts: string }).ts)
+    // The user deletes the message; the copy's echo has not arrived yet.
+    valueOf(await deleteMessage(engine.registry, { channelId: 'C0ENG', ts: kept, clientMsgId: id }))
+    await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the message deleted in Slack')
+    engine.fake.releaseFrames()
+    // The copy's echo is stored, and its delete row, if any, settles.
+    await sleep(2_000)
+    await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete rows settled')
+    // The user meant the message gone: Slack keeps no copy of it, and Juno shows none.
+    expect(inSlack(engine, id)).toBe(0)
   })
 })
