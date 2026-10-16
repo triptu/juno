@@ -2092,13 +2092,35 @@ export class PrivacyMode {
     await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
   }
 
+  /** ⌃⌘H through View, and waits until main has the change (the menu names the other action). */
   async toggleWithMenu(): Promise<void> {
+    const before = await this.menuLabel()
     await clickAppMenu(this.app, 'toggle-privacy')
+    await expect.poll(() => this.menuLabel()).not.toBe(before)
   }
 
   /** View › Hide or Show Message Text, which names what it will do. */
   menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
+  }
+
+  /** The footer's text: "Message text hidden", or "… while sharing" when sharing turned it on. */
+  footerText(): Promise<string> {
+    return this.footer.getByText(/^Message text hidden/).innerText()
+  }
+
+  /** Another app starts capturing the screen, as main's screen watch would see it (the JUNO_E2E seam). */
+  async startSharing(): Promise<void> {
+    await this.screenShared(true)
+  }
+
+  /** The capture ends. */
+  async stopSharing(): Promise<void> {
+    await this.screenShared(false)
+  }
+
+  private async screenShared(shared: boolean): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
   }
 }
 
