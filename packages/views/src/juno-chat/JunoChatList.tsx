@@ -37,6 +37,11 @@ export interface JunoChatListProps {
   readonly enterEmpty?: boolean
   /** `page` for the Juno tab's 720px column, `panel` for the Juno panel's narrow one. Default `page`. */
   readonly column?: 'page' | 'panel'
+  /**
+   * How many rows at the end are laid out in full rather than at their size estimate: a screenful, so the
+   * bottom the container sets before the first paint is where the list stays when they come into view.
+   */
+  readonly eagerTail?: number
 }
 
 /**
@@ -50,7 +55,7 @@ export interface JunoChatListProps {
  * slots above and below have a fixed height whether or not more items
  * exist, so a page arriving never moves the rows.
  */
-export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page' }: JunoChatListProps) {
+export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page', eagerTail = 0 }: JunoChatListProps) {
   // With AI assist off an empty chat is the one AI-off line (SPEC 13.7), not suggestions it cannot act on.
   const empty = items.length === 0 && banner._tag !== 'aiOff'
   return (
@@ -58,8 +63,8 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
       <div role="list" aria-label="Juno chat" {...stylex.props(styles.column, column === 'panel' && styles.panel)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
-        {items.map((item) => (
-          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} />
+        {items.map((item, index) => (
+          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} eager={index >= items.length - eagerTail} />
         ))}
         {banner._tag === 'aiOff' ? (
           <div {...stylex.props(styles.aiOff)}>
@@ -98,12 +103,12 @@ function keyOf(item: ChatItem): string {
   }
 }
 
-function Row({ item, now, actions, anchorRef }: { readonly item: ChatItem; readonly now: number; readonly actions: ChatActions; readonly anchorRef: Ref<HTMLDivElement> | undefined }): ReactNode {
+function Row({ item, now, actions, anchorRef, eager }: { readonly item: ChatItem; readonly now: number; readonly actions: ChatActions; readonly anchorRef: Ref<HTMLDivElement> | undefined; readonly eager: boolean }): ReactNode {
   switch (item._tag) {
     case 'owner':
-      return <OwnerBubble item={item} now={now} actions={actions} />
+      return <OwnerBubble item={item} now={now} actions={actions} eager={eager} />
     case 'juno':
-      return <JunoBubble item={item} now={now} actions={actions} />
+      return <JunoBubble item={item} now={now} actions={actions} eager={eager} />
     case 'card':
       return <CardRow item={item} now={now} actions={actions} />
     case 'ending':

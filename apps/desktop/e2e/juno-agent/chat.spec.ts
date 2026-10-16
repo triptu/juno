@@ -188,6 +188,46 @@ test('the panel is open in one tab and closed in another, and each keeps its sta
   await expect(panel).toHaveCount(0)
 })
 
+test('the panel opens at the newest message on its first frame, with no jump, when its chat has history to scroll', async ({ juno }) => {
+  await ready(juno)
+  await setWindowWidth(juno, 1400)
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('juno')
+  const panel = JunoChatPane.panel(juno.win)
+  // Long enough bubbles that each grows past its size estimate once it is laid out.
+  const asks = Array.from({ length: 10 }, (_, i) => `question ${i + 1}: what did Leo and Maya decide about the cutover window, the fallback primary and who reviews the plan before Thursday`)
+  for (const ask of asks) {
+    await panel.send(ask)
+    await panel.expectJuno(`You said: ${ask}`)
+  }
+  await juno.tabs.menu('juno')
+  await expect(juno.win.locator('aside[data-juno-panel]')).toHaveCount(0)
+
+  // After each painted frame: how far the panel's list is from its end, and whether the newest bubble is in view.
+  await juno.win.evaluate(() => {
+    const frames: Array<{ atEnd: boolean; lastInView: boolean }> = []
+    ;(window as unknown as { panelFrames: typeof frames }).panelFrames = frames
+    const afterPaint = () => {
+      const scroller = document.querySelector<HTMLElement>('aside[data-juno-panel] [data-scroll]')
+      const last = scroller?.querySelectorAll('[data-chat-juno]')
+      const row = last?.[last.length - 1]
+      if (scroller != null && row !== undefined && scroller.getClientRects().length > 0) {
+        const box = scroller.getBoundingClientRect()
+        const at = row.getBoundingClientRect()
+        frames.push({ atEnd: scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= 1, lastInView: at.bottom <= box.bottom + 1 && at.top >= box.top })
+      }
+      if (frames.length < 10) requestAnimationFrame(() => setTimeout(afterPaint, 0))
+    }
+    requestAnimationFrame(() => setTimeout(afterPaint, 0))
+  })
+  await juno.tabs.menu('juno')
+  await expect.poll(() => juno.win.evaluate(() => (window as unknown as { panelFrames: unknown[] }).panelFrames.length)).toBe(10)
+  const frames = await juno.win.evaluate(() => (window as unknown as { panelFrames: Array<{ atEnd: boolean; lastInView: boolean }> }).panelFrames)
+  // The scroller has more than a screenful, and every frame from the first shows its end.
+  expect(await panel.root.locator('[data-scroll]').evaluate((el) => el.scrollHeight > el.clientHeight * 1.5)).toBe(true)
+  expect(frames).toEqual(Array.from({ length: 10 }, () => ({ atEnd: true, lastInView: true })))
+})
+
 test('Ask Juno in a person menu opens the panel with an About chip, and the message is about that person', async ({ juno, model }) => {
   await ready(juno)
   await setWindowWidth(juno, 1400)

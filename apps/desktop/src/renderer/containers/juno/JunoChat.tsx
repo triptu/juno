@@ -36,6 +36,8 @@ export interface JunoChatProps {
  *   edge it moves by `OVERLAP` rows; rows stay in flow, so scroll anchoring
  *   keeps the rows in view still. A window that reaches the newest row
  *   follows it (`latest`).
+ * - The last screenful of rows is laid out in full (`eagerTail`), so the
+ *   bottom set before the first paint is the bottom that paints.
  * - At the bottom, a new row is scrolled into view before paint; scrolled
  *   up, the "New message" pill shows.
  * - A Juno bubble fully on screen for a second in the focused window is read.
@@ -57,7 +59,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // The hooks run their effects in this order; keep it.
   const items = useChatItems(page, current)
-  const { pinnedRef, positioned, atBottom, setAtBottom, unseen } = useChatPosition(column, loaded, items, scrollRef, anchorRef)
+  const { pinnedRef, positioned, atBottom, setAtBottom, unseen, eagerTail } = useChatPosition(column, loaded, items, scrollRef, anchorRef)
   const { sentAtRef, newestBubbleId } = useBubbleMeasure(items)
   useStickToBottom(scrollRef, pinnedRef, positioned, items, page.moreBelow)
   useScrollRelease(scrollRef, pinnedRef, pageRef, setAtBottom)
@@ -120,6 +122,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
         topEdgeRef={topEdgeRef}
         bottomEdgeRef={bottomEdgeRef}
         enterEmpty={column === 'page' && loaded && agent !== 'off'}
+        eagerTail={eagerTail}
       />
     </JunoChatFrame>
     </>
