@@ -11,10 +11,11 @@ export function AttachmentCard({ attachment, title, children, footer, tabbable }
   const [expanded, setExpanded] = useState(false)
   const long = attachment.blocks.some((block) => block.kind === 'paragraph' && block.children.reduce((size, inline) => size + ('text' in inline ? inline.text.length : inline.kind === 'break' ? 80 : 0), 0) > 700 || block.kind === 'code' && block.text.length > 700)
   return <section aria-label="Attachment" {...stylex.props(styles.card, tintStyles[attachment.tint])}>
+    {attachment.author && <div {...stylex.props(styles.identity)}>{attachment.author.icon && <AttachmentIcon url={attachment.author.icon} />}<span>{attachment.author.name}</span></div>}
     {attachment.title.length > 0 && <div {...stylex.props(styles.title)}>{title}</div>}
     <div {...stylex.props(styles.content, long && !expanded && styles.collapsed)}>{children}</div>
     {long && <div data-expands-in-place="" {...stylex.props(styles.more)}><Button size="sm" variant="ghost" tabIndex={tabbable ? 0 : -1} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show less' : 'Show more'}</Button></div>}
-    {attachment.footer.length > 0 && <div {...stylex.props(styles.footer)}>{footer}</div>}
+    {attachment.footer.length > 0 && <div {...stylex.props(styles.footer, styles.identity)}>{attachment.footerIcon && <AttachmentIcon url={attachment.footerIcon} />}{footer}</div>}
   </section>
 }
 
@@ -43,11 +44,25 @@ function fieldParts(item: ReadonlyArray<BodyInline>): { readonly label?: string;
 }
 
 export function AttachmentImage({ image }: { readonly image: Extract<BodyBlock, { kind: 'image' }> }) {
+  const [failed, setFailed] = useState<string>()
+  if (failed === image.url) return null
   const box = image.width && image.height && image.width > 0 && image.height > 0 ? thumbnailBox(image.width, image.height) : thumbnailBox()
-  return <div {...stylex.props(styles.imageBox(box.width, box.height))}><img src={image.url} alt={image.alt} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
+  return <div {...stylex.props(styles.imageBox(box.width, box.height))}><img src={imageSource(image.url)} alt={image.alt} onError={() => setFailed(image.url)} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
+}
+
+function imageSource(url: string): string {
+  return url.startsWith('data:') || url.startsWith('juno:') || url.startsWith('/') ? url : `juno://images/?url=${encodeURIComponent(url)}`
+}
+
+function AttachmentIcon({ url }: { readonly url: string }) {
+  const [failed, setFailed] = useState<string>()
+  if (failed === url) return null
+  return <img src={imageSource(url)} alt="" onError={() => setFailed(url)} {...stylex.props(styles.icon)} />
 }
 
 const styles = stylex.create({
+  identity: { display: 'flex', alignItems: 'center', gap: spacing['--space-2'] },
+  icon: { width: spacing['--space-4'], height: spacing['--space-4'], objectFit: 'contain', borderRadius: radii['--radius-full'] },
   // Slack's short fields: two columns, each a label above its value.
   fields: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing['--space-3'], whiteSpace: 'pre-wrap' },
   field: { display: 'flex', flexDirection: 'column', gap: spacing['--space-0-5'], minWidth: 0 },

@@ -47,6 +47,8 @@ export type ContentBlock =
 
 export type Block = ContentBlock | {
   readonly kind: 'attachment'
+  readonly author?: { readonly name: string; readonly icon?: string }
+  readonly footerIcon?: string
   readonly tint: 'neutral' | 'info' | 'success' | 'warning' | 'danger'
   readonly title: ReadonlyArray<Inline>
   readonly blocks: ReadonlyArray<ContentBlock>

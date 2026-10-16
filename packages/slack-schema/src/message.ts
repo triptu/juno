@@ -100,6 +100,7 @@ export const Attachment = S.Struct({
   from_url: opt(S.String),
   original_url: opt(S.String),
   service_name: opt(S.String),
+  service_icon: opt(S.String),
   is_msg_unfurl: opt(S.Boolean),
 })
 export type Attachment = typeof Attachment.Type

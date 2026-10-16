@@ -23,3 +23,13 @@ for (const theme of ['light', 'dark']) {
     expect(box!.height).toBe(240)
   })
 }
+
+for (const theme of ['light', 'dark']) {
+  test(`failed unfurl image leaves only readable content (${theme})`, async ({ page }) => {
+    await page.goto(`/#/AttachmentCard?__state=failed-image&theme=${theme}`)
+    const card = page.getByRole('region', { name: 'Attachment' })
+    await expect(card).toContainText('Small experiments make the next decision clearer.')
+    await expect(card.getByRole('img', { name: 'Unavailable preview' })).toHaveCount(0)
+    expect((await card.boundingBox())!.height).toBeLessThan(200)
+  })
+}

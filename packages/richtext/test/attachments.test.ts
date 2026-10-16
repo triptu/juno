@@ -43,3 +43,18 @@ describe('integration content', () => {
   })
 
 })
+
+it('keeps unfurl author, text, service icon and source link through decoding', () => {
+  const body = parse({ attachments: [{
+    title: 'Avery Example on X', from_url: 'https://example.test/post/1',
+    author_name: 'Avery Example (@avery_example)', author_icon: 'https://example.test/author.png',
+    text: 'Small experiments make the next decision clearer.', service_name: 'X', service_icon: 'https://example.test/x.png',
+    image_url: 'https://example.test/chart.png', image_width: 600, image_height: 400,
+  }] })
+  expect(body.blocks[0]).toMatchObject({
+    kind: 'attachment', author: { name: 'Avery Example (@avery_example)', icon: 'https://example.test/author.png' },
+    footerIcon: 'https://example.test/x.png', footer: [{ kind: 'text', text: 'X' }],
+    title: [{ kind: 'link', url: 'https://example.test/post/1', text: 'Avery Example on X' }],
+  })
+  expect(plainText(body)).toContain('Small experiments make the next decision clearer.')
+})
