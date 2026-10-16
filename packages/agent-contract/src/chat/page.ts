@@ -57,7 +57,7 @@ export type ChatPage = typeof ChatPage.Type
  */
 export const ChatSummary = Schema.Struct({
   mayAuthorize: Schema.optionalKey(Schema.Boolean),
-  /** Unread Juno messages. A soft grey count, never an accent badge. */
+  /** Unread Juno messages. The sidebar shows it in its counter colours. */
   unread: Schema.Int,
   /** A background job is running: the duotone sparkle. A run alone does not light it (SPEC §13.2). */
   busy: Schema.Boolean,

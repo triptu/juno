@@ -77,7 +77,7 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; unread count), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
+| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; the topic switcher's unread count), `count` (`--hl-count` / `--hl-count-fg`; the sidebar's counters), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
 | `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (notification setting tag), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
 | `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge |
 | `numeric` | boolean | tabular figures |
@@ -155,6 +155,10 @@ Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120
 
 `Logo`: the laptop-two mark in `currentColor`. `size` 16 | 18 | 20 | 24 | 28 | 32 | 40 | 44; `label` ("Juno") when it is not decorative. The sign-in page shows it at 40; the assistant's avatar is 28.
 
+## 15b. ProgressRing
+
+A determinate ring, as macOS draws one for a download: `value` out of `max`, a `--border-strongest` track and an `--hl` arc from twelve o'clock with round ends. Without `max` it draws the track only (the total is not known yet). `size` 16 | 20 (default 20), stroke 2 and 2.5. It is the `progressbar` itself: `label` is required ("Sync progress") and `valueText` is what a screen reader says ("11 of 148 conversations"). The arc does not animate; each value repaints it. Used by the sidebar's sync status card.
+
 ## 16. Page, PageHeader, Section
 
 `Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 (every settings page), padding 40 32 72. The scroller keeps a stable scrollbar gutter, so the column does not move when the page starts or stops overflowing. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
@@ -175,6 +179,6 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-23 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, Page/PageHeader/Section, CodeBlock, Card.
+24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.

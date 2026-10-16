@@ -371,9 +371,14 @@ export class Sidebar {
     return (await lastMenu(this.win)).labels
   }
 
-  /** The status line under the filters, shown when the list may be behind Slack. */
+  /** The status card's title at the foot of the sidebar: the first sync, or why the list may be behind Slack. */
   get syncStatus() {
     return this.root.getByRole('status', { name: 'Sync status' })
+  }
+
+  /** The first sync's ring in the status card; its value text is "N of M conversations". */
+  get syncProgress() {
+    return this.root.getByRole('progressbar', { name: 'Sync progress' })
   }
 
   get restartButton() {

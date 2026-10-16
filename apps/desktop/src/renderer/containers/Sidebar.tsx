@@ -13,6 +13,8 @@ import {
   sidebarFilterAtom,
   sidebarListAtom,
   signedInAtom,
+  syncNoticeAtom,
+  syncProgressAtom,
   tabsAtom,
   viewPillsAtom,
   viewSheetAtom,
@@ -73,7 +75,7 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
 /**
  * Wires the sidebar chrome: the filters and scope (local UI state), the
  * filter dots (booleans from the counts live value, so a count that changes
- * without a dot changing re-renders nothing), the sync status line, and
+ * without a dot changing re-renders nothing), the sync status card, and
  * the account menu, whose Notifications and Settings open Settings. The
  * list is a memoized child with no props, so a render here does not reach
  * the rows.
@@ -101,6 +103,10 @@ export function Sidebar() {
   // Whether the list may still change: the engine is not live, or a sync cycle runs. Two booleans, so a status tick re-renders nothing.
   const connected = useAtomValue(connectionStateAtom, (state) => state === 'connected')
   const caughtUp = useAtomValue(engineStatusAtom, (engine) => engine._tag === 'Success' && engine.value.phase._tag === 'live' && !engine.value.syncing)
+  // Whether the footer's status card shows; the card reads the progress itself, so a count tick re-renders only the card.
+  const noticeShown = useAtomValue(syncNoticeAtom, (kind) => kind !== undefined)
+  const progressShown = useAtomValue(syncProgressAtom, (progress) => progress !== undefined)
+  const syncStatus = noticeShown || progressShown
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
@@ -165,7 +171,7 @@ export function Sidebar() {
       onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}
-      status={<SyncNotice />}
+      {...(syncStatus ? { status: <SyncNotice /> } : {})}
       privacy={privacy}
       onPrivacyOff={() => setPrivacy(false)}
       syncing={!connected || !caughtUp}
