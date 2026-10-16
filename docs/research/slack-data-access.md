@@ -582,3 +582,26 @@ Why the first real session showed user ids instead of names. `JUNO_LIVE=1 pnpm p
 | Messages whose `text` holds `&amp;`, `&lt;` or `&gt;` | 7 of 310 |
 
 So the edge answers every id the sync asks about, Slack Connect users included, and the names were missing because of when and what Juno asked. The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.
+
+### Live reactions (2026-10-16)
+
+`JUNO_LIVE=1 pnpm react:live` (`scripts/react-live.ts`) runs the whole engine on the cached session in a temporary directory. The transport refuses every write except reactions and posts in the self-DM and deletes of the posts the run made. It reacts through the real path: `messages.react`, the `outbox` row, `ActionWorker`. Shapes and codes only:
+
+| Call | Target | Name | Slack's answer | `reactions.get` after |
+| --- | --- | --- | --- | --- |
+| `reactions.add {channel, timestamp, name}` (form fields `_x_mode, channel, timestamp, name`) | message from history | `+1` | `ok` | mine |
+| same | same | `+1::skin-tone-2` | `ok` | mine |
+| same | same | custom (bare name, from `emoji.list`, 306 custom) | `ok` | mine |
+| same | same | a name no emoji has | `invalid_name` | absent |
+| `reactions.remove`, the three above | same | | `ok` each | none left |
+| `reactions.add` while Juno's post was still sending (row waited on `depends_on`) | own new post | `+1` | `ok`, sent with Slack's ts | mine |
+| add and remove | own post, then a thread reply to it | `eyes`, `+1` | `ok` each | as asked |
+| `reactions.add` at a ts no message has | self-DM | `+1` | `message_not_found` | |
+
+Every row ended within 0.3 to 2.5 s of the command. The two test posts were deleted through Juno (`chat.delete`, `ok`); nothing was left over.
+
+Then, read-only, `reactions.get {channel, timestamp}` for up to six stored messages of each kind in a fresh boot's store (4,769 messages; by conversation kind, membership, root, reply or plain, subtype, own or others'): 47 kinds, every answer `ok`. So Slack finds every stored message by the pair a reaction names, thread broadcasts, bot, huddle and join messages included.
+
+And `emoji.list {include_categories: true}` lists 1,859 standard names in 9 categories. Of the picker's 1,867 emoji (emoji-datasource 16), 16 have no name in that list, mostly person variants (`bearded_person`, `shrug`, `face_palm`); whether Slack refuses them is Unknown.
+
+What this means for Juno: the call Juno makes is right. Slack answers `message_not_found` to a reaction on a message it does not have, and the worker counted that answer as "already done" for reactions as for deletes, so it stored a reaction Slack never took and the chip stayed. It now treats that answer as a refusal for reactions.
