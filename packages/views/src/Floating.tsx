@@ -71,6 +71,8 @@ const styles = stylex.create({
   base: {
     position: 'absolute',
     display: 'inline-flex',
+    // Over a title bar's drag strip near the top of the page, which would otherwise take the press.
+    WebkitAppRegion: 'no-drag',
   },
   picker: {
     zIndex: z['--z-picker'],

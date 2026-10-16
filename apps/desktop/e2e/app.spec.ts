@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { execFile } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
@@ -76,6 +76,66 @@ test('only the title bars drag the window, and every control on them opts out', 
   expect(report.uncovered).toEqual([])
   // Regions sit on the title bars' groups, not on every control: each one is redrawn every frame it moves (performance.md 8.5).
   expect(report.regions, report.holders.join(', ')).toBeLessThan(20)
+})
+
+/**
+ * A surface that can open over a title bar must opt out of its drag region on
+ * its own root, or a real Mac drags the window instead of delivering the
+ * press (the avatar menu bug of 10-16). Playwright sends events to the page
+ * directly, so this reads the region instead: the nearest absolute or fixed
+ * box holding the surface must be no-drag, and nothing inside may drag.
+ */
+async function expectOptsOut(surface: Locator, name: string): Promise<void> {
+  await expect(surface, name).toBeVisible()
+  const found = await surface.evaluate((node) => {
+    const region = (element: Element) => getComputedStyle(element).getPropertyValue('-webkit-app-region')
+    let root: Element | null = node
+    while (root !== null && !['absolute', 'fixed'].includes(getComputedStyle(root).position)) root = root.parentElement
+    if (root === null) return { root: 'none', region: '', drags: 0 }
+    return { root: `${root.tagName.toLowerCase()} ${root.className}`.slice(0, 80), region: region(root), drags: [...root.querySelectorAll('*')].filter((element) => region(element) === 'drag').length }
+  })
+  expect(found.region, `${name}: its root (${found.root}) must be no-drag`).toBe('no-drag')
+  expect(found.drags, `${name}: nothing inside may drag`).toBe(0)
+}
+
+test('every surface that can open over a title bar opts out of its drag region', async ({ juno, win, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, topic, palette, tabs, newChat } = juno
+
+  await win.locator('aside [aria-label="Account and settings"]').click()
+  await expectOptsOut(win.getByRole('menu', { name: 'Account' }), 'avatar menu')
+  await win.keyboard.press('Escape')
+
+  await sidebar.root.getByRole('button', { name: 'New view', exact: true }).click()
+  await expectOptsOut(sidebar.viewSheet, 'view sheet')
+  await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
+  await expect(sidebar.viewSheet).toHaveCount(0)
+
+  await palette.open()
+  await expectOptsOut(win.getByRole('dialog', { name: 'Search and commands' }), 'palette')
+  await win.keyboard.press('Escape')
+
+  await sidebar.row('#eng').open()
+  await topic.expectTitle('Main')
+  await topic.openSwitcher()
+  await expectOptsOut(win.locator('[data-topic-switcher]'), 'topic switcher')
+  await win.keyboard.press('Escape')
+
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Drag region check' })
+  const row = topic.message('Drag region check')
+  await row.hover()
+  await row.getByRole('button', { name: 'More reactions' }).click()
+  await expectOptsOut(win.locator('[data-floating="picker"]'), 'emoji picker')
+  await win.keyboard.press('Escape')
+
+  await tabs.newTabButton.click()
+  await tabs.expectActive('New chat')
+  await newChat.conversationButton.click()
+  await expectOptsOut(newChat.list, 'New chat conversation picker')
+  await win.keyboard.press('Escape')
+  await newChat.composer.pressSequentially('@ma')
+  await expectOptsOut(newChat.suggestions, 'mention suggestions')
 })
 
 test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {

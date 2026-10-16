@@ -241,6 +241,8 @@ const styles = stylex.create({
     justifyContent: 'center',
     padding: spacing['--space-6'],
     backgroundColor: colors['--overlay'],
+    // Over the title bars' drag strips, which would otherwise take the press (as the palette's overlay).
+    WebkitAppRegion: 'no-drag',
   },
   sheet: {
     width: '100%',

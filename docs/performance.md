@@ -712,9 +712,17 @@ strip's slots and the history group already opted out on their containers.
 The sidebar's icon group now does too, and the primitives set nothing. The
 `app.spec.ts` title bar test checks that every control over a drag strip is
 covered, and that regions start on fewer than 20 elements.
-Overlays that cover the window (image viewer, sheets) keep their controls
-below the title bar height, and popovers and option lists keep their own
-`no-drag`.
+Every surface that can open over a title bar sets `no-drag` once, on its
+root: `Popover`'s panel (the avatar menu, the topic switcher, the view sheet,
+the New chat pickers), `OptionList`, the palette's overlay, `Floating` (the
+emoji picker and the selection quote), the @ and # suggestions, `SheetLayer`
+and the image viewer. The first commit of this fix missed `Floating`, the
+suggestions, `SheetLayer` and the image viewer, which had relied on their
+controls' own `no-drag`; on a real Mac a press there could drag the window
+(the avatar menu bug of 10-16). A second `app.spec.ts` test opens each listed
+surface and fails unless the nearest absolutely or fixed placed box around it
+is `no-drag` with nothing inside set to `drag`. The tab menu and the topic's
+⋯ menu are native menus, outside the page.
 
 **Measured, not shipped: no `flushSync` in All topics.** With the
 virtualizer's `useFlushSync: false` the new rows render one frame after the

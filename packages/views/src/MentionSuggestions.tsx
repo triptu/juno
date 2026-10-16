@@ -120,6 +120,8 @@ const styles = stylex.create({
     width: layout['--menu-width-mention'],
     bottom: `anchor(${COMPOSER_BOX_ANCHOR} top)`,
     marginBottom: spacing['--space-1-5'],
+    // In a short window the list can rise over a title bar's drag strip.
+    WebkitAppRegion: 'no-drag',
   },
   // The left edge that puts a row's name under the "@" or "#": the panel's
   // and the row's insets, the avatar or icon, and the gap.

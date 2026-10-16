@@ -56,7 +56,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 **Electron chrome**
 
-20. `-webkit-app-region` goes on title bar strips (`drag`) and on the container of each control group inside them (`no-drag`), never on a primitive or a row. It is inherited, and with a region on every control Chromium took about twice as long to apply each scroll offset and to finish each layout: 6 to 18 % of a scroll's frame work (`docs/performance.md` 8.5). The `app.spec.ts` title bar test fails above 20 region roots.
+20. `-webkit-app-region` goes on title bar strips (`drag`) and on the container of each control group inside them (`no-drag`), never on a primitive or a row. Every surface that can open over a title bar (popover, list, overlay, floating picker, sheet) sets `no-drag` once on its root. It is inherited, and with a region on every control Chromium took about twice as long to apply each scroll offset and to finish each layout: 6 to 18 % of a scroll's frame work (`docs/performance.md` 8.5). The `app.spec.ts` title bar test fails above 20 region roots.
 
 ## Measure before you call it done
 

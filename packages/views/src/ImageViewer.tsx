@@ -93,6 +93,8 @@ const styles = stylex.create({
     position: 'fixed',
     inset: 0,
     zIndex: z['--z-viewer'],
+    // Over the title bars' drag strips, which would otherwise take the press (as the palette's overlay).
+    WebkitAppRegion: 'no-drag',
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: colors['--overlay-viewer'],
