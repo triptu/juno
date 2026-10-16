@@ -66,10 +66,11 @@ for (const id of ['main/conversation', 'thread/long', 'main/thread-links']) {
     expect(measured.length).toBeGreaterThan(3)
     for (const [index, row] of measured.entries()) {
       expect(row.empty, `row ${index} holds empty space`).toEqual([])
-      // The content column rounds up to a whole pixel (performance 3.3), so the row may end under a pixel later.
+      // The content column rounds up to a whole pixel (performance 3.3) and an emoji-only line's
+      // images can sit a fraction past its box, so the row may end up to two pixels later.
       const below = row.bottom - row.inkBottom - row.paddingBottom
       expect(below, `row ${index}: space under its content`).toBeGreaterThanOrEqual(-0.01)
-      expect(below, `row ${index}: space under its content`).toBeLessThan(1)
+      expect(below, `row ${index}: space under its content`).toBeLessThan(2)
       const previous = measured[index - 1]
       if (previous === undefined) continue
       const gap = row.top - previous.bottom
@@ -94,7 +95,10 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   const unknown = page.getByRole('button', { name: '1 :shipit-old:' })
   await expect(unknown.locator('img')).toHaveCount(0)
   // `:shipit-old:` then the count, apart: never `:shipit-old:1`.
-  const parts = await unknown.evaluate((chip) => [...chip.querySelectorAll('span > span')].map((span) => ({ text: span.textContent, left: span.getBoundingClientRect().left, right: span.getBoundingClientRect().right })))
+  const parts = await unknown.evaluate((chip) => {
+    const name = chip.querySelector('span[aria-hidden]')!
+    return [name, name.nextElementSibling!].map((span) => ({ text: span.textContent, left: span.getBoundingClientRect().left, right: span.getBoundingClientRect().right }))
+  })
   expect(parts.map((part) => part.text)).toEqual([':shipit-old:', '1'])
   expect(parts[1]!.left - parts[0]!.right).toBeGreaterThan(2)
   // The custom emoji on a line is an image too.
