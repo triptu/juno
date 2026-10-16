@@ -7,6 +7,7 @@ import { connections, NOW, settings, settingsRecovery, settingsReleased, setting
 import { ConnectionsPage } from './juno-pages/ConnectionsPage'
 import { JunoBackupPage, JunoSettingsPage } from './juno-pages/JunoSettingsPage'
 import { ProviderSection } from './juno-pages/ProviderSection'
+import { RulesSection } from './juno-pages/RulesSection'
 import { NotificationsPage } from './NotificationsPage'
 import { notificationsBase } from './NotificationsPage.fixtures'
 import { SettingsPage, type SettingsPageProps } from './SettingsPage'
@@ -80,9 +81,9 @@ export default defineFixtures(
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
-      juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />),
+      juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} />),
       'ai-activity': at('ai-activity', <AiActivityPage activity={aiActivity} now={NOW} onCopyDetails={noop} />),
-      connections: at('connections', <ConnectionsPage page={connections} onAction={noop} onConfigure={noop} onAdd={noop} />),
+      connections: at('connections', <ConnectionsPage page={connections} rules={<RulesSection rules={settings.rules} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />} onAction={noop} onConfigure={noop} onAdd={noop} />),
       backup: at('backup', <JunoBackupPage {...backup} page={settings} />),
       about: at('about', about),
     },
@@ -90,6 +91,7 @@ export default defineFixtures(
       'grammar-ai-off': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} checks={checks} grammarUnavailable="Turn on AI assist to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'grammar-no-key': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} checks={checks} grammarUnavailable="Add an OpenRouter key to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'read-catch-up-running': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'read-catch-up-done': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'sharing-unavailable': at('general', <SettingsGeneral hideWhileSharing sharingDetection="missing" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       // Another app records the screen all the time, so Juno cannot tell when a share starts.
       'sharing-always-on': at('general', <SettingsGeneral hideWhileSharing sharingDetection="alwaysOn" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),

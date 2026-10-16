@@ -96,7 +96,7 @@ function General() {
   const newTabPage = useAtomValue(newTabPageAtom)
   const [sharing, setSharing] = useSharingSetting()
   return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
-    catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
+    catchUp={catchUp._tag === 'Success' ? catchUp.value : undefined}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
     checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
     newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />

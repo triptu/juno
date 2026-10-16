@@ -1,4 +1,4 @@
-import { chatCopy, type ModelChoice } from '@juno/agent-contract'
+import type { ModelChoice } from '@juno/agent-contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { settings, settingsTrouble } from './fixtures'
 import { JunoSettingsPage, type JunoSettingsPageProps } from './JunoSettingsPage'
@@ -23,22 +23,15 @@ const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
     ...callbacks,
     providers: provider(),
     onSignInCodex: noop,
-    onRuleChange: noop,
-    onRuleRemove: noop,
-    onRuleAdd: noop,
   })
 
-/** The provider, the models, spend, the rules and Pause, with Codex's sign-in not wired. */
-const today = (props: Partial<Pick<JunoSettingsPageProps, 'page' | 'providers' | 'rulesError'>> = {}) =>
+/** The provider, the models, spend and Pause, with Codex's sign-in not wired. */
+const today = (props: Partial<Pick<JunoSettingsPageProps, 'page' | 'providers'>> = {}) =>
   fixture<JunoSettingsPageProps>({
     page: settings,
     providers: provider(),
     ...props,
     ...callbacks,
-    onRuleChange: noop,
-    onRuleRemove: noop,
-    onRuleAdd: noop,
-    onRulesCommit: noop,
   })
 
 const local = (id: string, selected = false): ModelChoice => ({ family: id, resolved: id, provider: 'custom', selected })
@@ -65,8 +58,6 @@ export default defineFixtures(
       }),
       // One that lists none: the model id is typed.
       'custom-typed': today({ page: { ...settings, provider: 'custom', chatModels: [local('mistral-small', true)], compactionModels: [], modelTyped: true, spendUntracked: true }, providers: onCustom('set') }),
-      'no-rules': today({ page: { ...settings, rules: [] } }),
-      'rules-refused': today({ rulesError: chatCopy.pages.settings.rulesInvalid }),
     },
   },
   { width: 960, height: 880, padded: false },

@@ -5,6 +5,7 @@ export { CODEX_ENABLED, JunoBackupPage, JunoSettingsPage, type JunoBackupPagePro
 export { MemoryPage } from './MemoryPage'
 export { ProviderSection, type ProviderDrafts } from './ProviderSection'
 export { RemembersPage } from './RemembersPage'
+export { RulesSection } from './RulesSection'
 export { ReviewPage } from './ReviewPage'
 export { ScheduledPage } from './ScheduledPage'
 export { MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer } from './BackupSheets'
