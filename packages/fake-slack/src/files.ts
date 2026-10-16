@@ -150,5 +150,13 @@ export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false
     url_private_download: `${url}?download=1`,
     permalink: url,
     ...(size === undefined ? {} : { original_w: size.width, original_h: size.height, ...thumbs(url, size.width, size.height) }),
+    // A video: its poster and the url it plays from, as live (research section 10, "Videos"); not until Slack has made them.
+    ...(stored.poster === undefined || stored.thumbsHeld === true ? {} : { thumb_video: `${url}?thumb=video`, thumb_video_w: stored.poster.width, thumb_video_h: stored.poster.height, mp4: url }),
   }
+}
+
+/** Slack's partial copy of a file on a socket message: what `file_access: "check_file_info"` carries. */
+export function partialFileObject(stored: StoredFile): File {
+  const seconds = Math.floor(stored.created / 1000)
+  return { id: stored.id, mode: 'hosted', file_access: 'check_file_info', created: seconds, timestamp: seconds, user: stored.user }
 }

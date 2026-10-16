@@ -10,7 +10,7 @@ import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
 import { FakeServer, type CallRecord, type GatedCall, type GateDecision, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
-import { fileObject } from './files.ts'
+import { fileObject, partialFileObject } from './files.ts'
 import { samplePng } from './samples.ts'
 
 export type { CallRecord, GatedCall, GateDecision, Session } from './server.ts'
@@ -331,7 +331,7 @@ export class FakeSlack {
   }
 
   /**
-   * Files uploaded from now on, and images from `injectImages`, come without
+   * Files uploaded from now on, and media from `injectMedia`, come without
    * thumbnails and without a size, on the message and from `files.info`, as
    * live Slack's echo of a fresh upload does, until `releaseThumbnails`.
    */
@@ -362,19 +362,53 @@ export class FakeSlack {
     for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, event_ts: ws.eventTs() })
   }
 
-  /** A message from another user with PNGs of the sizes given, in order. Without thumbnails while `holdThumbnails` is on. Emits the socket events. */
-  injectImages(input: { channel: string; user?: string; text?: string; images: ReadonlyArray<{ name: string; width: number; height: number }> }): Message {
+  /**
+   * A message from another user with images (PNGs) and videos of the sizes
+   * given, in order; a video gets a PNG poster of that size and bytes that
+   * are not a playable video. Without thumbnails or posters while
+   * `holdThumbnails` is on. With `partial`, the socket event carries each
+   * file as Slack's partial copy (`file_access: "check_file_info"`, little
+   * more than the id), while history and `files.info` have it whole. With
+   * `ago` (minutes), the message is that old.
+   */
+  injectMedia(input: {
+    channel: string
+    user?: string
+    text?: string
+    partial?: boolean
+    ago?: number
+    media: ReadonlyArray<{ name: string; width: number; height: number; kind?: 'image' | 'video' }>
+  }): Message {
     const ws = this.workspace
     const user = input.user ?? 'U0MAYA'
     const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
-    const files = input.images.map((each) => {
+    const stored = input.media.map((each) => {
       const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
-      const bytes = samplePng(each.width, each.height)
-      const stored = { id, name: each.name, length: bytes.length, user, created: ws.clock.now(), bytes, mimetype: 'image/png', ...(ws.holdThumbnails ? { thumbsHeld: true } : {}) }
-      ws.files.set(id, stored)
-      return fileObject(this.server.url, stored, isPublic)
+      const picture = samplePng(each.width, each.height)
+      const video = each.kind === 'video'
+      const bytes = video ? Buffer.from('not a playable video') : picture
+      const file = {
+        id,
+        name: each.name,
+        length: bytes.length,
+        user,
+        created: ws.clock.now(),
+        bytes,
+        mimetype: video ? 'video/mp4' : 'image/png',
+        ...(video ? { poster: { bytes: picture, width: each.width, height: each.height } } : {}),
+        ...(ws.holdThumbnails ? { thumbsHeld: true } : {}),
+      }
+      ws.files.set(id, file)
+      return file
     })
-    return ws.post({ channel: input.channel, user, ...(input.text === undefined ? {} : { text: input.text }), files })
+    return ws.post({
+      channel: input.channel,
+      user,
+      ...(input.text === undefined ? {} : { text: input.text }),
+      files: stored.map((file) => fileObject(this.server.url, file, isPublic)),
+      ...(input.ago === undefined ? {} : { at: ws.clock.now() - input.ago * 60_000 }),
+      ...(input.partial === true ? { eventFiles: stored.map(partialFileObject) } : {}),
+    })
   }
 
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
@@ -473,7 +507,7 @@ export class FakeSlack {
       failUploads: (i) => this.failUploads(i),
       holdThumbnails: () => this.holdThumbnails(),
       releaseThumbnails: (i) => this.releaseThumbnails(i),
-      injectImages: (i) => this.injectImages(i),
+      injectMedia: (i) => this.injectMedia(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),

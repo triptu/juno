@@ -279,7 +279,7 @@ test('media viewer open: a picture in a message to the viewer painted', async ({
   await juno.waitForSync()
   const { sidebar, topic } = juno
   await sidebar.row('#eng').open()
-  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos for the viewer check', images: Array.from({ length: 6 }, (_, index) => ({ name: `photo-${index + 1}.png`, width: 1200, height: 800 + index * 40 })) })
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos for the viewer check', media: Array.from({ length: 6 }, (_, index) => ({ name: `photo-${index + 1}.png`, width: 1200, height: 800 + index * 40 })) })
   const row = topic.message('Photos for the viewer check')
   const tiles = row.locator('[data-thumbnail]')
   await expect(tiles).toHaveCount(4)

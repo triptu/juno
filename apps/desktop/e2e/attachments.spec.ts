@@ -132,7 +132,7 @@ test('another person\'s image that arrives without thumbnails fills in after the
   await topic.expectTitle('Main')
 
   fake.holdThumbnails()
-  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', images: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', media: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
   const row = topic.message('Whiteboard from today')
   await expect(row.getByRole('button', { name: 'Download whiteboard.png' })).toBeVisible()
   // The first try finds no thumbnails yet; Slack makes them without an event, and a later try brings them.
@@ -345,7 +345,7 @@ test('several images open in the viewer at the one clicked, and the keys and the
   await topic.expectTitle('Main')
 
   const names = ['rack-front.png', 'rack-back.png', 'cable-map.png', 'patch-panel.png']
-  fake.injectImages({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos from the rack move', images: names.map((name, index) => ({ name, width: 800 + index * 100, height: 600 })) })
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos from the rack move', media: names.map((name, index) => ({ name, width: 800 + index * 100, height: 600 })) })
   const row = topic.message('Photos from the rack move')
   const grid = row.locator('[data-thumbnail-grid]')
   await expect(grid).toHaveAttribute('data-count', '4')
