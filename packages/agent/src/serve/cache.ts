@@ -21,13 +21,12 @@ export function chatRevisions(store: Store) {
   }
 }
 
-/** One typed computation; callers list every input that affects its result. */
+/** One typed computation; callers list every input that affects its result. A build gets the last value, to keep unchanged parts. */
 export function memo<A>() {
   let previous: { readonly inputs: ReadonlyArray<unknown>; readonly value: A } | undefined
-  return (inputs: ReadonlyArray<unknown>, build: () => A): A => {
-    const known = previous
-    if (known !== undefined && inputs.length === known.inputs.length && inputs.every((input, i) => input === known.inputs[i])) return known.value
-    const value = build()
+  return (inputs: ReadonlyArray<unknown>, build: (last: A | undefined) => A): A => {
+    if (previous !== undefined && same(inputs, previous.inputs)) return previous.value
+    const value = build(previous?.value)
     previous = { inputs, value }
     return value
   }
@@ -35,21 +34,27 @@ export function memo<A>() {
 
 /** Sweep keys no longer present so removed runs and rows do not retain their text. */
 export function keyedMemo<A>() {
-  const entries = new Map<string, ReturnType<typeof memo<A>>>()
-  let used = new Set<string>()
+  // Each entry records the last pass that used it, so a get adds no key to a set.
+  const entries = new Map<string, { readonly memo: ReturnType<typeof memo<A>>; used: number }>()
+  let pass = 0
   return {
     get(key: string, inputs: ReadonlyArray<unknown>, build: () => A): A {
-      used.add(key)
       let entry = entries.get(key)
       if (entry === undefined) {
-        entry = memo<A>()
+        entry = { memo: memo<A>(), used: pass }
         entries.set(key, entry)
-      }
-      return entry(inputs, build)
+      } else entry.used = pass
+      return entry.memo(inputs, build)
     },
     sweep() {
-      for (const key of entries.keys()) if (!used.has(key)) entries.delete(key)
-      used = new Set()
+      for (const [key, entry] of entries) if (entry.used !== pass) entries.delete(key)
+      pass++
     },
   }
+}
+
+const same = (a: ReadonlyArray<unknown>, b: ReadonlyArray<unknown>) => {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
 }
