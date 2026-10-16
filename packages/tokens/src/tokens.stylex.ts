@@ -836,8 +836,11 @@ export const layout = stylex.defineVars({
   '--filter-pill-max-width': '120px',
   // The view sheet's conversation list (inventory 2.3), which scrolls past this.
   '--view-sheet-list-max-height': '200px',
-  // The peek popover beside the sidebar; never wider than the room left of the window.
-  '--peek-width': '480px',
+  // The peek popover: about 75 characters of message text in compact rows;
+  // never wider than the room left in the window.
+  '--peek-width': '640px',
+  // The peek's header: one 20px line with 12px above and below.
+  '--peek-header-height': '44px',
   // Never taller than the window below a title-bar anchor, so a menu fits
   // at the minimum size and under zoom; the content scrolls inside.
   '--popover-max-height': 'min(400px, calc(100vh - var(--titlebar-height) - var(--space-5)))',

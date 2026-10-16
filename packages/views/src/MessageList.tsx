@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -50,6 +50,11 @@ export interface MessageListProps {
   readonly scrollRef?: Ref<HTMLElement>
   /** The list runs under the topic's floating header (default). False where nothing floats over it, as in peek. */
   readonly underHeader?: boolean
+  /**
+   * In a popover (peek): a tighter column, as tall as its rows, and no slot
+   * above the first row while nothing older can load.
+   */
+  readonly popover?: boolean
   /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
@@ -69,6 +74,8 @@ export interface MessageListProps {
    */
   readonly onRowKey?: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
+  /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
+  readonly onPrefetchThread?: (id: string) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
@@ -93,6 +100,8 @@ export interface MessageListProps {
 }
 
 const ROW = '[data-message-row]'
+/** A Main message that has a thread; `data-thread` is the thread's topic id. */
+const THREAD_ROW = '[data-thread]'
 
 /** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
 function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
@@ -164,6 +173,7 @@ export function MessageList({
   older = 'none',
   scrollRef,
   underHeader = true,
+  popover = false,
   anchorRef,
   hueOf = hueForId,
   actions,
@@ -173,6 +183,7 @@ export function MessageList({
   suggestion,
   onRowKey,
   onOpenThread,
+  onPrefetchThread,
   onChannel,
   onLink,
   onToggleReaction,
@@ -187,6 +198,8 @@ export function MessageList({
   onChannelMenu,
 }: MessageListProps) {
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
+  // The thread last warmed, so moving within one message warms it once.
+  const warmed = useRef<string | undefined>(undefined)
   const last = items[items.length - 1]
   const tabbable = focusedTs !== undefined && items.some((item) => item.message.ts === focusedTs) ? focusedTs : last?.message.ts
   const dividerIndex = dividerBefore === undefined ? -1 : items.findIndex((item) => item.message.ts >= dividerBefore)
@@ -199,12 +212,22 @@ export function MessageList({
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey)}
+        onPointerOver={
+          onPrefetchThread === undefined
+            ? undefined
+            : (event) => {
+                const id = event.target instanceof Element ? event.target.closest<HTMLElement>(THREAD_ROW)?.dataset['thread'] : undefined
+                if (id === undefined || id === warmed.current) return
+                warmed.current = id
+                onPrefetchThread(id)
+              }
+        }
         onContextMenu={
           onMessageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onPersonMenu, onChannelMenu })
         }
-        {...stylex.props(styles.column)}
+        {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >
-        {items.length > 0 ? (
+        {items.length > 0 && !(popover && older === 'none') ? (
           <div aria-live="polite" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
               <Text variant="meta" tone="muted">
@@ -308,6 +331,14 @@ const styles = stylex.create({
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-4'],
     boxSizing: 'border-box',
+  },
+  // The rows start where the popover's header does: the scrollbar's even
+  // inset, then room for a row's focus ring, which the scroller would clip.
+  popoverColumn: {
+    minHeight: 0,
+    paddingTop: spacing['--space-2'],
+    paddingInline: sizes['--focus-ring-room'],
+    paddingBottom: spacing['--space-2'],
   },
   // A fixed slot above the first row, so "Loading older messages" appearing
   // or going away never moves the rows below it.

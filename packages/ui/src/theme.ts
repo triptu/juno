@@ -34,6 +34,12 @@ export function isAccentName(value: unknown): value is AccentName {
   return typeof value === 'string' && accentNames.includes(value as AccentName)
 }
 
+/**
+ * Compact density for one subtree, whatever the app's density: pass it to
+ * `stylex.props` on the root. Peek reads its messages in compact rows.
+ */
+export const compactDensity = compact
+
 let previous: ReadonlyArray<string> = []
 
 /**

@@ -25,7 +25,7 @@ export { NewChat, startOfConversation } from './NewChat'
 export { NewMessagesPill } from './NewMessagesPill'
 export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
-export { PeekView } from './PeekView'
+export { PeekView, type PeekPlacement } from './PeekView'
 
 export { SessionView } from './SessionView'
 export { SetUpJunoView, type SetUpChoice, type SetUpCodex } from './SetUpJunoView'

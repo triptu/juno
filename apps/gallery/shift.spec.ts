@@ -589,7 +589,7 @@ test('the peek floats beside the sidebar: the rows, the tab strip and the page s
     )
   await openState(page, { component: 'Shell', id: 'window/signed-in', route: 'Shell/window/signed-in' } as Route)
   const without = await boxes()
-  await openState(page, { component: 'PeekView', id: 'topic/thread', route: 'PeekView/topic/thread' } as Route)
+  await openState(page, { component: 'PeekView', id: 'size/long', route: 'PeekView/size/long' } as Route)
   const peek = page.locator('[role="dialog"][aria-roledescription="peek"]')
   await expect(peek).toBeVisible()
   expect(without.length).toBeGreaterThan(3)
@@ -597,7 +597,7 @@ test('the peek floats beside the sidebar: the rows, the tab strip and the page s
   // It hangs off the sidebar's right edge and stays inside the window.
   const sidebar = (await page.getByRole('complementary', { name: 'Sidebar' }).boundingBox())!
   const panel = (await peek.boundingBox())!
-  const frame = (await page.locator('[data-fixture-frame="PeekView/topic/thread"]').boundingBox())!
+  const frame = (await page.locator('[data-fixture-frame="PeekView/size/long"]').boundingBox())!
   expect(panel.x).toBeGreaterThan(sidebar.x + sidebar.width)
   expect(panel.x + panel.width).toBeLessThanOrEqual(frame.x + frame.width)
 })

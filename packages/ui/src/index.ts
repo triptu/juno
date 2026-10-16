@@ -47,6 +47,7 @@ export {
   accentNames,
   applyPrivacy,
   applyTheme,
+  compactDensity,
   defaultAccent,
   isAccentName,
   isThemeName,

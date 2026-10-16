@@ -144,6 +144,9 @@ const styles = stylex.create({
   shell: {
     // The toast region is placed against the window.
     position: 'relative',
+    // The peek beside the sidebar reads the window's width as `100cqw`.
+    containerName: 'shell',
+    containerType: 'inline-size',
     display: 'flex',
     width: '100%',
     height: '100%',
