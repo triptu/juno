@@ -8,7 +8,9 @@
  * - Tell Juno in the why popover, which opens the panel the same way with
  *   the message quoted.
  *
- * Each of these asks the composer it brings on screen for focus.
+ * Each of these asks the composer it brings on screen for focus. Each
+ * decides between the panel and the tab once a topic open asked for
+ * before it has landed (`afterNavigation`).
  */
 import type { About, Selection } from '@juno/agent-contract'
 import {
@@ -25,7 +27,7 @@ import {
   tabsAtom,
 } from '@juno/state'
 import { chatActions, junoPageActions } from '@juno/state/agent'
-import { openJuno } from '../navigation'
+import { afterNavigation, openJuno } from '../navigation'
 
 export { openJunoPage } from '../navigation'
 
@@ -78,15 +80,19 @@ export function moveJunoToTab(): void {
 /** View › Juno (⌘J): the panel in a topic tab, the Juno tab elsewhere. Nothing while the agent is off. */
 export function runJunoShortcut(): void {
   if (!registry.get(junoAvailableAtom)) return
-  if (topicTabActive()) toggleJunoPanel()
-  else openJunoTab()
+  afterNavigation(() => {
+    if (topicTabActive()) toggleJunoPanel()
+    else openJunoTab()
+  })
 }
 
 /** Ask Juno in a person's or channel's menu (SPEC 7, plan v3 §19.3). */
 export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
-  registry.set(junoAboutAtom(aboutKey()), about)
-  if (topicTabActive()) openPanel()
-  else openJunoTab()
+  afterNavigation(() => {
+    registry.set(junoAboutAtom(aboutKey()), about)
+    if (topicTabActive()) openPanel()
+    else openJunoTab()
+  })
 }
 
 /** Whose About chip Ask Juno sets: the active topic tab's panel, or the Juno tab's. */
@@ -97,10 +103,12 @@ function aboutKey(): string {
 
 /** Tell Juno in the why popover (SPEC 14, inventory 15.4): the chat beside the topic, with the message quoted in its composer. */
 export function tellJunoAbout(topicId: string, quote: Selection | undefined): void {
-  registry.set(junoAboutAtom(aboutKey()), undefined)
-  if (quote !== undefined) quoteInJuno(registry, topicId, quote)
-  if (topicTabActive()) openPanel()
-  else openJunoTab()
+  afterNavigation(() => {
+    registry.set(junoAboutAtom(aboutKey()), undefined)
+    if (quote !== undefined) quoteInJuno(registry, topicId, quote)
+    if (topicTabActive()) openPanel()
+    else openJunoTab()
+  })
 }
 
 /** The paused chip's Resume: the same switch as Settings › Juno's Pause. */
