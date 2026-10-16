@@ -9,6 +9,10 @@
  *   are left out.
  * - `newChat.frequent`: up to six local destinations by decayed own sends,
  *   with member activity as the fallback, DMs first; no archived channels.
+ * - `newChat.ranked`: the ⌘K Conversations tab (spec section 10). DMs,
+ *   group DMs and channels by own sends and topic visits, decayed like
+ *   `newChat.frequent`, then activity; with text, the conversations the
+ *   picker finds for it, ranked the same way.
  * - `newChat.threads`: the thread picker's rows. With a channel, its
  *   threads by latest activity, followed or not; without one, recent
  *   threads from everywhere. Main is not a row: the renderer puts it first.
@@ -81,4 +85,13 @@ export const newChatThreads = liveValueRoute('newChat.threads', {
 /** Up to six local destinations ranked by own recent sends, then activity. */
 export const newChatFrequent = liveValueRoute('newChat.frequent', { value: Schema.Array(PickConversation) })
 
-export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, newChatFrequent)
+/** Rows `newChat.ranked` returns, with or without text. */
+export const PALETTE_CONVERSATIONS = 12
+
+/** The palette's Conversations tab. A person never messaged has the key `u:<user id>` and no `channelId`. */
+export const newChatRanked = liveValueRoute('newChat.ranked', {
+  payload: { query: Schema.String },
+  value: Schema.Array(PickConversation),
+})
+
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, newChatFrequent, newChatRanked)
