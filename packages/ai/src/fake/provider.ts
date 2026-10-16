@@ -12,12 +12,14 @@ import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision } from
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
+import { fakeGrammarCheck } from './grammar'
 import { fakeAutomatedChannel, fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
 
 const structuredRules: Record<string, (input: never) => unknown> = {
   routeCheck: fakeRouteCheck,
+  grammarCheck: fakeGrammarCheck,
   settledScore: fakeSettledScore,
   urgencyGate: fakeUrgencyGate,
   parseCommand: fakeParseCommand,

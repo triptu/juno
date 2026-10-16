@@ -10,6 +10,7 @@
  * - `conversations`, `users`, `usergroups`, `team`, `channel_reads`, `thread_subs`:
  *   mirror tables the view models join.
  * - `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`, `ignored_channels`: Juno's own state.
+ * - `sync_state`: any `setSyncState`, such as the quick-start and boot markers.
  */
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import type { InvalidationKeys, MessageRow } from '@juno/store'
@@ -45,4 +46,6 @@ export const syncKeys = {
   reads: (topicId: string) => ({ topic_reads: [topicId] }) satisfies InvalidationKeys,
   overlay: (topicId: string) => ({ topic_overlay: [topicId] }) satisfies InvalidationKeys,
   ignored: ['ignored_channels'] satisfies InvalidationKeys,
+  /** The boot markers (`sync_state.quickStart`, `sync_state.boot`): the sidebar shows rows once one is written. */
+  syncState: ['sync_state'] satisfies InvalidationKeys,
 }

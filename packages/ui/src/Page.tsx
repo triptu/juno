@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
 import { Text } from './Text'
 
 export type PageWidth = 'narrow' | 'default' | 'settings'
@@ -11,10 +12,13 @@ export interface PageProps {
   readonly children?: ReactNode
 }
 
-/** A scrolling page with a centred column of a fixed maximum width. */
+/**
+ * A scrolling page with a centred column of a fixed maximum width. Keyboard
+ * focus inside it scrolls into view whole, ring included.
+ */
 export function Page({ width = 'default', children }: PageProps) {
   return (
-    <div {...stylex.props(styles.scroll)}>
+    <div onFocus={revealFocus} {...stylex.props(styles.scroll)}>
       <div {...stylex.props(styles.column, widths[width], styles.page)}>{children}</div>
     </div>
   )

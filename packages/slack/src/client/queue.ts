@@ -6,8 +6,12 @@
  *   refill 2/second. Token waits queue; if the method is paused for longer than `interactiveMaxWaitMillis`
  *   the call fails at once with `SlackRateLimited`, so the route can answer
  *   from the cache and the engine can show `rate-limited`.
- * - `background`: backfill and sweeps. Concurrency 2, starts spaced 1,500 ms apart in total and per method (research section 6).
- *   A 429 doubles that method's interval, up to 60 s; five quiet minutes halve it.
+ * - `background`: backfill and sweeps. Concurrency 2. Each method has its own
+ *   spacing, so independent methods run side by side: history and replies
+ *   40 a minute, search 10, edge `users/info` and any other method 20, and
+ *   at most 120 starts a minute in total (`SlackConfig.lanes.backgroundPacing`,
+ *   research section 6). A 429 doubles that method's interval, up to 60 s;
+ *   five quiet minutes halve it, down to the method's own base.
  * - `send`: one in flight, like the official client's message queue.
  *
  * The lanes have separate permits, so a flood of background calls cannot

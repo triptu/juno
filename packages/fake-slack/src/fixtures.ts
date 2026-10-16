@@ -466,6 +466,8 @@ function userObject(seed: SeedUser, avatarBase: string): User {
       title: seed.title,
       team: TEAM.id,
       avatar_hash: `fake${seed.id.toLowerCase()}`,
+      // Leo keeps Slack's default photo: live, `is_custom_image` is then absent, not false.
+      ...(seed.bot === true || seed.id === 'U0LEO' ? {} : { is_custom_image: true, image_original: `${image}?size=original` }),
       image_24: image,
       image_32: image,
       image_48: `${image}?size=48`,

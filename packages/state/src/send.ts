@@ -13,6 +13,7 @@ import {
   draftsSet,
   messagesCheck,
   messagesPrecheck,
+  messagesPostcheck,
   messagesDelete,
   messagesDiscard,
   messagesEdit,
@@ -25,20 +26,26 @@ import {
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
+import { watchSentMessage } from './sentSuggestions'
 
 /**
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
  * Resolves with the `Exit`; on success, the topic.
  */
-export const sendMessage = (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>, startThread = false) =>
-  runCommand(registry, messagesSend, {
-    to,
-    text,
-    startThread,
-    clientMsgId: crypto.randomUUID(),
+export const sendMessage = async (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>, startThread = false) => {
+  const clientMsgId = crypto.randomUUID()
+  const sentAt = performance.now()
+  const exit = await runCommand(registry, messagesSend, {
+    to, text, startThread, clientMsgId,
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })
+  if (exit._tag === 'Success' && [...text].length <= 1000 && text.trim() !== '') {
+    const receive = watchSentMessage(registry, { clientMsgId, topicId: exit.value.topicId, original: text, sentAt })
+    void runCommand(registry, messagesPostcheck, { clientMsgId }).then((checked) => receive(checked._tag === 'Success' ? checked.value.clarity : undefined))
+  }
+  return exit
+}
 
 /**
  * The longest a send waits for its checks. They read the store only, so
@@ -60,9 +67,10 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
   return Promise.race([checked, late]).finally(() => clearTimeout(timer))
 }
 
-/** Asks the wrong-place question for a Main draft now, so Enter finds the answer. Nothing to wait for. */
-export function precheckMessage(registry: Registry, channelId: string, text: string): void {
-  void runCommand(registry, messagesPrecheck, { channelId, text })
+/** Warms Main routing; message fixes run only after sending. */
+export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string): void {
+  if (threadTs !== undefined || [...text].length > 1000) return
+  void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }) })
 }
 
 /** Retry on a failed row. */

@@ -63,6 +63,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
 })

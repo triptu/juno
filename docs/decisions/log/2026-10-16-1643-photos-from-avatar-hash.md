@@ -1,0 +1,1 @@
+- 10-16 16:43 · avatars-live · Profile photos are built from `avatar_hash` and `team.avatar_base_url`, since the edge sends no `image_*` urls; stored users with no photo are refetched once a session on the background lane instead of bumping the cache schema.

@@ -64,6 +64,7 @@ interface Call<A> {
   readonly modelId: string
   readonly priced: boolean
   readonly timeoutMillis: number
+  readonly maxAttempts?: number
   readonly started: number
   /** One attempt. `previous` is the failed first attempt, so the retry can change shape. */
   readonly attempt: (previous: Outcome<A> | undefined, cost: { usd: number }) => Effect.Effect<Outcome<A>>
@@ -155,7 +156,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         if (!config.apiKey) return noKey(model.id, started)
         const upper = upperUsd(model.cost, priced, JSON.stringify(task.classify!.ask(input)), DECISION_MAX_TOKENS)
         return yield* admitted(config, model.id, priced, upper,
-          run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: classifyAttempt(task, input, model, config.apiKey) }))
+          run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: classifyAttempt(task, input, model, config.apiKey) }))
       }
       const { model, priced } = resolveModel(models, modelFor(task.tier, config))
       if (!config.apiKey) return noKey(model.id, started)
@@ -164,7 +165,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         model,
         tool,
         toolChoice: task.tier === 'decision' ? 'forced' : 'auto',
-        maxTokens: task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS,
+        maxTokens: task.maxTokens ?? (task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS),
         context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))], tools: [tool] },
         read: (message) => {
           const call = message.content.find((c) => c.type === 'toolCall' && c.name === tool.name)
@@ -174,7 +175,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         },
       }
       return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
-        run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) }))
+        run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
   const generate: AiProviderShape['generate'] = <I>(task: TextTask<I>, input: I) =>
@@ -199,7 +200,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         },
       }
       return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
-        run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) }))
+        run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
   return { decide, generate }
@@ -258,7 +259,7 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
       })
     const twice = Effect.gen(function* () {
       const first = yield* once(undefined)
-      if (first.kind === 'ok' || first.kind === 'timeout') return first
+      if (call.maxAttempts === 1 || first.kind === 'ok' || first.kind === 'timeout') return first
       return yield* once(first)
     })
     const outcome = yield* Effect.timeoutOption(twice, call.timeoutMillis)

@@ -25,6 +25,8 @@ export interface FakeSlackOptions {
   readonly now?: number
   /** Replace the default seed. */
   readonly seed?: (workspace: Workspace, avatarBase: string) => void
+  /** Every Web API and edge call waits this long before it runs (`setLatency`). Default 0. */
+  readonly latencyMillis?: number
   /** Enterprise Grid: the team carries this `enterprise_id`, in `auth.test`, `client.userBoot` and the client page. */
   readonly enterpriseId?: string
 }
@@ -73,6 +75,7 @@ export class FakeSlack {
     })
     const url = await server.listen(options.port ?? 0, options.host ?? '127.0.0.1')
     ;(options.seed ?? seedWorkspace)(workspace, `${url}/avatars`)
+    if (options.latencyMillis !== undefined) server.setLatency(options.latencyMillis)
     fake = new FakeSlack(workspace, server, url)
     return fake
   }
@@ -169,6 +172,11 @@ export class FakeSlack {
   /** Adds or changes a user group from another client. Emits `subteam_created` or `subteam_updated`. */
   putUsergroup(input: { id: string; handle: string; name: string; deleted?: boolean }): void {
     this.workspace.putUsergroup(input)
+  }
+
+  /** A custom emoji in the workspace, listed by edge `emojis/list` and taken as a reaction name. */
+  addEmoji(input: { name: string; url: string }): void {
+    this.workspace.emoji.set(input.name, { name: input.name, value: input.url })
   }
 
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
@@ -301,6 +309,11 @@ export class FakeSlack {
     this.server.loseResponse(input.method, input.times ?? 1)
   }
 
+  /** Every Web API and edge call waits `ms` before it runs, like a real network. 0 turns it off. */
+  setLatency(input: { ms: number }): void {
+    this.server.setLatency(input.ms)
+  }
+
   /** File downloads answer after `ms` milliseconds, so images arrive late. 0 turns it off. */
   delayFiles(input: { ms: number }): void {
     this.server.delayFiles(input.ms)
@@ -407,6 +420,7 @@ export class FakeSlack {
       loseResponse: (i) => this.loseResponse(i),
       holdFrames: (i) => this.holdFrames(i),
       delayFiles: (i) => this.delayFiles(i),
+      setLatency: (i) => this.setLatency(i),
       failUploads: (i) => this.failUploads(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),

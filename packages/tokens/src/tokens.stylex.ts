@@ -906,6 +906,10 @@ export const sizes = stylex.defineVars({
   '--tab-divider-height': '16px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // How far an outset ring reaches past its element: the width plus the
+  // offset. A box that clips (a scroller, paint containment) keeps this much
+  // room around its controls (ringRoom in @juno/ui).
+  '--focus-ring-room': 'calc(var(--focus-ring-width) + var(--focus-ring-offset))',
   // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
   '--privacy-blur': '6px',
 })

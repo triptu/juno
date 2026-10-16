@@ -208,7 +208,6 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           </Chip>
         </button>
       )
-    // A user group reads like a person; the user's own groups mention them, so they take the accent.
     case 'usergroup':
       return (
         <Chip variant={inline.isMine ? 'accent' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
@@ -388,6 +387,7 @@ const styles = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
 })

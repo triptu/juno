@@ -26,6 +26,9 @@
  * `client.counts`, eight history pages, then the ids those reference
  * (senders, mentions, DM and group DM members) through the edge
  * `users/info`, one page of edge `users/list` and one of `users.list`.
+ * It also prints how each spells profile photos (which `image_*` keys,
+ * on which hosts), and GETs one photo built from `avatar_hash` for a user
+ * with a custom photo and one without, with and without the cookie.
  *
  * `--only usergroups` reads `client.userBoot`, `usergroups.list` and
  * recent history pages, and prints how user groups are listed and how a
@@ -214,7 +217,7 @@ async function main(): Promise<number> {
       if (json !== undefined && !shapes.has(`edge.${method.replace('/', '.')}.${purpose}`)) shapes.set(`edge.${method.replace('/', '.')}.${purpose}`, redact(json))
       return json
     }
-    console.log(JSON.stringify(flag('--only') === 'emoji' ? await emojiOnly(call, edge) : await usersOnly(call, edge, session.teamId), null, 2))
+    console.log(JSON.stringify(flag('--only') === 'emoji' ? await emojiOnly(call, edge) : await usersOnly(call, edge, session.teamId, cookie), null, 2))
     return writeShapes(out)
   }
 
@@ -398,7 +401,7 @@ async function emojiOnly(call: Call, edge: Edge): Promise<unknown> {
 }
 
 /** `--only users`: which ids the store would hold and what the edge says about them. Counts only. */
-async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknown> {
+async function usersOnly(call: Call, edge: Edge, teamId: string, cookie: string): Promise<unknown> {
   const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'users')
   const counts = await call('client.counts', { thread_counts_by_channel: true }, 'users')
   const flannel = await call('api.getFlannelHttpUrl', { include_external_workspaces: true }, 'users')
@@ -428,6 +431,7 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     }
   }
   const all = [...new Set([...ids.sender, ...ids.mention, ...ids.im, ...ids.mpim, ...ids.replyUser])].filter((id) => /^[UW][A-Z0-9]+$/.test(id))
+  const infoUsers: Array<Json> = []
   const info = { calls: 0, resultsShape: new Set<string>(), results: 0, failed: 0, pending: 0, invalid: 0, disconnected: 0, otherTeam: 0, emptyDisplayName: 0, noProfile: 0, bots: 0, keys: new Map<string, number>() }
   const returned = new Set<string>()
   for (let i = 0; i < all.length && base !== ''; i += 100) {
@@ -437,6 +441,7 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     info.resultsShape.add(Array.isArray(results) ? 'array' : typeof results)
     const list = Array.isArray(results) ? (results as Array<Json>) : results !== null && typeof results === 'object' ? Object.values(results as Record<string, Json>) : []
     for (const user of list) {
+      infoUsers.push(user)
       info.results++
       returned.add(String(user['id']))
       if (user['team_id'] !== teamId) info.otherTeam++
@@ -451,6 +456,7 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     info.invalid += ((answer?.['invalid_ids'] as Array<unknown> | undefined) ?? []).length
     info.disconnected += ((answer?.['disconnected_ids'] as Array<unknown> | undefined) ?? []).length
   }
+  const photos = await avatarPhotos(infoUsers, cookie)
   const missingBy = (set: Set<string>) => [...set].filter((id) => !returned.has(id)).length
   const edgeList = base === '' ? undefined : await edge('users/list', base, { count: 100, present_first: false }, 'users')
   const webList = await call('users.list', { limit: 200 }, 'users')
@@ -462,6 +468,16 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     usersInfo: { ...info, resultsShape: [...info.resultsShape], keys: Object.fromEntries([...info.keys].toSorted()), notReturned: { all: all.length - returned.size, sender: missingBy(ids.sender), mention: missingBy(ids.mention), im: missingBy(ids.im), mpim: missingBy(ids.mpim) } },
     edgeUsersList: { ok: edgeList?.['ok'], error: edgeList?.['error'], results: Array.isArray(edgeList?.['results']) ? (edgeList['results'] as Array<unknown>).length : typeof edgeList?.['results'], nextMarker: typeof edgeList?.['next_marker'] === 'string' },
     usersList: { ok: webList?.['ok'] ?? false, members: ((webList?.['members'] as Array<unknown> | undefined) ?? []).length, nextCursor: ((webList?.['response_metadata'] as Json | undefined)?.['next_cursor'] ?? '') !== '' },
+    images: {
+      usersInfo: imageCensus(infoUsers),
+      edgeUsersList: imageCensus(Array.isArray(edgeList?.['results']) ? (edgeList['results'] as Array<Json>) : []),
+      usersList: imageCensus((webList?.['members'] as Array<Json> | undefined) ?? []),
+      bootSelf: imageCensus(boot?.['self'] === undefined ? [] : [boot['self'] as Json]),
+      avatarBase: avatarBase(boot),
+      profileKeys: keyCensus(infoUsers.map((user) => user['profile'])),
+      teamIdPrefix: Object.fromEntries([...new Set(infoUsers.map((user) => String(user['team_id'] ?? 'absent')[0]))].map((prefix) => [prefix, infoUsers.filter((user) => String(user['team_id'] ?? 'absent')[0] === prefix).length])),
+      photos,
+    },
   }
 }
 
@@ -530,6 +546,83 @@ async function usergroupsOnly(call: Call): Promise<unknown> {
     },
     mentions: { ...mentions, blockKeys: keyCensus(mentions.blockKeys) },
   }
+}
+
+/** Where `client.userBoot`'s team says photos live: host, and whether the path is bare. */
+function avatarBase(boot: Json | undefined) {
+  const raw = (boot?.['team'] as Json | undefined)?.['avatar_base_url']
+  if (typeof raw !== 'string') return { present: false }
+  try {
+    const url = new URL(raw)
+    return { present: true, host: url.hostname, barePath: url.pathname === '/', search: url.search !== '' }
+  } catch {
+    return { present: true, host: 'not-a-url' }
+  }
+}
+
+/**
+ * One GET of the `ca.slack-edge.com/<team>-<user>-<avatar_hash>-<size>` photo
+ * for a user with a custom image and one without, with and without the
+ * cookie. Status and content type only.
+ */
+async function avatarPhotos(users: ReadonlyArray<Json>, cookie: string) {
+  const pick = (custom: boolean) => users.find((user) => (user['profile'] as Json | undefined)?.['is_custom_image'] === (custom ? true : undefined) && typeof (user['profile'] as Json | undefined)?.['avatar_hash'] === 'string')
+  const out: Array<{ user: string; how: string; status: number; type: string; redirectHost: string }> = []
+  for (const [label, user] of [['custom', pick(true)], ['default', pick(false)]] as const) {
+    if (user === undefined) continue
+    const url = `https://ca.slack-edge.com/${String(user['team_id'])}-${String(user['id'])}-${String((user['profile'] as Json)['avatar_hash'])}-72`
+    for (const [how, headers] of [['none', {}], ['cookie', { cookie }]] as const) {
+      const wait = lastStart + SPACING_MILLIS - Date.now()
+      if (wait > 0) await sleep(wait)
+      lastStart = Date.now()
+      const response = await fetch(url, { headers, redirect: 'manual' })
+      await response.arrayBuffer()
+      const location = response.headers.get('location')
+      out.push({ user: label, how, status: response.status, type: response.headers.get('content-type') ?? '', redirectHost: location === null ? '' : new URL(location, url).hostname })
+    }
+  }
+  return out
+}
+
+/** How profile photos are spelled: which `image_*` keys are set, on which hosts, and how gravatar defaults look. Counts and hostnames only. */
+function imageCensus(users: ReadonlyArray<Json>) {
+  const keys = new Map<string, number>()
+  const hosts = new Map<string, number>()
+  const flags = { users: users.length, noProfile: 0, customImage: 0, notCustomImage: 0, customImageAbsent: 0, avatarHash: 0, image72Empty: 0, gravatarWithDefault: 0, defaultHosts: new Map<string, number>() }
+  const bump = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1)
+  for (const user of users) {
+    const profile = user['profile'] as Json | undefined
+    if (profile === undefined) {
+      flags.noProfile++
+      continue
+    }
+    if (profile['is_custom_image'] === true) flags.customImage++
+    else if (profile['is_custom_image'] === false) flags.notCustomImage++
+    else flags.customImageAbsent++
+    if (typeof profile['avatar_hash'] === 'string' && profile['avatar_hash'] !== '') flags.avatarHash++
+    if (typeof profile['image_72'] !== 'string' || profile['image_72'] === '') flags.image72Empty++
+    for (const [key, value] of Object.entries(profile)) {
+      if (!key.startsWith('image_')) continue
+      bump(keys, `${key}:${value === '' ? 'empty' : typeof value}`)
+      if (key !== 'image_72' || typeof value !== 'string' || value === '') continue
+      try {
+        const url = new URL(value)
+        bump(hosts, url.hostname)
+        const fallback = url.searchParams.get('d')
+        if (fallback !== null) {
+          flags.gravatarWithDefault++
+          try {
+            bump(flags.defaultHosts, new URL(fallback).hostname)
+          } catch {
+            bump(flags.defaultHosts, 'not-a-url')
+          }
+        }
+      } catch {
+        bump(hosts, 'not-a-url')
+      }
+    }
+  }
+  return { ...flags, defaultHosts: Object.fromEntries(flags.defaultHosts), keys: Object.fromEntries([...keys].toSorted()), image72Hosts: Object.fromEntries(hosts) }
 }
 
 type Call = (method: ReadOnlyMethod, args: Record<string, string | number | boolean>, purpose: string) => Promise<Json | undefined>

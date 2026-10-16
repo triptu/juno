@@ -71,7 +71,7 @@ export class SessionHost {
 
   async #capture(
     method: 'window' | 'import',
-    run: () => Promise<{ ok: true; secrets: SessionSecrets } | { ok: false; kind: MainToEngineFailure['kind']; message: string }>,
+    run: () => Promise<{ ok: true; secrets: SessionSecrets } | { ok: false; kind: MainToEngineFailure['kind']; message: string; details?: string }>,
   ): Promise<void> {
     if (this.#busy) {
       this.#deps.send({ _tag: 'sessionFailed', method, kind: 'other', message: 'A sign-in is already in progress.' })
@@ -81,7 +81,14 @@ export class SessionHost {
     try {
       const result = await run()
       if (result.ok) this.#deps.send({ _tag: 'secrets', secrets: result.secrets })
-      else this.#deps.send({ _tag: 'sessionFailed', method, kind: result.kind, message: result.message })
+      else
+        this.#deps.send({
+          _tag: 'sessionFailed',
+          method,
+          kind: result.kind,
+          message: result.message,
+          ...(result.details === undefined ? {} : { details: result.details }),
+        })
     } catch (cause) {
       console.error('main: sign-in failed', cause instanceof Error ? cause.name : '')
       this.#deps.send({ _tag: 'sessionFailed', method, kind: 'other', message: 'The sign-in did not finish.' })

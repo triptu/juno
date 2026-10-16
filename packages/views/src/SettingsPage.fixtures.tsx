@@ -1,5 +1,6 @@
-import type { ProviderState } from '@juno/contract'
-import { defineFixtures, fixture } from '@juno/ui'
+import { sendCheckDefaults, sendCheckPrefKeys, type ProviderState } from '@juno/contract'
+import { useLayoutEffect, type ReactNode } from 'react'
+import { defineFixtures, fixture, scene } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
 import { connections, NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './juno-pages/fixtures'
@@ -12,8 +13,18 @@ import { SettingsPage, type SettingsPageProps } from './SettingsPage'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 import { UpdateSettings } from './UpdateSettings'
 
+/** As a new install has them: all on except Capital i. */
+const checks = sendCheckPrefKeys.map((key) => ({ key, enabled: sendCheckDefaults[key] }))
 const noop = () => {}
 const at = (section: SettingsPageProps['section'], children: SettingsPageProps['children']) => fixture<SettingsPageProps>({ section, onSection: noop, children })
+
+/** General scrolled to its last section before the first paint. */
+function ScrolledToEnd({ children }: { readonly children: ReactNode }) {
+  useLayoutEffect(() => {
+    [...document.querySelectorAll('section')].at(-1)?.scrollIntoView({ block: 'end' })
+  }, [])
+  return <SettingsPage section="general" onSection={noop}>{children}</SettingsPage>
+}
 
 const none: ProviderState = { active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } }
 const openRouter: ProviderState = { ...none, active: 'openRouter', openRouter: { key: 'set' } }
@@ -42,7 +53,9 @@ export default defineFixtures(
   SettingsPage,
   {
     Sections: {
-      general: at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      general: at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      // The end of General: message checks and AI assist, as after scrolling down.
+      'general-end': scene(() => <ScrolledToEnd><SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} /></ScrolledToEnd>),
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
@@ -52,8 +65,10 @@ export default defineFixtures(
       about: at('about', about),
     },
     States: {
-      'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
-      'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'grammar-ai-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} checks={checks} grammarUnavailable="Turn on AI assist to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'grammar-no-key': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} checks={checks} grammarUnavailable="Add an OpenRouter key to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),
