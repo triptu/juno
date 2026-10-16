@@ -225,7 +225,8 @@ describe('cold boot', () => {
     engine.fake.release({ method: 'conversations.history' })
     await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
     await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
-    expect(engine.fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
+    // The discovery search runs before the boot ends: held, it keeps the sync from reaching live.
+    await waitFor(() => (engine.fake.heldCount({ method: 'search.modules.messages' }) === 1 ? true : undefined), 10_000, 'the discovery search')
     expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
     engine.fake.release()
     await engine.phase('live')
