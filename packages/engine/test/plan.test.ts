@@ -9,7 +9,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
-import { reactionsStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
@@ -126,7 +126,7 @@ describe('query plans', () => {
           }
         }
       }
-      for (const statement of [reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), threadTitlesStatement(['t:C0ENG:1700000000.000100'])]) {
+      for (const statement of [rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), threadTitlesStatement(['t:C0ENG:1700000000.000100'])]) {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }

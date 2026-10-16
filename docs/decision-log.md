@@ -15,6 +15,7 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 - 10-16 20:00 · orchestrator · Local desktop tests rebuild first when sources changed (Playwright global setup with build-cached), after a stale build made a fixed bug look live.
 - 10-16 19:30 · orchestrator · A post the network sends twice is reconciled by its client message id: the copy is hidden and deleted through the outbox; a copy with replies stays (ADR 0014).
 - 10-16 18:30 · orchestrator · Background Slack calls stay at 40 per minute per method, below the published 50, because the session token is shared with the official client.
+- 10-16 18:16 · thread-root · A thread's window reads its root by key while the root has no reply and no `thread_ts`, so a just-started thread shows its root at once instead of an empty state.
 - 10-16 16:21 · orchestrator · Editing a post that is back in the queue drops any edit row left from while it was out, so the newest edit text always wins.
 - 10-16 16:05 · orchestrator · Enter while an attached file is still being read sends once the file is ready, shown as sending, instead of doing nothing. A silently ignored Enter loses what the user asked for. To do after send-checks lands, since both touch TopicComposer.
 - 10-16 15:56 · orchestrator · The New chat outbox schedules (`pendingRoot`, `failedRoot`) claim the root before the reply is queued, as Juno does, and the conformance run replays them.
