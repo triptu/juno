@@ -13,6 +13,14 @@ import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 // Juno, Connections and Backup & This Mac are their own pages. Each section
 // is a settings page with its title; `SettingsPage` puts the list beside it.
 
+export type SharingDetection = 'available' | 'missing' | 'alwaysOn'
+
+const SHARING_LINE: Record<SharingDetection, string> = {
+  available: 'When another app starts recording or sharing the screen, Juno hides message text as ⌃⌘H does, and shows it again when that stops.',
+  missing: 'This Mac does not tell Juno when the screen is shared. Use ⌃⌘H to hide message text.',
+  alwaysOn: "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text.",
+}
+
 const checkLabels: Record<SendCheckPref, string> = {
   wrongPlace: 'Wrong place', typos: 'Typos and doubled words', capitalI: 'Capital i',
   questionMarks: 'Question marks', longSentences: 'Long sentences', grammar: 'Grammar (uses AI)',
@@ -36,10 +44,18 @@ export interface SettingsGeneralProps {
   readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
+  /** Privacy mode turns on while the screen is shared (SPEC section 5). */
+  readonly hideWhileSharing: boolean
+  /**
+   * Whether Juno can tell that the screen is shared. `missing`: macOS does not say, so the switch
+   * is off and disabled. `alwaysOn`: another app captures the screen all the time, so a line says so.
+   */
+  readonly sharingDetection: SharingDetection
+  readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Slack read mirroring, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -67,6 +83,13 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
             {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
               : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
           </div>
+        </Surface>
+      </Section>
+      <Section heading="Screen sharing">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Hide message text while sharing the screen" checked={sharingDetection !== 'missing' && hideWhileSharing} disabled={sharingDetection === 'missing'}
+            onChange={(event) => onHideWhileSharingChange(event.currentTarget.checked)}
+            description={SHARING_LINE[sharingDetection]} />
         </Surface>
       </Section>
       <Section heading="Message checks" sub="Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit.">

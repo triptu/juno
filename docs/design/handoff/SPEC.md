@@ -105,7 +105,9 @@ While the mode is on, macOS notifications keep their title (who or where) and re
 
 While the mode is on, a small footer at the bottom of the sidebar says "Message text hidden" with a **Show** button, which turns it off in one click. The avatar menu item reads **Show message text**.
 
-The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text. Juno never turns it off by itself. (Turning it on by itself when sharing starts is researched in `docs/research/screen-share-detection.md`, not built.)
+The mode you set is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text you hid.
+
+**While sharing.** When another app starts recording or sharing the screen while Juno runs (a Zoom or Meet share, a screen recording), Juno turns the mode on by itself and the footer reads "Message text hidden while sharing". Only a start that Juno sees counts: a capture already running when Juno opens is where it starts from, so Juno never hides text at launch. When the capture stops, Juno turns the mode off again, but only if sharing turned it on and you have not touched it since; a mode you turned on yourself stays on. Show turns it off for the rest of this share; the next share hides the text again. A mode sharing turned on is not remembered: on launch the mode is what you left it as. macOS cannot say who is capturing, so a screenshot tool or a recorder counts too, which is why the footer says why. If something has captured the screen all the time since Juno opened, for more than about 2 minutes, Juno cannot tell when you share, and Settings says so (section 14); once that capture stops, Juno can tell again. Settings › General has the switch, on by default. How Juno tells: `docs/research/screen-share-detection.md`.
 
 ### Row anatomy
 
@@ -539,7 +541,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); Message checks (below); and Use fast classifier (section 15).
+- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); Hide message text while sharing the screen (on by default, section 5, Privacy mode; disabled with a one-line reason where macOS does not tell Juno; while another app has recorded the screen all the time since launch, a line under it says "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text."); Message checks (below); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 

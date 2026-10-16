@@ -5,6 +5,7 @@ import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, t
 import { chunk } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { Peek } from './containers/Peek'
+import { followSharingPrivacy } from './containers/privacy'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
@@ -29,6 +30,7 @@ void [_accentFromContract, _accentFromTokens, _themeFromContract, _themeFromView
 function PrivacyRoot() {
   const privacy = useAtomValue(privacyAtom)
   useLayoutEffect(() => applyPrivacy(privacy), [privacy])
+  useEffect(followSharingPrivacy, [])
   return null
 }
 

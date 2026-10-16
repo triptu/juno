@@ -8,6 +8,11 @@ files:
   - out/**
   - package.json
   - "!**/*.map"
+  # koffi ships its C++ sources, headers and docs; the app needs only its JS and the prebuilt .node.
+  - "!**/node_modules/koffi/{doc,lib,vendor}/**"
+  - "!**/node_modules/koffi/src/koffi/src/abi/**"
+  - "!**/node_modules/koffi/**/*.{cc,hh,inc,def,d.ts}"
+  - "!**/node_modules/koffi/**/{CMakeLists.txt,CHANGELOG.md,README.md,cnoke.cjs}"
 asar: true
 mac:
   category: public.app-category.productivity

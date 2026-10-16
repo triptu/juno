@@ -122,6 +122,8 @@ export interface SidebarProps {
   readonly status?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
+  /** It is on because the screen is shared: the footer says so ("Message text hidden while sharing"). */
+  readonly privacySharing?: boolean
   readonly onPrivacyOff?: () => void
   /** The topic list. */
   readonly children: ReactNode
@@ -165,6 +167,7 @@ export function Sidebar({
   onClearScope,
   status,
   privacy = false,
+  privacySharing = false,
   onPrivacyOff,
   children,
   syncing = false,
@@ -325,7 +328,7 @@ export function Sidebar({
             <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
               <Icon icon={EyeSlash} size={14} />
               <Text variant="meta" tone="subtle" truncate sx={styles.privacyText}>
-                Message text hidden
+                {privacySharing ? 'Message text hidden while sharing' : 'Message text hidden'}
               </Text>
               <Button variant="raised" size="xs" aria-label="Show message text" onClick={onPrivacyOff}>
                 Show

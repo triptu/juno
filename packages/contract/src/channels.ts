@@ -46,6 +46,10 @@ export const Channels = {
   launchSetPrivacy: 'launch.setPrivacy',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
   launchSetSidebar: 'launch.setSidebar',
+  /** "Hide message text while sharing the screen": whether it is on, and whether this Mac can tell. */
+  sharingGet: 'sharing.get',
+  /** Turns "Hide message text while sharing the screen" on or off; answers as `sharing.get`. */
+  sharingSet: 'sharing.set',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
@@ -75,6 +79,8 @@ export const Events = {
   notificationOpen: 'notification.open',
   /** The agent's provider state changed, with the new `ProviderState`. */
   agentProviderChanged: 'agent.providerChanged',
+  /** Main turned privacy mode on or off because sharing started or ended, with a `PrivacyState`. */
+  privacyChanged: 'privacy.changed',
 } as const
 
 /**
@@ -256,6 +262,14 @@ export interface JunoBridge {
     readonly setDensity: (density: Density) => Promise<unknown>
     readonly setPrivacy: (privacy: boolean) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
+    /** Calls `listener` with each `PrivacyState` main sets because sharing started or ended, undecoded. Returns the unsubscribe. */
+    readonly onPrivacy: (listener: (state: unknown) => void) => () => void
+  }
+  readonly sharing: {
+    /** Resolves with a `SharingSetting`. */
+    readonly get: () => Promise<unknown>
+    /** Turns hiding while sharing on or off; resolves with the `SharingSetting` after. */
+    readonly set: (hide: boolean) => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

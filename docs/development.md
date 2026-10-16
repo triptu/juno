@@ -792,8 +792,11 @@ Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
-files and koffi are explicitly unpacked. Only `electron-updater` and its runtime
-dependencies ship as node_modules; application dependencies are bundled by Vite.
+files and koffi are explicitly unpacked. koffi (main's screen watch, ADR 0015) is
+a Node-API module, so it needs no rebuild per Electron version; its prebuilt
+binary comes from `@koromix/koffi-darwin-arm64`, its install script is denied in
+`pnpm-workspace.yaml`, and its C++ sources and docs are left out of the app.
+Only `electron-updater`, koffi and their runtime dependencies ship as node_modules; application dependencies are bundled by Vite.
 Source maps are excluded. Codex uses the separately installed `codex` executable;
 its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
 

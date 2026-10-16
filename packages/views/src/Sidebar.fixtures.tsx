@@ -236,7 +236,9 @@ export default defineFixtures(
       'off-screen': scene(() => <ArtOffScreen />),
     },
     // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
+    // Sharing: turned on because the screen is shared, and the footer says so.
     Privacy: {
+      sharing: scene(() => <PrivacyOn>{full({ privacy: true, privacySharing: true, onPrivacyOff: noop })}</PrivacyOn>),
       on: scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop }, { selected: rows.postgres.id })}</PrivacyOn>),
       'row-hover': scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>, { hover: '[data-topic-row]:nth-of-type(2)' }),
     },
