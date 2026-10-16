@@ -77,7 +77,7 @@ Rules:
 
 - **V8 code cache on `juno://`.** Register the scheme with `codeCache: true` as well as `standard` and `secure`; the code cache only covers `http(s)` otherwise and `codeCache` requires `standard` ([custom scheme privileges](https://www.electronjs.org/docs/latest/api/structures/custom-scheme)). Set `webPreferences.v8CacheOptions: 'bypassHeatCheck'` so the main bundle is cached on the first run ([web preferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)). Measure warm start before and after; keep it if it helps.
 - **No synchronous IPC.** `ipcRenderer.sendSync` blocks the renderer until main answers ([ipcRenderer](https://www.electronjs.org/docs/latest/api/ipc-renderer)); `pnpm lint` fails on it (`scripts/check-deps.mjs`). `@electron/remote` is not used. Main never does work that could block the UI thread: no sync file reads after `ready`, no JSON of any size, no `net` waits.
-- **One bundle per process, workspace packages bundled.** No `require` at runtime in the renderer. Pages other than the sidebar and topic view (`Settings`, `Juno`, `All topics`) are `React.lazy` chunks, prefetched on idle after the sidebar paints.
+- **One bundle per process, workspace packages bundled.** No `require` at runtime in the renderer. Pages other than the sidebar and topic view (`Settings`, `Juno`, `All topics`) are `React.lazy` chunks, prefetched on idle after the sidebar paints. A prefetched chunk's components come from `chunk()` (`containers/chunks.ts`), not a bare `lazy`: a bare `lazy` suspends on its first render even when its chunk is loaded, and React then holds the content back for its 300 ms fallback throttle (section 8.5).
 - **Fonts.** Bundled, never from a URL. The two Latin files (Figtree variable, Instrument Serif) are `<link rel="preload" as="font">` in `index.html` (added at build by `juno:preload-fonts` in `electron.vite.config.ts`, which fails the build if a file is missing; before 10-15 there was no preload, so the first layout requested Figtree and its arrival laid the page out again) so they are ready before the first content paint; other subsets load on demand. `@font-face` uses `font-display: swap` plus a `size-adjust`/`ascent-override` fallback face built from the system font so a swap never moves text ([font-display](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display), [size-adjust](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/size-adjust)). The e2e asserts `document.fonts.check` for both faces before the first rows.
 - **Background throttling stays on** (default `true`). Timers and `requestAnimationFrame` in a hidden window slow to 1 Hz, which is what we want: the engine owns the clock and the network, and port messages are still delivered. Nothing in the renderer may rely on a timer firing while hidden. Do not call `setBackgroundThrottling(false)`; it affects the whole window ([webContents](https://www.electronjs.org/docs/latest/api/web-contents)).
 - **Process count is fixed**: main, one renderer, the engine, Chromium's GPU and network helpers. No second window, no `webview`, no `BrowserView` for a feature. Every process costs tens of MB and a startup.
@@ -576,6 +576,49 @@ panel's empty-state text fades in over about 350 ms after the panel
 lands. There is no feel scenario for Home during the first sync; it is
 covered by `layout-shift.spec.ts` only. Logs are under
 `.juno-status/perf-1017/`.
+
+### 8.5 The Juno panel's first open (10-17)
+
+**The outlier was React's fallback throttle.** Every perf run had one
+`juno.panel-open` sample near 320 ms, always the first open (in order:
+320.1, 17.5, 19.5, ...). A trace of that open with `JUNO_TRACE_EXTRA`
+(`renderer,input,v8,disabled-by-default-v8.gc,loading`) showed the main
+thread busy for 32.8 ms of the 320 and idle for the rest: no GC, no
+compile, no font or shader work, no slow composite. React had committed
+the Suspense fallback and set a 294 ms timer from `performWorkOnRoot`
+(`globalMostRecentFallbackTime + 300`) before it committed the panel. The
+Juno chunk was already loaded on idle, but `React.lazy` suspends on its
+first render whatever the import's state, because the promise its factory
+returns settles a microtask later. Each lazy component pays it once, so
+the first open of All topics and of ⌘K had the same wait.
+
+**Fix.** `chunk()` in `containers/chunks.ts` loads a chunk once and makes
+its lazy components. Once the chunk is in, the factory returns a thenable
+that calls back at once, which `lazy` reads as loaded in the same render.
+The Juno chunk, All topics and the palette use it. Nothing new runs at
+launch: the chunks still load on idle after the first paint, and the
+initial JS is 969.8 KB.
+
+| Panel open, ms | Before | After |
+| --- | --- | --- |
+| First open | 320.1 | 26.7 |
+| p95 / median of 20 | 21.0 / 17.8 | 20.5 / 14.8 |
+| Feel, first open in a fresh app | | lands whole in frame 4, +45 ms |
+
+The after run's only failure was the ordinary chat scroll gate (9.7 ms,
+held-clock 3.7 ms), the known gap from section 8.4.
+
+**Empty-state fade.** The panel replayed the empty chat's staggered
+entrance (friendly-layer section 5: 240 ms parts, 80 ms apart, about
+400 ms in all) on every open. That section plays it once, when the state
+first appears, and never on a repeated action. ⌘J opens and closes the
+panel all day, like a tab switch, which never animates. The panel now
+shows the empty state with no entrance; the Juno tab keeps it. The feel
+scenario `juno-panel-open` checks that the empty title is at full
+opacity in every frame the panel shows. With `JUNO_PERF_TRACE` set, the
+perf scenario traces the first two panel opens (`panel-open-0`, the
+first, and `panel-open-1`, a usual one). Logs are under
+`.juno-status/panel-1017/`.
 
 ### Engine speed measurements (2026-10-15)
 

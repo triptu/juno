@@ -1053,21 +1053,33 @@ test.describe('Juno chat', () => {
       await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
       await juno.sidebar.row(POSTGRES).open()
       await juno.topic.expectAtBottom()
-      const panels: number[] = []
-      for (let i = 0; i < 20; i++) {
-        const before = (await juno.measures('juno.panel-open')).length
-        await juno.tabs.menu('juno')
-        await expect.poll(async () => (await juno.measures('juno.panel-open')).length, { timeout: 15_000 }).toBeGreaterThan(before)
-        panels.push((await juno.measures('juno.panel-open')).at(-1)!)
-        await juno.tabs.menu('juno')
-        await expect(win.locator('aside[data-juno-panel]')).toHaveCount(0)
-      }
+      const panels = await panelOpens(juno, win)
+      console.log(`panel open, in order: ${panels.map((ms) => ms.toFixed(1)).join(' ')}`)
       within('panel open, p95', stats('panel open, ⌘J to the panel painted (juno.panel-open)', panels).p95, oneFrame)
     } finally {
       await running.close()
     }
   })
 })
+
+/** ⌘J twenty times beside the open topic: each `juno.panel-open`, in order. With JUNO_PERF_TRACE, the first two are traced. */
+async function panelOpens(juno: Juno, win: Page): Promise<number[]> {
+  const panels: number[] = []
+  for (let i = 0; i < 20; i++) {
+    const before = (await juno.measures('juno.panel-open')).length
+    const open = async () => {
+      await juno.tabs.menu('juno')
+      await expect.poll(async () => (await juno.measures('juno.panel-open')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+    }
+    // The first open mounts the panel for the first time; the second is a usual one to compare it with.
+    if (process.env['JUNO_PERF_TRACE'] !== undefined && i < 2) await traced(win, `panel-open-${i}`, open)
+    else await open()
+    panels.push((await juno.measures('juno.panel-open')).at(-1)!)
+    await juno.tabs.menu('juno')
+    await expect(win.locator('aside[data-juno-panel]')).toHaveCount(0)
+  }
+  return panels
+}
 
 test('New chat open to first paint', async ({ juno, win }) => {
   await juno.signIn()

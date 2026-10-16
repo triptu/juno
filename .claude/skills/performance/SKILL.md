@@ -51,7 +51,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 **Startup**
 
-18. The shell paints with no data; `show` on `ready-to-show` with `backgroundColor` from the saved theme. The engine answers the first `topics.list` from `cache.db` before any Slack call. AI, notifications, emoji, lazy pages and prefetch run after the first sidebar paint. `juno://` has `codeCache: true`; `v8CacheOptions: 'bypassHeatCheck'`. Latin fonts are preloaded; fallback faces are size-adjusted. Background throttling stays on.
+18. The shell paints with no data; `show` on `ready-to-show` with `backgroundColor` from the saved theme. The engine answers the first `topics.list` from `cache.db` before any Slack call. AI, notifications, emoji, lazy pages and prefetch run after the first sidebar paint. `juno://` has `codeCache: true`; `v8CacheOptions: 'bypassHeatCheck'`. Latin fonts are preloaded; fallback faces are size-adjusted. Background throttling stays on. A prefetched chunk's components come from `chunk()` (`containers/chunks.ts`); a bare `lazy` waits 300 ms on its first open even when loaded (`docs/performance.md` 8.5).
 19. Adding a dependency or a page to the initial bundle needs a before/after size from the bundle check.
 
 ## Measure before you call it done
