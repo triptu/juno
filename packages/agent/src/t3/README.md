@@ -95,9 +95,13 @@ After signing in on the owner's loopback connection, check:
   after that requires a verified identity from WP17, not relaxing the check.
 - Session Open: check that T3 Code handles its thread deep link on this Mac.
 
-Plan gaps: the watcher polls thread reads every ten seconds because S8's `t3_thread_wait` only
-wakes on terminal state, not questions. A server notification or a wait that
-wakes on pending requests should replace polling. Positive launch recovery
+Plan gaps: S8's `t3_thread_wait` only wakes on terminal state, not questions,
+and T3 Code sends no change notification, so the watcher still polls. It reads
+again 1 s after it saw a change and doubles the wait up to 10 s while nothing
+changes. Between reads it also waits on `t3_thread_wait` when the server offers
+it, so a run that ends is seen at once, and an answer Juno sends wakes it. A
+server notification or a wait that wakes on pending requests should replace
+the poll. Positive launch recovery
 reconstructs a missing Task card after a crash between launch and local job
 insertion. It does not mint a grant again and never relaunches.
 

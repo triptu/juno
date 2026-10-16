@@ -34,7 +34,8 @@ function answerArgs(args: unknown) {
   return { threadId: input.threadId, requestId: input.requestId, answers: { [input.questionId]: value } }
 }
 
-export function questionExecutor(manager: McpManagerApi): Executor {
+/** `answered` wakes the session's watcher, so the Task card leaves needs-you without waiting for the next read. */
+export function questionExecutor(manager: McpManagerApi, answered: (threadId: string) => void): Executor {
   const check: NonNullable<Executor['check']> = async (payload) => {
     if (payload.connection_id !== 't3' || payload.account_id !== manager.stored('t3').epoch) return 'accountChanged'
     try {
@@ -48,7 +49,9 @@ export function questionExecutor(manager: McpManagerApi): Executor {
     run: async ({ payload }) => {
       if (await check(payload) !== 'valid') return { _tag: 'failed', detail: 'This T3 Code question changed.' }
       try {
-        content(await manager.invoke('t3', RESPOND, answerArgs(payload.args), 'write'))
+        const args = answerArgs(payload.args)
+        content(await manager.invoke('t3', RESPOND, args, 'write'))
+        answered(args.threadId)
         return { _tag: 'done', receipt: { confirmed: true } }
       } catch { return { _tag: 'unknown', detail: 'T3 Code did not confirm the answer. Check the session.' } }
     },

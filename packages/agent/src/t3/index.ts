@@ -13,7 +13,7 @@ import { workTools } from './work'
 import { stopSession } from './stop'
 import { content, launched } from './protocol'
 import { proposeQuestions, questionExecutor } from './questions'
-import { t3Driver } from './watch'
+import { t3Driver, t3Wakes } from './watch'
 
 export function createT3Adapter(manager: McpManagerApi) {
   let bound: { readonly actions: Actions; readonly jobs: Jobs } | undefined
@@ -36,6 +36,7 @@ export function createT3Adapter(manager: McpManagerApi) {
     return job
   }
   const check = checkLaunch(manager)
+  const wakes = t3Wakes()
   const executor: Executor = {
     tool: START, tier: 2, deduped: false, check,
     run: async (call) => {
@@ -55,9 +56,9 @@ export function createT3Adapter(manager: McpManagerApi) {
     },
   }
   return {
-    executors: [executor, questionExecutor(manager)],
+    executors: [executor, questionExecutor(manager, wakes.wake)],
     stop: async (job: Parameters<typeof stopSession>[2], click: string | undefined) => bound ? stopSession(manager, bound.actions, job, click) : false,
-    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : { shown: false, requestIds: [] }),
+    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : { shown: false, requestIds: [] }, wakes),
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({

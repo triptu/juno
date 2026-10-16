@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "erasableSyntaxOnly": true,
     "lib": ["ES2023"]
   },
   "include": ["src", "test"]

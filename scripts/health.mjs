@@ -1,9 +1,9 @@
-import { execFile } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { healthBaseline, healthRegressions } from './health-ratchet.mjs'
 import { collectSizeReport } from './health-size.mjs'
+import { runTool } from './health-run.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const output = resolve(root, '.juno-status')
@@ -15,26 +15,12 @@ function run(tool, args) {
   const manifestPath = resolve(root, 'node_modules', tool, 'package.json')
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
   const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin[tool]
-  return new Promise((accept, reject) => {
-    const child = execFile(process.execPath, [resolve(dirname(manifestPath), bin), ...args], {
-      cwd: root, encoding: 'utf8', timeout: 20000, maxBuffer: 16 * 1024 * 1024,
-      detached: process.platform !== 'win32',
-      env: { ...process.env, NO_COLOR: '1' },
-    }, (error, stdout, stderr) => {
-      if (error) {
-        // jscpd starts a native child; stop the whole group on failure or timeout.
-        if (child.pid && process.platform !== 'win32') {
-          try { process.kill(-child.pid, 'SIGKILL') } catch { /* Already exited. */ }
-        }
-        reject(new Error(`${tool}: ${error.message} ${stderr.trim()}`))
-      } else accept(stdout)
-    })
-  })
+  return runTool(tool, process.execPath, [resolve(dirname(manifestPath), bin), ...args], { cwd: root, env: { ...process.env, NO_COLOR: '1' } })
 }
 
 async function check(name, action) {
   try { return await action() } catch (error) {
-    errors.push({ tool: name, message: error.message })
+    errors.push({ tool: name, message: error.message, ...(error.timedOut ? { timedOut: true } : {}) })
     return null
   }
 }
@@ -90,7 +76,7 @@ async function main() {
     for (const item of size.oversizedFiles.slice(0, 5)) console.log(`  ${item.file}: ${item.lines} lines`)
     for (const item of size.oversizedFunctions.slice(0, 5)) console.log(`  ${item.file}:${item.line} ${item.name}: ${item.lines} lines`)
   }
-  for (const error of errors) console.warn(`  ${error.tool} report unavailable: ${error.message}`)
+  for (const error of errors) console.warn(error.timedOut ? `  ${error.message}` : `  ${error.tool} report unavailable: ${error.message}`)
   console.log(`Report: .juno-status/health.json (${(report.durationMs / 1000).toFixed(1)}s)`)
   if (!report.complete) process.exitCode = 1
   if (process.argv.includes('--update-baseline')) {
@@ -100,7 +86,7 @@ async function main() {
   } else if (process.argv.includes('--check')) {
     const baseline = JSON.parse(readFileSync(resolve(root, 'health-baseline.json'), 'utf8'))
     const failures = healthRegressions(report, baseline)
-    for (const failure of failures) console.error(`Health regression: ${failure}`)
+    for (const failure of failures) console.error(report.complete ? `Health regression: ${failure}` : failure)
     if (failures.length) process.exitCode = 1
   }
 

@@ -7,13 +7,15 @@ import { createProviderGuard, openTurns } from '../src'
 import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
 import { parseObject } from '../src/mcp/catalogue'
 import { createT3Adapter } from '../src/t3'
+import { IDLE_MS } from '../src/t3/watch'
 import { createJobs } from '../src/jobs/jobs'
 import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
 import { initialize } from '../src/store/store'
 
-// The T3 watcher polls a session every 10 s (src/t3/watch.ts). A test that watches several polls
-// sets `polls.scale` to run them faster; every other test keeps the real waits.
+// The T3 watcher reads a session 1 s after a change and backs off to 10 s while nothing changes
+// (src/t3/watch.ts). A test that watches several reads sets `polls.scale` to run them faster, or
+// slower to show that something other than the timer woke it; every other test keeps the real waits.
 const polls = vi.hoisted(() => ({ scale: 1 }))
 vi.mock('node:timers/promises', async (importOriginal) => {
   const real = await importOriginal<typeof import('node:timers/promises')>()
@@ -520,7 +522,7 @@ it('writes a job only when its phase or line changes', async () => {
 })
 
 it('reports each new T3 question even while the session already waits', async () => {
-  // Polls every 200 ms instead of every 10 s.
+  // Reads every 20 to 200 ms instead of every 1 to 10 s.
   polls.scale = 0.02
   const requestIds = ['request-test']
   let reads = 0
@@ -548,4 +550,74 @@ it('reports each new T3 question even while the session already waits', async ()
   const seen = reads
   await expect.poll(() => reads, { timeout: 15_000 }).toBeGreaterThanOrEqual(seen + 3)
   expect(reports()).toHaveLength(2)
+})
+
+it('sees a session end as soon as t3_thread_wait returns, without waiting for the next read', async () => {
+  // A read every 100 s at the fastest: only the wait can wake the watcher in time.
+  polls.scale = 100
+  let status = 'running'
+  let end = () => undefined as void
+  const ended = new Promise<void>((resolve) => { end = resolve })
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { threadId: 'thread-test', status, branch: 'fix-test' } }) },
+    t3Tools[2]!,
+    { name: 't3_thread_wait', inputSchema: { type: 'object', properties: { threadId: str, timeoutMs: { type: 'number' } }, required: ['threadId'] }, call: async () => {
+      await ended
+      return json({ threadId: 'thread-test', status, timedOut: false })
+    } },
+  ]
+  const { server, turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  await click()
+  await expect.poll(() => server.calls.filter((c) => c.name === 't3_thread_wait').length).toBeGreaterThanOrEqual(1)
+  status = 'completed'
+  end()
+  await expect.poll(() => turns.jobs.list()[0]?.phase, { timeout: 5000 }).toBe('done')
+})
+
+it('reads a session again as soon as Juno answers its question', async () => {
+  polls.scale = 100
+  let answered = false
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: answered ? 'running' : 'waiting' } }) },
+    t3Tools[2]!,
+    { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds: answered ? [] : ['request-test'] }) },
+    { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: () => json({ requestId: 'request-test', questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
+    { name: 't3_pending_request_respond', inputSchema: { type: 'object', properties: { threadId: str, requestId: str, answers: { type: 'object' } }, required: ['threadId', 'requestId', 'answers'] }, call: () => {
+      answered = true
+      return json({})
+    } },
+  ]
+  const { turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  await click()
+  await expect.poll(() => turns.jobs.list()[0]?.phase).toBe('needsYou')
+  const question = turns.actions.views().find((v) => v.card._tag === 'question')
+  if (!question?.binding || question.card._tag !== 'question') throw new Error('No question')
+  const prepared = turns.actions.prepare(question.binding.identity, { _tag: 'answer', answer: { _tag: 'option', optionId: question.card.options[0]!.id } })
+  if ('_tag' in prepared) throw new Error('Question refused')
+  turns.actions.approve('answer-click', prepared.identity, prepared.children)
+  await turns.actions.idle()
+  await expect.poll(() => turns.jobs.list()[0]?.phase, { timeout: 5000 }).toBe('running')
+})
+
+it('reads a session that does not change less and less often', async () => {
+  // Reads 20 ms after a change, backing off to 200 ms.
+  polls.scale = 0.02
+  const reads: number[] = []
+  const tools: FakeTool[] = [launch,
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => {
+      reads.push(performance.now())
+      return json({ thread: { threadId: 'thread-test', status: 'running', branch: 'fix-test' } })
+    } },
+    t3Tools[2]!,
+  ]
+  const { turns, call, click } = await fixture('t3', tools)
+  await call('t3_start', start)
+  await click()
+  await expect.poll(() => reads.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(8)
+  const gaps = reads.slice(1).map((at, i) => at - reads[i]!)
+  // A fixed 20 ms poll would read about 60 times in the time these reads took.
+  expect(gaps.at(-1)).toBeGreaterThanOrEqual(IDLE_MS * polls.scale * 0.9)
+  expect(turns.jobs.list()[0]?.phase).toBe('running')
 })
