@@ -1,0 +1,1 @@
+- 10-16 12:38 · sidebar-row · Line three: the Main and Reopened tags follow the place name, and the people sit in a fixed right-aligned 84px slot before Resolve, so neither floats.

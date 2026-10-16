@@ -1,0 +1,1 @@
+- 10-16 12:38 · sidebar-row · The row's people are the senders of the last 15 unread messages, most recent first, never you, none when read; `indexTopic` computes them into `participants_json`, the row sends four as `participantIds` and the rest as `moreParticipants` for "+N". Cache schema 10 rebuilds the stored rows.

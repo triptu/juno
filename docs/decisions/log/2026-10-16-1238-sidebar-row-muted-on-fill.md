@@ -1,0 +1,1 @@
+- 10-16 12:38 · sidebar-row · A selected row points muted at the new `--foreground-muted-on-fill` (light = subtle, dark = muted), so its meta stays 4.5:1 on the fill and a step below the preview.
