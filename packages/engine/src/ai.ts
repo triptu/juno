@@ -72,8 +72,8 @@ interface TaskInfo {
 const subjectOf = (key: string): Pick<HostAiCall, 'subjectKind' | 'subjectId'> =>
   key === '' ? { subjectKind: '', subjectId: '' } : { subjectKind: parseTopicId(key) === undefined ? 'channel' : 'topic', subjectId: key }
 
-/** Tasks that are always backlog work for the spend cap (`AiBackground`). */
-const BACKGROUND_TASKS = new Set(['settledScore', 'followUps', 'homeTitle', 'automatedChannel'])
+/** Tasks that are always backlog work for the spend cap (`AiBackground`). Grammar starts on typing pauses, most never sent. */
+const BACKGROUND_TASKS = new Set(['settledScore', 'followUps', 'homeTitle', 'automatedChannel', 'grammarCheck'])
 
 const MISSING: Decision<never> = { _tag: 'NoDecision', reason: 'missing-key', meta: { model: '', latencyMillis: 0, attempts: 0 } }
 /** A key change cut the call short: to the job it is `missing-key`, to the log it was cancelled. */

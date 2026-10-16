@@ -5,14 +5,16 @@
  * message shows as a pending row in `messages.list` until Slack has it.
  * Drafts live in the engine per topic, so they outlive tabs and restarts;
  * the composer reads one once and writes it back as the user types.
- * `precheckMessage` asks the model while typing pauses; `checkMessage` runs
- * the checks on send before the composer sends, with no model in the way.
+ * `precheckMessage` asks the models while typing pauses, and `stopPrecheck`
+ * drops the grammar request when the text changes after it; `checkMessage`
+ * runs the checks on send before the composer sends, with no model in the way.
  */
 import {
   draftsGet,
   draftsSet,
   messagesCheck,
   messagesPrecheck,
+  messagesPrecheckStop,
   messagesPostcheck,
   messagesDelete,
   messagesDiscard,
@@ -67,10 +69,18 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
   return Promise.race([checked, late]).finally(() => clearTimeout(timer))
 }
 
-/** Warms Main routing; message fixes run only after sending. */
-export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string): void {
-  if (threadTs !== undefined || [...text].length > 1000) return
-  void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }) })
+/**
+ * Warms Main routing and the grammar answer for `message`, the draft as it will be sent (`text` when absent).
+ * Grammar suggestions still show only after sending.
+ */
+export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string, message?: string): void {
+  if ([...text].length > 1000) return stopPrecheck(registry, channelId, threadTs)
+  void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }), ...(message === undefined || message === text ? {} : { message }) })
+}
+
+/** The draft at this place changed after a pause: the grammar request that pause started stops. */
+export function stopPrecheck(registry: Registry, channelId: string, threadTs?: string): void {
+  void runCommand(registry, messagesPrecheckStop, { channelId, ...(threadTs === undefined ? {} : { threadTs }) })
 }
 
 /** Retry on a failed row. */

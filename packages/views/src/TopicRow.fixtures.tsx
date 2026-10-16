@@ -112,6 +112,20 @@ export default defineFixtures(
       'count-99-plus': state(rows.alertsMain),
       'count-lower-bound': state(rows.lowerBound, { newThreads: newThreadsById.get(rows.lowerBound.id) }),
     },
+    // The count ends on the time's right edge, whatever its width.
+    Count: {
+      '3': state(rows.roadmap),
+      '12': state({ ...rows.roadmap, unreadCount: 12 }),
+      '99-plus': state({ ...rows.roadmap, unreadCount: 128 }),
+      'all-widths': scene(() => (
+        <div style={column}>
+          {[3, 12, 128].flatMap((unreadCount) => [
+            <TopicRow key={`thread-${unreadCount}`} {...one({ ...rows.roadmap, id: `${rows.roadmap.id}-${unreadCount}`, unreadCount })} />,
+            <TopicRow key={`main-${unreadCount}`} {...one({ ...rows.alertsMain, id: `${rows.alertsMain.id}-${unreadCount}`, unreadCount })} />,
+          ])}
+        </div>
+      )),
+    },
     Interaction: {
       hover: state(rows.postgres, {}, { hover: ROW }),
       'hover-resolve': state(rows.postgres, {}, { hover: 'button' }),

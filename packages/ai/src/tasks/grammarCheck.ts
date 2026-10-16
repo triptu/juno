@@ -61,8 +61,12 @@ function clean(output: Static<typeof GrammarCheckOutput>, input: GrammarCheckInp
   return { edits }
 }
 
+/**
+ * Started on a typing pause, so the deadline is not the one-second display window: the 10-16 study measured
+ * a 1.39 s p50 for the full answer (docs/research/grammar-post-send.md). The engine waits only within the window.
+ */
 export const grammarCheck = defineStructuredTask<GrammarCheckInput, typeof GrammarCheckOutput>({
-  name: 'grammarCheck', version: 2, tier: 'decision', timeoutMillis: 700, maxAttempts: 1, maxTokens: 256,
+  name: 'grammarCheck', version: 2, tier: 'decision', timeoutMillis: 3000, maxAttempts: 1, maxTokens: 256,
   prompt, tool: { name: 'grammar', description: 'Report only clear grammar errors as minimal word edits.' },
   output: GrammarCheckOutput, clean,
   render: ({ draft }) => {
