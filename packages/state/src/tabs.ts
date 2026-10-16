@@ -19,6 +19,8 @@
  *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
  *   (⌘⇧T) takes the last one back. The bulk closes leave pinned tabs open.
  * - `setPinned`: pinned tabs sit first, in pin order.
+ * - `moveTab`: a tab dragged, or moved with ⌃⇧← and ⌃⇧→, to another place
+ *   in the strip, within its pinned or unpinned group.
  * - `activateTab`, `cycleTab` (⌃Tab, ⌘⇧] and ⌘⇧[), `tabByNumber` (⌘1 to ⌘9).
  * - `mountedTabs`: the active tab and the 4 most recently active stay
  *   mounted in `<Activity>`; the rest unmount and keep a `ScrollSnapshot`.
@@ -320,6 +322,21 @@ export function setPinned(tabs: Tabs, id: string, pinned: boolean): Tabs {
   if (tab === undefined || tab.pinned === pinned) return tabs
   const rest = tabs.tabs.toSpliced(at, 1)
   return { ...tabs, tabs: rest.toSpliced(pinnedCount(rest), 0, { ...tab, pinned }) }
+}
+
+/**
+ * Moves tab `id` to `index` in the strip, as a drag or ⌃⇧← and ⌃⇧→ do. A
+ * pinned tab stays among the pinned ones and an unpinned tab after them, so
+ * `index` is clamped to the tab's group. The active tab and history do not change.
+ */
+export function moveTab(tabs: Tabs, id: string, index: number): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  const tab = tabs.tabs[at]
+  if (tab === undefined) return tabs
+  const pinned = pinnedCount(tabs.tabs)
+  const to = tab.pinned ? Math.min(Math.max(index, 0), pinned - 1) : Math.min(Math.max(index, pinned), tabs.tabs.length - 1)
+  if (to === at) return tabs
+  return { ...tabs, tabs: tabs.tabs.toSpliced(at, 1).toSpliced(to, 0, tab) }
 }
 
 /** Opens or closes the Juno panel in one tab; the other tabs keep theirs. */

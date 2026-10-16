@@ -62,6 +62,7 @@ export {
   goToEntry,
   historyStateAtom,
   mountedTabs,
+  moveTab,
   allTopicsPlace,
   allTopicsTab,
   homePlace,
