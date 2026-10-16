@@ -1,0 +1,1 @@
+- 10-16 21:18 · orchestrator · A typed word of 3 letters may have two letters swapped ("dim" finds Dmitriy), the owner's case, while any other typo needs 4 letters or more; matching inside a word needs 3.
