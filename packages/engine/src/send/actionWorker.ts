@@ -161,6 +161,11 @@ export class ActionWorker extends Context.Service<
           // and again holding the lane, so a change made while it waited is seen.
           const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
+            // The call retries Slack's own trouble itself, so a retry can come after a socket drop. Until the
+            // catch-up ends or its deadline passes, the row waits for it, as in `pass`, rather than keep the copy.
+            if (!gap.caughtUp && isCopyDelete(action) && (!(yield* link.online) || (yield* Clock.currentTimeMillis) < (gap.reconnectedAt ?? 0) + COPY_CATCH_UP_MILLIS)) {
+              return yield* new NotSent()
+            }
             if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
           })
           if (action.kind === 'delete' && (yield* Effect.result(check))._tag === 'Failure') return false
@@ -224,7 +229,7 @@ export class ActionWorker extends Context.Service<
             if (action === undefined) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
-            if (!caughtUp && now < catchUpDeadline && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) {
+            if (!caughtUp && now < catchUpDeadline && isCopyDelete(action)) {
               copyWait = catchUpDeadline
               continue
             }
@@ -233,7 +238,7 @@ export class ActionWorker extends Context.Service<
             else if ((yield* local(readAction(action.id))) === undefined) held.delete(action.channel)
           }
           // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
-          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null))
+          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && isCopyDelete(action)))
           const after = yield* Clock.currentTimeMillis
           const due = [...rest.map((action) => action.nextAt), ...(copyWait === undefined ? [] : [copyWait])]
           const next = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - after)
@@ -273,6 +278,9 @@ export class ActionWorker extends Context.Service<
     }),
   )
 }
+
+/** A copy's delete: it names the copy by ts alone, with no post to wait on (`@juno/sync` `sent.ts`). */
+const isCopyDelete = (action: PendingAction): boolean => action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null
 
 /** What the call stores when Slack says the change was already made. */
 const alreadyDone = (action: PendingAction, ts: string): Acted | undefined =>
