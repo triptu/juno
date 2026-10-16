@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, machinesToDestroy, mayPass, pendingVcpu, orphanGraceMs } from './pool-decisions.mjs'
+import { capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap, orphanGraceMs } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -14,7 +14,7 @@ const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').
 const defaultIdleMinutes = 8
 export const idleMinutes = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? defaultIdleMinutes), idleMs = idleMinutes * 60_000
 const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2), holdMs = Number(process.env.JUNO_REMOTE_HOLD_SECONDS ?? 120) * 1000
-const maxVcpu = Math.min(24, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24))
+const maxVcpu = Math.min(planCap, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? defaultCap))
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
@@ -130,7 +130,7 @@ export function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 10) return
+    if (alive(pid) && version >= 11) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -140,7 +140,7 @@ export function ensureReaper() {
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
     child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '10')
+    writeFileSync(versionFile, '11')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -250,7 +250,7 @@ function queue() {
 }
 function daemonAlive() {
   try {
-    return Number(readFileSync(join(dir, 'watcher.version'), 'utf8')) >= 10 && alive(Number(readFileSync(join(dir, 'watcher.pid'), 'utf8')))
+    return Number(readFileSync(join(dir, 'watcher.version'), 'utf8')) >= 11 && alive(Number(readFileSync(join(dir, 'watcher.pid'), 'utf8')))
   } catch { return false }
 }
 
@@ -276,7 +276,7 @@ function admit(request, instances) {
   }
   const usage = capacity(instances, all)
   let used = usage.tracked + usage.untracked + pendingVcpu(instances, entries().filter((entry) => entry.pending))
-  const cap = Math.min(24, request.cap)
+  const cap = requestCap(request, maxVcpu)
   for (const state of all) {
     if (used + vcpu(request.machine) <= cap) break
     if (!state.kept && !state.destroying && takeLock(state.id) && destroy(state.id)) used -= vcpu(state.machine)
@@ -309,7 +309,7 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
   const started = Date.now()
   for (;;) {
     while (!takeLock('decide')) await sleep(100)
-    const request = { id: randomUUID(), pid: process.pid, machine, fresh, cap: maxVcpu, created: started }
+    const request = { id: randomUUID(), pid: process.pid, machine, fresh, cap: maxVcpu, capSet: process.env.JUNO_REMOTE_MAX_VCPU !== undefined, created: started }
     try {
       request.order = Math.max(Date.now(), ...queue().map((item) => item.order + 1))
       writeRequest(request)

@@ -1,4 +1,12 @@
 export const orphanGraceMs = 5 * 60_000
+/** The default cap (approved 10-17), the plan's limit, and the default clients before 10-17 sent with every request. */
+export const defaultCap = 48, planCap = 64, legacyCap = 24
+
+/** The cap a request is admitted against: the admitter's own, unless the request was explicitly lowered below the default. */
+export function requestCap(request, ownCap) {
+  const lowered = request.capSet ? request.cap < defaultCap : request.cap < legacyCap
+  return lowered ? Math.min(ownCap, request.cap) : ownCap
+}
 
 /** Whether a later request may be admitted past the waiting ones in `blocked`. */
 export function mayPass(blocked, now, holdMs) {

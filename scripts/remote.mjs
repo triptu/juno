@@ -232,7 +232,7 @@ try {
       if (!runner.image) throw new Error('Set JUNO_RUNNER_IMAGE to the preloaded Juno image; pnpm runner:check verifies it')
     } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
   }
-  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
+  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
   appendFileSync(runLog, `remote: backend ${backend}\n`)
   if (backend === 'ssh') {
     image = runner.image

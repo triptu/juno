@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { capacity, machinesToDestroy, mayPass, pendingVcpu } from './pool-decisions.mjs'
+import { capacity, machinesToDestroy, mayPass, pendingVcpu, requestCap } from './pool-decisions.mjs'
 
 const now = 10_000_000
 const instance = (id, labels = {}, age = 600_000) => ({ cluster_id: id, created_at: new Date(now - age).toISOString(), labels: { 'juno-remote': '1', ...labels }, shape: { virtual_cpu: 4 } })
@@ -50,4 +50,14 @@ test('a request that does not fit lets later ones use free cores until it has wa
 
 test("Namespace's idle image builders do not count against the cap", () => {
   assert.deepEqual(capacity([instance('tracked'), { cluster_id: 'builder', labels: { 'nsc.purpose': 'builder' }, shape: { virtual_cpu: 16 } }], [state('tracked')]), { tracked: 4, untracked: 0 })
+})
+
+test("requests are admitted against the admitter's cap unless explicitly lowered", () => {
+  // Clients before 10-17 always sent 24, their default.
+  assert.equal(requestCap({ cap: 24 }, 48), 48)
+  assert.equal(requestCap({ cap: 16 }, 48), 16)
+  assert.equal(requestCap({ cap: 48, capSet: false }, 48), 48)
+  assert.equal(requestCap({ cap: 32, capSet: true }, 48), 32)
+  assert.equal(requestCap({ cap: 64, capSet: true }, 48), 48)
+  assert.equal(requestCap({ cap: 64, capSet: true }, 64), 64)
 })
