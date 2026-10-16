@@ -46,7 +46,7 @@ import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, rootStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -142,6 +142,12 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const room = Math.max(0, range.limit - shown.length)
       atNewest = newer.length <= room
       stored = [...shown, ...newer.slice(0, room)]
+    }
+    // A root with no reply yet is outside the thread scope; it still comes first.
+    if (target.kind === 'thread' && beforeWindow === undefined && !target.threadTs.startsWith('pending:') && stored[0]?.ts !== target.threadTs) {
+      const statement = rootStatement(target)
+      const root = (yield* sql.unsafe<WindowMessage>(statement.sql, statement.params))[0]
+      if (root !== undefined) stored = [root, ...stored]
     }
 
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
