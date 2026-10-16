@@ -39,6 +39,7 @@ import {
   messageLink,
   openInSlack,
   popupContextMenu,
+  canRedraw,
   redrawTopic,
   registry,
   renamingAtom,
@@ -96,7 +97,7 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
-/** Why Redraw made nothing, said plainly. */
+/** Why Redraw art made nothing, said plainly. */
 const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
   off: 'AI assist is off',
   budget: 'Today’s AI spend cap is reached',
@@ -108,7 +109,7 @@ const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
   other: 'Something went wrong',
 }
 
-/** Redraw: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
+/** Redraw art: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
 async function redrawArt(topic: ActionTopic): Promise<void> {
   const problem = await redrawTopic(registry, topic.id, said('Redrawn', topic))
   if (problem !== undefined) showToast(registry, { text: `Could not redraw · ${REDRAW_PROBLEMS[problem]}` })
@@ -140,6 +141,8 @@ function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; 
  * channel's or DM's choice.
  */
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
+  // Redraw art shows only when a drawing can be made: asked beside the settings, within a fraction of a second.
+  const drawable = canRedraw(registry)
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const notify = notifyTarget(topic)
   const state = {
@@ -149,7 +152,7 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     pinned: topic.pinned,
     resolved: topic.resolved,
     notify: choiceFor(settings, notify.target, topic.subscribed),
-    aiAssist: settings?.aiAssist === true,
+    canDraw: settings?.aiAssist === true && (await drawable),
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
   }

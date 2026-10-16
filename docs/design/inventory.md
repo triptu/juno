@@ -659,7 +659,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Open in new tab | `square-arrow-out-up-right` | ⌘ click | always | |
 | — | | | | |
 | Rename | `pencil` | | not Main | inline rename in the row (or in the header's title island when opened from there) |
-| Redraw | `paintbrush` | | AI assist on, not a DM's Main | `art.redraw`: a new drawing of the topic's art (a few seconds), then the toast with Undo, which puts the old drawing back. "Could not redraw · …" (no Undo) when the model gives nothing |
+| Redraw art | `paintbrush` | | a drawing can be made, not a DM's Main | `art.redraw`: a new drawing of the topic's art (a few seconds), then the toast with Undo, which puts the old drawing back. "Could not redraw · …" (no Undo) when the model gives nothing. [built composer-small-1017] The menu asks `art.available` as it opens, beside the notification settings: AI assist on, an OpenRouter key, and a reservation of nothing fitting in the agent's spend ledger for the engine (so the engine's share and the day's cap both count, and a raise shows at once). With no answer from the ledger within 200 ms the item shows, and a redraw that then cannot draw says why |
 | Mark as read / Mark as unread | `check-check` / `circle-dot` | | by state | unread sets count to at least 1 |
 | Pin / Unpin | `pin` / `pin-off` | | by state | |
 | Resolve / Reopen | `circle-check` / `rotate-ccw` | | by state | undo toast; resolve clears unread and mention |
