@@ -31,6 +31,10 @@ import type { Page } from '@playwright/test'
  * of an endless one the action started), then `settleMs`, then reads both.
  * Motion that is declared but not running, or endless and running before the
  * action, was not started by it, so it is not waited for.
+ *
+ * A `<video>`'s own controls are not the page's layout: a shift source with
+ * no node (it is in the video's shadow root) that stays inside a video's box
+ * is dropped, and an entry with only such sources counts as no shift.
  */
 export interface LayoutShiftOptions {
   /** CSS selector of the region to snapshot. Default: the gallery's `[data-fixture-frame]`, else `body`. */
@@ -181,11 +185,20 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
           hadRecentInput: boolean
           sources?: ReadonlyArray<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }>
         }
+        // A video's own controls live in its shadow root, so their sources have no node; they move inside the video's box
+        // as the controls show and hide, which moves nothing of the page. Only those sources are dropped.
+        const videos = Array.from(document.querySelectorAll('video'), (video) => video.getBoundingClientRect())
+        const inside = (outer: DOMRect, inner: DOMRectReadOnly) =>
+          inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5 && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5
+        const inControls = (source: { node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }) =>
+          source.node === null && videos.some((box) => inside(box, source.previousRect) && inside(box, source.currentRect))
+        const all = shift.sources ?? []
+        const kept = all.filter((source) => !inControls(source))
         return {
-          value: shift.value,
+          value: all.length > 0 && kept.length === 0 ? 0 : shift.value,
           hadRecentInput: shift.hadRecentInput,
           at: Math.round(shift.startTime - startedAt),
-          sources: (shift.sources ?? []).map((source) => ({
+          sources: kept.map((source) => ({
             node: describe(source.node),
             previous: rectBox(source.previousRect),
             current: rectBox(source.currentRect),
