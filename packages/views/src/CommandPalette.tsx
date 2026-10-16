@@ -1,65 +1,37 @@
 import * as stylex from '@stylexjs/stylex'
-import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
-import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
-import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
-import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
-import { FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
-import { PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
-import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useEffect, useEffectEvent, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { colors, layout, spacing, text, weights, z } from '@juno/tokens/tokens.stylex'
-import { Chip, Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text, type PhosphorIcon } from '@juno/ui'
-import { relativeTime } from './time'
+import { Icon, Kbd, OptionGroupLabel, OptionList, Segmented, Surface, Text } from '@juno/ui'
+import { PaletteRow, rowDomId, type PaletteItem } from './PaletteRow'
 
-/** What a row's icon shows. */
-export type PaletteIconName = 'thread' | 'public' | 'private' | 'dm' | 'group' | 'message' | 'scope' | 'person' | 'send' | 'open-dm' | 'ask' | 'resolve'
+export type { PaletteIconName, PaletteItem } from './PaletteRow'
 
-const icons: Record<PaletteIconName, PhosphorIcon> = {
-  thread: ChatsCircle,
-  public: Hash,
-  private: Lock,
-  dm: User,
-  group: Users,
-  message: ChatText,
-  scope: FunnelSimple,
-  person: User,
-  send: PaperPlaneTilt,
-  'open-dm': ChatCircle,
-  ask: Sparkle,
-  resolve: CheckCircle,
-}
+/** The palette's two tabs (spec section 10). */
+export type PaletteTab = 'conversations' | 'messages'
 
-export interface PaletteItem {
-  readonly id: string
-  readonly icon: PaletteIconName
-  readonly label: string
-  /** The plain part of the sub line: "#eng", "Public channel · Main". */
-  readonly sub?: string
-  /** Epoch milliseconds, shown after `sub` as "4m". */
-  readonly at?: number
-  /** A matched message, shown after `sub` as "Leo: text". Hidden in privacy mode. */
-  readonly snippet?: { readonly sender: string; readonly text: string }
-  /** A command's confidence, "95%". */
-  readonly badge?: string
-  /** The key hint on the active row: its keys, a space, then what they do ("↵ Send"). "⌘↵ New tab" by default when `opensTab`, else "↵". */
-  readonly hint?: string
-  /** ⌘Enter and ⌘-click open it in a new tab. */
-  readonly opensTab?: boolean
-  /** It has a context menu (a channel). */
-  readonly menu?: boolean
+const tabOptions: ReadonlyArray<{ readonly value: PaletteTab; readonly label: string }> = [
+  { value: 'conversations', label: 'Conversations' },
+  { value: 'messages', label: 'Messages' },
+]
+
+const placeholders: Record<PaletteTab, string> = {
+  conversations: 'Find a conversation, or type >',
+  messages: 'Search, or ask Juno',
 }
 
 export interface PaletteSection {
-  readonly heading: 'Recent' | 'Results' | 'Juno'
+  /** "Frequent", "Conversations", "Commands", "Recent", "Results", "Juno", or the open topic's name over its commands. */
+  readonly heading: string
+  /** Unique among the sections; the heading by default. */
+  readonly key?: string
   readonly items: ReadonlyArray<PaletteItem>
 }
 
 export interface CommandPaletteProps {
+  readonly tab: PaletteTab
+  /** Tab and Shift Tab, ⌘1 and ⌘2, and the segmented control. */
+  readonly onTab: (tab: PaletteTab) => void
   readonly query: string
   readonly onQuery: (query: string) => void
   /** The query that produced the displayed rows, which may lag the input. */
@@ -77,30 +49,29 @@ export interface CommandPaletteProps {
   readonly onClose: () => void
 }
 
-const rowDomId = (id: string) => `palette-${id}`
-
 /**
- * ⌘K (spec section 10, inventory 9): a search field over sections of
- * results. Dumb: the owner gives the rows and runs what is chosen. The
- * active row keeps its identity until the displayed query changes;
- * Enter runs it, ⌘Enter opens it in a new tab, Esc and a press outside
- * close.
+ * ⌘K (spec section 10, inventory 9): a search field and the two tabs over
+ * sections of results. Dumb: the owner gives the rows and runs what is
+ * chosen. The active row keeps its identity until the displayed query or
+ * the tab changes; Enter runs it, ⌘Enter opens it in a new tab, Tab and
+ * Shift Tab or ⌘1 and ⌘2 switch tabs, Esc and a press outside close.
  */
-export function CommandPalette({ query, onQuery, resultsQuery, sections, settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
+export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, sections, settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
   const items = sections.flatMap((section) => section.items)
   const ids = items.map((item) => item.id)
-  const [selection, setSelection] = useState({ query: resultsQuery, id: ids[0] })
+  const shown = `${tab}\n${resultsQuery}`
+  const [selection, setSelection] = useState({ query: shown, id: ids[0] })
   // Pin even the automatic first selection. A late command or re-ranked
   // local result must not change what Enter will open.
-  const chosen = selection.query === resultsQuery ? selection.id : ids[0]
-  if (selection.query !== resultsQuery || (chosen === undefined && ids.length > 0)) {
-    setSelection({ query: resultsQuery, id: chosen ?? ids[0] })
+  const chosen = selection.query === shown ? selection.id : ids[0]
+  if (selection.query !== shown || (chosen === undefined && ids.length > 0)) {
+    setSelection({ query: shown, id: chosen ?? ids[0] })
   }
   // If a selected result disappears, Enter does nothing until the user
   // chooses another row; it must not silently open the new first result.
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : undefined
 
-  const activate = (id: string) => setSelection({ query: resultsQuery, id })
+  const activate = (id: string) => setSelection({ query: shown, id })
   const warmActive = useEffectEvent((id: string) => onActiveChange?.(id))
   useEffect(() => {
     if (activeId !== undefined) warmActive(activeId)
@@ -124,10 +95,15 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
       case 'Escape':
         event.preventDefault()
         return onClose()
-      // The field is the palette's one stop: Tab must not reach the window under the dim while it is open.
+      // The field is the palette's one stop: Tab switches tabs and never reaches the window under the dim.
       case 'Tab':
         event.preventDefault()
-        return
+        return onTab(tab === 'conversations' ? 'messages' : 'conversations')
+      case '1':
+      case '2':
+        if (!event.metaKey) return
+        event.preventDefault()
+        return onTab(event.key === '1' ? 'conversations' : 'messages')
       case 'Enter':
         if (event.nativeEvent.isComposing || activeId === undefined) return
         event.preventDefault()
@@ -162,8 +138,8 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
             aria-controls="palette-results"
             aria-autocomplete="list"
             aria-activedescendant={activeId === undefined ? undefined : rowDomId(activeId)}
-            aria-label="Search, or ask Juno"
-            placeholder="Search, or ask Juno"
+            aria-label={placeholders[tab]}
+            placeholder={placeholders[tab]}
             spellCheck={false}
             value={query}
             onChange={(event) => {
@@ -172,13 +148,17 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
             onKeyDown={onKeyDown}
             {...stylex.props(styles.input)}
           />
+          {/* A press keeps focus in the field, the palette's one stop. */}
+          <span {...stylex.props(styles.tabs)} onMouseDown={(event) => event.preventDefault()}>
+            <Segmented label="Search in" options={tabOptions} value={tab} onChange={onTab} />
+          </span>
           <Kbd look="key">esc</Kbd>
         </label>
         <div {...stylex.props(styles.scroll)}>
           <OptionList id="palette-results" label="Results" aria-busy={!settled} {...(activeId === undefined ? {} : { activeId: rowDomId(activeId) })}>
             {sections.map((section) =>
               section.items.length === 0 ? null : (
-                <div key={section.heading} role="group" aria-label={section.heading}>
+                <div key={section.key ?? section.heading} role="group" aria-label={section.heading}>
                   <OptionGroupLabel>{section.heading}</OptionGroupLabel>
                   {section.items.map((item) => (
                     <PaletteRow
@@ -205,91 +185,6 @@ export function CommandPalette({ query, onQuery, resultsQuery, sections, settled
         </div>
       </Surface>
     </div>
-  )
-}
-
-interface PaletteRowProps {
-  readonly item: PaletteItem
-  readonly active: boolean
-  readonly now: number
-  readonly onSelect: (newTab: boolean) => void
-  readonly onActivate: () => void
-  readonly onMenu?: (at: { readonly x: number; readonly y: number }) => void
-}
-
-function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: PaletteRowProps) {
-  const time = item.at === undefined ? undefined : relativeTime(item.at, now)
-  const plain = [item.sub, item.snippet === undefined ? time : undefined].filter((part) => part !== undefined && part !== '').join(' · ')
-  const sub =
-    item.snippet === undefined ? (
-      plain === '' ? undefined : plain
-    ) : (
-      <>
-        {plain === '' ? null : `${plain} · `}
-        <span dir="auto" data-sensitive="">
-          {item.snippet.sender === '' ? null : (
-            <>
-              <bdi>{item.snippet.sender}</bdi>:{' '}
-            </>
-          )}
-          {item.snippet.text}
-        </span>
-      </>
-    )
-  // One look for every hint: the keys as a keycap, then what they do. "↵ Send" is the key and its word.
-  const [keys, ...words] = (item.hint ?? (item.opensTab === true ? '⌘↵ New tab' : '↵')).split(' ')
-  const hint = (
-    <span {...stylex.props(styles.hintLine)}>
-      <Kbd look="key">{keys}</Kbd>
-      {words.length === 0 ? null : (
-        <Text variant="tagSmall" tone="muted">
-          {words.join(' ')}
-        </Text>
-      )}
-    </span>
-  )
-  return (
-    <OptionRow
-      id={rowDomId(item.id)}
-      size={55}
-      active={active}
-      leading={
-        <>
-          <Icon icon={icons[item.icon]} size={16} />
-          {/* Laid over the row's end: moving the active row must not reflow any row's text. */}
-          {active && item.badge === undefined ? (
-            <span aria-hidden="true" {...stylex.props(styles.hintOver)}>
-              {hint}
-            </span>
-          ) : null}
-        </>
-      }
-      label={item.icon === 'public' && item.label.startsWith('#') ? item.label.slice(1) : item.label}
-      {...(sub === undefined ? {} : { sub, subPlacement: 'below' as const })}
-      trailing={
-        // A command keeps its hint's place in flow, hidden while another row is active.
-        item.badge === undefined ? undefined : (
-          <>
-            <Chip variant="filled" size={20} icon={Sparkle} iconSize={12} title="Juno's read of what you typed" numeric>
-              {item.badge}
-            </Chip>
-            <span aria-hidden="true" {...stylex.props(!active && styles.hintHidden)}>
-              {hint}
-            </span>
-          </>
-        )
-      }
-      onSelect={(event) => onSelect(event.metaKey && item.opensTab === true)}
-      onActivate={onActivate}
-      {...(onMenu === undefined
-        ? {}
-        : {
-            onContextMenu: (event) => {
-              event.preventDefault()
-              onMenu({ x: event.clientX, y: event.clientY })
-            },
-          })}
-    />
   )
 }
 
@@ -353,26 +248,14 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
   },
-  hintLine: {
+  // Room for the input to shrink into: the control never gives up its width.
+  tabs: {
     display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing['--space-1'],
-  },
-  hintHidden: {
-    visibility: 'hidden',
-  },
-  // Over the end of the active row (its `contain` makes it the containing block), on its background, with a soft edge over any text it covers.
-  hintOver: {
-    position: 'absolute',
-    insetInlineEnd: spacing['--space-2-5'],
-    top: '50%',
-    transform: 'translateY(-50%)',
-    paddingInlineStart: spacing['--space-2'],
-    backgroundColor: colors['--surface-hover'],
-    boxShadow: `calc(-1 * ${spacing['--space-2']}) 0 ${spacing['--space-2']} ${colors['--surface-hover']}`,
+    flexShrink: 0,
   },
   empty: {
     paddingBlock: spacing['--space-5'],
     paddingInline: spacing['--space-2-5'],
   },
 })
+

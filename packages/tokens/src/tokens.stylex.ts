@@ -55,6 +55,14 @@ export const colors = stylex.defineVars({
   '--border-strongest': 'hsla(48, 30%, 82%, 1)',
   '--input-border': 'hsla(48, 14%, 82%, 1)',
 
+  // The tab strip, a step below the sidebar so the page-coloured active tab
+  // stands out of it, as in Safari and Finder. Inactive tabs are the strip;
+  // a hovered one takes --tab-hover, and a thin divider separates two
+  // inactive neighbours.
+  '--tab-strip': 'hsla(48, 26%, 94%, 1)',
+  '--tab-hover': 'hsla(48, 24%, 90.5%, 1)',
+  '--tab-divider': 'hsla(48, 14%, 80%, 1)',
+
   // Foreground. Warm neutrals, never pure black. Muted is darkened from the
   // handoff's 52% to 42% lightness so meta text reaches 4.5:1 on paper.
   '--foreground-default': 'hsla(48, 15%, 12%, 1)',
@@ -350,6 +358,9 @@ export const shadows = stylex.defineVars({
   // The Juno panel floating over the page: a hairline ring, a tight contact
   // shadow and two wide soft ones, so it lifts without a border.
   '--panel-shadow': '0 0 0 1px oklch(0 0 0 / 0.05), 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -6px oklch(0 0 0 / 0.08), 0 24px 56px -12px oklch(0 0 0 / 0.12)',
+  // The active tab lifted out of the strip: a soft shadow up and to the
+  // sides only, so nothing falls on the page it joins.
+  '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.08)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -885,6 +896,8 @@ export const sizes = stylex.defineVars({
   '--slider-width': '200px',
   '--unread-dot': '5px',
   '--tab-unread-dot': '6px',
+  // The divider between two inactive tabs, centred on their height.
+  '--tab-divider-height': '16px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
   // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).

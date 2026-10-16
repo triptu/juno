@@ -1,0 +1,1 @@
+- 10-16 12:59 · tabs-palette · ⌘K commands live in the Conversations tab: up to four matches beside the conversations, all after a leading ">". The open topic's commands come first under its name and run the topic menu's own actions. "Show topics active in the last N days" is left out: main has no such preference.

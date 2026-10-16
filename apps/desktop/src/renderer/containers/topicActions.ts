@@ -63,7 +63,7 @@ export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' 
 }
 
 /** The header's detail when it is loaded, else the sidebar or All topics row, with its thread's root from the id. */
-function topicOf(id: string): ActionTopic | undefined {
+export function topicOf(id: string): ActionTopic | undefined {
   const header = registry.get(topicAtom(id))
   if (header._tag === 'Success' && header.value !== null) return header.value
   const row = registry.get(sidebarRowAtom(id)) ?? registry.get(allTopicsRowAtom(id))
@@ -71,7 +71,7 @@ function topicOf(id: string): ActionTopic | undefined {
 }
 
 /** How a toast names a topic: its title, or the channel label for Main ("#eng"). */
-function labelOf(topic: ActionTopic): string {
+export function labelOf(topic: ActionTopic): string {
   return topic.kind === 'main' ? topic.channel.label : topic.title
 }
 
@@ -140,17 +140,25 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
   }
-  const linkable = topic.kind === 'main' || topic.rootTs !== undefined
-  const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => linkable || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
+  const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
+  if (chosen !== undefined) runTopicAction(topic, chosen, from)
+}
+
+/** Whether Copy Slack link and Open in Slack have a link: a Main, or a thread whose root is known. */
+export const isLinkable = (topic: ActionTopic): boolean => topic.kind === 'main' || topic.rootTs !== undefined
+
+/** One topic action, from the topic menu or the ⌘K palette. `from` says which title Rename edits. */
+export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from: RenameTarget['where']): void {
   const { id } = topic
-  if (chosen !== undefined && isViewMenuAction(chosen)) return runViewMenuAction(chosen, topic.channel)
+  if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, topic.channel)
+  const notify = notifyTarget(topic)
   switch (chosen) {
     case 'open-new-tab':
       return openTopic(id, { newTab: true })
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
     case 'redraw':
-      return redrawArt(topic)
+      return void redrawArt(topic)
     case 'mark-read':
       return void runAction(registry, readsMarkRead, { id }, said('Marked as read', topic))
     case 'mark-unread':

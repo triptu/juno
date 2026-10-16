@@ -88,6 +88,7 @@ import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
 import { toggleSidebar } from './layout'
+import { paletteTakesTabNumber } from './paletteActions'
 import { togglePrivacy } from './privacy'
 
 /** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
@@ -640,7 +641,9 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'settings.open':
       return openSettings()
     default: {
-      const tab = tabByNumber(tabs, Number(command.slice('tab.select.'.length)))
+      const number = Number(command.slice('tab.select.'.length))
+      if (paletteTakesTabNumber(number)) return
+      const tab = tabByNumber(tabs, number)
       if (tab !== undefined) switchToTab(tab.id)
     }
   }
