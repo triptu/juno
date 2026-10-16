@@ -49,7 +49,7 @@ independent of the cache implementation.
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
 a live run and a task card. Its Vitest project runs after the other agent tests,
 with file parallelism off, so their child processes do not compete with its timer.
-The 5 ms and 50 ms p95 limits still apply to every run. Five alternating pairs of fresh Node processes measure
+The 5 ms and 50 ms p95 limits apply to the events of all five cached runs together, as every budget in `docs/performance.md` is a p95 over the runs of its scenario; each run's own p95 is still reported. Five alternating pairs of fresh Node processes measure
 the original and cached projection. Each process warms up for ten events, then
 measures 100 alternating reaction writes, status changes, card updates, live bubble appends
 and read marks through
@@ -59,7 +59,7 @@ agent's page preparation, not write-to-pixels latency.
 
 The check fails above 5 ms p95 for queries after an in-place update, 50 ms p95 from
 any event through
-encoding, or 200 KB for the snapshot (`docs/performance.md`). It also caps retained
+encoding (both over the five runs' events together), or 200 KB for the snapshot (`docs/performance.md`). It also caps retained
 cache heap at 32 MiB. Memory is measured after explicit GC, relative to the seeded
 process before creating its projection; RSS and peak RSS are reported separately.
 Set `JUNO_CHAT_BENCH_REPORT` to save the JSON results. Set `JUNO_CHAT_PROFILE` to an

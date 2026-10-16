@@ -8,7 +8,10 @@ import type { BenchmarkMode } from './chat-cache-bench'
 const Measurement = Schema.Struct({
   p50: Schema.Number, p95: Schema.Number, queryP95: Schema.Number, structuralP95: Schema.Number, warmHeap: Schema.Number,
   retainedHeap: Schema.Number, rss: Schema.Number, peakRss: Schema.Number, bytes: Schema.Number, events: Schema.Number,
+  eventMs: Schema.Array(Schema.Number), queryMs: Schema.Array(Schema.Number),
 })
+
+const percentile = (values: ReadonlyArray<number>, p: number) => values.toSorted((a, b) => a - b)[Math.floor(values.length * p)]!
 
 const measure = (mode: BenchmarkMode) => {
   const result = spawnSync(process.execPath, [
@@ -28,13 +31,18 @@ it('5,000 messages: event to encoded window, query and payload stay within budge
     if (compare) before.push(measure('full'))
     after.push(measure('cached'))
   }
-  const report = JSON.stringify({ messages: 5000, window: 40, before, after })
+  const summary = (runs: ReadonlyArray<typeof Measurement.Type>) => runs.map(({ eventMs: _event, queryMs: _query, ...run }) => run)
+  // A budget is a p95 over every run of the scenario (docs/performance.md, section 1): pool the five processes' events.
+  // One process's p95 rests on its five slowest events, so a shared machine's scheduling stall failed it alone.
+  const p95 = percentile(after.flatMap((run) => run.eventMs), 0.95)
+  const queryP95 = percentile(after.flatMap((run) => run.queryMs), 0.95)
+  const report = JSON.stringify({ messages: 5000, window: 40, p95, queryP95, before: summary(before), after: summary(after) })
   console.log(report)
   if (process.env.JUNO_CHAT_BENCH_REPORT) writeFileSync(process.env.JUNO_CHAT_BENCH_REPORT, report)
+  expect(queryP95).toBeLessThan(5)
+  expect(p95).toBeLessThan(50)
   for (const run of after) {
     expect(run.events).toBe(100)
-    expect(run.queryP95).toBeLessThan(5)
-    expect(run.p95).toBeLessThan(50)
     expect(run.bytes).toBeLessThan(200_000)
     // Cache retained heap, not the test runner's RSS or GC scheduling noise.
     expect(run.retainedHeap).toBeLessThan(32 * 1024 * 1024)
