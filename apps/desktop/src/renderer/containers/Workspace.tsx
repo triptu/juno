@@ -28,14 +28,14 @@ import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
-import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
-import { NewChatTab } from './NewChat'
+import { closeTabById, loadAllTopicsPage, loadNewChat, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
 /** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
 const AllTopicsPage = lazy(loadAllTopicsPage)
+const NewChatTab = lazy(loadNewChat)
 // Rare pages load on first open, to keep the first bundle in budget.
 const SettingsTab = lazy(() => import('./Settings').then((chunk) => ({ default: chunk.SettingsTab })))
 
@@ -85,7 +85,11 @@ function Page({ tab }: { readonly tab: Tab }) {
     case 'topic':
       return <TopicTab key={place.topicId} tabId={tab.id} id={place.topicId} />
     case 'newChat':
-      return <NewChatTab key="new-chat" tabId={tab.id} />
+      return (
+        <Suspense key="new-chat" fallback={null}>
+          <NewChatTab tabId={tab.id} />
+        </Suspense>
+      )
     case 'home':
       return <HomePage key="home" />
     case 'juno':
@@ -175,6 +179,7 @@ export function Workspace() {
     const idle = requestIdleCallback(
       () => {
         void loadAllTopicsPage()
+        void loadNewChat()
         if (registry.get(junoAvailableAtom)) void loadJuno()
       },
       { timeout: 5_000 },

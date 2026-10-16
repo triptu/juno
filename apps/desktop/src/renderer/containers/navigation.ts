@@ -306,6 +306,12 @@ function keepsNewChat(tabs: Tabs): boolean {
   return tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
 }
 
+/** New chat loads on idle, or before navigation if opened sooner. */
+export const loadNewChat = (() => {
+  let loading: Promise<{ default: typeof import('./NewChat').NewChatTab }> | undefined
+  return () => (loading ??= import('./NewChat').then((chunk) => ({ default: chunk.NewChatTab })))
+})()
+
 /**
  * ⌘N and the sidebar's New chat button: a New chat in a new tab (spec
  * section 9), or the New chat tab that is still untouched.
@@ -320,7 +326,7 @@ export function openNewChat(): void {
     else switchToTab(blank.id)
     return
   }
-  show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
+  show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined, true, loadNewChat().then(() => undefined))
 }
 
 /** New chat tabs listening for "focus your composer", by tab id. */
@@ -347,7 +353,7 @@ export function openNewChatTo(conversation: PickConversation): void {
     const next = blank === undefined ? openHere(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
     if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
     return next
-  }, undefined)
+  }, undefined, true, loadNewChat().then(() => undefined))
 }
 
 /**

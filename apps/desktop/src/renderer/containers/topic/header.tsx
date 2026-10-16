@@ -1,35 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
-import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, nowAtom, registry, topicAtom } from '@juno/state'
+import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { TopicHeader, TopicSwitcher as TopicSwitcherView, type MenuAnchor } from '@juno/views'
+import { TopicHeader, type MenuAnchor } from '@juno/views'
 import { toggleJunoPanel } from '../juno/actions'
-import { openTopic } from '../navigation'
 import { scopeToChannel, showChannelMenu } from '../placeMenus'
 import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from '../topicActions'
 
-/**
- * The title's topic switcher (SPEC 7): the channel's Main and threads, from
- * local queries the topic keeps live while shown, so it opens with its rows
- * in the first frame. Mounted only while open; the query text is its own.
- */
-function Switcher({ detail, onClose }: { readonly detail: TopicDetail; readonly onClose: () => void }) {
-  const channel = detail.channel.id
-  const mainId = mainTopicOf(channel)
-  const result = useAtomValue(channelTopicsAtom(channel))
-  const mainUnread = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? (header.value?.unreadCount ?? 0) : 0))
-  const now = useAtomValue(nowAtom)
-  const [query, setQuery] = useState('')
-  const window = result._tag === 'Success' ? result.value : undefined
-  const threads = window === undefined ? undefined : window.order.map((id) => window.rows.get(id)!)
-  const open = (id: string, event: { readonly metaKey: boolean }) => {
-    onClose()
-    if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
-  }
-  return (
-    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
-  )
-}
+const loadSwitcher = () => import('./Switcher')
+const Switcher = lazy(loadSwitcher)
 
 /**
  * The topic's header: title, place pill, Resolve, the Juno toggle, the
@@ -53,6 +32,7 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
   // title opens the switcher with its rows in the first frame (performance 4.4).
   useEffect(() => {
     if (!drawnAll || readOnly) return undefined
+    void loadSwitcher()
     const releases = [registry.mount(channelTopicsAtom(channel)), registry.mount(topicAtom(mainTopicOf(channel)))]
     return () => releases.forEach((release) => release())
   }, [drawnAll, readOnly, channel])
@@ -67,7 +47,7 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
       {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
       {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
-      switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
+      switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Suspense fallback={null}><Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /></Suspense> : null }}
     />
   )
 }
