@@ -14,6 +14,8 @@ export interface OwnerBubbleProps {
   readonly item: OwnerMessageItem
   readonly now: number
   readonly actions: ChatActions
+  /** Laid out in full even off screen, never at the size estimate. */
+  readonly eager?: boolean
 }
 
 /**
@@ -27,7 +29,7 @@ export interface OwnerBubbleProps {
  * and text come from the `chat` token group, so the owner's colour choice
  * is a token change.
  */
-export const OwnerBubble = memo(function OwnerBubble({ item, now, actions }: OwnerBubbleProps) {
+export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager = false }: OwnerBubbleProps) {
   const end = isGroupEnd(item.group)
   const menu = actions.onContextMenu
   const replyTo = item.replyTo
@@ -40,7 +42,7 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions }: Own
           <QuoteStub quote={replyTo} onOpen={() => actions.onQuote(replyTo.target)} />
         </div>
       ) : null}
-      <div {...stylex.props(rowStyles.row, rowStyles.contained, styles.row)}>
+      <div {...stylex.props(rowStyles.row, rowStyles.contained, eager && rowStyles.eager, styles.row)}>
         <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
           {messageTime(item.at, now)}
         </Text>

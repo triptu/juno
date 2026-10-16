@@ -14,8 +14,8 @@
  *   (`panel:<tabId>`) or one Juno tab (`tab:<tabId>`), so it is kept while
  *   the panel is closed or the tab is put away.
  * - `openedAtNewAtom(topicId)`: the first message under the "new" divider the
- *   topic opened at, set by the topic view. The panel offers Catch me up
- *   until a message about the topic is sent from it (`catchUpDoneAtom`).
+ *   topic opened at, set by the topic view. A message sent from the panel
+ *   carries it, so Juno knows what is new.
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
  * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
@@ -87,7 +87,6 @@ export const junoAboutAtom = Atom.family((_key: string) => Atom.make<Exclude<Abo
 export const junoDraftAtom = Atom.family((_key: string) => Atom.make('').pipe(Atom.keepAlive))
 
 export const openedAtNewAtom = Atom.family((_topicId: string) => Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive))
-export const catchUpDoneAtom = Atom.family((_topicId: string) => Atom.make(false).pipe(Atom.keepAlive))
 
 /** A request for the Juno tab's or the panel's composer to take focus; `n` counts requests, so each is taken once. */
 export interface JunoFocusRequest {

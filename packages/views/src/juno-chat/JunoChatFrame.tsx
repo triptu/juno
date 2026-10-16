@@ -76,8 +76,10 @@ const styles = stylex.create({
     minHeight: 0,
     backgroundColor: colors['--background'],
   },
+  // On the panel's own surface, with Juno's bubbles lifted off it.
   panel: {
     backgroundColor: 'transparent',
+    '--juno-bubble-bg': colors['--panel-bubble'],
   },
   middle: {
     position: 'relative',

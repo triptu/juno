@@ -1,0 +1,1 @@
+- 10-16 14:05 · juno-panel · The Juno panel's surface is its own token, a step below the page in light and above it in dark, with no accent tint; Juno's bubbles on it are lifted to stay readable.

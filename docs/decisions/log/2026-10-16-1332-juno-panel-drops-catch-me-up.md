@@ -1,0 +1,1 @@
+- 10-16 13:32 · juno-panel · The Juno panel no longer offers a Catch me up chip; to catch up you ask Juno in the panel, and the message still carries where the "new" divider was.

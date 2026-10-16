@@ -27,6 +27,10 @@ export const darkColors = stylex.createTheme(colors, {
   '--surface-active': '#32302D',
   '--surface-raised': '#373532',
 
+  // A step above the page (L 0.215) and under the field (0.26).
+  '--panel-surface': '#201E1B',
+  '--panel-bubble': '#2D2B28',
+
   '--secondary-default': '#302F2C',
   '--secondary-hover': '#383633',
   '--secondary-active': '#403E3B',

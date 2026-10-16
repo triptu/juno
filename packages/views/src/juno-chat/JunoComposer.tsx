@@ -30,7 +30,7 @@ export interface JunoComposerProps {
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** `panel`: the Juno panel's padding, full width. Default `page`. */
   readonly column?: 'page' | 'panel'
-  /** Above the field in the panel: Catch me up and the context line. */
+  /** In the field's top, above the text, in the panel: the context chips. */
   readonly context?: ReactNode
 }
 
@@ -55,13 +55,13 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
   }
   return (
     <div data-juno-composer={column} {...stylex.props(styles.outer, panel && styles.outerPanel)}>
-      {context}
       {quote !== undefined ? (
         <div data-composer-quote="" {...stylex.props(styles.quote, panel && styles.wide)}>
           <QuoteStub quote={quote} {...(onClearQuote ? { onClear: onClearQuote } : {})} />
         </div>
       ) : null}
       <Surface kind="field" data-composer-field="" sx={[styles.box, panel && styles.wide, !enabled && styles.off]}>
+        {context}
         <div {...stylex.props(styles.row)}>
           <Textarea
             ref={inputRef}
@@ -114,6 +114,7 @@ const styles = stylex.create({
   box: {
     anchorName: '--composer-box',
     display: 'flex',
+    flexDirection: 'column',
     width: '100%',
     maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,
     marginInline: 'auto',
