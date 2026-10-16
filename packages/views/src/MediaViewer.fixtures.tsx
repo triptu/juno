@@ -4,7 +4,7 @@ import { defineFixtures, scene } from '@juno/ui'
 import type { MediaFile } from './MediaGrid'
 import { album, albumOf } from './fixtures/media'
 import { downloadable, image, PENDING_PICTURE, picture } from './fixtures/messages'
-import { NOW } from './fixtures/topics'
+import { NOW, people } from './fixtures/topics'
 import { MediaViewer, type MediaViewing } from './MediaViewer'
 import { MessageList } from './MessageList'
 
@@ -13,7 +13,8 @@ const noop = () => {}
 const { download: _download, ...notDownloadable } = downloadable.portrait
 
 const media = (files: ReadonlyArray<FileView>) => files as ReadonlyArray<MediaFile>
-const viewing = (items: ReadonlyArray<FileView>, index = 0): MediaViewing => ({ items: media(items), index, sender: 'Priya Shah', at: NOW - 20 * 60_000 })
+/** As the message behind it (`albumOf`) says: its sender and its time. */
+const viewing = (items: ReadonlyArray<FileView>, index = 0): MediaViewing => ({ items: media(items), index, sender: people.priya.name, at: NOW - 20 * 60_000 })
 
 /** A video Slack made a poster for; the fixture plays nothing. */
 const video: FileView = { ...image('F0VID', 'standup-recording.mp4', 1280, 720, picture(1280, 720, '#7F8FA6')), kind: 'video', mimetype: 'video/mp4' }

@@ -346,7 +346,9 @@ test('several images open in the viewer at the one clicked, and the keys and the
   const strip = viewer.getByRole('group', { name: 'All pictures in this message' })
   await expect(current).toHaveAttribute('data-viewer-item', '3')
   await expect(viewer.locator('[data-viewer-name]')).toHaveText('cable-map.png')
-  await expect(viewer.locator('[data-viewer-meta]')).toContainText('3 of 4')
+  // The header names the message's sender, as the message does.
+  await expect(row).toContainText('Maya Chen')
+  await expect(viewer.locator('[data-viewer-meta]')).toHaveText(/^Maya Chen · .+ · 3 of 4$/)
   await expect(strip.getByRole('button')).toHaveCount(4)
   await expect(strip.getByRole('button', { name: 'Show cable-map.png' })).toHaveAttribute('aria-current', 'true')
 
