@@ -1,0 +1,1 @@
+- 10-14 02:04 · Tushar · Living home: layout A (centred scene, greeting, up to three smart items, Ask Juno field, all-caught-up state), with the eight mascot scenes in docs/design/home/.

@@ -1,0 +1,1 @@
+- 10-13 10:50 · Tushar · The gallery follows the state-machine pattern; break passes run at each UI milestone and before shipping; layout shift must never happen (automated guard in tests).

@@ -1,0 +1,1 @@
+- 10-15 04:40 · Tushar · Verification must not be a bottleneck: saturate remote machines (parallel inside one, fan out across several), run only the tests affected by a change while iterating, run full suites on a schedule against main, cache passed checks by input hash, and find other ways to remove waiting.

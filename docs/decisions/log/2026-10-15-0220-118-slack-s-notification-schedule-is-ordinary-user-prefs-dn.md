@@ -1,0 +1,1 @@
+- 10-15 02:20 · orchestrator · Slack's notification schedule is ordinary user prefs (`dnd_enabled`, `dnd_days`, `dnd_start_hour`, `dnd_end_hour`, per-day keys) written with `users.prefs.set`; found read-only, setter not called. Slack lets only VIP people through a pause, so outside the hours a channel set to Every message reaches the Mac only, never the phone.

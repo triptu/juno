@@ -1,0 +1,1 @@
+- 10-15 22:10 · Tushar · The sidebar's Unread toggle becomes an icon, like Channels and DMs.

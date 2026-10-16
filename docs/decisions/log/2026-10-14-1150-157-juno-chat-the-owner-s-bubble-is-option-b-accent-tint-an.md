@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · Juno chat: the owner's bubble is option B (accent tint), and Juno says "I" in its own chat.

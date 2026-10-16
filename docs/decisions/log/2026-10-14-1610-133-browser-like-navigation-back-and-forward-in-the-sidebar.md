@@ -1,0 +1,1 @@
+- 10-14 16:10 · Tushar · Browser-like navigation: back and forward in the sidebar header (per-tab history), a resizable and collapsible sidebar, a native tab menu (Pin, Close, Close others, Close to the right, Close all), the usual browser shortcuts including ⌘⇧T to reopen a closed tab, and an unread dot on tabs. Specced in the simplification pass; built after fix B.

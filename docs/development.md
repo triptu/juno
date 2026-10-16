@@ -54,6 +54,63 @@ Before calling work done: `pnpm affected`, which covers typecheck, lint and the 
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 
+## Decision log
+
+Add one file per decision under `docs/decisions/log/`, named
+`YYYY-MM-DD-HHMM-slug.md` using local IST time and a distinct descriptive slug.
+Keep the existing one-line format, for example:
+
+```md
+- 10-17 00:55 · orchestrator · Record decisions in separate fragments to avoid merge conflicts.
+```
+
+Run `node scripts/decision-log.mjs` and commit both the fragment and generated
+`docs/decision-log.md`. Never edit the generated log by hand. Lint checks that it
+matches the fragments. The builder sorts newest first, then by filename for ties;
+`~` in a reconstructed entry's time stays in its text. The status page reads the
+built file. Historical fragments use a numeric prefix in the slug to preserve
+their original order when timestamps match.
+
+## Batch merges
+
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+
+Fetch `origin/main`, then run from the repository root:
+
+```sh
+node scripts/batch-merge.mjs branch-one branch-two
+node scripts/batch-merge.mjs --continue batch-1
+node scripts/batch-merge.mjs --continue batch-1 --push
+```
+
+The script creates `batch-N` from the current `origin/main` in
+`.claude/worktrees/batch-N`, pins the input branch tips, and merges them in order.
+At a source conflict it prints the branch and files. Resolve and `git add` them
+in that worktree, then use `--continue batch-N` from the original worktree. You
+can also commit the resolution yourself. An aborted merge must be redone before
+continuing. Progress and command output stay in `.juno-status/batches/` in the
+original worktree; read `batch-N.log` while checks run.
+
+Generated-file conflicts use a temporary copy of the batch's version. After all
+merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
+decision log, runs `pnpm health:baseline`, and commits generated changes. Review
+the baseline diff: regeneration records the merged tree's current health,
+including any increases. Then it runs one `pnpm affected --base <base-commit>`
+against the pinned `origin/main` commit. A failed command retains the worktree;
+fix the cause, commit source fixes, and continue to rerun checks.
+
+Nothing pushes without `--push`. Publishing checks commit messages for attribution
+lines, requires clean files and the checked commit, and uses a normal push to
+`origin/main`. If main advanced, start a new batch after fetching. A successful
+push removes the worktree; the batch branch and logs remain. Continuing a checked
+batch reruns checks before publishing.
+
+`--dry-run branch-one branch-two` performs local merges, installation and
+regeneration, but only prints the affected plan. Dry-run batches cannot push.
+Remove a discarded worktree with `git worktree remove <path>`, then delete its
+batch branch with `git branch -D batch-N`. If a process was killed, remove its
+`.juno-status/batches/active.lock` only after confirming it has stopped.
+
 ## Codebase health
 
 Run `pnpm health` for a summary and the largest clone pairs, files, and functions.

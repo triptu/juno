@@ -1,0 +1,1 @@
+- 10-17 00:55 · orchestrator · From the design review, following native Mac conventions: Settings controls sit at the trailing edge in every section; tab Close buttons are not Tab stops (Delete and ⌘W close a focused tab); two-line picker rows are 44px; Main has no icon in the topic switcher; the default button goes last on Juno cards.

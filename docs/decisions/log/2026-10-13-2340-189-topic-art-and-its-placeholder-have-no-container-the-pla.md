@@ -1,0 +1,1 @@
+- 10-13 23:40 · Tushar · Topic art and its placeholder have no container. The placeholder is a free-form shape picked per topic (Tide-style), not a rounded box.

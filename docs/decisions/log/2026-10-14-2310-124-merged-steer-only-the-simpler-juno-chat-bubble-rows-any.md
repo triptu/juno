@@ -1,0 +1,1 @@
+- 10-14 23:10 · orchestrator · Merged steer-only (the simpler Juno chat: bubble rows, any-emoji reactions both ways, reply quotes, no Stop, plain Failed cards; Task card keeps its Stop) and the header B design. Double-click rename in the header is dropped since the title opens the menu, which has Rename (designer's recommendation, in line with the simplicity rule).

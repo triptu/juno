@@ -1,0 +1,1 @@
+- 10-13 11:30 · Orchestrator · Add a read-only live sync dry run that prints only aggregate numbers, to validate sync against the real workspace before the sidebar UI.

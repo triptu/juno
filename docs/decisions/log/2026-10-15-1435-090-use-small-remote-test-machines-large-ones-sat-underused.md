@@ -1,0 +1,1 @@
+- 10-15 14:35 · Tushar · Use small remote test machines; large ones sat underused and cost too much. Fan out across more small machines within the plan cap.

@@ -1,0 +1,1 @@
+- 10-16 00:00 · Tushar · Row meta lines show no avatar stack for 1:1 and group DMs (the meta already names the people), and no avatar stack anywhere includes you.

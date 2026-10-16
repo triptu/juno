@@ -1,0 +1,1 @@
+- 10-16 15:00 · Tushar · Links in message content that open outside the app use the pointing-hand cursor, as native Mac apps do for text links. Every other control keeps the arrow; the lint check allows only that one place.

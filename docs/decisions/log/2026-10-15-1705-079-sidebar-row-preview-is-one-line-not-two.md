@@ -1,0 +1,1 @@
+- 10-15 17:05 · Tushar · Sidebar row preview is one line, not two.

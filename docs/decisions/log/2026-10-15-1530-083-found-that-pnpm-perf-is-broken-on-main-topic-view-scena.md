@@ -1,0 +1,1 @@
+- 10-15 15:30 · orchestrator · Found that `pnpm perf` is broken on main: topic-view scenarios skip on a failing shared setup and the send mark is empty, so no budget guarded topic open, scroll or send. A perf-fix agent repairs it, makes skipped scenarios fail, measures every budget, and adds perf and feel to the scheduled main check.

@@ -1,0 +1,1 @@
+- 10-14 18:45 · orchestrator · Merged spend-cap spec alignment, M4 fix B and WP12 to main. Steer-only merges after its agent resolves the action-spec conflicts with the spend-cap change. The Task card keeps its Stop: it stops a running coding task, not the chat.

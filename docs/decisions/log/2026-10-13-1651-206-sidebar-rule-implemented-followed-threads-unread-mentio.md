@@ -1,0 +1,1 @@
+- 10-13 16:51 · Orchestrator · Sidebar rule implemented: followed threads, unread-mention threads Slack has said nothing about, and Main for channels with any activity in the window. An explicit unfollow hides the thread. Subscribe and unsubscribe mirror through an outbox seam and revert on failure. Real workspace: 452 rows (303 threads, 149 Main).

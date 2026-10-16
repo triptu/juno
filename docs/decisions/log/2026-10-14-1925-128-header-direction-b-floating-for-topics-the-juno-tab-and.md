@@ -1,0 +1,1 @@
+- 10-14 19:25 · Tushar · Header direction B (Floating) for topics, the Juno tab and the Juno panel: the pill and title, and the actions, float as islands over the messages. No topic art in the header. The pill drops its visible kind text; the tint, icon, tooltip and screen-reader name keep the kind. Designs in `docs/design/header/`.

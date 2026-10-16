@@ -1,0 +1,1 @@
+- 10-14 02:31 · Tushar · Juno Agent: T3 sessions run with full access in a new worktree; backup goes to a local folder he chooses (path is a setting); bubble colour decided after a mock; T3 over a network address needs a switch, off by default.

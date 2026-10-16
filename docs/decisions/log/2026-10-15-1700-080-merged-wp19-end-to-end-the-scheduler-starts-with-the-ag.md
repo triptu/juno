@@ -1,0 +1,1 @@
+- 10-15 17:00 · orchestrator · Merged WP19 end to end: the scheduler starts with the agent and admits due wakes, reply watches check for replies through the host with no model run, and an open nudge card expires when a reply arrives; four clock-driven flow tests, 171 agent tests pass.

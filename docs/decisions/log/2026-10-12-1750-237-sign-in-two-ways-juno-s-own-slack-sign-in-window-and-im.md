@@ -1,0 +1,1 @@
+- 10-12 ~17:50 · Tushar · Sign in two ways: Juno's own Slack sign-in window, and import from the installed Slack app.

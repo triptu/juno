@@ -1,0 +1,1 @@
+- 10-13 23:10 · Orchestrator · The Quint follow spec, aligned with the implementation, found three ways an accepted Unsubscribe could be undone (a delayed followed event, a page requested during the command, a lost response plus a failed lookup). Fixing them in sync and making `acceptedUnfollow` pass; the old behaviour stays as bug-mode counterexamples.

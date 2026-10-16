@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · Juno Agent chat works like iMessage. There is no Stop button and no Esc to stop; to change course you send a message. The core has two inputs: queue a message and listen to events. A queued message joins the run at its next step (pi already works this way). SPEC 13 and the turn router are revised to match.

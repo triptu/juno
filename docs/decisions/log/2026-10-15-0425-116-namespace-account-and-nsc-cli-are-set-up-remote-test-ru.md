@@ -1,0 +1,1 @@
+- 10-15 04:25 · Tushar · Namespace account and `nsc` CLI are set up; remote test runs become the top priority because the Mac is overloaded (load 11 to 15, about 20 queued heavy jobs). Perf and feel stay on the Mac.

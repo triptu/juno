@@ -1,0 +1,1 @@
+- 10-15 20:45 · orchestrator · Merged the Juno chat cache: finished runs are cached and reactions, status and card updates patch rows in place; on a 5,000-message chat the p95 time per event fell from 50.4 ms to 14.8 ms, for about 13 MiB more memory. A randomized test checks the cached page equals a full rebuild. Removal will call `invalidateChatCaches`.

@@ -1,0 +1,1 @@
+- 10-14 14:05 · Tushar · Keyboard edit and delete: ↑ from an empty composer selects the newest message, ↑ ↓ move, E edits your own message, Delete or Backspace deletes it after one inline confirm (M6). The owner uses few shortcuts; this is the one that matters.

@@ -1,0 +1,1 @@
+- 10-14 04:10 · Orchestrator · Tabs (M4 WP5): ⌘-click, ⌘-Enter and Open in new tab put the new tab right after the current one and focus it; Open in stealth opens in the current tab like a plain open. The tab menu has only Close tab until M5. Tabs are saved per workspace in the `tabs` preference, stealth flags included.

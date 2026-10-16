@@ -1,0 +1,1 @@
+- 10-12 ~19:20 · Tushar · Performance is a first-class feature: rows activate on mouse down, there are budgets and regression tests, and a performance reviewer looks at each milestone.

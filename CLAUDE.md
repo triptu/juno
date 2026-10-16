@@ -24,6 +24,8 @@ Read the parts relevant to your task, and the package's README, before changing 
 
 ## Working rules
 
+- Add each decision as one dated line in its own `docs/decisions/log/YYYY-MM-DD-HHMM-slug.md` fragment (IST; choose a distinct slug). Run `node scripts/decision-log.mjs` and commit the generated result. Never edit `docs/decision-log.md` by hand; lint checks it against the fragments.
+
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
 - Verify with `pnpm affected` while iterating and before calling work done: it typechecks the tsc projects whose inputs changed (remotely), runs the whole lint (on the Mac, about 3 s) and runs only the tests your change can reach, on Namespace machines in parallel (`docs/development.md`, "Affected tests"). Do not run a full local `pnpm typecheck` or `tsc -b`; if you want a quick local check while editing, run tsc on the one package you are editing (`pnpm --filter <package> typecheck`). Run full suites only when asked, before a merge; scheduled full runs cover main.

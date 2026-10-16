@@ -1,0 +1,1 @@
+- 10-16 01:20 · orchestrator · Merged row-avatars-2: indexing leaves you out when it collects a topic's 4 participants, so busy threads show up to 4 other people. No migration; older rows fix themselves on their next activity, and the display filter covers them until then.

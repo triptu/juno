@@ -1,0 +1,1 @@
+- 10-16 11:30 · orchestrator · Merged the 10-16 design follow-ups: no confidence number in the send-check bar, one "Runs without asking" checkbox per tool, secondary Connect and Sign in, the shorter Automated question with Move raised, the backup path cut in the middle with the full path on hover, "Search, or ask Juno", and focus returning to Export recovery phrase.

@@ -1,0 +1,1 @@
+- 10-14 06:40 · Orchestrator · Root `pnpm typecheck` runs at most three packages at once. Unbounded parallel typechecks from several agents pushed load to 30 and made the spec checker time out.

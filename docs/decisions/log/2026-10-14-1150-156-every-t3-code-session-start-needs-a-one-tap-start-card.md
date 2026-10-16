@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · Every T3 Code session start needs a one-tap Start card, whatever Juno has read. Replaces the narrower no-click rule.

@@ -1,0 +1,1 @@
+- 10-16 20:00 · orchestrator · Local desktop tests rebuild first when sources changed (Playwright global setup with build-cached), after a stale build made a fixed bug look live.

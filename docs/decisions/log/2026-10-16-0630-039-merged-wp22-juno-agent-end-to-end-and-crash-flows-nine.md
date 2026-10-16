@@ -1,0 +1,1 @@
+- 10-16 06:30 · orchestrator · Merged WP22 (Juno Agent end-to-end and crash flows): nine flow specs and all 16 crash points, 1,950 passes and 0 failures over 50 repeats each. 18 cases stay `fixme` with their blockers listed in apps/desktop/e2e/juno-agent/WP22.md; the card-wiring agent turns on the ones that now pass.

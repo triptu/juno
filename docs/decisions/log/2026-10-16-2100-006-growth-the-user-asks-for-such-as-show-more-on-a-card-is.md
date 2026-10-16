@@ -1,0 +1,1 @@
+- 10-16 21:00 · orchestrator · Growth the user asks for, such as Show more on a card, is exempt from the layout-shift guard (`data-expands-in-place`). Everything that moves on its own still fails the guard.
