@@ -14,6 +14,8 @@
  *   0007), so Chromium attaches the `d` cookie, stores rotations and uses
  *   the system proxy and CAs.
  */
+// First, so coverage (test runs only) starts before the rest of the bundle runs.
+import '../coverage'
 import { net } from 'electron'
 import { Effect, Layer, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'

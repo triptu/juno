@@ -46,7 +46,7 @@ if (files.status !== 0) {
 
 const hash = createHash('sha256')
 hash.update(command.join(' '))
-for (const name of ['JUNO_UNMINIFIED', 'NODE_ENV']) hash.update(`\0${name}=${process.env[name] ?? ''}`)
+for (const name of ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV']) hash.update(`\0${name}=${process.env[name] ?? ''}`)
 for (const file of files.stdout.split('\0').filter(Boolean).toSorted()) {
   const path = join(root, file)
   // A deleted file that git still tracks counts as absent.

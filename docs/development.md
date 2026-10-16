@@ -629,16 +629,15 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 
 Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
 
-**Agents.** Before reporting, an agent runs `pnpm typecheck`, `pnpm lint`, the unit test files its change reaches (`pnpm remote test --passWithNoTests <files>`, paths relative to their package), the e2e spec files it added or changed plus those for the feature it changed (`pnpm remote test:desktop <files>`), gallery shots for the components it changed (`GALLERY_SHIFT_ONLY=<names> pnpm remote test:gallery`), and `pnpm specs:check` only when it changed a spec or the code the spec models. One remote run at a time per agent. Bare `pnpm affected` is not used until it selects narrowly again (below).
+**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then every suite its change reaches as one plan on one remote machine, with desktop specs picked by coverage ("Affected tests"). `pnpm affected --plan` first shows what it would run and why. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green.
+**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green. After each run it commits `apps/desktop/e2e/coverage-map.json`, which `pnpm verify:main` refreshed ("Desktop specs by coverage").
 
 **One machine per run** (landed 10-16): `pnpm affected` and `pnpm verify:main` run their remote suites as one plan on one 8x16 machine, build the desktop app once, and do not shard the desktop e2e. See "Remote runs" and "Machine shapes".
 
-**Work in progress** (this section changes as each lands):
-- Test selection by coverage: the full run records which source files each e2e spec and gallery component exercises, and `pnpm affected` runs only the specs whose recorded files changed.
+**Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map the keeper refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
 **A leaner suite** (10-17). Slow, duplicated and misplaced tests were merged, moved or removed, and fixed waits replaced with waits on a condition. Each suite on one remote machine of its usual shape, main at `0d93f4e9` before and the `test-slim` branch after:
 
@@ -658,25 +657,53 @@ Still slow, left as they are: the T3 Code e2e tests wait out the watcher's fixed
 
 `pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan on one Namespace machine (`pnpm remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
-An import graph over `apps/` and `packages/` decides what each change reaches: relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
+An import graph over `apps/` and `packages/` decides what each change reaches, and for desktop e2e specs a coverage map narrows it ("Desktop specs by coverage" below). The graph follows relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
 | Changed | Runs |
 | --- | --- |
-| `pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `tsconfig.base.json`, `scripts/affected.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs` | everything below, in full |
+| `pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `tsconfig.base.json`, `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs` | everything below, in full |
 | A file a vitest file reaches, or a package's `package.json`, `vitest.config.ts` or `tsconfig.json` | those vitest files (`pnpm test --passWithNoTests <files>`) |
 | `specs/` (not Markdown) | `pnpm specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
 | `specs/outbox.qnt`, the conformance generator, or code the replay reaches | `pnpm specs:conformance` |
-| A file a component's fixtures reach | `pnpm test:gallery` with `GALLERY_SHIFT_ONLY` set to those components (the behaviour tests run in full) |
-| `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
-| A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
-| Only e2e spec files | `pnpm test:desktop <those files>` |
+| A file a component's fixtures reach | `pnpm test:gallery` with `GALLERY_SHIFT_ONLY` set to those components, and the other behaviour specs that open one of them (below) |
+| A gallery behaviour spec other than `shift.spec.ts` | that spec |
+| `apps/gallery/` (except its spec files and `shots.spec.ts`), `shift.spec.ts`, `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component and spec |
+| A file the desktop app runs (`apps/desktop/src` and the packages it bundles) | `pnpm test:desktop` with the specs the coverage map says ran it (below) |
+| The shared e2e support: `e2e/fixtures.ts`, `e2e/driver/`, `e2e/build.ts`, `e2e/coverage.ts`, `e2e/no-skips.ts`, the Playwright and electron-vite configs, `apps/desktop/package.json`, the renderer's `index.html`, `src/coverage.ts`, and what they reach outside the app (the fake Slack, the fake OpenRouter) | `pnpm test:desktop` in full |
+| An e2e spec file, or a helper only some specs import | `pnpm test:desktop <those specs>` |
 | Any `.ts`, `.tsx` or config a typecheck project reads | `pnpm typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
 | Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
-**Results cache.** Each unit test file, gallery component (plus one item for the behaviour tests) and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
+**Results cache.** Each unit test file, gallery component, gallery behaviour spec file and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
 
 `perf` and `test:feel` never run here, but `pnpm verify:main --with-mac` runs both on the Mac after the other suites; the plan reminds you to run them on the Mac when the renderer or a view changed. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
+
+### Desktop specs by coverage
+
+Nearly every file reaches the whole desktop app through the import graph, so the graph alone would run every desktop spec for any app change. Instead, `pnpm affected` reads `apps/desktop/e2e/coverage-map.json`, which records, for each spec file, the source files under `apps/` and `packages/` whose functions ran while one of its tests had the app open.
+
+**Recording.** `JUNO_COVERAGE=1` turns it on for a desktop run. The build then writes hidden source maps (`electron.vite.config.ts`; `build-cached` rebuilds when the variable changes). `apps/desktop/src/coverage.ts` is the first import of main, the engine and the agent: with `JUNO_E2E_COVERAGE` set to a directory, each process starts precise function coverage on its own inspector and writes the start offsets of the functions that ran. Main also attaches to each renderer over the DevTools protocol before its page loads. The fixtures give each launch its own directory under the spec it belongs to, and ask main and the renderers to write before they close the app. The engine and the agent write every two seconds and on SIGTERM. The run's teardown (`e2e/coverage.ts`) runs `node scripts/coverage-map.mjs reduce`, which maps the offsets to source files with the source maps and writes `apps/desktop/coverage/map/partial-<shard>.json`; `pnpm remote` brings it back with the reports. A module's top level does not count: in a bundle it runs at load in every test, so it says nothing about a spec.
+
+**Refreshing.** `pnpm verify:main` runs the desktop suite with `JUNO_COVERAGE=1` and writes the joined map (`node scripts/coverage-map.mjs merge <partials> --commit <sha>`) to `apps/desktop/e2e/coverage-map.json` in the checkout it ran from. A failed test still ran its code, so failures do not stop the refresh. The CI keeper commits the map after each of its runs on main, as "Refresh the e2e coverage map". The map is a few hundred kilobytes, one source file per line, so a refresh reads as a diff.
+
+**Selecting.** `scripts/affected-select.mjs` picks, and the plan prints the first reason for each spec:
+
+- every spec, when the shared e2e support other than the driver changed (the table above), or when a changed file is in the app but outside the JavaScript bundles (a style sheet, a page, an asset);
+- for a driver change (`e2e/driver/`), the specs that use a changed class member or function, or a driver part that uses one. A spec uses `Palette.section` when it names `.section` and can get a `Palette`: it names the class or an accessor that builds or returns one. A change outside every named part (the class line, top-level statements) runs every spec;
+- the specs that ran a changed file;
+- a changed spec, and the specs that import a changed helper;
+- for a file with module-level code only (`moduleOnly` in the map: bundled, but no spec ran a function from it, such as schemas, RPC routes and prompts) or a file that is new since the map's commit, the specs that ran the files importing it, walking up through importers that did not run; every spec when nothing that imports it ran;
+- the specs that ran a file importing a changed file, when that importer itself changed since the map's commit (it may call the changed file now);
+- specs the map has no coverage for (new or never recorded), whenever the app changed.
+
+A changed app file that was in no bundle when the map was recorded (types only, or not used by the app) picks no spec.
+
+**Measured** (10-17, map from `d15f27ee`, replaying merges with `pnpm affected --plan --range <merge>^1..<merge>`). Of the 20 merges on main up to `25e9b5f7`, 17 touched the app, and for each the import graph picked every desktop spec. The coverage map picked 6 of 69 for palette-pages, 44 for thread-root and 1 for a batch fix; the other 14 still ran everything, because of the lockfile or root `package.json` (4), the fake Slack, the fake OpenRouter or the fixtures (5), or core files every spec runs (5: navigation, the send worker, sync boot). 123 files are run by every spec and the median file by 40. File by file it is narrower: palette files pick 5 specs, the message window 44. It picked the failing spec for all six real desktop failures of 10-16 (mirror-reads, tabs, both break-pass specs, avatars-unfurls, stick-bottom), whether given the whole merge or only the files that caused the failure. Gallery behaviour specs: 3 of 14 for palette-pages, slack-import-paths and automated-reason, 8 for send-checks-c, 13 for broad UI merges.
+
+**Staleness.** The map lags main by the time since the keeper's last run (about four merges or 90 minutes). The rules above cover the two ways it goes stale: new files, and importers edited since the map. What they miss is a call that became reachable through a file that did not change, which is rare; the keeper's full run on main catches it. A map more than three days old, from a commit this repository does not have, or missing, is not used: every spec runs when the app changed, as before. `pnpm affected --graph` ignores the map.
+
+**Limits.** Code that runs only in the test process (the fake Slack, the driver) is not recorded; that is why changes there run every spec. The renderer writes its coverage when the test closes the app, so a renderer that crashed or a window that closed before that is not counted. Tests tagged `@mac` do not run remotely and are not recorded. The gallery is not recorded: its behaviour specs are narrowed by the component names they open (`galleryComponents`), and a spec that reads every route without filtering them runs for any component.
 
 ## Remote runs
 

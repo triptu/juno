@@ -15,12 +15,18 @@
 // suite failed. perf and test:feel time the Mac, so they run only with
 // --with-mac, one after the other, each holding the whole machine; the feel
 // contact sheet is copied next to the logs.
+//
+// The desktop suite records coverage (JUNO_COVERAGE=1), and the run writes the
+// coverage map pnpm affected selects specs by to
+// apps/desktop/e2e/coverage-map.json in this checkout; the CI keeper commits
+// it (docs/development.md, "Affected tests").
 
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -49,7 +55,7 @@ const suites = [
   { name: 'test', words: ['test'] },
   { name: 'specs:check', words: ['SPECS_CACHE=off', 'specs:check'] },
   { name: 'test:gallery', words: ['test:gallery'] },
-  { name: 'test:desktop', words: ['test:desktop'] },
+  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'test:desktop'] },
 ]
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -94,7 +100,25 @@ if (withMac) {
     })(),
   )
 }
+const planStarted = Date.now()
 let results = (await Promise.all(runs)).flat()
+
+// The coverage map, from the partials this run's desktop machines brought back
+// (scripts/coverage-map.mjs). A failed test still ran its code, so a failure
+// does not stop the refresh; a spec with no partial is left out of the map and
+// then always runs.
+const partials = existsSync(join(checkout, '.remote'))
+  ? readdirSync(join(checkout, '.remote'), { recursive: true })
+      .map((name) => join(checkout, '.remote', String(name)))
+      .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= planStarted)
+  : []
+let coverageNote = 'no coverage partials came back; the coverage map was not refreshed'
+if (partials.length > 0) {
+  const map = mergePartials(partials.map((path) => JSON.parse(readFileSync(path, 'utf8'))), commit)
+  writeFileSync(join(root, MAP_PATH), formatMap(map))
+  coverageNote = `coverage map refreshed from ${partials.length} partial(s): ${map.specs.length} spec file(s), ${Object.keys(map.files).length} source file(s); commit ${MAP_PATH}`
+}
+console.log(`verify:main: ${coverageNote}`)
 if (withMac) {
   // After the rest, so they do not time a machine the other suites are using.
   for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout)]
@@ -127,6 +151,7 @@ const summary = {
   ref,
   finishedAt: new Date().toISOString(),
   passed: results.every((result) => result.code === 0),
+  coverage: coverageNote,
   suites: results.map((result) => ({ ...result, log: relative(root, result.log), failures: result.code === 0 ? [] : failures(result.log) })),
 }
 writeFileSync(join(statusDir, 'verify-main.json'), `${JSON.stringify(summary, null, 2)}\n`)
@@ -134,6 +159,8 @@ const markdown = [
   `# verify:main ${summary.passed ? 'passed' : 'FAILED'}`,
   '',
   `${commit.slice(0, 10)} ${subject} (${ref}), finished ${summary.finishedAt}.`,
+  '',
+  `${coverageNote[0].toUpperCase()}${coverageNote.slice(1)}.`,
   '',
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',

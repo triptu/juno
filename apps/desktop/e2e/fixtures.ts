@@ -2,7 +2,7 @@ import { _electron as electron, test as base, type ElectronApplication, type Pag
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { startFakeSlack, writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
@@ -78,6 +78,23 @@ export interface LaunchOptions {
   readonly paced?: boolean
 }
 
+let launches = 0
+
+/**
+ * Under JUNO_COVERAGE=1, a directory of its own for this launch's coverage,
+ * under the spec file it belongs to (e2e/coverage.ts reduces them after the run).
+ */
+function coverageDir(): string | undefined {
+  if (process.env.JUNO_COVERAGE !== '1') return undefined
+  let spec = 'unknown'
+  try {
+    spec = relative(resolve(__dirname, '..'), base.info().file)
+  } catch {
+    // Outside a test or hook: the launch counts for no spec.
+  }
+  return resolve(__dirname, '../coverage/raw', spec.replaceAll('/', '__'), `${process.pid}-${launches++}`)
+}
+
 /**
  * Launches the built app (prepared by Playwright setup) on the given user-data
  * directory and waits for its first window. Launch the same directory twice
@@ -106,6 +123,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
   if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
+  const coverage = coverageDir()
+  if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
@@ -121,6 +140,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     app,
     win,
     close: async () => {
+      // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
+      if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
       await app.close()
       await ownOpenRouter?.close()
     },
