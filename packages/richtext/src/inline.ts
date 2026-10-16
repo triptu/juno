@@ -89,8 +89,12 @@ export function usergroupInline(id: string, fallbackHandle: string | undefined, 
 export function emojiInline(rawName: string, lookups: Lookups, hex?: string): Inline {
   const unicode = (hex !== undefined ? unicodeFromHex(hex) : undefined) ?? emojiUnicode(rawName)
   if (unicode !== undefined) return { kind: 'emoji', name: rawName, unicode }
-  const url = lookups.emoji?.(splitEmojiName(rawName).name)
+  const name = splitEmojiName(rawName).name
+  const url = lookups.emoji?.(name)
   if (url !== undefined) return { kind: 'emoji', name: rawName, url }
+  const target = lookups.emojiAlias?.(name)
+  const aliased = target === undefined ? undefined : emojiUnicode(target)
+  if (aliased !== undefined) return { kind: 'emoji', name: rawName, unicode: aliased }
   return { kind: 'emoji', name: rawName }
 }
 

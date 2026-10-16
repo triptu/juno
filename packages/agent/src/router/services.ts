@@ -16,6 +16,7 @@ import { createScheduler, ownScheduleTool, scheduleCreateTool, scheduleExecutors
 import type { JournalPosition } from '../store/ledger'
 import type { Store } from '../store/store'
 import { createViewSettings } from '../view-tools/views'
+import { openScripts } from '../scripts'
 import { hostTools } from './host-tools'
 import type { ModelRef, TurnsOptions } from './open'
 import type { Session } from './router'
@@ -36,12 +37,23 @@ interface Setup {
 export function createTurnServices(setup: Setup) {
   const { store, guard, initial, options, session, models, backup, poke } = setup
   const tools = () => registeredTools()
+  const scripting = options.codemode ? openScripts(store, options.codemode, () => router.state()?.runId) : undefined
   const section = () => {
     const base = instructions(jobs.active().map((job) => ({ title: job.title, line: job.state ?? job.phase })))
     const rules = rulesSection(ownerRules(store))
     return rules === '' ? base : `${base}\n\n${rules}`
   }
-  const builder = createRequestBuilder({ store, guard, systemAndTools: () => [`<juno>\n${section()}\n</juno>`, ...tools().map((t) => declaration(t.registration))] })
+  // What the model is sent: Juno's section, the codemode section, and the tools offered to the model.
+  // A tool only scripts call is in the codemode section instead.
+  const systemAndTools = () => {
+    const registered = tools().map((t) => t.registration)
+    return [
+      `<juno>\n${section()}\n</juno>`,
+      ...(scripting ? [scripting.scripts.sectionText(registered)] : []),
+      ...registered.filter((r) => r.callers?.includes('model') ?? true).map(declaration),
+    ]
+  }
+  const builder = createRequestBuilder({ store, guard, systemAndTools })
   const router = createRouter({
     store, session, builder, model: models.running, tools,
     rotate: session.rotate,
@@ -62,7 +74,8 @@ export function createTurnServices(setup: Setup) {
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const { scheduler, viewSettings, actions, redaction } = createActionServices({ ...setup, router, jobs, subagentModel })
-  const registeredTools = createTools({ ...setup, router, jobs, scheduler, viewSettings, actions, subagentModel })
+  const ownTools = createTools({ ...setup, router, jobs, scheduler, viewSettings, actions, subagentModel })
+  const registeredTools = scripting ? () => [...ownTools(), scripting.tool] : ownTools
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
     if (event._tag !== 'ended' || event.ending._tag !== 'blocked' || event.ending.reason !== 'budget') return
@@ -70,7 +83,7 @@ export function createTurnServices(setup: Setup) {
     actions.propose({ runId: event.runId, callId: `budget:${today.day}:${today.raises}`, payload: budgetCard(store, guard.spend) })
   })
   const ownership = openOwnership(store, options, backup, router, actions, session)
-  return { router, jobs, scheduler, actions, redaction, ownership, tools, section }
+  return { router, jobs, scheduler, actions, redaction, ownership, tools, section, scripts: scripting?.scripts }
 }
 
 type Router = ReturnType<typeof createRouter>

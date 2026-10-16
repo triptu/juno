@@ -17,14 +17,18 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
     blocks.push({ kind: 'paragraph', children: action.url ? [{ kind: 'link', url: action.url, text }] : mrkdwnInlines(text, lookups) })
   }
   if (!blocks.length && !attachment.title && attachment.fallback) blocks.push(...mrkdwnBlocks(attachment.fallback, lookups))
-  const title: Inline[] = attachment.title_link && attachment.title ? [{ kind: 'link', url: attachment.title_link, text: inlineText(mrkdwnInlines(attachment.title, lookups)) }] : mrkdwnInlines(attachment.title ?? '', lookups)
-  const footer = mrkdwnInlines(attachment.footer ?? '', lookups)
+  const titleUrl = attachment.title_link || attachment.from_url || attachment.original_url
+  const title: Inline[] = titleUrl && attachment.title ? [{ kind: 'link', url: titleUrl, text: inlineText(mrkdwnInlines(attachment.title, lookups)) }] : mrkdwnInlines(attachment.title ?? '', lookups)
+  const footer = mrkdwnInlines(attachment.footer || attachment.service_name || '', lookups)
   const timestamp = Number(attachment.ts)
   if (attachment.ts !== undefined && Number.isFinite(timestamp) && Math.abs(timestamp) < 8.64e12) {
     if (footer.length) footer.push({ kind: 'text', text: ' · ' })
     footer.push({ kind: 'date', timestamp, format: '{date_short} at {time}', fallback: '' })
   }
-  return { kind: 'attachment', tint: attachmentTint(attachment.color), title, blocks, footer }
+  return { kind: 'attachment',
+    ...(attachment.author_name ? { author: { name: attachment.author_name, ...(attachment.author_icon ? { icon: attachment.author_icon } : {}) } } : {}),
+    ...(attachment.footer_icon || attachment.service_icon ? { footerIcon: attachment.footer_icon || attachment.service_icon } : {}),
+    tint: attachmentTint(attachment.color), title, blocks, footer }
 }
 
 function attachmentTint(color: string | undefined): Extract<Block, { kind: 'attachment' }>['tint'] {

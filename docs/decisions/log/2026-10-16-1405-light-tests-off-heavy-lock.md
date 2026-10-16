@@ -1,0 +1,1 @@
+- 10-16 14:05 · orchestrator · `test:health` and `test:remote-pool` run without the heavy lock. They are small Node tests (1 to 70 s, mostly waiting) and sat an hour behind exclusive perf and package runs, which held a whole batch merge.

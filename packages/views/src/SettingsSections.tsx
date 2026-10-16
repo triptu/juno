@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { QuietWindowSetting } from './QuietWindowSetting'
@@ -14,35 +14,51 @@ import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 // is a settings page with its title; `SettingsPage` puts the list beside it.
 
 export interface SettingsGeneralProps {
+  /** How many days of activity the sidebar shows (1, 3, 7 or 14). */
+  readonly quietDays: number
+  readonly onQuietDaysChange: (days: number) => void
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
-  readonly quietDays: number
-  readonly onQuietDaysChange: (days: number) => void
+  readonly mirrorReads: boolean
+  readonly onMirrorReadsChange: (enabled: boolean) => void
+  readonly catchUp: { readonly available: number; readonly pending: number }
+  readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
 }
 
-/** General: tabs, topic recency, the peek key and the fast classifier. */
-export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, quietDays, onQuietDaysChange, classifier, onClassifierChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
+      <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
+        </Surface>
+      </Section>
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
         </Surface>
       </Section>
-      <Section heading="Topics">
-        <Surface kind="group" padding="md" sx={styles.card}>
-          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
-        </Surface>
-      </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
+        </Surface>
+      </Section>
+      <Section heading="Read status">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Mark messages read in Slack too" checked={mirrorReads}
+            onChange={(event) => onMirrorReadsChange(event.currentTarget.checked)}
+            description="When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read." />
+          <div {...stylex.props(styles.catchUp)} aria-live="polite">
+            {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
+              : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
+          </div>
         </Surface>
       </Section>
       <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">
@@ -123,6 +139,11 @@ const styles = stylex.create({
   // on the same line as the rows of Notifications, Juno, Connections and Backup.
   card: {
     paddingInline: spacing['--space-3-5'],
+  },
+  catchUp: {
+    minHeight: spacing['--space-8'],
+    display: 'flex',
+    alignItems: 'center',
   },
   stack: {
     display: 'flex',

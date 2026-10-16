@@ -1,7 +1,7 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
 export { engineStatusAtom, pingCommand, syncNoticeAtom, syncProgressAtom } from './engine'
-export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, signedInAtom, signInCommand, signOutCommand } from './session'
+export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, signedInAtom, signInCommand, signOutCommand } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
@@ -13,7 +13,7 @@ export {
   defaultAllTopicsFilter,
   type AllTopicsLayout,
 } from './allTopics'
-export { mirrorReadsAtom, shouldMarkRead } from './reads'
+export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
@@ -175,9 +175,10 @@ export {
   catchUpDoneAtom,
   flashMessage,
   focusJunoComposer,
+  JUNO_TAB_ABOUT,
   junoAboutAtom,
+  junoDraftAtom,
   junoAvailableAtom,
-  junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
   junoPanelWidthAtom,
@@ -187,7 +188,6 @@ export {
   quoteInJuno,
   setJunoPanelOpen,
   setJunoPanelWidth,
-  showInJunoChat,
 } from './junoPanel'
 export {
   fillHome,

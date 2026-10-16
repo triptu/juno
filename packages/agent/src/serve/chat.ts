@@ -18,9 +18,6 @@
  *
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
  *   Task card at the time its job started. A card is unread like a bubble.
- * - An hours-start summary (`chat_summaries`) is one Juno bubble with
- *   origin `summary` under a "Summary" label, at the time the host made
- *   it. It has no run: its `runId` is `summary:<id>`.
  *
  * Removed messages leave a "Removed" note in their place. The server adds
  * pin notes and their time-limited Undo after this cached projection.
@@ -47,14 +44,13 @@ import type {
 } from '@juno/agent-contract'
 import type { CardView } from '../actions/cards'
 import { sessionOf } from '../t3/protocol'
-import { aboutOf, chatCopy, summaryBubbleId } from '@juno/agent-contract'
+import { aboutOf } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
 import { resolveSpans, sourceTable, type BubbleSpan } from '../router/sources'
 import type { Store } from '../store/store'
 import { chatRevisions, keyedMemo, memo } from './cache'
-import { summaryBody, type SummaryRow } from './summaries'
 
 const GROUP_GAP_MS = 2 * 60_000
 const PREVIEW_CHARS = 120
@@ -124,7 +120,6 @@ function caches() {
     sourceKeys: memo<Map<string, string>>(),
     endings: keyedMemo<Entry | undefined>(),
     runs: memo<ReadonlyArray<RunRow>>(),
-    summaries: memo<ReadonlyArray<SummaryRow>>(),
     archiveIds: memo<Map<string, ChatMessageId>>(),
     archive: memo<ReadonlyArray<ArchiveRow>>(),
     reactions: memo<ReadonlyArray<ReactionRow>>(),
@@ -155,7 +150,7 @@ export function createChatCache(store: Store, changed: () => void = () => {}) {
   registered.add(invalidateAll)
   invalidators.set(store.db, registered)
   const inputs = (source: ChatSource, revision: ReturnType<typeof revisions>) => [
-    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs', 'tool_blocks', 'chat_summaries'),
+    ...revision('inbox', 'messages', 'runs', 'run_inputs', 'sources', 'chat_bubbles', 'jobs', 'tool_blocks'),
     source.readAt, source.waiting, source.dayOf, new Date().getTimezoneOffset(),
     JSON.stringify(source.jobs), JSON.stringify(source.cards.map((view) => [view.at, view.runId, view.card.id])),
     JSON.stringify(source.live === undefined ? undefined : { ...source.live, status: undefined }),
@@ -393,25 +388,6 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     }
   }
 
-  const summaries = cache.summaries(revision('chat_summaries'), () => store.db
-    .prepare('SELECT id, at, title, sources FROM chat_summaries ORDER BY at, id')
-    .all() as unknown as ReadonlyArray<SummaryRow>)
-  for (const row of summaries) {
-    const id = summaryBubbleId(row.id)
-    const origin: Origin = { _tag: 'summary', at: row.at }
-    const label = `label:summary:${row.id}`
-    junoEntries.push(cache.entries.get(label, [row.at], () => ({ by: 'line', at: row.at, item: { _tag: 'groupLabel', id: label, origin, text: chatCopy.groupLabel.summary } })))
-    const reactions = reactionsOf('bubble', id)
-    const body = summaryBody(row)
-    bubbleTexts.set(id, body.map((inline) => inline.text).join(''))
-    junoEntries.push(cache.entries.get(`bubble:${id}`, [row.at, row.title, row.sources, JSON.stringify(reactions), row.at > source.readAt], () => ({
-      by: 'juno',
-      at: row.at,
-      originKey: `summary:${row.id}`,
-      item: { _tag: 'juno', id, runId: `summary:${row.id}` as RunId, body, at: row.at, origin, reactions, unread: row.at > source.readAt },
-    })))
-  }
-
   for (const op of ops) {
     if (op.kind === 'retry') continue
     const id = archiveIds.get(op.opId)
@@ -534,8 +510,6 @@ function labelOf(origin: Origin, jobs: ReadonlyArray<Job>): string {
     }
     case 'schedule':
       return `Scheduled · ${origin.name}`
-    case 'summary':
-      return chatCopy.groupLabel.summary
     case 'owner':
       return ''
   }

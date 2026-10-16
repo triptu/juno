@@ -65,11 +65,12 @@ interface UserRow {
   readonly name: string | null
   readonly display_name: string | null
   readonly real_name: string | null
+  readonly avatar_small_url?: string | null
   readonly avatar_url: string | null
   readonly deleted: 0 | 1
 }
 
-const USER_COLUMNS = 'u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.deleted'
+const USER_COLUMNS = 'u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url, u.deleted'
 
 /** The name the token shows: the display name, as message chips show it. */
 const shownName = (user: UserRow) => user.display_name || user.real_name || user.name || user.id
@@ -81,7 +82,7 @@ function personOf(user: UserRow, tier: number, order: number): MentionPerson {
     id: user.id,
     name,
     ...(realName === undefined ? {} : { realName }),
-    ...(user.avatar_url ? { avatarUrl: user.avatar_url } : {}),
+    ...(user.avatar_url ? { avatarUrl: user.avatar_small_url || user.avatar_url } : {}),
     color: defaultPersonColor(user.id),
     tier,
     order,

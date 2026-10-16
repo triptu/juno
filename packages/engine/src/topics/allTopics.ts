@@ -194,7 +194,7 @@ export const summarizeAllTopics = (narrowing: Narrowing, now: number): Effect.Ef
     }
     const users = new Map<string, UserRow>()
     if (userIds.size > 0) {
-      for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
+      for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
     }
     const refs: Array<ChannelRef> = rows.map((row) => {
       const info = channelInfoOf(row, { members: members.get(row.channel)! }, selfId, (id) => userName(id, users.get(id)))

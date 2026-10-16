@@ -1,6 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
+import { useLayoutEffect, useRef } from 'react'
 import { parseRecipe, renderArt, renderPebble, type ArtSize } from '@juno/topic-art'
-import { motion, sizes as tokenSizes } from '@juno/tokens/tokens.stylex'
+import { sizes as tokenSizes } from '@juno/tokens/tokens.stylex'
+import { rootDuration } from './motion'
 
 export type TopicArtSize = ArtSize
 
@@ -9,9 +11,11 @@ export interface TopicArtProps {
   readonly topicId: string
   /**
    * The topic's art as a recipe (`TopicRow.art`, `TopicDetail.art`). Absent
-   * shows the Tide placeholder. When it arrives while the component is on
-   * screen, the art fades in over the placeholder (opacity only, so nothing
-   * moves); art that is there on the first paint shows at once.
+   * shows the Tide placeholder. When it arrives, the placeholder fades out
+   * under the art (opacity only, so nothing moves). The fade runs on the
+   * clock from the moment the art arrived, so a row that renders later (it
+   * was off screen, under `content-visibility`) shows the art at full
+   * opacity. Art that is there on the first paint shows at once.
    */
   readonly recipe?: string | undefined
   /** 40 in rows, 20 in peek, 16 in tabs. */
@@ -44,6 +48,28 @@ function artMarkup(recipe: string, size: TopicArtSize): string | undefined {
   return markup === '' ? undefined : markup
 }
 
+/** `--duration-appear` and `--ease-out`, read from the root once, at the first fade. */
+let fadeTiming: { readonly duration: number; readonly easing: string } | undefined
+let reducedMotion: MediaQueryList | undefined
+
+/**
+ * Fades the placeholder layer between `from` and `to`. A Web Animation runs
+ * on the document clock from the moment it is made, whether or not its
+ * element renders. A CSS transition starts only when the element's style is
+ * next computed, which `content-visibility` puts off until the row comes
+ * near the view, so a row scrolled in later would play the fade then. Runs
+ * only when art arrives or goes, never per scroll frame.
+ */
+function fade(layer: HTMLElement, from: number, to: number): void {
+  reducedMotion ??= matchMedia('(prefers-reduced-motion: reduce)')
+  if (reducedMotion.matches) return
+  fadeTiming ??= {
+    duration: rootDuration('--duration-appear'),
+    easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-out').trim() || 'ease-out',
+  }
+  layer.animate([{ opacity: from }, { opacity: to }], fadeTiming)
+}
+
 /**
  * A topic's tile: the AI drawing when the topic has one, the Tide pebble
  * until then (and while AI assist is off). Both are inline SVG rebuilt from
@@ -55,10 +81,18 @@ function artMarkup(recipe: string, size: TopicArtSize): string | undefined {
 export function TopicArt({ topicId, recipe, size = 40, label }: TopicArtProps) {
   const art = recipe === undefined ? undefined : artMarkup(recipe, size)
   const pebble = remember(`${size}:pebble:${topicId}`, () => renderPebble(topicId, size))
+  const hasArt = art !== undefined
+  const pebbleLayer = useRef<HTMLSpanElement>(null)
+  const shown = useRef(hasArt)
+  useLayoutEffect(() => {
+    if (shown.current === hasArt) return
+    shown.current = hasArt
+    if (pebbleLayer.current !== null) fade(pebbleLayer.current, hasArt ? 1 : 0, hasArt ? 0 : 1)
+  }, [hasArt])
   return (
     <span role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} data-topic-art={art === undefined ? 'placeholder' : 'art'} {...stylex.props(styles.box, sizes[size])}>
       {/* Our own markup, rebuilt from the checked recipe (see @juno/topic-art); no model text reaches here. */}
-      <span {...stylex.props(styles.layer, art !== undefined && styles.hidden)} dangerouslySetInnerHTML={{ __html: pebble }} />
+      <span ref={pebbleLayer} {...stylex.props(styles.layer, hasArt && styles.hidden)} dangerouslySetInnerHTML={{ __html: pebble }} />
       {art === undefined ? null : <span {...stylex.props(styles.layer)} dangerouslySetInnerHTML={{ __html: art }} />}
     </span>
   )
@@ -74,18 +108,17 @@ const styles = stylex.create({
     // Nothing inside has a layout effect outside the box.
     contain: 'strict',
   },
-  // Both layers fill the box; the cross-fade is opacity alone, 240ms, and the
-  // duration token collapses to nothing under reduced motion. A layer that is
-  // present on the first paint has no previous opacity to animate from.
+  // Both layers fill the box. The swap is opacity alone; `fade` animates it,
+  // not a transition, because a transition starts only when the row renders.
+  // That includes the 0.01ms one global.css gives everything under reduced
+  // motion, which draws one frame of the old opacity.
   layer: {
     position: 'absolute',
     inset: 0,
     display: 'block',
     lineHeight: 0,
     opacity: 1,
-    transitionProperty: 'opacity',
-    transitionDuration: motion['--duration-appear'],
-    transitionTimingFunction: motion['--ease-out'],
+    transitionProperty: 'none',
   },
   hidden: {
     opacity: 0,

@@ -91,7 +91,7 @@ function Page({ tab }: { readonly tab: Tab }) {
     case 'juno':
       return (
         <Suspense key="juno" fallback={null}>
-          <JunoTab />
+          <JunoTab tabId={tab.id} />
         </Suspense>
       )
     case 'junoPage':
@@ -135,6 +135,33 @@ function resizePanel(width: number): void {
 
 function resetPanelWidth(): void {
   setJunoPanelWidth(registry, JUNO_PANEL_WIDTH.default)
+}
+
+/**
+ * The element that last had focus in each tab, outside the tab strip: its
+ * page or its Juno panel. Each tab keeps its own composer focus (SPEC 6).
+ * Weak, so a closed or put away tab's page is not held.
+ */
+const lastFocus = new Map<string, WeakRef<HTMLElement>>()
+
+function onFocusIn(event: FocusEvent): void {
+  const target = event.target
+  if (!(target instanceof HTMLElement) || target.closest('section[aria-label="Workspace"]') === null || target.closest('[role="tablist"]') !== null) return
+  const active = registry.get(tabsAtom).active
+  if (active !== undefined) lastFocus.set(active, new WeakRef(target))
+}
+
+/**
+ * A tab that shows again gets back the focus it had, when the switch left
+ * focus nowhere: a shortcut such as ⌃Tab, while focus was in the page that
+ * hid. Focus the switch put somewhere, as on a tab in the strip, stays.
+ */
+function restoreFocus(tabId: string): void {
+  const element = lastFocus.get(tabId)?.deref()
+  if (element === undefined || !element.isConnected || !element.checkVisibility()) return
+  const focused = document.activeElement
+  if (focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return
+  element.focus({ preventScroll: true })
 }
 
 /** The mouse's back and forward buttons. */
@@ -183,6 +210,14 @@ export function Workspace() {
     return () => cancelIdleCallback(idle)
   }, [])
   useEffect(() => {
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [])
+  // After the pages' own effects, so a composer takes another tab's draft before it has focus again.
+  useEffect(() => {
+    if (state.active !== undefined) restoreFocus(state.active)
+  }, [state.active])
+  useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [])
@@ -203,9 +238,9 @@ export function Workspace() {
       empty={null}
       newTabLabel={newTabPage === 'home' ? 'New tab' : 'New chat'}
       side={
-        agentOn && panelOpen && panelTopic !== undefined ? (
+        agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>
-            <JunoPanel topicId={panelTopic} />
+            <JunoPanel tabId={state.active} topicId={panelTopic} />
           </Suspense>
         ) : undefined
       }

@@ -28,8 +28,10 @@ import { millisToTs, parseTopicId, type ParsedTopicId, type Ts } from '@juno/dom
 import { transaction, type SqlError } from '@juno/store'
 import { deferMark, dropMark, endMark, observeRead, pendingMark, pendingMarks, rejectMark, reindexTopics, storedMe } from '@juno/sync'
 import { EngineConfig } from './config'
+import { SyncLink } from './syncLink'
 import { Outbox } from './outbox'
 import { Workspace, type OpenWorkspace, type StoreServices } from './workspace'
+import { queueReadCatchUp } from './readCatchUp'
 import { mirrorSetting } from './readSetting'
 
 /** Longest wait between two tries of a mark that keeps failing. */
@@ -50,11 +52,12 @@ export class MarkWorker extends Context.Service<
     readonly wake: Effect.Effect<void>
   }
 >()('juno/engine/MarkWorker') {
-  static readonly layer: Layer.Layer<MarkWorker, never, Workspace | Outbox | EngineConfig> = Layer.effect(
+  static readonly layer: Layer.Layer<MarkWorker, never, Workspace | Outbox | EngineConfig | SyncLink> = Layer.effect(
     MarkWorker,
     Effect.gen(function* () {
       const workspace = yield* Workspace
       const outbox = yield* Outbox
+      const sync = yield* SyncLink
       const config = yield* EngineConfig
       const signal = yield* Queue.sliding<void>(1)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
@@ -100,7 +103,7 @@ export class MarkWorker extends Context.Service<
             }
             const topic = parsed
             const result = yield* Effect.result(
-              outbox.send((api) =>
+              (mark.catchUp ? outbox.sendBackground : outbox.send)((api) =>
                 topic.kind === 'main'
                   ? api.call('conversations.mark', { channel: topic.channel, ts: mark.lastReadTs })
                   : api.call('subscriptions.thread.mark', {
@@ -137,9 +140,14 @@ export class MarkWorker extends Context.Service<
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
+          yield* local(transaction(queueReadCatchUp(config, true)))
           const now = yield* Clock.currentTimeMillis
           const due = (yield* local(pendingMarks)).filter((mark) => mark.nextAt <= now)
-          yield* Effect.forEach(due, (mark) => send(open, mark.topicId), { concurrency: 4, discard: true })
+          // Re-read the queue between catch-up marks so newly opened topics do not wait for the backlog.
+          const catchUp = due.find((mark) => mark.catchUp)
+          const batch = due.filter((mark) => !mark.catchUp)
+          if (catchUp !== undefined) batch.push(catchUp)
+          yield* Effect.forEach(batch, (mark) => send(open, mark.topicId), { concurrency: 4, discard: true })
           const rest = yield* local(pendingMarks)
           if (rest.length === 0) return undefined
           const after = yield* Clock.currentTimeMillis
@@ -159,6 +167,7 @@ export class MarkWorker extends Context.Service<
       yield* Effect.forkScoped(loop)
       // A workspace that opens (a sign-in, a restart) may hold marks from before.
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => wake))
+      yield* Effect.forkScoped(Stream.runForEach(sync.caughtUps, () => wake))
       return MarkWorker.of({ wake })
     }),
   )

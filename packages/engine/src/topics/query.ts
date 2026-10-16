@@ -400,7 +400,7 @@ export const shapeRows = (
     const missing: Array<string> = []
     for (const id of userIds) if (!users.has(id)) missing.push(id)
     if (missing.length > 0) {
-      const found = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(missing)}`
+      const found = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`
       for (const id of missing) users.set(id, null)
       for (const user of found) users.set(user.id, user)
     }

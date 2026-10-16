@@ -19,6 +19,7 @@ export type ChipVariant =
   | 'outline'
   | 'filled'
   | 'strong'
+  | 'count'
   | 'soft'
   | 'accent'
   | 'success'
@@ -239,6 +240,11 @@ export const chipVariants = stylex.create({
   strong: {
     color: colors['--foreground-subtle'],
     backgroundColor: colors['--secondary-active'],
+  },
+  // The sidebar's counters: the accent at reduced brightness, text 4.5:1 on its fill.
+  count: {
+    color: accent['--hl-count-fg'],
+    backgroundColor: accent['--hl-count'],
   },
   soft: {
     color: colors['--foreground-subtle'],

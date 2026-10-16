@@ -1,11 +1,11 @@
 import { useEmojiSuggestions } from '../emojiSuggestions'
 import { useRef, useState, type ReactNode, type RefObject } from 'react'
 import { chatCopy, type ChatPage, type Quote, type SendContext } from '@juno/agent-contract'
-import { nowAtom } from '@juno/state'
+import { junoDraftAtom, nowAtom, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useReactionPicker, useRemoval } from './chatActions'
-import { useBubbleMeasure, useChatPosition, useChatTarget, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
+import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 
 /** Times change at most at a day boundary; re-render for it this often. */
@@ -14,6 +14,8 @@ const TIME_STEP = 10 * 60_000
 export interface JunoChatProps {
   /** `page` in the Juno tab, `panel` beside a topic. */
   readonly column: 'page' | 'panel'
+  /** Whose draft the composer shows (`junoDraftAtom`): `panel:<tabId>` or `tab:<tabId>`. */
+  readonly draftKey: string
   readonly header: (banner: ChatPage['banner']) => ReactNode
   /** What the next message is about, read at send time (the panel's topic, an About chip). */
   readonly contextOf?: () => SendContext | undefined
@@ -46,7 +48,7 @@ export interface JunoChatProps {
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
  */
-export function JunoChat({ column, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
+export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
   const agent = useAgentState()
   const { page, pageRef, current, loaded, setWindow } = useChatWindow(column, agent)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -64,14 +66,14 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
   useEdges({ scrollRef, topEdgeRef, bottomEdgeRef }, positioned, page, items, setWindow)
   useReadMarks(scrollRef, positioned, items)
   // The composer: the draft, and the bubble or card a reply quotes.
-  const [draft, setDraft] = useState('')
+  const draft = useAtomValue(junoDraftAtom(draftKey))
+  const setDraft = (value: string) => registry.set(junoDraftAtom(draftKey), value)
   const emojiSuggestions = useEmojiSuggestions({ text: draft, onChange: setDraft, field: inputRef })
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
   useFocusRequest(column, inputRef)
   const { toBottom, send } = useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
-  useChatTarget(column, positioned, items, scrollRef, pinnedRef, setWindow)
   const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval })
 
   return (

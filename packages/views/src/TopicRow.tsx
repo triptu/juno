@@ -109,7 +109,7 @@ export const TopicRow = memo(function TopicRow({
     initials: initials(person.name),
     name: person.name,
     hue: hueFor(person.color, person.id),
-    ...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl }),
+    ...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl }),
   }))
 
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
@@ -191,7 +191,7 @@ export const TopicRow = memo(function TopicRow({
             </span>
             <span {...stylex.props(styles.badgeSlot)}>
               {unread ? (
-                <Chip variant="strong" numeric title={unreadLabel}>
+                <Chip variant="count" numeric title={unreadLabel}>
                   {countLabel(row.unreadCount, row.unreadExact)}
                 </Chip>
               ) : null}
@@ -274,7 +274,7 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
     const partner = channel.partner
     const name = partner?.name ?? channel.name
     const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
-    return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarUrl })} />
+    return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
     return <Avatar kind="group" label={groupInitials(channel.name)} size={44} hue={hueFor(channel.color, channel.id)} />

@@ -4,7 +4,6 @@ import { bindViewHost } from './view-tools/host'
  * in the agent utility process; tests call it from Node.
  *
  * It reaches the host and checks the protocol, follows `host.presence`,
- * appends the host's hours-start summaries to the chat (`serve/summaries.ts`),
  * then, given `turns`, opens the turn engine on the agent directory with
  * the Slack reads and the card actions bound to the host (`host/reads.ts`,
  * `actions/host.ts`): the owner lock,
@@ -35,8 +34,6 @@ import { open } from './router/service'
 import type { RendererTransport } from './serve/runner'
 import { rendererServer } from './serve/server'
 import { CHAT_MIGRATIONS } from './serve/schema'
-import { invalidateChatCaches } from './serve/chat'
-import { appendSummary } from './serve/summaries'
 import { createJunoSettings } from './settings/settings'
 import type { UpdateNeeded } from './runtime/core'
 
@@ -117,17 +114,6 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         if (engine?._tag === 'running') {
           yield* bound.scheduleChanges.pipe(
             Stream.runForEach(() => Effect.promise(engine.checkSchedules)),
-            Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
-            Effect.forkScoped, Scope.provide(scope),
-          )
-          // The hours-start summary (SPEC 14): appended to the chat with no run, then handed back. A Mac that
-          // released Juno writes nothing, so the summary waits for the Mac that owns it.
-          yield* client['host.notification.summaries']().pipe(
-            Stream.runForEach((summaries) => Effect.forEach(summaries, (summary) => Effect.gen(function* () {
-              if (engine.ownership.owner().state === 'released') return
-              if (appendSummary(engine.store, summary)) invalidateChatCaches(engine.store)
-              yield* client['host.notification.summaryTaken']({ id: summary.id })
-            }), { discard: true })),
             Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
             Effect.forkScoped, Scope.provide(scope),
           )

@@ -96,11 +96,14 @@ export const colors = stylex.defineVars({
  * - --hl-bubble: the owner's bubble in the Juno chat, a stronger tint than
  *   --hl-soft (16% light, 22% dark) with --foreground-default text
  * - --hl-nav: the selected nav item's fill, over the sidebar
+ * - --hl-count, --hl-count-fg: the sidebar's counters, the accent at reduced
+ *   brightness: a tint of it over the sidebar for the fill and a deeper
+ *   (light) or dimmer (dark) accent for the text, held to 4.5:1 on the fill
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
  *
- * Unread counts are never the accent; they stay the soft grey tag.
+ * Counts outside the sidebar (the topic switcher) stay the soft grey tag.
  */
 export const accent = stylex.defineVars({
   '--hl': '#CC4628',
@@ -109,6 +112,8 @@ export const accent = stylex.defineVars({
   '--hl-soft': `color-mix(in oklch, #CC4628 10%, ${colors['--background']})`,
   '--hl-bubble': `color-mix(in oklch, #CC4628 16%, ${colors['--background']})`,
   '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
+  '--hl-count': '#F7DED4',
+  '--hl-count-fg': '#B3371B',
   '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
   '--focus-ring': '#B4351F',
@@ -805,7 +810,6 @@ export const sizes = stylex.defineVars({
   '--topic-time-width': '48px',
   '--topic-people-width': '60px',
   '--topic-tags-width': '76px',
-  '--message-sender-width': '128px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
   '--control-26': '26px',

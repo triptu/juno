@@ -77,6 +77,20 @@ export const activity: ActivityPage = {
       tainted: true,
     },
     {
+      id: rid('r5'),
+      who: 'You',
+      at: NOW - 40 * MINUTE,
+      outcome: 'replied',
+      actions: [],
+      reads: 'Ran 1 script: 3 reads, 1 cancelled',
+      scriptCalls: [
+        { tool: 'slack_search', args: '{"query":"deploy in:#eng"}', outcome: 'done' },
+        { tool: 'slack_replies', args: '{"channel":"C0ENG","thread":"1760500000.000001"}', outcome: 'done' },
+        { tool: 'connection_read', args: '{"server":"notion","tool":"notion-search","args":{"query":"rollout"}}', outcome: 'cancelled' },
+      ],
+      tainted: true,
+    },
+    {
       id: rid('r3'),
       who: 'You',
       at: NOW - 2 * HOUR,

@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test'
 import { expect, hooks, test } from './fixtures'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
@@ -5,6 +6,15 @@ import { expectStableAnchor } from './shiftProbe'
 test.describe.configure({ timeout: 60_000, mode: 'parallel' })
 
 const POSTGRES = 'Draft plan is in the doc'
+
+/** The edge a growing last row keeps: its bottom when the list scrolls and holds its end, its top when the list fits the view. */
+const growingEdge = async (list: Locator): Promise<'top' | 'bottom'> =>
+  (await list.evaluate((node) => {
+    const scroller = node.closest('[data-scroll-area]')!
+    return scroller.scrollHeight > scroller.clientHeight + 1
+  }))
+    ? 'bottom'
+    : 'top'
 const RINA = 'Rina finished the onsite.'
 
 for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const) {
@@ -40,7 +50,10 @@ for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 
   })
 }
 
-test('a late reaction keeps the last message fixed', async ({ juno, win, slack, fake }) => {
+// No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
+// chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
+// its end and the rows above lift in the same frame, as Slack's do.
+test('a late reaction on the last message grows it without a jump', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
@@ -48,10 +61,37 @@ test('a late reaction keeps the last message fixed', async ({ juno, win, slack, 
   const ts = await row.getAttribute('data-message-row')
   expect(ts).not.toBeNull()
   const selector = `[data-message-row="${ts}"]`
+  const edge = await growingEdge(juno.topic.list)
   await expectStableAnchor(win, selector, async () => {
     fake.addReaction({ channel: slack.root(POSTGRES).channel, ts: ts!, name: 'eyes', user: slack.as('Leo').id })
     await expect(row.getByRole('list', { name: 'Reactions' })).toBeVisible()
+  }, { edge })
+})
+
+// What must never move: the rows in view when something changes above them, and the list's end while it is held.
+test('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async ({ juno, win, slack, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const channel = slack.channel('eng')
+  const user = slack.as('Leo').id
+  const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
+  const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
+  const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
+  await juno.topic.expectMessage('Latest reply under the view check')
+  const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
+  expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
+  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+    fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
+    await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
   })
+  expect(await growingEdge(juno.topic.list)).toBe('bottom')
+  const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
+  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+    fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
+    await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
+  }, { edge: 'bottom' })
 })
 
 for (const divider of [false, true]) {
@@ -79,7 +119,8 @@ for (const divider of [false, true]) {
   })
 }
 
-test('a sender name resolves without moving the timestamp or message', async ({ juno, win, slack, fake }) => {
+// The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
+test('a sender name resolves without moving the message', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
@@ -89,13 +130,13 @@ test('a sender name resolves without moving the timestamp or message', async ({ 
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('A message before its sender resolves')
   await expect.poll(() => fake.heldCount({ method: 'edge:users/info' })).toBe(1)
-  await expectStableAnchor(win, `[data-message-row="${message.ts}"] time`, async () => {
+  await expectStableAnchor(win, `[data-message-row="${message.ts}"] [data-msg-text]`, async () => {
     fake.release({ method: 'edge:users/info' })
     await expect(juno.topic.list.getByText('Leonard Alexander Park', { exact: true }).first()).toBeVisible()
   })
 })
 
-test('a Main message gains a thread link without moving, and the header stays put', async ({ juno, win, slack, fake }) => {
+test('a new Main message gains a thread link without a jump, and the header stays put', async ({ juno, win, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const channel = slack.channel('deploys')
@@ -107,11 +148,12 @@ test('a Main message gains a thread link without moving, and the header stays pu
   // Main's threads are behind the title's switcher now; the right island (⋯ and Juno) must not move either.
   const island = juno.topic.header.locator('[data-island="right"]')
   const islandBefore = await island.boundingBox()
+  const edge = await growingEdge(juno.topic.list)
   await expectStableAnchor(win, `[data-message-row="${root.ts}"]`, async () => {
     fake.injectMessage({ channel, user, threadTs: root.ts, text: 'A reply arriving after Main paints' })
     await expect(juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)).toBeVisible()
     expect(await island.boundingBox()).toEqual(islandBefore)
-  })
+  }, { edge })
   // The new thread is in the switcher.
   const switcher = await juno.topic.openSwitcher()
   await expect(switcher.row('A new Main message')).toBeVisible()

@@ -19,12 +19,7 @@ export interface MessageSource {
   readonly ts: string
   readonly topicId: string
 }
-/** A message the hours-start summary names: where it is as the owner sees it ("#eng", "Maya Chen"), and who wrote it. */
-export interface SummarySource extends MessageSource {
-  readonly place: string
-  readonly sender?: string
-}
-export type NotificationTarget = { readonly kind: 'message'; readonly source: MessageSource } | { readonly kind: 'summary'; readonly id: string }
+export type NotificationTarget = { readonly kind: 'message'; readonly source: MessageSource }
 export interface Notification {
   readonly id: string
   readonly title: string
@@ -33,8 +28,5 @@ export interface Notification {
 }
 export interface Notifier {
   readonly show: (notification: Notification) => Effect.Effect<void>
-  /** The host appends one message with origin summary and source inlines, without a model run.
-   * Must be idempotent by id. Return the chat message id used by notification clicks. */
-  readonly summary: (input: { readonly id: string; readonly at: string; readonly sources: ReadonlyArray<SummarySource>; readonly title: string; readonly body: string }) => Effect.Effect<string>
   readonly viewing: (topicId: string) => Effect.Effect<boolean>
 }

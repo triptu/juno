@@ -252,9 +252,9 @@ Keep SPEC §17: sentence case, verb-first buttons, no emoji in chrome, undo over
 | Juno error | Couldn't reach the assistant. Try again in a moment. | Juno didn't answer. Give it a moment and try again. |
 | Sign-in, first run | Engine ready to sign in | Hi, I'm Juno / Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you. [button: Sign in to Slack] |
 | Sign-in, session expired | Engine session expired | Slack signed you out / Sign in again to pick up where you left off. [button: Sign in] |
-| Offline | Engine offline | You're offline / Juno shows what it has and catches up when you're back. |
+| Offline | Engine offline | You're offline / Juno shows what it has and catches up when you're back. In the sidebar's status card the second line is "Juno catches up when you're back." and the full sentence is the tooltip. |
 | Rate limited | Engine rate limited | Slack asked us to slow down / Juno will catch up in a minute. |
-| Catching up | Engine catching up, 12 of 40 | First sync only, under the sidebar's filters where the offline line goes: a thin line that fills, and "Syncing 30 of 143" ("Syncing" while the conversations are still being listed). Gone when the first sync is done; later catch-ups show nothing. Offline and rate limited take its place while they last. |
+| Catching up | Engine catching up, 12 of 40 | First sync only, in the status card at the foot of the sidebar, where the offline notice goes: a progress ring, "Syncing with Slack" and "30 of 143 conversations" ("Finding your conversations" while they are still being listed). Gone when the first sync is done; later catch-ups show nothing. Offline and rate limited take its place while they last. |
 | Send failed | | Couldn't send that. Your message is still in the composer. [button: Try again] |
 
 Rules that fall out of the table:

@@ -5,13 +5,14 @@
  * nothing while no workspace is open.
  */
 import { Effect, Stream } from 'effect'
-import { ReadsRoutes } from '@juno/contract'
-import { keys, liveQuery } from '@juno/store'
+import { ReadsRoutes, NotSignedIn } from '@juno/contract'
+import { keys, liveQuery, transaction } from '@juno/store'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { markRead, markUnread } from '../marks'
 import { readMirrorSetting } from '../readSetting'
+import { queueReadCatchUp, readCatchUpStatus } from '../readCatchUp'
 import { MarkWorker } from '../markWorker'
 
 export const ReadsHandlers = ReadsRoutes.toLayer(
@@ -29,6 +30,16 @@ export const ReadsHandlers = ReadsRoutes.toLayer(
     return {
       'reads.markRead': ({ id, upTo }) => provide(markRead(id, upTo)),
       'reads.markUnread': ({ id, from }) => provide(markUnread(id, from)),
+      'reads.catchUp': () => Effect.gen(function* () {
+        const open = yield* workspace.current
+        if (open === undefined) return yield* new NotSignedIn()
+        yield* transaction(queueReadCatchUp(config)).pipe(Effect.provide(open.context), Effect.orDie)
+        yield* worker.wake
+      }),
+      'reads.catchUpStatus': () => serveLiveValue(workspace.changes.pipe(
+        Stream.switchMap((open) => open === undefined ? Stream.empty :
+          liveQuery(['prefs', 'topic_reads', 'thread_subs', 'conversations'], timed(readCatchUpStatus)).pipe(Stream.provide(open.context))),
+      )).pipe(retryFirstRun('reads.catchUpStatus'), Stream.orDie),
       'reads.mirror': () => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) =>

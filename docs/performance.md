@@ -146,7 +146,7 @@ Why TanStack Virtual over the others (versions as of 2026-10-12). `@tanstack/rea
 - Rows are a whole number of pixels tall. A row laid out for the first time above the view grows from the 56 px estimate, and scroll anchoring moves `scrollTop` by the difference, but `scrollTop` lands on device pixels. With text at 23.2 px a line, the difference was fractional, so the rows in view were left up to a quarter pixel off and their text jumped a device pixel for a frame (the feel suite's long-thread flicker). The message's content box rounds its height up to a whole pixel (`height: calc-size(auto, round(up, size, 1px))`), so this holds for any content; `apps/gallery/behaviour.spec.ts` checks every message row in the gallery.
 - Window cap: 500 rows. Beyond it, the end furthest from the viewport is dropped from the subscription window. Dropping rows at the bottom clears `isAtBottom`; "Jump to bottom" re-anchors the window at the end and scrolls there.
 - Partial message caches carry `meta.windowCovered` from the message query. An isolated socket or search result does not establish the initial scroll position. The header and empty body still paint within the 50 ms uncached budget; the list waits for history coverage around the read pointer or the fetch outcome. Offline fetches expose the available cache. The divider keeps its eager rows after the deferred rows mount.
-- Messages reserve one reaction row and Main reserves a thread-link row. Reactions stay on one horizontally scrollable line; arriving chips never increase the row height. Sender names reserve a width so resolving them does not move timestamps. The Threads counter reserves its button width.
+- Messages reserve space only for content they already have (SPEC 7, "Stable geometry"): images and files of known size, and reactions or a thread link the row lists, whose chips and link are a fixed height before their images load. Nothing is held for a reaction, thread link or name that might arrive. From 10-15 to 10-16 every row held a reaction line and, in Main, a thread-link line, and every name a 128px slot; on real data that was 60px or more of empty space under each message and a time far from its name. A first chip or link grows its row at the bottom: rows above the view are absorbed by scroll anchoring, and at the bottom the stick-to-bottom effect holds the end before paint. A name that resolves late moves the time along its line. `apps/gallery/message-geometry.spec.ts` checks that rows hold no empty space, that senders sit the group gap apart and runs touch, and that the time follows the name. The Threads counter reserves its button width.
 - Late-loading images never change layout: every image box gets `aspect-ratio` and a max size from Slack's `thumb_w`/`thumb_h` (or `original_w`/`original_h`) before the bytes arrive. A file with no dimensions renders as a fixed-height card. The catch-up card and the grouping suggestion arrive after the first paint; they insert above the anchor and scroll anchoring absorbs them, but they must still have no entering animation that changes height.
 - Messages set `content-visibility: auto; contain-intrinsic-size: auto 56px` and `contain: content`. Text is selectable (`user-select: text` on bodies, `none` on chrome). Because rows stay in flow, selection and ⌘F behave like a normal page for the whole window.
 - Reactions, hover toolbars and the selection-quote button are positioned inside the message's containing block so they never force a layout of the list. A narrow row's toolbar sits above the row's top edge and paints there through the row's `overflow-clip-margin`, so the row keeps `contain: content`. Near the list's top it drops inside the row instead; that is decided by one rect read on pointer enter or focus, written as a custom property on the row, never per frame.
@@ -789,8 +789,8 @@ the first sweep: art that arrives while a row is skipped by
 `content-visibility` keeps the row's old style, so the placeholder fades
 out (240 ms) when the row scrolls into view, not when the art arrived.
 That contradicts `TopicArt`'s rule that art present on the first paint
-shows at once. It is a small look issue, not a cost, and is not changed
-here. The scrollbar does not add a main-thread frame either: a sweep
+shows at once. It is a look issue, not a cost, and is fixed in the art
+fade section below. The scrollbar does not add a main-thread frame either: a sweep
 draws the same number of frames with the native one (237 to 283 against
 236 to 243 for the sidebar, 469 to 481 against 464 to 476 for All
 topics). Swapping it would change the look and buy nothing, so it needs no
@@ -887,6 +887,30 @@ and every structural ceiling passed. One gate run moves by about ±1.5 ms,
 so the interleaved A/B numbers above are the better measure of the fix.
 `pnpm test:feel -g scroll` (the scrolled tab restore) passed. Logs and
 traces are under `.juno-status/scroll-frames/`.
+
+### Art that arrives off screen (10-17)
+
+The 10-17 scroll pass found that a row whose art arrived while it was
+skipped by `content-visibility` played the placeholder's 240 ms fade when
+it scrolled into view, so rows came in looking as if they were loading.
+A CSS transition starts when the element's style is next computed, and a
+skipped row's style is not computed until it comes near the view.
+
+**Fix.** `TopicArt` no longer uses a transition. When the art arrives or
+goes, a layout effect starts a Web Animation on the placeholder layer.
+It runs on the document clock from that moment whether or not the row
+renders, so a row that renders later finds it finished and shows the art
+at full opacity on its first frame; a row on screen still fades. The
+layers set `transition-property: none`, because under reduced motion
+`global.css` gives every element a 0.01 ms transition, which drew one frame
+of the placeholder in the same way. Nothing runs per row while scrolling:
+the effect runs only when the art changes.
+
+The gallery test `apps/gallery/topic-art.spec.ts` gives the
+last row of a 30-row sidebar its art while the row is skipped, waits past
+the fade, scrolls it into view and reads the placeholder in the first
+frame drawn: opacity 0 and no running animation, with and without reduced
+motion. On the old code it read opacity 0.94 with a running transition.
 
 ### Engine speed measurements (2026-10-15)
 

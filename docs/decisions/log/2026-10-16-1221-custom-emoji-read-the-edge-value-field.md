@@ -1,0 +1,1 @@
+- 10-16 12:21 · message-layout · Custom emoji are read from the edge `emojis/list` `value` field (an image url, `alias:<name>` or per-vendor urls) and `alias`, as observed live; the schema had assumed `url` and `alias_for`, so every custom emoji showed as `:name:`. An alias of a standard emoji shows that emoji.

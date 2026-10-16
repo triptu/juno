@@ -1,0 +1,1 @@
+- 10-16 12:04 · tushar · Keep previously visible sidebar topics in read-dependent filters while any tab currently shows them; state retains their order and reads live unread state from the topic header, without counting history or changing Slack read sync.

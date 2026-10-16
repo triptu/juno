@@ -32,7 +32,9 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   const fake = await startFakeSlack()
   const model = await startFakeOpenRouter()
   const env: NodeJS.ProcessEnv = { ...process.env, JUNO_E2E: '1', JUNO_USER_DATA: userData, JUNO_FAKE_SLACK_URL: fake.url,
-    JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin }
+    JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin,
+    // The agent runs one script at start and writes the result: the QuickJS worker and binary load from the asar.
+    JUNO_AGENT_CODEMODE: '1' }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.NODE_OPTIONS
   try {
@@ -85,6 +87,7 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
         await closed
       }
     }
+    expect(JSON.parse(await readFile(join(userData, 'agent', 'codemode-probe.json'), 'utf8'))).toEqual({ ok: true, value: 12 })
     expect(timings).toHaveLength(5)
     const sorted = timings.toSorted((a, b) => a - b)
     const report = { samplesMs: timings, medianMs: sorted[2], minMs: sorted[0], maxMs: sorted[4] }

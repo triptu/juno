@@ -1,14 +1,11 @@
 /**
  * Where the chat's list is scrolled (see `JunoChat`): the open position,
- * holding the bottom, the edges that move the window, read marks and the
- * notification's target. `JunoChat` calls these hooks in this file's order,
+ * holding the bottom, the edges that move the window, and read marks. `JunoChat` calls these hooks in this file's order,
  * which is the order their effects run in.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
-import { junoChatTargetAtom, registry } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
-import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { junoCommands, takePanelOpenStart } from './actions'
 import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
@@ -205,29 +202,4 @@ export function useReadMarks(scrollRef: Scroller, positioned: boolean, items: Re
       if (timer !== undefined) clearTimeout(timer)
     }
   }, [positioned, items, scrollRef])
-}
-
-/**
- * A notification asked the tab for a message (the hours-start summary): the window moves to it if it is not
- * in it, then it scrolls into view and flashes. Before paint, so the open position does not show first. Each
- * request is taken once; one for a message the agent has not appended yet waits for it.
- */
-export function useChatTarget(column: 'page' | 'panel', positioned: boolean, items: ReadonlyArray<ChatItem>, scrollRef: Scroller, pinnedRef: RefObject<boolean>, setWindow: SetWindow): void {
-  const chatTarget = useAtomValue(junoChatTargetAtom)
-  const targetTaken = useRef(0)
-  const targetAsked = useRef(0)
-  useLayoutEffect(() => {
-    if (column !== 'page' || chatTarget === undefined || chatTarget.n <= targetTaken.current || !positioned) return
-    const scroller = scrollRef.current
-    const target = { _tag: 'bubble', id: chatTarget.id as BubbleId } as const
-    if (scroller === null || rowOf(scroller, target) === null) {
-      if (targetAsked.current === chatTarget.n) return
-      targetAsked.current = chatTarget.n
-      setWindow({ _tag: 'around', anchor: target.id, before: OVERLAP, limit: WINDOW })
-      return
-    }
-    targetTaken.current = chatTarget.n
-    if (registry.get(junoChatTargetAtom)?.n === chatTarget.n) registry.set(junoChatTargetAtom, undefined)
-    scrollToRow(scrollRef, pinnedRef, target)
-  }, [column, chatTarget, positioned, items, scrollRef, pinnedRef, setWindow])
 }

@@ -22,10 +22,13 @@
  * other Mac's banner is the computer name from System Settings.
  */
 import { execFileSync } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { credentialBridge, describeFailure, keychainBridge, modelPicker, providerConnection, providerTurns, rendererPorts, reviewModel, startAgent, type HostPort } from '@juno/agent'
+import { credentialBridge, describeFailure, keychainBridge, modelPicker, probeSandbox, providerConnection, providerTurns, rendererPorts, reviewModel, startAgent, type CodemodeRunner, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
 
 const parent = process.parentPort
@@ -95,6 +98,20 @@ const restart = () => {
     setTimeout(() => process.exit(0), 1_000).unref()
   }, 200)
 }
+/**
+ * The codemode sandbox's QuickJS binary and worker, which the build writes
+ * next to this file (`electron.vite.config.ts`, `codemodeFiles`).
+ */
+const codemodeRunner: CodemodeRunner = { wasmPath: join(__dirname, 'quickjs.wasm'), workerUrl: pathToFileURL(join(__dirname, 'codemode-worker.js')) }
+
+/** Under Playwright with the flag on: one script in the sandbox, so a test can check it loads in this build. */
+function probeCodemode(agentDir: string) {
+  void probeSandbox(codemodeRunner).then((result) => {
+    mkdirSync(agentDir, { recursive: true })
+    writeFileSync(join(agentDir, 'codemode-probe.json'), JSON.stringify(result))
+  })
+}
+
 // The provider arrives from main at spawn and on every change.
 const connection = providerConnection()
 
@@ -112,6 +129,7 @@ parent.on('message', (event) => {
       if (started) return
       started = true
       const config = message.config
+      if (config.e2e && config.codemode === true) probeCodemode(config.agentDir)
       const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: 'codex' } })
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
@@ -120,6 +138,7 @@ parent.on('message', (event) => {
           startAgent(config, { acquire: nextPort }, {
             turns: {
               ...providerTurns(connection, picker),
+              ...(config.codemode === true ? { codemode: codemodeRunner } : {}),
               backup: {
                 keychain: secrets.keychain,
                 deviceName: config.deviceName ?? computerName(),

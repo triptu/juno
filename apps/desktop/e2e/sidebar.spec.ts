@@ -185,27 +185,30 @@ test('during the first sync the list says Juno is getting the topics, not that i
   await juno.signIn()
   const { sidebar } = juno
   await sidebar.expectEmpty('Getting your topics')
-  await expect(juno.win.getByRole('progressbar', { name: 'Sync progress' })).toBeVisible()
-  await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText('Syncing')
+  await expect(sidebar.syncStatus).toHaveText('Syncing with Slack')
+  await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', 'Finding your conversations')
   await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
 
+  // The card sits at the foot of the sidebar, under the list; the header has no status line.
   await juno.allTopics.open()
   const header = sidebar.root.locator('header[aria-label="Sidebar title bar"]')
   const headerBox = await header.boundingBox()
-  const barBox = await header.getByRole('progressbar').boundingBox()
-  expect(headerBox).not.toBeNull()
-  expect(barBox).not.toBeNull()
-  expect(barBox!.height).toBe(2)
-  expect(barBox!.y + barBox!.height).toBe(headerBox!.y + headerBox!.height)
+  expect(await header.getByRole('progressbar').count()).toBe(0)
+  const listBox = await sidebar.list.boundingBox()
+  const cardBox = await sidebar.root.locator('[data-sync-status]').boundingBox()
+  expect(listBox).not.toBeNull()
+  expect(cardBox).not.toBeNull()
+  expect(cardBox!.y).toBeGreaterThan(listBox!.y + listBox!.height)
   await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
     fake.release({ method: 'client.userBoot' })
     await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
-    await expect(juno.win.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
+    await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
     await sidebar.expectEmpty('Getting your topics')
     fake.release({ method: 'conversations.history' })
     await juno.waitForSync()
     await sidebar.row(POSTGRES).expectVisible()
   })
+  await sidebar.expectNoSyncStatus()
   expect(await header.boundingBox()).toEqual(headerBox)
 })
 
@@ -438,4 +441,37 @@ test('a row says its unread count and a mention in words, not only in tooltips',
   await rina.expectVisible()
   await expect(rina.root).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
   await expect(juno.sidebar.row(POSTGRES).root).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
+})
+
+test('Unread keeps read topics until no tab shows them', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  await sidebar.toggleUnread()
+  const rina = sidebar.row(RINA)
+  const roadmap = sidebar.row(ROADMAP)
+  await rina.expectUnread(2)
+  const before = await sidebar.titles()
+  const anchor = `[data-topic-id="${await rina.root.getAttribute('data-topic-id')}"]`
+  await expectStableAnchor(win, anchor, async () => {
+    await rina.open()
+    await rina.expectRead()
+    await rina.expectSelected()
+  })
+  expect(await sidebar.titles()).toEqual(before)
+
+  await roadmap.open()
+  await roadmap.expectRead()
+  await roadmap.expectSelected()
+  await expect(rina.root).toHaveCount(0)
+
+  // Two tabs show the same read topic. Closing one must leave its row.
+  await roadmap.openInNewTab()
+  await tabs.expectCount(2)
+  await tabs.menu('close-tab')
+  await tabs.expectCount(1)
+  await roadmap.expectRead()
+  await roadmap.expectSelected()
+  await tabs.menu('close-tab')
+  await expect(roadmap.root).toHaveCount(0)
 })

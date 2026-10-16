@@ -11,7 +11,7 @@
  * `mirrorReadsAtom` is the setting that lets marks reach Slack; change it
  * with `prefs.set { key: MIRROR_READS_PREF, value }`.
  */
-import { readsMirror } from '@juno/contract'
+import { readsMirror, readsCatchUpStatus } from '@juno/contract'
 import { liveQuery } from './atoms'
 
 /** What happened in a topic tab. */
@@ -38,3 +38,5 @@ export function shouldMarkRead(trigger: ReadTrigger, view: ReadView): boolean {
 
 /** The mirror setting of the open workspace: `{ on, explicit }`. */
 export const mirrorReadsAtom = liveQuery(readsMirror)(undefined)
+
+export const readCatchUpAtom = liveQuery(readsCatchUpStatus)(undefined)

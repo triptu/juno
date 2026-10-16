@@ -41,6 +41,8 @@ export class Outbox extends Context.Service<
      * `send` lane. Fails with `NotSignedIn` when there is no session.
      */
     readonly send: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
+    /** Sends catch-up marks with shared background pacing. */
+    readonly sendBackground: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Like `send`, but one exchange and no retry. `Offline` means Slack may have run it. */
     readonly sendOnce: <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) => Effect.Effect<A, MirrorError>
     /** Like `send`, on the `interactive` lane: an authoritative lookup after a change, such as a thread's root. */
@@ -58,7 +60,7 @@ export class Outbox extends Context.Service<
     Effect.gen(function* () {
       const client = yield* SessionClient
       const onLane =
-        (lane: 'send' | 'interactive', singleAttempt = false) =>
+        (lane: 'send' | 'interactive' | 'background', singleAttempt = false) =>
         <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError>) =>
           Effect.gen(function* () {
             const api = yield* client.api
@@ -98,7 +100,7 @@ export class Outbox extends Context.Service<
       const background = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<void> =>
         FiberSet.run(recoveries, Effect.ignore(effect).pipe(Effect.asVoid)).pipe(Effect.asVoid)
 
-      return Outbox.of({ send, sendOnce, lookup, exclusive, background, idle: FiberSet.awaitEmpty(recoveries) })
+      return Outbox.of({ sendBackground: onLane('background'), send, sendOnce, lookup, exclusive, background, idle: FiberSet.awaitEmpty(recoveries) })
     }),
   )
 }

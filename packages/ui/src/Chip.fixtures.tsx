@@ -15,6 +15,7 @@ export default defineFixtures(Chip, {
   Counts: {
     'unread-count': fixture({ variant: 'strong', size: 18, numeric: true, children: '9' }),
     'read-count': fixture({ variant: 'filled', size: 18, numeric: true, children: '3' }),
+    'sidebar-count': fixture({ variant: 'count', size: 18, numeric: true, children: '9' }),
     mention: fixture({ variant: 'soft', size: 18, title: 'Mentions you', children: '@' }),
     'mention-accent': fixture({ variant: 'accent', size: 18, children: '@' }),
   },

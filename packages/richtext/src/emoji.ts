@@ -8,7 +8,6 @@
  * from the `emoji` lookup, not from here.
  */
 
-import type { CustomEmoji } from '@juno/slack-schema'
 import { catalogData } from './emoji-catalog'
 
 /** One category of the standard emoji, in Slack's picker order. */
@@ -123,8 +122,15 @@ export function reactionDisplay(
   return { kind: 'name', value: name }
 }
 
+/** One row of the `emoji` table: an image url, or the name it is an alias for. */
+export interface CustomEmojiRow {
+  readonly name: string
+  readonly url?: string | null
+  readonly alias_for?: string | null
+}
+
 /** A workspace lookup, including aliases. Missing targets and cycles keep their shortcode. */
-export function customEmojiLookup(emojis: ReadonlyArray<CustomEmoji>): (name: string) => string | undefined {
+export function customEmojiLookup(emojis: ReadonlyArray<CustomEmojiRow>): (name: string) => string | undefined {
   const byName = new Map(emojis.map((emoji) => [emoji.name, emoji]))
   return (name) => {
     const seen = new Set<string>()

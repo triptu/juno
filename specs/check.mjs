@@ -363,6 +363,9 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
     for (const schedule of ['ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet', 'widerWindow']) {
       simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
     }
+    simulate('readstate', 'mirrorCatchUpStep', 'invariants', 'read-mirror-catchup.itf.json', false, false,
+      { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
+    simulate('readstate', 'mirrorCatchUpBugStep', 'catchUpNeverBackwards', 'read-mirror-catchup-bug.itf.json', true)
     simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
     for (const schedule of ['retryAfterAccept', 'peekThenMark']) {
       simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)

@@ -84,7 +84,7 @@ const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
     const users = new Map<string, UserRow>()
     if (ids.size === 0) return users
-    const rows = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`
+    const rows = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...ids])}`
     for (const row of rows) users.set(row.id, row)
     return users
   })
@@ -144,7 +144,7 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
   }
   // Only the last word is a prefix, matching an input still being typed.
   const query = `${terms}*`
-  const people = yield* sql<UserRow>`SELECT u.id, u.name, u.display_name, u.real_name, u.avatar_url
+  const people = yield* sql<UserRow>`SELECT u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url
     FROM people_fts f JOIN users u ON u.rowid = f.rowid
     WHERE people_fts MATCH ${query} AND u.deleted = 0 AND u.is_bot = 0 ORDER BY f.rank, u.id LIMIT ${PICK_LIMIT}`
   const dms =

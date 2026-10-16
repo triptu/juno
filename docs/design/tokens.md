@@ -26,7 +26,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
-| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, Juno nav count, pressed state |
+| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | The topic switcher's unread count, pressed state |
 | `--border-subtle` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | List-style row rule, table row rule, card inner rules |
 | `--border-default` | `hsla(48, 30%, 91%, 1)` | #EFECE1 | css | Sidebar edge, tab strip edge, menu separators, card-style row border, reaction chips, option buttons |
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
@@ -93,13 +93,29 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
 | `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
+| `--hl-count`, `--hl-count-fg` | The sidebar's counters (row unread counts, the Juno nav count): the accent at reduced brightness. Literal values per accent, below | #F7DED4 / #B3371B | #462E26 / #F8846D |
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
 | `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
 
 Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
-**What the accent does not touch.** Unread counts, the Juno nav count, the tab unread dot and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
+**Sidebar counters** (decided 10-16, the owner: the grey count tags were almost invisible). The row unread counts and the Juno nav count take the accent at reduced brightness: `--hl-count` is the accent mixed into `--background-subtle` in OKLab (16% light, 24% dark, raised until the fill stands 1.2:1 from the sidebar in light and 1.45:1 in dark), and `--hl-count-fg` is the accent's own hue, darkened in light until it reaches at least 4.5:1 on that fill, and in dark dimmed toward the fill while it stays above 5:1. They are literal hex values, computed once (WCAG 2, sRGB):
+
+| Accent | Light fill | Light text | Light contrast | Dark fill | Dark text | Dark contrast |
+| --- | --- | --- | --- | --- | --- | --- |
+| Coral | #F7DED4 | #B3371B | 4.67:1 | #462E26 | #F8846D | 5.07:1 |
+| Ink | #D2D0CB | #1B180E | 11.53:1 | #41403B | #B9B6AB | 5.14:1 |
+| Marigold | #F9E1BD | #895A00 | 4.7:1 | #43361F | #DEA213 | 5.15:1 |
+| Teal | #D8E4DF | #006E69 | 4.7:1 | #253834 | #38B8B2 | 5.11:1 |
+| Midnight | #D5D4DE | #2E1F64 | 9.54:1 | #36333E | #AA9CE0 | 5.03:1 |
+| Emerald | #D5E1D8 | #00674F | 5.1:1 | #26392F | #44BA98 | 5.14:1 |
+| Claret | #E9D4D3 | #7F1734 | 7.17:1 | #432E2F | #ED889D | 5.16:1 |
+| Cyan | #D7E6EA | #006B8F | 4.69:1 | #28393E | #48B6DB | 5.14:1 |
+
+Ink stays neutral, as everywhere else. The quick filters show no counts, only the unread dot, so nothing else in the sidebar changes.
+
+**What the accent does not touch.** Counts outside the sidebar (the topic switcher), the tab unread dot and the quiet "@" tag on rows stay the soft grey tags; the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the sidebar's counters, the user's own @mention chip, the focus ring and text selection.
 
 **Values and measured contrast.** Measured in Chromium from the built gallery (WCAG 2, sRGB; `color-mix()` resolved by the browser). Targets: 4.5:1 for text on the fill, accent text on the page, on the selected nav and on the soft tint, and for body text on the selection; the focus ring is the accent text so it meets the same bar. The fill against the page is information only: Marigold in light is 1.94:1, so a marigold button is identified by its label, never by colour alone. The dark column was measured against the dark palette in 1.2.
 
@@ -548,6 +564,5 @@ Other literal lengths and colours require tokens, or a trailing
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
 | `--topic-people-width` | 60px | Four overlapping participant avatars. |
 | `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
-| `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |
 | `--threads-button-width` | 128px | Threads button before and after its count arrives. |
 | `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |
