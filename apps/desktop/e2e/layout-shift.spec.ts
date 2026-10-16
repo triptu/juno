@@ -236,11 +236,13 @@ test('Home rows painted during the first sync stay fixed as later history pages 
   // The latest-reply fetch comes after every history page: holding it keeps the sync open while the probe watches
   // the pages land, so the sidebar's progress line leaving at the end is not part of it.
   fake.holdNext({ method: 'conversations.replies', times: 1000 })
+  // The sidebar's list is still being built: its rows take their places by recency, and #alerts-prod and #deploys
+  // leave for Automated, as their pages land (sidebar.spec.ts, "during the first sync"). Only those moves are skipped.
   await expectStableAnchor(win, '[data-home-item]', async () => {
     fake.release({ method })
     await expect.poll(() => fake.heldCount({ method: 'conversations.replies' }), { timeout: 30_000 }).toBeGreaterThan(0)
     await expect(syncing).toBeVisible()
-  })
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   expect((await boxes()).slice(0, painted.length)).toEqual(painted)
   // The sync ends: the rows painted are still where they were.
   fake.release({ method: 'conversations.replies' })
