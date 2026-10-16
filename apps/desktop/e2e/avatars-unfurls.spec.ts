@@ -9,6 +9,10 @@ test('photos load in messages and sidebar stacks and unfurls keep text when imag
   }
   await juno.signIn()
   await juno.waitForSync()
+  // The sidebar's people are the senders of unread messages, so check them before opening marks #eng read.
+  fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Unread from Leo' })
+  const stack = juno.sidebar.row('#eng').root.locator('img[src^="juno://files/avatar"]')
+  await expect.poll(() => stack.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0))).toBe(true)
   await juno.sidebar.row('#eng').open()
   const row = juno.topic.message('Preview xImage')
   await row.scrollIntoViewIfNeeded()
@@ -16,8 +20,6 @@ test('photos load in messages and sidebar stacks and unfurls keep text when imag
   await expect(row).toContainText('Avery Example (@avery_example)')
   const photo = row.locator('img[src^="juno://files/avatar"]')
   await expect.poll(() => photo.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0))).toBe(true)
-  const stack = juno.sidebar.row('#eng').root.locator('img[src^="juno://files/avatar"]')
-  await expect.poll(() => stack.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0))).toBe(true)
   await expect(photo).toHaveAttribute('src', /size%3D72/)
   const previewImage = row.getByRole('img', { name: 'Avery Example on X' })
   await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
