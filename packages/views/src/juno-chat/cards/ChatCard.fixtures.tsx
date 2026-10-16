@@ -72,6 +72,9 @@ export const sendMessageCard = defineFixtures(
       because: card(sendMessage('s9', open, [results.pending], { because: 'a message from #eng was in this reply' })),
       'may-have-happened': card(sendMessage('s10', mayHaveHappened)),
       dismissed: card(sendMessage('s11', dismissed)),
+      // The Juno tab's column at the minimum window (336 beside the sidebar, less 32 on each side): the pill keeps its kind
+      // and "in {topic}" moves under it; the kind label and the buttons keep their words.
+      'minimum-window': card(sendMessage('s12', open, [results.pending, results.pending, results.pending]), { width: 320, padded: true }),
     },
   },
   frame,

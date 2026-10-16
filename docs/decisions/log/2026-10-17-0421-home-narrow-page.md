@@ -1,0 +1,1 @@
+- 10-17 04:21 · narrow-fixes · On a page under 576px wide Home keeps 24px sides instead of 48, and a greeting too long for the column takes an ellipsis; it stays one line.

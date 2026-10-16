@@ -824,10 +824,15 @@ export const layout = stylex.defineVars({
   '--filmstrip-thumb': '56px',
   '--search-field-width': '260px',
   // The All topics table (inventory 10): topic, where, status, messages,
-  // updated. Under the minimum width (the columns' minimums, their gaps and
-  // the row and table padding) the table scrolls sideways.
-  '--all-topics-columns': 'minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px',
-  '--all-topics-table-min': '576px',
+  // updated. Where gives way first: it shrinks to its minimum, then the
+  // column hides, then Msgs hides (views/AllTopics.tsx repeats the widths
+  // in its container queries). Under the narrowest columns' minimum (their
+  // minimums, their gaps and the row and table padding) the table scrolls
+  // sideways.
+  '--all-topics-columns': 'minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px',
+  '--all-topics-columns-narrow': 'minmax(200px, 1fr) 104px 44px 84px',
+  '--all-topics-columns-narrowest': 'minmax(200px, 1fr) 104px 84px',
+  '--all-topics-table-min': '500px',
   '--keyword-field-width': '160px',
   // Home's column: the item rows and the Ask Juno field.
   '--home-width': '480px',
@@ -837,6 +842,8 @@ export const layout = stylex.defineVars({
   // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
+  // A wrapping ListRow keeps its text at least this wide; under it the controls go to a line of their own.
+  '--list-row-wrap-min': '200px',
   '--palette-width': '560px',
   // The tour sheet (inventory 1.2): its screenshots are the window at its minimum size, 720 by 480 at 1x
   // (1440 by 960 files), the sheet adds its 20px padding on each side. On a

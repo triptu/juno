@@ -53,6 +53,8 @@ export default defineFixtures(
       // A running job's state line in place of "Ask Juno…" (SPEC 13.4); a long one takes an ellipsis.
       'ask-job-line': state({ askLine: 'T3 Code · tests running, 2 of 5' }),
       'ask-job-line-long': state({ askLine: 'T3 Code · Fix the sidebar flake · tests running, 2 of 5, the slowest suite still has four minutes to go' }),
+      // The minimum window with the sidebar shown: the page is 336 by 436, and the column keeps 24 on each side.
+      'minimum-window': state({}, { width: 336, height: 436, padded: false }),
       'short-window': state({ line: 'Two things want you.', items: [homeItems.waiting, homeItems.resume] }, { width: 720, height: 520, padded: false }),
     },
     Empty: {

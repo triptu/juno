@@ -82,6 +82,8 @@ export default defineFixtures(
   {
     Chat: {
       conversation: list(conversation),
+      // The Juno tab at the minimum window with the sidebar shown.
+      'minimum-window': list(conversation, {}, { width: 336, height: 436, padded: false }),
       empty: list([]),
       'new-divider': list(withNewDivider),
       'scheduled-group': list(scheduled),

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { HTMLAttributes, ReactNode } from 'react'
-import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
 
@@ -27,6 +27,13 @@ export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
   readonly divider?: boolean
   /** Padding preset: `settings` 8 14 (the same inset at both ends), `table` 8 12, `log` 6 4, `navigation` 0 12 with a fixed leading slot and 8px gap. */
   readonly padding?: 'settings' | 'table' | 'log' | 'navigation'
+  /**
+   * When the text would get narrower than `--list-row-wrap-min`, the
+   * trailing controls move to a line of their own under it, at the start,
+   * and wrap there too. For rows whose controls are wide (a settings row
+   * with days and times).
+   */
+  readonly wrap?: boolean
   readonly children?: ReactNode
 }
 
@@ -42,6 +49,7 @@ export function ListRow({
   selected = false,
   divider = true,
   padding = 'settings',
+  wrap = false,
   children,
   ...rest
 }: ListRowProps) {
@@ -64,11 +72,12 @@ export function ListRow({
         selected && styles.selected,
         padding === 'navigation' && styles.navigation,
         padding === 'navigation' && selected && styles.navigationSelected,
+        wrap && styles.wrap,
       )}
     >
       {leading !== undefined ? <span {...stylex.props(styles.leading, padding === 'navigation' && styles.navigationLeading)}>{leading}</span> : null}
-      <span {...stylex.props(styles.body, padding === 'navigation' && styles.navigationBody)}>{children}</span>
-      {trailing !== undefined ? <span {...stylex.props(styles.trailing)}>{trailing}</span> : null}
+      <span {...stylex.props(styles.body, padding === 'navigation' && styles.navigationBody, wrap && styles.wrapBody)}>{children}</span>
+      {trailing !== undefined ? <span {...stylex.props(styles.trailing, wrap && styles.wrapTrailing)}>{trailing}</span> : null}
     </div>
   )
 }
@@ -141,6 +150,23 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     flexShrink: 0,
     marginInlineStart: 'auto',
+  },
+  wrap: {
+    flexWrap: 'wrap',
+    rowGap: spacing['--space-2'],
+  },
+  // A zero basis: the text takes the room the controls leave, and the row wraps only below the minimum.
+  wrapBody: {
+    flexBasis: 0,
+    minWidth: layout['--list-row-wrap-min'],
+  },
+  // Beside the text, the growing text keeps it at the end; on its own line it starts under the text.
+  wrapTrailing: {
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '100%',
+    marginInlineStart: 0,
   },
 })
 

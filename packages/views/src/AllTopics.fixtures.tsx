@@ -118,8 +118,12 @@ export default defineFixtures(
       narrow: page({ place: placePicker({ place: eng }) }, { width: 560, height: 480 }),
     },
     Size: {
-      // The topic column keeps its minimum width and the table scrolls sideways.
+      // Under 560 Msgs hides too, and the table still fits without scrolling sideways.
       narrow: page(undefined, { width: 520, height: 560 }),
+      // Under 648 the Where column hides, and the others keep their room.
+      'where-hidden': page(undefined, { width: 620, height: 560 }),
+      // The minimum window with the sidebar hidden: every column fits.
+      'minimum-window': page(undefined, { width: 720, height: 436 }),
       wide: page(undefined, { width: 1400, height: 640 }),
     },
     Window: {

@@ -164,7 +164,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
           {status.label}
         </Chip>
       </span>
-      <span role="gridcell" {...stylex.props(styles.cell, styles.end)}>
+      <span role="gridcell" {...stylex.props(styles.cell, styles.end, styles.messages)}>
         <Text variant="ui" tone="subtle" numeric sx={styles.messageCount}>
           {row.messageCount}
         </Text>
@@ -357,13 +357,13 @@ const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRa
           <Text variant="tableHeader" tone="muted" role="columnheader">
             Topic
           </Text>
-          <Text variant="tableHeader" tone="muted" role="columnheader">
+          <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.whereHeader}>
             Where
           </Text>
           <Text variant="tableHeader" tone="muted" role="columnheader">
             Status
           </Text>
-          <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
+          <Text variant="tableHeader" tone="muted" role="columnheader" sx={[styles.endText, styles.messagesHeader]}>
             Msgs
           </Text>
           <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.endText}>
@@ -393,6 +393,13 @@ const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRa
     </div>
   )
 })
+
+// Where's minimum (72) plus the other columns' minimums (432), four gaps (64), the row's padding (24) and the table's (56):
+// under this the Where column would cut its own header, so it hides and the others keep their room.
+const NARROW = '@container all-topics (width < 648px)'
+// The same without Where: the other minimums (432), three gaps (48), the row's padding and the table's (80). Under this
+// Msgs hides too, so the table fits down to --all-topics-table-min and a focused row's ring stays in view.
+const NARROWER = '@container all-topics (width < 560px)'
 
 const rowsHeight = stylex.create({ is: (px: number) => ({ height: px }) }).is
 const slotAt = stylex.create({ at: (px: number) => ({ transform: `translateY(${px}px)` }) }).at
@@ -440,6 +447,8 @@ const styles = stylex.create({
     overflow: 'auto',
     scrollbarGutter: 'stable',
     overscrollBehavior: 'contain',
+    containerType: 'inline-size',
+    containerName: 'all-topics',
   },
   table: {
     minWidth: layout['--all-topics-table-min'],
@@ -449,7 +458,7 @@ const styles = stylex.create({
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: layout['--all-topics-columns'],
+    gridTemplateColumns: { default: layout['--all-topics-columns'], [NARROW]: layout['--all-topics-columns-narrow'], [NARROWER]: layout['--all-topics-columns-narrowest'] },
     columnGap: spacing['--space-4'],
     alignItems: 'center',
     boxSizing: 'border-box',
@@ -492,6 +501,9 @@ const styles = stylex.create({
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
   },
+  whereHeader: {
+    display: { default: 'block', [NARROW]: 'none' },
+  },
   placeholder: {
     backgroundColor: 'transparent',
   },
@@ -512,7 +524,7 @@ const styles = stylex.create({
     color: colors['--foreground-muted'],
   },
   where: {
-    display: 'flex',
+    display: { default: 'flex', [NARROW]: 'none' },
     alignItems: 'center',
     gap: spacing['--space-1-5'],
     minWidth: 0,
@@ -527,5 +539,11 @@ const styles = stylex.create({
   },
   endText: {
     textAlign: 'end',
+  },
+  messages: {
+    display: { default: 'flex', [NARROWER]: 'none' },
+  },
+  messagesHeader: {
+    display: { default: 'block', [NARROWER]: 'none' },
   },
 })

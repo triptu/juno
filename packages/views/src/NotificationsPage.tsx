@@ -191,14 +191,18 @@ function HoursRow({ which, title, sub, hours, onChange }: { readonly which: Hour
   return (
     <ListRow
       aria-label={title}
+      wrap
       trailing={
         <span {...stylex.props(styles.controls)}>
           <DayToggles days={hours.days} label={`${title} days`} onChange={(days) => set({ days })} />
-          <Select size={32} label={`${title} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />
-          <Text variant="ui" tone="muted">
-            to
-          </Text>
-          <Select size={32} label={`${title} to`} options={times} value={to} onChange={(event) => set({ to: Number(event.currentTarget.value) })} />
+          {/* The times stay together when the controls wrap. */}
+          <span {...stylex.props(styles.times)}>
+            <Select size={32} label={`${title} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />
+            <Text variant="ui" tone="muted">
+              to
+            </Text>
+            <Select size={32} label={`${title} to`} options={times} value={to} onChange={(event) => set({ to: Number(event.currentTarget.value) })} />
+          </span>
         </span>
       }
     >
@@ -332,9 +336,15 @@ const styles = stylex.create({
   },
   controls: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing['--space-2'],
-    flexShrink: 0,
+    minWidth: 0,
+  },
+  times: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
   },
   note: {
     borderTopWidth: '1px',

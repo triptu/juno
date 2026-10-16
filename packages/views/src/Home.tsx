@@ -204,6 +204,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
 }
 
 const HOVER = '@media (hover: hover)'
+// The column's 480 and its 48 on each side: under this the page keeps 24 on each side, and the column takes the rest.
+const NARROW = '@container home (width < 576px)'
 
 const rise = stylex.keyframes({
   from: { opacity: 0 },
@@ -218,6 +220,10 @@ const styles = stylex.create({
     minHeight: 0,
     overflowY: 'auto',
     userSelect: 'none',
+    // A size container has no width of its own: it takes the page's.
+    width: '100%',
+    containerType: 'inline-size',
+    containerName: 'home',
   },
   // Centred in the page, and scrolls from the top when the window is shorter than it.
   column: {
@@ -225,12 +231,15 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'center',
     marginBlock: 'auto',
-    padding: spacing['--space-12'],
+    paddingBlock: spacing['--space-12'],
+    paddingInline: { default: spacing['--space-12'], [NARROW]: spacing['--space-6'] },
   },
   greeting: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    maxWidth: '100%',
+    minWidth: 0,
     marginTop: spacing['--space-3-5'],
     textAlign: 'center',
   },
@@ -242,7 +251,11 @@ const styles = stylex.create({
     lineHeight: text['--text-greeting-leading'],
     letterSpacing: text['--text-greeting-tracking'],
     color: colors['--foreground-default'],
+    // One line always (the layout is fixed before data arrives); a name too long for the window takes an ellipsis.
     whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
   },
   line: {
     marginTop: spacing['--space-1-5'],

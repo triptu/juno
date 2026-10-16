@@ -434,6 +434,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
+| `--list-row-wrap-min` | 200px: the narrowest a wrapping ListRow's text gets before its controls move under it |
+| `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 560px; `--all-topics-table-min` 500px, under which the table scrolls sideways |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 1.2) |

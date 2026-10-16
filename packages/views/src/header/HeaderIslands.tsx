@@ -19,6 +19,13 @@ export interface HeaderIslandsProps {
   readonly wrapLeft?: (island: ReactNode) => ReactNode
   /** Extra attributes for tests and probes (`data-topic-header`). */
   readonly data?: Readonly<Record<`data-${string}`, string>>
+  /**
+   * Which island gives way in a narrow area. `left` (the default): the
+   * title shortens and the buttons keep their size. `right`: the left
+   * island keeps its width and the right one shrinks (the Juno header,
+   * whose title is one word and whose banner chip is long).
+   */
+  readonly give?: 'left' | 'right'
 }
 
 /**
@@ -30,7 +37,8 @@ export interface HeaderIslandsProps {
  * container, so the buttons can switch to their narrow form by the area's
  * width alone.
  */
-export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIslandsProps) {
+export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'left' }: HeaderIslandsProps) {
+  const keep = give === 'right'
   // The panel floats already, so its header is the islands' row with no
   // surfaces of its own: the controls sit on the panel, 4px in from its top
   // corners, on the same line as the topic's islands.
@@ -39,11 +47,11 @@ export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIsl
       <header {...data} {...stylex.props(styles.root)}>
         <HeaderBand surface="panel" />
         <div {...stylex.props(styles.row, columns.panel)}>
-          <div data-island="left" {...stylex.props(styles.bare, styles.left, styles.bareLeft)}>
+          <div data-island="left" {...stylex.props(styles.bare, styles.left, styles.bareLeft, keep && styles.kept)}>
             {left}
           </div>
           {right === undefined ? null : (
-            <div data-island="right" {...stylex.props(styles.bare, styles.right)}>
+            <div data-island="right" {...stylex.props(styles.bare, styles.right, keep && styles.giving)}>
               {right}
             </div>
           )}
@@ -52,7 +60,7 @@ export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIsl
     )
   }
   const island = (
-    <Surface kind="island" data-island="left" sx={styles.left}>
+    <Surface kind="island" data-island="left" sx={[styles.left, keep && styles.kept]}>
       {left}
     </Surface>
   )
@@ -62,7 +70,7 @@ export function HeaderIslands({ column, left, right, data, wrapLeft }: HeaderIsl
       <div {...stylex.props(styles.row, columns[column])}>
         {wrapLeft === undefined ? island : wrapLeft(island)}
         {right === undefined ? null : (
-          <Surface kind="island" data-island="right" sx={styles.right}>
+          <Surface kind="island" data-island="right" sx={[styles.right, keep && styles.giving]}>
             {right}
           </Surface>
         )}
@@ -105,6 +113,13 @@ const styles = stylex.create({
   },
   right: {
     flexShrink: 0,
+  },
+  kept: {
+    flexShrink: 0,
+  },
+  giving: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   // An island's row with no surface: the island's height and gap, so the 28px controls sit 4px from the row's edges.
   bare: {

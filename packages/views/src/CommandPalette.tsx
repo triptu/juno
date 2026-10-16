@@ -198,6 +198,9 @@ const styles = stylex.create({
     alignItems: 'flex-start',
     paddingTop: layout['--palette-top'],
     paddingInline: spacing['--space-6'],
+    // In a short window the list gives up height so the palette ends above the window's bottom edge.
+    paddingBottom: spacing['--space-6'],
+    boxSizing: 'border-box',
     backgroundColor: colors['--overlay'],
     // Over the title bars' drag regions, which would otherwise take the press.
     WebkitAppRegion: 'no-drag',
@@ -207,6 +210,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     width: layout['--palette-width'],
     maxWidth: '100%',
+    maxHeight: '100%',
     overflow: 'hidden',
   },
   header: {
@@ -218,6 +222,7 @@ const styles = stylex.create({
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-default'],
+    flexShrink: 0,
     cursor: 'text',
     // Its own compositor layer, so a keystroke re-rasters this row and not the window-sized overlay with the panel's shadows (performance 2.3).
     willChange: 'transform',
@@ -243,6 +248,7 @@ const styles = stylex.create({
   },
   scroll: {
     maxHeight: layout['--palette-list-max-height'],
+    minHeight: 0,
     scrollbarGutter: 'stable both-edges',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
