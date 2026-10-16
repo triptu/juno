@@ -5,8 +5,9 @@ packages:
 
 # pnpm 12 refuses to run dependency install scripts unless each package is
 # approved or denied here. electron needs its postinstall to download the
-# binary; esbuild uses one to pick its platform binary.
+# binary; esbuild and bun use theirs to select the platform binary.
 allowBuilds:
+  bun: true
   electron: true
   esbuild: true
   electron-winstaller: false

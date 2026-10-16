@@ -33,6 +33,7 @@ import {
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
 import { activityActions } from '../actions/activity'
+import { activityScripts } from '../scripts'
 import type { Origin } from '../router/events'
 import { parseOutput } from '../router/output'
 import { view } from '../store/memory'
@@ -137,6 +138,7 @@ export function activityPage(store: Store, window: PageWindow): ActivityPage {
         at: run.at,
         outcome: outcomeOf(JSON.parse(run.ending) as Ending, parseOutput(text).bubbles.length === 0),
         actions: activityActions(store, run.id),
+        ...activityScripts(store, run.id),
         tainted: run.clean === 0,
       }
     }),

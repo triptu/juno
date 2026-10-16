@@ -85,6 +85,15 @@ export type ActivityAction = typeof ActivityAction.Type
 export const RunOutcome = Schema.Literals(['replied', 'interrupted', 'blocked', 'failed', 'stayedQuiet'])
 export type RunOutcome = typeof RunOutcome.Type
 
+/** One read a codemode script made in a run, with its arguments as the script passed them. */
+export const ActivityScriptCall = Schema.Struct({
+  tool: Schema.String,
+  args: Schema.String,
+  /** `unfinished`: the run ended while the call ran, as after a crash. */
+  outcome: Schema.Literals(['done', 'failed', 'cancelled', 'refused', 'unfinished']),
+})
+export type ActivityScriptCall = typeof ActivityScriptCall.Type
+
 export const ActivityRun = Schema.Struct({
   id: RunId,
   /** Who asked: "You", a schedule's name, a job's title. */
@@ -94,6 +103,8 @@ export const ActivityRun = Schema.Struct({
   actions: Schema.Array(ActivityAction),
   /** The folded read line: "Read 3 topics, looked back 4 times". */
   reads: Schema.optionalKey(Schema.String),
+  /** Every call the run's scripts made, in order. */
+  scriptCalls: Schema.optionalKey(Schema.Array(ActivityScriptCall)),
   /** The run was tainted by untrusted content from here on. */
   tainted: Schema.Boolean,
 })
