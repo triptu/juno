@@ -21,7 +21,8 @@ USER pwuser
 WORKDIR /work
 ENV QUINT_HOME=/home/pwuser/.quint
 COPY --chown=pwuser . /work
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile \
+  && test "$(pnpm exec bun --version)" = "$(node -p "require('./node_modules/bun/package.json').version")"
 
 # Quint downloads its Rust evaluator and Apalache on first use; do it here.
 RUN printf 'module warm {\n  var x: int\n  action init = x'"'"' = 0\n  action step = x'"'"' = x\n  val ok = x == 0\n}\n' > /tmp/warm.qnt \
