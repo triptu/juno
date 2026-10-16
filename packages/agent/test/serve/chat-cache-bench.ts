@@ -88,6 +88,6 @@ try {
   console.log(JSON.stringify({
     p50: percentile(eventMs, .5), p95: percentile(eventMs, .95), queryP95: percentile(queryMs, .95), structuralP95: percentile(structuralMs, .95),
     warmHeap: warmHeap - initialHeap, retainedHeap, rss: process.memoryUsage().rss, peakRss: process.resourceUsage().maxRSS * 1024,
-    bytes, events: eventMs.length,
+    bytes, events: eventMs.length, eventMs, queryMs,
   }))
 } finally { cache?.close(); fixture.close() }
