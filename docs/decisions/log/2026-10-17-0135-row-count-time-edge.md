@@ -1,0 +1,1 @@
+- 10-17 01:35 · grammar-chips · Sidebar counts: measured on main, every count pill ("3", "12", "99+", Main and thread rows, hover, selected, full Sidebar) already ends exactly on the time's right edge (0.00 px), with no change in row height; the digits sit 7 px inside the pill's padding. No layout change; the Count gallery states and a geometry check hold that edge.

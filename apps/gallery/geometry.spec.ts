@@ -350,3 +350,15 @@ test('Backup cuts the path in the middle and keeps the row insets', async ({ pag
   expect(at.fits).toBe(true)
   expect(at.gap).toBeGreaterThan(0)
 })
+
+test('row counts end on the time edge at every width, and keep the row height', async ({ page }) => {
+  await open(page, 'TopicRow', 'count/all-widths')
+  const rows = await page.evaluate(() => [...document.querySelectorAll('[data-topic-row]')].map((row) => {
+    const time = row.querySelector('[data-row-part="time"]')!.getBoundingClientRect()
+    const count = row.querySelector('[data-row-part="counts"] > :last-child')!
+    return { count: count.textContent, offset: count.getBoundingClientRect().right - time.right, height: row.getBoundingClientRect().height, lines: row.getAttribute('data-row-lines') }
+  }))
+  expect(rows.map((row) => row.count)).toEqual(['3', '3', '12', '12', '99+', '99+'])
+  for (const row of rows) expect(row.offset).toBe(0)
+  for (const lines of ['2', '3']) expect(new Set(rows.filter((row) => row.lines === lines).map((row) => row.height)).size).toBe(1)
+})

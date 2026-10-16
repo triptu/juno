@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 01:35 · grammar-chips · Sidebar counts: measured on main, every count pill ("3", "12", "99+", Main and thread rows, hover, selected, full Sidebar) already ends exactly on the time's right edge (0.00 px), with no change in row height; the digits sit 7 px inside the pill's padding. No layout change; the Count gallery states and a geometry check hold that edge.
 - 10-17 01:10 · grammar-chips · Start the grammar request on a typing pause, for the draft as it will be sent, so the second after sending usually has the answer: no model answered within one second on 10-16 (Luna kept: 100% precision, 68% recall, p50 1.39 s, cheapest). One request per exact text, cached by its hash; the next edit stops it unless that text was sent; a 3 s deadline; background spend; Enter never waits.
 - 10-17 01:01 · test-slim · Tests: a test that only repeats another test's flow or a unit rule is removed or merged, a fixed wait gives way to a wait on a condition or an injected delay, and the gallery's layout-shift guard waits only for motion that can move a box.
 - 10-17 00:55 · orchestrator · From the design review, following native Mac conventions: Settings controls sit at the trailing edge in every section; tab Close buttons are not Tab stops (Delete and ⌘W close a focused tab); two-line picker rows are 44px; Main has no icon in the topic switcher; the default button goes last on Juno cards.
