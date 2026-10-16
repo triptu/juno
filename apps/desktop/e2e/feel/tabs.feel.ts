@@ -20,7 +20,7 @@ const test = base.extend({
   },
 })
 
-const THREAD = 'Review the rollout checklist 1.'
+const THREAD = 'Review the rollout checklist 1'
 const OTHERS = ['Draft plan is in the doc', 'Rina finished the onsite.', 'Proposal: cut offline mode and public', 'Can eng take the Wednesday afternoon']
 
 test('switching back to a scrolled tab restores it before the first paint', async ({ juno, feel }) => {

@@ -11,7 +11,7 @@ import { expect, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 
 const ALERTS_MAIN = '#alerts-prod'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const LONG_THREAD = 'Review the rollout checklist 1.'
 
 test('Notify me on a channel lists it on the page, and removing it there has Undo', async ({ juno }) => {

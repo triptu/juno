@@ -21,7 +21,8 @@ import { quietDaysOf } from '@juno/domain'
 import { liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
-import { Workspace, type StoreServices } from '../workspace'
+import { AiCredentials } from '../aiCredentials'
+import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { ART_SELECT, drawTopic, type ArtOutcome } from './draw'
 import type { JoinedRow } from '../topicRows'
 
@@ -135,14 +136,21 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
   })
 
 /** Runs the job for the life of the engine. Requires the services; provides nothing. */
-export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider> = Layer.effectDiscard(
+export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials> = Layer.effectDiscard(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
+    const credentials = yield* AiCredentials
+    let previous: OpenWorkspace | undefined
+    let memory: Memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
     const passes = workspace.changes.pipe(
-      Stream.switchMap((open) => {
+      Stream.zipLatest(credentials.revisions),
+      Stream.switchMap(([open]) => {
         if (open === undefined) return Stream.empty
-        const memory: Memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
+        if (previous !== open) memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
+        previous = open
+        memory.deferred.clear()
+        memory.passDeferredUntil = 0
         // The live query is the trigger; each pass reads its own fresh candidates, so a stale emission costs one query.
         return liveQuery(KEYS, Effect.void).pipe(
           Stream.debounce(DEBOUNCE),

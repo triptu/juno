@@ -6,8 +6,8 @@
  * gets only the active one, over `parentPort`.
  *
  * - Keys are generic passwords in the login keychain (`keychain.ts`), never
- *   in a file or a log. The OpenRouter key, else `OPENROUTER_API_KEY` in
- *   development, which overrides it until a key is set in Settings.
+ *   in a file or a log. `OPENROUTER_API_KEY` overrides the initial
+ *   OpenRouter key in development until a key is saved or removed.
  * - The endpoint's base URL and which provider is active are not secret:
  *   they live in `juno-provider.json` in userData.
  * - One provider is active at a time. Setting one up makes it active;
@@ -54,8 +54,8 @@ export class ProviderStore {
     private readonly keychains: ProviderKeychains,
     /** `OPENROUTER_API_KEY`, outside tests. */
     private readonly override: string | undefined,
-    /** Called after every change, and once loaded, with the new state and the active provider. */
-    private readonly changed: (state: ProviderState, provider: AgentProvider | null) => void,
+    /** Called after every change, and once loaded, with public state, the active chat provider and the engine’s OpenRouter key. */
+    private readonly changed: (state: ProviderState, provider: AgentProvider | null, engineKey: string | null) => void,
   ) {
     this.#file = join(userData, PROVIDER_FILE)
   }
@@ -170,6 +170,6 @@ export class ProviderStore {
   }
 
   #notify(): void {
-    this.changed(this.state, this.provider)
+    this.changed(this.state, this.provider, this.#openRouterKey)
   }
 }

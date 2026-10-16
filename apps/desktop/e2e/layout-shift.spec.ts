@@ -5,7 +5,7 @@ import { expectStableAnchor } from './shiftProbe'
 test.describe.configure({ timeout: 60_000, mode: 'parallel' })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const) {
   test(`stable open: ${path}`, async ({ juno, win, fake }) => {

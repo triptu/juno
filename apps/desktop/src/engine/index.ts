@@ -69,8 +69,8 @@ parent.on('message', (event) => {
   let message: MainToEngine
   try {
     message = decode(event.data)
-  } catch (cause) {
-    console.error('engine: bad message from main', cause)
+  } catch {
+    console.error('engine: bad message from main')
     return
   }
   switch (message._tag) {

@@ -9,7 +9,7 @@ import { Juno } from './driver/juno'
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ENG_MAIN = '#eng'
 
 test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {

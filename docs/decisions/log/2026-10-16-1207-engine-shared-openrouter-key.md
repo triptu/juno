@@ -1,0 +1,1 @@
+- 10-16 12:07 · Engineering · Engine tasks use the agent’s OpenRouter keychain entry, delivered in memory at startup and on changes; credential revisions cancel old requests and wake deferred jobs. Custom endpoints remain chat-only because @juno/ai supports OpenRouter only. Add budgeted titles for recent sidebar threads after first sync, and a quiet missing-key line in Settings.

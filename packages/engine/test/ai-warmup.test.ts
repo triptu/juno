@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 import { prefs, transaction } from '@juno/store'
 import { expect, it, vi } from 'vitest'
+import { AiCredentials } from '../src/aiCredentials'
 import { AiWarmup } from '../src/aiWarmup'
 import { EngineConfig } from '../src/config'
 import { HostLink, memoryHost } from '../src/protocol/host'
@@ -16,6 +17,7 @@ it('warms once after paint and enabling AI, without a model call', async () => {
   vi.stubGlobal('fetch', request)
   const runtime = ManagedRuntime.make(AiWarmup.pipe(
     Layer.provideMerge(Workspace.layer),
+    Layer.provide(AiCredentials.layer),
     Layer.provide(HostLink.layer(host)),
     Layer.provide(EngineConfig.layer({ userData: dir, e2e: true, dev: false, ai: 'live', openRouterApiKey: 'fake-key' })),
   ))

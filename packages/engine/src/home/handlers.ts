@@ -16,6 +16,7 @@ import { HomeRoutes, NotSignedIn } from '@juno/contract'
 import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
+import { AiCredentials } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
 import { readHome, type HomeRun } from './query'
@@ -48,16 +49,17 @@ export const HomeHandlers = HomeRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
+    const credentials = yield* AiCredentials
     const scope = yield* Effect.scope
     /** Items asked about, by workspace, with the activity they were asked at, so one is asked once until its topic moves. */
     const asked = new Map<string, Map<string, string>>()
 
-    const rewrite = (open: OpenWorkspace, run: HomeRun): Effect.Effect<void> => {
+    const rewrite = (open: OpenWorkspace, run: HomeRun, revision: number): Effect.Effect<void> => {
       const memory = asked.get(open.id) ?? new Map<string, string>()
       asked.set(open.id, memory)
-      const due = run.rewritable.filter(({ item, row }) => memory.get(item.id) !== (row.last_activity_ts ?? ''))
+      const due = run.rewritable.filter(({ item, row }) => memory.get(item.id) !== `${revision}:${row.last_activity_ts ?? ''}`)
       if (due.length === 0) return Effect.void
-      for (const { item, row } of due) memory.set(item.id, row.last_activity_ts ?? '')
+      for (const { item, row } of due) memory.set(item.id, `${revision}:${row.last_activity_ts ?? ''}`)
       const work: Effect.Effect<void, SqlError, StoreServices | AiProvider> = Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
         const left = HOME_DAILY_BUDGET - (yield* usedToday(now))
@@ -89,12 +91,13 @@ export const HomeHandlers = HomeRoutes.toLayer(
     const view = () =>
       serveLiveValue(
         workspace.changes.pipe(
-          Stream.switchMap((open) =>
+          Stream.zipLatest(credentials.revisions),
+          Stream.switchMap(([open, revision]) =>
             open === undefined
               ? Stream.empty
               : liveQuery(
                   KEYS,
-                  timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run) : Effect.void)))).pipe(
+                  timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run, revision) : Effect.void)))).pipe(
                     Effect.map((timedRun) => ({ value: timedRun.value.view, queryMs: timedRun.queryMs })),
                   ),
                 ).pipe(Stream.provide(open.context)),

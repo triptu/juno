@@ -24,6 +24,7 @@ import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, syncState, tra
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
+import { AiCredentials } from '../aiCredentials'
 import { channelInfoOf, parseColumns, topicFrom, userIdsOf, userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
@@ -155,12 +156,14 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
   })
 
 /** Runs the job for the life of the engine. */
-export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider> = Layer.effectDiscard(
+export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials> = Layer.effectDiscard(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
+    const credentials = yield* AiCredentials
     const passes = workspace.changes.pipe(
-      Stream.switchMap((open) => {
+      Stream.zipLatest(credentials.revisions),
+      Stream.switchMap(([open]) => {
         if (open === undefined) return Stream.empty
         const memory: Memory = { deferred: new Map() }
         const triggers = Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK))

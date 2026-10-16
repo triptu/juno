@@ -26,7 +26,7 @@ const isDmMain = (row: TopicRow) => row.kind === 'main' && (row.channel.kind ===
 const hasArt = (row: TopicRow) => typeof row.art === 'string' && row.art.length > 0
 
 const storedArt = (engine: RunningEngine) =>
-  readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id, recipe, status, source, hue FROM topic_art ORDER BY topic_id').all() as Array<{ topic_id: string; recipe: string; status: string; source: string; hue: string }>)
+  readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id, recipe, status, source, hue, title_source FROM topic_art ORDER BY topic_id').all() as Array<{ topic_id: string; recipe: string; status: string; source: string; hue: string; title_source: string }>)
 
 /** The rows once every thread and channel Main in the window has been drawn, or finished trying, and every finished drawing shows. */
 const drawnRows = (engine: RunningEngine) =>
@@ -35,7 +35,7 @@ const drawnRows = (engine: RunningEngine) =>
     const stored = new Map(storedArt(engine).map((entry) => [entry.topic_id, entry]))
     return rows.filter((row) => !isDmMain(row)).every((row) => {
       const entry = stored.get(row.id)
-      return entry !== undefined && (entry.status === 'ok' ? row.art === entry.recipe : row.art === undefined)
+      return entry !== undefined && !(row.titleSource === 'ai' && entry.source === 'ai' && entry.title_source === 'fallback') && (entry.status === 'ok' ? row.art === entry.recipe : row.art === undefined)
     })
   }, 'every drawable row drawn')
 
@@ -81,6 +81,8 @@ describe('topic art', () => {
 
   it('shows the placeholder everywhere while AI assist is off, draws nothing new, and brings the drawings back when it is on again', async () => {
     const engine = await bootedEngine()
+    // The title job can replace a fallback drawing once; wait before taking the baseline.
+    await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar threads titled')
     const before = await drawnRows(engine)
     expect(before.some(hasArt)).toBe(true)
     const count = storedArt(engine).length

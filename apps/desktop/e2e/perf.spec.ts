@@ -792,7 +792,7 @@ test.describe('topic view', () => {
   let userData: string
   let slackDir: string
   let slackApp: SlackAppFixture
-  const THREAD = 'Review the rollout checklist 1.'
+  const THREAD = 'Review the rollout checklist 1'
   const MAIN = '#perf-main'
 
   const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })

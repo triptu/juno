@@ -25,12 +25,14 @@ async function setup(options: { readonly dir?: string; readonly keychains?: Prov
   const keychains = options.keychains ?? { openRouter: memoryKeychain(), custom: memoryKeychain() }
   const sent: Array<AgentProvider | null> = []
   const states: ProviderState[] = []
-  const store = new ProviderStore(dir, keychains, options.override, (state, provider) => {
+  const engineKeys: Array<string | null> = []
+  const store = new ProviderStore(dir, keychains, options.override, (state, provider, engineKey) => {
+    engineKeys.push(engineKey)
     states.push(state)
     sent.push(provider)
   })
   await store.load()
-  return { dir, keychains, store, sent, states }
+  return { dir, keychains, store, sent, states, engineKeys }
 }
 
 it('starts with no provider, so the agent gets none', async () => {
@@ -130,4 +132,17 @@ it('the keychain gets a key on stdin, never in argv, and nothing about it is log
   expect(calls[1]!.stdin).toBe(`add-generic-password -U -s juno-openrouter-key -a openrouter -w ${KEY}\n`)
   expect(calls.flatMap((call) => call.args).some((arg) => arg.includes(KEY))).toBe(false)
   for (const spy of logged) expect(spy).not.toHaveBeenCalled()
+})
+
+
+it('shares the keychain OpenRouter key with the engine independently of the chat provider', async () => {
+  const keychains = { openRouter: memoryKeychain('fake-router-key'), custom: memoryKeychain() }
+  const { store, engineKeys } = await setup({ keychains })
+  expect(engineKeys).toEqual(['fake-router-key'])
+  await store.set({ _tag: 'custom', baseUrl: LOCAL, key: 'fake-custom-key' })
+  expect(engineKeys.at(-1)).toBe('fake-router-key')
+  await store.set({ _tag: 'openRouter', key: 'fake-replacement-key' })
+  expect(engineKeys.at(-1)).toBe('fake-replacement-key')
+  await store.set({ _tag: 'openRouter', key: null })
+  expect(engineKeys.at(-1)).toBeNull()
 })

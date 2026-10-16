@@ -9,7 +9,7 @@ test.describe.configure({ timeout: 90_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 
@@ -191,7 +191,7 @@ test.describe('a long thread', () => {
       await fake.close()
     },
   })
-  const THREAD = 'Review the rollout checklist 1.'
+  const THREAD = 'Review the rollout checklist 1'
 
   longTest('opens with the first new reply 80px below the header band, and older pages load without moving what is on screen', async ({ juno, slack }) => {
     await juno.signIn()

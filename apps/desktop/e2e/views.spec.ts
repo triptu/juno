@@ -12,7 +12,7 @@ test.describe.configure({ timeout: 90_000 })
 
 const ALERTS_MAIN = '#alerts-prod'
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 /** Signs in, waits for the sync and deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
 async function withoutAutomated(juno: Juno): Promise<void> {
