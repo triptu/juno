@@ -1,0 +1,1 @@
+- 10-16 18:50 · links · Links go to Slack as its clients send them: a typed URL as a `link` element with no text and `<url>`, a bare domain or address with `http://` or `mailto:` added and its text kept, linked words as `{ url, text }` and `<url|words>`; Slack never links text elements itself, which is why Juno's links came back plain.

@@ -30,6 +30,11 @@
  * `--only emoji` reads every edge `emojis/list` page and prints the result
  * keys and how image urls and aliases are spelled.
  *
+ * `--only links` reads one history page of the self-DM and of the most
+ * recently active conversations, and counts how messages sent from Slack's
+ * clients spell links: `link` element keys, how `url` relates to `text`,
+ * and the `<url>` and `<url|label>` forms in the mrkdwn `text`.
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -174,6 +179,11 @@ async function main(): Promise<number> {
   if (flag('--only') === 'integrations') {
     await probeIntegrations(call, out)
     return 0
+  }
+
+  if (flag('--only') === 'links') {
+    console.log(JSON.stringify(await linksOnly(call), null, 2))
+    return writeShapes(out)
   }
 
   const now = Date.now() / 1000
@@ -453,6 +463,88 @@ async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknow
     usersInfo: { ...info, resultsShape: [...info.resultsShape], keys: Object.fromEntries([...info.keys].toSorted()), notReturned: { all: all.length - returned.size, sender: missingBy(ids.sender), mention: missingBy(ids.mention), im: missingBy(ids.im), mpim: missingBy(ids.mpim) } },
     edgeUsersList: { ok: edgeList?.['ok'], error: edgeList?.['error'], results: Array.isArray(edgeList?.['results']) ? (edgeList['results'] as Array<unknown>).length : typeof edgeList?.['results'], nextMarker: typeof edgeList?.['next_marker'] === 'string' },
     usersList: { ok: webList?.['ok'] ?? false, members: ((webList?.['members'] as Array<unknown> | undefined) ?? []).length, nextCursor: ((webList?.['response_metadata'] as Json | undefined)?.['next_cursor'] ?? '') !== '' },
+  }
+}
+
+/** `--only links`: how Slack's own clients encode links in `blocks` and `text`. Counts only. */
+async function linksOnly(call: Call): Promise<unknown> {
+  const auth = await call('auth.test', {}, 'links')
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'links')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'links')
+  const self = String(auth?.['user_id'] ?? '')
+  const selfDm = ((boot?.['ims'] as Array<Json> | undefined) ?? []).find((im) => im['user'] === self)
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 10)
+    .map((e) => e.id)
+  const ids = [...new Set([...(selfDm === undefined ? [] : [String(selfDm['id'])]), ...recent])]
+  const links: Array<Json> = []
+  const relation = new Map<string, number>()
+  const textForms = new Map<string, number>()
+  const add = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1)
+  let messages = 0
+  let fromClients = 0
+  let withLinks = 0
+  let urlInTextElement = 0
+  const bareScheme = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const walk = (node: unknown, found: (el: Json) => void) => {
+    if (Array.isArray(node)) for (const item of node) walk(item, found)
+    else if (node !== null && typeof node === 'object') {
+      const el = node as Json
+      if (typeof el['type'] === 'string' && (el['type'] === 'link' || el['type'] === 'text') && el !== undefined) found(el)
+      for (const value of Object.values(el)) if (typeof value === 'object') walk(value, found)
+    }
+  }
+  for (const channel of ids) {
+    const page = await call('conversations.history', { channel, limit: 100, no_user_profile: true }, 'links')
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      messages++
+      if (typeof m['client_msg_id'] !== 'string' || m.subtype !== undefined) continue
+      fromClients++
+      let has = false
+      walk(m['blocks'], (el) => {
+        if (el['type'] === 'text') {
+          if (/(?:https?:\/\/|\b[a-z0-9-]+\.(?:com|org|net|io|dev|ai)\b)/i.test(String(el['text']))) urlInTextElement++
+          return
+        }
+        has = true
+        links.push(el)
+        const url = String(el['url'])
+        const text = typeof el['text'] === 'string' ? el['text'] : undefined
+        const scheme = /^([a-z]+):/i.exec(url)?.[1] ?? 'none'
+        if (text === undefined) add(relation, `no text, url scheme ${scheme}`)
+        else if (text === url) add(relation, 'text equals url')
+        else if (bareScheme(url) === text) add(relation, `text is url without ${scheme}:// (trailing slash ${url.endsWith('/') && !text.endsWith('/')})`)
+        else add(relation, `text is a label, url scheme ${scheme}`)
+        if (el['unsafe'] !== undefined) add(relation, 'has unsafe')
+        if (el['truncated'] !== undefined) add(relation, `truncated, ${text === undefined ? 'no text' : bareScheme(url) === text ? 'text is url without scheme' : 'text is a label'}`)
+      })
+      if (has) withLinks++
+      const mrkdwn = typeof m['text'] === 'string' ? m['text'] : ''
+      for (const match of mrkdwn.matchAll(/<([^@#!][^|>]*)(?:\|([^>]*))?>/g)) {
+        const url = match[1]!
+        const label = match[2]
+        if (label === undefined) add(textForms, '<url>')
+        else if (label === url) add(textForms, '<url|url>')
+        else if (bareScheme(url) === label) add(textForms, '<url|url without scheme>')
+        else add(textForms, '<url|label>')
+      }
+      if (has && !/<[^@#!]/.test(mrkdwn)) add(textForms, 'message with link elements but no <…> in text')
+    }
+  }
+  return {
+    calls: summariseCalls(),
+    selfDmRead: selfDm !== undefined,
+    conversations: ids.length,
+    messages,
+    fromClients,
+    withLinks,
+    linkKeys: keyCensus(links),
+    linkStyleKeys: keyCensus(links.map((l) => l['style']).filter((s) => s !== undefined)),
+    relation: Object.fromEntries(relation),
+    textForms: Object.fromEntries(textForms),
+    urlLikeTextInTextElements: urlInTextElement,
   }
 }
 
