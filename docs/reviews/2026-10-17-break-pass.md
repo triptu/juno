@@ -169,3 +169,31 @@ passes.
   here exercised them together with tabs.
 - Anything that needs the Mac (`@mac`, feel, perf). The focus change should
   be checked by `pnpm test:feel -g tabs` on the Mac before merge.
+
+## Round three: more than one New chat tab
+
+The owner found the tabs too constrained: a second ⌘T took them back to the
+New chat already open. Changed:
+
+- ⌘T, "+", ⌘N and the sidebar's New chat button open a new New chat tab
+  every time. They used to focus an untouched one.
+- ⌘K's "Message" for someone never messaged opens a new New chat tab too,
+  rather than filling an untouched one.
+- A New chat sent to a topic that another tab shows stays in its own tab
+  and becomes the topic. It used to close and focus the other tab.
+
+Kept as they are:
+
+- **Settings is one tab.** It is one page with sections, and every entry
+  (⌘,, the avatar menu, Notifications, the Juno menu) moves it to a
+  section. Two copies would show the same controls twice and could disagree
+  while a change saves.
+- **A plain open focuses a tab that already shows the place** (a topic,
+  Home, All topics, Juno). This keeps the sidebar's selection in one place
+  (SPEC 6). It never stops a second tab: ⌘-click, ⌘ Enter and "Open in new
+  tab" always open one.
+- **There is always a tab.** Closing the last one opens a new one.
+
+Tests: "⌘T twice gives two New chat tabs with their own drafts, and both
+survive a relaunch" and "a New chat sent to a topic open in another tab
+stays in its own tab", in `break-pass-1017.spec.ts`.
