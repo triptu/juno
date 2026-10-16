@@ -1,1 +1,1 @@
-- 10-16 11:47 · Tushar · Bun's test runner is a candidate for pure package suites; keep pnpm for installs and oxlint for linting. Why: Bun passed the unchanged domain suite over 11× faster, but its clean install omitted Electron's native binary.
+- 10-16 11:47 · orchestrator · Measured Bun against our tools (docs/research/bun-tooling.md): `bun check -b` matched tsc's errors at about 10× the speed (6 s cold against 64 s); `bun test` ran the pure domain suite unchanged, 11× faster; `bun install` left Electron's native binary out and Bun has no linter, so pnpm and oxlint stay.
