@@ -8,7 +8,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { BubbleId, Ending } from '@juno/agent-contract'
-import { openTurns, sourceTable, type ModelRef, type ProviderGuardApi, type TurnEvent, type Turns } from '../src/index'
+import { openTurns, sourceTable, type ModelRef, type ProviderGuardApi, type TurnEvent, type Turns, type TurnsOptions } from '../src/index'
 import type { Store } from '../src/store/store'
 import { fromArchive, handleTable, unique, type StepTrace, type Trace } from './trace'
 import { fakeActionHost } from '@juno/agent-testing'
@@ -30,7 +30,8 @@ export interface Backend {
 
 export class StepTimeout extends Error {}
 
-export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, timeoutMs: number): Promise<Trace> {
+/** `extra`: more engine options, such as `codemode` for `bench/codemode.ts`. */
+export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, timeoutMs: number, extra: Partial<TurnsOptions> = {}): Promise<Trace & { readonly ms: number }> {
   const dir = await mkdtemp(join(tmpdir(), 'juno-eval-'))
   const { host, read } = recordingHost()
   const errors: unknown[] = []
@@ -42,12 +43,13 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
     const name = `#${channelName(found.place.channelId)}`
     return { topic: { ...found.topic, where: name }, place: { ...found.place, name } }
   } }, executors: external.executors }
-  const opened = await openTurns({ ...external.options, now: () => Date.parse('2026-10-15T12:00:00Z'), agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
+  const opened = await openTurns({ ...external.options, ...extra, now: () => Date.parse('2026-10-15T12:00:00Z'), agentDir: dir, provider: backend.provider, model: backend.model, subagent: backend.helper, host, actions, onReport: (e) => errors.push(e) })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')
   const turns: Turns = opened
   const events: TurnEvent[] = []
   const off = turns.subscribe((event) => events.push(event))
   const traces: StepTrace[] = []
+  let ms = 0
   try {
     await external.connect()
     for (const [i, step] of steps.entries()) {
@@ -65,8 +67,10 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
         input = `Owner reacted ${step.react} to Juno's bubble: "${last.text}"`
         turns.accept({ opId, kind: 'react', target: { _tag: 'bubble', id: last.id as BubbleId }, emoji: step.react })
       }
+      const started = performance.now()
       await within(turns.idle(), timeoutMs)
       await settle(turns)
+      ms += performance.now() - started
       const stepEvents = events.slice(firstEvent)
       const stepRead = unique(read().slice(firstRead))
       traces.push({
@@ -88,7 +92,7 @@ export async function runSteps(steps: ReadonlyArray<Step>, backend: Backend, tim
     await external.close()
     await rm(dir, { recursive: true, force: true })
   }
-  return { steps: traces }
+  return { steps: traces, ms }
 }
 
 const nextRow = (turns: Turns) => (turns.store.db.prepare('SELECT coalesce(max(id) + 1, 0) AS id FROM messages').get() as { id: number }).id
