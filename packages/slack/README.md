@@ -12,7 +12,7 @@ Compose `SlackClient.layer` and provide the three seams the host owns:
 
 Then use the services:
 
-- `SlackApi`: Web API calls, decoded with `@juno/slack-schema`, including `presence.set({ presence: 'auto' | 'away' })`.
+- `SlackApi`: Web API calls, decoded with `@juno/slack-schema`. A call's `beforeSend` runs holding its lane's permit just before each exchange and can stop the call with its own error. Includes `presence.set({ presence: 'auto' | 'away' })`.
 - `SlackEdge`: the edge API (`users/info` and similar).
 - `RequestQueue`: request lanes, per-method rate limits and `Retry-After`.
 - `SlackSocket`: the event socket with reconnect, as a stream of `SocketEvent`.

@@ -175,7 +175,9 @@ module outboxProtocol {
   // the catch-up's recheck finds it. **Assumption:** the time between Slack
   // applying the change and Juno storing its event, and between the check
   // and Slack applying Juno's delete, is not modelled. A change in that
-  // window can still race the delete.
+  // window can still race the delete. The check runs holding the send
+  // lane, just before the request leaves, so the second window is one
+  // request's flight, not a wait behind other writes.
   action remoteChange(k: int, what: str): bool = {
     val c = { key: k, what: what }
     all {

@@ -25,8 +25,9 @@
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
  * posts (`@juno/sync` `sent.ts`), which wakes this worker. Just before
- * that delete goes out, one transaction checks again that it loses
- * nothing (`checkCopyDelete`) and cancels it otherwise. After the socket
+ * that delete goes out, holding the send lane so no other write comes
+ * between, one transaction checks again that it loses nothing
+ * (`checkCopyDelete`) and cancels it otherwise. After the socket
  * comes back, a copy's delete waits for the catch-up, at most
  * `COPY_CATCH_UP_MILLIS`; the check then also needs the copy's own topic
  * rechecked since the reconnect, so a delete of the kept message made
@@ -39,7 +40,7 @@ import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
 import { actionDone, checkCopyDelete, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
-import { Outbox, type MirrorError } from '../outbox'
+import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
 import { inStore } from './worker'
@@ -82,8 +83,12 @@ export class ActionWorker extends Context.Service<
       const reconnectedAt = yield* Ref.make<number | undefined>(undefined)
       const wake = Effect.asVoid(Queue.offer(signal, undefined))
 
-      /** The call for a row whose message has `ts`, and what Slack's acceptance stores. Undefined when there is nothing to send. */
-      const callFor = (action: PendingAction, ts: string, selfId: string): Effect.Effect<Acted, MirrorError> => {
+      /**
+       * The call for a row whose message has `ts`, and what Slack's acceptance
+       * stores. A delete's `check` runs holding the send lane, just before the
+       * request leaves; when it fails nothing is sent.
+       */
+      const callFor = (action: PendingAction, ts: string, selfId: string, check: Effect.Effect<void, NotSent>): Effect.Effect<Acted, MirrorError | NotSent> => {
         const { channel } = action
         switch (action.kind) {
           case 'edit': {
@@ -103,7 +108,9 @@ export class ActionWorker extends Context.Service<
               )
           }
           case 'delete':
-            return outbox.send((api) => api.call('chat.delete', { channel, ts: ts as Ts })).pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
+            return outbox
+              .sendChecked((api) => api.call('chat.delete', { channel, ts: ts as Ts }, { beforeSend: check }))
+              .pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
           case 'react': {
             const name = action.payload.name ?? ''
             const added = action.payload.want === true
@@ -135,20 +142,24 @@ export class ActionWorker extends Context.Service<
             yield* local(transaction(dropAction(action)))
             return false
           }
-          if (action.kind === 'delete') {
+          // A copy's delete is checked once more on the send lane, so a change made while it waited for the lane is seen.
+          const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
-            if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return false
-          }
+            if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
+          })
           const selfId = (yield* local(storedMe))?.userId ?? ''
-          const result = yield* Effect.result(callFor(action, place.ts, selfId))
+          const result = yield* Effect.result(callFor(action, place.ts, selfId, check))
           const now = yield* Clock.currentTimeMillis
           const done = () => actionDone(action, now)
           if (result._tag === 'Success') {
             yield* fetcher.acted(result.success, done()).pipe(Effect.orDie)
             return false
           }
-          const error: MirrorError = result.failure
+          const error = result.failure
           switch (error._tag) {
+            // The check kept the copy and ended the row.
+            case 'NotSent':
+              return false
             case 'Rejected': {
               const acted = ALREADY_DONE.has(error.code) ? alreadyDone(action, place.ts) : undefined
               if (acted !== undefined) {
