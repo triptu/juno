@@ -319,13 +319,15 @@ function setAppMenu(state: MenuState, rebuild = false): void {
       { label: 'View', submenu: view },
       { label: 'Go', submenu: go },
       { role: 'window', submenu: windowItems },
+      // The tour (SPEC 4), again whenever the owner wants it.
+      { role: 'help', submenu: [{ id: 'tour', label: 'Show the Tour', click: (_item, window) => tabCommand(window, 'tour.show') }] },
     ]),
   )
 }
 
 /**
  * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
- * accent, density and privacy mode, and the saved sidebar.
+ * accent, density and privacy mode, and the saved sidebar. `?tour=manual` (tests only) keeps the tour from opening by itself.
  */
 function pageUrl(base: string, launch: PageLaunch): string {
   const url = new URL(base)
@@ -336,5 +338,7 @@ function pageUrl(base: string, launch: PageLaunch): string {
   if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
+  // Under JUNO_E2E the tour opens only when asked, unless the test wants it to open by itself (JUNO_E2E_TOUR).
+  if (process.env.JUNO_E2E === '1' && process.env.JUNO_E2E_TOUR !== '1') url.searchParams.set('tour', 'manual')
   return url.toString()
 }

@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, tourOpenAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
@@ -13,6 +13,9 @@ import { Workspace } from './containers/Workspace'
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
 const SetUpJuno = setup.component((module) => module.SetUpJuno)
+// The tour (SPEC 4) opens over the app right after a first sign-in, so it warms with the setup page.
+const tour = chunk(() => import('./containers/Tour'))
+const Tour = tour.component((module) => module.Tour)
 
 // The contract's names and the tokens' names must be the same set. These
 // assignments fail to compile if either side drifts.
@@ -34,6 +37,16 @@ function PrivacyRoot() {
   return null
 }
 
+/** The tour over the app while it is open; its code loads only when it is wanted. */
+function TourLayer() {
+  const open = useAtomValue(tourOpenAtom)
+  return open ? (
+    <Suspense fallback={null}>
+      <Tour />
+    </Suspense>
+  ) : null
+}
+
 /** The root container: the theme, privacy mode, and the shell in its signed-in or signed-out shape. */
 export function App() {
   const [theme, setTheme] = useAtom(themeAtom)
@@ -45,7 +58,10 @@ export function App() {
 
   useEffect(() => {
     if (signedIn !== undefined) return
-    const idle = requestIdleCallback(() => void setup.load())
+    const idle = requestIdleCallback(() => {
+      void setup.load()
+      void tour.load()
+    })
     return () => cancelIdleCallback(idle)
   }, [signedIn])
 
@@ -81,6 +97,7 @@ export function App() {
         <Frame sidebar={<Sidebar />} peek={<Peek />}>
           <Workspace />
         </Frame>
+        <TourLayer />
       </>
     )
   }

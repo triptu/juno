@@ -170,10 +170,12 @@ export interface SettingsAboutProps {
   readonly updates: ReactNode
   /** The engine's status line and Ping engine. */
   readonly diagnostics: ReactNode
+  /** Opens the tour again (SPEC 4, "The tour"). */
+  readonly onShowTour: () => void
 }
 
-/** About: the version, updates, and the diagnostics for when something looks wrong. */
-export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProps) {
+/** About: the version, updates, the tour, and the diagnostics for when something looks wrong. */
+export function SettingsAbout({ build, updates, diagnostics, onShowTour }: SettingsAboutProps) {
   return (
     <Page width="settings">
       <PageHeader title="About" />
@@ -182,6 +184,16 @@ export function SettingsAbout({ build, updates, diagnostics }: SettingsAboutProp
           <div {...stylex.props(styles.stack)}>
             {build}
             {updates}
+          </div>
+        </Surface>
+      </Section>
+      <Section heading="Tour">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <div {...stylex.props(styles.tour)}>
+            <Text variant="body">Topics, Mains, views and Juno, in five steps.</Text>
+            <Button variant="secondary" size="sm" onClick={onShowTour}>
+              Show the tour
+            </Button>
           </div>
         </Surface>
       </Section>
@@ -215,6 +227,13 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
+    gap: spacing['--space-3'],
+  },
+  tour: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: spacing['--space-3'],
   },
 })

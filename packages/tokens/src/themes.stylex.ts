@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, art, colors, density, hues, iconTints, shadows, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, density, hues, iconTints, shadows, themed, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -222,7 +222,13 @@ export const darkArt = stylex.createTheme(art, {
 })
 
 /** Everything that changes in dark mode. Spread into stylex.props(). */
-export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt] as const
+/** The dark copy of two-copy content shows, the light one hides. */
+export const darkThemed = stylex.createTheme(themed, {
+  '--show-light': 'none',
+  '--show-dark': 'block',
+})
+
+export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt, darkThemed] as const
 
 /*
  * Accent themes. Each sets the fill, the text on it, the accent text, and

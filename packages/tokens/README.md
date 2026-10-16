@@ -7,7 +7,7 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 | File | What it holds |
 | --- | --- |
 | `src/tokens.stylex.ts` | Every variable group with its light, Coral value. |
-| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches) and a light and a dark theme for each of the eight accents. |
+| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches, the two-copy switch) and a light and a dark theme for each of the eight accents. |
 | `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression. |
 | `src/fonts.css` | `@font-face` imports for Figtree, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
@@ -36,6 +36,7 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `sizes` | `--control-<px>`, `--tile-<px>`, `--avatar-<px>`, `--initials-<px>`, `--icon-<px>`, misc | control, tile, avatar and icon sizes named by pixel value |
 | `z` | `--z-<layer>` | stacking order from `toolbar` (2) to `toast` (45) |
 | `opacity` | `--opacity-disabled` / `-dim` / `-tab-icon` / `-kbd` | |
+| `themed` | `--show-light`, `--show-dark` | `display` values for content made in a light and a dark copy (the tour's screenshots); `darkThemed` swaps them |
 
 ## Naming
 

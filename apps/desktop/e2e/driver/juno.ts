@@ -625,6 +625,7 @@ export class Juno {
   readonly peek: PeekPopover
   readonly privacy: PrivacyMode
   readonly palette: PaletteDriver
+  readonly tour: TourDriver
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -644,6 +645,7 @@ export class Juno {
     this.peek = new PeekPopover(win)
     this.privacy = new PrivacyMode(app, win)
     this.palette = new PaletteDriver(app, win)
+    this.tour = new TourDriver(app, win)
   }
 
   /**
@@ -1956,6 +1958,7 @@ export type AppMenuItem =
   | 'juno'
   | 'search'
   | 'undo'
+  | 'tour'
   | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
   | 'tab-last'
 
@@ -1965,6 +1968,71 @@ async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<
     if (!item) throw new Error(`No menu item ${itemId}`)
     item.click(undefined, BrowserWindow.getAllWindows()[0])
   }, id)
+}
+
+/**
+ * The tour (SPEC 4): the sheet over the app, by itself once per workspace
+ * when the sidebar has rows (only in apps launched with `tour: true`), and
+ * from Help, ⌘K or Settings › About.
+ */
+export class TourDriver {
+  readonly root: Locator
+
+  constructor(
+    readonly app: ElectronApplication,
+    readonly win: Page,
+  ) {
+    this.root = win.getByRole('dialog', { name: 'Tour of Juno' })
+  }
+
+  /** The step on screen: its heading is the one visible. */
+  get heading(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  get next(): Locator {
+    return this.root.locator('[data-tour-next]')
+  }
+
+  get back(): Locator {
+    return this.root.getByRole('button', { name: 'Back', exact: true })
+  }
+
+  /** The dot for step `n`, counted from 1. */
+  dot(n: number): Locator {
+    return this.root.getByRole('group', { name: 'Steps' }).getByRole('button', { name: new RegExp(`^Step ${n} of `) })
+  }
+
+  async expectOpen(): Promise<void> {
+    await expect(this.root).toBeVisible({ timeout: 15_000 })
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Open and done entering: its box is final. */
+  async expectSettled(): Promise<void> {
+    await this.expectOpen()
+    await this.root.evaluate((sheet) => Promise.all(sheet.getAnimations().map((animation) => animation.finished)))
+  }
+
+  async expectStep(heading: string): Promise<void> {
+    await expect(this.heading).toHaveText(heading)
+  }
+
+  /** Help › Show the Tour, through its app menu item. */
+  async openFromHelp(): Promise<void> {
+    await clickAppMenu(this.app, 'tour')
+    await this.expectOpen()
+  }
+
+  /** Waits for the tour to open, and closes it with Esc. */
+  async skip(): Promise<void> {
+    await this.expectOpen()
+    await this.win.keyboard.press('Escape')
+    await this.expectClosed()
+  }
 }
 
 /** ⌘K (spec section 10): the search and command palette. */

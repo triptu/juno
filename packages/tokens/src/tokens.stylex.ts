@@ -838,6 +838,14 @@ export const layout = stylex.defineVars({
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
   '--palette-width': '560px',
+  // The tour sheet (inventory 1.2): its screenshots are the window at its minimum size, 720 by 480 at 1x
+  // (1440 by 960 files), the sheet adds its 20px padding on each side. On a
+  // short window the picture shrinks by its aspect ratio first, keeping room
+  // for the tour's text, dots and buttons (--tour-chrome-height).
+  '--tour-shot-width': '720px',
+  '--tour-shot-height': '480px',
+  '--tour-width': '760px',
+  '--tour-chrome-height': '340px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
@@ -1010,6 +1018,17 @@ export const z = stylex.defineVars({
   '--z-toast': '45',
   // A tooltip names what is under the pointer, so it sits over everything.
   '--z-tooltip': '50',
+})
+
+/**
+ * Content made in two copies, one per theme: the tour's product screenshots.
+ * Each copy is in the page and this shows the one for the theme in use, so
+ * a view never needs to know the theme, and a theme change swaps the copies
+ * in the same frame as everything else. Dark values are in themes.stylex.ts.
+ */
+export const themed = stylex.defineVars({
+  '--show-light': 'block',
+  '--show-dark': 'none',
 })
 
 export const opacity = stylex.defineVars({
