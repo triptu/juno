@@ -440,7 +440,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
 | `--toast-max-width` | 352px |
-| `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
+| `--peek-width` | 640px peek popover (about 75 characters of compact message text), 8px right of the sidebar or at a Main message; as tall as its messages, up to the room in the window; never wider than the window has room for |
+| `--peek-header-height` | 44px peek header: art, title and where on one line |
 | `--destination-list-max-height` | 360px New chat destination lists before scrolling |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
 | `--emoji-picker-width` / `--emoji-picker-height` | 314px / 360px. The full emoji picker (`EmojiPicker`): nine 32px cells, 12px and 2px padding, the 10px scrollbar gutter and a 1px border each side, so the search field and the grid share edges. Fixed height; the grid scrolls inside |

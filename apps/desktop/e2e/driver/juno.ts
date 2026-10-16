@@ -581,7 +581,7 @@ export class NotificationsPage {
   }
 }
 
-/** The peek popover beside the sidebar, while the peek key is held over a row. */
+/** The peek popover, while the peek key is held over a sidebar row or a Main message's thread. */
 export class PeekPopover {
   readonly root: Locator
 
@@ -1721,6 +1721,13 @@ export class ThreadLinkDriver {
     await this.win.mouse.move(box.x + 8, box.y + box.height / 2)
     await press(this.win)
     if (options.newTab) await this.win.keyboard.up('Meta')
+  }
+
+  /** Points at the link and holds the peek key. `juno.peek.release()` lets go. */
+  async peek(key: PeekKeyName = 'option'): Promise<void> {
+    await this.root.scrollIntoViewIfNeeded()
+    await this.root.hover({ position: { x: 8, y: 8 } })
+    await this.win.keyboard.down(peekKeys[key])
   }
 }
 

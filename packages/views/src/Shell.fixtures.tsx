@@ -21,8 +21,8 @@ const workspaceTabs = [
 
 const nav = (hidden: boolean) => <TitlebarNav sidebarHidden={hidden} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
 
-/** The signed-in window with fixture rows. `peek` fills the shell's peek slot. */
-export function SignedIn({ width, hidden = false, peek }: { readonly width?: number; readonly hidden?: boolean; readonly peek?: ReactNode }) {
+/** The signed-in window with fixture rows. `peek` fills the shell's peek slot, `page` the workspace. */
+export function SignedIn({ width, hidden = false, peek, page }: { readonly width?: number; readonly hidden?: boolean; readonly peek?: ReactNode; readonly page?: ReactNode }) {
   return (
     <Shell
       {...(width === undefined ? {} : { sidebarWidth: width })}
@@ -61,7 +61,9 @@ export function SignedIn({ width, hidden = false, peek }: { readonly width?: num
         </Sidebar>
       }
     >
-      <Workspace tabs={workspaceTabs} activeId="postgres" {...(hidden ? { leading: nav(true) } : {})} />
+      <Workspace tabs={workspaceTabs} activeId={page === undefined ? 'postgres' : 'pinned'} {...(hidden ? { leading: nav(true) } : {})}>
+        {page}
+      </Workspace>
     </Shell>
   )
 }
