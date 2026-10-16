@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
+import { tooltip } from './Tooltip'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
 export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
@@ -14,6 +15,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   readonly icon: PhosphorIcon
   /** Required accessible name; also the tooltip. */
   readonly label: string
+  /** The shortcut that does the same ("⌘["): keycaps in the tooltip, and the end of the accessible name. */
+  readonly shortcut?: string
   readonly size?: IconButtonSize
   readonly iconSize?: IconSize
   /** Icon weight override (`bold` for the send arrow). Default by icon size, `fill` when pressed. */
@@ -29,7 +32,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
   readonly expanded?: boolean
   readonly dimmed?: boolean
-  /** Hides the native tooltip when the label would repeat visible text. */
+  /** No tooltip, when the label would repeat visible text. */
   readonly noTooltip?: boolean
 }
 
@@ -71,6 +74,7 @@ const iconBySize: Record<IconButtonSize, IconSize> = {
 export function IconButton({
   icon,
   label,
+  shortcut,
   size = 30,
   iconSize,
   iconWeight,
@@ -90,8 +94,8 @@ export function IconButton({
   return (
     <button
       type={type}
-      aria-label={label}
-      title={noTooltip ? undefined : label}
+      aria-label={shortcut === undefined ? label : `${label} ${shortcut}`}
+      {...(noTooltip ? {} : tooltip(label, shortcut))}
       aria-pressed={pressed}
       aria-expanded={expanded}
       aria-disabled={dimmed || undefined}

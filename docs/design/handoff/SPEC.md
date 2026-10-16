@@ -591,6 +591,7 @@ Use the Littlebird design system's tokens.
 - **Real menus.** Use native right-click context menus and the context-menu key on every row, tab and channel.
 - **Instant feedback.** High-frequency interactions get instant feedback or at most 150ms on background colour. These include row hover, tab switching and typing. Buttons scale to 0.96 when pressed, never when disabled.
 - **Hover only with a pointer.** Hover styles apply only on devices with a hover-capable pointer.
+- **Tooltips.** Every icon-only control names itself in a tooltip, with its shortcut as keycaps when it has one (Back ⌘[). As on macOS it waits for a moment of hover or keyboard focus, then neighbours show at once; a press, a scroll or Esc hides it. It never covers the control or moves anything.
 - **Contained scrolling.** Scroll stays inside menus, popovers and the palette, and never scrolls the page behind.
 - **Text selection.** Text is selectable in messages and not in chrome.
 - **Window chrome.** Window controls and drag regions follow macOS: traffic lights in the sidebar bar, and the tab strip as a drag region.

@@ -16,6 +16,7 @@ export interface Route {
     readonly hover?: string
     readonly press?: string
     readonly focus?: string
+    readonly tooltip?: string
   }
 }
 

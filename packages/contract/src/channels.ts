@@ -102,6 +102,53 @@ export type MenuCommand =
   | 'edit.undo'
   | 'settings.open'
 
+/**
+ * The app menu's shortcuts, in Electron's accelerator form. Main registers
+ * them; the renderer shows them in tooltips and hints through
+ * `shortcutKeys`, so a key changes in one place.
+ */
+export const menuShortcuts = {
+  'chat.new': 'CommandOrControl+N',
+  'tab.new': 'CommandOrControl+T',
+  'tab.reopen': 'CommandOrControl+Shift+T',
+  'tab.close': 'CommandOrControl+W',
+  'tab.previous': 'CommandOrControl+Shift+[',
+  'tab.next': 'CommandOrControl+Shift+]',
+  'history.back': 'CommandOrControl+[',
+  'history.forward': 'CommandOrControl+]',
+  'sidebar.toggle': 'Control+Command+S',
+  'privacy.toggle': 'Control+Command+H',
+  'juno.toggle': 'CommandOrControl+J',
+  'palette.toggle': 'CommandOrControl+K',
+  'edit.undo': 'CommandOrControl+Z',
+  'settings.open': 'CommandOrControl+,',
+} as const satisfies Partial<Record<MenuCommand, string>>
+
+const keyGlyphs: Record<string, string> = {
+  CommandOrControl: '⌘',
+  Command: '⌘',
+  Control: '⌃',
+  Alt: '⌥',
+  Option: '⌥',
+  Shift: '⇧',
+  Plus: '+',
+}
+// macOS writes the modifiers in this order, whatever order the accelerator uses.
+const modifierOrder = ['⌃', '⌥', '⇧', '⌘']
+
+/** An accelerator as the Mac writes it: "Control+Command+S" is "⌃⌘S". */
+export function shortcutKeys(accelerator: string): string {
+  const parts = accelerator.split('+').map((part) => keyGlyphs[part] ?? part)
+  const key = parts.at(-1) ?? ''
+  const modifiers = parts.slice(0, -1).toSorted((a, b) => modifierOrder.indexOf(a) - modifierOrder.indexOf(b))
+  return [...modifiers, key].join('')
+}
+
+/** The keys of an app-menu command, as the Mac writes them ("⌘["). */
+export function menuKeys(command: keyof typeof menuShortcuts): string {
+  return shortcutKeys(menuShortcuts[command])
+}
+
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
   | {

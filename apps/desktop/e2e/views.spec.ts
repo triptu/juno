@@ -30,7 +30,7 @@ test('a view with an icon gathers its channel, keeps it out of All, and lights o
   await sidebar.createView({ name: 'Bots', icon: 'Robot', conversations: ['alerts-prod'], keepOutOfAll: true })
   // An icon pill: the name is its tooltip and accessible name, not its text.
   const bots = sidebar.viewPill('Bots')
-  await expect(bots).toHaveAttribute('title', 'Bots')
+  await expect(bots).toHaveAttribute('data-tooltip', 'Bots')
   await expect(bots).toHaveText('')
   // Saved and selected: only the view's channel.
   await sidebar.row(ALERTS_MAIN).expectVisible()

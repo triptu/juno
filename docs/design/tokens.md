@@ -396,6 +396,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
+| `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
@@ -508,6 +509,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
 | `--z-toast` | 45 | Toast |
+| `--z-tooltip` | 50 | Tooltip, over everything |
 
 ## 8. Motion
 

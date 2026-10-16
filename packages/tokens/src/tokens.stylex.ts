@@ -717,6 +717,8 @@ export const motion = stylex.defineVars({
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
   '--chat-empty-width': '520px',
+  // A tooltip wraps past this; most are one short line.
+  '--tooltip-max-width': '280px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '280px',
@@ -946,6 +948,8 @@ export const z = stylex.defineVars({
   '--z-selection': '35',
   '--z-context': '40',
   '--z-toast': '45',
+  // A tooltip names what is under the pointer, so it sits over everything.
+  '--z-tooltip': '50',
 })
 
 export const opacity = stylex.defineVars({

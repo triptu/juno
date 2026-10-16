@@ -260,7 +260,7 @@ test('hovering a row shows Resolve in its reserved slot without moving anything'
   await expect(slot).toHaveCSS('opacity', '0')
   await expectNoLayoutShift(win, () => postgres.hover(), { root: 'aside' })
   await expect(slot).toHaveCSS('opacity', '1')
-  await expect(postgres.resolveButton).toHaveAttribute('title', 'Resolve')
+  await expect(postgres.resolveButton).toHaveAttribute('data-tooltip', 'Resolve')
   await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}`)
 
   // Leaving hides it again.

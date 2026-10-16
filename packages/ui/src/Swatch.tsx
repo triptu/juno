@@ -6,6 +6,7 @@ import { hueStyles } from './Avatar'
 import { Icon } from './Icon'
 import type { HueName } from './internal/hue'
 import { interactive } from './internal/interactive'
+import { tooltip } from './Tooltip'
 import type { AccentName } from './theme'
 
 interface SwatchBaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
@@ -40,7 +41,7 @@ export function Swatch({ hue, accent, label, selected = false, type = 'button', 
     <button
       type={type}
       aria-label={label}
-      title={label}
+      {...tooltip(label)}
       aria-pressed={selected}
       {...rest}
       {...stylex.props(

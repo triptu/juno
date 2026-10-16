@@ -1,4 +1,4 @@
-import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
+import { defineFixtures, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useState } from 'react'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
@@ -225,6 +225,27 @@ export default defineFixtures(
     Privacy: {
       on: scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop }, { selected: rows.postgres.id })}</PrivacyOn>),
       'row-hover': scene(() => <PrivacyOn>{full({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>, { hover: '[data-topic-row]:nth-of-type(2)' }),
+    },
+    // The title bar's and the pills' tooltips (primitives, Tooltip): the shot waits out the hover delay.
+    Tooltips: {
+      back: scene(
+        () => (
+          <>
+            {full()}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[aria-label="Back ⌘["]' },
+      ),
+      'view-pill': scene(
+        () => (
+          <>
+            {full(viewChrome)}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[data-view-pill="vwork"]' },
+      ),
     },
     'Account menu': {
       open: scene(() =>

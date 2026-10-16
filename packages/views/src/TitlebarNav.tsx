@@ -3,6 +3,7 @@ import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { SidebarSimple } from '@phosphor-icons/react/dist/icons/SidebarSimple'
 import { useRef, type PointerEvent } from 'react'
+import { menuKeys } from '@juno/contract/channels'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, type PhosphorIcon } from '@juno/ui'
 
@@ -28,9 +29,9 @@ export interface TitlebarNavProps {
 export function TitlebarNav({ sidebarHidden, canGoBack, canGoForward, onToggleSidebar, onBack, onForward, onBackMenu, onForwardMenu }: TitlebarNavProps) {
   return (
     <div role="group" aria-label="Navigation" {...stylex.props(styles.root)}>
-      <IconButton icon={SidebarSimple} label={sidebarHidden ? 'Show sidebar ⌃⌘S' : 'Hide sidebar ⌃⌘S'} size={30} onClick={onToggleSidebar} />
-      <HistoryButton icon={CaretLeft} label="Back ⌘[" enabled={canGoBack} onGo={onBack} onMenu={onBackMenu} />
-      <HistoryButton icon={CaretRight} label="Forward ⌘]" enabled={canGoForward} onGo={onForward} onMenu={onForwardMenu} />
+      <IconButton icon={SidebarSimple} label={sidebarHidden ? 'Show sidebar' : 'Hide sidebar'} shortcut={menuKeys('sidebar.toggle')} size={30} onClick={onToggleSidebar} />
+      <HistoryButton icon={CaretLeft} label="Back" shortcut={menuKeys('history.back')} enabled={canGoBack} onGo={onBack} onMenu={onBackMenu} />
+      <HistoryButton icon={CaretRight} label="Forward" shortcut={menuKeys('history.forward')} enabled={canGoForward} onGo={onForward} onMenu={onForwardMenu} />
     </div>
   )
 }
@@ -41,13 +42,14 @@ const LONG_PRESS_MS = 500
 interface HistoryButtonProps {
   readonly icon: PhosphorIcon
   readonly label: string
+  readonly shortcut: string
   readonly enabled: boolean
   readonly onGo: () => void
   readonly onMenu: (() => void) | undefined
 }
 
 /** Acts on click, not on press, so holding it can open the menu instead. */
-function HistoryButton({ icon, label, enabled, onGo, onMenu }: HistoryButtonProps) {
+function HistoryButton({ icon, label, shortcut, enabled, onGo, onMenu }: HistoryButtonProps) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const held = useRef(false)
   const cancel = () => {
@@ -67,6 +69,7 @@ function HistoryButton({ icon, label, enabled, onGo, onMenu }: HistoryButtonProp
     <IconButton
       icon={icon}
       label={label}
+      shortcut={shortcut}
       size={30}
       disabled={!enabled}
       onPointerDown={onPointerDown}
