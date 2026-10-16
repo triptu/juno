@@ -25,7 +25,7 @@ Run these from the repo root.
 | `pnpm typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
 | `pnpm typecheck:tsc` | Manual TypeScript check of every project. |
 | `pnpm typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
-| `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
+| `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
 | `pnpm test` | Runs every package's vitest suite (`packages/*/test`). |
@@ -621,6 +621,10 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 `pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
 **Type stripping.** Node runs some TypeScript from source by stripping types: the agent's crash and recovery fixtures, `pnpm agent:eval`, the AI evals, `fake-slack start`, and the live scripts in `scripts/`, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `pnpm typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
+
+`pnpm lint` runs its nine checks at once through `scripts/lint.mjs`: oxlint, the decision log, the cache epoch, the migration order, the cursor rule, tokens, `check-deps`, the fixture check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
+
+Measured on 10-17 on this Mac, eight alternating runs of each while other agents kept the load at 5.5 to 7.3 on 8 cores, so the numbers vary a lot. The checks one after another with `&&` took 5.5 s median (fastest 3.0 s). At once they took 4.8 s median (fastest 2.2 s). In the parallel run every check except health finishes within 0.7 s. Health takes 2.6 s, and knip alone takes 1.9 to 2.0 s, so knip sets the floor. Making lint faster than that means making knip faster.
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
