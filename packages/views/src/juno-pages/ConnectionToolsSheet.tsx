@@ -2,8 +2,8 @@ import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { chatCopy, type ConnectionId, type ConnectionRow, type DiscoveredTool, type ReviewRule, type T3Address } from '@juno/agent-contract'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, Select, Surface, Text, TextField } from '@juno/ui'
+import { colors, layout, spacing, text } from '@juno/tokens/tokens.stylex'
+import { Button, Checkbox, Chip, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 import { T3AddressRow } from './ConnectionsPage'
 
@@ -120,7 +120,7 @@ function Tool({ tool, t3, options, onTool }: {
   const copy = chatCopy.pages.connections
   // A read runs with no review; a delete and T3 Code's other tools always ask; a forbidden tool is never offered.
   const fixed = tool.read ? 'read' : tool.locked === 'forbidden' ? 'forbidden' : tool.locked === 'delete' || t3 ? 'always' : undefined
-  const mark = tool.changed ? copy.changed : tool.added ? copy.added : undefined
+  const mark = tool.changed ? 'changed' : tool.added ? 'new' : undefined
   return (
     <div
       {...stylex.props(styles.row, styles.tool)}
@@ -128,25 +128,28 @@ function Tool({ tool, t3, options, onTool }: {
       data-tool={tool.name}
       data-tool-enabled={tool.enabled}
       data-tool-review={fixed ?? tool.review}
-      data-tool-mark={tool.changed ? 'changed' : tool.added ? 'new' : undefined}
+      data-tool-mark={mark}
       data-tool-read-only={tool.readOnly}
     >
-      <span {...stylex.props(cell.lines)} role="cell">
-        <Text variant="bodySmall" weight="medium" truncate>
-          {tool.name}
-        </Text>
+      <span {...stylex.props(cell.lines, styles.toolLines)} role="cell">
+        {/* A New or Changed mark is a tag after the name, as a server's state is on Connections: outline when it asks for a look. */}
+        <span {...stylex.props(cell.line)}>
+          <Text variant="bodySmall" weight="medium" truncate sx={styles.toolName}>
+            {tool.name}
+          </Text>
+          {mark !== undefined ? (
+            <Chip variant={mark === 'changed' ? 'outline' : 'filled'} size={20} data-tool-tag="">
+              {mark === 'changed' ? copy.changed : copy.added}
+            </Chip>
+          ) : null}
+        </span>
         {tool.hint !== undefined ? (
-          <Text variant="meta" tone="muted" truncate dir="auto">
+          <Text variant="meta" tone="muted" truncate dir="auto" sx={styles.toolMeta}>
             {tool.hint}
           </Text>
         ) : null}
-        {mark !== undefined ? (
-          <Text variant="meta" tone="muted">
-            {mark}
-          </Text>
-        ) : null}
         {tool.locked !== undefined ? (
-          <Text variant="meta" tone="muted" sx={cell.wrap}>
+          <Text variant="meta" tone="muted" sx={[cell.wrap, styles.toolMeta]}>
             {copy.locked[tool.locked]}
           </Text>
         ) : null}
@@ -221,20 +224,34 @@ const styles = stylex.create({
     display: 'grid',
     gridColumn: '1 / -1',
     gridTemplateColumns: 'subgrid',
-    // A fixed height, so the sheet keeps its size while a search narrows the list.
-    height: layout['--palette-list-max-height'],
+    // A fixed height, so the sheet keeps its size while a search narrows the
+    // list: seven whole rows, so at rest the list ends on a row's edge.
+    height: `calc(7 * ${layout['--tool-row-height']})`,
     alignContent: 'start',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
   },
+  // 56px rows on the 4px grid. The rule is above each row, after the
+  // header's, so none sits on the list's bottom edge over the sheet's padding.
+  // The rule is an inset hairline, not a border, so it takes no height:
+  // 10 + 20 + 16 + 10, and the two lines sit on whole pixels.
   tool: {
-    paddingBlock: spacing['--space-2'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: {
-      default: colors['--border-subtle'],
-      ':last-child': 'transparent',
+    boxSizing: 'border-box',
+    minHeight: layout['--tool-row-height'],
+    paddingBlock: spacing['--space-2-5'],
+    boxShadow: {
+      default: `inset 0 1px 0 ${colors['--border-subtle']}`, // tokens-allow: A 1px hairline rule, drawn as an inset shadow so it takes no height.
+      ':first-child': 'none',
     },
+  },
+  toolLines: {
+    gap: 0,
+  },
+  toolName: {
+    lineHeight: text['--text-option-title-leading'],
+  },
+  toolMeta: {
+    lineHeight: text['--text-option-meta-leading'],
   },
   center: {
     display: 'flex',

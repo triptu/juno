@@ -41,14 +41,14 @@ export function ScheduleCard({ card, actions, enter }: ScheduleCardProps) {
       because={card.because}
       buttons={
         <>
-          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'keep' })}>
-            {copy.keep}
+          <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(card.id, { _tag: 'delete' })}>
+            {copy.delete}
           </Button>
           <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(card.id, { _tag: 'pause' })}>
             {copy.pause}
           </Button>
-          <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(card.id, { _tag: 'delete' })}>
-            {copy.delete}
+          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'keep' })}>
+            {copy.keep}
           </Button>
         </>
       }

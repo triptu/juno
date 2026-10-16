@@ -16,8 +16,8 @@ const base: TopicSwitcherProps = {
   onOpen: noop,
 }
 
-// The popover's width (`--browse-width`), on the popover's surface.
-const frame: FixtureFrame = { width: 360, surface: 'surface', padded: false }
+// The popover's width (`--menu-width-browse` 300), on the popover's surface.
+const frame: FixtureFrame = { width: 300, surface: 'surface', padded: false }
 
 export default defineFixtures(
   TopicSwitcher,

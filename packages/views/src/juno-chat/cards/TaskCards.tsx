@@ -57,11 +57,7 @@ export function TaskCard({ card, actions, enter }: TaskCardProps) {
       buttons={
         active.has(card.phase) ? (
           <>
-            {card.phase === 'lostSight' ? (
-              <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'signIn' })}>
-                {copy.signIn}
-              </Button>
-            ) : open !== undefined ? (
+            {card.phase !== 'lostSight' && open !== undefined ? (
               <Button variant="ghost" size="md" tone="subtle" onClick={(event) => actions.onOpen(open, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>
                 {copy.open}
               </Button>
@@ -69,6 +65,12 @@ export function TaskCard({ card, actions, enter }: TaskCardProps) {
             <DangerGhost onClick={() => actions.onCard(card.id, { _tag: 'stop' })} disabled={card.phase === 'stopping'}>
               {copy.stop}
             </DangerGhost>
+            {/* The default button last, at the trailing edge, as on the Mac. */}
+            {card.phase === 'lostSight' ? (
+              <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'signIn' })}>
+                {copy.signIn}
+              </Button>
+            ) : null}
           </>
         ) : (
           <Text variant="meta" tone="muted" as="p" sx={styles.after}>

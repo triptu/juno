@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { colors, layout, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
@@ -21,51 +21,6 @@ const NARROW_TAB = '@container tab (max-width: 140px)'
 // 1.5px ring in the strip's colour (inventory 4). One-off sizes.
 const PINNED_DOT_RING = '1.5px'
 const PINNED_DOT_OFFSET = '-2px'
-
-export interface TabStripProps {
-  readonly label?: string
-  /**
-   * Controls before the tabs, after the traffic lights' space: Show
-   * sidebar, Back and Forward while the sidebar is hidden.
-   */
-  readonly leading?: ReactNode
-  /**
-   * The new-tab button, right after the last tab as in Safari and Chrome.
-   * It sits outside the scroller, so when the tabs overflow it stays at the
-   * strip's end and never scrolls away.
-   */
-  readonly trailing?: ReactNode
-  /**
-   * Keys pressed on a tab that the strip does not handle itself: the owner
-   * moves the selection on ArrowLeft, ArrowRight, Home and End (the APG
-   * tablist pattern with automatic activation). Delete closes the tab.
-   */
-  readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
-  readonly children?: ReactNode
-}
-
-/**
- * The 44px strip above the workspace. A window drag region. The tabs sit in
- * a horizontal scroller with no visible scrollbar, as wide as the tabs need
- * and no wider, so `trailing` follows the last tab and the rest of the
- * strip is free to drag the window by. The active tab scrolls itself into
- * view when it changes, like browser tabs.
- */
-export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
-  return (
-    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
-      {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
-        {children}
-      </div>
-      {trailing ? (
-        <span data-tab-strip-trailing="" {...stylex.props(styles.trailing)}>
-          {trailing}
-        </span>
-      ) : null}
-    </div>
-  )
-}
 
 export interface TabProps {
   readonly icon: PhosphorIcon
@@ -95,13 +50,16 @@ export interface TabProps {
 
 const isTab = (node: Element | null): node is HTMLElement => node instanceof HTMLElement && node.getAttribute('role') === 'tab'
 
+/** The tab element inside a tab's box (`data-tab`), the box being a tablist child. */
+const tabIn = (box: Element | null): HTMLElement | null => box?.querySelector<HTMLElement>(':scope > [role="tab"]') ?? null
+
 /** Where focus goes when a focused tab closes: the right neighbour, else the left, else the new-tab button. */
-function focusTarget(tab: HTMLElement): HTMLElement | undefined {
-  const next = tab.nextElementSibling
-  if (isTab(next)) return next
-  const previous = tab.previousElementSibling
-  if (isTab(previous)) return previous
-  const trailing = tab.closest('[data-tab-strip]')?.querySelector<HTMLElement>('[data-tab-strip-trailing] button')
+function focusTarget(box: HTMLElement): HTMLElement | undefined {
+  const next = tabIn(box.nextElementSibling)
+  if (next !== null) return next
+  const previous = tabIn(box.previousElementSibling)
+  if (previous !== null) return previous
+  const trailing = box.closest('[data-tab-strip]')?.querySelector<HTMLElement>('[data-tab-strip-trailing] button')
   return trailing ?? undefined
 }
 
@@ -111,21 +69,28 @@ function focusTarget(tab: HTMLElement): HTMLElement | undefined {
  * moves while focus is in the strip. The icon stays regular even when
  * active: tab switches do not animate and a filled set is too heavy in a
  * strip.
+ *
+ * The close button is the tab's sibling in a plain box, not its child, so no
+ * control sits inside another. It is never a Tab stop: Delete and ⌘W close a
+ * focused tab. The tab names it with `aria-actions`, which VoiceOver offers
+ * as the tab's action, and the pointer clicks it where it always was.
  */
 export function Tab({ icon, leading, label, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const closeId = useId()
 
   useLayoutEffect(() => {
     const tab = ref.current
     if (!active || tab === null) return
     tab.scrollIntoView({ inline: 'nearest', block: 'nearest' })
     const focused = document.activeElement
-    if (focused !== tab && isTab(focused) && tab.parentElement?.contains(focused)) tab.focus({ preventScroll: true })
+    if (focused !== tab && isTab(focused) && tab.closest('[role="tablist"]')?.contains(focused)) tab.focus({ preventScroll: true })
   }, [active])
 
   const close = () => {
-    const tab = ref.current
-    if (tab !== null && tab.contains(document.activeElement)) focusTarget(tab)?.focus()
+    const box = boxRef.current
+    if (box !== null && box.contains(document.activeElement)) focusTarget(box)?.focus()
     onClose?.()
   }
 
@@ -143,21 +108,47 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
 
   return (
     <div
-      ref={ref}
-      role="tab"
-      tabIndex={active ? 0 : -1}
-      aria-selected={active}
-      aria-description={dot ? 'Unread' : undefined}
-      aria-label={pinned ? label : undefined}
-      data-pinned={pinned ? '' : undefined}
-      data-unread={dot ? '' : undefined}
-      title={label}
-      onContextMenu={onContextMenu}
-      onPointerDown={activate.onPointerDown}
-      onClick={activate.onClick}
-      onKeyDown={onKeyDown}
-      {...stylex.props(interactive.focusRingInset, styles.tab, typeVariants.ui, active ? styles.tabActive : styles.tabInactive, pinned && styles.tabPinned)}
+      ref={boxRef}
+      data-tab=""
+      {...stylex.props(styles.box, active ? styles.boxActive : styles.boxInactive, pinned && styles.boxPinned)}
     >
+      <div
+        ref={ref}
+        role="tab"
+        tabIndex={active ? 0 : -1}
+        aria-selected={active}
+        aria-description={dot ? 'Unread' : undefined}
+        aria-label={pinned ? label : undefined}
+        aria-actions={onClose ? closeId : undefined}
+        aria-keyshortcuts={onClose ? 'Delete' : undefined}
+        data-pinned={pinned ? '' : undefined}
+        data-unread={dot ? '' : undefined}
+        title={label}
+        onContextMenu={onContextMenu}
+        onPointerDown={activate.onPointerDown}
+        onClick={activate.onClick}
+        onKeyDown={onKeyDown}
+        {...stylex.props(
+          interactive.focusRingInset,
+          styles.tab,
+          typeVariants.ui,
+          active ? styles.tabActive : styles.tabInactive,
+          pinned && styles.tabPinned,
+          onClose !== undefined && styles.tabClosable,
+          onClose !== undefined && !active && styles.tabClosableInactive,
+        )}
+      >
+        <TabContent icon={icon} leading={leading} label={label} pinned={pinned} dot={dot} />
+      </div>
+      {onClose ? <TabClose id={closeId} label={closeLabel} active={active} onClose={close} /> : null}
+    </div>
+  )
+}
+
+/** The tab's icon slot, label and unread dot. */
+function TabContent({ icon, leading, label, pinned, dot }: Pick<TabProps, 'icon' | 'leading' | 'label'> & { readonly pinned: boolean; readonly dot: boolean }) {
+  return (
+    <>
       <span {...stylex.props(styles.iconSlot, pinned && styles.iconSlotPinned)}>
         {leading ?? <Icon icon={icon} size={15} dim />}
         {pinned ? <span aria-hidden {...stylex.props(styles.pinnedDot, dot && styles.dotShown)} /> : null}
@@ -171,95 +162,25 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
           <span aria-hidden {...stylex.props(styles.dot, dot && styles.dotShown)} />
         </>
       )}
-      {onClose ? (
-        <span {...stylex.props(styles.close, !active && styles.closeInactive)}>
-          <IconButton
-            icon={X}
-            label={closeLabel}
-            size={20}
-            iconSize={13}
-            tone="muted"
-            noTooltip
-            onClick={(event) => {
-              event.stopPropagation()
-              close()
-            }}
-          />
-        </span>
-      ) : null}
-    </div>
+    </>
+  )
+}
+
+/** The close button over the tab's end: the tab's sibling, never a Tab stop. */
+function TabClose({ id, label, active, onClose }: { readonly id: string; readonly label: string; readonly active: boolean; readonly onClose: () => void }) {
+  return (
+    <span {...stylex.props(styles.close, !active && styles.closeInactive)}>
+      <IconButton id={id} icon={X} label={label} size={20} iconSize={13} tone="muted" noTooltip tabIndex={-1} onClick={onClose} />
+    </span>
   )
 }
 
 const styles = stylex.create({
-  strip: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    // Fills the window so the strip and its bottom border run edge to edge,
-    // and never gives up height to a tall page under it.
-    width: '100%',
-    flexShrink: 0,
-    boxSizing: 'border-box',
-    height: layout['--titlebar-height'],
-    paddingInline: spacing['--space-2-5'],
-    backgroundColor: colors['--background-subtle'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-default'],
-    userSelect: 'none',
-    WebkitAppRegion: 'drag',
-  },
-  // With the sidebar hidden the strip starts after the traffic lights.
-  stripLeading: {
-    paddingInlineStart: layout['--titlebar-lights-inset'],
-  },
-  leading: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing['--space-0-5'],
-    flexShrink: 0,
-    alignSelf: 'center',
-    marginInlineEnd: spacing['--space-2'],
-    WebkitAppRegion: 'no-drag',
-  },
-  // The tabs scroll sideways inside the strip. The scroller hangs 1px over
-  // the strip's bottom border so the active tab can paint across it. It
-  // takes only the tabs' width, and shrinks to scroll once they overflow.
-  scroller: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: spacing['--space-0-5'],
-    flexGrow: 0,
-    flexShrink: 1,
-    minWidth: 0,
-    height: '100%',
-    marginBottom: '-1px', // tokens-allow: Overlap the page border by one pixel.
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    scrollbarWidth: 'none',
-    scrollSnapType: 'x proximity',
-    overscrollBehaviorX: 'contain',
-  },
-  // A square slot as tall as a tab and level with it, one tab gap after the
-  // last tab: the button inside is centred on the tabs' middle line and
-  // keeps an even inset on all four sides.
-  trailing: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    alignSelf: 'flex-end',
-    width: layout['--tab-height'],
-    height: layout['--tab-height'],
-    marginBottom: '-1px', // tokens-allow: Level with the tabs, which overlap the page border by one pixel.
-    marginInlineStart: spacing['--space-0-5'],
-    WebkitAppRegion: 'no-drag',
-  },
-  tab: {
+  // The tab's box: its size in the strip, and the tab and its close button
+  // side by side in it. Plain, so the tablist's children read as its tabs.
+  box: {
     position: 'relative',
     display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
     // The width too, not only the basis: the scroller sizes to its tabs' widths, which ignore the basis.
     flexBasis: layout['--tab-width'],
     width: layout['--tab-width'],
@@ -267,35 +188,21 @@ const styles = stylex.create({
     flexShrink: 1,
     minWidth: layout['--tab-min-width'],
     height: layout['--tab-height'],
-    paddingInlineStart: spacing['--space-3'],
-    paddingInlineEnd: spacing['--space-1-5'],
-    borderTopLeftRadius: radii['--radius-lg'],
-    borderTopRightRadius: radii['--radius-lg'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: 'transparent',
     scrollSnapAlign: 'start',
     // Its own width decides whether the close button has room (NARROW_TAB).
     containerType: 'inline-size',
     containerName: 'tab',
     WebkitAppRegion: 'no-drag',
-    minHeight: 0,
   },
-  tabActive: {
-    backgroundColor: colors['--background'],
-    borderTopColor: colors['--border-default'],
-    borderLeftColor: colors['--border-default'],
-    borderRightColor: colors['--border-default'],
-    borderBottomColor: colors['--background'],
+  boxActive: {
     color: colors['--foreground-default'],
-    fontWeight: weights['--weight-medium'],
   },
-  tabInactive: {
+  // On the box, so the pointer on the close button still counts as on the tab.
+  boxInactive: {
     color: {
       default: colors['--foreground-subtle'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
-    fontWeight: weights['--weight-regular'],
     // Read by the close button on a narrow tab: shown while the pointer or
     // the keyboard is on the tab.
     '--tab-close-opacity': {
@@ -305,11 +212,50 @@ const styles = stylex.create({
     },
   },
   // Icon only, centred, at a fixed width that never shrinks.
-  tabPinned: {
+  boxPinned: {
     flexBasis: layout['--tab-pinned-width'],
     flexShrink: 0,
     minWidth: layout['--tab-pinned-width'],
     width: layout['--tab-pinned-width'],
+  },
+  tab: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    boxSizing: 'border-box',
+    width: '100%',
+    height: '100%',
+    paddingInlineStart: spacing['--space-3'],
+    paddingInlineEnd: spacing['--space-1-5'],
+    borderTopLeftRadius: radii['--radius-lg'],
+    borderTopRightRadius: radii['--radius-lg'],
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'transparent',
+    color: 'inherit',
+    minHeight: 0,
+  },
+  // Room at the end for the close button over it: its 20px and the 8px gap before it.
+  tabClosable: {
+    paddingInlineEnd: `calc(${spacing['--space-1-5']} + ${sizes['--control-20']} + ${spacing['--space-2']})`,
+  },
+  // A narrow inactive tab gives that room to the label; the button shows over the label's end.
+  tabClosableInactive: {
+    paddingInlineEnd: { default: `calc(${spacing['--space-1-5']} + ${sizes['--control-20']} + ${spacing['--space-2']})`, [NARROW_TAB]: spacing['--space-1-5'] },
+  },
+  tabActive: {
+    backgroundColor: colors['--background'],
+    borderTopColor: colors['--border-default'],
+    borderLeftColor: colors['--border-default'],
+    borderRightColor: colors['--border-default'],
+    borderBottomColor: colors['--background'],
+    fontWeight: weights['--weight-medium'],
+  },
+  tabInactive: {
+    fontWeight: weights['--weight-regular'],
+  },
+  tabPinned: {
     justifyContent: 'center',
     paddingInline: 0,
   },
@@ -356,15 +302,18 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
+  // Over the tab's end, where the tab keeps room for it: the tab's 6px end
+  // padding and 1px border in, centred on the tab's height.
   close: {
+    position: 'absolute',
+    insetBlock: 0,
+    insetInlineEnd: `calc(${spacing['--space-1-5']} + 1px)`, // tokens-allow: Inside the tab's 1px border.
     display: 'inline-flex',
-    flexShrink: 0,
+    alignItems: 'center',
   },
-  // On a narrow inactive tab the button leaves the flow and sits over the
-  // label's end on the strip's own colour, so appearing moves nothing.
+  // On a narrow inactive tab the button sits over the label's end on the
+  // strip's own colour, so appearing moves nothing.
   closeInactive: {
-    position: { default: 'static', [NARROW_TAB]: 'absolute' },
-    insetInlineEnd: spacing['--space-1-5'],
     paddingInlineStart: { default: 0, [NARROW_TAB]: spacing['--space-1'] },
     backgroundColor: { default: 'transparent', [NARROW_TAB]: colors['--background-subtle'] },
     opacity: { default: 1, [NARROW_TAB]: 'var(--tab-close-opacity)' },

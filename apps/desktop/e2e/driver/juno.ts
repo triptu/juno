@@ -1698,6 +1698,10 @@ export class TopicSwitcherDriver {
 }
 
 /** The tab strip over the workspace. */
+
+/** A tab's close button: the tab's sibling in its box, not its child. */
+const closeOf = (tab: Locator): Locator => tab.locator('xpath=..').getByRole('button', { name: 'Close tab' })
+
 export class TabStrip {
   readonly root: Locator
 
@@ -1734,7 +1738,7 @@ export class TabStrip {
   async closeAt(title: string, index: number): Promise<void> {
     const tab = this.nth(title, index)
     await tab.hover()
-    await tab.getByRole('button', { name: 'Close tab' }).click()
+    await closeOf(tab).click()
   }
 
   /** Points at a tab. */
@@ -1766,13 +1770,13 @@ export class TabStrip {
   /** The close button on a tab. */
   async close(title: string): Promise<void> {
     await this.tab(title).hover()
-    await this.tab(title).getByRole('button', { name: 'Close tab' }).click()
+    await closeOf(this.tab(title)).click()
   }
 
-  /** Focuses a tab's close button and presses Enter. */
+  /** Focuses a tab and presses Delete. The close buttons are not Tab stops. */
   async closeWithKeyboard(title: string): Promise<void> {
-    await this.tab(title).getByRole('button', { name: 'Close tab' }).focus()
-    await this.win.keyboard.press('Enter')
+    await this.tab(title).focus()
+    await this.win.keyboard.press('Delete')
   }
 
   async expectFocused(title: string): Promise<void> {
@@ -1810,7 +1814,7 @@ export class TabStrip {
 
   /** Whether the tab shows a close button. */
   closeButton(title: string): Locator {
-    return this.tab(title).getByRole('button', { name: 'Close tab' })
+    return closeOf(this.tab(title))
   }
 }
 

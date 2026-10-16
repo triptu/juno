@@ -147,10 +147,10 @@ export default defineFixtures(
       'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),
     },
     Interaction: {
-      'hover-tab': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(2)' }),
-      'hover-close': workspace({}, postgresPage, { hover: '[role="tab"]:nth-of-type(1) button' }),
+      'hover-tab': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(2) [role="tab"]' }),
+      'hover-close': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(1) button' }),
       'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New chat ⌘T"]' }),
-      'focus-tab': workspace({}, postgresPage, { focus: '[role="tab"]:nth-of-type(2)' }),
+      'focus-tab': workspace({}, postgresPage, { focus: '[data-tab]:nth-of-type(2) [role="tab"]' }),
     },
   },
   { width: 900, height: 640, padded: false },

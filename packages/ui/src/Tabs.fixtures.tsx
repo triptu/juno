@@ -7,7 +7,8 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene } from './fixtures/define'
 import { IconButton } from './IconButton'
-import { Tab, TabStrip } from './Tabs'
+import { Tab } from './Tabs'
+import { TabStrip } from './TabStrip'
 import { Text } from './Text'
 
 const newTab = <IconButton icon={Plus} label="New tab" size={28} iconSize={16} tone="muted" />
@@ -101,8 +102,8 @@ export default defineFixtures(
       'with-page-wide': scene(() => <StripWithPage />, { width: 1400, height: 160 }),
     },
     Interaction: {
-      hover: scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(1)' }),
-      'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[role="tab"]:nth-of-type(2) button' }),
+      hover: scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(1) [role="tab"]' }),
+      'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(2) button' }),
       'pinned-hover': scene(
         () => (
           <TabStrip trailing={newTab}>
@@ -110,10 +111,11 @@ export default defineFixtures(
             <Tab icon={Hash} label="Postgres 16 migration plan" active onClose={() => {}} />
           </TabStrip>
         ),
-        { hover: '[role="tab"]:nth-of-type(1)' },
+        { hover: '[data-tab]:nth-of-type(1) [role="tab"]' },
       ),
-      'narrow-hover': scene(() => <ThirtySeven />, { hover: '[role="tab"]:nth-of-type(33)' }),
-      'narrow-focus-close': scene(() => <ThirtySeven />, { focus: '[role="tab"]:nth-of-type(34) button' }),
+      'narrow-hover': scene(() => <ThirtySeven />, { hover: '[data-tab]:nth-of-type(33) [role="tab"]' }),
+      // The strip's one Tab stop is the active tab; arrows move the selection with the focus.
+      'narrow-focus-tab': scene(() => <ThirtySeven />, { focus: '[role="tab"][aria-selected="true"]' }),
     },
   },
   { width: 720, padded: false },

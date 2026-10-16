@@ -478,6 +478,11 @@ export const text = stylex.defineVars({
   '--text-tag-small-leading': 'normal',
   '--text-tag-small-tracking': '0',
 
+  // A two-line picker row (OptionRow 44): a 20px title line over a 16px meta
+  // line, 4px above and below, so the row is 44px whatever the fonts' metrics.
+  '--text-option-title-leading': '20px',
+  '--text-option-meta-leading': '16px',
+
   // Times, timestamps, card headers, status chips, log reasons.
   '--text-meta-family': fonts['--font-sans'],
   '--text-meta-size': '12.5px',
@@ -752,12 +757,13 @@ export const layout = stylex.defineVars({
   '--page-width': '720px',
   '--page-width-settings': '760px',
   // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
-  '--settings-label-width': '104px',
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',
+  // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
+  '--tool-row-height': '56px',
   '--menu-width': '236px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
