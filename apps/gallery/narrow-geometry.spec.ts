@@ -32,7 +32,7 @@ test.describe('the minimum window', () => {
     for (const [at, buttons] of STATES) {
       test(`${at.route}, ${theme}: no text overlaps`, async ({ page }) => {
         await openState(page, at, theme)
-        expect(await page.evaluate(findOverlaps, { route: at.route, buttons })).toEqual([])
+        expect(await findOverlaps(page, { route: at.route, buttons })).toEqual([])
       })
     }
   }
