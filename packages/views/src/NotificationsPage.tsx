@@ -1,12 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
+import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type ReactNode } from 'react'
-import type { Hours, NotifyTag, TodayRow } from '@juno/contract'
+import type { Hours, NotificationPermission, NotifyTag, TodayRow } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, Chip, DayToggles, Icon, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { clockLabel, hourLabel } from './time'
 
@@ -30,6 +31,14 @@ export interface NotificationsPageProps {
   readonly onMattersSave: (text: string) => void
   /** Back to When it matters. */
   readonly onRemove: (tag: NotifyTag) => void
+  /** Whether macOS lets Juno notify. Denied or not determined puts a line at the top of the page. */
+  readonly permission: NotificationPermission
+  /** Send test notification. */
+  readonly onSendTest: () => void
+  /** Open Notification Settings: System Settings at Juno's entry. */
+  readonly onOpenSettings: () => void
+  /** Allow notifications, while macOS has not asked yet: its prompt. */
+  readonly onAllow: () => void
   /** Show why starts open (fixtures). */
   readonly showWhy?: boolean
 }
@@ -45,14 +54,18 @@ const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'
 /**
  * The Notifications page (SPEC 14, inventory 13): two sets of hours, what
  * matters in the owner's words, the channels and people set to Every
- * message or Never, and one line for today with Show why. Everything else
- * is said to Juno or set from a channel's or person's menu.
+ * message or Never, one line for today with Show why, and a test
+ * notification. Everything else is said to Juno or set from a channel's or
+ * person's menu. While macOS does not let Juno notify, a line at the top
+ * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onMattersSave, onRemove, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
+
+      <PermissionLine permission={permission} onOpenSettings={onOpenSettings} onAllow={onAllow} />
 
       <Section heading="Hours">
         <Surface kind="group">
@@ -111,7 +124,63 @@ export function NotificationsPage(props: NotificationsPageProps) {
       <Section heading="Today">
         <Today interrupted={interrupted} held={held} rows={today} initiallyOpen={showWhy} />
       </Section>
+
+      <Section heading="Test">
+        <TestRow permission={permission} onSendTest={onSendTest} onOpenSettings={onOpenSettings} />
+      </Section>
     </Page>
+  )
+}
+
+/** While macOS does not let Juno notify: one line with the way to turn it on. Nothing otherwise. */
+function PermissionLine({ permission, onOpenSettings, onAllow }: Pick<NotificationsPageProps, 'permission' | 'onOpenSettings' | 'onAllow'>) {
+  if (permission !== 'denied' && permission !== 'notDetermined') return null
+  return (
+    <Surface kind="group" role="status" aria-label="Notification permission">
+      <ListRow
+        divider={false}
+        leading={<Icon icon={BellSlash} size={15} />}
+        trailing={
+          permission === 'denied' ? (
+            <Button variant="secondary" size="sm" onClick={onOpenSettings}>
+              Open Notification Settings
+            </Button>
+          ) : (
+            <Button variant="secondary" size="sm" onClick={onAllow}>
+              Allow notifications
+            </Button>
+          )
+        }
+      >
+        <Text variant="ui">macOS is not showing Juno's notifications.</Text>
+      </ListRow>
+    </Surface>
+  )
+}
+
+/** Send test notification. When Juno cannot tell whether macOS lets it notify, Open Notification Settings sits beside it. */
+function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsPageProps, 'permission' | 'onSendTest' | 'onOpenSettings'>) {
+  return (
+    <Surface kind="group">
+      <ListRow
+        aria-label="Test notification"
+        divider={false}
+        trailing={
+          <span {...stylex.props(styles.controls)}>
+            {permission === 'unknown' ? (
+              <Button variant="ghost" size="sm" tone="subtle" onClick={onOpenSettings}>
+                Open Notification Settings
+              </Button>
+            ) : null}
+            <Button variant="secondary" size="sm" onClick={onSendTest}>
+              Send test notification
+            </Button>
+          </span>
+        }
+      >
+        <Label title="Test notification" sub="If none appears, Focus or Do Not Disturb may be on." />
+      </ListRow>
+    </Surface>
   )
 }
 
