@@ -5,6 +5,7 @@ import { spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
+import { QuietWindowSetting } from './QuietWindowSetting'
 import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
@@ -18,18 +19,25 @@ export interface SettingsGeneralProps {
   readonly onNewTabPageChange: (page: NewTabPageName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
+  readonly quietDays: number
+  readonly onQuietDaysChange: (days: number) => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
 }
 
-/** General: what a new tab opens, the peek key and the fast classifier. */
-export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange }: SettingsGeneralProps) {
+/** General: tabs, topic recency, the peek key and the fast classifier. */
+export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, quietDays, onQuietDaysChange, classifier, onClassifierChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
+        </Surface>
+      </Section>
+      <Section heading="Topics">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
         </Surface>
       </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">

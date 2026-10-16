@@ -1,6 +1,7 @@
 import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SIDEBAR_WINDOW, type KindFilter } from '@juno/contract'
 import {
+  quietDaysAtom,
   currentRowAtom,
   defaultTopicListFilter,
   engineStatusAtom,
@@ -164,6 +165,7 @@ function useEmptyEntrance(shown: boolean): boolean {
  * arrive below.
  */
 export const TopicList = memo(function TopicList() {
+  const quietDays = useAtomValue(quietDaysAtom)
   const sections = useAtomValue(sidebarSectionsAtom)
   const { filter, ready } = sections
   const painted = useRef(false)
@@ -221,6 +223,7 @@ export const TopicList = memo(function TopicList() {
 
   return (
     <TopicListView
+      quietDays={quietDays}
       sections={[
         { id: 'pinned', ids: pinned },
         { id: 'recent', ids: recent },

@@ -135,7 +135,7 @@ function Empty({ kind, quietDays, enter, onClearFilters, onViewAll, onEditView }
       return <EmptyState illustration="nothing-here" title="Nothing here with these filters" body="Older and resolved topics live in All topics." action={action} enter={enter} />
     }
     case 'quiet':
-      return <EmptyState illustration="nothing-here" title="It's quiet" body={`Topics with activity in the last ${quietDays} days show up here.`} action={viewAll('secondary')} enter={enter} />
+      return <EmptyState illustration="nothing-here" title="It's quiet" body={`Topics with activity in the last ${quietDays} ${quietDays === 1 ? 'day' : 'days'} show up here.`} action={viewAll('secondary')} enter={enter} />
     case 'syncing':
       return <EmptyState title="Getting your topics" body="Juno is reading your conversations from Slack. Topics show up here as they arrive." enter={enter} />
     case 'empty-view': {
