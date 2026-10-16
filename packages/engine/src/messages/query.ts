@@ -76,6 +76,8 @@ export interface MessageCache {
   channels: Map<string, string | null>
   /** Custom emoji image urls, `null` for a name with no custom emoji. */
   emoji: Map<string, string | null>
+  /** Custom aliases with no image, to the name they end at (a standard emoji, or a missing one). */
+  emojiAliases: Map<string, string>
   /** Bumped whenever the lookup maps are dropped; a body parsed in an older epoch is parsed again. */
   epoch: number
   people: Map<string, Person>
@@ -89,6 +91,7 @@ export const makeMessageCache = (): MessageCache => ({
   users: new Map(),
   channels: new Map(),
   emoji: new Map(),
+  emojiAliases: new Map(),
   epoch: 0,
   people: new Map(),
   selfId: undefined,
@@ -100,6 +103,7 @@ export function forgetLookups(cache: MessageCache): void {
   cache.users = new Map()
   cache.channels = new Map()
   cache.emoji = new Map()
+  cache.emojiAliases = new Map()
   cache.epoch += 1
 }
 
@@ -214,6 +218,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         if (url === undefined) wanted.emoji.add(name)
         return url ?? undefined
       },
+      emojiAlias: (name: string) => cache.emojiAliases.get(name),
     }
     const parse = (row: WindowMessage): CachedBody => {
       const content: MessageContent = {
@@ -342,6 +347,8 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
         url = cache.emoji.get(current) ?? null
       }
       cache.emoji.set(name, url)
+      // An alias of a standard emoji (`alias:thumbsup`) shows that emoji.
+      if (url === null) cache.emojiAliases.set(name, current)
     }
   })
 
@@ -389,8 +396,11 @@ interface ShapeInput {
 function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): MessageView {
   const kind = row.deleted === 1 ? 'deleted' : STUB(row) ? 'unloaded' : 'message'
   const reactions: Array<ReactionView> = input.reactions.map((reaction) => {
-    const unicode = emojiUnicode(reaction.name)
-    const url = unicode === undefined ? (input.cache.emoji.get(splitEmojiName(reaction.name).name) ?? undefined) : undefined
+    const standard = emojiUnicode(reaction.name)
+    const base = splitEmojiName(reaction.name).name
+    const url = standard === undefined ? (input.cache.emoji.get(base) ?? undefined) : undefined
+    const alias = standard === undefined && url === undefined ? input.cache.emojiAliases.get(base) : undefined
+    const unicode = standard ?? (alias === undefined ? undefined : emojiUnicode(alias))
     return {
       name: reaction.name,
       count: reaction.count,

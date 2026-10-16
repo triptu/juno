@@ -356,7 +356,7 @@ milliseconds only, and writes redacted shapes to `--out DIR` (a temporary direct
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
 `-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
 `users/info` about every person the newest conversations reference and reads one page of each
-users list (about 14 calls). A full run is about 34 calls. The
+users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
 
 ## The live sync dry run
