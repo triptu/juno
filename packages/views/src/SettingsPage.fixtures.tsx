@@ -6,6 +6,7 @@ import { connections, NOW, settings, settingsRecovery, settingsReleased, setting
 import { ConnectionsPage } from './juno-pages/ConnectionsPage'
 import { JunoBackupPage, JunoSettingsPage } from './juno-pages/JunoSettingsPage'
 import { ProviderSection } from './juno-pages/ProviderSection'
+import { RulesSection } from './juno-pages/RulesSection'
 import { NotificationsPage } from './NotificationsPage'
 import { notificationsBase } from './NotificationsPage.fixtures'
 import { SettingsPage, type SettingsPageProps } from './SettingsPage'
@@ -46,8 +47,8 @@ export default defineFixtures(
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
-      juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />),
-      connections: at('connections', <ConnectionsPage page={connections} onAction={noop} onConfigure={noop} onAdd={noop} />),
+      juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} />),
+      connections: at('connections', <ConnectionsPage page={connections} rules={<RulesSection rules={settings.rules} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />} onAction={noop} onConfigure={noop} onAdd={noop} />),
       backup: at('backup', <JunoBackupPage {...backup} page={settings} />),
       about: at('about', about),
     },

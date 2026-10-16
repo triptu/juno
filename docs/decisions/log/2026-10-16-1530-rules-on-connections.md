@@ -1,0 +1,1 @@
+- 10-16 15:30 · general-polish · The owner's rules move from Settings › Juno to the top of Connections as "When Juno asks first", next to each tool's Auto, Always ask or Never ask, because that is where integrations live (owner, 10-16). Pause Juno stays in Settings › Juno. The servers list gets a "Servers" heading so it reads apart from the rules.

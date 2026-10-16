@@ -28,7 +28,9 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await openPage(juno, 'Settings')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Rules', 'Pause Juno']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Pause Juno']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  // The owner's rules are on Connections.
+  await expect(page.getByRole('heading', { name: 'When Juno asks first' })).toHaveCount(0)
   await expect(page.getByText('Use your ChatGPT plan instead of an API key.')).toBeVisible()
   await expect(page.getByText('Coming soon')).toBeVisible()
   // Backup and This Mac are their own section.
@@ -46,20 +48,6 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await page.getByLabel('Chat model').selectOption('Claude Opus')
   await expect(page.getByLabel('Chat model')).toHaveValue('Claude Opus')
 
-  // A rule is saved when its field loses focus, and a removed one goes at once.
-  await page.getByRole('button', { name: 'Add a rule' }).click()
-  await page.getByLabel('Rule', { exact: true }).fill('Ask me before anything goes to #hiring')
-  await page.getByLabel('Rule', { exact: true }).press('Enter')
-  await page.getByRole('button', { name: 'Add a rule' }).click()
-  await page.getByLabel('Rule', { exact: true }).nth(1).fill('Never post in #general without asking')
-  await page.getByLabel('Pause Juno').focus()
-  await page.getByRole('button', { name: 'Remove rule' }).first().click()
-  await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
-  // What the agent kept: the page opened again shows only its served list.
-  await juno.nav.back()
-  await openPage(juno, 'Settings')
-  await expect.poll(() => ruleFields(juno)).toEqual(['Never post in #general without asking'])
-
   // Pause shows in the chat's header, and its Resume undoes it.
   await page.getByLabel('Pause Juno').check()
   // A page opens in the tab it was asked from; Back returns to the chat.
@@ -68,6 +56,27 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await expect(chip).toBeVisible()
   await chip.getByRole('button', { name: 'Resume' }).click()
   await expect(chip).toHaveCount(0)
+})
+
+test('Connections starts with when Juno asks first, and saves your rules', async ({ juno }) => {
+  await ready(juno)
+  await openPage(juno, 'Connections')
+  const page = juno.win.locator('main')
+  await expect(page.getByRole('heading', { name: 'When Juno asks first' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Servers' })).toBeVisible()
+  // A rule is saved when its field loses focus, and a removed one goes at once.
+  await page.getByRole('button', { name: 'Add a rule' }).click()
+  await page.getByLabel('Rule', { exact: true }).fill('Ask me before anything goes to #hiring')
+  await page.getByLabel('Rule', { exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'Add a rule' }).click()
+  await page.getByLabel('Rule', { exact: true }).nth(1).fill('Never post in #general without asking')
+  await page.getByLabel('Rule', { exact: true }).nth(1).blur()
+  await page.getByRole('button', { name: 'Remove rule' }).first().click()
+  await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
+  // What the agent kept: the page opened again shows only its served list.
+  await juno.nav.back()
+  await openPage(juno, 'Connections')
+  await expect.poll(() => ruleFields(juno)).toEqual(['Never post in #general without asking'])
 })
 
 test('Activity lists the run a message started, and the other pages open', async ({ juno }) => {
