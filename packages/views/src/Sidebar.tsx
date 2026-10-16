@@ -437,6 +437,7 @@ const styles = stylex.create({
     alignItems: 'center',
     marginInlineStart: 'auto',
     gap: spacing['--space-0-5'],
+    WebkitAppRegion: 'no-drag',
   },
   account: {
     display: 'inline-flex',

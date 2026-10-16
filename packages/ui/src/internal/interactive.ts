@@ -25,7 +25,11 @@ export const interactive = stylex.create({
     textAlign: 'start',
     textDecoration: 'none',
     userSelect: 'none',
-    WebkitAppRegion: 'no-drag',
+    // No app region here. In a title bar's drag strip the control's group
+    // opts out (no-drag on its container); everywhere else no-drag does
+    // nothing but cost: Chromium redraws every region rectangle each frame
+    // they move, and on every control of a scrolling list that was 10 to
+    // 20 % of the scroll's frame work (performance.md 8.5).
   },
   feedback: {
     transitionProperty: 'scale, background-color, color, border-color, box-shadow, opacity',

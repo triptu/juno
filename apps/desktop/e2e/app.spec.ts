@@ -48,6 +48,36 @@ test('renders the shell with bundled fonts and token colours', async ({ win }) =
   await expect(button).toHaveCSS('cursor', 'default')
 })
 
+test('only the title bars drag the window, and every control on them opts out', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.expectRows()
+  const report = await win.evaluate(() => {
+    const region = (node: Element) => getComputedStyle(node).getPropertyValue('-webkit-app-region')
+    const all = [...document.querySelectorAll('*')]
+    const drags = all.filter((node) => region(node) === 'drag')
+    const overlaps = (a: DOMRect, b: DOMRect) => a.width > 0 && a.height > 0 && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+    const uncovered: string[] = []
+    for (const control of document.querySelectorAll('button, a[href], input, textarea, select, [role="tab"], [role="row"], [tabindex]')) {
+      const box = control.getBoundingClientRect()
+      if (!drags.some((drag) => overlaps(box, drag.getBoundingClientRect()))) continue
+      let covered = false
+      for (let node: Element | null = control; node !== null && region(node) !== 'drag'; node = node.parentElement) {
+        if (region(node) === 'no-drag') covered = true
+      }
+      if (!covered) uncovered.push(control.getAttribute('aria-label') ?? control.textContent?.slice(0, 40) ?? control.tagName)
+    }
+    // The property is inherited: count where a region starts.
+    const holders = all.filter((node) => (region(node) === 'no-drag' || region(node) === 'drag') && (node.parentElement === null || region(node.parentElement) !== region(node))).map((node) => `${node.tagName.toLowerCase()}${node.getAttribute('role') === null ? '' : `[${node.getAttribute('role')}]`} ${node.getAttribute('aria-label') ?? ''}`.trim())
+    return { drags: drags.length, regions: holders.length, holders, uncovered }
+  })
+  // The sidebar's top bar and the tab strip at least.
+  expect(report.drags).toBeGreaterThanOrEqual(2)
+  expect(report.uncovered).toEqual([])
+  // Regions sit on the title bars' groups, not on every control: each one is redrawn every frame it moves (performance.md 8.5).
+  expect(report.regions, report.holders.join(', ')).toBeLessThan(20)
+})
+
 test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {
   await juno.signIn()
   const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
