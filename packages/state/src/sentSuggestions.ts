@@ -29,14 +29,25 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
   const initial = visible()
   // A finding that beats New chat to its topic waits for the topic to show.
   let held: ClarityFinding | undefined
+  // A thread New chat starts is renamed from its pending id once Slack has it.
+  let topicId = sent.topicId
+  const onTopic = (place: ReturnType<typeof visible>) => {
+    if (place?.kind !== 'topic' || (place.topicId !== topicId && place.viewId !== topicId)) return false
+    if (place.topicId !== topicId) {
+      topicId = place.topicId
+      const shown = registry.get(sentSuggestionAtom)
+      if (shown?.clientMsgId === sent.clientMsgId) registry.set(sentSuggestionAtom, { ...shown, topicId })
+    }
+    return true
+  }
   const current = () => registry.get(latestSentAtom) === sent.clientMsgId && !left && performance.now() - sent.sentAt < 1000
   const show = (finding: ClarityFinding) => {
     held = undefined
-    registry.set(sentSuggestionAtom, { ...sent, finding })
+    registry.set(sentSuggestionAtom, { ...sent, topicId, finding })
   }
   const unsubscribe = registry.subscribe(tabsAtom, () => {
     const place = visible()
-    if (place?.kind === 'topic' && place.topicId === sent.topicId) {
+    if (onTopic(place)) {
       if (held !== undefined && current()) show(held)
       return
     }
@@ -56,7 +67,7 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
       cleanup()
       return
     }
-    if (place?.kind === 'topic' && place.topicId === sent.topicId) show(finding)
+    if (onTopic(place)) show(finding)
     else if (initial?.kind === 'newChat' && place?.kind === 'newChat') held = finding
     else cleanup()
   }
