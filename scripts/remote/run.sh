@@ -65,10 +65,10 @@ fi
 if [ -s /out/load.txt ]; then
   # Runnable tasks per core (1 means every core has one, more means tasks queue) and the share of time some task
   # waited for a core (the kernel's CPU pressure, over 10 s), at the median and the 90th percentile, then every 30 s.
-  pick() { sort -n | awk '{ v[NR] = $1 } END { printf "%s %s", v[int((NR + 1) / 2)], v[int(NR * 0.9) > 0 ? int(NR * 0.9) : 1] }'; }
-  read -r run_median run_p90 <<< "$(awk '{ printf "%.1f\n", $2 / '"$cores"' }' /out/load.txt | pick)"
-  read -r pressure_median pressure_p90 <<< "$(awk '{ print $3 }' /out/load.txt | pick)"
-  echo "remote: runnable per core $run_median at the median, $run_p90 at p90; CPU pressure $pressure_median% at the median, $pressure_p90% at p90" >&2
+  pick() { sort -n | awk '{ v[NR] = $1 } END { m = int((NR + 1) / 2); q = int(NR * 0.9); if (q < 1) q = 1; print v[m], v[q] }'; }
+  runnable=$(awk '{ printf "%.1f\n", $2 / '"$cores"' }' /out/load.txt | pick)
+  pressure=$(awk '{ print $3 }' /out/load.txt | pick)
+  echo "remote: runnable per core ${runnable% *} at the median, ${runnable#* } at p90; CPU pressure ${pressure% *}% at the median, ${pressure#* }% at p90" >&2
   awk '{ b = int($1 / 30); r[b] += $2; p[b] += $3; c[b]++ } END { for (b in c) printf "remote: load +%d s: runnable per core %.1f, CPU pressure %.0f%%\n", b * 30, r[b] / c[b] / '"$cores"', p[b] / c[b] }' /out/load.txt | sort -t+ -k2 -n >&2
 fi
 
