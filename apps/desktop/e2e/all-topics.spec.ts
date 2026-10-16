@@ -55,7 +55,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await juno.topic.expectTitle(/We have 142 flags/)
 })
 
-test('each filter narrows the list: status chips, kind, place, sort and text', async ({ juno }) => {
+test('each filter narrows the list: status chips, kind, sort and text', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { allTopics } = juno
@@ -82,13 +82,44 @@ test('each filter narrows the list: status chips, kind, place, sort and text', a
   await allTopics.row(OFFSITE).expectAbsent()
   await allTopics.row(POSTGRES).expectVisible()
 
-  // Place: one channel, found by a word inside its name in the searchable picker.
+  // Place: the next test.
+
+  // Sort: most messages puts the six-reply Postgres thread above the two-reply quiet one.
+  await allTopics.sort('Most messages')
+  const byMessages = await allTopics.titles()
+  expect(byMessages.findIndex((title) => title.startsWith('Draft plan'))).toBeLessThan(byMessages.findIndex((title) => title.startsWith('Lag alerts')))
+  await allTopics.sort('Oldest first')
+  const oldest = await allTopics.titles()
+  expect(oldest.findIndex((title) => title.startsWith('Lag alerts'))).toBeLessThan(oldest.findIndex((title) => title.startsWith('Draft plan')))
+  await allTopics.sort('Most recent')
+
+  // Text: a word from a reply finds its thread, not just titles.
+  await allTopics.type('reaper')
+  await allTopics.row(STAGING).expectVisible()
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.expectCount('All', 1)
+  await allTopics.type('nothing in slack says this')
+  await allTopics.expectEmpty()
+  await allTopics.clearFilters()
+  await expect(allTopics.search).toHaveValue('')
+  await allTopics.row(POSTGRES).expectVisible()
+  await allTopics.row(QUIET).expectVisible()
+})
+
+test('the place picker searches conversations by word, and a pick narrows the list', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { allTopics } = juno
+  await allTopics.open()
+
+  // A channel by a word inside its name.
   await allTopics.filterPlace('review', 'design-review')
   await allTopics.row(DESIGN).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.filterPlace('', 'Anywhere')
   await allTopics.row(POSTGRES).expectVisible()
 
+  await allTopics.filterKind('Channels')
   // With Channels on, the picker offers no DMs.
   await allTopics.placeButton.click()
   await allTopics.placeSearch.fill('maya')
@@ -117,27 +148,6 @@ test('each filter narrows the list: status chips, kind, place, sort and text', a
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.filterPlace('any', 'Anywhere')
   await allTopics.row(POSTGRES).expectVisible()
-
-  // Sort: most messages puts the six-reply Postgres thread above the two-reply quiet one.
-  await allTopics.sort('Most messages')
-  const byMessages = await allTopics.titles()
-  expect(byMessages.findIndex((title) => title.startsWith('Draft plan'))).toBeLessThan(byMessages.findIndex((title) => title.startsWith('Lag alerts')))
-  await allTopics.sort('Oldest first')
-  const oldest = await allTopics.titles()
-  expect(oldest.findIndex((title) => title.startsWith('Lag alerts'))).toBeLessThan(oldest.findIndex((title) => title.startsWith('Draft plan')))
-  await allTopics.sort('Most recent')
-
-  // Text: a word from a reply finds its thread, not just titles.
-  await allTopics.type('reaper')
-  await allTopics.row(STAGING).expectVisible()
-  await allTopics.row(POSTGRES).expectAbsent()
-  await allTopics.expectCount('All', 1)
-  await allTopics.type('nothing in slack says this')
-  await allTopics.expectEmpty()
-  await allTopics.clearFilters()
-  await expect(allTopics.search).toHaveValue('')
-  await allTopics.row(POSTGRES).expectVisible()
-  await allTopics.row(QUIET).expectVisible()
 })
 
 test('the row menu works from All topics, each action with its undo', async ({ juno, slack }) => {

@@ -4,6 +4,36 @@
 import { expect, test } from '@playwright/test'
 import { openState } from './support'
 
+/** The filter row's controls and status tabs, as the page lays them out. */
+function measure() {
+  const row = document.querySelector('[data-all-topics-filters]')!
+  const box = (element: Element) => {
+    const b = element.getBoundingClientRect()
+    return { x: b.x, y: b.y, right: b.right, bottom: b.bottom, width: b.width, height: b.height }
+  }
+  const controls = [
+    row.querySelector('[role="radiogroup"][aria-label="Status"]')!,
+    row.querySelector('[role="radiogroup"][aria-label="Kind"]')!,
+    row.querySelector('button[aria-label^="Where: "]')!,
+    row.querySelector('select[aria-label="Sort"]')!,
+  ]
+  const segments = [...row.querySelectorAll('[role="radiogroup"][aria-label="Status"] [role="radio"]')]
+  return {
+    row: box(row),
+    controls: controls.map(box),
+    // Everything the pointer can press in the row, outside the four controls: a stray chevron would show here.
+    extras: [...row.querySelectorAll('button, select, [role="button"]')].filter((element) => !controls.some((control) => control === element || control.contains(element))).length,
+    clipped: controls.filter((control) => control.scrollWidth > control.clientWidth + 1).length,
+    segments: segments.map(box),
+    segmentsClipped: segments.filter((segment) => segment.scrollWidth > segment.clientWidth).length,
+    counts: segments.map((segment) => {
+      const count = segment.lastElementChild!
+      const style = getComputedStyle(count)
+      return { numeric: style.fontVariantNumeric, color: style.color, label: getComputedStyle(segment).color }
+    }),
+  }
+}
+
 const STATES = ['default', 'place-picked', 'picker-open', 'picker-query', 'narrow'] as const
 
 test.describe('All topics filter row geometry', () => {
@@ -12,34 +42,7 @@ test.describe('All topics filter row geometry', () => {
       test(`${state}, ${theme}: controls do not overlap, share a height and gap, and fit the row`, async ({ page }) => {
         const id = `filters/${state}`
         await openState(page, { component: 'AllTopics', id, route: `AllTopics/${id}`, group: '', groupId: '', state, frame: {} }, theme)
-        const at = await page.evaluate(() => {
-          const row = document.querySelector('[data-all-topics-filters]')!
-          const box = (element: Element) => {
-            const b = element.getBoundingClientRect()
-            return { x: b.x, y: b.y, right: b.right, bottom: b.bottom, width: b.width, height: b.height }
-          }
-          const controls = [
-            row.querySelector('[role="radiogroup"][aria-label="Status"]')!,
-            row.querySelector('[role="radiogroup"][aria-label="Kind"]')!,
-            row.querySelector('button[aria-label^="Where: "]')!,
-            row.querySelector('select[aria-label="Sort"]')!,
-          ]
-          const segments = [...row.querySelectorAll('[role="radiogroup"][aria-label="Status"] [role="radio"]')]
-          return {
-            row: box(row),
-            controls: controls.map(box),
-            // Everything the pointer can press in the row, outside the four controls: a stray chevron would show here.
-            extras: [...row.querySelectorAll('button, select, [role="button"]')].filter((element) => !controls.some((control) => control === element || control.contains(element))).length,
-            clipped: controls.filter((control) => control.scrollWidth > control.clientWidth + 1).length,
-            segments: segments.map(box),
-            segmentsClipped: segments.filter((segment) => segment.scrollWidth > segment.clientWidth).length,
-            counts: segments.map((segment) => {
-              const count = segment.lastElementChild!
-              const style = getComputedStyle(count)
-              return { numeric: style.fontVariantNumeric, color: style.color, label: getComputedStyle(segment).color }
-            }),
-          }
-        })
+        const at = await page.evaluate(measure)
         expect(at.extras).toBe(0)
         expect(at.clipped).toBe(0)
 
@@ -73,7 +76,9 @@ test.describe('All topics filter row geometry', () => {
       })
     }
   }
+})
 
+test.describe('All topics place picker', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`picker-query, ${theme}: the searchable list opens below the place button with avatars, # and the group icon`, async ({ page }) => {
       const id = 'filters/picker-query'
