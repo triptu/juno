@@ -166,6 +166,7 @@ The row leaves when the last tab showing it closes or navigates elsewhere. Histo
 - **Tab menu** (right-click a tab): Pin tab, Close tab, Close other tabs, Close tabs to the right, Close all tabs, and for a topic Copy Slack link and Open in Slack.
 - **Pinned tabs** sit first, as small icon-only tabs with no close button. "Close other", "to the right" and "all" leave them open, as in browsers; closing one directly works.
 - **Reopen closed tab.** ⌘⇧T reopens the last closed tab with its history, and again for the one before, up to 20.
+- **Tabs close by themselves.** So tabs do not pile up, a tab not viewed for the time Settings › General chooses ("Close tabs not viewed in": Never, 1 day, the default, 3 days or 7 days) closes by itself, quietly, onto the reopen stack, so ⌘⇧T brings it back. A tab counts as viewed while it is the active tab. The active tab and a tab with an unsent draft (a New chat's, or a topic's or reply's) never close this way, and pinned tabs follow the same rule. The time is coarse: Juno checks at launch and about hourly, so a tab may close up to an hour late. There is never no tab.
 - The usual browser keys work: ⌘T new tab, ⌘W close, ⌘1 to ⌘8 a tab by position, ⌘9 the last tab, ⌃Tab and ⌃⇧Tab or ⌘⇧] and ⌘⇧[ for the next and previous tab (section 18).
 - To read a topic without marking it read, peek at it (section 5).
 
@@ -526,7 +527,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
+- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); Close tabs not viewed in: Never, 1 day (the default), 3 days or 7 days (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 
