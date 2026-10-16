@@ -128,10 +128,16 @@ function LoadedComposer({
   })
   // The tab hid or closed: write what is typed now.
   useEffect(() => () => flushRef.current(), [])
-  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
-  // text when this tab shows again, unless this field has typing of its own or has focus.
+  // Typed in since this tab last showed: a draft change from the store is then this field's own echo.
+  const typedSinceShown = useRef(false)
   useEffect(() => {
-    if (unsaved.current !== undefined || document.activeElement === field.current || latest === encoded(text)) return
+    typedSinceShown.current = false
+  }, [])
+  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
+  // text when this tab shows again, unless this field has typing of its own. A field that has focus takes it
+  // only until it is typed in, so a tab whose press gave it focus still takes the other tab's newer draft.
+  useEffect(() => {
+    if (unsaved.current !== undefined || (document.activeElement === field.current && typedSinceShown.current) || latest === encoded(text)) return
     const next = decodeMentions(latest)
     picked.current = next.picks
     setPicks(next.picks)
@@ -154,6 +160,7 @@ function LoadedComposer({
   }
 
   const change = (next: string) => {
+    typedSinceShown.current = true
     setText(next)
     // Editing closes the bar and drops a check still running: Enter checks the new text.
     setBar(undefined)
