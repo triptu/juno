@@ -591,7 +591,7 @@ Bun 1.4.3 is an exact root devDependency installed by pnpm, including its approv
 
 `pnpm affected` runs `pnpm typecheck:bun` before starting the other steps. It gets the project list and input hashes from `scripts/typecheck.mjs --projects-json`, writes a temporary solution config referencing the pending projects, and runs `bun check -b --no-pretty --all`. Errors use `file(line,column): error TS…` locations that VS Code can open. A type error stops the run before remote suites start. The local check uses the machine-wide typecheck queue.
 
-Passing Bun results live in a separate `juno-cache/typecheck-bun` directory. Their keys include the existing project input hash, the pinned Bun version and both checker scripts. Bun itself has no incremental build cache. Its results never populate the TypeScript cache. `--no-cache` bypasses result caches.
+Passing Bun results live in a separate `juno-cache/typecheck-bun` directory. Their keys include the existing project input hash, the pinned Bun version and both checker scripts. Generated `.tsbuildinfo` files are excluded from project inputs. Bun itself has no incremental build cache. Its results never populate the TypeScript cache. `--no-cache` bypasses result caches.
 
 The planner reads effective compiler options, including inherited options and project references. Plugins, emit requirements, declaration options, composite builds or config parse errors send that project to remote `pnpm typecheck --projects <JSON config list>`, which uses `tsc -b` for the selected configs. A passing TypeScript cache key skips that fallback. All 29 current configs support Bun. `--local` also runs fallback TypeScript locally.
 

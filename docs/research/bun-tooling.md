@@ -27,3 +27,9 @@ These are local tool timings, not app performance measurements. Typecheck timing
 ## Adopted for local feedback
 
 On 2026-10-16, `pnpm affected` switched to pinned Bun for supported projects, with a separate result cache and remote TypeScript fallback for unsupported configs. Full and merge checks retain TypeScript. `pnpm typecheck:parity` compares both tools across the shared project list. See [Local Bun checks](../development.md#local-bun-checks) for the commands and fallback rules.
+
+Verification on the shared Mac used one comment-only change to `scripts/probe-integrations.ts`, which invalidated the scripts project. Both affected runs checked that project and ran lint. Wall time was 72.22 s before and 6.53 s after, one run each. The baseline remote image was ready after 56.0 s and TypeScript took 2.9 s; local Bun took 0.9 s. Mac load averages were about 5 to 7 on eight cores. This measures the developer loop, including remote startup, rather than a repeatable compiler speedup.
+
+A deliberate `string` to `number` error in the desktop renderer failed locally in 2.27 s, before remote suites started. The probe was removed. `pnpm typecheck:parity` matched the same one diagnostic across all 29 projects in 179.4 s. Plugin, declaration and emit option probes selected TypeScript fallback; a selected desktop web check passed through `tsc -b` in 4.4 s. The Linux x64 image build passed its pinned Bun version assertion, and the installed Mac executable was confirmed as ARM64.
+
+The final `pnpm affected --base origin/main` attempt passed local Bun checking and lint, but its remote suites never started after more than eight minutes waiting for Namespace capacity. Those queued jobs were cancelled. Health tests and remote-pool tests passed during verification. Full remote-suite verification remains incomplete. After excluding build-info files from input hashes, `pnpm affected --base HEAD` passed all 29 projects locally and lint.

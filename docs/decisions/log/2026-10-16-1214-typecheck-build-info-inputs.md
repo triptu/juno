@@ -1,0 +1,1 @@
+- 10-16 12:14 · tooling · Exclude generated .tsbuildinfo files from typecheck input hashes so parity and selected-project builds do not invalidate source checks.

@@ -46,7 +46,7 @@ function filesUnder(dir) {
       const child = path ? `${path}/${entry.name}` : entry.name
       if (entry.isDirectory()) {
         if (!skip.has(entry.name)) walk(child)
-      } else if (entry.isFile()) found.push(child)
+      } else if (entry.isFile() && !entry.name.endsWith('.tsbuildinfo')) found.push(child)
     }
   }
   walk(dir)
