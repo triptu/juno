@@ -141,12 +141,41 @@ test('Main at the bottom keeps a new message fully in view after a click on a me
   await juno.topic.expectNoPill()
 })
 
+/**
+ * Reads, each time the scroller's box changes size, whether its last row is fully inside it and how far it is from
+ * its end. An observer created after the app's runs after it in the same frame, after layout and before paint, so
+ * it reads what that frame paints; a read from a task could land after the size change and before the frame.
+ */
+async function watchResize(page: Page, scroller: string): Promise<() => Promise<Frame[]>> {
+  await page.evaluate((scroller) => {
+    const list = [...document.querySelectorAll<HTMLElement>(scroller)].find((node) => node.getClientRects().length > 0)!
+    const state = { frames: [] as Frame[], observer: undefined as ResizeObserver | undefined }
+    ;(window as unknown as { resized: typeof state }).resized = state
+    state.observer = new ResizeObserver(() => {
+      const box = list.getBoundingClientRect()
+      const at = [...list.querySelectorAll('[data-message-row]')].at(-1)?.getBoundingClientRect()
+      state.frames.push({ present: at !== undefined, inView: at !== undefined && at.top >= box.top - 1 && at.bottom <= box.bottom + 1, distance: list.scrollHeight - list.scrollTop - list.clientHeight })
+    })
+    state.observer.observe(list)
+  }, scroller)
+  return () =>
+    page.evaluate(() => {
+      const state = (window as unknown as { resized: { frames: Frame[]; observer: ResizeObserver } }).resized
+      state.observer.disconnect()
+      return state.frames
+    })
+}
+
 test('Main at the bottom keeps its last message in view while the composer grows', async ({ juno, win, slack, fake }) => {
   await openLongMain(juno, fake, slack)
-  const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', 'Earlier message 29')
+  const watched = await watchResize(win, TOPIC_SCROLLER)
+  const height = await juno.topic.scroller.evaluate((node) => node.clientHeight)
   await juno.topic.composer.fill('one\ntwo\nthree\nfour\nfive')
+  await expect.poll(() => juno.topic.scroller.evaluate((node) => node.clientHeight)).toBeLessThan(height)
   await frames(win, 5)
+  // The first entry is the observer's own first look, before the composer grew.
   expectHeldAtEnd(await watched())
+  expect(await distance(juno.topic.scroller)).toBeLessThanOrEqual(1)
 })
 
 test('scrolled up in Main, a new message moves nothing and shows the pill', async ({ juno, win, slack, fake }) => {
