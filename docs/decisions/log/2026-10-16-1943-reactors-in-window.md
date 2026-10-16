@@ -1,0 +1,1 @@
+- 10-16 19:43 · reactors · Who reacted comes with the message window (up to ten user ids per reaction, you first, and those people in `refs.people`), not from `reactions.get` on hover: the store already keeps Slack's users list, a hover then costs nothing, and the research has no cost for `reactions.get`.
