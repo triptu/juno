@@ -1,0 +1,1 @@
+- 10-17 04:30 · narrow-fixes · Under a 560px All topics table Msgs hides too, so the table fits down to 500px; it scrolls sideways only below that, where a focused row's ring can be cut.

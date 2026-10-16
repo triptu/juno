@@ -51,11 +51,20 @@ test.describe('the minimum window', () => {
     expect(where.topicTop).toBeGreaterThanOrEqual(where.pillBottom)
   })
 
-  test('All topics hides the Where column under 648px and shows it at the minimum window without the sidebar', async ({ page }) => {
-    for (const [id, shown] of [['size/where-hidden', false], ['size/minimum-window', true]] as const) {
+  test('All topics hides Where under 648px, then Msgs under 560px, and the table still fits', async ({ page }) => {
+    const states = [
+      ['size/minimum-window', true, true],
+      ['size/where-hidden', false, true],
+      ['size/narrow', false, false],
+    ] as const
+    for (const [id, where, messages] of states) {
       const at = route('AllTopics', id)
       await openState(page, at)
-      await expect(frameOf(page, at).getByRole('columnheader', { name: 'Where' })).toBeVisible({ visible: shown })
+      const frame = frameOf(page, at)
+      await expect(frame.getByRole('columnheader', { name: 'Where' })).toBeVisible({ visible: where })
+      await expect(frame.getByRole('columnheader', { name: 'Msgs' })).toBeVisible({ visible: messages })
+      // Nothing to scroll sideways to, so a focused row's ring is whole.
+      expect(await frame.locator('[data-all-topics-table]').evaluate((table) => table.scrollWidth <= table.clientWidth)).toBe(true)
     }
   })
 
