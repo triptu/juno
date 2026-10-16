@@ -201,6 +201,7 @@ export const Message = memo(function Message({
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
+        editor !== undefined && styles.rowEditing,
         message.mentionsMe && styles.rowMention,
       )}
     >
@@ -338,6 +339,12 @@ const styles = stylex.create({
     },
   },
   rowEager: {
+    contentVisibility: 'visible',
+  },
+  // The edit field's emoji suggestions open above it, past the row's edge:
+  // the one row being edited drops paint containment so they are not clipped.
+  rowEditing: {
+    contain: 'layout style',
     contentVisibility: 'visible',
   },
   // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.

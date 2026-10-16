@@ -384,7 +384,10 @@ test('the inline edit field suggests emoji, and Esc there closes the list, not t
   await edit.press('Escape')
   await expect(list).toHaveCount(0)
   await expect(edit).toBeVisible()
-  await edit.pressSequentially('a')
+  await expect(edit).toHaveValue('Edit with emoji :tad')
+  // As in the composer, the list stays closed for that word; written again, it opens.
+  for (let i = 0; i < 4; i++) await edit.press('Backspace')
+  await edit.pressSequentially(':tada')
   await expect(list).toBeVisible()
   await edit.press('Enter')
   await expect(edit).toHaveValue('Edit with emoji 🎉 ')
