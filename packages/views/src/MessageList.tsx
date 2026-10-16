@@ -69,6 +69,8 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
+  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** Retry on a failed send. */
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
@@ -170,6 +172,7 @@ export function MessageList({
   onChannel,
   onLink,
   onToggleReaction,
+  onSetReaction,
   onRetry,
   onDiscard,
   onOpenImage,
@@ -235,6 +238,7 @@ export function MessageList({
                 onChannel={onChannel}
                 onLink={onLink}
                 onToggleReaction={onToggleReaction}
+                onSetReaction={onSetReaction}
                 onRetry={onRetry}
                 onDiscard={onDiscard}
                 onOpenImage={onOpenImage}

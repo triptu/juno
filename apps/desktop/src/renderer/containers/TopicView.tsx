@@ -137,6 +137,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
     editing: messageActions.editing,
     onRowKey: messageActions.onRowKey,
     onToggleReaction: messageActions.onToggleReaction,
+    onSetReaction: messageActions.onSetReaction,
     onPersonMenu: personMenu,
     onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
       const known = list.refs.channels.get(chip.id)
