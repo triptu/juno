@@ -191,7 +191,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
 - **Where it opens.** A topic opens at a "N new" divider when it has unread messages, otherwise at the bottom. There is no summary card at the divider; to catch up, ask Juno in the panel.
 - **Mentions.** @people and #channels render as soft chips. Mentions of you get the accent colour and a lightly tinted message background. Clicking a #channel filters the sidebar to it.
 - **Reactions** are toggleable chips under the message. Hovering a chip, or focusing it with the keyboard, shows who reacted after the usual tooltip delay: the emoji large with its name (`:+1:`), then each person with their avatar, "You" first when you reacted. More than ten people, or people Slack did not list, end in "and N others". The pointer can move into the card. It never moves anything and stays inside the window. Clicking the chip still toggles your reaction.
-- **Hover toolbar:**
+- **Hover toolbar:** it straddles the top edge of the message, mostly above it, so it never covers the message's own text. Where there is no room above, under the header, it sits below the message instead.
   - One-click quick reactions, 👍 ✅ 👀 by default. You choose up to seven, and their order, in Settings › Appearance. Where the message list is too narrow for all of them, the toolbar shows as many as fit, then the full picker's button; it never runs past the message.
   - A full emoji picker.
   - Quote.
