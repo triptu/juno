@@ -49,11 +49,12 @@ function isAppUrl(url: string): boolean {
  * item the next context menu picks; that menu answers at once without
  * showing, and keeps the labels it was asked to show and where.
  */
-/** How a test reads a menu item: "-" for a separator, "(label)" when disabled, "label ✓" when checked; submenu items start with "> ". */
+/** How a test reads a menu item: "-" for a separator, "(label)" when disabled, "label ✓" when checked, "label · sublabel" with a second line; submenu items start with "> ". */
 function testLabel(item: ContextMenuLeaf): string {
   if ('separator' in item) return '-'
   const label = item.enabled === false ? `(${item.label})` : item.label
-  return item.checked === true ? `${label} ✓` : label
+  const lines = item.sublabel === undefined ? label : `${label} · ${item.sublabel}`
+  return item.checked === true ? `${lines} ✓` : lines
 }
 
 export const contextMenuForTests: {
@@ -201,6 +202,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
                 label: item.label,
                 enabled: item.enabled ?? true,
                 ...(item.checked === undefined ? {} : { type: 'checkbox', checked: item.checked }),
+                ...(item.sublabel === undefined ? {} : { sublabel: item.sublabel }),
                 // Shown only: the app menu owns the shortcut.
                 ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator, registerAccelerator: false }),
                 click: () => (chosen = item.id),

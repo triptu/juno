@@ -683,6 +683,26 @@ test.describe('Topic header', () => {
     await open(page, 'TopicHeader', 'narrow/thread-480')
     await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
+
+  test('Follow and Resolve are one width, roomy and narrow, so following moves nothing', async ({ page }) => {
+    const box = async (state: string, name: string) => {
+      await open(page, 'TopicHeader', state)
+      const button = page.getByRole('button', { name, exact: true })
+      await expect(button).toBeVisible()
+      return (await button.boundingBox())!
+    }
+    for (const [follow, followed] of [
+      ['follow/follow', 'follow/followed'],
+      ['follow/follow-336', 'follow/followed-336'],
+    ] as const) {
+      const before = await box(follow, 'Follow')
+      const after = await box(followed, 'Resolve')
+      expect(after.x).toBeCloseTo(before.x, 1)
+      expect(after.width).toBeCloseTo(before.width, 1)
+    }
+    await open(page, 'TopicHeader', 'follow/follow')
+    await expect(page.getByRole('button', { name: 'Follow', exact: true })).toHaveText('Follow', { useInnerText: true })
+  })
 })
 
 /**

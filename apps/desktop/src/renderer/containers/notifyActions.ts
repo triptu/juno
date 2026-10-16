@@ -4,6 +4,7 @@
  * unfollows it; each change shows a toast with Undo.
  */
 import {
+  followMenuItems,
   notificationsSetLevel,
   notifyChoice,
   notifyChoiceLabel,
@@ -50,7 +51,13 @@ export function nativeMenu<A extends string>(items: ReadonlyArray<MenuItem<A>>, 
       case 'submenu':
         return { label: item.label, submenu: nativeMenu(item.items, enabled) as ContextMenuLeaf[] }
       case 'item':
-        return { id: item.id, label: item.label, ...(enabled(item.id) ? {} : { enabled: false }), ...(item.checked === undefined ? {} : { checked: item.checked }) }
+        return {
+          id: item.id,
+          label: item.label,
+          ...(enabled(item.id) ? {} : { enabled: false }),
+          ...(item.checked === undefined ? {} : { checked: item.checked }),
+          ...(item.sublabel === undefined ? {} : { sublabel: item.sublabel }),
+        }
     }
   })
 }
@@ -63,6 +70,16 @@ export async function showPersonMenu(person: { readonly id: string; readonly nam
   const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | undefined
   if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
   else if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)
+}
+
+/**
+ * The header's Follow menu on a thread you do not follow (SPEC 5 and 7):
+ * When it matters or Every message, set as Notify me sets them, so the
+ * thread follows in Slack, joins the sidebar, and ⌘Z undoes it.
+ */
+export async function showFollowMenu(thread: { readonly id: string; readonly title: string }, at: ContextMenuAt): Promise<void> {
+  const chosen = (await popupContextMenu(nativeMenu(followMenuItems()), at)) as NotifyAction | undefined
+  if (chosen !== undefined) setNotifyLevel({ kind: 'thread', id: thread.id }, notifyChoiceOf(chosen), thread.title)
 }
 
 /** Opens the why popover for a message, under where its menu opened. */
