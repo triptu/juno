@@ -436,6 +436,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
+| Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `pnpm test:gallery` |
 | No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
 | Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
