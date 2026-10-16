@@ -1,0 +1,1 @@
+- 10-14 04:10 · Orchestrator · `ScrollArea` keeps its scrollbar gutter before the content overflows (`scrollbar-gutter: stable`): the first overflow (a live message) moved the message column 5 px.

@@ -1,0 +1,1 @@
+- 10-15 14:00 · Tushar · Move to TypeScript 7 (native compiler, 7.0.2 is npm latest); the repo was still on 5.9.3. Any tool that needs TypeScript's JS API keeps a pinned 5.x for itself only.

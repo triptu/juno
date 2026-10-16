@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · An action whose result Juno can't confirm shows as failed on its card, with no special "can't tell" row and no retry warning. The owner checks by hand, or asks Juno again for a new card. Juno still never repeats an action by itself.

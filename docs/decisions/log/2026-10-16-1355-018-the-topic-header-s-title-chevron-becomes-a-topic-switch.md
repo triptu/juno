@@ -1,0 +1,1 @@
+- 10-16 13:55 · Tushar · The topic header's title chevron becomes a topic switcher (search, the channel's Main and threads, newest first, unread marked; ⌘ opens in a new tab). The topic menu moves to a ⋯ button in the right floating group; right-click on the title still opens it.

@@ -1,0 +1,1 @@
+- 10-13 10:30 · Orchestrator · Store the imported dev session in a Juno-owned keychain item so the live smoke does not ask for "Slack Safe Storage" every run.

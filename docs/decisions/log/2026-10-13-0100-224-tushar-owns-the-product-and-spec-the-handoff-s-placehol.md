@@ -1,0 +1,1 @@
+- 10-13 ~01:00 · Tushar · Tushar owns the product and spec. The handoff's placeholder name is removed everywhere.

@@ -1,0 +1,1 @@
+- 10-14 01:10 · Tushar · The empty workspace becomes a "living home": a changing scene with the logo's seated-j mascot, a greeting, 2–3 smart items computed from data, an Ask Juno field, and an all-caught-up state. Mock-ups first.

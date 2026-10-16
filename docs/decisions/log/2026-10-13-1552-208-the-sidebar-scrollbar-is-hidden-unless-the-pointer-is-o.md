@@ -1,0 +1,1 @@
+- 10-13 15:52 · Tushar · The sidebar scrollbar is hidden unless the pointer is over the list, with no layout shift. Built as a reusable scroll-area option so other areas can follow.

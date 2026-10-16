@@ -1,0 +1,1 @@
+- 10-14 02:42 · Tushar · Add a "feel pass": recorded, slowed-down interaction filmstrips with automated stability checks, plus a feel reviewer at each UI milestone, so the app feels as stable as a native one (no shift, jank, flicker, or jumpy scroll).

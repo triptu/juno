@@ -1,0 +1,1 @@
+- 10-14 07:30 · Orchestrator · Proposed, not applied: one-frame budgets (tab switch, prefetched open, hover) become one refresh interval plus 8 ms, which is 16 ms at 120 Hz and 24.7 ms at 60 Hz, because on a 60 Hz display the wait for the next refresh alone is over 16 ms at p95 (performance.md 8). `perf.spec.ts` uses the rule on displays slower than 120 Hz.

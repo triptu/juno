@@ -1,0 +1,1 @@
+- 10-14 17:10 · Tushar · Confirmed: a channel's Main has no Subscribe of its own (it follows the channel's Notify me; Ignore or Resolve hide a noisy one); the Juno panel shows the whole Juno chat; ⌘J in a topic toggles the panel and opens the Juno tab elsewhere.

@@ -1,0 +1,1 @@
+- 10-16 07:35 · orchestrator · Merged Juno resolve: Juno proposes a Tier 3 Resolve card; the click runs the same local resolve command as the sidebar, with Undo that survives a restart and no double resolve on a repeated delivery. Spec pair added in agent-actions.

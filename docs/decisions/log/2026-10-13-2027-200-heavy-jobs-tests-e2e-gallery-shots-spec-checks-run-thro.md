@@ -1,0 +1,1 @@
+- 10-13 20:27 · Orchestrator · Heavy jobs (tests, e2e, gallery, shots, spec checks) run through a machine-wide queue, `scripts/heavy.mjs`, one at a time by default; vitest capped at 2 workers and the gallery at 3. The machine hit a load average of 175 when several agents tested at once.

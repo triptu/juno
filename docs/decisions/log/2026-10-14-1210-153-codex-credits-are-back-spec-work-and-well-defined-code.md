@@ -1,0 +1,1 @@
+- 10-14 12:10 · Tushar · Codex credits are back. Spec work and well-defined code go to Codex again; UI and coupled tests stay on Claude.

@@ -54,6 +54,23 @@ Before calling work done: `pnpm affected`, which covers typecheck, lint and the 
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 
+## Decision log
+
+Add one file per decision under `docs/decisions/log/`, named
+`YYYY-MM-DD-HHMM-slug.md` using local IST time and a distinct descriptive slug.
+Keep the existing one-line format, for example:
+
+```md
+- 10-17 00:55 · orchestrator · Record decisions in separate fragments to avoid merge conflicts.
+```
+
+Run `node scripts/decision-log.mjs` and commit both the fragment and generated
+`docs/decision-log.md`. Never edit the generated log by hand. Lint checks that it
+matches the fragments. The builder sorts newest first, then by filename for ties;
+`~` in a reconstructed entry's time stays in its text. The status page reads the
+built file. Historical fragments use a numeric prefix in the slug to preserve
+their original order when timestamps match.
+
 ## Codebase health
 
 Run `pnpm health` for a summary and the largest clone pairs, files, and functions.

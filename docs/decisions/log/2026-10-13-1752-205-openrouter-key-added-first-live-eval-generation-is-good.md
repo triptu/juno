@@ -1,0 +1,1 @@
+- 10-13 17:52 · Tushar · OpenRouter key added. First live eval: generation is good; decisions on Claude Haiku via OpenRouter take about 1.5 s and mostly hit the timeout, so the decision tier needs tuning.

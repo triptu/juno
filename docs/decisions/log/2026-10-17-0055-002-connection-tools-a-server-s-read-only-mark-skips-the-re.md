@@ -1,0 +1,1 @@
+- 10-17 00:55 · orchestrator · Connection tools: a server's read-only mark skips the review only in a clean run and never overrides Always ask; a new or changed tool gets its own Auto; merge, buy and force-push are never offered; deletes always ask, even under Never ask; the rule is read again at authorization.

@@ -1,0 +1,1 @@
+- 10-15 06:20 · orchestrator · Merged the test infra (`pnpm remote`, `pnpm affected`) and switched every agent to it. Main at this point is fully green remotely, all four suites in parallel in about 3 minutes wall time: unit 130 passed, specs:check passed, gallery 79 of 79, desktop e2e 69 of 69. Started All topics, the notifications UI half and living Home in parallel.

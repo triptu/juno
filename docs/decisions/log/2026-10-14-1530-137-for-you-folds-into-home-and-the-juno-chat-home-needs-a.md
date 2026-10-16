@@ -1,0 +1,1 @@
+- 10-14 15:30 · Tushar · For you folds into Home and the Juno chat; Home needs a visible way in. All topics stays: it is the guarantee that everything in Slack is findable with filters and recency, which lets the sidebar stay small.

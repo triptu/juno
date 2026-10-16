@@ -1,0 +1,1 @@
+- 10-14 12:50 · Tushar · Reactions use any emoji, both ways. The owner's thumbs up is only recorded; any other reaction goes to Juno at once as an input, and Juno may ignore it. Juno may react instead of replying. Replies can quote a specific bubble or card. A reaction or reply never approves an action.

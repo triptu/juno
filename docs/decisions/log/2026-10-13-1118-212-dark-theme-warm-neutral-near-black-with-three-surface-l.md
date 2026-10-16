@@ -1,0 +1,1 @@
+- 10-13 11:18 · Orchestrator · Dark theme: warm-neutral near-black with three surface layers (sidebar, page, cards, popovers). Accent themes: Coral default plus 7 others, all meeting 4.5:1. "System" theme deferred because main must resolve it before first paint.

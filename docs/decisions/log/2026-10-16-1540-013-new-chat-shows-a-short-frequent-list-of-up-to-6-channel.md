@@ -1,0 +1,1 @@
+- 10-16 15:40 · Tushar · New chat shows a short "Frequent" list of up to 6 channels and DMs, ranked by the user's own recent sends (7-day half-life over 30 days) and filled from recent activity; choosing one sets the destination and focuses the composer.

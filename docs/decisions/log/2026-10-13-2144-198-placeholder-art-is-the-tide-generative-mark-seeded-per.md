@@ -1,0 +1,1 @@
+- 10-13 21:44 · Tushar · Placeholder art is the Tide generative mark, seeded per topic, for every topic (Main and threads alike) while AI is off or art has not been generated. Same size and container as the art, so swapping causes no layout shift.

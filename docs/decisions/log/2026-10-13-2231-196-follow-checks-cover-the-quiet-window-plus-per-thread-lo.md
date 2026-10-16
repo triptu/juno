@@ -1,0 +1,1 @@
+- 10-13 22:31 · Orchestrator · Follow checks cover the quiet window plus per-thread lookups on new replies, not the whole follow list (the real workspace follows more than 9,000 threads). Merged M3 fixes A and B; main green.
