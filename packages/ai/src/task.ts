@@ -24,6 +24,8 @@ interface TaskBase<I> {
   readonly version: number
   readonly tier: Tier
   readonly timeoutMillis: number
+  readonly maxAttempts?: number
+  readonly maxTokens?: number
   /** The system prompt. */
   readonly prompt: string
   /** The user message: the input as plain text the model reads. */
@@ -39,6 +41,8 @@ export interface StructuredTask<I, S extends TSchema = TSchema> extends TaskBase
   readonly output: S
   /** Checks the schema cannot: ids point into the input, counts hold. False means invalid output. */
   readonly accept?: (output: Static<S>, input: I) => boolean
+  /** Removes unsafe individual findings after schema validation. */
+  readonly clean?: (output: Static<S>, input: I) => Static<S>
   /** Present when a decision model can answer the task. Used when the classifier slug is set. */
   readonly classify?: ClassifierMapping<I>
 }
@@ -102,7 +106,7 @@ export function validateOutput<I, S extends TSchema>(task: StructuredTask<I, S>,
     return { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
   if (task.accept && !task.accept(value, input)) return { ok: false, message: 'output does not fit the input' }
-  return { ok: true, value }
+  return { ok: true, value: task.clean ? task.clean(value, input) : value }
 }
 
 /** Text output trimmed to the task's limit, or undefined when there is nothing usable. */

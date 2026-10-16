@@ -77,3 +77,10 @@ export const aiAssistOn = prefs.get<unknown>(AI_ASSIST_PREF).pipe(
   Effect.map((value) => value !== false),
   Effect.catch(() => Effect.succeed(true)),
 )
+
+/** Availability for decision features, independent of the saved AI assist switch: a key, unless the fake runs ungated. */
+export const decisionProviderAvailable = Effect.gen(function* () {
+  const config = yield* EngineConfig
+  if (config.ai === 'fake' && config.fakeAiRequiresKey !== true) return true
+  return (yield* (yield* AiCredentials).key) !== undefined
+})

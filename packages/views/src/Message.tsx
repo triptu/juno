@@ -3,7 +3,7 @@ import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, Button, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
@@ -63,6 +63,7 @@ export interface MessageProps {
   readonly active?: boolean
   readonly confirmingDelete?: boolean
   /** The inline edit field, in place of the body while the message is edited. */
+  readonly suggestion?: { readonly label: string; readonly onEdit: () => void } | undefined
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
@@ -152,6 +153,7 @@ export const Message = memo(function Message({
   active = false,
   confirmingDelete = false,
   editor,
+  suggestion,
   onOpenThread,
   onChannel,
   onLink,
@@ -208,6 +210,14 @@ export const Message = memo(function Message({
         message.mentionsMe && styles.rowMention,
       )}
     >
+      {suggestion !== undefined && editor === undefined ? (
+        <span {...stylex.props(styles.suggestion)}>
+          <Surface kind="toolbar" padding="xs" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestionBar}>
+            <Text variant="meta" tone="default" as="span" truncate sx={styles.suggestionLabel}>{suggestion.label}</Text>
+            <Button variant="ghost" size="sm" onClick={suggestion.onEdit}>Edit</Button>
+          </Surface>
+        </span>
+      ) : null}
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
@@ -275,7 +285,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined && suggestion === undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
   )
 })
@@ -312,6 +322,27 @@ function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly
 }
 
 const styles = stylex.create({
+  // Over the end of the row before, as a narrow row's toolbar is, so the
+  // message it is about stays readable and nothing reserves space for it.
+  suggestion: {
+    position: 'absolute',
+    top: `calc(-1 * ${layout['--toolbar-height']})`,
+    right: spacing['--space-2'],
+    zIndex: z['--z-toolbar'],
+    display: 'flex',
+    maxWidth: '80%',
+  },
+  suggestionBar: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1'],
+    minWidth: 0,
+  },
+  suggestionLabel: {
+    paddingInline: spacing['--space-2'],
+    minWidth: 0,
+    userSelect: 'none',
+  },
   row: {
     position: 'relative',
     display: 'flex',

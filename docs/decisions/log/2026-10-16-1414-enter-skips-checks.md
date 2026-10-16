@@ -1,0 +1,1 @@
+- 10-16 14:14 · Juno · Enter asks the engine for checks only when Wrong place can apply (AI assist on, the switch on, in Main); threads and other sends go straight to the outbox.
