@@ -1,0 +1,1 @@
+- 10-16 12:26 · tooling · Make pinned local Bun the default for full and affected typechecks; keep TypeScript and parity manual, and warn and skip any project Bun cannot check.

@@ -42,19 +42,17 @@ for (const project of projects) {
   project.reason = unsupported(project.path)
   project.bunKey = createHash('sha256').update(`${version}\0${runnerHash}\0${project.key}`).digest('hex')
 }
-const pending = projects.filter((project) => noCache || (project.reason ? !project.tscPassed : !existsSync(join(cache, project.bunKey))))
+const skipped = projects.filter((project) => project.reason)
+const pending = projects.filter((project) => !project.reason && (noCache || !existsSync(join(cache, project.bunKey))))
 const local = pending.filter((project) => !project.reason)
-const fallback = pending.filter((project) => project.reason)
+for (const project of skipped) console.error(`warning: skipping ${project.label}; Bun cannot check this project (${project.reason})`)
+if (parity && skipped.length) throw new Error(`Parity requires Bun-compatible configs; skipped ${skipped.map((project) => project.label).join(', ')}`)
 if (process.argv.includes('--pending')) {
-  console.log(JSON.stringify({ bun: local.map((project) => project.label), tsc: fallback.map((project) => ({ label: project.label, config: `${project.cwd}/${project.config}`, reason: project.reason })) }))
+  console.log(JSON.stringify({ bun: local.map((project) => project.label), skipped: skipped.map((project) => ({ label: project.label, reason: project.reason })) }))
   process.exit(0)
 }
 
-console.log(`typecheck:bun: ${local.length} local project(s), ${fallback.length} need TypeScript, ${projects.length - pending.length} cached`)
-if (fallback.length) {
-  console.log('TypeScript fallback is scheduled by pnpm affected.')
-  if (parity) throw new Error('Parity requires Bun-compatible configs for every project')
-}
+console.log(`typecheck:bun: ${local.length} project(s) to check, ${projects.length - pending.length - skipped.length} cached, ${skipped.length} skipped`)
 if (!local.length) process.exit(0)
 const work = mkdtempSync(join(tmpdir(), 'juno-bun-check-'))
 const solution = join(work, 'tsconfig.json')
