@@ -10,6 +10,10 @@ const route = (component: string, id: string): Route => ({ component, id, route:
 /** Each state, and whether its buttons are all verbs that must never cut. */
 const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('SendMessageCard', 'send-message/minimum-window'), true],
+  [route('AllTopics', 'size/minimum-window'), false],
+  [route('AllTopics', 'size/where-hidden'), false],
+  [route('AllTopics', 'size/narrow'), false],
+  [route('AllTopics', 'filters/narrow'), false],
 ]
 
 const frameOf = (page: Page, at: Route) => page.locator(`[data-fixture-frame="${at.route}"]`)
@@ -36,5 +40,13 @@ test.describe('the minimum window', () => {
       return { pillBottom: pill.bottom, topicTop: topic.top }
     })
     expect(where.topicTop).toBeGreaterThanOrEqual(where.pillBottom)
+  })
+
+  test('All topics hides the Where column under 648px and shows it at the minimum window without the sidebar', async ({ page }) => {
+    for (const [id, shown] of [['size/where-hidden', false], ['size/minimum-window', true]] as const) {
+      const at = route('AllTopics', id)
+      await openState(page, at)
+      await expect(frameOf(page, at).getByRole('columnheader', { name: 'Where' })).toBeVisible({ visible: shown })
+    }
   })
 })

@@ -434,6 +434,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
+| `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table; `--all-topics-table-min` 560px, under which the table scrolls sideways |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |

@@ -824,10 +824,13 @@ export const layout = stylex.defineVars({
   '--filmstrip-thumb': '56px',
   '--search-field-width': '260px',
   // The All topics table (inventory 10): topic, where, status, messages,
-  // updated. Under the minimum width (the columns' minimums, their gaps and
-  // the row and table padding) the table scrolls sideways.
-  '--all-topics-columns': 'minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px',
-  '--all-topics-table-min': '576px',
+  // updated. Where gives way first: it shrinks to its minimum, then the
+  // column hides (views/AllTopics.tsx repeats the width in its container
+  // query). Under the narrow columns' minimum (their minimums, their gaps
+  // and the row and table padding) the table scrolls sideways.
+  '--all-topics-columns': 'minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px',
+  '--all-topics-columns-narrow': 'minmax(200px, 1fr) 104px 44px 84px',
+  '--all-topics-table-min': '560px',
   '--keyword-field-width': '160px',
   // Home's column: the item rows and the Ask Juno field.
   '--home-width': '480px',

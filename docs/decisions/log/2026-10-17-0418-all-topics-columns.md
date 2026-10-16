@@ -1,0 +1,1 @@
+- 10-17 04:18 · narrow-fixes · All topics columns give way in order: Where shrinks to 72px, then hides under a 648px table, then the table scrolls sideways under 560px inside its own scroller.
