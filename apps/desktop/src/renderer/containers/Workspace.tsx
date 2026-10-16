@@ -202,28 +202,8 @@ function onMouseUp(event: MouseEvent): void {
   else if (event.button === 4) stepTabHistory(1)
 }
 
-/**
- * The tab strip and the open tabs. The active tab and the 4 most recently
- * active stay mounted in `<Activity>` (performance 4.3), so a switch is a
- * display toggle; older tabs unmount and come back at their scroll
- * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
- * topic they bring back, and a New chat that sends becomes its topic in one
- * commit. There is always a tab (`ensureTab`); until the saved tabs have
- * been read the page is blank. While the sidebar is hidden the strip
- * starts with its controls.
- */
-export function Workspace() {
-  const state = useAtomValue(tabsAtom)
-  const strip = useAtomValue(tabStripAtom)
-  const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
-  const mounted = mountedTabs(state)
-  // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
-  const agentOn = useAtomValue(junoAvailableAtom)
-  const panelOpen = useAtomValue(junoPanelOpenAtom)
-  const panelWidth = useAtomValue(junoPanelWidthAtom)
-  const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
-  const newTabPage = useAtomValue(newTabPageAtom)
-
+/** The workspace's app-wide wiring: menu commands, notifications, idle preloads, per-tab focus and the mouse's back and forward buttons. */
+function useWorkspaceEffects(active: string | undefined): void {
   useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
@@ -247,12 +227,37 @@ export function Workspace() {
   }, [])
   // After the pages' own effects, so a composer takes another tab's draft before it has focus again.
   useEffect(() => {
-    if (state.active !== undefined) restoreFocus(state.active)
-  }, [state.active])
+    if (active !== undefined) restoreFocus(active)
+  }, [active])
   useEffect(() => {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [])
+}
+
+/**
+ * The tab strip and the open tabs. The active tab and the 4 most recently
+ * active stay mounted in `<Activity>` (performance 4.3), so a switch is a
+ * display toggle; older tabs unmount and come back at their scroll
+ * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
+ * topic they bring back, and a New chat that sends becomes its topic in one
+ * commit. There is always a tab (`ensureTab`); until the saved tabs have
+ * been read the page is blank. While the sidebar is hidden the strip
+ * starts with its controls.
+ */
+export function Workspace() {
+  const state = useAtomValue(tabsAtom)
+  const strip = useAtomValue(tabStripAtom)
+  const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
+  const mounted = mountedTabs(state)
+  // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
+  const agentOn = useAtomValue(junoAvailableAtom)
+  const panelOpen = useAtomValue(junoPanelOpenAtom)
+  const panelWidth = useAtomValue(junoPanelWidthAtom)
+  const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
+  const newTabPage = useAtomValue(newTabPageAtom)
+
+  useWorkspaceEffects(state.active)
 
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
 
