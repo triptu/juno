@@ -22,7 +22,7 @@
  * name or photo changes no row.
  */
 import { Effect } from 'effect'
-import { pendingRowId, type FileView, type MessageView, type Person, type ReactionView, type ThreadLink } from '@juno/contract'
+import { pendingRowId, type FileView, type MessageView, type Person, type ReactionIssue, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
   hashId,
   messageMentionsMe,
@@ -287,6 +287,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         title?.ai_title,
         conversation?.name,
         pending.get(row.ts)?.state,
+        intent?.issue === undefined ? '' : `${intent.issue.state}:${intent.issue.on ? 1 : 0}:${intent.issue.name}`,
         ...own.flatMap((r) => [r.name, r.count, r.me]),
       ].join('\u0001')
       const held = cache.rows.get(row.ts)
@@ -295,7 +296,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         view = held.row
       } else {
         const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation, lookups)
-        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, thread, cache, pending: pending.get(row.ts) })
+        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, thread, cache, pending: pending.get(row.ts) })
       }
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
@@ -397,6 +398,7 @@ interface ShapeInput {
   readonly isRoot: boolean
   readonly selfId: string | undefined
   readonly reactions: ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>
+  readonly reactionIssue: ReactionIssue | undefined
   readonly thread: ThreadLink | undefined
   readonly cache: MessageCache
   readonly pending: PendingRow | undefined
@@ -432,6 +434,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     broadcast: row.subtype === 'thread_broadcast',
     root: input.isRoot,
     reactions: kind === 'message' ? reactions : [],
+    ...(kind === 'message' && input.reactionIssue !== undefined ? { reactionIssue: input.reactionIssue } : {}),
     files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row) : pendingFiles(input.pending),
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
@@ -476,11 +479,12 @@ interface ActionRow {
   readonly payload_json: string
 }
 
-/** What the user has asked for one message: the text of an edit, a delete, and reactions by name. */
+/** What the user has asked for one message: the text of an edit, a delete, reactions by name, and the newest reaction Slack has not taken. */
 interface Intent {
   edit?: { readonly text: string; readonly blocksJson: string | null }
   deleted: boolean
   readonly reactions: Map<string, boolean>
+  issue?: ReactionIssue
 }
 
 /** Intents by the message's ts and by its `client_msg_id`, for posts Slack did not have when the user acted. */
@@ -492,14 +496,18 @@ function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
   const byTs = new Map<string, Intent>()
   const byClientMsgId = new Map<string, Intent>()
   for (const row of rows) {
-    const payload = parseJson<{ ts: string | null; clientMsgId: string | null; text?: string; blocksJson?: string | null; name?: string; want?: boolean }>(row.payload_json)
+    const payload = parseJson<{ ts: string | null; clientMsgId: string | null; text?: string; blocksJson?: string | null; name?: string; want?: boolean; failed?: string; stalled?: boolean }>(row.payload_json)
     if (payload === undefined) continue
     const intent = (payload.ts !== null ? byTs.get(payload.ts) : undefined) ?? (payload.clientMsgId !== null ? byClientMsgId.get(payload.clientMsgId) : undefined) ?? { deleted: false, reactions: new Map<string, boolean>() }
     if (payload.ts !== null) byTs.set(payload.ts, intent)
     if (payload.clientMsgId !== null) byClientMsgId.set(payload.clientMsgId, intent)
     if (row.kind === 'delete') intent.deleted = true
     else if (row.kind === 'edit' && payload.text !== undefined) intent.edit = { text: payload.text, blocksJson: payload.blocksJson ?? null }
-    else if (row.kind === 'react' && payload.name !== undefined) intent.reactions.set(payload.name, payload.want === true)
+    else if (row.kind === 'react' && payload.name !== undefined) {
+      // A refused reaction shows what Slack has; one that has waited long shows the change and says it is not sent yet.
+      if (payload.failed === undefined) intent.reactions.set(payload.name, payload.want === true)
+      if (payload.failed !== undefined || payload.stalled === true) intent.issue = { name: payload.name, on: payload.want === true, state: payload.failed === undefined ? 'waiting' : 'failed' }
+    }
   }
   return { size: rows.length, byTs, byClientMsgId }
 }

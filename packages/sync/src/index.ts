@@ -64,13 +64,13 @@ export {
   placeOf,
   queueDelete,
   queueEdit,
-  queueReaction,
   resolveTarget,
   settleOnFailedPost,
   type ActionRefusal,
   type MessageRef,
   type PendingAction,
 } from './actions'
+export { failReaction, isFailed, markStalled, queueReaction } from './reactions'
 export { checkCopyDelete } from './sent'
 
 export { startThread } from './startedThreads'
