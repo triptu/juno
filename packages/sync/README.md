@@ -2,6 +2,18 @@
 
 Slack into the store. Cold and warm boot, thread discovery, the merge rules, socket event application, read-state seeding and `reindexTopics`. See `docs/architecture.md` sections 4.4, 5 and 6, and ADRs 0004 and 0011.
 
+## Source layout
+
+`sync.ts` wires the session together. `run/runtime.ts` owns its shared state and work
+permit; `run/boot.ts`, `run/reconcile.ts` and `run/socket.ts` handle boot, catch-up
+and socket events. `run/fetcher.ts` exposes topic fetches and `run/lookups.ts` runs
+root and read lookups. `counts.ts` reads counts through the metadata fence;
+`recheck.ts` still owns gap-page reconciliation.
+
+`write.ts` re-exports the table writers in `write/`: messages, users, conversations,
+team, channel reads, subscriptions, coverage, read state, overlays and sync state.
+Each writer still uses the caller's transaction and fires the same invalidations.
+
 ## Public API
 
 - `runSync({ onPhase, onCycle?, onFetcher?, openTopics?, onEvent? })`: the whole sync for one session, until interrupted. Needs the Slack client (`SlackApi`, `SlackEdge`, `SlackSocket`, `SlackSession`) and the store (`StoreWriter`, `StoreReader`, `Invalidation`) in its context, plus a `Scope`. It opens the socket first, boots cold (empty cache) or warm (`sync_state.boot` present), then stays live: every event is one transaction, a reconnect runs the catch-up, a discovery sweep runs every ten minutes. It fails only with `SlackAuthRequired`; the engine then ends the session.
@@ -72,7 +84,7 @@ The spec now uses separate Slack event and Juno observation clocks, Unknown, fai
 
 ## Read state against `specs/readstate.qnt`
 
-Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The rules are `observeServerRead` and the local marks in `@juno/domain` (`reads.ts`); `write.ts` loads and stores their state. Two clocks, never compared: Slack's `event_ts` orders events (`last_server_event_ts`), Juno's clock orders fetches (`observed_at`).
+Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The rules are `observeServerRead` and the local marks in `@juno/domain` (`reads.ts`); `write/reads.ts` loads and stores their state. Two clocks, never compared: Slack's `event_ts` orders events (`last_server_event_ts`), Juno's clock orders fetches (`observed_at`).
 
 | Rule | Code | Spec |
 | --- | --- | --- |
@@ -85,7 +97,7 @@ Juno's pointer (`topic_reads.last_read_ts`) is the state the sidebar shows. The 
 | An event applies only when its `event_ts` is newer than the last applied. Its arrival stamps `observed_at`. | `observeServerRead` | `deliver`: `e.at > updatedEvent` |
 | After Juno has sent a mark (`commanded`), an event that contradicts the pointer is not applied: Slack is asked (`conversations.info` for Main, the root for a thread). An event without `event_ts` is always asked about. | `events.ts`, `readLookups`, `rootFetches` | `deliver` (`verify`); `acceptedMarkKept`, `lateMarkStep` |
 | A page (counts, a `getView` row, a root, a lookup) applies only when requested after `observed_at` and when Slack's pointer differs from `slack_read_ts`, so a mark Slack never saw (mirroring off) survives an unchanged Slack. | `observeServerRead` | `finishFetch` (`newer`, `changed`); `latePageStep` |
-| A page too old to apply that disagrees with the pointer asks Slack. | `boot.ts`, `pages.ts`, `sync.ts` queue the lookup | `finishFetch` (`stale`) |
+| A page too old to apply that disagrees with the pointer asks Slack. | `boot.ts`, `counts.ts`, `pages.ts`, `run/lookups.ts` queue the lookup | `finishFetch` (`stale`) |
 | A reconnect reads counts and `getView` again. | `catchUp` | `reconnect`, `scan`; `quietAgreement` |
 | Nothing marks by itself: opening, live queries and the sync never do. Peek will be the renderer not calling the command. | `shouldMarkRead` in `@juno/state` | `peek`; `peekNeverMarks` |
 
