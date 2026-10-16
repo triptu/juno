@@ -762,7 +762,7 @@ export const layout = stylex.defineVars({
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',
-  // A tool row of the Configure sheet: two lines (20 + 16) and 8px above and below, on the 4px grid.
+  // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',
   '--menu-width-account': '248px',

@@ -143,3 +143,17 @@ test('sidebar times end at the row’s trailing edge, short or long', async ({ p
   expect(ends.length).toBeGreaterThan(3)
   expect(new Set(ends).size).toBe(1)
 })
+
+test('Configure: a New or Changed mark is a tag after the tool’s name, on the name’s line, and the row stays 56px', async ({ page }) => {
+  await open(page, 'ConnectionToolsSheet', 'configure/changed-and-new')
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-tool][data-tool-mark]')].map((row) => {
+      const tagElement = row.querySelector('[data-tool-tag]')!
+      const tag = tagElement.getBoundingClientRect()
+      const name = tagElement.previousElementSibling!.getBoundingClientRect()
+      return { height: row.getBoundingClientRect().height, after: tag.left > name.right, middle: Math.round(tag.top + tag.height / 2 - (name.top + name.height / 2)) }
+    }),
+  )
+  expect(rows).toHaveLength(2)
+  for (const row of rows) expect(row).toEqual({ height: 56, after: true, middle: 0 })
+})
