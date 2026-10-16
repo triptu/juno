@@ -248,3 +248,14 @@ export const recordSend = (clientMsgId: string, channel: string, userId: string)
     yield* sql`INSERT INTO sent_posts (client_msg_id, channel, user_id, ts, sent_at) VALUES (${clientMsgId}, ${channel}, ${userId}, NULL, ${now})
       ON CONFLICT (client_msg_id) DO NOTHING`
   })
+
+/**
+ * Slack applied the user's own delete of the post with `clientMsgId` (`actions.ts`). `ts` is the message
+ * the delete named, or null when it named the pending post. A network copy stored later is deleted too
+ * (`sent.ts`). Not for a delete of a copy Juno kept beside the message: that names another ts.
+ */
+export const recordOwnDelete = (clientMsgId: string, ts: string | null): Effect.Effect<void, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE sent_posts SET deleted_by_user = 1 WHERE client_msg_id = ${clientMsgId} AND (${ts} IS NULL OR ts IS NULL OR ts = ${ts})`
+  })

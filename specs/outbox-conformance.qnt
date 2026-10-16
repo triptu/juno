@@ -31,13 +31,9 @@
 //   drafts whose own pending row came first).
 //
 // Differences the replay found are kept out of the schedules, so the
-// random traces check the rest; each has a directed engine test
-// (README, "Conformance", "Differences found"):
+// random traces check the rest (README, "Conformance", "Differences
+// found"):
 //
-// - The user's delete of a message whose copy's delete waits brings the
-//   copy back: the check before that delete finds the kept message
-//   deleted and makes the copy the message. No user delete comes while a
-//   copy Juno does not show is in Slack.
 // - A reply to a copy Juno has not stored, made while the socket is down,
 //   reaches the store with the copy itself, before the catch-up's recheck
 //   finds the kept message deleted, so the copy is kept for the reply and
@@ -186,8 +182,7 @@ module outbox_conformance {
     val atAct = atSlack(actCall(k))
     any {
       all { open, send(k), auxAll("world", lane, actFirst, copyFrame, closed, "", if (firstSent == 0) k else firstSent, retrying) }, all { open, retry(k), same }, all { open, discard(k), same },
-      all { open, shown(k),
-        not(kind == "delete" and copyInSlack(k) and s.copyRow.get(k) != "kept"), queueAction(k, kind), world(lane, first, copyFrame, closed) },
+      all { open, shown(k), queueAction(k, kind), world(lane, first, copyFrame, closed) },
       all { atPost, accept(k, withEcho), same }, all { atPost, refuse(k, later), same }, all { atPost, drop(k), same },
       all { Set("accepted", "refused", "later").contains(s.request.get(k)), lost(k), ended("post", without(postCall(k)), actFirst) },
       all { answer(k), ended("post", without(postCall(k)), actFirst) },

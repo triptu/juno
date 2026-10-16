@@ -1,0 +1,1 @@
+- 10-16 15:05 · orchestrator · The user's own delete of a sent post is recorded on `sent_posts` (`deleted_by_user`), so a network copy that arrives after it is deleted too. Only a delete made on another device keeps the copy as the message.

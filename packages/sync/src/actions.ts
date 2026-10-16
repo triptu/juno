@@ -26,7 +26,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react'
 
@@ -352,10 +352,13 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
  * After a call Slack accepted. An edit ends unless a newer edit replaced
  * its text meanwhile (`rev`); a reaction ends unless the user toggled it
  * again, in which case Slack's state becomes the new `base` and the row is
- * sent again; a delete always ends. Answers whether the row ended.
+ * sent again; a delete always ends, and the user's delete of one of Juno's
+ * posts is recorded, so a network copy stored later goes too (`sent.ts`).
+ * Answers whether the row ended.
  */
 export const actionDone = (sent: PendingAction, now: number): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
+    if (sent.kind === 'delete' && sent.payload.clientMsgId !== null) yield* recordOwnDelete(sent.payload.clientMsgId, sent.payload.ts)
     const current = yield* readAction(sent.id)
     if (current === undefined) return true
     if (current.kind === 'edit' && current.payload.rev !== sent.payload.rev) return false

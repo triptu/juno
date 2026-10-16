@@ -124,12 +124,20 @@ module outboxProtocol {
   // first is the message; this one is hidden in the same transaction and a
   // delete row is queued for it. With the guard off it is listed.
   // A copy that the store already says should stay is kept at once.
-  action observeCopyWith(k: int, guard: bool): bool = all {
-    s.connected, s.stored.contains(k), copyUnseen(k),
-    s' = { ...s, copyRow: s.copyRow.set(k, if (not(guard)) "shown" else if (keepReasonSeen(k)) "kept" else "hidden"),
-      kept: if (guard and s.seen.contains({ key: k, what: "gone" })) s.kept.set(k, "copy") else s.kept,
-      label: "observeCopy", target: k }
+  // The user's own delete in Juno (`deleted`) is not a reason to keep it:
+  // the engine records it on `sent_posts`, so the copy is deleted too.
+  // With `ownAsGone` on, the bug takes it for a delete made elsewhere and
+  // makes the copy the message.
+  action observeCopyAs(k: int, guard: bool, ownAsGone: bool): bool = {
+    val gone = s.seen.contains({ key: k, what: "gone" }) or (ownAsGone and deleted(k))
+    all {
+      s.connected, s.stored.contains(k), copyUnseen(k),
+      s' = { ...s, copyRow: s.copyRow.set(k, if (not(guard)) "shown" else if (gone or keepReasonSeen(k)) "kept" else "hidden"),
+        kept: if (guard and gone) s.kept.set(k, "copy") else s.kept,
+        label: "observeCopy", target: k }
+    }
   }
+  action observeCopyWith(k: int, guard: bool): bool = observeCopyAs(k, guard, false)
   action observeCopy(k: int): bool = observeCopyWith(k, true)
   // The delete row's `chat.delete`. A lost answer sends it again, and
   // `message_not_found` counts as done, so only its success is modelled.
@@ -406,6 +414,9 @@ module outboxProtocol {
   val repliesKeepRoot = drafts.forall(k => copyReplied(k) implies copyInSlack(k))
   // Once the copy replaced the deleted first message, Slack holds it.
   def keptHeld(k: int): bool = s.kept.get(k) == "copy" implies copyInSlack(k)
+  // The copy replaces the message only when the user deleted it on another
+  // device, never when they deleted it in Juno: that delete stays.
+  val ownDeleteHolds = drafts.forall(k => s.kept.get(k) == "copy" implies keptGone(k))
   // A kept copy stays beside the first message unless it replaced it.
   def expectedHeld(k: int): int = if (s.copyRow.get(k) == "kept" and not(keptGone(k))) 2 else 1
   val noDoubleShow = drafts.forall(k => s.stored.contains(k) implies s.row.get(k) == "gone")
@@ -427,7 +438,8 @@ module outboxProtocol {
   val sendsWaitOffline = not(s.claimedOffline)
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   val invariants = atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
-    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot
+    actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
+    ownDeleteHolds
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
@@ -705,6 +717,24 @@ module outboxProtocol {
   ) }
   action copyReplyStep = copyReplyWith("full")
   action copyReplyBugStep = copyReplyWith("none")
+
+  // The user deletes the message in Juno before Juno has stored its
+  // network copy. When the copy arrives it is hidden and deleted too. The
+  // bug takes the user's delete for one made elsewhere and keeps the copy
+  // as the message, so the deleted post comes back.
+  action ownDeleteWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (copyHidden(turn)) copySetup else
+    if (turn == 6) queueAction(1, "delete") else
+    if (turn == 7) runAction(1) else
+    if (turn == 8) actAccept(1) else
+    if (turn == 9) actAnswer(1) else
+    if (turn == 10) observeCopyAs(1, true, not(guard)) else
+    if (turn == 11 and guard) deleteCopy(1) else
+    seal
+  ) }
+  action ownDeleteStep = ownDeleteWith(true)
+  action ownDeleteBugStep = ownDeleteWith(false)
 
   // The socket drops while the copy's delete waits, and the user deletes
   // the kept message meanwhile. The store learns it only from the

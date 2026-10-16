@@ -198,9 +198,9 @@ describe('send: a copy whose delete waits for the send lane', () => {
 })
 
 // Found by the conformance replay (test/conformance): the check that keeps a copy whose kept message was
-// deleted cannot tell the user's own delete from one made on another device. `it.fails` until fixed.
+// deleted could not tell the user's own delete from one made on another device. `sent_posts` now records it.
 describe('send: the user deletes a message before Juno has seen its copy', () => {
-  it.fails('deletes the copy too, and does not show it as the message (fails: the copy comes back)', async () => {
+  it('deletes the copy too, and does not show it as the message', async () => {
     const engine = await booted()
     engine.main.network.resend = true
     const rows = watch(engine, MAIN)

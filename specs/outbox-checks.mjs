@@ -13,6 +13,7 @@ export const outboxPairs = [
   ['sameText', 'keepsRealSends', 'outbox-same-text'],
   ['keptDeleted', 'keepsRealSends', 'outbox-kept-deleted'],
   ['copyReply', 'repliesKeepRoot', 'outbox-copy-reply'],
+  ['ownDelete', 'ownDeleteHolds', 'outbox-own-delete'],
   ['deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
   ['uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
 ]
