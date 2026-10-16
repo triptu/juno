@@ -30,7 +30,7 @@ Read the parts relevant to your task, and the package's README, before changing 
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
 - Merge first, test in full afterwards (`docs/development.md`, "Testing"). Many agents work at once, so no agent runs a full suite. Before you report, run only what your change touches:
   - `pnpm typecheck` (fast local Bun check) and `pnpm lint` (about 3 s).
-  - The unit test files your change reaches: `pnpm remote test <files>`.
+  - The unit test files your change reaches: `pnpm remote test --passWithNoTests <files>`, with paths relative to their package (`test/messages.test.ts`, not `packages/engine/test/messages.test.ts`); the script runs vitest in every package.
   - The e2e spec files you added or changed, and the ones for the feature you changed: `pnpm remote test:desktop <files>`.
   - Gallery shots only for components you changed: `GALLERY_SHIFT_ONLY=<Component,...> pnpm remote test:gallery`.
   - `pnpm specs:check` only when you changed a spec or the sync code it models.

@@ -583,7 +583,7 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 
 Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
 
-**Agents.** Before reporting, an agent runs `pnpm typecheck`, `pnpm lint`, the unit test files its change reaches (`pnpm remote test <files>`), the e2e spec files it added or changed plus those for the feature it changed (`pnpm remote test:desktop <files>`), gallery shots for the components it changed (`GALLERY_SHIFT_ONLY=<names> pnpm remote test:gallery`), and `pnpm specs:check` only when it changed a spec or the code the spec models. One remote run at a time per agent. Bare `pnpm affected` is not used until it selects narrowly again (below).
+**Agents.** Before reporting, an agent runs `pnpm typecheck`, `pnpm lint`, the unit test files its change reaches (`pnpm remote test --passWithNoTests <files>`, paths relative to their package), the e2e spec files it added or changed plus those for the feature it changed (`pnpm remote test:desktop <files>`), gallery shots for the components it changed (`GALLERY_SHIFT_ONLY=<names> pnpm remote test:gallery`), and `pnpm specs:check` only when it changed a spec or the code the spec models. One remote run at a time per agent. Bare `pnpm affected` is not used until it selects narrowly again (below).
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
