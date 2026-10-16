@@ -150,6 +150,8 @@ export default defineFixtures(
       command: scene(() => <Palette initial="tell maya the wednesday slot works" sections={[{ heading: 'Juno', items: [command] }, { heading: 'Results', items: people }]} />),
       overflowing: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} />),
       people: scene(() => <Palette initial="maya" sections={[{ heading: 'Results', items: people }]} />),
+      // The minimum window (720 by 480): the list gives up height, so the palette ends above the bottom edge.
+      'minimum-window': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} />, { width: 720, height: 480, padded: false }),
       'no-matches': scene(() => <Palette initial="zebra crossing" sections={[]} />),
       waiting: scene(() => <Palette initial="zebra" sections={[]} settled={false} />),
     },

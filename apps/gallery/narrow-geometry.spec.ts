@@ -14,6 +14,7 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('AllTopics', 'size/where-hidden'), false],
   [route('AllTopics', 'size/narrow'), false],
   [route('AllTopics', 'filters/narrow'), false],
+  [route('CommandPalette', 'states/minimum-window'), false],
 ]
 
 const frameOf = (page: Page, at: Route) => page.locator(`[data-fixture-frame="${at.route}"]`)
@@ -48,5 +49,13 @@ test.describe('the minimum window', () => {
       await openState(page, at)
       await expect(frameOf(page, at).getByRole('columnheader', { name: 'Where' })).toBeVisible({ visible: shown })
     }
+  })
+
+  test('the command palette ends above the bottom of a 480px window', async ({ page }) => {
+    const at = route('CommandPalette', 'states/minimum-window')
+    await openState(page, at)
+    const frame = await frameOf(page, at).boundingBox()
+    const palette = await frameOf(page, at).getByRole('dialog').boundingBox()
+    expect(palette!.y + palette!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
   })
 })

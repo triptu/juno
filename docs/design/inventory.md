@@ -483,6 +483,7 @@ A tab with the message list's area on top and the composer at the bottom, like a
 - Order: channels and people first (at most 3 each), then titles, then message matches. Slack's search adds up to 4 message matches under the local rows after a 400 ms pause in typing, never moving a row already shown.
 - The list reserves equal scrollbar gutters on both sides; geometry tests measure symmetric row insets with and without overflow.
 - Right-click on a channel result, or the context-menu key (or ⇧F10) on the active one, opens the channel menu (15.2); Show its topics, Open Main and Ask Juno close the palette.
+- In a short window the list gives up height: the palette ends 24px above the window's bottom edge (the dim's padding), down to the minimum window.
 - Commands show only while AI assist is on. Esc gives focus back to where it was; a press on the dim closes.
 
 ## 10. All topics page

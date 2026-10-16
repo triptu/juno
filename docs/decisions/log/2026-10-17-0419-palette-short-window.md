@@ -1,0 +1,1 @@
+- 10-17 04:19 · narrow-fixes · In a short window the ⌘K list gives up height, so the palette ends 24px above the window's bottom edge.
