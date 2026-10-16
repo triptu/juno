@@ -66,10 +66,10 @@ const PRIVATE_TITLE = 'Private channel'
 
 /**
  * One sidebar row, chat style: the topic's art or the person's photo, then
- * the title and time, a one-line "Sender: text" preview with the @ and count
- * tags, and the meta line: the place with its Main and Reopened tags and a
- * Main row's new-thread count, then the people talking in the unread
- * messages. Text takes three levels: the title, the preview one step down,
+ * the title and time, a one-line "Sender: text" preview ending with the
+ * people who wrote the unread messages beside the @ and count tags, and the
+ * meta line: the place with its Main and Reopened tags and a Main row's
+ * new-thread count. Text takes three levels: the title, the preview one step down,
  * and the meta line and time a step below that. A DM's or group DM's Main
  * has no meta line: its title names the people and its tile is their
  * photo, so the row is two lines and shorter, and a Reopened tag or thread
@@ -154,6 +154,51 @@ export const TopicRow = memo(function TopicRow({
     </span>
   ) : null
 
+  const hasTrail = hasPeople || row.mentionsMe || unread
+  // The preview, then who wrote the unread messages beside the @ and the
+  // count, all at the line's end. Nothing is kept for any of them when
+  // absent: the preview takes the space.
+  const line2 = (
+    <span {...stylex.props(styles.line2, twoLine && resolvable && styles.underMask)}>
+      {/* The message sets the direction; the sender is isolated so a Latin
+          name before Arabic text, or the reverse, keeps its own order. */}
+      <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
+        {row.preview.text.length === 0 ? (
+          row.preview.sender
+        ) : previewNamesSender(row) ? (
+          <>
+            <bdi>{row.preview.sender}</bdi>: {row.preview.text}
+          </>
+        ) : (
+          row.preview.text
+        )}
+      </Text>
+      {hasTrail ? (
+        <span {...stylex.props(styles.trail)}>
+          {hasPeople ? (
+            <span {...stylex.props(styles.people)} data-row-part="people">
+              <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
+            </span>
+          ) : null}
+          {row.mentionsMe || unread ? (
+            <span {...stylex.props(styles.badges)} data-row-part="counts">
+              {row.mentionsMe ? (
+                <Chip variant="soft" title="Mentions you">
+                  @
+                </Chip>
+              ) : null}
+              {unread ? (
+                <Chip variant="count" numeric title={unreadLabel}>
+                  {countLabel(row.unreadCount, row.unreadExact)}
+                </Chip>
+              ) : null}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
+  )
+
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onPrefetch?.(row.id)
   }
@@ -215,38 +260,14 @@ export const TopicRow = memo(function TopicRow({
             {time}
           </Text>
         </span>
-        <span {...stylex.props(styles.line2, twoLine && styles.line2Last)}>
-          {/* The message sets the direction; the sender is isolated so a Latin
-              name before Arabic text, or the reverse, keeps its own order. */}
-          <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
-            {row.preview.text.length === 0 ? (
-              row.preview.sender
-            ) : previewNamesSender(row) ? (
-              <>
-                <bdi>{row.preview.sender}</bdi>: {row.preview.text}
-              </>
-            ) : (
-              row.preview.text
-            )}
-          </Text>
-          <span {...stylex.props(styles.badges, twoLine && resolvable && styles.underAction)}>
-            <span {...stylex.props(styles.badgeSlot)}>
-              {row.mentionsMe ? (
-                <Chip variant="soft" title="Mentions you">
-                  @
-                </Chip>
-              ) : null}
-            </span>
-            <span {...stylex.props(styles.badgeSlot)}>
-              {unread ? (
-                <Chip variant="count" numeric title={unreadLabel}>
-                  {countLabel(row.unreadCount, row.unreadExact)}
-                </Chip>
-              ) : null}
-            </span>
+        {twoLine ? (
+          <span {...stylex.props(styles.line2Last)}>
+            {line2}
+            {resolve}
           </span>
-          {twoLine ? resolve : null}
-        </span>
+        ) : (
+          line2
+        )}
         {twoLine ? null : (
           <span {...stylex.props(styles.line3)}>
             <span {...stylex.props(styles.where, resolvable && styles.whereUnderAction)}>
@@ -259,11 +280,6 @@ export const TopicRow = memo(function TopicRow({
                 </Text>
               </span>
               {tags}
-              {hasPeople ? (
-                <span {...stylex.props(styles.people)} data-row-part="people">
-                  <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
-                </span>
-              ) : null}
             </span>
             {resolve}
           </span>
@@ -394,8 +410,8 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
-    // While Resolve shows over the end of the meta line, what reaches it
-    // (the place, or the people when the line is full) fades out under it
+    // While Resolve shows over the end of the last line, what reaches it
+    // (the place, or a two-line row's preview and counts) fades out under it
     // instead of running beneath the button.
     '--row-place-mask': {
       default: 'none',
@@ -496,32 +512,32 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
-  badgeSlot: {
+  // The stack, then the @ and the count, at the preview line's end. They
+  // never shrink: the preview gives way.
+  trail: {
     display: 'inline-flex',
-    width: sizes['--control-28'],
+    alignItems: 'center',
+    gap: spacing['--space-2'],
     flexShrink: 0,
+    paddingTop: spacing['--space-pixel'],
   },
-  // The stack follows the place and its tags at the line's gap and always
-  // shows whole. Without people there is no slot.
   people: {
     display: 'inline-flex',
     alignItems: 'center',
     flexShrink: 0,
   },
-  // On a two-line row Resolve shows in the counts' place on hover or
-  // keyboard focus; only opacity changes, so nothing moves.
-  underAction: {
-    opacity: 'calc(1 - var(--row-action-opacity))',
+  // On a two-line row Resolve overlays the preview line's end, and what
+  // reaches it fades out under it, as on the meta line.
+  underMask: {
+    maskImage: 'var(--row-place-mask)',
   },
   badges: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
     flexShrink: 0,
-    paddingTop: spacing['--space-pixel'],
   },
-  // The place, its tags and the people in one run, so the tags and the
-  // stack never float. Resolve overlays the end of the line in the same
+  // The place and its tags in one run, so the tags never float. Resolve overlays the end of the line in the same
   // cell, so it takes no space when hidden.
   line3: {
     display: 'grid',
@@ -543,8 +559,7 @@ const styles = stylex.create({
     display: 'inline-flex',
     flexShrink: 0,
   },
-  // The glyph and the name; the name gives way first, the tags and the
-  // people keep their size.
+  // The glyph and the name; the name gives way first, the tags keep their size.
   place: {
     display: 'inline-flex',
     alignItems: 'center',

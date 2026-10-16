@@ -189,19 +189,31 @@ test('a DM’s Main row is two lines and shorter, with even padding; every other
   expect(rows.slice(0, 3).some((row) => row.main)).toBe(false)
 })
 
-test('the people follow the place and its tags at the line’s 8px gap and show whole', async ({ page }) => {
+test('the people sit beside the count on the preview line, 8px before it, and show whole', async ({ page }) => {
   await open(page, 'TopicRow', 'sidebar/mixed-rows')
-  const stacks = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-row-part="people"]')].map((people) => {
-      const box = people.getBoundingClientRect()
-      const before = people.previousElementSibling!.getBoundingClientRect()
-      const line = people.parentElement!.getBoundingClientRect()
-      const place = people.closest('[data-topic-row]')!.querySelector<HTMLElement>('[data-row-part="place"]')!
-      return { gap: Math.round((box.left - before.right) * 100) / 100, inside: box.right <= line.right + 0.5, whole: people.scrollWidth <= Math.ceil(box.width), placeCut: place.scrollWidth > place.clientWidth }
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-topic-row]')].map((row) => {
+      const people = row.querySelector('[data-row-part="people"]')
+      const counts = row.querySelector('[data-row-part="counts"]')
+      const preview = row.querySelector('[data-row-part="preview"]')!.getBoundingClientRect()
+      const line = row.querySelector('[data-row-part="preview"]')!.parentElement!.getBoundingClientRect()
+      const middle = (box: DOMRect) => Math.round((box.top + box.height / 2) * 2) / 2
+      if (people === null) return { people: false, previewToEnd: Math.round(line.right - preview.right), counts: counts !== null }
+      const stack = people.getBoundingClientRect()
+      const count = counts!.getBoundingClientRect()
+      return {
+        people: true,
+        gap: Math.round((count.left - stack.right) * 100) / 100,
+        sameLine: middle(stack) === middle(count),
+        countAtEnd: Math.round(line.right - count.right),
+        whole: people.scrollWidth <= Math.ceil(stack.width),
+        previewBefore: preview.right <= stack.left,
+      }
     }),
   )
-  expect(stacks.length).toBe(3)
-  for (const stack of stacks) expect(stack).toMatchObject({ gap: 8, inside: true, whole: true })
-  // The long private channel name gives way before the stack does.
-  expect(stacks.some((stack) => stack.placeCut)).toBe(true)
+  const withPeople = rows.filter((row) => row.people)
+  expect(withPeople.length).toBe(3)
+  for (const row of withPeople) expect(row).toMatchObject({ gap: 8, sameLine: true, countAtEnd: 0, whole: true, previewBefore: true })
+  // No people and no count: nothing is kept for them, the preview runs to the line's end.
+  for (const row of rows.filter((row) => !row.people && !row.counts)) expect(row.previewToEnd).toBe(0)
 })
