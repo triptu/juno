@@ -16,14 +16,19 @@ electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
+# Lets scripts/build-cached.mjs reuse a build made earlier in this run.
+export JUNO_REMOTE_CONTAINER=1
 export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(at_least $(( cores / 2 )) 1)}
 export JUNO_TEST_PACKAGE_JOBS=${JUNO_TEST_PACKAGE_JOBS:-2}
 if [ "$cores" -eq 2 ]; then export JUNO_TEST_TIMING_SEPARATE=${JUNO_TEST_TIMING_SEPARATE:-1}; fi
 export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$(at_least $cores 4)}
 # An Electron test runs the app, its engine and a fake Slack: half a core's worth
-# of workers kept tests on time on 4 cores, one per core did not. The gallery
+# of workers kept tests on time on 4 cores, one per core did not (8 cores take
+# one per core, below). The gallery
 # mostly waits on frames and timers, so it runs more workers than cores.
 desktop_workers=$(at_least $(( cores / 2 )) 2)
+# On the standard 8x16 shape, eight workers ran all 380 tests in 266 s without a failure (10-17).
+if [ "$cores" -ge 8 ]; then desktop_workers=$cores; fi
 if [ "$cores" -eq 4 ] && [ "$1" = test:desktop ] && [ -n "${JUNO_SHARD:-}" ]; then desktop_workers=3; fi
 export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$desktop_workers}
 export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( cores * 3 ))}

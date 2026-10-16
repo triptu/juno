@@ -170,23 +170,23 @@ assert(!readdirSync(${JSON.stringify(poolDir)}).some(x => x.startsWith('pending-
   }
 })
 
-test('default e2e splits desktop and sizes full and partial galleries separately', () => {
+test('every script runs on one standard machine; desktop shards only when asked', () => {
   const env = { ...process.env }
-  for (const key of ['JUNO_REMOTE_MACHINE', 'JUNO_REMOTE_DESKTOP_SHARDS', 'JUNO_REMOTE_SHARDED', 'JUNO_RUNNER_HOST', 'GALLERY_SHIFT_ONLY']) delete env[key]
+  for (const key of ['JUNO_REMOTE_MACHINE', 'JUNO_REMOTE_DESKTOP_SHARDS', 'JUNO_RUNNER_HOST', 'GALLERY_SHIFT_ONLY']) delete env[key]
   const dryRun = (args) => {
     const result = spawnSync(process.execPath, ['scripts/remote.mjs', '--dry-run', ...args], { env, encoding: 'utf8', timeout: 30_000 })
     assert.equal(result.status, 0, result.stderr || result.error?.message)
     return result.stdout
   }
-  const combined = dryRun(['test:e2e'])
-  assert.equal(combined.match(/a warm linux\/amd64:4x8/g)?.length, 4)
-  assert.equal(combined.match(/a warm linux\/amd64:8x16/g)?.length, 1)
-  for (let shard = 1; shard <= 4; shard++) assert(combined.includes(`--shard=${shard}/4`))
-  const single = dryRun(['--machine', 'linux/amd64:4x8', 'test:desktop'])
-  assert.doesNotMatch(single, /--shard=/)
-  const partial = dryRun(['--env', 'GALLERY_SHIFT_ONLY=Sidebar', 'test:gallery'])
-  assert.match(partial, /a warm linux\/amd64:4x8/)
-  assert.match(dryRun(['--env', 'GALLERY_SHIFT_ONLY=', 'test:gallery']), /a warm linux\/amd64:8x16/)
+  for (const args of [['test:e2e'], ['test:desktop'], ['test'], ['--env', 'GALLERY_SHIFT_ONLY=Sidebar', 'test:gallery'], ['test:plan', 'test', '+', 'test:desktop']]) {
+    const output = dryRun(args)
+    assert.equal(output.match(/a warm linux\/amd64:8x16/g)?.length, 1, args.join(' '))
+    assert.doesNotMatch(output, /--shard=/)
+  }
+  const sharded = dryRun(['--shards', '4', 'test:desktop'])
+  assert.equal(sharded.match(/a warm linux\/amd64:8x16/g)?.length, 4)
+  for (let shard = 1; shard <= 4; shard++) assert(sharded.includes(`--shard=${shard}/4`))
+  assert.match(dryRun(['--machine', 'linux/amd64:4x8', 'test:desktop']), /a warm linux\/amd64:4x8/)
 })
 
 test('inventory is shared briefly across processes and mutations invalidate it', () => {
@@ -287,16 +287,16 @@ else process.exit(2);
   chmodSync(join(dir, 'nsc'), 0o755)
 }
 
-test('daemon owns inventory, holds capacity for the queue head, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
+async function poolHarness(extraEnv = {}) {
   const { spawn } = await import('node:child_process')
-  const { mkdirSync, readdirSync } = await import('node:fs')
+  const { mkdirSync } = await import('node:fs')
   const dir = mkdtempSync(join(tmpdir(), 'juno-pool-daemon-'))
   const poolDir = join(dir, 'juno-remote-pool')
   const instances = join(dir, 'instances')
   mkdirSync(instances)
   writePoolNamespace(dir)
   const children = []
-  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: instances, TEST_CALLS: join(dir, 'lists'), JUNO_REMOTE_MAX_VCPU: '8', JUNO_REMOTE_IDLE_MINUTES: '0' }
+  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: instances, TEST_CALLS: join(dir, 'lists'), JUNO_REMOTE_MAX_VCPU: '8', JUNO_REMOTE_IDLE_MINUTES: '0', ...extraEnv }
   const waitFor = async (predicate) => {
     const deadline = Date.now() + 35_000
     while (!predicate()) {
@@ -325,6 +325,12 @@ if (!destroy(job.id)) throw new Error('destroy failed');
     children.push(item)
     return item
   }
+  return { dir, poolDir, instances, children, waitFor, run }
+}
+
+test('daemon owns inventory, holds capacity for a queue head past its hold, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
+  const { readdirSync } = await import('node:fs')
+  const { dir, poolDir, instances, children, waitFor, run } = await poolHarness({ JUNO_REMOTE_HOLD_SECONDS: '0' })
   let daemon
   try {
     const blocker = run('blocker', 2, true)
@@ -362,6 +368,24 @@ if (!destroy(job.id)) throw new Error('destroy failed');
   } finally {
     for (const { child } of children) if (child.exitCode === null) child.kill('SIGKILL')
     if (daemon) { try { process.kill(daemon, 'SIGKILL') } catch { /* Already exited. */ } }
+    await Promise.all(children.map((item) => item.done))
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a waiting request leaves free cores to a later one that fits', { timeout: 60_000 }, async () => {
+  const { dir, children, waitFor, run } = await poolHarness()
+  try {
+    const blocker = run('blocker', 2, true)
+    await waitFor(() => blocker.output.includes('creating'))
+    const head = run('head', 8)
+    await waitFor(() => head.output.includes('waiting: 1st'))
+    const small = run('small', 2)
+    await waitFor(() => small.output.includes('acquired'))
+    assert(!head.output.includes('acquired'))
+  } finally {
+    for (const { child } of children) if (child.exitCode === null) child.kill('SIGKILL')
+    try { process.kill(Number(readFileSync(join(dir, 'juno-remote-pool', 'watcher.pid'), 'utf8')), 'SIGKILL') } catch { /* Already exited. */ }
     await Promise.all(children.map((item) => item.done))
     rmSync(dir, { recursive: true, force: true })
   }

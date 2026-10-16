@@ -1,4 +1,17 @@
 export const orphanGraceMs = 5 * 60_000
+/** The default cap (approved 10-17), the plan's limit, and the default clients before 10-17 sent with every request. */
+export const defaultCap = 48, planCap = 64, legacyCap = 24
+
+/** The cap a request is admitted against: the admitter's own, unless the request was explicitly lowered below the default. */
+export function requestCap(request, ownCap) {
+  const lowered = request.capSet ? request.cap < defaultCap : request.cap < legacyCap
+  return lowered ? Math.min(ownCap, request.cap) : ownCap
+}
+
+/** Whether a later request may be admitted past the waiting ones in `blocked`. */
+export function mayPass(blocked, now, holdMs) {
+  return blocked.every((request) => now - request.created < holdMs)
+}
 
 /** Inputs carry liveness observations; this function never contacts Namespace. */
 export function machinesToDestroy({ instances, states, pending, owner, now, idleMs, lifetimeMs }) {
@@ -20,7 +33,13 @@ export function machinesToDestroy({ instances, states, pending, owner, now, idle
   return [...result]
 }
 
-export function capacity(instances, states) {
+/**
+ * Cores in use against the cap. Namespace's image builders (nsc.purpose=builder)
+ * stay up idle after a build and are not ours to release; counting them would
+ * stop every run while they linger without saving their cost.
+ */
+export function capacity(allInstances, states) {
+  const instances = allInstances.filter((instance) => instance.labels?.['nsc.purpose'] !== 'builder')
   const ids = new Set(states.map((state) => state.id))
   // A create can finish after the inventory read and replace its pending reservation.
   const visible = new Set(instances.map((instance) => instance.cluster_id))

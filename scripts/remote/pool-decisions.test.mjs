@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { capacity, machinesToDestroy, pendingVcpu } from './pool-decisions.mjs'
+import { capacity, machinesToDestroy, mayPass, pendingVcpu, requestCap } from './pool-decisions.mjs'
 
 const now = 10_000_000
 const instance = (id, labels = {}, age = 600_000) => ({ cluster_id: id, created_at: new Date(now - age).toISOString(), labels: { 'juno-remote': '1', ...labels }, shape: { virtual_cpu: 4 } })
@@ -39,4 +39,25 @@ test('zero idle window still protects live and kept machines', () => {
 
 test('each release can set its idle window independently of the watcher', () => {
   assert.deepEqual(decide({ idleMs: 60_000, states: [state('short', { idleMs: 1000, lastUsed: now - 2000 }), state('long', { idleMs: 300_000, lastUsed: now - 120_000 })] }), ['short'])
+})
+
+test('a request that does not fit lets later ones use free cores until it has waited two minutes', () => {
+  assert.equal(mayPass([], now, 120_000), true)
+  assert.equal(mayPass([{ created: now - 60_000 }], now, 120_000), true)
+  assert.equal(mayPass([{ created: now - 60_000 }, { created: now - 120_000 }], now, 120_000), false)
+  assert.equal(mayPass([{ created: now }], now, 0), false)
+})
+
+test("Namespace's idle image builders do not count against the cap", () => {
+  assert.deepEqual(capacity([instance('tracked'), { cluster_id: 'builder', labels: { 'nsc.purpose': 'builder' }, shape: { virtual_cpu: 16 } }], [state('tracked')]), { tracked: 4, untracked: 0 })
+})
+
+test("requests are admitted against the admitter's cap unless explicitly lowered", () => {
+  // Clients before 10-17 always sent 24, their default.
+  assert.equal(requestCap({ cap: 24 }, 48), 48)
+  assert.equal(requestCap({ cap: 16 }, 48), 16)
+  assert.equal(requestCap({ cap: 48, capSet: false }, 48), 48)
+  assert.equal(requestCap({ cap: 32, capSet: true }, 48), 32)
+  assert.equal(requestCap({ cap: 64, capSet: true }, 48), 48)
+  assert.equal(requestCap({ cap: 64, capSet: true }, 64), 64)
 })
