@@ -16,7 +16,7 @@
  * A normal launch never sets the variable, and then nothing here runs.
  */
 import type { App, WebContents } from 'electron'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { Session } from 'node:inspector'
 import { join } from 'node:path'
 
@@ -42,7 +42,10 @@ function write(kind: string, result: ReadonlyArray<ScriptCoverage>): void {
   }
   if (Object.keys(ran).length === 0) return
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, `${kind}-${process.pid}-${writes++}.json`), JSON.stringify(ran))
+  // Through a temporary file and a rename: a process killed mid-write (a test's close timing out) leaves no half file.
+  const file = join(dir, `${kind}-${process.pid}-${writes++}.json`)
+  writeFileSync(`${file}.tmp`, JSON.stringify(ran))
+  renameSync(`${file}.tmp`, file)
 }
 
 /** Writes what ran in this process since the last write. Does nothing without JUNO_E2E_COVERAGE. */

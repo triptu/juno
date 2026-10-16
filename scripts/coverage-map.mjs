@@ -137,12 +137,21 @@ function reduce() {
   const specs = {}
   let mapped = 0
   let unmapped = 0
+  const unreadable = []
   for (const specDir of existsSync(raw) ? readdirSync(raw) : []) {
     if (specDir === 'unknown') continue
     const spec = `apps/desktop/${specDir.replaceAll('__', '/')}`
     const files = new Set(specs[spec] ?? [])
     for (const write of walk(join(raw, specDir)).filter((path) => path.endsWith('.json'))) {
-      for (const [url, offsets] of Object.entries(JSON.parse(readFileSync(write, 'utf8')))) {
+      let ran
+      try {
+        ran = JSON.parse(readFileSync(write, 'utf8'))
+      } catch {
+        // A write cut short must not fail the suite; it is reported below.
+        unreadable.push(relative(root, write))
+        continue
+      }
+      for (const [url, offsets] of Object.entries(ran)) {
         const built = builtFile(url)
         const loaded = built && bundle(built)
         if (!loaded) {
@@ -166,6 +175,7 @@ function reduce() {
   writeFileSync(out, `${JSON.stringify({ specs, bundled: [...bundled()].toSorted() })}\n`)
   rmSync(raw, { recursive: true, force: true })
   console.log(`coverage-map: ${Object.keys(specs).length} spec file(s), ${mapped} function start(s) in repo files, ${unmapped} in dependencies or unmapped; wrote ${relative(root, out)}`)
+  if (unreadable.length > 0) console.warn(`coverage-map: skipped ${unreadable.length} unreadable write(s), so those specs may list too few files: ${unreadable.join(', ')}`)
 }
 
 /** Joins partials into the committed map: every spec, and per file the indices of the specs that ran it. */
