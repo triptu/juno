@@ -179,13 +179,6 @@ export const thread = window([
   { ago: 4, from: me, text: 'Booked 2–4pm. Will post results here.' },
 ])
 
-/** The end of `thread` with a lowercase reply just sent, holding one slip the post-send check finds. */
-export const sentSlip: ReadonlyArray<MessageListItem> = [
-  ...thread.slice(10),
-  message({ ago: 0, from: me, text: "dry run passed on staging, replica lag stayed under 2s the whole time. its ready for thursday, i'll post the runbook diff after lunch" }, thread.at(-1)),
-]
-export const sentSlipText = "its → it's"
-
 /** The first unread message in `thread`: the divider goes before Elena's. */
 export const threadDividerBefore = thread[10]?.message.ts ?? ''
 

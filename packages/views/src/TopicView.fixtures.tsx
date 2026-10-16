@@ -3,7 +3,7 @@ import { Button, defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import type { TopicDetail } from '@juno/contract'
 import { TopicSwitcher } from './TopicSwitcher'
 import { ComposerSlot } from './ComposerSlot'
-import { details, emojiOnly, sentSlip, sentSlipText, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import { details, emojiOnly, me, message, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import type { EmojiCategory } from '@juno/contract'
 import { EmojiPicker } from './EmojiPicker'
@@ -15,6 +15,13 @@ import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
 import { TopicView, type TopicViewProps } from './TopicView'
 
 const noop = () => {}
+
+/** The end of `thread` with a lowercase reply just sent, holding one slip the post-send check finds. */
+const sentSlip = [
+  ...thread.slice(10),
+  message({ ago: 0, from: me, text: "dry run passed on staging, replica lag stayed under 2s the whole time. its ready for thursday, i'll post the runbook diff after lunch" }, thread.at(-1)),
+]
+const slip = { ts: sentSlip.at(-1)!.message.ts, value: { label: "its → it's", onEdit: noop } }
 
 interface Scene {
   readonly detail: TopicDetail
@@ -210,8 +217,8 @@ export default defineFixtures(
         ),
       }),
       // Just after sending: the post-send check's slip floats over the sent row and reserves nothing.
-      'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: { ts: sentSlip.at(-1)!.message.ts, value: { label: sentSlipText, onEdit: noop } } } }),
-      'sent-suggestion-narrow': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: { ts: sentSlip.at(-1)!.message.ts, value: { label: sentSlipText, onEdit: noop } } } }, { width: 400, height: 640 }),
+      'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: slip } }),
+      'sent-suggestion-narrow': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: slip } }, { width: 400, height: 640 }),
       'minimum-window': topic({ detail: details.engMain, items: main, list: { dividerBefore: mainDividerBefore } }, { width: 720, height: 480 }),
     },
   },
