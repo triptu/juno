@@ -266,11 +266,11 @@ const styles = stylex.create({
     flexWrap: 'wrap',
     gap: spacing['--space-0-5'],
   },
-  // The swatches' selected ring reaches 4px past the disc; the inset keeps it inside the sheet.
+  // Nine swatches on one line across the sheet. The selected ring reaches 4px past the disc; the inset keeps it inside.
   colors: {
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: spacing['--space-2'],
+    justifyContent: 'space-between',
+    gap: spacing['--space-1'],
     paddingInline: spacing['--space-1'],
     paddingBlock: spacing['--space-1'],
   },
