@@ -136,3 +136,13 @@ it('keeps a reservation when the cap is lowered, settles it, and admits again to
   h.nextDay()
   expect(ledger.reserve('chat', dollars(0.25)).kind).toBe('reserved')
 })
+
+it('stops the engine backlog at three quarters of the engine half, leaving the rest for new threads and Redraw (spec engineBackground)', () => {
+  expect(ledger.reserve('engine', dollars(0.5), 'backlog-1', true).kind).toBe('reserved')
+  expect(ledger.reserve('engine', dollars(0.3), 'backlog-2', true).kind).toBe('blocked')
+  // A foreground engine call, such as a new thread's title, still fits in the half.
+  expect(ledger.reserve('engine', dollars(0.4), 'title-1').kind).toBe('reserved')
+  // And while the engine holds that much, the backlog waits.
+  expect(ledger.reserve('engine', 1, 'backlog-3', true).kind).toBe('blocked')
+  invariant()
+})

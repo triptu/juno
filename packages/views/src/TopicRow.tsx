@@ -19,6 +19,7 @@ import {
   IconButton,
   pointerMoved,
   Text,
+  tooltip,
   TopicArt,
   type ActivateEvent,
   type AvatarStackPerson,
@@ -240,7 +241,7 @@ export const TopicRow = memo(function TopicRow({
               <IconButton
                 icon={Check}
                 label={`Resolve ${row.title}`}
-                title="Resolve"
+                {...tooltip('Resolve')}
                 size={22}
                 iconSize={13}
                 radius="full"

@@ -339,10 +339,10 @@ export class Sidebar {
 
   /**
    * Makes a view through the New view pill and the sheet: the name, an icon
-   * by its label, the conversations by searching for each name, and Keep
+   * and its colour by their labels, the conversations by searching for each name, and Keep
    * these out of All. A new view is selected once saved.
    */
-  async createView(view: { readonly name: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async createView(view: { readonly name: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     await this.root.getByRole('button', { name: 'New view', exact: true }).click()
     await expect(this.viewSheet).toBeVisible()
     await this.fillViewSheet(view)
@@ -352,10 +352,11 @@ export class Sidebar {
   }
 
   /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
-  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     const sheet = this.viewSheet
     if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
     if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('button', { name: view.color, exact: true }).click()
     for (const conversation of view.conversations ?? []) {
       await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
       await sheet.getByRole('option', { name: conversation, exact: true }).click()
@@ -525,7 +526,7 @@ export class SettingsPage {
   }
 }
 
-export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'Connections' | 'Backup & This Mac' | 'About'
+export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
 /** Settings › Notifications (inventory 13). */
 export class NotificationsPage {
@@ -694,6 +695,11 @@ export class Juno {
   /** The text the app last put on the clipboard. */
   clipboard(): Promise<string> {
     return this.app.evaluate(({ clipboard }) => clipboard.readText())
+  }
+
+  /** The links a click sent to the browser, oldest first. */
+  browserLinks(): Promise<string[]> {
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { browserLinks: string[] } }).junoTest.browserLinks])
   }
 
   /** The `slack://` links Open in Slack opened, oldest first. */
@@ -1373,6 +1379,17 @@ export class TopicPane {
   /** The picked people and channels drawn as chips in the composer's field. */
   get composerChips(): Locator {
     return this.root.locator('[data-composer] [data-mark]')
+  }
+
+  /** The links drawn in the composer's field: typed URLs and linked words. */
+  get composerLinks(): Locator {
+    return this.root.locator('[data-composer] [data-mark="link"]')
+  }
+
+  /** The link editor ⌘K opens on words selected in the composer. */
+  get linkEditor() {
+    const root = this.root.locator('[data-link-editor]')
+    return { root, url: root.getByRole('textbox', { name: 'Link' }), remove: root.getByRole('button', { name: 'Remove' }) }
   }
 
   /** The composer's box, which must not move as rows come and go. */
@@ -2147,13 +2164,40 @@ export class PrivacyMode {
     await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
   }
 
+  /** ⌃⌘H through View, and waits until main has the change (the menu names the other action). */
   async toggleWithMenu(): Promise<void> {
+    const before = await this.menuLabel()
     await clickAppMenu(this.app, 'toggle-privacy')
+    await expect.poll(() => this.menuLabel()).not.toBe(before)
   }
 
   /** View › Hide or Show Message Text, which names what it will do. */
   menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
+  }
+
+  /** The footer's text: "Message text hidden", or "… while sharing" when sharing turned it on. */
+  footerText(): Promise<string> {
+    return this.footer.getByText(/^Message text hidden/).innerText()
+  }
+
+  /** Another app starts capturing the screen, as main's screen watch would see it (the JUNO_E2E seam). */
+  async startSharing(): Promise<void> {
+    await this.screenShared(true)
+  }
+
+  /** The capture ends. */
+  async stopSharing(): Promise<void> {
+    await this.screenShared(false)
+  }
+
+  /** Moves the screen watch's clock on, as if the signal had stayed as it is for that long. */
+  async elapse(ms: number): Promise<void> {
+    await this.app.evaluate((_electron, by) => (globalThis as unknown as { junoTest: { screenWatchElapse: (ms: number) => void } }).junoTest.screenWatchElapse(by), ms)
+  }
+
+  private async screenShared(shared: boolean): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
   }
 }
 

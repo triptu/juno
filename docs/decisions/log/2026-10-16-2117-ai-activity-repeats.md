@@ -1,0 +1,1 @@
+- 10-16 21:17 · ai-audit · AI activity log: a blocked call that repeats the newest row of its feature (same outcome, reason and model) adds to that row's count, so a job refused every 30 s cannot push the other calls out of the 500 kept.

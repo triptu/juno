@@ -1,0 +1,1 @@
+- 10-16 17:41 · usergroups · The `usergroups` table is an additive cache migration (`202610171200_usergroups`) with no `CACHE_SCHEMA_VERSION` bump, so an existing cache gains the table in place; `INDEX_VERSION` 3 re-indexes stored previews so old "@S…" previews go.

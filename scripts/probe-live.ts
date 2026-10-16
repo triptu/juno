@@ -30,8 +30,17 @@
  * on which hosts), and GETs one photo built from `avatar_hash` for a user
  * with a custom photo and one without, with and without the cookie.
  *
+ * `--only usergroups` reads `client.userBoot`, `usergroups.list` and
+ * recent history pages, and prints how user groups are listed and how a
+ * group mention is spelled in `text` and in rich text blocks.
+ *
  * `--only emoji` reads every edge `emojis/list` page and prints the result
  * keys and how image urls and aliases are spelled.
+ *
+ * `--only links` reads one history page of the self-DM and of the most
+ * recently active conversations, and counts how messages sent from Slack's
+ * clients spell links: `link` element keys, how `url` relates to `text`,
+ * and the `<url>` and `<url|label>` forms in the mrkdwn `text`.
  *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
@@ -62,6 +71,7 @@ const READ_ONLY_METHODS = [
   'client.userBoot',
   'api.getFlannelHttpUrl',
   'users.list',
+  'usergroups.list',
 ] as const
 /** Edge methods `--only users` and `--only emoji` may call, all reads. */
 const READ_ONLY_EDGE = ['users/info', 'users/list', 'emojis/list'] as const
@@ -179,9 +189,18 @@ async function main(): Promise<number> {
     return 0
   }
 
+  if (flag('--only') === 'links') {
+    console.log(JSON.stringify(await linksOnly(call), null, 2))
+    return writeShapes(out)
+  }
+
   const now = Date.now() / 1000
   if (flag('--only') === 'search') {
     await searchOnly(call, now)
+    return writeShapes(out)
+  }
+  if (flag('--only') === 'usergroups') {
+    console.log(JSON.stringify(await usergroupsOnly(call), null, 2))
     return writeShapes(out)
   }
   if (flag('--only') === 'users' || flag('--only') === 'emoji') {
@@ -469,6 +488,155 @@ async function usersOnly(call: Call, edge: Edge, teamId: string, cookie: string)
       teamIdPrefix: Object.fromEntries([...new Set(infoUsers.map((user) => String(user['team_id'] ?? 'absent')[0]))].map((prefix) => [prefix, infoUsers.filter((user) => String(user['team_id'] ?? 'absent')[0] === prefix).length])),
       photos,
     },
+  }
+}
+
+/** `--only links`: how Slack's own clients encode links in `blocks` and `text`. Counts only. */
+async function linksOnly(call: Call): Promise<unknown> {
+  const auth = await call('auth.test', {}, 'links')
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'links')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'links')
+  const self = String(auth?.['user_id'] ?? '')
+  const selfDm = ((boot?.['ims'] as Array<Json> | undefined) ?? []).find((im) => im['user'] === self)
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 10)
+    .map((e) => e.id)
+  const ids = [...new Set([...(selfDm === undefined ? [] : [String(selfDm['id'])]), ...recent])]
+  const links: Array<Json> = []
+  const relation = new Map<string, number>()
+  const textForms = new Map<string, number>()
+  const add = (map: Map<string, number>, key: string) => map.set(key, (map.get(key) ?? 0) + 1)
+  let messages = 0
+  let fromClients = 0
+  let withLinks = 0
+  let urlInTextElement = 0
+  const bareScheme = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const walk = (node: unknown, found: (el: Json) => void) => {
+    if (Array.isArray(node)) for (const item of node) walk(item, found)
+    else if (node !== null && typeof node === 'object') {
+      const el = node as Json
+      if (typeof el['type'] === 'string' && (el['type'] === 'link' || el['type'] === 'text') && el !== undefined) found(el)
+      for (const value of Object.values(el)) if (typeof value === 'object') walk(value, found)
+    }
+  }
+  for (const channel of ids) {
+    const page = await call('conversations.history', { channel, limit: 100, no_user_profile: true }, 'links')
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      messages++
+      if (typeof m['client_msg_id'] !== 'string' || m.subtype !== undefined) continue
+      fromClients++
+      let has = false
+      walk(m['blocks'], (el) => {
+        if (el['type'] === 'text') {
+          if (/(?:https?:\/\/|\b[a-z0-9-]+\.(?:com|org|net|io|dev|ai)\b)/i.test(String(el['text']))) urlInTextElement++
+          return
+        }
+        has = true
+        links.push(el)
+        const url = String(el['url'])
+        const text = typeof el['text'] === 'string' ? el['text'] : undefined
+        const scheme = /^([a-z]+):/i.exec(url)?.[1] ?? 'none'
+        if (text === undefined) add(relation, `no text, url scheme ${scheme}`)
+        else if (text === url) add(relation, 'text equals url')
+        else if (bareScheme(url) === text) add(relation, `text is url without ${scheme}:// (trailing slash ${url.endsWith('/') && !text.endsWith('/')})`)
+        else add(relation, `text is a label, url scheme ${scheme}`)
+        if (el['unsafe'] !== undefined) add(relation, 'has unsafe')
+        if (el['truncated'] !== undefined) add(relation, `truncated, ${text === undefined ? 'no text' : bareScheme(url) === text ? 'text is url without scheme' : 'text is a label'}`)
+      })
+      if (has) withLinks++
+      const mrkdwn = typeof m['text'] === 'string' ? m['text'] : ''
+      for (const match of mrkdwn.matchAll(/<([^@#!][^|>]*)(?:\|([^>]*))?>/g)) {
+        const url = match[1]!
+        const label = match[2]
+        if (label === undefined) add(textForms, '<url>')
+        else if (label === url) add(textForms, '<url|url>')
+        else if (bareScheme(url) === label) add(textForms, '<url|url without scheme>')
+        else add(textForms, '<url|label>')
+      }
+      if (has && !/<[^@#!]/.test(mrkdwn)) add(textForms, 'message with link elements but no <…> in text')
+    }
+  }
+  return {
+    calls: summariseCalls(),
+    selfDmRead: selfDm !== undefined,
+    conversations: ids.length,
+    messages,
+    fromClients,
+    withLinks,
+    linkKeys: keyCensus(links),
+    linkStyleKeys: keyCensus(links.map((l) => l['style']).filter((s) => s !== undefined)),
+    relation: Object.fromEntries(relation),
+    textForms: Object.fromEntries(textForms),
+    urlLikeTextInTextElements: urlInTextElement,
+  }
+}
+
+/** `--only usergroups`: how groups are listed and how a group mention is spelled. Counts and key names only. */
+async function usergroupsOnly(call: Call): Promise<unknown> {
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'usergroups')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'usergroups')
+  const subteams = (boot?.['subteams'] ?? {}) as Json
+  const listed = await call('usergroups.list', { include_disabled: true }, 'usergroups')
+  const listedCount = await call('usergroups.list', { include_disabled: true, include_count: true }, 'usergroups.count')
+  const groups = (listed?.['usergroups'] as Array<Json> | undefined) ?? []
+  const ids = new Set(groups.map((g) => String(g['id'])))
+  const self = (subteams['self'] as Array<string> | undefined) ?? []
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 15)
+  const mentions = { messages: 0, textLabelled: 0, textBare: 0, labelHasAt: 0, blockElements: 0, blockKeys: [] as Array<unknown>, textWithoutBlock: 0, blockWithoutText: 0, mentionedIdsListed: 0, mentionedIdsNotListed: 0 }
+  const mentioned = new Set<string>()
+  const walk = (node: unknown, found: Array<Json>) => {
+    if (Array.isArray(node)) for (const child of node) walk(child, found)
+    else if (node !== null && typeof node === 'object') {
+      if ((node as Json)['type'] === 'usergroup') found.push(node as Json)
+      for (const value of Object.values(node as Json)) walk(value, found)
+    }
+  }
+  for (const entry of recent) {
+    const page = await call('conversations.history', { channel: entry.id, limit: 100, no_user_profile: true }, 'usergroups')
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      mentions.messages++
+      const text = typeof m['text'] === 'string' ? m['text'] : ''
+      const inText = [...text.matchAll(/<!subteam\^([A-Z0-9]+)(\|([^>]*))?>/g)]
+      for (const match of inText) {
+        mentioned.add(match[1]!)
+        if (match[3] === undefined) mentions.textBare++
+        else {
+          mentions.textLabelled++
+          if (match[3].startsWith('@')) mentions.labelHasAt++
+        }
+      }
+      const elements: Array<Json> = []
+      walk(m['blocks'], elements)
+      mentions.blockElements += elements.length
+      for (const element of elements) if (typeof element['usergroup_id'] === 'string') mentioned.add(element['usergroup_id'])
+      if (elements.length > 0) mentions.blockKeys.push(...elements)
+      if (inText.length > 0 && elements.length === 0) mentions.textWithoutBlock++
+      if (elements.length > 0 && inText.length === 0) mentions.blockWithoutText++
+    }
+  }
+  for (const id of mentioned) if (ids.has(id)) mentions.mentionedIdsListed++
+  else mentions.mentionedIdsNotListed++
+  return {
+    calls: summariseCalls(),
+    bootSubteams: { keys: Object.keys(subteams).toSorted(), self: self.length, selfListed: self.filter((id) => ids.has(id)).length, all: Array.isArray(subteams['all']) ? (subteams['all'] as Array<unknown>).length : typeof subteams['all'] },
+    usergroupsList: {
+      ok: listed?.['ok'] ?? false,
+      topLevelKeys: Object.keys(listed ?? {}).toSorted(),
+      groups: groups.length,
+      keys: keyCensus(groups),
+      deleted: groups.filter((g) => typeof g['date_delete'] === 'number' && g['date_delete'] > 0).length,
+      handleHasAt: groups.filter((g) => String(g['handle'] ?? '').startsWith('@')).length,
+      emptyHandle: groups.filter((g) => !g['handle']).length,
+      withUsers: groups.filter((g) => Array.isArray(g['users'])).length,
+      withCountArg: { ok: listedCount?.['ok'] ?? false, withUserCount: ((listedCount?.['usergroups'] as Array<Json> | undefined) ?? []).filter((g) => typeof g['user_count'] === 'number').length },
+      paged: (listed?.['response_metadata'] as Json | undefined)?.['next_cursor'] !== undefined,
+    },
+    mentions: { ...mentions, blockKeys: keyCensus(mentions.blockKeys) },
   }
 }
 

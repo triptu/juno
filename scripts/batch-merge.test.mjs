@@ -38,7 +38,7 @@ function fixture(t) {
   write('bin/pnpm', `#!/bin/sh
 printf '%s\\n' "$*"
 if [ "$1" = health:baseline ]; then printf '{"rebuilt":true}\\n' > health-baseline.json; fi
-if [ "$1" = affected ] && [ "$FAIL_CHECK" = 1 ]; then exit 7; fi
+if [ "$1" = remote ] && [ "$FAIL_CHECK" = 1 ]; then exit 7; fi
 `)
   command('chmod', ['+x', 'bin/pnpm'])
   git(['add', '.'])
@@ -73,7 +73,7 @@ test('conflict stops at its branch; continue keeps both fragments and rebuilds g
   assert.match(log, /Two decision\.\n.*One decision\.\n.*Base decision\./)
   assert.deepEqual(JSON.parse(readFileSync(resolve(f.tree, 'health-baseline.json'), 'utf8')), { rebuilt: true })
   assert.equal(f.git(['status', '--porcelain'], f.tree), '')
-  assert.match(readFileSync(resolve(f.dir, '.juno-status/batches/batch-1.log'), 'utf8'), /affected --base [a-f0-9]+ --plan/)
+  assert.doesNotMatch(readFileSync(resolve(f.dir, '.juno-status/batches/batch-1.log'), 'utf8'), /^(typecheck|lint|remote test)$/m)
   assert.equal(f.batch(['--continue', 'batch-1', '--push']).status, 1)
 })
 

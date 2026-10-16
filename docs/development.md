@@ -99,8 +99,9 @@ Generated-file conflicts use a temporary copy of the batch's version. After all
 merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
 decision log, runs `pnpm health:baseline`, and commits generated changes. Review
 the baseline diff: regeneration records the merged tree's current health,
-including any increases. Then it runs one `pnpm affected --base <base-commit>`
-against the pinned `origin/main` commit. A failed command retains the worktree;
+including any increases. Then it runs `pnpm typecheck`, `pnpm lint` and
+`pnpm remote test` (the unit tests on one machine); the full suites run on main
+afterwards (see "Testing"). A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
@@ -110,7 +111,7 @@ push removes the worktree; the batch branch and logs remain. Continuing a checke
 batch reruns checks before publishing.
 
 `--dry-run branch-one branch-two` performs local merges, installation and
-regeneration, but only prints the affected plan. Dry-run batches cannot push.
+regeneration, but runs no checks. Dry-run batches cannot push.
 Remove a discarded worktree with `git worktree remove <path>`, then delete its
 batch branch with `git branch -D batch-N`. If a process was killed, remove its
 `.juno-status/batches/active.lock` only after confirming it has stopped.
@@ -578,6 +579,21 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 
 `pnpm affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
 
+## Testing
+
+Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
+
+**Agents.** Before reporting, an agent runs `pnpm typecheck`, `pnpm lint`, the unit test files its change reaches (`pnpm remote test <files>`), the e2e spec files it added or changed plus those for the feature it changed (`pnpm remote test:desktop <files>`), gallery shots for the components it changed (`GALLERY_SHIFT_ONLY=<names> pnpm remote test:gallery`), and `pnpm specs:check` only when it changed a spec or the code the spec models. One remote run at a time per agent. Bare `pnpm affected` is not used until it selects narrowly again (below).
+
+**Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
+
+**The CI keeper.** One agent owns main's health. It runs the full suites on main (one machine per suite) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green.
+
+**Work in progress** (this section changes as each lands):
+- One machine per run: a suite runs on one machine and builds the app once, instead of four desktop shards that each build it. Shards stay for the scheduled full run only.
+- Test selection by coverage: the full run records which source files each e2e spec and gallery component exercises, and `pnpm affected` runs only the specs whose recorded files changed.
+- A faster suite: slow, redundant or misplaced tests are merged, moved to faster layers or removed.
+
 ## Affected tests
 
 `pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
@@ -776,8 +792,11 @@ Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
-files and koffi are explicitly unpacked. Only `electron-updater` and its runtime
-dependencies ship as node_modules; application dependencies are bundled by Vite.
+files and koffi are explicitly unpacked. koffi (main's screen watch, ADR 0015) is
+a Node-API module, so it needs no rebuild per Electron version; its prebuilt
+binary comes from `@koromix/koffi-darwin-arm64`, its install script is denied in
+`pnpm-workspace.yaml`, and its C++ sources and docs are left out of the app.
+Only `electron-updater`, koffi and their runtime dependencies ship as node_modules; application dependencies are bundled by Vite.
 Source maps are excluded. Codex uses the separately installed `codex` executable;
 its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
 

@@ -1,0 +1,1 @@
+- 10-16 17:32 · quick-reactions · With more than three quick reactions the message header's reserve grows 30px per reaction and the row turns narrow (toolbar raised) 30px sooner; in a narrow row each reaction shows only while its container query says the toolbar fits, so nothing is measured and nothing re-renders on resize.

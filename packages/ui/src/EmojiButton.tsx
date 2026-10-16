@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
 import { interactive } from './internal/interactive'
+import { tooltip } from './Tooltip'
 
 const HOVER = '@media (hover: hover)'
 
@@ -29,7 +30,7 @@ export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'butt
     <button
       type={type}
       aria-label={label}
-      title={noTooltip ? undefined : label}
+      {...(noTooltip ? {} : tooltip(label))}
       {...rest}
       {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base)}
     >

@@ -19,6 +19,8 @@ import keptCopies from './202610170900_kept_copies'
 import noNotificationSummary from './202610171000_no_notification_summary'
 import outboxIds from './202610171200_outbox_ids'
 import sentPostsOwnDelete from './202610171300_sent_posts_own_delete'
+import viewColors from './202610171400_view_colors'
+import aiCalls from './202610180900_ai_calls'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -45,4 +47,6 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610171001_started_threads': startedThreads,
   '202610171200_outbox_ids': outboxIds,
   '202610171300_sent_posts_own_delete': sentPostsOwnDelete,
+  '202610171400_view_colors': viewColors,
+  '202610180900_ai_calls': aiCalls,
 }

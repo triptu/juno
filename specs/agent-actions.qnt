@@ -30,8 +30,9 @@ module actionsProtocol {
   type Occurrence = { schedule: int, rev: int, due: int }
   // One spend reservation (WP9 `spend_reservations`). `actual` counts once
   // settled. `charged` is a ghost: what the provider really billed. `engine`
-  // marks the engine's own model calls (topic art, titles, Home, send checks).
-  type Spend = { id: int, day: int, compact: bool, engine: bool, amount: int, state: str, actual: int, charged: int }
+  // marks the engine's own model calls (topic art, titles, Home, send checks);
+  // `background` marks the engine's backlog work (art for older topics, Home).
+  type Spend = { id: int, day: int, compact: bool, engine: bool, background: bool, amount: int, state: str, actual: int, charged: int }
   type Raise = { click: int, day: int }
   type State = {
     batchId: int, batchOrder: List[Intent], expanded: List[Intent],
@@ -347,16 +348,26 @@ module actionsProtocol {
     if (r.state == "settled" and r.actual > r.amount and (r.compact or not(compactOnly))) r.actual - r.amount else 0)
   def engineOverReportOn(d: int): int = sumOn(d, r =>
     if (r.state == "settled" and r.actual > r.amount and r.engine) r.actual - r.amount else 0)
+  // The engine's backlog may use three quarters of its half (10-16), so new
+  // threads' titles and art and the owner's Redraw keep the rest of it.
+  // `backgroundUncapped` is the bug that lets the backlog use the whole half.
+  def backgroundOn(d: int): int = sumOn(d, r =>
+    if (not(r.background)) 0 else if (r.state != "settled") r.amount else r.actual)
+  def backgroundOverReportOn(d: int): int = sumOn(d, r =>
+    if (r.state == "settled" and r.actual > r.amount and r.background) r.actual - r.amount else 0)
   // `zeroAtCap` is the rule before the change: only the sum is checked, so a
   // zero-cost reservation is admitted on a day exactly at its cap.
-  def fits(compact: bool, engine: bool, amount: int, bug: str): bool =
+  def fits(compact: bool, engine: bool, background: bool, amount: int, bug: str): bool =
     (bug == "zeroAtCap" or totalOn(s.day) < limitOn(s.day)) and
     totalOn(s.day) + amount <= limitOn(s.day) and
     (not(compact) or compactionOn(s.day, bug) + amount <= limitOn(s.day) / 4) and
-    (not(engine) or bug == "engineUncapped" or engineOn(s.day) + amount <= limitOn(s.day) / 2)
+    (not(engine) or bug == "engineUncapped" or engineOn(s.day) + amount <= limitOn(s.day) / 2) and
+    (not(background) or bug == "backgroundUncapped" or engineOn(s.day) + amount <= limitOn(s.day) * 3 / 8)
   action reserve(compact: bool, engine: bool, amount: int, guard: bool, bug: str): bool =
-    if (guard and not(fits(compact, engine, amount, bug))) s' = { ...s, label: "budgetBlocked" } else
-    s' = { ...s, spends: s.spends.union(Set({ id: s.nextSpend, day: s.day, compact: compact, engine: engine, amount: amount, state: "reserved", actual: 0, charged: 0 })),
+    reserveWith(compact, engine, false, amount, guard, bug)
+  action reserveWith(compact: bool, engine: bool, background: bool, amount: int, guard: bool, bug: str): bool =
+    if (guard and not(fits(compact, engine, background, amount, bug))) s' = { ...s, label: "budgetBlocked" } else
+    s' = { ...s, spends: s.spends.union(Set({ id: s.nextSpend, day: s.day, compact: compact, engine: engine, background: background, amount: amount, state: "reserved", actual: 0, charged: 0 })),
       nextSpend: s.nextSpend + 1, overCapAdmissions: s.overCapAdmissions + (if (totalOn(s.day) >= grantedOn(s.day)) 1 else 0),
       label: "reserve" }
   // Settles the oldest open reservation on its own day. `outcome` is what the
@@ -489,7 +500,8 @@ module actionsProtocol {
     s.spends.forall(r => r.charged <= (if (r.state == "settled") r.actual else r.amount)) and
     days.forall(d => totalOn(d) <= grantedOn(d) + s.capReductions.get(d) + overReportOn(d, false) and
       compactionOn(d, "") <= (grantedOn(d) + s.capReductions.get(d)) / 4 + overReportOn(d, true) and
-      engineOn(d) <= (grantedOn(d) + s.capReductions.get(d)) / 2 + engineOverReportOn(d))
+      engineOn(d) <= (grantedOn(d) + s.capReductions.get(d)) / 2 + engineOverReportOn(d) and
+      backgroundOn(d) <= (grantedOn(d) + s.capReductions.get(d)) * 3 / 8 + backgroundOverReportOn(d))
   // The rule before the over-report decision: the cap is never passed. It does
   // not hold once a request reports more than it reserved (`overReportStep`).
   val strictCap = days.forall(d => totalOn(d) <= grantedOn(d))
@@ -547,6 +559,7 @@ module actionsProtocol {
       { nondet rule = Set("auto", "always", "never").oneOf(); setToolRule(rule) }, changeTool,
       all { s.nextSpend < 8, reserve(false, false, 2, true, "") }, all { s.nextSpend < 8, reserve(true, false, 2, true, "") },
       all { s.nextSpend < 8, reserve(false, true, 2, true, "") }, all { s.nextSpend < 8, reserve(false, false, 0, true, "") },
+      all { s.nextSpend < 8, reserveWith(false, true, true, 2, true, "") },
       { nondet cost = 0.to(3).oneOf(); settle("done", cost, cost, "") }, settle("refused", 0, 0, ""),
       { nondet charge = 0.to(2).oneOf(); settle("lost", 0, charge, "") },
       { nondet click = 1.to(2).oneOf(); allowDollar(click, true) }, newDay, setCap(4) }
@@ -617,7 +630,7 @@ module actionsProtocol {
     if (op == "startWake") startWake(bug != "startWake") else
     if (op == "quiet") s' = { ...s, quiet: true, label: "quiet" } else
     if (op == "notify") notify(bug != "notify") else
-    if (op == "reserve") reserve(k == 1, k == 2, 2, bug != "cap", bug) else
+    if (op == "reserve") reserveWith(k == 1, k == 2 or k == 3, k == 3, 2, bug != "cap", bug) else
     if (op == "reserveFree") reserve(false, false, 0, bug != "cap", bug) else
     if (op == "spend") settle("lost", 0, 1, bug) else
     // A stream that failed after output is lost; `lostAsRefused` settles it as a refusal.
@@ -747,6 +760,11 @@ module actionsProtocol {
   pure val engineBudget = List(c("reserve", 2), c("reserve", 2), c("reserve", 2), c("reserve", 0), c("reserve", 0))
   action engineBudgetStep = script(engineBudget, "")
   action engineBudgetBugStep = script(engineBudget, "engineUncapped")
+  // The engine's backlog (10-16) stops at three quarters of the engine's half,
+  // and a new thread's title still fits after it.
+  pure val engineBackground = List(c("reserve", 3), c("reserve", 3), c("reserve", 2))
+  action engineBackgroundStep = script(engineBackground, "")
+  action engineBackgroundBugStep = script(engineBackground, "backgroundUncapped")
   // WP9: a settled compaction counts its actual cost, not its reservation.
   pure val compactionSettle = List(c("reserve", 1), c("settle", 1), c("reserve", 1))
   action compactionSettleStep = script(compactionSettle, "")
@@ -858,10 +876,10 @@ module actionsProtocol {
   pure val scriptWrite = List(c("scriptChild", 0), c("scriptReview", 0), c("scriptAuthorize", 0))
   action scriptWriteStep = script(scriptWrite, "")
   action scriptWriteBugStep = script(scriptWrite, "scriptWrite")
-  action suiteInit = { nondet which = 0.to(61).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  action suiteInit = { nondet which = 0.to(62).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
     compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated,
-    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview, scriptWrite, engineBudget).nth(scenario)
+    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview, scriptWrite, engineBudget, engineBackground).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -928,6 +946,7 @@ module actionsProtocol {
   val case59 = scenario == 59 and reachedAgreement and s.auths == Set()
   val case60 = scenario == 60 and reachedAgreement and s.auths == Set() and s.intents == Set()
   val case61 = scenario == 61 and reachedAgreement and engineOn(0) == 4 and totalOn(0) == 8
+  val case62 = scenario == 62 and reachedAgreement and engineOn(0) == 4 and backgroundOn(0) == 2
   // An explicit, reversible call the owner asked for runs once with no click, under Auto and under Never ask.
   action reviewedRunWitnessStep = script(List(c("conn", 0), c("reviewExplicit", 0), c("authorize", 0)), "")
   val reviewedRunSent = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => a.review) and s.receipts.size() == 1

@@ -114,5 +114,6 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   has one weight (400); never set bold on it.
 - **Main process** cannot use StyleX. The one raw colour there (`BrowserWindow.backgroundColor` in
   `main/window.ts`) must match `--background`; update both together.
-- **Verify** with `pnpm affected`, plus `pnpm remote test:gallery` for anything
-  that changes computed colours or states.
+- **Verify** as CLAUDE.md says (typecheck, lint, your own tests), plus
+  `GALLERY_SHIFT_ONLY=<components> pnpm remote test:gallery` for anything that
+  changes computed colours or states.

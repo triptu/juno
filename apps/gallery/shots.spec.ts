@@ -12,7 +12,7 @@ const only = process.env.GALLERY_SHOTS_ONLY?.split(',').map((name) => name.trim(
 /** Puts the state into the look its frame asks for; returns the cleanup. */
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
   const frame = page.locator('[data-fixture-frame]')
-  const { hover, press, focus, drag } = route.frame
+  const { hover, press, focus, tooltip, drag } = route.frame
   // The pointer stays where the last state left it; park it off the frame so
   // a state that asks for no hover does not show one.
   await page.mouse.move(0, 0)
@@ -23,6 +23,10 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
     await page.keyboard.press('Tab')
   }
   if (hover) await frame.locator(hover).first().hover()
+  if (tooltip) {
+    await frame.locator(tooltip).first().hover()
+    await page.locator('[role="tooltip"]').waitFor()
+  }
   if (press) {
     // The press scale is a transition that reduced motion collapses, so the
     // shot runs with motion on and waits for the 150ms to finish.

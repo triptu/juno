@@ -17,6 +17,7 @@ export interface Route {
     readonly press?: string
     readonly focus?: string
     readonly drag?: { readonly from: string; readonly by: number }
+    readonly tooltip?: string
   }
 }
 

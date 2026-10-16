@@ -1,27 +1,17 @@
 /**
  * The New chat pickers' queries (spec section 9). Local only: they read the
- * conversations, people and topics the sync stored. The statements that
+ * conversations, people and topics the sync stored. Conversation search
+ * matches words in memory (`searchIndex.ts`). The statements that
  * read `topic_index` are in `pickerStatements`, so the plan test can check
  * that each one reads it through an index (performance 6).
  */
 import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
-import { channelLabelBare, contextTint, frequentDestinations, firstWords, mainTopicId, parseTopicId, rankConversations, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { frequentDestinations, firstWords, parseTopicId, rankConversations, rankSearchResults, searchWords, tsToMillis, type Ts } from '@juno/domain'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
-
-/** A conversation row with whether Juno holds any of its messages. */
-interface ConversationRow {
-  readonly id: string
-  readonly kind: ConversationKind
-  readonly name: string | null
-  readonly user_id: string | null
-  readonly member_ids_json: string | null
-  readonly has_topics: 0 | 1
-}
-
-const CONVERSATION_COLUMNS = `c.id, c.kind, c.name, c.user_id, c.member_ids_json,
-  EXISTS (SELECT 1 FROM topic_index t WHERE t.channel = c.id) AS has_topics`
+import type { UserRow } from '../topicRows'
+import { CONVERSATION_COLUMNS, peopleOf, pickOf, type ConversationRow } from './picks'
+import { searchEntries, type Found } from './searchIndex'
 
 /** How far back Recent and the threads from everywhere look. */
 const RECENT_DAYS = 30
@@ -92,89 +82,22 @@ const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
 const selfIdOf = (sql: SqlClient.SqlClient) =>
   Effect.map(sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`, (rows) => rows[0]?.self_user_id ?? undefined)
 
-/** The people a set of conversation rows names: DM partners and group DM members. */
-function peopleOf(rows: ReadonlyArray<ConversationRow>): Set<string> {
-  const ids = new Set<string>()
-  for (const row of rows) {
-    if (row.user_id !== null) ids.add(row.user_id)
-    if (row.kind === 'mpim') for (const id of parseIds(row.member_ids_json)) ids.add(id)
-  }
-  return ids
-}
-
-function pickOf(row: ConversationRow, users: ReadonlyMap<string, UserRow>, selfId: string | undefined): PickConversation {
-  const base = { key: row.id, kind: row.kind, tint: contextTint(row.kind), channelId: row.id, mainId: mainTopicId(row.id as ChannelId), empty: row.has_topics === 0 }
-  switch (row.kind) {
-    case 'im': {
-      const userId = row.user_id ?? row.id
-      const person = personFrom(userId, users.get(userId))
-      return { ...base, name: person.name, person }
-    }
-    case 'mpim': {
-      const memberNames = parseIds(row.member_ids_json)
-        .filter((id) => id !== selfId)
-        .map((id) => userName(id, users.get(id)))
-      return { ...base, name: channelLabelBare({ kind: 'mpim', name: row.name ?? row.id, memberNames }) }
-    }
-    default:
-      return { ...base, name: row.name ?? row.id }
-  }
-}
-
-/** A person with no DM yet: sending opens one. */
-const newPerson = (user: UserRow): PickConversation => ({
-  key: `u:${user.id}`,
-  name: userName(user.id, user),
-  kind: 'im',
-  tint: 'dm',
-  person: personFrom(user.id, user),
-  empty: true,
-})
-
 /** The conversation picker's sections for `text` (see `newChat.conversations`). */
 export const queryConversations = Effect.fn('newChat.conversations')(function* (text: string) {
   const sql = yield* StoreReader
   const selfId = yield* selfIdOf(sql)
-  const terms = ftsQuery(text.trim())
-  if (terms === '') {
-    const { recent } = pickerStatements(cutoffTs(yield* Clock.currentTimeMillis), undefined, undefined)
+  const now = yield* Clock.currentTimeMillis
+  if (searchWords(text).length === 0) {
+    const { recent } = pickerStatements(cutoffTs(now), undefined, undefined)
     const rows = yield* sql.unsafe<ConversationRow>(recent.sql, recent.params)
     const users = yield* readUsers(sql, peopleOf(rows))
     return { recent: rows.map((row) => pickOf(row, users, selfId)), people: [], channels: [] } satisfies PickConversations
   }
-  // Only the last word is a prefix, matching an input still being typed.
-  const query = `${terms}*`
-  const people = yield* sql<UserRow>`SELECT u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url
-    FROM people_fts f JOIN users u ON u.rowid = f.rowid
-    WHERE people_fts MATCH ${query} AND u.deleted = 0 AND u.is_bot = 0 ORDER BY f.rank, u.id LIMIT ${PICK_LIMIT}`
-  const dms =
-    people.length === 0
-      ? []
-      : yield* sql.unsafe<ConversationRow>(
-          `SELECT ${CONVERSATION_COLUMNS} FROM conversations c WHERE c.kind = 'im' AND c.user_id IN (${people.map(() => '?').join(', ')})`,
-          people.map((person) => person.id),
-        )
-  const channels = yield* sql.unsafe<ConversationRow>(
-    `SELECT ${CONVERSATION_COLUMNS} FROM conversations c
-      LEFT JOIN ignored_channels g ON g.channel = c.id
-      WHERE c.kind != 'im' AND c.is_member = 1 AND g.channel IS NULL AND (
-        c.rowid IN (SELECT rowid FROM channels_fts WHERE channels_fts MATCH ?)
-        OR (c.kind = 'mpim' AND EXISTS (
-          SELECT 1 FROM json_each(c.member_ids_json) member JOIN users u ON u.id = member.value
-          WHERE u.id != ? AND u.rowid IN (SELECT rowid FROM people_fts WHERE people_fts MATCH ?)
-        ))) ORDER BY c.id LIMIT ?`,
-    [query, selfId ?? '', query, PICK_LIMIT],
-  )
-  const users = yield* readUsers(sql, new Set([...peopleOf(channels), ...people.map((person) => person.id)]))
-  for (const person of people) users.set(person.id, person)
-  const dmOf = new Map(dms.map((row) => [row.user_id, row]))
+  const ranked = yield* rankFound(sql, yield* searchEntries(text), yield* usesOf(sql, selfId, now), now)
   return {
     recent: [],
-    people: people.map((person) => {
-      const dm = dmOf.get(person.id)
-      return dm === undefined ? newPerson(person) : pickOf(dm, users, selfId)
-    }),
-    channels: channels.map((row) => pickOf(row, users, selfId)),
+    people: ranked.filter((pick) => pick.kind === 'im').slice(0, PICK_LIMIT),
+    channels: ranked.filter((pick) => pick.kind !== 'im').slice(0, PICK_LIMIT),
   } satisfies PickConversations
 })
 
@@ -236,11 +159,39 @@ export const queryFrequent = Effect.fn('newChat.frequent')(function* () {
   return chosen.map(row => pickOf(row, users, selfId))
 })
 
-/** The latest activity of each of `ids`, read through the channel index. */
+/** The latest activity of each of `ids`, read through the channel index. A conversation with no row has no topics. */
 export const activityStatement = (ids: ReadonlyArray<string>) => ({
   sql: `SELECT channel, MAX(last_activity_ts) AS activity FROM topic_index WHERE channel IN (${ids.map(() => '?').join(', ')}) GROUP BY channel`,
   params: ids,
 })
+
+/**
+ * Search matches in rank order (`rankSearchResults`), each with whether
+ * Juno holds messages in it and the parts of its name to highlight. Only
+ * the matched conversations' activity is read, through the channel index.
+ */
+const rankFound = (sql: SqlClient.SqlClient, found: ReadonlyArray<Found>, uses: ReadonlyArray<{ readonly channel: string; readonly at: number }>, now: number) =>
+  Effect.gen(function* () {
+    const ids = found.flatMap(({ entry }) => entry.pick.channelId ?? [])
+    const activity = new Map<string, number>()
+    if (ids.length > 0) {
+      const statement = activityStatement(ids)
+      for (const row of yield* sql.unsafe<{ channel: string; activity: string | null }>(statement.sql, statement.params)) activity.set(row.channel, Number(row.activity ?? 0) * 1000)
+    }
+    const byKey = new Map(found.map((each) => [each.entry.pick.key, each]))
+    const order = rankSearchResults(
+      found.map(({ entry, match }) => ({ id: entry.pick.key, kind: entry.pick.kind, lastActivityAt: activity.get(entry.pick.key) ?? 0, match })),
+      uses,
+      now,
+    )
+    return order.flatMap((key): ReadonlyArray<PickConversation> => {
+      const each = byKey.get(key)
+      if (each === undefined) return []
+      const { pick } = each.entry
+      const channelId = pick.channelId
+      return [{ ...pick, empty: channelId === undefined || !activity.has(channelId), ...(each.match.ranges.length === 0 ? {} : { highlight: each.match.ranges }) }]
+    })
+  })
 
 /** Own sends and topic visits, each a use of its conversation, for the palette's ranking. */
 const usesOf = (sql: SqlClient.SqlClient, selfId: string | undefined, now: number) =>
@@ -261,15 +212,15 @@ const usesOf = (sql: SqlClient.SqlClient, selfId: string | undefined, now: numbe
  * The ⌘K Conversations tab (spec section 10): DMs, group DMs and channels
  * by how much you use them, own sends and topic visits decaying by half
  * each week, then by activity. With text, the conversations the New chat
- * picker finds for it, ranked the same way, names that start with the text
- * first among the unused. Local only.
+ * picker finds for it, by how well they match, then ranked the same way
+ * (`rankSearchResults`). Local only.
  */
 export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (text: string) {
   const sql = yield* StoreReader
   const selfId = yield* selfIdOf(sql)
   const now = yield* Clock.currentTimeMillis
   const uses = yield* usesOf(sql, selfId, now)
-  if (ftsQuery(text.trim()) === '') {
+  if (searchWords(text).length === 0) {
     const rows = yield* sql.unsafe<ConversationRow & { activity: string | null }>(frequentConversationsStatement)
     const ids = rankConversations(rows.map((row) => ({ id: row.id, kind: row.kind, lastActivityAt: Number(row.activity ?? 0) * 1000 })), uses, now).slice(0, PALETTE_CONVERSATIONS)
     const byId = new Map(rows.map((row) => [row.id, row]))
@@ -277,17 +228,6 @@ export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (
     const users = yield* readUsers(sql, peopleOf(chosen))
     return chosen.map((row) => pickOf(row, users, selfId))
   }
-  const found = yield* queryConversations(text)
-  const candidates = [...found.people, ...found.channels]
-  const ids = candidates.flatMap((pick) => pick.channelId ?? [])
-  const activity = new Map<string, number>()
-  if (ids.length > 0) {
-    const statement = activityStatement(ids)
-    for (const row of yield* sql.unsafe<{ channel: string; activity: string | null }>(statement.sql, statement.params)) activity.set(row.channel, Number(row.activity ?? 0) * 1000)
-  }
-  const typed = text.trim().toLowerCase()
-  const starts = new Set(candidates.filter((pick) => pick.name.toLowerCase().startsWith(typed)).map((pick) => pick.key))
-  const order = rankConversations(candidates.map((pick) => ({ id: pick.key, kind: pick.kind, lastActivityAt: activity.get(pick.key) ?? 0 })), uses, now, starts)
-  const byKey = new Map(candidates.map((pick) => [pick.key, pick]))
-  return order.slice(0, PALETTE_CONVERSATIONS).flatMap((key) => byKey.get(key) ?? [])
+  const ranked = yield* rankFound(sql, yield* searchEntries(text), uses, now)
+  return ranked.slice(0, PALETTE_CONVERSATIONS)
 })

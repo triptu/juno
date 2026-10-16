@@ -6,6 +6,7 @@ import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
 import { Palette } from '@phosphor-icons/react/dist/icons/Palette'
 import { Plugs } from '@phosphor-icons/react/dist/icons/Plugs'
+import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { ReactNode } from 'react'
 import type { SettingsSection } from '@juno/contract'
@@ -19,6 +20,7 @@ export const settingsSections: ReadonlyArray<{ readonly section: SettingsSection
   { section: 'notifications', label: 'Notifications', icon: Bell },
   { section: 'ignored', label: 'Ignored', icon: EyeSlash },
   { section: 'juno', label: 'Juno', icon: Sparkle },
+  { section: 'ai-activity', label: 'AI activity', icon: Pulse },
   { section: 'connections', label: 'Connections', icon: Plugs },
   { section: 'backup', label: 'Backup & This Mac', icon: HardDrives },
   { section: 'about', label: 'About', icon: Info },

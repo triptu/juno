@@ -176,6 +176,7 @@ const conversationRow = (pick: PickConversation): Row => {
     id: `conversation:${pick.key}`,
     icon: placeIcon[pick.kind],
     label: pick.name,
+    ...(pick.highlight === undefined ? {} : { labelHighlight: pick.highlight }),
     compact: true,
     ...(pick.person === undefined ? {} : { person: pick.person }),
     ...(mainId === undefined ? { sub: 'Starts a conversation' } : { opensTab: true, topicId: mainId }),

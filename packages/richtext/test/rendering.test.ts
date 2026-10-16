@@ -6,7 +6,8 @@ const lookups: Lookups = {
   me: 'U0ME',
   user: (id) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen', U0LEO: 'Leo Park' })[id],
   channel: (id) => ({ C0ENG: 'eng', C0INC: 'incidents' })[id],
-  usergroup: (id) => ({ S0ONCALL: 'oncall' })[id],
+  usergroup: (id) => ({ S0ONCALL: { handle: 'oncall', name: 'On-call engineers' }, S0GONE: { handle: 'old-team' } })[id],
+  myUsergroups: ['S0ONCALL'],
   emoji: (name) => (name === 'partyparrot' ? 'https://emoji.slack-edge.com/T1/partyparrot/abc.gif' : undefined),
 }
 
@@ -91,7 +92,7 @@ describe('rich_text blocks', () => {
         { kind: 'text', text: ' see ' },
         { kind: 'channel', id: 'C0ENG', name: 'eng' },
         { kind: 'text', text: ' ' },
-        { kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall' },
+        { kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall', name: 'On-call engineers', isMine: true },
         { kind: 'text', text: ' ' },
         { kind: 'broadcast', range: 'here' },
       ],
@@ -290,7 +291,7 @@ describe('mrkdwn text', () => {
     ['<@U0ME|tushar> here', { kind: 'paragraph', children: [{ kind: 'user', id: 'U0ME', name: 'Tushar', isMe: true }, { kind: 'text', text: ' here' }] }],
     ['in <#C0ENG|eng>', { kind: 'paragraph', children: [{ kind: 'text', text: 'in ' }, { kind: 'channel', id: 'C0ENG', name: 'eng' }] }],
     ['in <#C0OTHER|random>', { kind: 'paragraph', children: [{ kind: 'text', text: 'in ' }, { kind: 'channel', id: 'C0OTHER', name: 'random' }] }],
-    ['<!subteam^S0ONCALL|@oncall> ping', { kind: 'paragraph', children: [{ kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall' }, { kind: 'text', text: ' ping' }] }],
+    ['<!subteam^S0ONCALL|@oncall> ping', { kind: 'paragraph', children: [{ kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall', name: 'On-call engineers', isMine: true }, { kind: 'text', text: ' ping' }] }],
     ['<!here> standup', { kind: 'paragraph', children: [{ kind: 'broadcast', range: 'here' }, { kind: 'text', text: ' standup' }] }],
     ['<!channel>', { kind: 'paragraph', children: [{ kind: 'broadcast', range: 'channel' }] }],
     ['<!everyone|@everyone>', { kind: 'paragraph', children: [{ kind: 'broadcast', range: 'everyone' }] }],
@@ -402,5 +403,35 @@ describe('plainText and inlinesOf', () => {
   it('flattens every inline including list items', () => {
     const body = bodyFromMrkdwn('<@U0ME> hi', lookups)
     expect(inlinesOf(body).map((i) => i.kind)).toEqual(['user', 'text'])
+  })
+})
+
+describe('user groups', () => {
+  it('names a user group from the list, then the label, and never shows its id', () => {
+    const groups = (text: string) => inlinesOf(bodyFromMrkdwn(text, lookups)).filter((inline) => inline.kind === 'usergroup')
+    // Slack sends the bare form; the list names it.
+    expect(groups('<!subteam^S0ONCALL> ping')).toEqual([{ kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall', name: 'On-call engineers', isMine: true }])
+    // A group the user is not in, known only by its label.
+    expect(groups('<!subteam^S0DESIGN|@design> ping')).toEqual([{ kind: 'usergroup', id: 'S0DESIGN', handle: 'design', isMine: false }])
+    // Unknown and unlabelled: a placeholder until the list arrives.
+    expect(groups('<!subteam^S0DESIGN> ping')).toEqual([{ kind: 'usergroup', id: 'S0DESIGN', handle: 'group', isMine: false }])
+    expect(plainText(bodyFromMrkdwn('<!subteam^S0DESIGN> ping', {}))).toBe('@group ping')
+    // A deleted group keeps its old handle.
+    expect(groups('<!subteam^S0GONE>')).toEqual([{ kind: 'usergroup', id: 'S0GONE', handle: 'old-team', isMine: false }])
+  })
+
+  it('names a usergroup block element the same way', () => {
+    const body = messageBody(
+      { text: '<!subteam^S0DESIGN>', blocks: richText([{ type: 'rich_text_section', elements: [{ type: 'usergroup', usergroup_id: 'S0DESIGN' }, { type: 'text', text: ' and ' }, { type: 'usergroup', usergroup_id: 'S0ONCALL' }] }]) },
+      lookups,
+    )
+    expect(body.blocks[0]).toEqual({
+      kind: 'paragraph',
+      children: [
+        { kind: 'usergroup', id: 'S0DESIGN', handle: 'group', isMine: false },
+        { kind: 'text', text: ' and ' },
+        { kind: 'usergroup', id: 'S0ONCALL', handle: 'oncall', name: 'On-call engineers', isMine: true },
+      ],
+    })
   })
 })

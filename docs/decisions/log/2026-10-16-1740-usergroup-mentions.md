@@ -1,0 +1,1 @@
+- 10-16 17:40 · usergroups · User group mentions read "@handle" from a `usergroups` cache table filled by `usergroups.list` (`include_disabled`) once per boot and by `subteam_*` events, because live text carries a bare `<!subteam^S…>`; an unknown group reads "@group", never its id, and a deleted group keeps its handle.

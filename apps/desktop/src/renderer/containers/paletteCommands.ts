@@ -87,6 +87,7 @@ const sectionLook: Record<SettingsSection, { readonly icon: PaletteIconName; rea
   connections: { icon: 'connections', words: 'juno servers tools integrations' },
   backup: { icon: 'backup', words: 'recovery restore move mac' },
   about: { icon: 'about', words: 'version update' },
+  'ai-activity': { icon: 'ai-activity', words: 'ai calls log cost spend models audit' },
 }
 
 function setTheme(theme: Theme): void {

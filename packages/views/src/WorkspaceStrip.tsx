@@ -10,6 +10,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { menuKeys } from '@juno/contract/channels'
 import { Avatar, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 
@@ -169,7 +170,7 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
   }
   return (
     <>
-      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} trailing={<IconButton icon={Plus} label={`${newTabLabel} ⌘T`} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}

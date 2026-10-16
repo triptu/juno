@@ -8,6 +8,7 @@ import { chips } from './AttachmentChips.fixtures'
 import { AudienceWarning } from './AudienceWarning'
 import { Composer } from './Composer'
 import { useFixtureControl } from './juno-chat/fixtures/control'
+import { LinkEditor } from './LinkEditor'
 import { MentionSuggestions, mentionRowId } from './MentionSuggestions'
 import { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
@@ -122,6 +123,27 @@ function MentionsOpen({ value, at, kind }: { readonly value: string; readonly at
   )
 }
 
+const LINKED = 'Read the docs first, then example.com/notes.'
+const linked: ReadonlyArray<TextareaMark> = [
+  { start: 5, end: 13, look: 'link' },
+  { start: 26, end: 43, look: 'link' },
+]
+
+/** The link editor open on "the docs" (inventory 7.1a). */
+function LinkEditorOpen({ url }: { readonly url: string }) {
+  return (
+    <div {...stylex.props(styles.column)}>
+      <Composer
+        {...base}
+        value={LINKED}
+        placeholder="Reply"
+        marks={url === '' ? linked.slice(1) : linked}
+        popover={{ anchorAt: 5, content: <LinkEditor url={url} onSave={() => true} {...(url === '' ? {} : { onRemove: noop })} onCancel={noop} /> }}
+      />
+    </div>
+  )
+}
+
 const picked: ReadonlyArray<TextareaMark> = [
   { start: 7, end: 12, look: 'person', hue: 'claret' },
   { start: 32, end: 41, look: 'channel' },
@@ -212,6 +234,12 @@ export default defineFixtures(
       'open-at-the-end': scene(() => <MentionsOpen value={`${'The numbers for the quarter are in and they look good. '.repeat(1)}cc @ma`} at={58} kind="person" />, {
         height: 300,
       }),
+    },
+    // Inventory 7.1a: typed URLs and linked words, and the link editor ⌘K opens.
+    Links: {
+      'in-the-field': fixture({ ...base, value: LINKED, placeholder: 'Reply', marks: linked }),
+      'editor-new': scene(() => <LinkEditorOpen url="" />, { height: 200 }),
+      'editor-existing': scene(() => <LinkEditorOpen url="https://example.com/docs" />, { height: 200 }),
     },
     Emoji: {
       'suggestions-open': scene(() => <div {...stylex.props(styles.column)}><Composer {...base} value=":smi" placeholder="Reply" marks={[]}

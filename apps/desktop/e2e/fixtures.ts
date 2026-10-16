@@ -68,6 +68,8 @@ export interface LaunchOptions {
   readonly fakeAiRequiresKey?: boolean
   /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
   readonly codemode?: boolean
+  /** Another app is already capturing the screen when Juno starts (`JUNO_E2E_SCREEN_SHARED`, the screen watch's seam). */
+  readonly screenShared?: boolean
   /** Play the next build: the engine opens the cache with one more migration (`JUNO_E2E_CACHE_MIGRATION`). */
   readonly cacheMigration?: boolean
   /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
@@ -98,6 +100,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
+  if (options.screenShared === true) env.JUNO_E2E_SCREEN_SHARED = '1'
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
   if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)

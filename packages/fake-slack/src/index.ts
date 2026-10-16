@@ -169,6 +169,11 @@ export class FakeSlack {
     this.workspace.selfUsergroups = [...input.ids]
   }
 
+  /** Adds or changes a user group from another client. Emits `subteam_created` or `subteam_updated`. */
+  putUsergroup(input: { id: string; handle: string; name: string; deleted?: boolean }): void {
+    this.workspace.putUsergroup(input)
+  }
+
   /** A custom emoji in the workspace, listed by edge `emojis/list` and taken as a reaction name. */
   addEmoji(input: { name: string; url: string }): void {
     this.workspace.emoji.set(input.name, { name: input.name, value: input.url })
@@ -398,6 +403,7 @@ export class FakeSlack {
       followThread: (i) => this.followThread(i),
       unfollowThread: (i) => this.unfollowThread(i),
       setSelfUsergroups: (i) => this.setSelfUsergroups(i),
+      putUsergroup: (i) => this.putUsergroup(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),

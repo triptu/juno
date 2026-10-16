@@ -141,13 +141,20 @@ describe('PiAiProvider decisions', () => {
     expect(settled).toHaveLength(1)
   })
 
-  it('keeps the whole reservation when the cost is unknown: a timeout', async () => {
+  it('settles a timeout in the first attempt at that attempt\'s bound: the retry was never sent', async () => {
+    const asked: number[] = []
     const settled: Array<number | undefined> = []
-    const admit = () => Effect.succeed({ _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) })
+    const admit = (upper: number) => Effect.sync(() => {
+      asked.push(upper)
+      return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
+    })
     const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
     const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
     expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
-    expect(settled).toEqual([undefined])
+    // Settled as known, not kept whole: at most the first attempt, under half the reservation.
+    expect(settled).toHaveLength(1)
+    expect(settled[0]).toBeTypeOf('number')
+    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
   })
 
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {

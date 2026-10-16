@@ -72,6 +72,11 @@ function withChannel(ws: Workspace, channel: string, message: Message): Message 
 }
 
 export const handlers: Handlers = {
+  /** Every group; deleted ones only with `include_disabled`, as live. No `users`, no paging. */
+  'usergroups.list': (ctx, args) => ({
+    usergroups: [...ctx.workspace.usergroups.values()].filter((group) => args.include_disabled === true || (group.date_delete ?? 0) === 0),
+  }),
+
   'auth.test': (ctx) => {
     const ws = ctx.workspace
     const self = ws.users.get(ws.selfId)

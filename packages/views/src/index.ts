@@ -6,7 +6,8 @@ export { AttachButton } from './AttachButton'
 export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
 
 export { AudienceWarning } from './AudienceWarning'
-export { Composer, type ComposerMention } from './Composer'
+export { Composer, type ComposerMention, type ComposerPopover } from './Composer'
+export { LinkEditor } from './LinkEditor'
 export { MentionSuggestions, mentionRowId, type EmojiSuggestion } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
 export { DestinationPickers, type PickerName } from './DestinationPickers'
@@ -60,9 +61,13 @@ export {
 } from '@juno/ui'
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt } from '@juno/ui'
+// The app's one tooltip, mounted once at the root.
+export { TooltipLayer } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
 export { SettingsPage, settingsSections } from './SettingsPage'
+export { AiActivityPage } from './AiActivityPage'
 export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
+export { QuickReactionsSetting } from './QuickReactionsSetting'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
 

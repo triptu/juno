@@ -1,13 +1,14 @@
-import { memo, Suspense, useState } from 'react'
-import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection } from '@juno/contract'
-import { quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, setTabExpiry, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { memo, Suspense, useEffect, useState } from 'react'
+import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
+import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, setTabExpiry, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
+import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus } from './EngineStatus'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
 import { openSettings } from './navigation'
 import { NotificationsPage } from './Notifications'
+import { QuickReactions } from './QuickReactions'
 import { Updates } from './Updates'
 
 const modelsAtom = liveQuery(prefsGet)({ key: 'aiModels' })
@@ -43,6 +44,8 @@ function Section({ section }: { readonly section: SettingsSection }) {
       return <Ignored />
     case 'juno':
       return <JunoSettings />
+    case 'ai-activity':
+      return <AiActivity />
     case 'connections':
       return <JunoConnections />
     case 'backup':
@@ -92,14 +95,33 @@ function General() {
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
   const tabExpiry = useAtomValue(tabExpiryAtom)
-  return <SettingsGeneral quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
+  const [sharing, setSharing] = useSharingSetting()
+  return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
     checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
     newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} tabExpiry={tabExpiry} onTabExpiryChange={(expiry) => setTabExpiry(registry, expiry)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
-/** Theme, accent and density, saved to main for the next launch's first frame. */
+/**
+ * "Hide message text while sharing the screen", which main holds (screenWatch.ts). Shown on until
+ * main answers, as it is by default; the switch moves on the click and takes main's answer after.
+ */
+function useSharingSetting(): readonly [SharingSetting, (hide: boolean) => void] {
+  const [setting, setSetting] = useState<SharingSetting>({ hide: true, detection: 'available' })
+  useEffect(() => {
+    let active = true
+    void getSharingSetting().then((value) => { if (active && value !== undefined) setSetting(value) })
+    return () => { active = false }
+  }, [])
+  const change = (hide: boolean) => {
+    setSetting((current) => ({ ...current, hide }))
+    void setSharingSetting(hide).then((value) => { if (value !== undefined) setSetting(value) })
+  }
+  return [setting, change]
+}
+
+/** Theme, accent and density, saved to main for the next launch's first frame; then the quick reactions. */
 function Appearance() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
@@ -116,10 +138,18 @@ function Appearance() {
     setDensity(next)
     persistDensity(next)
   }
-  return <SettingsAppearance theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} />
+  return <SettingsAppearance theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
 }
 
 function Ignored() {
   const ignored = useAtomValue(ignoredChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
   return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
+}
+
+/** AI activity: the engine's log of model calls, from the engine and the agent. */
+function AiActivity() {
+  const activity = useAtomValue(aiActivityAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
+  // A row's time reads "10:42" or "Yesterday": a minute is fine enough.
+  const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
+  return <AiActivityPage activity={activity} now={now} onCopyDetails={copyText} />
 }

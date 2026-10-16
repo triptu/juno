@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { MessageView } from '@juno/contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
@@ -26,6 +26,7 @@ import {
 } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
+import { sevenQuickReactions } from './fixtures/quickReactions'
 import { InlineEdit } from './InlineEdit'
 import { MessageList, type MessageListItem, type MessageListProps } from './MessageList'
 
@@ -36,6 +37,9 @@ const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onChannel' | 'onLin
 const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => fixture<MessageListProps>({ ...base, ...props }, frame)
 
 const ROW = '[data-message-row]'
+
+/** The toolbar with the most quick reactions it holds. */
+const sevenActions = { ...noopActions, quickReactions: sevenQuickReactions }
 
 /**
  * A send settles: the pending row is replaced by the message Slack stored,
@@ -69,6 +73,23 @@ const CHIPPED = 3
  * goes. The test drives each step through `window.__fixtureControls` and
  * checks what moved.
  */
+/**
+ * The list opened scrolled so its first row's name line is under the header
+ * band's place (`scroll-padding-top`) while its text shows: hovering that
+ * text flips the toolbar below the row, since above it there is no room.
+ */
+function ScrolledUnderBand() {
+  const scrollRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    const row = scroller?.querySelector<HTMLElement>(ROW)
+    if (scroller == null || row == null) return
+    const listTop = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
+    scroller.scrollTop += row.getBoundingClientRect().top - listTop + 16
+  }, [])
+  return <MessageList {...base} items={thread} main={false} actions={noopActions} scrollRef={scrollRef} />
+}
+
 function ReactionChanges() {
   const chips = thread[CHIPPED]!.message.reactions
   const [step, setStep] = useState<'base' | 'joined' | 'counted' | 'first'>('base')
@@ -181,20 +202,32 @@ export default defineFixtures(
     },
     Interaction: {
       hover: state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
-      'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
+      'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(6)` }),
       'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-toolbar-main': state({ items: mainStream, main: true, actions: noopActions }, { hover: `${ROW}:nth-of-type(5)` }),
-      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: `${ROW}:first-of-type` }),
+      // Seven quick reactions, all shown in a wide row.
+      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { hover: `${ROW}:nth-of-type(5)` }),
+      // The toolbar straddles the row's top edge, above the first line: on a
+      // header row, on a grouped row, and on the first row at the list's top.
+      'hover-toolbar-grouped': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(6)` }),
+      'hover-toolbar-first': state({ items: thread, main: false, actions: noopActions }, { hover: ROW }),
+      // A row whose top is under the band: the toolbar flips below it.
+      'hover-toolbar-under-band': scene(() => <ScrolledUnderBand />, { hover: `${ROW} [data-msg-text]` }),
+      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
     },
-    // A 336px column, a topic in the 720px window: the toolbar rises above a row,
-    // except near the list's top, where it drops inside under the name line.
+    // A 336px column, a topic in the 720px window: the toolbar straddles the
+    // row's top edge as in a wide one, and drops reactions that do not fit.
     Narrow: {
       'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
-      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:first-of-type` }),
-      'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: `${ROW}:first-of-type` }),
+      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: ROW }),
+      'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: ROW }),
+      // Seven quick reactions: the raised toolbar shows as many as fit, then More reactions.
+      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
+      // A pane between narrow and wide: all seven fit.
+      'hover-toolbar-seven-mid': state({ items: mainStream, main: true, actions: sevenActions }, { width: 560, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
     },
   },
   { width: 816, height: 600, padded: false },

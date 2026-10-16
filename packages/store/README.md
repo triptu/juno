@@ -17,6 +17,8 @@ The unused `topic_overlay.tracked` column remains from the initial migration. Re
 - `SqlClient` (type) and `SqlError`, re-exported so callers do not import `effect/sql`.
 - Row types (`MessageRow`, `TopicIndexRow`, ...) and the migrations lists.
 
+`usergroups` in cache.db holds the workspace's user groups (`id`, `handle`, `name`, `deleted`), so a group mention shows its handle.
+
 To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. Its id must be later than every shipped id in that folder: the Migrator skips ids at or below the newest one it has recorded. `scripts/check-migration-order.mjs` (run by `pnpm lint`) checks both folders against `origin/main` (or `main`): an id main does not have must be above main's largest, and no id may repeat. It names the id to renumber and the smallest safe one. Without git it checks only that ids are unique.
 
 ### Cache migrations

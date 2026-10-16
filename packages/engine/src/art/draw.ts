@@ -8,6 +8,7 @@
  * both keep the placeholder and stop the topic being asked about again
  * until a redraw or its first AI title. A call that did not finish (no key,
  * a timeout, a provider error) stores nothing; the job tries again later.
+ * A failed redraw stores nothing either, so the drawing shown stays.
  */
 import { AiProvider, cacheKeyOf, tasks, type Decision, type TopicArtInput } from '@juno/ai'
 import type { StoredArt } from '@juno/contract'
@@ -23,7 +24,8 @@ const RECENT_MESSAGES = 4
 /** Message text is cut here before it reaches the model; a drawing needs the subject, not the message. */
 const TEXT_CHARS = 240
 
-export type ArtOutcome = 'ok' | 'unsure' | 'failed' | 'missing-key' | 'timeout' | 'provider-error' | 'budget'
+/** `no-agent`: the agent's spend ledger did not answer, so nothing was sent. */
+export type ArtOutcome = 'ok' | 'unsure' | 'failed' | 'missing-key' | 'timeout' | 'provider-error' | 'budget' | 'no-agent'
 
 /** Rows the job and the command read: a topic joined as the sidebar sees it. */
 export const ART_SELECT = `${TOPIC_COLUMNS}, NULL AS channel_activity_ts ${TOPIC_FROM}`
@@ -95,11 +97,14 @@ const storeArt = (
   source: 'ai' | 'redraw',
 ): Effect.Effect<ArtOutcome, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
+    if (decision._tag === 'NoDecision' && decision.reason === 'budget' && (decision.detail === 'no-agent' || decision.detail === 'no-answer')) return 'no-agent'
     if (decision._tag === 'NoDecision' && decision.reason !== 'invalid-output') return decision.reason
     const value = decision._tag === 'Decided' ? decision.value : undefined
     const parsed = value === undefined ? undefined : parseRecipe(value)
     const recipe = parsed?.ok === true ? value! : ''
     const status: ArtOutcome = parsed?.ok === true ? (parsed.recipe.confident ? 'ok' : 'unsure') : 'failed'
+    // A redraw the model could not make keeps the drawing there was.
+    if (status === 'failed' && source === 'redraw') return status
     const hue = parsed?.ok === true ? parsed.recipe.hue : ''
     const sql = yield* StoreWriter
     const invalidation = yield* Invalidation
