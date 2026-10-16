@@ -1631,7 +1631,7 @@ export class TopicPane {
   /** At least one image thumbnail in view has its bytes, served by main from the Slack session. */
   async expectThumbnailsLoaded(): Promise<void> {
     await expect
-      .poll(() => this.list.locator('img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
+      .poll(() => this.list.locator('[data-thumbnail] img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
       .toBeGreaterThan(0)
   }
 

@@ -72,7 +72,7 @@ test('a pasted image goes with the message and shows in it at its final size', a
 
   fake.release()
   await topic.expectSent('The chart for Thursday')
-  await expect(row.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
+  await expect(row.getByRole('button', { name: 'Open chart.png' }).locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
   const settled = await row.getByRole('button', { name: 'Open chart.png' }).boundingBox()
   expect({ width: settled!.width, height: settled!.height }).toEqual({ width: 360, height: 225 })
 
