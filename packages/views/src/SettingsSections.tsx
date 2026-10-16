@@ -44,7 +44,7 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
         </Surface>
       </Section>
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open, and when tabs you left close. Tabs with a draft stay; ⌘⇧T reopens one.">
-        <Surface kind="group" padding="md" sx={styles.card}>
+        <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
           <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
         </Surface>
@@ -143,6 +143,12 @@ const styles = stylex.create({
   // on the same line as the rows of Notifications, Juno, Connections and Backup.
   card: {
     paddingInline: spacing['--space-3-5'],
+  },
+  // A card with two rows: they sit apart as Appearance's do.
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-2'],
   },
   catchUp: {
     minHeight: spacing['--space-8'],
