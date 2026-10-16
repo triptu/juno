@@ -156,6 +156,16 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     const twice = await client.call('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })
     expect(twice.body).toEqual({ ok: false, error: 'already_reacted' })
     expect(await client.ok('reactions.remove', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })).toEqual({ ok: true })
+    // Strict like Slack: unknown names, a removal of nothing, and a ts no message has are refused.
+    const removedTwice = await client.call('reactions.remove', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })
+    expect(removedTwice.body).toEqual({ ok: false, error: 'no_reaction' })
+    const unknown = await client.call('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'thumbs_up' })
+    expect(unknown.body).toEqual({ ok: false, error: 'invalid_name' })
+    const noMessage = await client.call('reactions.add', { channel: opened.channel.id, timestamp: '1000000000.000100' as typeof posted.ts, name: '+1' })
+    expect(noMessage.body).toEqual({ ok: false, error: 'message_not_found' })
+    expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: '+1::skin-tone-2' })).toEqual({ ok: true })
+    fake.addEmoji({ name: 'shipit', url: 'https://example.invalid/shipit.png' })
+    expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'shipit' })).toEqual({ ok: true })
 
     const deleted = await client.ok('chat.delete', { channel: opened.channel.id, ts: posted.ts })
     expect(deleted.ts).toBe(posted.ts)
