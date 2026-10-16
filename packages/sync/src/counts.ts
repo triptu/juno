@@ -86,4 +86,3 @@ export const activeConversations = (entries: ReadonlyArray<CountEntry>, start: T
       .map((e) => ({ id: e.id, latest: e.latest }))
       .toSorted((a, b) => (a.latest > b.latest ? -1 : a.latest < b.latest ? 1 : 0))
   })
-
