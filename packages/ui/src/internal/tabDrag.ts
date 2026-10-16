@@ -221,7 +221,8 @@ export class TabDrag {
     for (let i = first; i <= last; i++) {
       if (i === from) continue
       const middle = lefts[i]! + widths[i]! / 2
-      const shift = i < from && centre < middle ? width : i > from && centre > middle ? -width : 0
+      // Reaching a tab's middle takes its place, so a tab pushed to the strip's end lands there.
+      const shift = i < from && centre <= middle ? width : i > from && centre >= middle ? -width : 0
       if (shift > 0) to = Math.min(to, i)
       if (shift < 0) to = Math.max(to, i)
       if (shift !== drag.shifts[i]) {
