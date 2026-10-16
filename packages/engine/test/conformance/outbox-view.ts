@@ -167,6 +167,18 @@ export interface World {
   readonly timer: ReturnType<typeof setInterval>
 }
 
+/**
+ * Each draft's channel, and the drafts sent as New chat thread roots: a reply (`sendReply`) lives in its
+ * root's channel. Lookups and edits are matched by channel, so a trace with a reply must have neither (the
+ * New chat schedules do not).
+ */
+export function channelsOf(trace: { readonly states: ReadonlyArray<TraceState> }): Pick<World, 'channel' | 'roots'> {
+  const parent = sOf(trace.states.at(-1)!).parent ?? new Map<number, number>()
+  const channel = { ...CHANNEL }
+  for (const k of DRAFTS) if ((parent.get(k) ?? 0) !== 0) channel[k] = CHANNEL[parent.get(k) as Draft]
+  return { channel, roots: new Set(DRAFTS.filter((k) => DRAFTS.some((j) => parent.get(j) === k))) }
+}
+
 export const draftOf = (world: World, id: string | undefined): Draft | undefined => DRAFTS.find((k) => world.ids[k] === id)
 export const draftOfChannel = (channel: string | undefined): Draft | undefined => DRAFTS.find((k) => CHANNEL[k] === channel)
 
