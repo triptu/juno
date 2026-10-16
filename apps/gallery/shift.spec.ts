@@ -274,13 +274,6 @@ test.describe('Send', () => {
 })
 
 /**
- * Changes to one message (spec section 7): a reaction chip joining, its
- * count going up and the chip leaving move nothing; the first chip of a
- * message grows that message at its bottom only; the delete confirm takes
- * the toolbar's place and the edit field the body's without moving any row
- * above. Driven through `window.__fixtureControls`.
- */
-/**
  * The checks on send (spec section 8): the audience line and the check bar
  * appear inside the composer, above the text. The composer grows upwards
  * from where it sits; the text row and the field's bottom edge never move.
@@ -326,6 +319,13 @@ test.describe('Composer notices', () => {
   })
 })
 
+/**
+ * Changes to one message (spec section 7): a reaction chip joining, its
+ * count going up and the chip leaving move nothing; the first chip of a
+ * message grows that message at its bottom only; the delete confirm takes
+ * the toolbar's place and the edit field the body's without moving any row
+ * above. Driven through `window.__fixtureControls`.
+ */
 test.describe('Message actions', () => {
   const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
   const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
@@ -345,12 +345,19 @@ test.describe('Message actions', () => {
     expect(await boxes(page)).toEqual(before)
   })
 
-  test('a message’s first chip uses its reserved line and moves no row', async ({ page }) => {
+  // No line is reserved for reactions a message does not have (SPEC 7, "Stable geometry"): the first chip grows its message.
+  test('a message’s first chip grows it at its bottom and moves nothing above', async ({ page }) => {
     await open(page, 'MessageList', 'shift/reaction-changes')
     const before = await boxes(page)
     await step(page, 'first-chip')
     await expect(page.getByRole('button', { name: '1 👀, including you' })).toHaveCount(1)
-    expect(await boxes(page)).toEqual(before)
+    const after = await boxes(page)
+    // Rows 0 and 1 are above the message (row 2): untouched. The message keeps its top; the rows under it move down together.
+    expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
+    expect(after[2]!.y).toBe(before[2]!.y)
+    const grown = after[2]!.height - before[2]!.height
+    expect(grown).toBeGreaterThan(0)
+    for (let index = 3; index < before.length; index++) expect(after[index]!.y - before[index]!.y).toBe(grown)
   })
 
   test('the delete confirm takes the toolbar’s place and moves nothing', async ({ page }) => {

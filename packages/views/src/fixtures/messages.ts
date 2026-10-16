@@ -44,6 +44,10 @@ const partyBlob = `data:image/svg+xml;utf8,${encodeURIComponent(
 
 export const reaction = (name: string, unicode: string, count: number, mine = false): ReactionView => ({ name, count, me: mine, unicode })
 export const customReaction = (name: string, count: number, mine = false): ReactionView => ({ name, count, me: mine, url: partyBlob })
+/** A custom emoji the workspace does not know: the chip shows `:name:`. */
+export const unknownReaction = (name: string, count: number): ReactionView => ({ name, count, me: false })
+/** A workspace emoji on a text line. */
+export const customEmoji = (name: string): BodyInline => emoji(name, undefined, partyBlob)
 
 /** An SVG of the given size, so a thumbnail has real bytes and a real aspect ratio. */
 export const picture = (width: number, height: number, fill: string): string =>

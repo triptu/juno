@@ -23,7 +23,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
     for (const id of [TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL]) {
       workspace.addConversation({ id, name: id === TOPIC300_MAIN_CHANNEL ? 'perf-main' : 'perf-thread', kind: 'public', members: new Set(users), created: now, topic: '', purpose: '', isOpen: true, archived: false })
     }
-    workspace.emoji.set('juno_wave', { name: 'juno_wave', url: `${avatarBase}/U0PERFLEO.svg` })
+    workspace.emoji.set('juno_wave', { name: 'juno_wave', value: `${avatarBase}/U0PERFLEO.svg` })
     let root: Message | undefined
     for (const channel of [TOPIC300_THREAD_CHANNEL, TOPIC300_MAIN_CHANNEL]) {
       for (let i = 0; i < 300; i++) {

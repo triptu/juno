@@ -72,6 +72,8 @@ export interface Lookups {
   readonly usergroup?: (id: string) => string | undefined
   /** Image url for a custom emoji name. */
   readonly emoji?: (name: string) => string | undefined
+  /** The standard emoji a custom alias names, for an alias with no image of its own. */
+  readonly emojiAlias?: (name: string) => string | undefined
 }
 
 /** All inline runs of a body in reading order, including list items. */
