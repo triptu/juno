@@ -8,7 +8,7 @@ import { resolve, join } from 'node:path'
 import { startFakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 
-test('packaged app signs in, starts both utility processes and runs a codemode script @mac', async () => {
+test('packaged app signs in and starts both utility processes @mac', async () => {
   test.setTimeout(180_000)
   const executable = process.env.JUNO_PACKAGED_EXECUTABLE ?? resolve('release/mac-arm64/Juno.app/Contents/MacOS/Juno')
   const appPath = resolve(executable, '../../..')
