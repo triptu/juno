@@ -1,5 +1,6 @@
 import { sendCheckDefaults, sendCheckPrefKeys, type ProviderState } from '@juno/contract'
-import { defineFixtures, fixture } from '@juno/ui'
+import { useLayoutEffect, type ReactNode } from 'react'
+import { defineFixtures, fixture, scene } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
 import { connections, NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './juno-pages/fixtures'
@@ -16,6 +17,14 @@ import { UpdateSettings } from './UpdateSettings'
 const checks = sendCheckPrefKeys.map((key) => ({ key, enabled: sendCheckDefaults[key] }))
 const noop = () => {}
 const at = (section: SettingsPageProps['section'], children: SettingsPageProps['children']) => fixture<SettingsPageProps>({ section, onSection: noop, children })
+
+/** General scrolled to its last section before the first paint. */
+function ScrolledToEnd({ children }: { readonly children: ReactNode }) {
+  useLayoutEffect(() => {
+    [...document.querySelectorAll('section')].at(-1)?.scrollIntoView({ block: 'end' })
+  }, [])
+  return <SettingsPage section="general" onSection={noop}>{children}</SettingsPage>
+}
 
 const none: ProviderState = { active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } }
 const openRouter: ProviderState = { ...none, active: 'openRouter', openRouter: { key: 'set' } }
@@ -45,6 +54,8 @@ export default defineFixtures(
   {
     Sections: {
       general: at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      // The end of General: message checks and AI assist, as after scrolling down.
+      'general-end': scene(() => <ScrolledToEnd><SettingsGeneral quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} /></ScrolledToEnd>),
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
