@@ -76,7 +76,7 @@ their original order when timestamps match.
 
 ## Batch merges
 
-Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories (batch merges and the migration order check).
 
 Fetch `origin/main`, then run from the repository root:
 

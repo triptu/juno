@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { SqlClient } from 'effect/sql'
 import * as fs from 'node:fs/promises'
 import {
-  CACHE_SCHEMA_VERSION,
+  CACHE_RESET_EPOCH,
   cacheMigrations,
   migrate,
   MIGRATIONS_TABLE,
@@ -62,7 +62,7 @@ describe('migrations', () => {
       assert.notInclude(cacheTables, 'prefs')
 
       const [version] = yield* sql<{ user_version: number }>`PRAGMA cache.user_version`
-      assert.strictEqual(version?.user_version, CACHE_SCHEMA_VERSION)
+      assert.strictEqual(version?.user_version, CACHE_RESET_EPOCH)
 
       const [journal] = yield* sql<{ journal_mode: string }>`PRAGMA main.journal_mode`
       assert.strictEqual(journal?.journal_mode, 'wal')

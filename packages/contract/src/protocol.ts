@@ -30,6 +30,8 @@ export const EngineConfig = Schema.Struct({
   fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: the fake provider answers only with an OpenRouter key from main (`aiKey`) and inside the spend cap, as the live one does. */
   fakeAiRequiresKey: Schema.optionalKey(Schema.Boolean),
+  /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
+  cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })
 export type EngineConfig = typeof EngineConfig.Type
 
