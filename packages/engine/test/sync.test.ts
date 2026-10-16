@@ -259,7 +259,14 @@ describe('membership', () => {
 
 describe('warm boot', () => {
   it('uses incremental calls and picks up what changed while the engine was down', async () => {
-    const first = await bootedEngine()
+    const threadText = 'An older unfollowed thread.'
+    const first = await bootedEngine({
+      initial: (fake) => {
+        // Keep the root outside warm discovery's date window at every time of day.
+        seedThread(fake, { channel: 'C0ENG', text: threadText, ago: 2 * DAY, replies: [1, 2, 3, 4, 5].map((minutes) => 2 * DAY - minutes * 60_000), follow: false })
+        return fake.signIn()
+      },
+    })
     await first.rowsUntil((rows) => rows.length >= 20, 'rows')
     const { fake, userData } = first
     const credentials = fake.credentials()
@@ -269,9 +276,9 @@ describe('warm boot', () => {
     engines.splice(engines.indexOf(first), 1)
 
     // Activity while the app is quit: a new Main message and a reply in a thread we do not follow.
-    const flakyRoot = fake.messages('C0ENG').find((m) => m.text?.startsWith('checkout.spec'))!
+    const oldRoot = fake.messages('C0ENG').find((m) => m.text === threadText)!
     fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0PRIYA', text: 'Pricing page copy is live.' })
-    fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Still flaky after the wait?', threadTs: flakyRoot.ts })
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Still flaky after the wait?', threadTs: oldRoot.ts })
     // A reply in a public channel the user is not in: search returns it, the sync must drop it.
     const salesRoot = fake.messages('C0SALES').find((m) => (m.reply_count ?? 0) > 0)!
     fake.injectMessage({ channel: 'C0SALES', user: 'U0MAYA', text: 'Forecast is in the deck.', threadTs: salesRoot.ts })
@@ -285,15 +292,18 @@ describe('warm boot', () => {
     expect(rows.find((r) => r.title === '#product')).toMatchObject({ unreadCount: 1 })
     expect(rows.find((r) => r.channel.id === 'C0SALES')).toBeUndefined()
     // The reply in the unfollowed thread was discovered and indexed (it is a topic), but it is not a sidebar row.
-    expect(rows.find((r) => r.title === 'checkout.spec failed again on main. Third…')).toBeUndefined()
+    expect(rows.find((r) => r.id === `t:C0ENG:${oldRoot.ts}`)).toBeUndefined()
     const cache = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-    const flaky = cache.prepare(`SELECT message_count, unread_count FROM topic_index WHERE topic_id = ?`).get(`t:C0ENG:${flakyRoot.ts}`)
+    const thread = cache.prepare(`SELECT message_count, unread_count FROM topic_index WHERE topic_id = ?`).get(`t:C0ENG:${oldRoot.ts}`)
     cache.close()
-    expect(flaky).toMatchObject({ message_count: 7, unread_count: 1 })
+    expect(thread).toMatchObject({ message_count: 7, unread_count: 1 })
 
     // Only the conversation whose latest moved was fetched; the thread reply came from the discovery search.
     await quiet(second)
     expect(apiCalls(second, 'conversations.history').filter(notRecheck).map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
+    expect(apiCalls(second, 'conversations.replies').filter(notRecheck).map((call) => call.args)).toEqual([
+      expect.objectContaining({ channel: 'C0ENG', ts: oldRoot.ts, limit: '1', _x_reason: 'root' }),
+    ])
     const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = callMap(second)
     const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
     expect(budget).toEqual({
@@ -308,7 +318,8 @@ describe('warm boot', () => {
       // Back to the window, then the complete pass.
       'api:subscriptions.thread.getView': 4,
       'api:search.modules.messages': 1,
-      // Search supplies the root counters; there is no per-thread lookup.
+      // Search finds the new reply but not its old root. Fetch the root's authoritative reply count.
+      'api:conversations.replies': 1,
     })
     // The recheck for the time the app was closed: the ten most recently active topics, one page each.
     expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBe(10)
