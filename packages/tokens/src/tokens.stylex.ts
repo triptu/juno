@@ -170,6 +170,24 @@ export const accentSwatches = stylex.defineVars({
 })
 
 /**
+ * An icon drawn in an accent's colour (a sidebar view's icon): each
+ * accent's text colour, which holds 4.5:1 on the page and 3:1 or more on
+ * the secondary fill of a selected pill, in both themes. The dark values
+ * are in themes.stylex.ts. `--icon-tint-neutral` is the plain muted icon.
+ */
+export const iconTints = stylex.defineVars({
+  '--icon-tint-neutral': colors['--foreground-muted'],
+  '--icon-tint-coral': '#B4351F',
+  '--icon-tint-ink': 'hsla(48, 30%, 8%, 1)',
+  '--icon-tint-marigold': '#7F5200',
+  '--icon-tint-teal': '#096762',
+  '--icon-tint-midnight': '#2E1F64',
+  '--icon-tint-emerald': '#00674F',
+  '--icon-tint-claret': '#7F1734',
+  '--icon-tint-cyan': '#006A8A',
+})
+
+/**
  * The Juno chat (SPEC section 13, inventory section 12). The owner bubble's
  * colour is still the owner's choice between options A to D
  * (docs/design/juno-chat/README.md): this is option B, the accent tint.
@@ -717,6 +735,8 @@ export const motion = stylex.defineVars({
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
   '--chat-empty-width': '520px',
+  // A tooltip wraps past this; most are one short line.
+  '--tooltip-max-width': '280px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '280px',
@@ -950,6 +970,8 @@ export const z = stylex.defineVars({
   '--z-selection': '35',
   '--z-context': '40',
   '--z-toast': '45',
+  // A tooltip names what is under the pointer, so it sits over everything.
+  '--z-tooltip': '50',
 })
 
 export const opacity = stylex.defineVars({

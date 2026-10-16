@@ -60,6 +60,8 @@ export {
 } from '@juno/ui'
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt } from '@juno/ui'
+// The app's one tooltip, mounted once at the root.
+export { TooltipLayer } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
 export { SettingsPage, settingsSections } from './SettingsPage'
 export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'

@@ -3,6 +3,8 @@ import type { ButtonHTMLAttributes } from 'react'
 import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
+import { tintColors, type IconTint } from './internal/tint'
+import { tooltip } from './Tooltip'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
 export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
@@ -14,8 +16,12 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   readonly icon: PhosphorIcon
   /** Required accessible name; also the tooltip. */
   readonly label: string
+  /** The shortcut that does the same ("⌘["): keycaps in the tooltip, and the end of the accessible name. */
+  readonly shortcut?: string
   readonly size?: IconButtonSize
   readonly iconSize?: IconSize
+  /** Draws the icon in an accent's colour (the view sheet's chosen icon). Not with `pressed`. */
+  readonly iconTint?: IconTint
   /** Icon weight override (`bold` for the send arrow). Default by icon size, `fill` when pressed. */
   readonly iconWeight?: IconWeight
   readonly radius?: IconButtonRadius
@@ -29,7 +35,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
   readonly expanded?: boolean
   readonly dimmed?: boolean
-  /** Hides the native tooltip when the label would repeat visible text. */
+  /** No tooltip, when the label would repeat visible text. */
   readonly noTooltip?: boolean
 }
 
@@ -71,8 +77,10 @@ const iconBySize: Record<IconButtonSize, IconSize> = {
 export function IconButton({
   icon,
   label,
+  shortcut,
   size = 30,
   iconSize,
+  iconTint,
   iconWeight,
   radius,
   variant = 'ghost',
@@ -90,8 +98,8 @@ export function IconButton({
   return (
     <button
       type={type}
-      aria-label={label}
-      title={noTooltip ? undefined : label}
+      aria-label={shortcut === undefined ? label : `${label} ${shortcut}`}
+      {...(noTooltip ? {} : tooltip(label, shortcut))}
       aria-pressed={pressed}
       aria-expanded={expanded}
       aria-disabled={dimmed || undefined}
@@ -121,6 +129,10 @@ export function IconButton({
             <Icon icon={icon} size={px} weight="fill" />
           </span>
         </span>
+      ) : iconTint !== undefined ? (
+        <span data-icon-tint={iconTint} {...stylex.props(styles.tint, tintColors[iconTint])}>
+          {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
+        </span>
       ) : iconWeight === undefined ? (
         <Icon icon={icon} size={px} />
       ) : (
@@ -149,6 +161,9 @@ const styles = stylex.create({
       bottom: `calc((100% - ${sizes['--control-24']}) / 2)`,
       left: `calc((100% - ${sizes['--control-24']}) / 2)`,
     },
+  },
+  tint: {
+    display: 'inline-flex',
   },
   pair: {
     display: 'grid',

@@ -37,6 +37,15 @@ export const VIEW_ICONS = [
 export const ViewIcon = Schema.Literals(VIEW_ICONS)
 export type ViewIcon = typeof ViewIcon.Type
 
+/**
+ * The colours a view's icon can take: the accent names, which `@juno/ui`
+ * draws readable in both themes (`iconTints`). No colour is the neutral
+ * default.
+ */
+export const VIEW_COLORS = ['coral', 'ink', 'marigold', 'teal', 'midnight', 'emerald', 'claret', 'cyan'] as const
+export const ViewColor = Schema.Literals(VIEW_COLORS)
+export type ViewColor = typeof ViewColor.Type
+
 /** The longest view name the sheet takes. */
 export const VIEW_NAME_MAX = 32
 

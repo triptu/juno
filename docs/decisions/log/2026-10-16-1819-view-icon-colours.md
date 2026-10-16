@@ -1,0 +1,1 @@
+- 10-16 18:19 · tooltips-views · A view's icon can take one of the eight accent colours (the accents' text colours, `iconTints`), neutral by default, stored in `sidebar_views.color`. A draft without a colour keeps the stored one, so a Juno settings task that renames a view does not clear it.

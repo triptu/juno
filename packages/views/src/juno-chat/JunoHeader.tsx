@@ -1,4 +1,5 @@
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
+import { menuKeys } from '@juno/contract/channels'
 import type { ReactNode } from 'react'
 import { ArrowsOutSimple } from '@phosphor-icons/react/dist/icons/ArrowsOutSimple'
 import { X } from '@phosphor-icons/react/dist/icons/X'
@@ -90,7 +91,7 @@ export function JunoPanelActions({ onOpenInTab, onClose }: { readonly onOpenInTa
   return (
     <>
       <IconButton icon={ArrowsOutSimple} label={chatCopy.panel.openInTab} size={28} iconSize={15} radius="full" variant="island" onClick={onOpenInTab} />
-      <IconButton icon={X} label={chatCopy.panel.close} size={28} iconSize={15} radius="full" variant="island" onClick={onClose} />
+      <IconButton icon={X} label={chatCopy.panel.close} shortcut={menuKeys('juno.toggle')} size={28} iconSize={15} radius="full" variant="island" onClick={onClose} />
     </>
   )
 }

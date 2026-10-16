@@ -56,7 +56,7 @@ test('the view fills on the first sync, keeps the bot channels out of All, and i
 
   // An icon pill, with its name as the tooltip.
   const pill = sidebar.viewPill('Automated')
-  await expect(pill).toHaveAttribute('title', 'Automated')
+  await expect(pill).toHaveAttribute('data-tooltip', 'Automated')
   await expect(pill).toHaveText('')
   await sidebar.row(POSTGRES).expectVisible()
   await sidebar.row(ALERTS_MAIN).expectAbsent()
