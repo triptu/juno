@@ -51,6 +51,14 @@ export const colors = stylex.defineVars({
   '--foreground-default': 'hsla(48, 15%, 12%, 1)',
   '--foreground-subtle': 'hsla(48, 8%, 35%, 1)',
   '--foreground-muted': 'hsla(48, 5%, 42%, 1)',
+  // The middle step of a list row's three text levels (title, this, meta):
+  // the sidebar preview. It sits between default and muted in both themes;
+  // subtle is too close to muted in light to read as its own level.
+  '--foreground-secondary': 'hsla(48, 8%, 28%, 1)',
+  // Muted text on a secondary fill (a selected row), where light muted
+  // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
+  // its step below the preview.
+  '--foreground-muted-on-fill': 'hsla(48, 8%, 35%, 1)',
 
   // Ink accent. The default accent theme points --hl at this.
   '--accent-default': 'hsla(48, 30%, 8%, 1)',
@@ -803,8 +811,7 @@ export const sizes = stylex.defineVars({
   '--control-22': '22px',
   '--control-24': '24px',
   '--topic-time-width': '48px',
-  '--topic-people-width': '60px',
-  '--topic-tags-width': '76px',
+  '--topic-people-width': '84px',
   '--message-sender-width': '128px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
