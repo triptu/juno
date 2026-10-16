@@ -28,10 +28,11 @@ const hasArt = (row: TopicRow) => typeof row.art === 'string' && row.art.length 
 const storedArt = (engine: RunningEngine) =>
   readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id, recipe, status, source, hue, title_source FROM topic_art ORDER BY topic_id').all() as Array<{ topic_id: string; recipe: string; status: string; source: string; hue: string; title_source: string }>)
 
-/** The rows once every thread and channel Main in the window has been drawn, or finished trying, and every finished drawing shows. */
+/** The rows once every thread has its AI title, every thread and channel Main in the window has been drawn, or finished trying, and every finished drawing shows. */
 const drawnRows = (engine: RunningEngine) =>
   engine.rowsUntil((rows) => {
     if (rows.length === 0) return false
+    if (rows.some((row) => row.kind === 'thread' && row.titleSource !== 'ai')) return false
     const stored = new Map(storedArt(engine).map((entry) => [entry.topic_id, entry]))
     return rows.filter((row) => !isDmMain(row)).every((row) => {
       const entry = stored.get(row.id)
