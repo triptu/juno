@@ -683,6 +683,11 @@ test.describe('Topic header', () => {
     await open(page, 'TopicHeader', 'narrow/thread-480')
     await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
+})
+
+/** Following a thread from its header swaps Follow for Resolve, which must move nothing (SPEC 7). */
+test.describe('Topic header Follow', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
 
   test('Follow and Resolve are one width, roomy and narrow, so following moves nothing', async ({ page }) => {
     const box = async (state: string, name: string) => {
