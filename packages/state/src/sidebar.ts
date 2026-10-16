@@ -100,7 +100,8 @@ function sameRow(a: TopicRow, b: TopicRow): boolean {
 function sameChannel(a: RowChannel, b: RowChannel): boolean {
   if (a === b) return true
   const partners = a.partner === undefined || b.partner === undefined ? a.partner === b.partner : samePerson(a.partner, b.partner)
-  return partners && a.id === b.id && a.kind === b.kind && a.name === b.name && a.label === b.label && a.tint === b.tint && a.icon === b.icon && a.color === b.color
+  const members = (a.members ?? []).length === (b.members ?? []).length && (a.members ?? []).every((person, i) => samePerson(person, b.members![i]!))
+  return partners && members && a.id === b.id && a.kind === b.kind && a.name === b.name && a.label === b.label && a.tint === b.tint && a.icon === b.icon && a.color === b.color
 }
 
 /** Keep previously visible read-dependent rows while a tab still shows them. */

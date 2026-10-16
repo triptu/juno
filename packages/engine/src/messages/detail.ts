@@ -27,6 +27,7 @@ import {
   parseColumns,
   parseIds,
   personFrom,
+  tileMemberIds,
   topicFrom,
   TOPIC_COLUMNS,
   TOPIC_FROM,
@@ -108,7 +109,9 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const info = channelInfoOf(row, columns, selfId, nameOf)
     const topic = topicFrom(row, columns, info)
     const partnerId = row.c_kind === 'im' ? (row.c_user_id ?? undefined) : undefined
-    const { partnerId: _partnerId, ...channel } = channelRefOf(info, partnerId)
+    const memberIds = tileMemberIds(columns, selfId)
+    const { partnerId: _partnerId, memberIds: _memberIds, ...bare } = channelRefOf(info, partnerId, memberIds)
+    const channel = memberIds.length === 0 ? bare : { ...bare, members: memberIds.map((member) => personFrom(member, users.get(member))) }
     const reads = yield* sql<{ last_read_ts: string | null }>`SELECT last_read_ts FROM topic_reads WHERE topic_id = ${id}`
     const lastReadTs = reads[0]?.last_read_ts ?? undefined
     const title = resolveTitle(topic, { user: nameOf })

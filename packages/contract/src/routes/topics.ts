@@ -36,13 +36,15 @@ export const SIDEBAR_WINDOW = 300
 export const SidebarSection = Schema.Literals(['pinned', 'recent'])
 export type SidebarSection = typeof SidebarSection.Type
 
-const { partnerId: _partnerId, ...channelFields } = ChannelRef.fields
+const { partnerId: _partnerId, memberIds: _memberIds, ...channelFields } = ChannelRef.fields
 
-/** Where a topic lives, with everything the tile and line three need: a `ChannelRef` with the DM partner joined in. */
+/** Where a topic lives, with everything the tile and line three need: a `ChannelRef` with the DM partner and group members joined in. */
 export const RowChannel = Schema.Struct({
   ...channelFields,
   /** The other person in a DM, for the tile. */
   partner: Schema.optionalKey(Person),
+  /** A group DM's other members, at most three, for the tile. */
+  members: Schema.optionalKey(Schema.Array(Person)),
 })
 export type RowChannel = typeof RowChannel.Type
 
