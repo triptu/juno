@@ -3,7 +3,6 @@ import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { PrivacyOn } from './fixtures/privacy'
-import { Activity, EmptyProgress, TrailingProgress } from './fixtures/syncExplorations'
 import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
@@ -178,22 +177,6 @@ export default defineFixtures(
       'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
       'with privacy': scene(() => <PrivacyOn>{full({ status: <EngineNotice kind="offline" />, privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
-    },
-    // Design review only: direction A, an activity ring before Search with its popover.
-    'Sync A': {
-      syncing: scene(() => full({ dots: { channels: false, dms: false }, titlebarActivity: <Activity done={11} total={148} /> }, { sections: [], empty: 'syncing' })),
-      popover: scene(() => full({ dots: { channels: false, dms: false }, titlebarActivity: <Activity done={11} total={148} open /> }, { sections: [], empty: 'syncing' })),
-      rows: scene(() => full({ titlebarActivity: <Activity done={64} total={148} /> }, { sections: [{ id: 'recent', ids: firstRows }] })),
-      offline: scene(() => full({ titlebarActivity: <Activity done={64} total={148} offline open /> })),
-    },
-    // Design review only: direction B, the held list's empty state carries the progress.
-    'Sync B': {
-      empty: scene(() => (
-        <Sidebar {...chrome} dots={{ channels: false, dms: false }}>
-          <EmptyProgress done={11} total={148} />
-        </Sidebar>
-      )),
-      rows: scene(() => full({}, { sections: [{ id: 'recent', ids: [...firstRows, 'sync'] }], renderRow: (id) => (id === 'sync' ? <TrailingProgress key={id} done={64} total={148} /> : renderRow(id)) })),
     },
     Nav: {
       // Home tab active, or no tab open.

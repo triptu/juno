@@ -115,8 +115,6 @@ export interface SidebarProps {
    * set, or while privacy mode is on.
    */
   readonly status?: ReactNode
-  /** Exploration only: an activity control before Search in the title bar. */
-  readonly titlebarActivity?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
   readonly onPrivacyOff?: () => void
@@ -161,7 +159,6 @@ export function Sidebar({
   onToggleUnread,
   onClearScope,
   status,
-  titlebarActivity,
   privacy = false,
   onPrivacyOff,
   children,
@@ -186,7 +183,6 @@ export function Sidebar({
         <div {...stylex.props(styles.titlebar)}>
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
-            {titlebarActivity}
             <IconButton icon={MagnifyingGlass} label="Search ⌘K" size={30} onClick={onSearch} />
             <IconButton icon={NotePencil} label="New chat ⌘N" size={30} onClick={onNewChat} />
             <span {...stylex.props(styles.account)}>
