@@ -24,6 +24,8 @@ export const EngineConfig = Schema.Struct({
   dev: Schema.Boolean,
   /** Tests only: the fake Slack's base URL, so its host is allowed for the socket. */
   fakeSlackUrl: Schema.optionalKey(Schema.String),
+  /** Tests only: keep the production request pacing against the fake, to measure a first sync as a user meets it. */
+  fakeSlackPaced: Schema.optionalKey(Schema.Boolean),
   /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
   ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
   /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */

@@ -1,5 +1,7 @@
-import { StoreWriter, type SqlError } from '@juno/store'
+import { StoreWriter, type Invalidation, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
+import { syncKeys } from '../keys'
+import { invalidate } from './shared'
 
 
 export const getSyncState = <A>(key: string): Effect.Effect<A | undefined, SqlError, StoreWriter> =>
@@ -10,9 +12,11 @@ export const getSyncState = <A>(key: string): Effect.Effect<A | undefined, SqlEr
     return row === undefined ? undefined : (JSON.parse(row.value_json) as A)
   })
 
-export const setSyncState = (key: string, value: unknown): Effect.Effect<void, SqlError, StoreWriter> =>
+/** Fires `sync_state`: the sidebar and All topics read the boot markers (`windowCovered`), Home's Automated pass waits for them. */
+export const setSyncState = (key: string, value: unknown): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`INSERT INTO sync_state (key, value_json) VALUES (${key}, ${JSON.stringify(value)})
       ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`
+    yield* invalidate(syncKeys.syncState)
   })

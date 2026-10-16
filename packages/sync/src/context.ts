@@ -36,6 +36,8 @@ export interface SyncContext {
   usersOnBackground: boolean
   /** Hands the user's own presence from `client.userBoot` to whoever shows it. */
   readonly onSelfPresence: (presence: 'active' | 'away') => Effect.Effect<void>
+  /** Called after the cold boot stored a conversation's history page (`RunSyncOptions.onHistory`). */
+  readonly onHistory: (channel: string) => Effect.Effect<void>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
   /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */

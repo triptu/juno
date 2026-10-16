@@ -169,12 +169,15 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
   const fakeAiDelayMillis = e2e ? Number(process.env.JUNO_FAKE_AI_DELAY_MS) : Number.NaN
   // An e2e run can play the next build, which adds a cache migration.
   const cacheMigrationProbe = e2e && process.env.JUNO_E2E_CACHE_MIGRATION === '1'
+  // An e2e run can keep production request pacing against the fake, to time a first sync.
+  const fakeSlackPaced = e2e && process.env.JUNO_E2E_FAKE_PACED === '1'
   return new EngineSupervisor(
     {
       userData: app.getPath('userData'),
       e2e,
       dev: !app.isPackaged,
       ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
+      ...(fakeSlackPaced ? { fakeSlackPaced } : {}),
       ai,
       ...(e2e && process.env.JUNO_FAKE_AI_REQUIRES_KEY === '1' ? { fakeAiRequiresKey: true } : {}),
       ...(Number.isFinite(fakeAiDelayMillis) ? { fakeAiDelayMillis } : {}),

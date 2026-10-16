@@ -15,6 +15,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Cold start → window visible with the shell (sidebar bar, tab strip, empty list) | 400 ms p50, 600 ms p95 | From `app` launch to the first presented frame. The shell is static chrome; it needs no data. |
 | Cold start → first sidebar rows painted from the local cache | 800 ms p50, 1 200 ms p95 | Large workspace, OS file cache warm. Slack is not contacted before this point. |
 | Warm start (second launch within a minute) → first sidebar rows | 500 ms p50 | V8 code cache and OS caches hot. |
+| First sign-in → first sidebar rows (quick start) | 5 s | Empty cache, large seed, 300 ms per Slack call, production pacing. The rows are the cold boot's quick steps (`userBoot`, `prefs`, `counts`, DM names, the first `getView` page): followed threads titled from their first words, and channels and DMs from `client.counts`. History, replies, search and users fill in after, with no reload. Asserted by `quick-start.spec.ts`; `pnpm bench:sync -- --latency 300` prints the engine side. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Home open (the sidebar's Home item, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts`. |
@@ -993,6 +994,21 @@ run is not fully green. Logs: `/tmp/juno-speed-affected-final-3.log`,
 After queueing at the 24-vCPU cap, final remote checks used the supported
 `JUNO_REMOTE_MACHINE=linux/amd64:2x4` override. No pool limit was raised.
 
-The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps, unread badges and status tags reserve their widths; the participant stack takes only its own width at the line's end, so a stack arriving cuts the place name shorter and moves nothing; New view stays beside Unread only while view pills fill.
+The sidebar holds its first list on an empty cache until the cold boot's quick start (membership, DM names, the first page of followed threads) is stored, then shows rows as the sync stores them. Clear bot channels are sorted into Automated as each one's history lands. Cached rows still paint immediately. Topic-row timestamps, unread badges, participant stacks and status tags reserve their widths; New view stays beside Unread only while view pills fill.
 
-All topics holds its first cold rows until sync completes, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
+All topics holds its first cold rows until the quick start is stored, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
+
+### First sync quick start and per-method pacing (2026-10-16)
+
+`pnpm bench:sync -- --latency 300 --until-quiet` on the Mac: the large seed, 300 ms per Slack call, production pacing, the same 471 Web API calls before and after, no rate-limit hits.
+
+| | Before | After |
+| --- | --- | --- |
+| Sign-in to sidebar rows shown | 855 s (held until the whole boot ended) | 2.6 s |
+| First channel or DM row in the index | 5.1 s | 1.0 s (from `client.counts`) |
+| Boot to `live`, last call | 855 s | 545 s |
+| `getView` call time | 147 s | 74 s (one `users/info` per page, not per thread) |
+| Edge `users/info` calls | 471 | 153 |
+| Unread threads shown as a dot | 33 | 0 |
+
+The 33 dots before were threads whose reply coverage was recorded after their last re-index. Single runs, not a distribution. Full sync is now set by history alone: 300 calls at 40 a minute.

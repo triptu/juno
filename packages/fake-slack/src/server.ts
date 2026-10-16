@@ -102,6 +102,7 @@ export class FakeServer {
   #frameHold: ReadonlySet<string> | undefined
   #frameWhere: ((frame: RtmFrame) => boolean) | undefined
   #fileDelayMs = 0
+  #latencyMs = 0
   #failedUploads = 0
   #uploadsBeforeFailing = 0
   readonly #heldFrames: RtmFrame[] = []
@@ -318,6 +319,15 @@ export class FakeServer {
     this.#fileDelayMs = ms
   }
 
+  /** Every Web API and edge call waits `ms` before it runs, like the network and Slack's own time. 0 turns it off. */
+  setLatency(ms: number): void {
+    this.#latencyMs = ms
+  }
+
+  #wait(): Promise<void> | undefined {
+    return this.#latencyMs > 0 ? new Promise((resolve) => setTimeout(resolve, this.#latencyMs)) : undefined
+  }
+
   /** After `after` more upload POSTs succeed, the next `times` answer HTTP 500 and store nothing. */
   failUploads(times: number, after = 0): void {
     this.#failedUploads = times
@@ -479,6 +489,7 @@ export class FakeServer {
 
   async #api(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const fields = parseFields(request.headers['content-type'], await readBody(request))
+    await this.#wait()
     const record = (status: number, body: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'api', method, args: redact(fields), status, ok: body.ok, ...(body.error === undefined ? {} : { error: body.error }) })
       json(response, status, body)
@@ -557,6 +568,7 @@ export class FakeServer {
 
   async #edge(method: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = parseJson(await readBody(request))
+    await this.#wait()
     const record = async (status: number, payload: { ok: boolean; error?: string }) => {
       this.calls.push({ at: this.workspace.clock.now(), kind: 'edge', method, args: redact(stringify(body)), status, ok: payload.ok, ...(payload.error === undefined ? {} : { error: payload.error }) })
       await this.#hold(this.#holds, `edge:${method}`, redact(stringify(body)))

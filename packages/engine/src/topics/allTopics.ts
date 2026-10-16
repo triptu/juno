@@ -24,12 +24,11 @@
  */
 import { allTopicsStatus, quietDaysOf, type ConversationKind, type RuleContext } from '@juno/domain'
 import type { AllTopicsCounts, AllTopicsFilter, AllTopicsSummary, ChannelRef, KindFilter, TopicListRow } from '@juno/contract'
-import { ftsQuery, StoreReader, syncState, type SqlError } from '@juno/store'
-import { BOOT_KEY } from '@juno/sync'
+import { ftsQuery, StoreReader, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
 import { channelInfoOf, channelRefOf, parseIds, userName, type UserRow } from '../topicRows'
-import { cutoffTs, FROM, kindClause, SELECT, settings, shapeRows, type ListRow, type RowCache } from './query'
+import { cutoffTs, FROM, kindClause, rowsCovered, SELECT, settings, shapeRows, type ListRow, type RowCache } from './query'
 
 /** The filters that narrow the list before the chip: kind, place and text. */
 export type Narrowing = Pick<AllTopicsFilter, 'kind' | 'scope' | 'query'>
@@ -156,7 +155,7 @@ export const listAllTopics = (
     const shaper = yield* shapeRows(inOrder, { selfId, aiAssist }, cache)
     for (const entry of shaper.entries) shaper.place(entry, entry.topic.overlay.pinnedAt === undefined ? 'recent' : 'pinned', allTopicsStatus(entry.topic, ctx))
     // When the index moved between the two statements a row can be missing; the next run puts it back.
-    return { ...shaper.finish(Math.max(total, options.offset + shaper.entries.length)), windowCovered: (yield* syncState.get(BOOT_KEY)) !== undefined }
+    return { ...shaper.finish(Math.max(total, options.offset + shaper.entries.length)), windowCovered: yield* rowsCovered }
   })
 
 const emptyCounts = (): { -readonly [K in keyof AllTopicsCounts]: number } => ({ all: 0, open: 0, resolved: 0, quiet: 0, unsubscribed: 0 })

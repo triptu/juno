@@ -70,6 +70,8 @@ export interface LaunchOptions {
   readonly codemode?: boolean
   /** Play the next build: the engine opens the cache with one more migration (`JUNO_E2E_CACHE_MIGRATION`). */
   readonly cacheMigration?: boolean
+  /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
+  readonly paced?: boolean
 }
 
 /**
@@ -97,6 +99,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
+  if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
 
   // Launch the package directory (like `electron .`), not the script, so

@@ -26,6 +26,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     usersWanted: yield* Queue.sliding<void>(1),
     usersOnBackground: false,
     onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
+    onHistory: options.onHistory ?? (() => Effect.void),
     unknownUsers: new Set(),
     lateReactions: new Map(),
     fetchesInFlight: new Set(),
