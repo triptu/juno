@@ -171,8 +171,9 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
         event.preventDefault()
         onLink?.(inline.url)
       }
+      // The URL shows on hover, as the browser's status line would show it.
       return (
-        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
+        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
           {styled(inline.text, inline.style)}
         </a>
       )

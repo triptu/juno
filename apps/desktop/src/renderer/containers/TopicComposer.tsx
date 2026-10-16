@@ -1,11 +1,12 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
-import { audienceCheck, decodeMentions, encodeMentions, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
+import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import { chunk } from './chunks'
 import { takeAttachments, useAttachments } from './attachments'
+import { useComposerLinks } from './composerLinks'
 import { useMentions } from './mentions'
 import type { ComposerHandle } from './messageActions'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
@@ -66,8 +67,10 @@ export function withQuote(draft: string, text: string): string {
  * shows inside the composer until a choice, Esc or an edit. While typing
  * pauses in a public channel, the audience line warns about hiring and
  * people details. Typing @ or # suggests people and channels
- * (`useMentions`); the draft and the send carry the picked ones encoded as
- * Slack does (`encodeMentions`), while the checks read the text as shown.
+ * (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
+ * The draft and the send carry the picked people and channels and the
+ * linked words encoded as Slack does (`encodeDraft`), while the checks read
+ * the text as shown.
  */
 export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
@@ -89,19 +92,21 @@ function LoadedComposer({
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
-  const [start] = useState(() => decodeMentions(initial))
+  const [start] = useState(() => decodeDraft(initial))
   const [text, setText] = useState(start.text)
   const [picks, setPicks] = useState(start.picks)
   // Read when the draft is saved or sent, which can be in the same event as a pick.
   const picked = useRef<ReadonlyArray<MentionPick>>(start.picks)
-  const encoded = (value: string) => encodeMentions(value, picked.current)
+  const field = useRef<HTMLTextAreaElement>(null)
+  // Declared before `change`, which it calls back; `change` is a function declaration below.
+  const links = useComposerLinks({ field, initialText: start.text, initial: start.links, onChange: (value) => change(value) })
+  const encoded = (value: string) => encodeDraft(value, picked.current, links.current())
   // The draft as it was when typing last paused: the audience line reads it.
   const [paused, setPaused] = useState(start.text)
   const [bar, setBar] = useState<CheckBar | undefined>(undefined)
   // The check Enter started; an edit or a newer Enter replaces it, and its answer is dropped.
   const checking = useRef<object | undefined>(undefined)
   const [waiting, setWaiting] = useState(false)
-  const field = useRef<HTMLTextAreaElement>(null)
   // A quote just went in: the caret goes after it once it is drawn.
   const [quotedAt, setQuotedAt] = useState(0)
   useLayoutEffect(() => {
@@ -138,9 +143,10 @@ function LoadedComposer({
   // only until it is typed in, so a tab whose press gave it focus still takes the other tab's newer draft.
   useEffect(() => {
     if (unsaved.current !== undefined || (document.activeElement === field.current && typedSinceShown.current) || latest === encoded(text)) return
-    const next = decodeMentions(latest)
+    const next = decodeDraft(latest)
     picked.current = next.picks
     setPicks(next.picks)
+    links.reset(next.text, next.links)
     setText(next.text)
     setPaused(next.text)
     // Only a change of the stored draft is taken, not this field's own edits.
@@ -159,7 +165,8 @@ function LoadedComposer({
     setWaiting(false)
   }
 
-  const change = (next: string) => {
+  function change(next: string) {
+    links.moved(next)
     typedSinceShown.current = true
     setText(next)
     // Editing closes the bar and drops a check still running: Enter checks the new text.
@@ -179,19 +186,26 @@ function LoadedComposer({
   const deliver = (body: string, to: Destination) => {
     const attached = takeAttachments(id)
     if (attached === undefined) return
+    // A fixed text ("Fix and send") moves the linked words with its fixes.
+    const sentLinks = body === text ? links.current() : moveLinks(text, body, links.current())
+    const message = encodeDraft(body, picked.current, sentLinks)
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
+    links.reset('', [])
     setText('')
     setPaused('')
     setBar(undefined)
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
-    void sendMessage(registry, target, encoded(body), id, attached.ids).then((exit) => {
+    void sendMessage(registry, target, message, id, attached.ids).then((exit) => {
       if (exit._tag === 'Success') mark('juno.send-queued', undefined, { replace: true })
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text and the files come back so they can be sent again.
-        setText((current) => (current === '' ? body : current))
+        if (field.current?.value === '') {
+          links.reset(body, sentLinks)
+          setText(body)
+        }
         attached.restore()
         console.warn('juno: send failed', exit.cause)
       } else if (to.kind === 'thread') {
@@ -264,10 +278,18 @@ function LoadedComposer({
     place: { channel: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) },
   })
 
+  // Links are drawn where no picked name is.
+  const linkMarks = links.shown(text, picks).map((link) => ({ start: link.start, end: link.end, look: 'link' as const }))
+  const marks = [...mentions.marks.filter((mark) => !linkMarks.some((link) => mark.start < link.end && mark.end > link.start)), ...linkMarks].toSorted((a, b) => a.start - b.start)
+
   return (
     <Composer
       value={text}
       {...mentions}
+      marks={marks}
+      onPasteText={links.onPasteText}
+      onFieldClick={links.onFieldClick}
+      {...(links.popover === undefined ? {} : { popover: links.popover })}
       onSend={send}
       placeholder={placeholder}
       inputRef={field}
