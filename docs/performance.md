@@ -993,6 +993,6 @@ run is not fully green. Logs: `/tmp/juno-speed-affected-final-3.log`,
 After queueing at the 24-vCPU cap, final remote checks used the supported
 `JUNO_REMOTE_MACHINE=linux/amd64:2x4` override. No pool limit was raised.
 
-The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps, unread badges and status tags reserve their widths; the participant stack takes only its own width at the line's end, so a stack arriving cuts the place name shorter and moves nothing; New view stays beside Unread only while view pills fill.
+The sidebar holds its first list on an empty cache until cold sync and Automated classification establish membership. Cached rows still paint immediately. Topic-row timestamps reserve their width; the participant stack, the @ and the unread count keep no slot and take only their own width at the preview line's end, so one arriving cuts the preview shorter and moves nothing else (updated 10-16); New view stays beside Unread only while view pills fill.
 
 All topics holds its first cold rows until sync completes, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
