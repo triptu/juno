@@ -106,7 +106,7 @@ function sameChannel(a: RowChannel, b: RowChannel): boolean {
 /** Keep previously visible read-dependent rows while a tab still shows them. */
 export function retainOpenTopics(
   shown: SidebarWindow,
-  next: ListWindow<TopicRow>,
+  next: SidebarWindow,
   tabs: Tabs,
   details: ReadonlyMap<string, TopicDetail | null>,
 ): SidebarWindow {
