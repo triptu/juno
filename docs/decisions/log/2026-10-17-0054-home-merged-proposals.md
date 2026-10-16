@@ -1,0 +1,1 @@
+- 10-17 00:54 · home-newchat · Three looks for Home merged with New chat are in docs/design/home-merged (one field, composer at the foot, two columns); A, one field with Juno as the first destination, is recommended. The owner picks before anything is removed.

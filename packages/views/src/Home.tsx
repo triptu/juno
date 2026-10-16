@@ -3,7 +3,7 @@ import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
-import { useId, type MouseEvent } from 'react'
+import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Kbd, Text, TopicArt, type ActivateEvent } from '@juno/ui'
@@ -39,6 +39,8 @@ export interface HomeProps {
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
   readonly reservedItems?: number
+  /** Closes the column, under the ask field: the merged Home's writing block (proposal fixtures). */
+  readonly below?: ReactNode
 }
 
 /**
@@ -47,7 +49,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, loading = false, reservedItems = 0 }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, loading = false, reservedItems = 0, below }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -91,6 +93,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
             <Kbd look="key">⌘J</Kbd>
           </button>
         )}
+        {below}
       </div>
     </div>
   )

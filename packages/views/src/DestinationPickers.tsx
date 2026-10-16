@@ -294,3 +294,6 @@ const tintStyles = stylex.create({
   dm: { color: tints['--tint-dm-fg'], backgroundColor: tints['--tint-dm-bg'] },
 })
 
+
+/** The picker pill's look, for other destination controls (the merged Home proposals). */
+export const pickerLook = { pill: styles.button, plain: styles.plain, tints: tintStyles, caret: styles.caret, label: styles.buttonLabel }
