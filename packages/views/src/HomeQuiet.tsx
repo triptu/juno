@@ -80,7 +80,7 @@ function Row({ recent, chosen, refined = false }: { readonly recent: Recent; rea
   )
 }
 
-function Rows({ list, chosen, refined = false }: { readonly list: ReadonlyArray<Recent>; readonly chosen: string | undefined; readonly refined?: boolean }) {
+export function Rows({ list, chosen, refined = false }: { readonly list: ReadonlyArray<Recent>; readonly chosen: string | undefined; readonly refined?: boolean }) {
   return (
     <ul {...stylex.props(styles.list)}>
       {list.map((recent) => (
@@ -325,3 +325,6 @@ const styles = stylex.create({
     outlineColor: accent['--focus-ring'],
   },
 })
+
+/** The page frame (page, scroll, column) and the greeting title, for round 4's layouts. */
+export const quietStyles = styles

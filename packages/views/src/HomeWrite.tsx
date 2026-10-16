@@ -157,15 +157,18 @@ export interface HomeComposerProps {
   /** Above the field, inside its column: a band of recents. */
   readonly above?: ReactNode
   readonly refined?: boolean
+  /** The chip stays on the first line when the text wraps; the send button stays on the last, as in a topic. */
+  readonly chipAtTop?: boolean
 }
 
 /**
  * The composer at the bottom of Home. With `token` the chosen destination
  * is the first word of the text (`write.marks` carries its chip).
  */
-export function HomeComposer({ write, look, above, refined = false }: HomeComposerProps) {
+export function HomeComposer({ write, look, above, refined = false, chipAtTop = false }: HomeComposerProps) {
   const { destination, draft, picker } = write
-  const leading = leadingFor(look, destination)
+  const chip = leadingFor(look, destination)
+  const leading = chipAtTop && chip !== undefined ? <span {...stylex.props(styles.atTop)}>{chip}</span> : chip
   const toLine = look === 'to' ? <ToLine destination={destination} /> : undefined
   const top = above !== undefined && toLine !== undefined ? <div {...stylex.props(styles.aboveStack)}>{above}{toLine}</div> : (above ?? toLine)
   return (
@@ -258,6 +261,12 @@ const styles = stylex.create({
     borderRadius: radii['--radius-pill'],
     backgroundColor: colors['--warm-soft'],
     color: colors['--foreground-default'],
+  },
+  // The composer row lines its controls up on the last line; this one starts on the first.
+  atTop: {
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   chip: {
     flexShrink: 0,
