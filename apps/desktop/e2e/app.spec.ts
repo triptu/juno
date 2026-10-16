@@ -196,8 +196,8 @@ test('exposes only the bridge to the page', async ({ win }) => {
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
     launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar'],
     contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile'],
-    clipboard: ['writeText'],
+    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
+    clipboard: ['writeText', 'writeImage'],
     menu: ['onCommand'],
     notifications: ['setViewing', 'onOpen'],
   })

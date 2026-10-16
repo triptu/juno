@@ -98,9 +98,13 @@ export interface IpcDeps {
   readonly setViewing: (topicId: string | null) => void
   /** Download (files.ts), with the hosts it may fetch from already bound. */
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
+  /** Open in the viewer (files.ts), bound the same way. */
+  readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
+  /** Copy image in the viewer (files.ts), bound the same way. */
+  readonly copyImage: (src: string) => Promise<'copied' | 'failed'>
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, setViewing, downloadFile, openFile, copyImage }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -229,6 +233,8 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   })
 
   handle(Channels.shellDownloadFile, (file) => downloadFile(file))
+  handle(Channels.shellOpenFile, (file) => openFile(file))
+  handle(Channels.clipboardWriteImage, ({ src }) => copyImage(src))
 
   handle(Channels.clipboardWriteText, ({ text }) => {
     clipboard.writeText(text)

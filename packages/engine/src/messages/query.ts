@@ -600,6 +600,10 @@ interface SlackFile {
   readonly thumb_480?: string
   readonly thumb_720?: string
   readonly thumb_1024?: string
+  readonly thumb_video?: string
+  readonly thumb_video_w?: number
+  readonly thumb_video_h?: number
+  readonly mp4?: string
   readonly url_private?: string
   readonly url_private_download?: string
 }
@@ -621,6 +625,25 @@ function thumbOf(file: SlackFile): FileView['thumb'] {
   const h = file.original_h ?? file.thumb_360_h
   if (variant === undefined || url === undefined || w === undefined || h === undefined || w <= 0 || h <= 0) return undefined
   return boxOf(`juno://files/${encodeURIComponent(file.id)}/${variant}?url=${encodeURIComponent(url)}`, w, h)
+}
+
+/**
+ * A video's poster frame and what the viewer plays: Slack's `mp4` when it
+ * made one, else the original. Without a poster and its size the video is a
+ * card.
+ */
+function videoOf(file: SlackFile): Pick<FileView, 'thumb' | 'video' | 'width' | 'height'> | undefined {
+  const w = file.thumb_video_w
+  const h = file.thumb_video_h
+  const play = file.mp4 ?? file.url_private
+  if (file.id === undefined || file.thumb_video === undefined || play === undefined || w === undefined || h === undefined || w <= 0 || h <= 0) return undefined
+  const id = encodeURIComponent(file.id)
+  return {
+    width: w,
+    height: h,
+    thumb: boxOf(`juno://files/${id}/poster?url=${encodeURIComponent(file.thumb_video)}`, w, h),
+    video: `juno://files/${id}/video?url=${encodeURIComponent(play)}`,
+  }
 }
 
 /**
@@ -709,6 +732,19 @@ function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): Rea
         height: staged.height,
         thumb: boxOf(src, staged.width, staged.height),
         full: src,
+        ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
+      })
+      continue
+    }
+    if (kind === 'video') {
+      const poster = videoOf(file)
+      out.push({
+        id: file.id,
+        name: file.title || file.name || file.id,
+        kind,
+        ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
+        ...(file.size === undefined ? {} : { size: file.size }),
+        ...(poster === undefined ? {} : poster),
         ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
       })
       continue

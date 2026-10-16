@@ -222,6 +222,8 @@ export {
   attachmentsAtom,
   clearAttachments,
   downloadFile,
+  openFile,
+  copyImage,
   readyFiles,
   removeAttachment,
   restoreAttachments,
