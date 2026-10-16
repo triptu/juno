@@ -130,7 +130,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
           }
           const at = yield* Clock.currentTimeMillis
           // No key, or the daily cap: nothing was sent, and nothing can succeed until a key or a link to the ledger wakes the job.
-          if (outcome === 'missing-key' || outcome === 'budget') {
+          if (outcome === 'missing-key' || outcome === 'budget' || outcome === 'no-agent') {
             memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
             return
           }

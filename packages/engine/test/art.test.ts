@@ -109,7 +109,7 @@ describe('topic art', () => {
     const engine = await bootedEngine()
     const rows = await drawnRows(engine)
     const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
-    valueOf(await redrawTopic(engine.registry, target.id))
+    expect(await redrawTopic(engine.registry, target.id, { text: 'Redrawn' })).toBeUndefined()
     const after = await engine.rowsUntil((next) => {
       const row = next.find((candidate) => candidate.id === target.id)
       return row !== undefined && hasArt(row) && row.art !== target.art
