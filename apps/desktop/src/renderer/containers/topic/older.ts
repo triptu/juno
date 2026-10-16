@@ -43,7 +43,8 @@ export function useOlderPages(position: Position, id: string, view: string, list
               ? { limit: spec.limit + OLDER_PAGE }
               : { anchor: first, before: OLDER_PAGE, limit: MESSAGE_WINDOW_MAX }
           // Scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor; the pin covers both.
-          const inView = rowInView(scroller)
+          // A list that reached its end while the page loaded (the pill, End) keeps holding the bottom.
+          const inView = pinRef.current?.kind === 'bottom' ? undefined : rowInView(scroller)
           if (inView !== undefined) {
             pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
             pinnedTopRef.current = scroller.scrollTop

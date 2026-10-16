@@ -1,0 +1,1 @@
+- 10-17 01:57 · ci-fix-11 · An older page that lands while the message list holds its bottom keeps the bottom pin instead of pinning the row in view, so a list that reached its end while the page loaded still holds it.

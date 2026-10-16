@@ -837,6 +837,8 @@ Causes found so far (2026-10-15):
 
 - **A list item read at its threshold.** Home shows "moved a lot" from `MOVED_A_LOT_MIN` (8) new replies, so a test that injects nine and waits for the item can read it at eight. Wait for the value the test asserts.
 
+- **An older page that landed after the jump to the bottom.** A topic that opens at the "new" divider near its top asks for an older page at once. Under load the page landed after `toLatest` had reached the bottom, and `useOlderPages` replaced the bottom pin with a pin on the row in view, so the list stopped holding its end: the composer grew and the last message went 88 px out of view (2 of 40 at 24 workers, 12 of 40 with logging). The page now leaves a bottom pin alone (`older.ts`). The composer test also waits for the observer's first look before it types and for an entry at the smaller height, rather than counting frames.
+
 ## Machine shapes
 
 Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.
