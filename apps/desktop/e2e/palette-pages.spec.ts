@@ -37,8 +37,8 @@ test('"settings" lists every Settings section, and Enter on one opens Settings t
   await palette.open()
   await palette.type('settings')
   const sections = palette.section('Settings')
-  await expect(sections.getByRole('option')).toHaveCount(8)
-  for (const name of ['General', 'Appearance', 'Notifications', 'Ignored', 'Juno', 'Connections', 'Backup & This Mac', 'About']) {
+  await expect(sections.getByRole('option')).toHaveCount(9)
+  for (const name of ['General', 'Appearance', 'Notifications', 'Ignored', 'Juno', 'AI activity', 'Connections', 'Backup & This Mac', 'About']) {
     await expect(sections.getByRole('option', { name: new RegExp(`Settings: ${name}`) })).toBeVisible()
   }
   await palette.row('Settings: Notifications').hover()

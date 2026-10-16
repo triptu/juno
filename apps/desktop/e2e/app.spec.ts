@@ -201,7 +201,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
     clipboard: ['writeText', 'writeImage'],
     menu: ['onCommand'],
-    notifications: ['setViewing', 'onOpen'],
+    notifications: ['setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
   })
 })
 
