@@ -269,7 +269,7 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
   within('home open, p95', open.p95, 50)
 })
 
-// pointerdown on a picture in a message to the first presented frame that
+// A click on a picture in a message to the first presented frame that
 // shows the media viewer with its item and filmstrip (performance.md section
 // 1, "Media viewer open"). The viewer's chunk is preloaded once a topic has
 // painted, so this is the overlay's own cost.
@@ -286,11 +286,14 @@ test('media viewer open: a picture in a message to the viewer painted', async ({
   const samples: number[] = []
   for (let i = 0; i < 16; i++) {
     const tile = tiles.nth(i % 4)
+    // The topic opens at its divider, so the new message can sit under the composer.
+    await tile.scrollIntoViewIfNeeded()
     await tile.evaluate((node) => {
       const w = window as unknown as { __viewerSample?: Promise<number> }
       w.__viewerSample = new Promise((resolve) => {
+        // A tile opens on `click`, its activating event, as the account menu does; timing from pointerdown would add the driver's 60 ms hold.
         node.addEventListener(
-          'pointerdown',
+          'click',
           (event) => {
             const start = event.timeStamp
             const shown = () => document.querySelector('[data-media-viewer] [data-viewer-item]') !== null && document.querySelector('[data-media-viewer] [data-filmstrip]') !== null
@@ -320,7 +323,7 @@ test('media viewer open: a picture in a message to the viewer painted', async ({
     await expect(win.locator('[data-media-viewer]')).toHaveCount(0)
     await win.waitForTimeout(200)
   }
-  const open = stats('media viewer open (pointerdown on a picture) to the viewer painted', samples)
+  const open = stats('media viewer open (click on a picture) to the viewer painted', samples)
   within('media viewer open, p95', open.p95, 50)
 })
 
