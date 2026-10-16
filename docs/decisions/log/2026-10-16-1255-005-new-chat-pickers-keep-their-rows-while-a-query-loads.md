@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · New chat's pickers keep the last rows while a new query's rows load, so the list never draws empty; an Enter in that moment waits for the new rows.

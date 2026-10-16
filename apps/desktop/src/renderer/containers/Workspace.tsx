@@ -121,8 +121,10 @@ const activeTopicOf = (state: Tabs): string | undefined => {
   return tab === undefined ? undefined : tabTopic(tab)
 }
 
-function selectTab(id: string, _event: ActivateEvent): void {
-  switchToTab(id)
+function selectTab(id: string, event: ActivateEvent): void {
+  if (event.source === 'pointer') pressed = id
+  if (registry.get(tabsAtom).active === id) restoreFocus(id)
+  else switchToTab(id)
 }
 
 function tabMenu(id: string): void {
@@ -151,17 +153,28 @@ function onFocusIn(event: FocusEvent): void {
   if (active !== undefined) lastFocus.set(active, new WeakRef(target))
 }
 
+/** A tab the pointer pressed: its page takes focus once it shows, wherever focus was. */
+let pressed: string | undefined
+
 /**
- * A tab that shows again gets back the focus it had, when the switch left
- * focus nowhere: a shortcut such as ⌃Tab, while focus was in the page that
- * hid. Focus the switch put somewhere, as on a tab in the strip, stays.
+ * A tab that shows gets back the focus it had, or else its composer. A
+ * press on its tab always gives the page focus, as Safari does; a keyboard
+ * switch does when it left focus nowhere (⌃Tab while focus was in the page
+ * that hid). Focus on a tab in the strip, moved there by the keyboard, stays.
  */
 function restoreFocus(tabId: string): void {
-  const element = lastFocus.get(tabId)?.deref()
-  if (element === undefined || !element.isConnected || !element.checkVisibility()) return
+  const force = pressed === tabId
+  pressed = undefined
   const focused = document.activeElement
-  if (focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return
-  element.focus({ preventScroll: true })
+  if (!force && focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return
+  const kept = lastFocus.get(tabId)?.deref()
+  const element = kept !== undefined && kept.isConnected && kept.checkVisibility() ? kept : pageComposer()
+  element?.focus({ preventScroll: true })
+}
+
+/** The composer of the page on screen, if it has one. */
+function pageComposer(): HTMLElement | undefined {
+  return [...document.querySelectorAll<HTMLElement>('section[aria-label="Workspace"] main [data-composer] textarea')].find((field) => field.checkVisibility())
 }
 
 /** The mouse's back and forward buttons. */

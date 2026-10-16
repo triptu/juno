@@ -9,7 +9,8 @@ The aim was to use the features that landed on 10-16 and 10-17 together, the
 way a busy day does: several tabs on one topic, the Juno panel, New chat with
 Frequent, Settings, emoji suggestions, a dropped connection and a relaunch.
 
-The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts` and
+The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts`,
+`apps/desktop/e2e/break-pass-1017-input.spec.ts` and
 `apps/desktop/e2e/juno-agent/break-pass-1017.spec.ts`.
 
 ## Fixed
@@ -58,7 +59,24 @@ The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts` and
 
 ## Open findings
 
-Ranked by how much a daily user would feel them.
+Ranked by how much a daily user would feel them. All six were fixed in a
+second round on the same branch, as the owner decided (the decision log has
+one line for each):
+
+1. Emoji suggestions rank the common emoji 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌 after
+   recent use and before name order.
+2. A New chat tab's text, mentions and destination are saved with the tab
+   (`setNewChat`, the `newChat` field of a saved tab). Attachments are not.
+3. A press on a tab no longer focuses the tab; its page takes focus, the
+   element it had or else its composer. Arrow keys in the strip still move
+   focus there.
+4. Attach files has `tabIndex -1` in New chat only.
+5. The inline edit field has the emoji suggestions, above the field.
+6. New chat's pickers keep the last rows while a query loads (`useHeld` in
+   `NewChat.tsx`); a feel scenario, `new-chat-picker-typing`, checks that
+   the list never has zero rows while a search is typed.
+
+The findings as first written:
 
 1. **`:thumbs` and Enter gives 👎.** With no recent use, matches in the
    prefix tier are in name order, so `thumbsdown` comes before `thumbsup`.
@@ -139,7 +157,8 @@ These were tried and behaved as the spec says:
 
 `pnpm affected` passed after the fixes: typecheck, lint, the unit tests, the
 gallery and the whole desktop e2e on four remote shards. The New chat
-relaunch test is marked `test.fail()` until finding 2 is fixed.
+relaunch test was marked `test.fail()` until finding 2 was fixed; it now
+passes.
 
 ## Not covered
 
@@ -150,3 +169,31 @@ relaunch test is marked `test.fail()` until finding 2 is fixed.
   here exercised them together with tabs.
 - Anything that needs the Mac (`@mac`, feel, perf). The focus change should
   be checked by `pnpm test:feel -g tabs` on the Mac before merge.
+
+## Round three: more than one New chat tab
+
+The owner found the tabs too constrained: a second ⌘T took them back to the
+New chat already open. Changed:
+
+- ⌘T, "+", ⌘N and the sidebar's New chat button open a new New chat tab
+  every time. They used to focus an untouched one.
+- ⌘K's "Message" for someone never messaged opens a new New chat tab too,
+  rather than filling an untouched one.
+- A New chat sent to a topic that another tab shows stays in its own tab
+  and becomes the topic. It used to close and focus the other tab.
+
+Kept as they are:
+
+- **Settings is one tab.** It is one page with sections, and every entry
+  (⌘,, the avatar menu, Notifications, the Juno menu) moves it to a
+  section. Two copies would show the same controls twice and could disagree
+  while a change saves.
+- **A plain open focuses a tab that already shows the place** (a topic,
+  Home, All topics, Juno). This keeps the sidebar's selection in one place
+  (SPEC 6). It never stops a second tab: ⌘-click, ⌘ Enter and "Open in new
+  tab" always open one.
+- **There is always a tab.** Closing the last one opens a new one.
+
+Tests: "⌘T twice gives two New chat tabs with their own drafts, and both
+survive a relaunch" and "a New chat sent to a topic open in another tab
+stays in its own tab", in `break-pass-1017.spec.ts`.

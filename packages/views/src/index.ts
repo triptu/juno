@@ -15,7 +15,7 @@ export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView
 export { ImageViewer, type ImageViewerProps } from './ImageViewer'
 
 export { type MessageActions } from './Message'
-export { InlineEdit } from './InlineEdit'
+export { InlineEdit, type InlineEditProps } from './InlineEdit'
 export { Floating, SelectionQuote } from './Floating'
 
 export { MessageList, type MessageListItem, type MessageListStatus, type OlderStatus } from './MessageList'

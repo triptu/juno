@@ -94,7 +94,8 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
     onClose?.()
   }
 
-  const activate = activateHandlers<HTMLDivElement>(onSelect)
+  // A press does not focus the tab: the page it shows takes focus, as in Safari. The keyboard still moves focus in the strip.
+  const activate = activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true })
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (onClose !== undefined && event.target === event.currentTarget && (event.key === 'Delete' || event.key === 'Backspace')) {
       event.preventDefault()

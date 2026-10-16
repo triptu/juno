@@ -71,18 +71,18 @@ test('⌘T during the first sync opens a usable New chat', async ({ juno, fake }
   fake.holdNext({ method: 'conversations.history' })
   await juno.signIn()
   await expect(juno.sidebar.root.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing/, { timeout: 30_000 })
+  // ⌘T opens a New chat beside the launch tab's, every time.
   await juno.tabs.menu('new-tab')
-  // The launch tab is an untouched New chat, so ⌘T focuses it rather than adding another.
-  await juno.tabs.expectCount(1)
+  await juno.tabs.expectCount(2)
   await expect(juno.newChat.composer).toBeFocused()
   await juno.newChat.write('Written during sync')
   await juno.tabs.menu('new-tab')
-  await juno.tabs.expectCount(2)
+  await juno.tabs.expectCount(3)
   await expect(juno.newChat.composer).toBeFocused()
   await expect(juno.newChat.composer).toHaveValue('')
   fake.release()
   await juno.waitForSync()
-  await juno.tabs.selectAt('New chat', 0)
+  await juno.tabs.selectAt('New chat', 1)
   await expect(juno.newChat.composer).toHaveValue('Written during sync')
   await juno.newChat.pickConversation('eng', 'eng')
   await juno.newChat.send()
@@ -171,9 +171,7 @@ test('a relaunch keeps many tabs and their drafts', async ({ juno, running, user
   }
 })
 
-// Open finding: a New chat's draft and destination live only while the app runs (`newChatAtom`).
 test('a relaunch keeps a New chat tab with its destination and draft', async ({ juno, running, userData, fake, slackApp }) => {
-  test.fail()
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
@@ -266,88 +264,70 @@ test('each tab gets its composer focus back after a keyboard tab switch', async 
   await expect(juno.newChat.composer).toBeFocused()
 })
 
-test('New chat works from the keyboard alone: write, pick with Enter, send', async ({ juno, fake }) => {
+test('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.tabs.menu('new-chat')
-  await expect(juno.newChat.composer).toBeFocused()
-  await juno.win.keyboard.type('Keyboard only')
-  // Enter with no destination opens the conversation list and keeps the draft.
-  await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
-  // Esc closes the list and puts focus on its button; Space opens it again.
-  await juno.win.keyboard.press('Escape')
-  await expect(juno.newChat.conversationButton).toBeFocused()
-  await juno.win.keyboard.press('Space')
-  await expect(juno.newChat.search).toBeFocused()
-  await juno.win.keyboard.type('eng')
-  await expect(juno.newChat.option('eng')).toBeVisible()
-  await juno.win.keyboard.press('Enter')
-  await juno.newChat.expectConversation('eng')
-  await expect(juno.newChat.composer).toBeFocused()
-  await expect(juno.newChat.composer).toHaveValue('Keyboard only')
-  // Shift Tab reaches Attach files, then the thread picker; Esc from its list goes back without a change.
-  await juno.win.keyboard.press('Shift+Tab')
-  await expect(juno.newChat.root.getByRole('button', { name: 'Attach files' })).toBeFocused()
-  await juno.win.keyboard.press('Shift+Tab')
-  await expect(juno.newChat.threadButton).toBeFocused()
-  await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
-  await juno.win.keyboard.press('Escape')
-  await expect(juno.newChat.threadButton).toBeFocused()
-  await juno.newChat.expectThread('Main')
-  await juno.win.keyboard.press('Tab')
-  await juno.win.keyboard.press('Tab')
-  await expect(juno.newChat.composer).toBeFocused()
-  await juno.win.keyboard.press('Enter')
-  await juno.topic.expectMessage('Keyboard only')
-  expect(fake.messages('C0ENG').filter((m) => m.text === 'Keyboard only')).toHaveLength(1)
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.sidebar.row(RINA).openInNewTab()
+  // Never focused in this tab: the press focuses its composer.
+  await juno.tabs.select(POSTGRES)
+  await expect(juno.topic.composer).toBeFocused()
+  await juno.win.keyboard.type('Typed after a click')
+  await expect(juno.topic.composer).toHaveValue('Typed after a click')
+  // From the sidebar, a press on the active tab focuses its page too.
+  await juno.sidebar.row(POSTGRES).focus()
+  await juno.tabs.select(POSTGRES)
+  await expect(juno.topic.composer).toBeFocused()
+  // Arrow keys in the strip move the selection and keep focus on the tabs.
+  await juno.tabs.tab(POSTGRES).focus()
+  await juno.win.keyboard.press('ArrowRight')
+  await juno.tabs.expectActive('Rina')
+  await juno.tabs.expectFocused('Rina')
 })
 
-test('dark mode leaves no light surface in New chat, the switcher and Settings', async ({ juno, fake }) => {
-  for (let i = 0; i < 6; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
+test('⌘T twice gives two New chat tabs with their own drafts, and both survive a relaunch', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.setTheme('Dark')
-  const lightSurfaces = () =>
-    juno.win.evaluate(() => {
-      const light: string[] = []
-      for (const element of document.querySelectorAll<HTMLElement>('body *')) {
-        // Rows off screen skip style (content-visibility), and hidden actions are at opacity 0.
-        if (!element.checkVisibility({ opacityProperty: true, contentVisibilityAuto: true })) continue
-        const match = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(element).backgroundColor)
-        if (match === null || (match[4] !== undefined && Number(match[4]) < 0.5)) continue
-        const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])]
-        if (0.2126 * r + 0.7152 * g + 0.0722 * b > 200) light.push(`${element.tagName.toLowerCase()} "${element.getAttribute('aria-label') ?? element.textContent?.slice(0, 30)}" ${match[0]} in ${element.parentElement?.closest('[aria-label]')?.getAttribute('aria-label')}`)
-      }
-      return light
-    })
-  await juno.tabs.menu('new-chat')
-  await expect(juno.newChat.root.getByRole('list', { name: 'Frequent conversations' }).getByRole('button').first()).toBeVisible()
-  expect(await lightSurfaces()).toEqual([])
-  await juno.newChat.conversationButton.click()
-  await expect(juno.newChat.list).toBeVisible()
-  expect(await lightSurfaces()).toEqual([])
-  await juno.win.keyboard.press('Escape')
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('new-tab')
+  await juno.newChat.write('First new chat')
+  await juno.tabs.menu('new-tab')
+  await expect(juno.tabs.tab('New chat')).toHaveCount(2)
+  await juno.tabs.expectActiveAt('New chat', 1)
+  await expect(juno.newChat.composer).toHaveValue('')
+  await juno.newChat.write('Second new chat')
+  await juno.newChat.pickConversation('product', 'product')
+  await juno.tabs.selectAt('New chat', 0)
+  await expect(juno.newChat.composer).toHaveValue('First new chat')
+  await juno.newChat.expectConversation('Pick a conversation')
+  await juno.win.waitForTimeout(800)
+  await running.close()
+
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.tabs.expectCount(3)
+    await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'New chat', 'product'])
+    await restarted.tabs.expectActive('New chat')
+    await expect(restarted.newChat.composer).toHaveValue('First new chat')
+    await restarted.tabs.select('product')
+    await restarted.newChat.expectConversation('product')
+    await expect(restarted.newChat.composer).toHaveValue('Second new chat')
+  } finally {
+    await again.close()
+  }
+})
+
+test('a New chat sent to a topic open in another tab stays in its own tab', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
-  await juno.topic.openSwitcher()
-  expect(await lightSurfaces()).toEqual([])
-  await juno.win.keyboard.press('Escape')
-  await juno.openSettings('General')
-  expect(await lightSurfaces()).toEqual([])
-})
-
-test('Enter right after typing in the conversation search picks the match', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.tabs.menu('new-chat')
-  await juno.win.keyboard.type('Typed fast')
-  await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
-  await juno.win.keyboard.type('eng')
-  await juno.win.keyboard.press('Enter')
-  await juno.newChat.expectConversation('eng')
-  await expect(juno.newChat.composer).toBeFocused()
-  await juno.win.keyboard.press('Enter')
-  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typed fast').length).toBe(1)
+  await juno.tabs.menu('new-tab')
+  await juno.newChat.write('Sent from a second tab')
+  await juno.newChat.pickConversation('eng', 'eng')
+  await juno.newChat.send()
+  await juno.topic.expectMessage('Sent from a second tab')
+  await expect(juno.tabs.tab('eng')).toHaveCount(2)
+  await juno.tabs.expectActiveAt('eng', 1)
+  expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent from a second tab')).toHaveLength(1)
 })

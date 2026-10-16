@@ -222,9 +222,10 @@ test('closing the last tab opens a new tab: a New chat, or Home once Settings sa
   await expect(tabs.tab('Home')).toHaveCount(homes + 1)
   await juno.home.expectShown()
 
-  // ⌘N is always a New chat (the untouched one is focused).
+  // ⌘N is always a New chat, in a new tab.
+  const chats = await tabs.tab('New chat').count()
   await tabs.menu('new-chat')
-  await tabs.expectActive('New chat')
+  await tabs.expectActiveAt('New chat', chats)
 
   // Closing every tab leaves one Home.
   await tabs.contextMenu(POSTGRES, 'close-all')

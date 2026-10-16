@@ -82,6 +82,7 @@ export {
   tabTopic,
   topicPlace,
   updateTabs,
+  setNewChat,
   type OpenOptions,
   type JunoTabPage,
   type Place,

@@ -1,0 +1,1 @@
+- 10-16 12:55 · Tushar · A mouse press on a tab gives its page focus (the composer it had, or its composer), as Safari does; the keyboard keeps focus in the tab strip.

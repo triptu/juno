@@ -197,12 +197,12 @@ describe('a New chat that sends', () => {
     expect(historyTarget(stepHistory(sent, -1), 1)).toEqual(topicPlace('d'))
   })
 
-  it('closes and focuses the tab that already shows the topic, leaving nothing to reopen', () => {
+  it('stays and shows the topic when another tab already shows it too', () => {
     const chat = openPlace(three, newChatPlace, { newTab: true })
     const sent = settleNewChat(chat, chat.active!, 'c')
-    expect(shown(sent)).toEqual(['a', 'b', 'c'])
+    expect(shown(sent)).toEqual(['a', 'b', 'c', 'c'])
+    expect(sent.active).toBe(chat.active)
     expect(activeShows(sent)).toBe('c')
-    expect(sent.closed).toEqual(chat.closed)
   })
 
   it('changes nothing once the tab shows something else', () => {
