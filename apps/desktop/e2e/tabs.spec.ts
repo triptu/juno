@@ -2,7 +2,8 @@
 // of an open topic focuses its tab, one topic in two tabs scrolls apart,
 // closing focuses the neighbour and never leaves no tab, what a new tab
 // opens, where "+" sits, the app menu's tab items, the row menu's Open in
-// new tab, and tabs survive a restart.
+// new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
+// each tab shows its topic's art or the DM person's photo.
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
@@ -144,6 +145,78 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp 
   } finally {
     await again.close()
   }
+})
+
+test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  await sidebar.row(POSTGRES).open()
+  await sidebar.row(RINA).openInNewTab()
+  await sidebar.row(ROADMAP).openInNewTab()
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+
+  // The third tab dragged to the first place.
+  await tabs.drag(ROADMAP, POSTGRES)
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  await tabs.expectActive(ROADMAP)
+  // The dropped tab settles with no transform left on any tab.
+  await expect.poll(() => tabs.root.locator('[data-tab]').evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).style.transform).join(''))).toBe('')
+
+  // The keyboard moves the focused tab one place, and a screen reader hears where it went.
+  await tabs.tab(ROADMAP).focus()
+  await juno.win.keyboard.press('Control+Shift+ArrowRight')
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Rina/)])
+  await expect(tabs.announcement).toHaveText(/^Moved to position 2 of 3\./)
+  await tabs.expectFocused(ROADMAP)
+  await juno.win.keyboard.press('Control+Shift+ArrowLeft')
+  await juno.win.keyboard.press('Control+Shift+ArrowLeft')
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  await expect(tabs.announcement).toHaveText(/^Moved to position 1 of 3\./)
+
+  // Esc during a drag puts the tab back.
+  const from = await tabs.tab(RINA).boundingBox()
+  const to = await tabs.tab(ROADMAP).boundingBox()
+  if (!from || !to) throw new Error('No tabs to drag')
+  await juno.win.mouse.move(from.x + 24, from.y + from.height / 2)
+  await juno.win.mouse.down()
+  await juno.win.mouse.move(to.x + 24, from.y + from.height / 2, { steps: 20 })
+  await juno.win.keyboard.press('Escape')
+  await juno.win.mouse.up()
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+
+  // Let the save reach the engine.
+  await juno.win.waitForTimeout(500)
+  await running.close()
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.tabs.expectCount(3)
+    await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  } finally {
+    await again.close()
+  }
+})
+
+test('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  await sidebar.row(POSTGRES).open()
+  // A thread in the DM with Maya, and the DM itself.
+  await sidebar.row(OFFSITE).openInNewTab()
+  await sidebar.row('Maya', { exact: true }).openInNewTab()
+
+  // The topic's art, or its placeholder shape until it is drawn.
+  await expect(tabs.tile(POSTGRES)).toHaveAttribute('data-topic-art', /^(art|placeholder)$/)
+  for (const title of [OFFSITE, 'Maya']) {
+    const photo = tabs.tile(title)
+    await expect(photo).toHaveAttribute('src', /^juno:\/\/files\/avatar/)
+    await expect.poll(() => photo.evaluate((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)).toBe(true)
+  }
+  // The DM photo is the URL the sidebar row shows, so it was loaded already.
+  const rowPhoto = await sidebar.row('Maya', { exact: true }).root.locator('img').first().getAttribute('src')
+  await expect(tabs.tile('Maya')).toHaveAttribute('src', rowPhoto ?? '')
 })
 
 test.describe('one topic in two tabs', () => {
