@@ -7,6 +7,7 @@ import { NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
 import { AiProvider } from '@juno/ai'
 import { Effect, Stream } from 'effect'
+import { EngineConfig } from '../config'
 import { SyncLink } from '../syncLink'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
@@ -28,6 +29,7 @@ export const SendHandlers = SendRoutes.toLayer(
     const actions = yield* ActionWorker
     const staging = yield* Staging
     const ai = yield* AiProvider
+    const config = yield* EngineConfig
     const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
     const provide = <A, E>(effect: Effect.Effect<A, E, Workspace | Outbox | Staging | SyncLink>) =>
       effect.pipe(
@@ -44,8 +46,8 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),
-      'messages.check': (payload) => checkMessage(payload).pipe(Effect.provideService(Workspace, workspace)),
-      'messages.precheck': (payload) => precheckMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai)),
+      'messages.check': (payload) => checkMessage(payload).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config)),
+      'messages.precheck': (payload) => precheckMessage(payload, routeBudget).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(AiProvider, ai), Effect.provideService(EngineConfig, config)),
       'drafts.get': ({ topicId }) =>
         serveLiveValue(
           workspace.changes.pipe(

@@ -45,3 +45,9 @@ export const aiAssistOn = prefs.get<unknown>(AI_ASSIST_PREF).pipe(
   Effect.map((value) => value !== false),
   Effect.catch(() => Effect.succeed(true)),
 )
+
+/** Availability for decision features, independent of the saved AI assist switch. */
+export const decisionProviderAvailable = Effect.gen(function* () {
+  const config = yield* EngineConfig
+  return config.ai === 'fake' || Boolean(config.openRouterApiKey)
+})

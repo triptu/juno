@@ -31,7 +31,7 @@ export function useNewChatChecks(text: string, target: SendTarget | undefined, d
   useEffect(() => {
     if (!enabled || channelId === undefined || text.trim() === '') return
     const timer = setTimeout(() => {
-      if (threadTs === undefined) precheckMessage(registry, channelId, text)
+      precheckMessage(registry, channelId, text, threadTs)
       const found = conversation === undefined ? undefined : audienceCheck(text, conversation)
       if (found !== undefined) setWarning({ key, message: found.message })
     }, 400)
@@ -50,7 +50,7 @@ export function useNewChatChecks(text: string, target: SendTarget | undefined, d
   const send = () => {
     if (bar !== undefined) return pick('primary')
     if (checking.current !== undefined) return
-    if (!enabled || channelId === undefined || text.trim() === '') return deliver(text, { kind: 'here' })
+    if (channelId === undefined || text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)

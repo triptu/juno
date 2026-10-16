@@ -1,6 +1,6 @@
 import { memo, Suspense } from 'react'
 import { prefsGet, prefsSet, type SettingsSection } from '@juno/contract'
-import { liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -54,6 +54,10 @@ function Section({ section }: { readonly section: SettingsSection }) {
 
 /** What a new tab opens, the peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
 function General() {
+  const checks = useAtomValue(sendCheckPrefsAtom)
+  const available = useAtomValue(aiAvailableAtom)
+  const aiAssist = useAtomValue(aiAssistOnAtom)
+  const grammarUnavailable = !aiAssist ? 'Turn on AI assist to check grammar.' : available._tag !== 'Success' || !available.value ? 'Add an OpenRouter key to check grammar.' : undefined
   const models = useAtomValue(modelsAtom)
   const modelPrefs = models._tag === 'Success' && typeof models.value === 'object' && models.value !== null && !Array.isArray(models.value) ? models.value : {}
   const classifier = !('classifier' in modelPrefs) || modelPrefs.classifier !== ''
@@ -63,7 +67,7 @@ function General() {
   }
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
-  return <SettingsGeneral newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
+  return <SettingsGeneral checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={(key, enabled) => void setSendCheckPref(registry, key, enabled)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /** Theme, accent and density, saved to main for the next launch's first frame. */

@@ -143,7 +143,7 @@ function LoadedComposer({
   // A saved Main draft is asked about once, as if typing had just paused.
   useEffect(() => {
     preloadBar()
-    if (aiAssist && detail.kind === 'main' && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text)
+    if (aiAssist && start.text.trim() !== '') precheckMessage(registry, detail.channel.id, start.text, detail.kind === 'thread' ? detail.rootTs : undefined)
     // Once per mount: later drafts are asked about as typing pauses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -164,7 +164,7 @@ function LoadedComposer({
       setPaused(next)
       flush()
       // The model answers the wrong-place question now, so Enter never waits for it.
-      if (aiAssist && detail.kind === 'main' && next.trim() !== '') precheckMessage(registry, detail.channel.id, next)
+      if (aiAssist && next.trim() !== '') precheckMessage(registry, detail.channel.id, next, detail.kind === 'thread' ? detail.rootTs : undefined)
     }, DRAFT_SAVE_MS)
   }
 
@@ -205,7 +205,7 @@ function LoadedComposer({
     if (files.files.some((file) => file.state === 'staging')) return
     markSend()
     // Files with no text have nothing to check.
-    if (!aiAssist || text.trim() === '') return deliver(text, { kind: 'here' })
+    if (text.trim() === '') return deliver(text, { kind: 'here' })
     const token = {}
     checking.current = token
     setWaiting(true)

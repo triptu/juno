@@ -2,12 +2,15 @@ import { PrefsRoutes, NotSignedIn } from '@juno/contract'
 import { keys, liveQuery, prefs, transaction } from '@juno/store'
 import { Effect, Schema, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
+import { decisionProviderAvailable } from '../ai'
 import { Workspace } from '../workspace'
 
 export const PrefsHandlers = PrefsRoutes.toLayer(
   Effect.gen(function* () {
+    const available = yield* decisionProviderAvailable
     const workspace = yield* Workspace
     return {
+      'ai.available': () => serveLiveValue(Stream.fromEffect(Effect.result(timed(Effect.succeed(available))))),
       'prefs.get': ({ key }) => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {

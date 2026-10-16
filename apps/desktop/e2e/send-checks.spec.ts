@@ -2,7 +2,7 @@
 // in a Main posts in the thread or sends to Main, the clarity bar fixes and
 // sends or sends as is, Esc and editing return to the draft, the audience
 // line in a public channel, Enter never waits for a slow model, and with AI
-// assist off nothing is checked. The wrong-place question is asked while
+// assist off only local checks run. The wrong-place question is asked while
 // typing pauses; a test waits for its answer in `ai_cache` before Enter.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -20,13 +20,13 @@ const TYPOS = 'can you recieve the the report by friday'
 const FIXED = 'can you receive the report by friday?'
 
 /** Waits until the model's wrong-place answer for a draft typed after `since` is stored. */
-async function routeAnswered(userData: string, teamId: string, since: number): Promise<void> {
+async function routeAnswered(userData: string, teamId: string, since: number, task = 'routeCheck'): Promise<void> {
   await expect
     .poll(
       () => {
         const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'cache.db'), { readOnly: true })
         try {
-          const row = db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck'`).get() as { at: number | null }
+          const row = db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = ? AND model != ''`).get(task) as { at: number | null }
           return row.at ?? 0
         } finally {
           db.close()
@@ -195,7 +195,7 @@ test('Enter never waits for a slow model: before its answer the message sends at
   }
 })
 
-test('with AI assist off, Enter sends at once and nothing is checked', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, local checks still work and models stay off', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await running.close()
@@ -215,6 +215,8 @@ test('with AI assist off, Enter sends at once and nothing is checked', async ({ 
     await topic.send(BILL_REPLY)
     await topic.expectSent(BILL_REPLY)
     await topic.send(TYPOS)
+    await expect(topic.checkBar.bar).toContainText('recieve → receive')
+    await topic.checkBar.choose('Send as is')
     await topic.expectSent(TYPOS)
     await expect(topic.checkBar.bar).toHaveCount(0)
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
@@ -269,4 +271,90 @@ test('New chat warns about the audience of the chosen channel', async ({ juno })
   await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
   await juno.newChat.pickConversation('hiring', 'hiring')
   await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
+})
+
+
+test('Capital i can be turned off in General and stays off after reopening Settings', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openSettings('General')
+  const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
+  await expect(capital).toBeChecked()
+  await expect(juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true })).toBeChecked()
+  await juno.win.screenshot({ path: test.info().outputPath('send-checks-settings.png') })
+  await capital.uncheck()
+  await juno.tabs.close('Settings')
+  await juno.openSettings('General')
+  await expect(capital).not.toBeChecked()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.send('i think so')
+  await juno.topic.expectSent('i think so')
+  await expect(juno.topic.checkBar.bar).toHaveCount(0)
+  expect(posts(fake)[0]!.args['text']).toBe('i think so')
+})
+
+test('grammar fixes its broken and merges with local fixes in the same bar', async ({ juno, fake, userData }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  for (const [draft, fixed] of [["its broken", "it's broken"], ["its broken and i recieve errors", "it's broken and I receive errors"]]) {
+    const since = Date.now()
+    await juno.topic.composer.fill(draft!)
+    await routeAnswered(userData, fake.teamId, since, 'grammarCheck')
+    await juno.topic.composer.press('Enter')
+    await expect(juno.topic.checkBar.bar).toContainText("its → it's")
+    await juno.topic.checkBar.choose('Fix and send')
+    await juno.topic.expectSent(fixed!)
+  }
+})
+
+test('grammar over 800 ms is skipped and a repeated draft uses its cached timeout', async ({ juno, fake, slackApp, userData, running }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.sidebar.row(POSTGRES).open()
+    const since = Date.now()
+    await restarted.topic.composer.fill('its broken')
+    await routeAnswered(userData, fake.teamId, since, 'grammarCheck')
+    await restarted.topic.composer.press('Enter')
+    await expect(restarted.topic.composer).toHaveValue('', { timeout: 500 })
+    await expect(restarted.topic.checkBar.bar).toHaveCount(0)
+    await restarted.topic.expectSent('its broken')
+    await restarted.topic.composer.fill('its broken')
+    await restarted.win.waitForTimeout(500)
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+    try {
+      const rows = db.prepare("SELECT created_at, output_json FROM ai_cache WHERE task = 'grammarCheck'").all()
+      expect(rows).toHaveLength(1)
+      expect(rows[0]!.output_json).toBe('{"edits":[]}')
+      expect(Number(rows[0]!.created_at)).toBeGreaterThanOrEqual(since)
+    } finally { db.close() }
+    await restarted.topic.composer.press('Enter')
+    await expect(restarted.topic.composer).toHaveValue('', { timeout: 500 })
+    await expect(restarted.topic.checkBar.bar).toHaveCount(0)
+  } finally { await again.close() }
+})
+
+
+test('Wrong place and grammar can be turned off without disabling local checks', async ({ juno, fake, userData }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openSettings('General')
+  await juno.win.getByRole('checkbox', { name: 'Wrong place', exact: true }).uncheck()
+  await juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true }).uncheck()
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.composer.fill(BILL_REPLY)
+  await juno.win.waitForTimeout(900)
+  await juno.topic.composer.press('Enter')
+  await juno.topic.expectSent(BILL_REPLY)
+  await juno.topic.send('its broken')
+  await juno.topic.expectSent('its broken')
+  await juno.topic.send('i think so')
+  await expect(juno.topic.checkBar.bar).toContainText('i → I')
+  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+  try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task IN ('routeCheck', 'grammarCheck')").get()).toEqual({ n: 0 }) }
+  finally { db.close() }
 })

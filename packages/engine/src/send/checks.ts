@@ -11,15 +11,17 @@
  * `messages.check` runs on Enter and never waits for a model: the
  * wrong-place finding is the stored answer for the draft as it is, if there
  * is one, and the clarity check (pure, `@juno/domain`) runs on every draft.
- * Nothing runs while AI assist is off. No answer yet, a low confidence, a
+ * Local checks also run while AI assist is off. No answer yet, a low confidence, a
  * timeout or a spent budget find nothing, so the message just sends.
  */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
-import type { ClarityFinding, RouteFinding, SendCheck } from '@juno/contract'
-import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts } from '@juno/domain'
+import { type ClarityFinding, type RouteFinding, type SendCheck } from '@juno/contract'
+import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import { aiAssistOn } from '../ai'
+import { grammarFor, askGrammar } from './grammar'
+import { aiAssistOn, decisionProviderAvailable } from '../ai'
+import type { EngineConfig } from '../config'
 import { channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userName, type JoinedRow, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 import { unescapeMrkdwn } from '@juno/richtext'
@@ -162,31 +164,52 @@ const wrongPlace = (input: CheckInput): Effect.Effect<RouteFinding | undefined, 
     return { topicId: threadTopicId(input.channelId as ChannelId, topic.rootTs as Ts), threadTs: topic.rootTs, title: topic.title, confidence: answer.confidence }
   })
 
-const clarity = (text: string): ClarityFinding | undefined => {
-  const found = clarityCheck(text)
+const clarity = (text: string, options: ClarityPrefs): ClarityFinding | undefined => {
+  const found = clarityCheck(text, options)
   if (found === undefined) return undefined
   return { fixes: found.fixes.map((fix) => fix.label), fixed: found.fixed, confidence: found.confidence, ...(found.note === undefined ? {} : { note: found.note }) }
 }
 
 /** The checks on Enter for one draft. Empty when there is nothing to say. Reads the store only. */
-export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace> =>
+export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
     if (open === undefined || input.text.trim() === '') return {}
     return yield* Effect.gen(function* () {
-      if (!(yield* aiAssistOn)) return {}
-      const route = input.threadTs === undefined ? yield* wrongPlace(input) : undefined
-      const found = clarity(input.text)
+      const options = yield* checkPrefs
+      const ai = (yield* aiAssistOn) && (yield* decisionProviderAvailable)
+      const [route, grammar] = yield* Effect.all([
+        ai && options.wrongPlace && input.threadTs === undefined ? wrongPlace(input) : Effect.succeed(undefined),
+        ai && options.grammar ? grammarFor(input.text) : Effect.succeed([]),
+      ], { concurrency: 'unbounded' })
+      let fixed = input.text
+      for (const edit of grammar.toReversed()) fixed = fixed.slice(0, edit.start) + edit.to + fixed.slice(edit.start + edit.from.length)
+      const local = clarity(fixed, options)
+      const labels = [...new Set([...grammar.map((edit) => `${edit.from} → ${edit.to}`), ...(local?.fixes ?? [])])]
+      const found = labels.length === 0 ? local : { fixes: labels, fixed: local?.fixed ?? fixed, confidence: 0.9, ...(local?.note === undefined ? {} : { note: local.note }) }
       return { ...(route === undefined ? {} : { route }), ...(found === undefined ? {} : { clarity: found }) }
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
-/** The wrong-place question for a Main draft while typing pauses, so Enter finds the answer stored. */
-export const precheckMessage = (input: { readonly channelId: string; readonly text: string }, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider> =>
+/** Grammar and Main routing run together while typing pauses, so Enter finds ready answers. */
+export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
     if (open === undefined || input.text.trim() === '') return
     yield* Effect.gen(function* () {
-      if (yield* aiAssistOn) yield* askRoute(input, budget)
+      if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return
+      const options = yield* checkPrefs
+      yield* Effect.all([
+        options.wrongPlace && input.threadTs === undefined ? askRoute(input, budget) : Effect.void,
+        options.grammar ? askGrammar(input.text) : Effect.void,
+      ], { concurrency: 'unbounded' })
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
+
+const checkPrefs = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const rows = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key LIKE 'sendCheck.%'`
+  const disabled = new Set(rows.filter((row) => row.value_json === 'false').map((row) => row.key))
+  const enabled = (key: string) => !disabled.has(`sendCheck.${key}`)
+  return { wrongPlace: enabled('wrongPlace'), typos: enabled('typos'), capitalI: enabled('capitalI'), questionMarks: enabled('questionMarks'), longSentences: enabled('longSentences'), grammar: enabled('grammar') }
+})

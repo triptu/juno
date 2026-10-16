@@ -59,9 +59,9 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
   return Promise.race([checked, late]).finally(() => clearTimeout(timer))
 }
 
-/** Asks the wrong-place question for a Main draft now, so Enter finds the answer. Nothing to wait for. */
-export function precheckMessage(registry: Registry, channelId: string, text: string): void {
-  void runCommand(registry, messagesPrecheck, { channelId, text })
+/** Asks grammar and (in Main) the wrong-place question now, so Enter finds the answer. Nothing to wait for. */
+export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string): void {
+  void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }) })
 }
 
 /** Retry on a failed row. */

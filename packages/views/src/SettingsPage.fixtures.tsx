@@ -1,4 +1,4 @@
-import type { ProviderState } from '@juno/contract'
+import { sendCheckPrefKeys, type ProviderState } from '@juno/contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
@@ -42,7 +42,7 @@ export default defineFixtures(
   SettingsPage,
   {
     Sections: {
-      general: at('general', <SettingsGeneral newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      general: at('general', <SettingsGeneral checks={sendCheckPrefKeys.map((key) => ({ key, enabled: true }))} onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
@@ -52,6 +52,8 @@ export default defineFixtures(
       about: at('about', about),
     },
     States: {
+      'grammar-ai-off': at('general', <SettingsGeneral checks={sendCheckPrefKeys.map((key) => ({ key, enabled: true }))} grammarUnavailable="Turn on AI assist to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'grammar-no-key': at('general', <SettingsGeneral checks={sendCheckPrefKeys.map((key) => ({ key, enabled: true }))} grammarUnavailable="Add an OpenRouter key to check grammar." onCheckChange={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),

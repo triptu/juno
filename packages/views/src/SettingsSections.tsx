@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import type { IgnoredChannel } from '@juno/contract'
+import type { IgnoredChannel, SendCheckPref } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
@@ -12,7 +12,15 @@ import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 // Juno, Connections and Backup & This Mac are their own pages. Each section
 // is a settings page with its title; `SettingsPage` puts the list beside it.
 
+const checkLabels: Record<SendCheckPref, string> = {
+  wrongPlace: 'Wrong place', typos: 'Typos and doubled words', capitalI: 'Capital i',
+  questionMarks: 'Question marks', longSentences: 'Long sentences', grammar: 'Grammar (uses AI)',
+}
+
 export interface SettingsGeneralProps {
+  readonly checks: ReadonlyArray<{ readonly key: SendCheckPref; readonly enabled: boolean }>
+  readonly grammarUnavailable?: string | undefined
+  readonly onCheckChange: (key: SendCheckPref, enabled: boolean) => void
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
@@ -23,7 +31,7 @@ export interface SettingsGeneralProps {
 }
 
 /** General: what a new tab opens, the peek key and the fast classifier. */
-export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange }: SettingsGeneralProps) {
+export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, checks, grammarUnavailable, onCheckChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -35,6 +43,14 @@ export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPee
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
+        </Surface>
+      </Section>
+      <Section heading="Checks before sending" sub="Quick checks when you press Enter. Juno only suggests small fixes and never rewrites your message.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <div {...stylex.props(styles.stack)}>
+            {checks.map(({ key, enabled }) => <Checkbox key={key} label={checkLabels[key]} checked={enabled && !(key === 'grammar' && grammarUnavailable)} disabled={key === 'grammar' && grammarUnavailable !== undefined} onChange={(event) => onCheckChange(key, event.currentTarget.checked)} />)}
+            {grammarUnavailable && <Text variant="meta" tone="muted" as="p">{grammarUnavailable}</Text>}
+          </div>
         </Surface>
       </Section>
       <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">
