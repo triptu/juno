@@ -17,7 +17,7 @@ import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, ty
 import { mimetypeOf } from './files.ts'
 import { ApiError, handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
-import type { Workspace } from './state.ts'
+import { edgeUserObject, type Workspace } from './state.ts'
 
 export interface Session {
   readonly cookie: string
@@ -477,7 +477,9 @@ export class FakeServer {
       const cookie = parseCookies(request.headers.cookie)['d']
       const session = cookie === undefined ? undefined : this.sessions.get(cookie)
       if (session === undefined || session.expired) return json(response, 401, { ok: false, error: 'not_authed' })
-      return this.#avatar(path.slice('/avatars/'.length).replace(/\.svg$/, ''), response)
+      // `<id>.svg`, or `<team>-<user>-<avatar_hash>-<size>` as `team.avatar_base_url` photos are spelled.
+      const name = path.slice('/avatars/'.length)
+      return this.#avatar(/^T[A-Z0-9]+-[UW][A-Z0-9]+-[^-]+-\d+$/.test(name) ? name.split('-')[1]! : name.replace(/\.svg$/, ''), response)
     }
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))
@@ -592,7 +594,7 @@ export class FakeServer {
       return record(200, { ok: false, error: 'invalid_arguments' })
     }
     const ids = args.ids ?? Object.keys(args.updated_ids ?? {})
-    const results = ids.flatMap((id) => this.workspace.users.get(id) ?? [])
+    const results = ids.flatMap((id) => this.workspace.users.get(id) ?? []).map(edgeUserObject)
     const failed = ids.filter((id) => !this.workspace.users.has(id))
     await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
   }

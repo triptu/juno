@@ -8,7 +8,7 @@ import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
 import { isKnownReaction } from './emojiNames.ts'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
-import type { Workspace } from './state.ts'
+import { edgeUserObject, type Workspace } from './state.ts'
 
 export class ApiError {
   readonly error: string
@@ -99,8 +99,8 @@ export const handlers: Handlers = {
     const ims = records.filter((c) => c.kind === 'im').map((c) => ws.imObject(c))
     const cacheTs = `${Math.floor(ws.clock.now() / 1000)}.000000`
     return {
-      self: { ...self, manual_presence: ws.manualPresence },
-      team: { ...ws.team, url: `${ctx.baseUrl}/` },
+      self: { ...edgeUserObject(self), manual_presence: ws.manualPresence },
+      team: { ...ws.team, url: `${ctx.baseUrl}/`, avatar_base_url: `${ctx.baseUrl}/avatars/` },
       prefs: ws.prefs,
       channels,
       ims,

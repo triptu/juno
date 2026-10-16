@@ -42,6 +42,7 @@ import { reindexTopics } from './reindex'
 import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
+  AVATAR_BASE_KEY,
   getSyncState,
   latestSyncedRange,
   markRepliesComplete,
@@ -122,6 +123,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive'
       Effect.gen(function* () {
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
         yield* setSyncState(ME_KEY, ctx.me)
+        if (boot.team.avatar_base_url) yield* setSyncState(AVATAR_BASE_KEY, boot.team.avatar_base_url)
         yield* upsertUsers([boot.self])
         yield* storeMetadata(observed, [...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])
       }),

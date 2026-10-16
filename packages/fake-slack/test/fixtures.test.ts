@@ -194,15 +194,18 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(searchMatches(words).length).toBeGreaterThanOrEqual(2)
   })
 
-  it('edge users/info returns users and failed ids', async () => {
+  it('edge users/info returns users and failed ids, with photos as an avatar hash only', async () => {
     const raw = await client.edge('users/info', { ids: ['U0MAYA', 'U0NOBODY'] })
     const response = Schema.decodeUnknownSync(EdgeUsersInfoResponse)(raw)
     if (!response.ok) throw new Error(response.error)
     expect(response.results.map((u) => u.id)).toEqual(['U0MAYA'])
-    expect(response.results[0]?.profile?.image_72).toBe(`${fake.url}/avatars/U0MAYA.svg?size=72`)
+    const profile = response.results[0]!.profile!
+    expect(profile).toMatchObject({ avatar_hash: 'fakeu0maya', is_custom_image: true })
+    expect(profile.image_72).toBeUndefined()
     expect(response.failed_ids).toEqual(['U0NOBODY'])
-    expect((await fetch(response.results[0]!.profile!.image_72!)).status).toBe(401)
-    const avatar = await fetch(response.results[0]!.profile!.image_72!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
+    const photo = `${fake.url}/avatars/T0JUNO-U0MAYA-${profile.avatar_hash}-72`
+    expect((await fetch(photo)).status).toBe(401)
+    const avatar = await fetch(photo, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(avatar.headers.get('content-type')).toBe('image/svg+xml')
   })
 

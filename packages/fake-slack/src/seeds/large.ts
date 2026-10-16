@@ -225,6 +225,7 @@ function userObject(id: string, name: string, realName: string, avatarBase: stri
       first_name: first,
       last_name: rest.join(' '),
       team: TEAM.id,
+      avatar_hash: `fake${id.toLowerCase()}`,
       image_24: image,
       image_48: image,
       image_72: image,
