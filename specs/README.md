@@ -1,6 +1,6 @@
 # Juno sync protocols
 
-These specs describe the protocols and their limits. They do not certify the application code. Only the model checks are tests here.
+These specs describe the protocols and their limits. The model checks test the specs; `pnpm specs:conformance` checks that the engine follows `outbox.qnt` ("Conformance" below).
 
 `follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages.
 
@@ -140,6 +140,70 @@ The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before a
 `pnpm specs:check --outbox` selects only this model, its 10,000 random traces and nineteen corrected schedules plus thirteen broken variants. `--traces` reduces random sampling to 100. The normal root check includes them too. No new Apalache run is added: the existing 19 bounded checks remain, and the twelve-minute total execution budget and 60-second child deadline are unchanged. This is sampled safety and a finite drain check, not an exhaustive or unbounded liveness proof.
 
 Validation on 2026-10-15: the full root `pnpm specs:check` passed in **636.2 seconds (10m 36s)**, excluding the machine-lock wait. It ran the 10,000 outbox samples, all seven corrected outbox schedules, all four expected outbox counterexamples, the existing protocol suites and all 19 bounded checks. Every outbox sample reached agreement. This run held both heavy-job slots with `pnpm exec node scripts/heavy.mjs --exclusive pnpm specs:check`. An earlier shared-slot run hit the same twelve-minute deadline during a bounded follow check. The execution budget and child deadlines are unchanged.
+
+## Conformance
+
+`pnpm specs:conformance` checks that the engine follows `outbox.qnt`. Quint writes traces, and the harness in `packages/engine/test/conformance` replays each one against the real engine and the fake Slack. After each round it compares what the engine and the fake hold with the model's state, through a small projection. If the model and the code differ, a trace fails and shows where. `pnpm affected` runs it when `outbox.qnt`, `outbox-conformance.qnt`, the generator, or any file the replay reaches (the engine, `@juno/sync`, the fake) changes. `pnpm remote specs:conformance` runs it on a machine of its own.
+
+What it runs (seed `20261016`, `specs/conformance.mjs`):
+
+- 25 random traces of `outbox-conformance.qnt`'s `conformanceStep`, and 25 of `copyStep`, which starts from a post the network sent twice. Each has 24 steps and is cut at its last finished round, which leaves about 20. Every random trace also checks `invariants`.
+- Every directed schedule of `outbox.qnt` (`outbox-checks.mjs`): each corrected schedule must be followed, and each broken one must be refused where it leaves the corrected one (or earlier, when Juno's own steps already took the engine along the corrected one). Six corrected schedules and four broken ones are not replayed; `conformance.mjs` gives the reason for each: an upload, an order of steps that is not Juno's, a crash with the socket up, timing, a difference listed below, and a bug the projection cannot see.
+
+### Rounds and Juno's own steps
+
+A round is one step the harness drives, followed by the steps Juno takes on its own. The harness drives the first step, then waits until the projections are equal and stay equal for 300 ms (at most 35 s, or 75 s when the round waits for the next try of a copy's delete). Juno's own steps are a claim, a backoff ending, a lookup leaving, an action call leaving, the catch-up, a check that keeps a copy, and storing a copy the catch-up reads. The harness cannot hold the engine back from these, so `outbox-conformance.qnt` takes them before any other step while one is enabled: first the ones that wait for nothing, then the ones that wait for a timer. Directed schedules from `outbox.qnt` say nothing about this, so the harness classifies their steps by action name.
+
+`outbox-conformance.qnt` imports the protocol unchanged, so every trace it writes is a trace of `outbox.qnt`. It narrows the schedules to Juno's own scheduling, which `outbox.qnt` leaves out:
+
+- **One Slack write at a time.** Posts, edits, deletes and reactions share the client's `send` lane, which runs one call at a time (`sendConcurrency: 1`). The model lets two drafts' posts, or a post and an edit, be at Slack together.
+- **The lane is not first come, first served.** When a post ends, the post worker's next post goes before an edit or delete that was already waiting for the lane.
+- **Each worker settles one row at a time.** The post worker waits for its post or lookup before it claims or looks up another, and the action worker waits for its call before it runs, checks or drops another row.
+- **A channel's action rows go in order.** The user's edit or delete waits behind a copy's delete queued before it, and the other way round (review S3).
+- **The post worker takes due rows in the order they were sent**, and **after a reconnect the catch-up stores what it finds before a lookup goes**.
+- **An action call that failed goes again after a backoff**, so other calls can take the lane meanwhile. The model sends it again at once.
+- **Going offline fails calls that wait for the lane.** The model keeps them in transit until Slack decides them.
+
+None of these weakens the model's safety properties: the engine's schedules are a subset of the model's.
+
+### What is compared
+
+Per draft, from the store (`pending_messages`, `sent_posts`, `kept_copies`, `outbox`, `messages`), the fake's messages and its gated calls:
+
+| Field | Model | Engine |
+| --- | --- | --- |
+| `row` | `row` | `pending_messages.state`, or gone; a row left `sending` while the app is closed counts as unknown, as the next start recovers it |
+| `due` | `due`, for a queued or unknown row with no lookup out | `next_at` has passed |
+| `stored` | `stored` | a message with the draft's `client_msg_id` is stored |
+| `request` | `request`; `transit` while another call holds the lane is `waiting` | the post call at the gate: `transit` before Slack ran it, `accepted`, `refused` or `later` at its answer; `waiting` while the row is sending and no call has arrived |
+| `lookup` | a lookup fetch | a lookup at the gate |
+| `slack` | `held`, less the user's own applied delete | messages in the fake with the draft's id |
+| `copy` | `copyRow` | the other stored message: `hidden` while its delete row waits, `kept` with a `kept_copies` row, `none` when absent or deleted, else `shown` |
+| `kept` | `kept` | whether `sent_posts.ts` is still the first message Juno stored |
+| `act` | `act` and `actKind` while pending | the user's `outbox` row, and its call at the gate |
+
+Plus `connected`, the model's socket against the fake's open sockets. What Juno's message list shows follows from these and is not compared apart.
+
+### How each step is driven
+
+The fake gates every call Slack decides in the model (`gate`, `decide` and `holdFramesWhere` in `@juno/fake-slack`): a post stops before Slack runs it (`accept`, `refuse` with an error or a 429, `drop`) and again before its answer (`answer`, `refused`, `lost`). A lookup runs when it arrives, so its page is Slack's state at request time, and its answer waits (`finishFetch`). Echoes of Juno's posts wait in the fake until `echo` or `observeCopy` delivers them, or a drop discards them. `resend` sends Juno's accepted request to the fake again, as Chromium does. `remoteChange` is the fake's `deleteMessage` of the kept message, or a reply to the copy from another person. `disconnect` and `reconnect` are the fake's `goOffline` and `goOnline`; `goOffline` also fails every HTTP request. `crash` decides the calls in transit as the model says, loses every answer and stops the engine; `reconnect` then starts it again on the same store. A copy's delete is the one call the engine repeats on its own: the fake refuses it (`request_timeout`) until `deleteCopy` lets the next try through, so the model's waiting delete is a run of refused tries.
+
+### Differences found
+
+The first runs found these. The real bugs have tests marked `it.fails`, which pass while the bug is there; when it is fixed, make each an ordinary test. `outbox-conformance.qnt` keeps the bugs out of its schedules, with a comment for each, so the random traces check the rest.
+
+| Difference | Kind | Where |
+| --- | --- | --- |
+| A delete queued while an edit of the same message is out is lost. `outbox` ids are SQLite rowids, which are reused: the delete's new row takes the edit's id, and the edit's answer (`actionDone`) then deletes it. The model sends it after the edit (`stale`). | bug | `actions.test.ts`, "a delete while an edit is out" |
+| The check before a copy's delete runs before the call waits for the send lane. If the user deletes the kept message on another device during that wait, Slack ends with no copy of the post. `outbox.qnt` assumes this window away, but the lane makes it as long as the slowest write. Review S1 is not fully closed. | bug | `send-copies.test.ts`, "a copy whose delete waits for the send lane" |
+| The user's delete of a message whose network copy Juno has not stored yet brings the copy back. When the copy arrives, the check finds the kept message deleted, keeps the copy and makes it the message: it cannot tell the user's own delete from one made on another device. Slack keeps the copy and Juno shows it. | bug | `send-copies.test.ts`, "the user deletes a message before Juno has seen its copy" |
+| The post worker checks the socket once per pass, not per row. When the socket drops while one post is out, the next queued post still goes (`sendsWaitOffline`, SPEC 8). | bug | `send.test.ts`, "waits out a lost connection that comes while another post is out" |
+| The scheduling rules above. | model leaves out | `outbox-conformance.qnt` |
+| A reply to a copy Juno has not stored, made while the socket is down, is stored with the copy before the recheck finds the kept message deleted. The copy is kept for the reply and `sent_posts.ts` stays on the deleted message; the model makes the copy the message. | small difference | kept out of the schedules |
+| When the kept message is deleted elsewhere and the copy takes its place, the model's pending edit or delete moves to the copy. The engine's stays on the message the user acted on, which is safer: the copy may have replies the user never saw. | model | kept out of the schedules |
+| The model lets the user edit or delete a message deleted on another device, which Juno no longer shows. | model | the user acts only on a shown message |
+| After a lost answer to an edit that changed meanwhile, the client sends the old text again before the worker sends the new one. One extra call; the end state agrees. | small difference | `outbox-actionRetry` is not replayed |
+| The model's `crash` keeps the socket up and reads nothing; the engine's restart boots warm and reads history, so it stores the post without a lookup. | model | crashes only while the socket is down |
 
 ## Catch-up rules and assumptions
 
