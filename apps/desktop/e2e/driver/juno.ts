@@ -1933,7 +1933,7 @@ export class PaletteDriver {
     await this.input.press(key)
   }
 
-  /** A section of rows: Frequent, Conversations, Commands, the open topic's name, Recent, Results or Juno. */
+  /** A section of rows: Frequent, Conversations, Pages, Settings, Commands, the open topic's name, Recent, Results or Juno. */
   section(heading: string): Locator {
     return this.root.getByRole('group', { name: heading })
   }
