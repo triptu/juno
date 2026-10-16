@@ -134,19 +134,20 @@ describe('SlackApi.call', () => {
         yield* api.call('client.counts', {}, { lane: 'interactive' })
         // The history call is already waiting for its slot when the pause arrives.
         const pausedAt = Date.now()
-        yield* queue.pause('conversations.history', 1_500)
+        yield* queue.pause('conversations.history', 1_000)
         yield* Fiber.join(waiting)
         yield* history
         const calls = fake.calls.filter((call) => call.method === 'conversations.history')
         assert.lengthOf(calls, 3)
-        assert.isAtLeast(calls[1]!.at - pausedAt, 1_450)
-        // A 429 doubles the method interval until the quiet period.
-        assert.isAtLeast(calls[2]!.at - calls[1]!.at, 2_350)
+        assert.isAtLeast(calls[1]!.at - pausedAt, 950)
+        // A 429 doubles the method interval (1 s here) until the quiet period.
+        assert.isAtLeast(calls[2]!.at - calls[1]!.at, 1_900)
         const counts = fake.calls.find((call) => call.method === 'client.counts')!
         assert.isBelow(counts.at, calls[1]!.at)
         assert.isTrue(fake.calls.every((call) => call.status === 200))
       })
-      yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundConcurrency: 1 } })))
+      // History is spaced 1 s apart, not 1.5 s, to keep the waits short.
+      yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundConcurrency: 1, backgroundMinIntervalMillis: 1_000 } })))
     }),
     10_000,
   )
