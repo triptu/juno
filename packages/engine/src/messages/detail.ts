@@ -59,7 +59,7 @@ const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
     const users = new Map<string, UserRow>()
     if (ids.size === 0) return users
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
+    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
     return users
   })
 

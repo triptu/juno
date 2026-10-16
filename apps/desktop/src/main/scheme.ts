@@ -11,6 +11,7 @@ import { app, net, protocol } from 'electron'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { serveThumbnail, serveUpload } from './files'
+import { serveImage } from './images'
 
 export const APP_SCHEME = 'juno'
 export const APP_ORIGIN = `${APP_SCHEME}://app`
@@ -32,6 +33,7 @@ export function serveAppScheme(rendererDir: string, fakeSlackOrigin?: string): v
   const root = resolve(rendererDir)
   protocol.handle(APP_SCHEME, (request) => {
     const url = new URL(request.url)
+    if (url.host === 'images') return serveImage(url, fakeSlackOrigin)
     if (url.host === 'files') return serveThumbnail(url, fakeSlackOrigin)
     if (url.host === 'uploads') return serveUpload(url, app.getPath('userData'))
     if (url.host !== 'app') return new Response('Not found', { status: 404 })

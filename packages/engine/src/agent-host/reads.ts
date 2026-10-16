@@ -77,7 +77,7 @@ const named = (sql: SqlClient.SqlClient, rows: ReadonlyArray<MessageRow>) =>
     ])]
     const users = userIds.length === 0
       ? []
-      : yield* sql.unsafe<UserRow>(`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN (${placeholders(userIds)})`, userIds)
+      : yield* sql.unsafe<UserRow>(`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN (${placeholders(userIds)})`, userIds)
     const byId = new Map(users.map((u) => [u.id, u]))
     const nameOf = (id: string) => userName(id, byId.get(id))
     const channelNames = new Map(conversations.map((c) => [c.id, channelLabel({
@@ -199,7 +199,7 @@ export const search = (query: string, offsetCursor: string | undefined, limit: n
 export const person = (userId: string) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const [row] = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id = ${userId}`
+    const [row] = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id = ${userId}`
     if (row === undefined) return yield* notFound('No such person.')
     return { id: row.id as typeof HostUserId.Type, name: row.real_name ?? row.name ?? row.id, displayName: userName(row.id, row) }
   })
@@ -216,7 +216,7 @@ const shape = (sql: SqlClient.SqlClient, rows: ReadonlyArray<JoinedRow>) =>
       if (row.c_user_id !== null) ids.add(row.c_user_id)
       return { row, columns }
     })
-    const users = ids.size === 0 ? [] : yield* sql.unsafe<UserRow>(`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN (${[...ids].map(() => '?').join(', ')})`, [...ids])
+    const users = ids.size === 0 ? [] : yield* sql.unsafe<UserRow>(`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN (${[...ids].map(() => '?').join(', ')})`, [...ids])
     const byId = new Map(users.map((u) => [u.id, u]))
     const [team] = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const nameOf = (id: string) => userName(id, byId.get(id))

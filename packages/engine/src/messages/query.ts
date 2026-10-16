@@ -307,7 +307,7 @@ const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.users.set(id, null)
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
+    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
   })
 
 const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>

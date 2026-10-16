@@ -63,7 +63,7 @@ export const recentMessages = (
     const messages = (yield* messagesAfter(row, NO_READ, limit)).toReversed()
     const ids = new Set(messages.flatMap((m) => (m.user_id === null ? [] : [m.user_id])))
     const users = new Map<string, UserRow>()
-    if (ids.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
+    if (ids.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
     return messages
       .filter((m) => m.text.trim() !== '')
       .map((m) => ({
