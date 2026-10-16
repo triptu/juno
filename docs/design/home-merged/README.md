@@ -1,5 +1,7 @@
 # Home merged with New chat
 
+Round 2, after the owner's feedback (one composer at the bottom, Juno by default, @ and # to pick, generous recents), is in `round-2/README.md`.
+
 Three proposals for one Home that shows what needs you, lets you write to anyone, and asks Juno, so New chat stops being a separate page. Nothing here is built into the app yet; the owner picks a direction first.
 
 Each direction is a gallery fixture made from the real `Home`, `Composer`, `DestinationPickers` and Frequent rows (`packages/views/src/HomeMerged.tsx`, `HomeMerged.fixtures.tsx`, gallery components `HomeMergedA`, `HomeMergedB`, `HomeMergedC`). The screenshots in `A/`, `B/` and `C/` come from `GALLERY_SHOTS_ONLY=HomeMergedA,HomeMergedB,HomeMergedC pnpm gallery:shots`, a 1056 by 720 workspace (a 1440px window less the sidebar), light and dark:

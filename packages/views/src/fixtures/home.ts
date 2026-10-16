@@ -1,5 +1,6 @@
 /** Home's items for the fixtures: what the fake workspace would show. */
 import type { HomeItem } from '@juno/contract'
+import type { HomeProps } from '../Home'
 import { art, NOW } from './topics'
 
 const MINUTE = 60_000
@@ -60,3 +61,21 @@ export const rewritten = {
   resume: { ...homeItems.resume, aiTitle: 'Pick up where you left off: Dev wants the Postgres 16 cutover window' },
   moved: { ...homeItems.moved, aiTitle: "Maya's proposal grew 14 replies, leaning toward cutting offline mode" },
 } satisfies Record<string, HomeItem>
+
+const noop = () => {}
+
+/** Home's props for the merged Home proposals: the morning greeting and three rows, overridable. */
+export const homeProps = (props: Partial<Omit<HomeProps, 'onAsk' | 'below'>> = {}): Omit<HomeProps, 'onAsk' | 'below'> => ({
+  scene: 'morning',
+  title: 'Morning, Tushar.',
+  line: 'Three things want you.',
+  items: [homeItems.waiting, homeItems.resume, homeItems.moved],
+  now: NOW,
+  enter: false,
+  onOpen: noop,
+  onMarkDone: noop,
+  onResolveAll: noop,
+  onSort: noop,
+  onItemMenu: noop,
+  ...props,
+})

@@ -1,28 +1,14 @@
 import type { ComponentType } from 'react'
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
-import { homeItems } from './fixtures/home'
+import { homeItems, homeProps } from './fixtures/home'
 import { conversations, cutoverThreads, recentConversations } from './fixtures/newChat'
 import { NOW } from './fixtures/topics'
 import { HomeOneField, HomeFoot, HomeSplit, type MergedProps } from './HomeMerged'
 
 // Proposals for Home merged with New chat: the same four states for each direction.
 
-const noop = () => {}
 
-const home = (props: Partial<MergedProps['home']> = {}): MergedProps['home'] => ({
-  scene: 'morning',
-  title: 'Morning, Tushar.',
-  line: 'Three things want you.',
-  items: [homeItems.waiting, homeItems.resume, homeItems.moved],
-  now: NOW,
-  enter: false,
-  onOpen: noop,
-  onMarkDone: noop,
-  onResolveAll: noop,
-  onSort: noop,
-  onItemMenu: noop,
-  ...props,
-})
+const home = homeProps
 
 const caughtUp = home({ scene: 'caughtUp', title: 'All caught up.', line: 'Nothing is waiting on you.', items: [] })
 const firstRun = home({ scene: 'midday', title: 'Hello, Tushar.', line: 'Nothing is waiting on you.', items: [] })

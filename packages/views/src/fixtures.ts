@@ -16,6 +16,7 @@ import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
+import { addressBookRefined as HomeWriteRefined1, shelfRefined as HomeWriteRefined2, addressBook as HomeWrite1, shelf as HomeWrite2, mosaic as HomeWrite3, inbox as HomeWrite4, dock as HomeWrite5 } from './HomeWrite.fixtures'
 import { foot as HomeMergedB, oneField as HomeMergedA, split as HomeMergedC } from './HomeMerged.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
@@ -104,6 +105,13 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   HomeMergedA,
   HomeMergedB,
   HomeMergedC,
+  HomeWrite1,
+  HomeWrite2,
+  HomeWrite3,
+  HomeWrite4,
+  HomeWrite5,
+  HomeWriteRefined1,
+  HomeWriteRefined2,
   HoverToolbar,
   JunoChatList,
   JunoComposer,

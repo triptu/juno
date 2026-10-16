@@ -99,7 +99,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
   )
 }
 
-interface HomeRowProps {
+export interface HomeRowProps {
   readonly item: HomeItem
   readonly done: boolean
   readonly now: number
@@ -129,7 +129,7 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  * in All and Move. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
+export function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
   const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' ? Robot : undefined
   const body = (
