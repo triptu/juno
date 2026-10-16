@@ -68,6 +68,8 @@ export interface LaunchOptions {
   readonly fakeAiDelayMillis?: number
   /** The fake AI answers only once Settings has an OpenRouter key, as the live provider does. */
   readonly fakeAiRequiresKey?: boolean
+  /** Run the engine's background AI jobs: titles, art, Home's AI items, Juno's Automated check (`JUNO_E2E_AI_JOBS`). Off by default. */
+  readonly aiJobs?: boolean
   /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
   readonly codemode?: boolean
   /** Another app is already capturing the screen when Juno starts (`JUNO_E2E_SCREEN_SHARED`, the screen watch's seam). */
@@ -125,6 +127,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
   if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.tour === true) env.JUNO_E2E_TOUR = '1'
+  if (options.aiJobs === true) env.JUNO_E2E_AI_JOBS = '1'
+  else delete env.JUNO_E2E_AI_JOBS
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
   const coverage = coverageDir()
   if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage
@@ -176,6 +180,8 @@ export async function writeSlackApp(
 }
 
 export interface Fixtures {
+  /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
+  readonly aiJobs: boolean
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -245,8 +251,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
-  running: async ({ fake, slackApp, userData }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  aiJobs: [false, { option: true }],
+  running: async ({ fake, slackApp, userData, aiJobs }, use) => {
+    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs })
     await use(running)
     await running.close()
   },

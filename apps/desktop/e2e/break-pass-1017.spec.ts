@@ -138,10 +138,6 @@ test('a Frequent pick and its draft survive switching tabs before sending', asyn
 test('a relaunch keeps many tabs and their drafts', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
-  // Recent threads get AI titles in the background; let them settle so the tab titles compared below are final.
-  for (const title of [POSTGRES, RINA, ROADMAP]) {
-    await expect(juno.sidebar.row(title).root).toHaveAttribute('data-title-source', 'ai', { timeout: 15_000 })
-  }
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('Draft one')
   await juno.sidebar.row(RINA).openInNewTab()
