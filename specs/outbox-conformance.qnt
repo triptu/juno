@@ -44,11 +44,6 @@
 //   does not become the message. Replies to an unseen copy come only while
 //   the socket is up here.
 //
-// - The post worker checks the socket once per pass, not per row: after a
-//   lookup or post that outlasts a drop, it still claims the next queued
-//   post. No drop comes while the post worker is busy and another post
-//   waits.
-//
 // The model's pending edit or delete follows `kept` to the copy when the
 // kept message is deleted elsewhere; the engine's targets the message the
 // user acted on. No such deletion comes while the user's change waits.
@@ -138,9 +133,8 @@ module outbox_conformance {
   action auxAll(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str, first: int, r: Set[int]): bool = all {
     by' = step, lane' = l, actFirst' = a, copyFrame' = c, closed' = d, freed' = f, firstSent' = first, retrying' = r
   }
-  // No drop while the post worker is busy and another post waits (the per-pass socket check).
-  // Nor while a call waits for the lane: whether it left its worker before the drop is not observable.
-  val dropSafe = lane.length() <= 1 and (postWorkerFree or drafts.forall(j => not(Set("queued", "unknown").contains(s.row.get(j))) or posting(j) or hasLookup(j)))
+  // No drop while a call waits for the lane: whether it left its worker before the drop is not observable.
+  val dropSafe = lane.length() <= 1
   action aux(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str): bool = auxAll(step, l, a, c, d, f, firstSent, retrying)
   action juno(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, freed)
   action timed(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, "")

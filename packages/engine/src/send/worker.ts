@@ -31,8 +31,10 @@
  * A row still `sending` when a pass starts was cut off (a restart, a store
  * failure) and becomes `unknown`, and the end of each boot
  * or catch-up makes every row due (the flush, architecture 5.8). Nothing is
- * sent while no sync runs or its socket is down, so a send made offline
- * stays `queued` and goes when the socket is back.
+ * sent while no sync runs or its socket is down, checked before each row
+ * and again just before the claim, so a send made offline, or queued
+ * behind a call that outlasted the socket, stays `queued` and goes when
+ * the socket is back.
  */
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
@@ -168,6 +170,8 @@ export class PostWorker extends Context.Service<
           const local = inStore(open)
           const fileIds = row.files.length === 0 ? [] : yield* upload(open, row)
           if (fileIds === undefined) return
+          // The socket may have dropped during the upload or an earlier row's call: the row waits for it (spec section 8).
+          if (!(yield* link.online)) return
           // Recorded as the user's send, so a copy the network makes is deleted (ADR 0014).
           const me = (yield* local(storedMe))?.userId ?? ''
           if (!(yield* local(transaction(claimPost(row.clientMsgId, me))))) return
@@ -269,6 +273,8 @@ export class PostWorker extends Context.Service<
             if (row.state === 'failed' || held.has(row.channel)) continue
             held.add(row.channel)
             if (row.nextAt > now) continue
+            // Checked per row, not per pass: an earlier row's call may have outlasted the socket. Its return wakes the worker.
+            if (!(yield* link.online)) return undefined
             if (row.state === 'queued') yield* post(open, fetcher, row)
             else if (row.state === 'unknown') yield* lookUp(open, fetcher, row)
           }

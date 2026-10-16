@@ -298,9 +298,9 @@ describe('send', () => {
     expect(inSlack(engine, id)).toBe(1)
   })
 
-  // Found by the conformance replay (test/conformance): the worker checks the socket once per pass, so
-  // after a post that answers once the socket has dropped, the next queued post goes out while Juno is offline.
-  it.fails('waits out a lost connection that comes while another post is out (fails: the check is per pass)', async () => {
+  // Found by the conformance replay (test/conformance): the worker checked the socket once per pass, so
+  // after a post that answered once the socket had dropped, the next queued post went out while Juno was offline.
+  it('waits out a lost connection that comes while another post is out', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')
