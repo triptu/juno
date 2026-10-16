@@ -43,6 +43,8 @@ export default defineConfig({
     { name: 'shots', testMatch: 'shots.spec.ts', use: { viewport: { width: 1800, height: 1000 } } },
     // Every other spec, so a branch that adds one does not edit this line.
     { name: 'behaviour', testMatch: '*.spec.ts', testIgnore: ['shots.spec.ts', '**/node_modules/**'] },
+    // The tour's screenshots (pnpm tour:shots), written into packages/views/src/tour/shots.
+    { name: 'tour', testMatch: 'tour-shots.ts' },
   ],
   webServer: {
     command: `pnpm exec vite preview --port ${port} --strictPort`,

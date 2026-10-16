@@ -39,6 +39,8 @@ import SessionView from './SessionView.fixtures'
 import SetUpJunoView from './SetUpJunoView.fixtures'
 import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
+import TourScene from './tour/TourScene.fixtures'
+import TourSheet from './TourSheet.fixtures'
 import Sidebar from './Sidebar.fixtures'
 import ThreadLink from './ThreadLink.fixtures'
 import TitlebarNav from './TitlebarNav.fixtures'
@@ -153,6 +155,8 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicHeader,
   TopicRow,
   TopicView,
+  TourScene,
+  TourSheet,
   UnknownCard: unknownCardSet,
   WhyPopover,
   Workspace,

@@ -10,6 +10,7 @@
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
     "shots": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project shots",
+    "tour-shots": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project tour",
     "test:e2e": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project=behaviour"
   },
   "dependencies": {
