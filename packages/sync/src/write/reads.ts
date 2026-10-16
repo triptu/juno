@@ -36,6 +36,8 @@ interface MarkPayload {
   readonly from?: string
   /** Bumped by every local mark that replaces the intent, so the worker knows its answer is for an older one. */
   readonly gen: number
+  /** Catch-up marks use the background lane, including after a restart. */
+  readonly catchUp?: boolean
   /** Slack said something about the topic while the mark was pending. */
   readonly seen: boolean
 }
@@ -47,6 +49,8 @@ export interface PendingMark {
   readonly unread: boolean
   readonly from?: Ts
   readonly gen: number
+  /** Catch-up marks use the background lane, including after a restart. */
+  readonly catchUp: boolean
   readonly seen: boolean
   readonly attempts: number
   /** Epoch milliseconds when the worker may send it. */
@@ -64,6 +68,7 @@ const toPendingMark = (row: { target_key: string; payload_json: string; attempts
     ...(payload.from === undefined ? {} : { from: payload.from as Ts }),
     gen: payload.gen,
     seen: payload.seen,
+    catchUp: payload.catchUp ?? false,
     attempts: row.attempts,
     nextAt: row.next_at === null ? 0 : Number(row.next_at),
   }
@@ -159,13 +164,14 @@ export const observeRead = (topicId: string, read: ServerRead): Effect.Effect<Re
  * the last) and keeps its due time; a new row is due `delayMillis` after
  * `now`, so marks in quick succession make one call.
  */
-export const writeLocalMark = (topicId: string, state: ReadState, from: Ts | undefined, now: number, delayMillis: number): Writer =>
+export const writeLocalMark = (topicId: string, state: ReadState, from: Ts | undefined, now: number, delayMillis: number, catchUp = false): Writer =>
   Effect.gen(function* () {
     yield* writeReadState(topicId, state)
     if (!state.pendingLocalWrite || state.intent === undefined) return
     const sql = yield* StoreWriter
     const existing = yield* pendingMark(topicId)
     const payload: MarkPayload = {
+      catchUp,
       ts: state.intent.lastReadTs,
       unread: state.intent.unread,
       ...(from === undefined ? {} : { from }),
