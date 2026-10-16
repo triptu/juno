@@ -1,0 +1,1 @@
+- 10-17 04:03 · ci-fix-15 · The New chat send test checks the composer field on every frame (`recordBoxes`) instead of one `boundingBox()` read, which could measure the topic's placeholder slot just after the real composer replaced it; its draft matches no #eng thread, so the wrong-place check cannot stop the send.
