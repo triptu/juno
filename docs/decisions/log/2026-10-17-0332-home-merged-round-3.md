@@ -1,0 +1,1 @@
+- 10-17 03:32 · home-newchat · Merged Home round 3: no greeting while items wait, no counts, labels or times; recents in two unlabelled columns (people, channels) under what needs you, with round 2's composer; final removal plan in docs/design/home-merged/round-3.
