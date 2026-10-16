@@ -100,3 +100,22 @@ describe('audience check', () => {
     expect(audienceCheck('performance review tomorrow', eng)?.matched).toEqual(['performance review'])
   })
 })
+
+describe('clarity preferences', () => {
+  it('leaves lowercase i alone without suppressing typos', () => {
+    expect(clarityCheck('i think so', { capitalI: false })).toBeUndefined()
+    expect(clarityCheck('i recieve it', { capitalI: false })?.fixed).toBe('i receive it')
+  })
+  it('turns off typos and doubled words together, leaving capital i enabled', () => {
+    expect(clarityCheck('i recieve the the report', { typos: false })?.fixed).toBe('I recieve the the report')
+  })
+  it('turns off question marks independently', () => {
+    expect(clarityCheck('can i recieve the report', { questionMarks: false })?.fixed).toBe('can I receive the report')
+  })
+  it('turns off the long sentence note independently', () => {
+    const text = 'i ' + 'word '.repeat(41)
+    expect(clarityCheck(text, { longSentences: false })?.longSentence).toBe(false)
+    expect(clarityCheck(text, { capitalI: false })?.longSentence).toBe(true)
+    expect(clarityCheck(text, { capitalI: false, longSentences: false })).toBeUndefined()
+  })
+})

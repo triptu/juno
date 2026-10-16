@@ -77,7 +77,38 @@ const topicList = [
   { id: postgres.id, title: postgres.title, channel: '#eng' },
 ]
 
+const applyGrammar = (draft: string, edits: ReadonlyArray<{ start: number; from: string; to: string }>): string => {
+  for (const edit of edits.toReversed()) draft = draft.slice(0, edit.start) + edit.to + draft.slice(edit.start + edit.from.length)
+  return draft
+}
+
 export const examples: ReadonlyArray<Example> = [
+  ex(tasks.grammarCheck, "its broken", { draft: "its broken" }, (o) => applyGrammar("its broken", o.edits) === "it's broken"),
+  ex(tasks.grammarCheck, "it's owner is here", { draft: "it's owner is here" }, (o) => applyGrammar("it's owner is here", o.edits) === "its owner is here"),
+  ex(tasks.grammarCheck, "your welcome", { draft: "your welcome" }, (o) => applyGrammar("your welcome", o.edits) === "you're welcome"),
+  ex(tasks.grammarCheck, "you're report is ready", { draft: "you're report is ready" }, (o) => applyGrammar("you're report is ready", o.edits) === "your report is ready"),
+  ex(tasks.grammarCheck, "their is a problem", { draft: "their is a problem" }, (o) => applyGrammar("their is a problem", o.edits) === "there is a problem"),
+  ex(tasks.grammarCheck, "there ready", { draft: "there ready" }, (o) => applyGrammar("there ready", o.edits) === "they're ready"),
+  ex(tasks.grammarCheck, "they're report is ready", { draft: "they're report is ready" }, (o) => applyGrammar("they're report is ready", o.edits) === "their report is ready"),
+  ex(tasks.grammarCheck, "this is faster then before", { draft: "this is faster then before" }, (o) => applyGrammar("this is faster then before", o.edits) === "this is faster than before"),
+  ex(tasks.grammarCheck, "this will effect the build", { draft: "this will effect the build" }, (o) => applyGrammar("this will effect the build", o.edits) === "this will affect the build"),
+  ex(tasks.grammarCheck, "the affect was clear", { draft: "the affect was clear" }, (o) => applyGrammar("the affect was clear", o.edits) === "the effect was clear"),
+  ex(tasks.grammarCheck, "we might loose the file", { draft: "we might loose the file" }, (o) => applyGrammar("we might loose the file", o.edits) === "we might lose the file"),
+  ex(tasks.grammarCheck, "we could of shipped", { draft: "we could of shipped" }, (o) => applyGrammar("we could of shipped", o.edits) === "we could have shipped"),
+  ex(tasks.grammarCheck, "we need send it", { draft: "we need send it" }, (o) => applyGrammar("we need send it", o.edits) === "we need to send it"),
+  ex(tasks.grammarCheck, "send the the report", { draft: "send the the report" }, (o) => applyGrammar("send the the report", o.edits) === "send the report"),
+  ex(tasks.grammarCheck, "they is ready", { draft: "they is ready" }, (o) => applyGrammar("they is ready", o.edits) === "they are ready"),
+  ex(tasks.grammarCheck, "i think so", { draft: "i think so" }, (o) => applyGrammar("i think so", o.edits) === "i think so"),
+  ex(tasks.grammarCheck, "i like its colour", { draft: "i like its colour" }, (o) => applyGrammar("i like its colour", o.edits) === "i like its colour"),
+  ex(tasks.grammarCheck, "it's ready and you're welcome", { draft: "it's ready and you're welcome" }, (o) => applyGrammar("it's ready and you're welcome", o.edits) === "it's ready and you're welcome"),
+  ex(tasks.grammarCheck, "their report is there", { draft: "their report is there" }, (o) => applyGrammar("their report is there", o.edits) === "their report is there"),
+  ex(tasks.grammarCheck, "lol brb rn \ud83d\udc4d", { draft: "lol brb rn \ud83d\udc4d" }, (o) => applyGrammar("lol brb rn \ud83d\udc4d", o.edits) === "lol brb rn \ud83d\udc4d"),
+  ex(tasks.grammarCheck, "ship when ready...", { draft: "ship when ready..." }, (o) => applyGrammar("ship when ready...", o.edits) === "ship when ready..."),
+  ex(tasks.grammarCheck, "`its broken`", { draft: "`its broken`" }, (o) => applyGrammar("`its broken`", o.edits) === "`its broken`"),
+  ex(tasks.grammarCheck, "```\nits broken\n```", { draft: "```\nits broken\n```" }, (o) => applyGrammar("```\nits broken\n```", o.edits) === "```\nits broken\n```"),
+  ex(tasks.grammarCheck, "https://example.test/its", { draft: "https://example.test/its" }, (o) => applyGrammar("https://example.test/its", o.edits) === "https://example.test/its"),
+  ex(tasks.grammarCheck, "@its <@U123> :its:", { draft: "@its <@U123> :its:" }, (o) => applyGrammar("@its <@U123> :its:", o.edits) === "@its <@U123> :its:"),
+  ex(tasks.grammarCheck, "> its broken", { draft: "> its broken" }, (o) => applyGrammar("> its broken", o.edits) === "> its broken"),
   ex(tasks.routeCheck, 'reply typed into Main', { draft: 'Jonas scaled it down this morning, the bill should drop next week', channel: '#eng', topics: [stagingBill, postgres] }, (o) => o.replyTo === stagingBill.id),
   ex(tasks.routeCheck, 'new subject in Main', { draft: 'Heads up, I am out tomorrow afternoon for a dentist appointment', channel: '#eng', topics: [stagingBill, postgres] }, (o) => o.replyTo === null),
   ex(tasks.routeCheck, 'short agreement that fits one topic', { draft: 'Option two works for me, I can be on call', channel: '#eng', topics: [stagingBill, postgres] }, (o) => o.replyTo === postgres.id),
