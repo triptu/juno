@@ -875,6 +875,10 @@ Causes found so far (2026-10-15):
 
 - **An older page that landed after the jump to the bottom.** A topic that opens at the "new" divider near its top asks for an older page at once. Under load the page landed after `toLatest` had reached the bottom, and `useOlderPages` replaced the bottom pin with a pin on the row in view, so the list stopped holding its end: the composer grew and the last message went 88 px out of view (2 of 40 at 24 workers, 12 of 40 with logging). The page now leaves a bottom pin alone (`older.ts`). The composer test also waits for the observer's first look before it types and for an entry at the smaller height, rather than counting frames.
 
+- **A box read while a node was replaced.** `locator.boundingBox()` finds the element, then measures it in a second step. When the New chat tab became the topic, the topic's composer replaced its placeholder slot (`ComposerSlot`) with a new node; a read that found the slot and measured it after the swap got `null` (2 of 20 at 16 workers). Every frame still showed one field in the same place. To check what the user sees through a change, record the boxes on every frame (`recordBoxes` in `apps/desktop/e2e/shiftProbe.ts`); to read one box, poll until it is there.
+
+- **A draft that a send check could stop.** A Main draft that shares two words with a thread gets "Looks like a reply to" on Enter only if the typing pause's check (400 ms) has answered by then, so the same test sometimes sent and sometimes showed the bar (1 of 20). A test that is not about the check uses a draft that matches no thread; one that is waits for the answer (`routeAnswered` in `send-checks.spec.ts`).
+
 ## Machine shapes
 
 Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.

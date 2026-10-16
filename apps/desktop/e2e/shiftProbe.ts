@@ -79,3 +79,33 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
     })
   }
 }
+
+type Box = { x: number; y: number; width: number; height: number }
+
+/**
+ * Records the boxes of the visible elements matching `selector` on every frame, until the returned function stops it
+ * and returns them, one list per frame. A frame is what the user saw, where one `boundingBox()` read can fall between
+ * two steps of a change that no frame shows.
+ */
+export async function recordBoxes(page: Page, selector: string): Promise<() => Promise<Box[][]>> {
+  const key = `junoBoxes${Math.random().toString(36).slice(2)}`
+  await page.evaluate(({ selector, key }) => {
+    const frames: Box[][] = []
+    let frame = 0
+    const tick = () => {
+      frames.push([...document.querySelectorAll<HTMLElement>(selector)].filter((node) => node.checkVisibility()).map((node) => {
+        const { x, y, width, height } = node.getBoundingClientRect()
+        return { x, y, width, height }
+      }))
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    Object.assign(window, { [key]: { frames, stop: () => cancelAnimationFrame(frame) } })
+  }, { selector, key })
+  return () => page.evaluate((key) => {
+    const probe = (window as unknown as Record<string, { frames: Box[][]; stop: () => void }>)[key]!
+    probe.stop()
+    delete (window as unknown as Record<string, unknown>)[key]
+    return probe.frames
+  }, key)
+}

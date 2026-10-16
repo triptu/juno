@@ -2,7 +2,7 @@
 // where it goes, pick a thread first, change the destination, a preview that
 // never marks read, a first DM opened with conversations.open, and Home from
 // the sidebar.
-import { expectStableAnchor } from './shiftProbe'
+import { expectStableAnchor, recordBoxes } from './shiftProbe'
 import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
@@ -10,6 +10,8 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
+/** Shares no two words with any #eng thread, so the wrong-place check never stops the send, however soon it answers. */
+const DRAFT = 'Lunch order goes out at noon'
 
 test('write first, then pick a destination and send: the tab becomes the topic, and the composer does not move', async ({ juno, fake }) => {
   await juno.signIn()
@@ -29,11 +31,11 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
   await tabs.expectCount(3)
   await tabs.expectActiveAt('New chat', 2)
 
-  await newChat.write('Cutover moves to Thursday night')
+  await newChat.write(DRAFT)
   // Enter with no destination opens the conversation picker and keeps the draft.
   await newChat.send()
   await expect(newChat.search).toBeFocused()
-  await expect(newChat.composer).toHaveValue('Cutover moves to Thursday night')
+  await expect(newChat.composer).toHaveValue(DRAFT)
 
   await newChat.pickConversation('eng', 'eng')
   await newChat.expectConversation('eng')
@@ -42,26 +44,33 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
   await expect(newChat.composer).toBeFocused()
 
   const before = await newChat.field.boundingBox()
+  // Every frame through the change shows one composer field, in the same place.
+  const fields = await recordBoxes(juno.win, '[data-composer-field]')
   fake.holdNext({ method: 'chat.postMessage', before: true })
   await expectStableAnchor(juno.win, '[data-topic-view] [data-message-row]', async () => {
     await newChat.send()
-    await topic.expectMessage('Cutover moves to Thursday night')
-    await tabs.expectActive('Cutover moves to Thursday night')
+    await topic.expectMessage(DRAFT)
+    await tabs.expectActive(DRAFT)
     await expect(newChat.root).toHaveCount(0)
-    expect(await newChat.field.boundingBox()).toEqual(before)
-    await expect(juno.sidebar.row('Cutover moves to Thursday night').root).toBeVisible()
-    await juno.sidebar.row('Cutover moves to Thursday night').expectRead()
+    // The topic's composer replaces its placeholder slot with a new node, so one read can find the slot and measure it detached.
+    await expect.poll(() => newChat.field.boundingBox()).toEqual(before)
+    await expect(juno.sidebar.row(DRAFT).root).toBeVisible()
+    await juno.sidebar.row(DRAFT).expectRead()
     await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
     await topic.composer.fill('An unfinished reply')
     await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
     fake.release()
-    await topic.expectSent('Cutover moves to Thursday night')
-  })
+    await topic.expectSent(DRAFT)
+    // The sidebar sorts by latest activity (SPEC 5), so the send moves #eng's Main up; only those moves are skipped.
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   await expect(topic.composer).toHaveValue('An unfinished reply')
   expect(await newChat.field.boundingBox()).toEqual(before)
+  const frames = await fields()
+  expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
+  expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
   await topic.send('second')
   await topic.expectSent('second')
-  const root = fake.messages('C0ENG').find(message => message.text === 'Cutover moves to Thursday night')!
+  const root = fake.messages('C0ENG').find(message => message.text === DRAFT)!
   expect(fake.messages('C0ENG').find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
 
   const posted = fake.calls.filter((call) => call.method === 'chat.postMessage')
