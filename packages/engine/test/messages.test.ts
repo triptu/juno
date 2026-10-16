@@ -329,11 +329,11 @@ describe('live messages', () => {
     const after = await list.until((window) => window.refs.people.get('U0LEO')?.avatarUrl === photo, 'the new photo in refs')
     expect(after.refs.people.get('U0LEO')).toMatchObject({ avatarSmallUrl: `${photo}?size=48`, avatarLargeUrl: `${photo}?size=192` })
     expect(changedRows(before, after)).toEqual([])
-    // The sidebar rows that show Leo show the new photo with the same rev.
+    // Rows that show Leo (the stack or a group DM's tile) get the new photo with the same rev; the others keep their object.
     const shown = await engine.rowsUntil((rows) => rows.some((row) => row.participants.some((p) => p.id === 'U0LEO' && p.avatarUrl === photo)), 'the new photo in the sidebar')
     for (const row of shown) {
       expect(row.rev).toBe(sidebarBefore.get(row.id)?.rev)
-      if (!row.participants.some((p) => p.id === 'U0LEO')) expect(row).toBe(sidebarBefore.get(row.id))
+      if (![...row.participants, ...(row.channel.members ?? [])].some((p) => p.id === 'U0LEO')) expect(row).toBe(sidebarBefore.get(row.id))
     }
   })
 })
