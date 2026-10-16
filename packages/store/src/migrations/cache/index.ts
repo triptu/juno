@@ -17,7 +17,8 @@ import mainWindow from './202610141000_main_window'
  * with a different version is deleted and recreated when the store opens, and
  * the engine re-syncs. Bump it with every change to the cache migrations; the
  * mirror is disposable, so its migrations only ever run on an empty file and
- * never transform data (ADR 0008).
+ * never transform data (ADR 0008). A stored column that only changes meaning
+ * needs no bump: `@juno/sync` `INDEX_VERSION` re-indexes it from local messages.
  */
 export const CACHE_SCHEMA_VERSION = 10
 

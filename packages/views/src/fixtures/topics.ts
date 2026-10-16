@@ -97,14 +97,14 @@ export const channels = {
 } as const satisfies Record<string, TopicRow['channel']>
 
 export const rows = {
-  /** Read, two-line preview, four participants. */
+  /** Read, two-line preview: no people, since nothing is unread. */
   postgres: row({
     id: 'C0ENG:1760000000.000100',
     title: 'Postgres 16 migration plan',
     sender: 'Dev',
     text: 'Booked 2–4pm. Will post results here.',
     channel: channels.eng,
-    participants: [people.dev, people.leo, people.maya, people.sam],
+    participants: [],
     messageCount: 7,
     art: art.database,
     ago: 4,
@@ -261,7 +261,7 @@ export const rows = {
     sender: 'Priya',
     text: "That's where I landed too. Shipping two-line as the default, with the reply count kept because it tells you whether to open it now or later.",
     channel: { ...channels.design, name: 'design-review-and-critique-sessions' },
-    participants: [people.priya, people.leo],
+    participants: [],
     messageCount: 4,
     ago: 2 * 60 + 20,
   }),
@@ -273,7 +273,7 @@ export const rows = {
     sender: 'Dev',
     text: '',
     channel: channels.eng,
-    participants: [people.dev],
+    participants: [],
     messageCount: 2,
     ago: 7 * 60,
   }),
@@ -297,7 +297,7 @@ export const rows = {
     sender: 'Leo',
     text: 'تم النشر على الخادم الجديد، والنتائج تبدو جيدة.',
     channel: channels.eng,
-    participants: [people.leo],
+    participants: [],
     messageCount: 2,
     ago: 55,
   }),
@@ -334,7 +334,7 @@ export const rows = {
     sender: 'Sam',
     text: 'Numbers are in the sheet. Finance wants an answer by Thursday.',
     channel: channels.vendors,
-    participants: [people.sam, people.jonas],
+    participants: [],
     messageCount: 2,
     ago: 95,
   }),
@@ -347,7 +347,8 @@ export const rows = {
     sender: 'Dev',
     text: 'Replica lag back under a second.',
     channel: channels.eng,
-    participants: [people.dev, people.leo],
+    participants: [people.dev, people.leo, people.maya, people.sam],
+    moreParticipants: 3,
     messageCount: 60,
     unreadCount: 60,
     unreadExact: false,

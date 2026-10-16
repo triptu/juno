@@ -167,20 +167,23 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 ```
 [tile 44]  [line 1: title ........................ time | Resolve]  height 22
            [line 2: Sender: preview, 1 line …........  @ | count ]
-           [line 3: ⌗ channel   ○○○   ▢ 7   ]              margin-top 3
+           [line 3: # channel ▢Main ◌7 ......  ○○○○ +2 | slot]  margin-top 3
 ```
 
 - Container: `role="listitem"` in a `role="list"`, `tabindex` (roving), named by the title (`aria-labelledby`), `aria-current` when selected; Enter and Space open it. Not a button: a button's children are presentational, which would hide the Resolve button inside. Flex, gap 12, align start, padding `11 12`, a fixed height of 88px (80 compact: `--density-row-estimate` plus the padding), radius 10, transparent. Hover `--surface-hover`. Selected (open in the active tab) `--secondary-default`.
 - Tile: 44×44 (36 compact). Channel: first letter uppercase, 14/600, bg `--secondary-default`, fg subtle, radius 10. DM: person avatar, round, person colours (tokens §1.6). Group DM: first initials of each member ("ML").
-- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then `bell-slash` 13 muted on a thread set to Never that shows because it mentions you. Spacer. Then time 12px tabular, muted (subtle when unread), in a slot at least `--topic-time-width` 48 wide and aligned to its end, so every time ends at the row's trailing inset (decided 10-17).
-- Line 2 (gap 8): preview 13px lh 1.45, muted (subtle when unread), one line with an ellipsis (`Text truncate`; the full text is the tooltip while it is cut off). Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
+- Line 1 (22px box, gap 6): title 14.5px (13.5 compact), weight 500 (600 unread), letter-spacing 0, single line ellipsis, `flex: 0 1 auto` so the icons stay visible. Then `bell-slash` 13 muted on a thread set to Never that shows because it mentions you. Spacer. Then time 12px tabular, muted on every row, in a slot at least `--topic-time-width` 48 wide and aligned to its end, so every time ends at the row's trailing inset (decided 10-17).
+- Line 2 (gap 8): preview 13px lh 1.45, `--foreground-secondary` on every row (muted on a resolved or unsubscribed row), one line with an ellipsis (`Text truncate`; the full text is the tooltip while it is cut off). Text is "Sender: text" with "You:" for own messages and ">" quote lines stripped. Right column (gap 4, padding-top 1):
   - **@ tag** when the latest unread run mentions you: 18px, min-width 18, radius 6, bg `--hl-soft`, inset 1px ring `--border-strong`, "@" 11/500 subtle, title "Mentions you".
   - **count tag** = unread count: 18px, min-width 18, padding 0 5, radius 6, 11/500 tabular; bg `--hl-count`, fg `--hl-count-fg` (the accent at reduced brightness, 4.5:1 or more; `Chip variant="count"`). Shown only on unread rows; hidden at 0.
-- Line 3 (12px muted, gap 12, margin-top 3): channel icon 12 + name (no "#"), on Main rows too (the prototype's "Messages outside threads" label is gone). Then the avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, initials 7.5/600, up to 4 participants, never you), on channel rows only: rows in a DM or a group DM have none. With no stack, nothing is drawn and the tags follow at the same gap 12. Then optional tags in order (gap 6):
-  - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle.
-  - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
-  - Then, on Main rows only, `chats-circle` 13 + the number of threads started since Main was last read (tabular, title "3 new threads"). Hidden at 0. No message count on any row.
-  - The Resolve slot (22px) ends the line.
+- Text levels: the title is the strongest (`--foreground-default`, 500, 600 unread), the preview one step down (`--foreground-secondary`), and line 3 and the time a step below that (`--foreground-muted`). On the selected row muted points at `--foreground-muted-on-fill`, so it stays 4.5:1 on the fill and below the preview. Measured ratios are in tokens.md 1.7; the gallery test `contrast.spec.ts` checks them in both themes and every accent.
+- Line 3 (12px muted, grid `1fr`, plus an `auto` column when there are people, gap 8, margin-top 3):
+  - **Place** (flex, gap 8): the glyph 13 muted and the name (no "#"), gap 4, on Main rows too (the prototype's "Messages outside threads" label is gone). The glyph says only what kind of place it is: `hash` for a public channel, `lock` for a private one (title "Private channel"), `user` for a DM and `users` for a group DM. A channel's own icon is for its art, never this line. The name truncates first; then the tags follow it in order:
+    - Main tag: 18px, padding 0 6, radius 6, 1px `--border-strong`, 11/500 subtle.
+    - Reopened tag: same but filled `--secondary-default`, no border, title "New activity after it was resolved".
+    - On Main rows only, `chats-circle` 13 + the number of threads started since Main was last read (tabular, title "3 new threads"). Hidden at 0. No message count on any row.
+  - **People**: sized to the stack and ending on the row's trailing edge, under the time and the counts. No people, no column: the place takes the whole line. The avatar stack (18px circles, −4 overlap, 1.5px `--background-subtle` ring, one initial 7.5/600) shows the senders of the topic's unread messages, from the last 15 unread messages, most recent first, at most 4, then "+N" 12 muted tabular for the rest. Never you. Empty when the topic is read, and on rows in a DM or a group DM.
+  - **Resolve** (22px) overlays the end of the line across both columns, so it takes no width. On hover or keyboard focus it fades in while the stack fades out (`--row-action-opacity`), or, with no stack, the place fades out under its last 34px (`--row-place-mask`). Only opacity and the mask change.
 - Title text: manual title, else AI title, else first ~6 words of the first message with "…" (a cut on the end of a sentence keeps the sentence and adds no "…"; a final full stop is dropped). Main rows show the channel label ("#eng", "Maya Chen").
 
 ### 3.2 States
@@ -188,7 +191,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 | State | Change |
 | --- | --- |
 | Read | Title 500, preview muted, time muted, no count tag |
-| Unread | Title 600, preview subtle, time subtle, count tag `--hl-count` / `--hl-count-fg` |
+| Unread | Title 600, preview secondary, time muted, count tag `--secondary-active`, the unread senders |
 | Mention | @ tag before the count tag (count may be absent) |
 | Hover (pointer) / focus-within | Time stays. An icon-only **Resolve** IconButton (check icon, small size) appears at the right end of the meta line (line three), in a slot that is always reserved so nothing shifts. Tooltip "Resolve", accessible name "Resolve {title}". Not shown on resolved rows or while renaming. (Owner decision, overrides the prototype's text button that replaced the time.) |
 | Focused (keyboard) | 2px focus ring; Resolve button visible; Enter/Space opens |

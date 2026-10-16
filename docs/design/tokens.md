@@ -34,8 +34,10 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
 | `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, outline button hover |
 | `--foreground-default` | `hsla(48, 15%, 12%, 1)` | #23211A | css | Body text, toast background |
-| `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, unread preview, pill text |
+| `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, pill text |
+| `--foreground-secondary` | `hsla(48, 8%, 28%, 1)` | #4D4B42 | redesign | The middle of a list row's three text levels: the sidebar preview. See 1.7 |
 | `--foreground-muted` | `hsla(48, 5%, 42%, 1)` | #706E66 | **proto** (overrides css 52%) | Meta, time, placeholders, section labels. See 1.6 |
+| `--foreground-muted-on-fill` | `hsla(48, 8%, 35%, 1)` | #605E52 | redesign | Muted text on a selected row's `--secondary-default` fill. See 1.7 |
 | `--accent-default` | `hsla(48, 30%, 8%, 1)` | #1B180E | css | Ink accent: send button, "new" divider, @you chip, Now chip |
 | `--accent-hover` | `hsla(48, 30%, 10%, 1)` | #1F1C11 | css | |
 | `--accent-active` | `hsla(48, 30%, 13%, 1)` | #292516 | css | |
@@ -76,7 +78,9 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--tab-divider` | #3A3835 | 0.37 | 1.67:1 on the strip | redesign 10-16 |
 | `--foreground-default` | #EEEBE2 | 0.94 | 14.7:1 on the page | redesign |
 | `--foreground-subtle` | #C6C4BE | 0.82 | 10.1:1 page, 7.7:1 `--secondary-default`, 6.1:1 `--secondary-active`, 7.0:1 popovers | redesign |
+| `--foreground-secondary` | #C0BEB8 | 0.80 | 9.9:1 sidebar, 7.6:1 hover, 7.2:1 `--secondary-default` | redesign |
 | `--foreground-muted` | #A09E9A | 0.70 | 6.6:1 page, 6.9:1 sidebar, 5.8:1 cards, 5.3:1 hover, 5.0:1 `--secondary-default`, 4.6:1 popovers | redesign |
+| `--foreground-muted-on-fill` | #A09E9A | 0.70 | Same as muted, which passes on the fill in dark | redesign |
 | `--accent-default` | `hsla(48, 30%, 90%, 1)` #EDEADE | | The ink accent's dark fill | css |
 | `--accent-hover` | `hsla(48, 30%, 95%, 1)` | | | css |
 | `--accent-active` | `hsla(48, 30%, 99%, 1)` | | | css |
@@ -209,6 +213,14 @@ Measured, light: midnight #C3C2D9 / #28214D (8.5:1), claret #E3C3C6 / #5D1F2C (7
 | `--secondary-active` #EAE6D7 | | 4.06:1 |
 
 Rule that follows: muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`. On `--secondary-*` surfaces use `--foreground-subtle` (the prototype already does this for unread count tags, status chips and pills). The read-count tag (muted on `--secondary-default`, 4.39:1) is the one exception; [proposed] use `--foreground-subtle` there too.
+
+**Sidebar row levels.** A row has three text levels: title `--foreground-default`, preview `--foreground-secondary`, place and time `--foreground-muted`. Light subtle sits only 0.06 OKLCH lightness from muted, too close to read as a level, so the preview takes `--foreground-secondary`, which sits midway between the title and the meta in both themes (OKLCH L, light 0.25 / 0.41 / 0.54, dark 0.94 / 0.80 / 0.70). Dark meta cannot go lower: it must keep 4.5:1 on the selected row. On the selected row muted points at `--foreground-muted-on-fill`. Measured in Chromium by the gallery test `contrast.spec.ts` (title / preview / meta):
+
+| Row on | Light | Dark |
+| --- | --- | --- |
+| Sidebar `--background-subtle` | 15.3 / 8.3 / 4.85 | 15.5 / 9.9 / 6.9 |
+| Hover `--surface-hover` | 14.4 / 7.8 / 4.56 | 11.8 / 7.6 / 5.3 |
+| Selected `--secondary-default` | 13.9 / 7.5 / 5.6 | 11.2 / 7.2 / 5.0 |
 
 Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
@@ -574,7 +586,5 @@ Other literal lengths and colours require tokens, or a trailing
 | --- | --- | --- |
 | `--all-topics-place-width` | 160px | Native place select while options load. |
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
-| `--topic-people-width` | 60px | Four overlapping participant avatars. |
-| `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
 | `--threads-button-width` | 128px | Threads button before and after its count arrives. |
 | `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

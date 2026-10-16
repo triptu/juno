@@ -1,0 +1,1 @@
+- 10-16 12:38 · sidebar-row · The row's place glyph is # for a public channel and a lock for a private one (a person for DMs); the lock is muted like the #, not the private tint. Per-channel icons stay for art only.
