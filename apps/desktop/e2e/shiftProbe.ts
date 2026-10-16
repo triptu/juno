@@ -21,16 +21,21 @@ declare global {
  * Samples screen coordinates on every frame, including shifts hidden by Chromium's recent-input grace period.
  * `edge: 'bottom'` samples the anchor's bottom-left corner instead of its top-left: a row that grows while the list
  * holds its bottom (stick to bottom) keeps its bottom edge.
+ * `outside` skips a shift whose every moved node is inside that element: for a region whose movement during the
+ * action is intended and checked by its own test. A shift that also moves anything else still fails, but Chromium
+ * names at most five nodes per shift, so the anchor's samples and the test's own boxes guard the region under test.
  */
-export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom' } = {}): Promise<void> {
+export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom'; readonly outside?: string } = {}): Promise<void> {
   await waitForLayoutReady(page)
-  await page.evaluate(({ target, edge }) => {
+  await page.evaluate(({ target, edge, outside }) => {
     if (!PerformanceObserver.supportedEntryTypes.includes('layout-shift')) throw new Error('layout-shift observer unavailable')
     const shifts: Array<{ value: number; sources: string[] }> = []
     const collect = (entries: PerformanceEntry[]) => {
       for (const entry of entries) {
         if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') {
           const shift = entry as PerformanceEntry & { sources?: Array<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }
+          const region = outside === undefined ? null : document.querySelector(outside)
+          if (region !== null && (shift.sources ?? []).length > 0 && (shift.sources ?? []).every(({ node }) => node !== null && region.contains(node))) continue
           shifts.push({ value: entry.value, sources: (shift.sources ?? []).map(({ node, previousRect, currentRect }) => `${node instanceof Element ? node.outerHTML.slice(0, 240) : node?.parentElement?.outerHTML.slice(0, 240)}: ${JSON.stringify(previousRect)} → ${JSON.stringify(currentRect)}`) })
         }
       }
@@ -54,7 +59,7 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
     }
     window.junoShiftProbe = { shifts, observer, drain: () => collect(observer.takeRecords()), samples, sample, stop: () => cancelAnimationFrame(frame) }
     tick()
-  }, { target: selector, edge: options.edge ?? 'top' })
+  }, { target: selector, edge: options.edge ?? 'top', outside: options.outside })
   try {
     await action()
     await waitForLayoutReady(page)
