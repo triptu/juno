@@ -652,7 +652,7 @@ export const text = stylex.defineVars({
  * Three ideas: instant for what you do constantly, a quick ease-out for
  * presses and toggles, and a small spring for the few moments that deserve
  * it (a reaction landing, a toggle filling, a resolve check). Entrances are
- * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate.
+ * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate, except a tab being dragged, whose neighbours slide aside over --duration-fast.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.

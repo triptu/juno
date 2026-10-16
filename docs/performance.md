@@ -173,7 +173,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 - `ctrlKey` on macOS is a context-menu click: ignore it. Button 2 and the context-menu key open the menu, never navigate.
 - `metaKey` opens in a new tab on `pointerdown` too; `shiftKey` and `altKey` do nothing in v1 (reserved).
 - The target must not be inside a nested control (`closest('button, a, input, [data-no-activate]')`), so the Resolve button, the tab close button and rename inputs are not swallowed.
-- Rows are not draggable, so there is nothing to cancel. Tabs will be reorderable later; Safari activates a tab on mousedown and still allows the drag, which is the model.
+- Rows are not draggable, so there is nothing to cancel. Tabs are: as in Safari, a tab activates on mousedown and still drags once the pointer has moved 4px. The drag reads the tabs' places once, then writes only `transform` on the moved tabs once per animation frame, so no tab re-renders and nothing lays out while the pointer moves; the order commits once, on drop (inventory 4, "Reorder").
 - `onClick` still exists for assistive technology, which synthesises `click` with `detail === 0`. A real click (`detail !== 0`) is ignored because `pointerdown` already activated; a touch press waits for its click. This is `activateHandlers` in `packages/ui/src/internal/activate.ts`.
 - Keyboard activation is on `keydown` of Enter or Space (Space on `keyup` for `role="button"`, to match native buttons, but navigation rows use `keydown` for Enter).
 
