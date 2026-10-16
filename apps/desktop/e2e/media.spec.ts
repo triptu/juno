@@ -75,8 +75,18 @@ test('a video plays inline with its poster, and opens full screen', async ({ jun
   const poster = await player.getAttribute('poster')
   expect(poster).toMatch(/^juno:\/\/files\/[^/]+\/poster\?url=/)
   expect(await player.getAttribute('src')).toMatch(/^juno:\/\/files\/[^/]+\/video\?url=/)
-  const type = await win.evaluate(async (src) => (await fetch(src)).headers.get('content-type'), poster!)
-  expect(type).toBe('image/png')
+  // Loaded as an image, as the player loads it: a real picture of the poster's size.
+  const size = await win.evaluate(
+    (src) =>
+      new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+        image.onerror = () => reject(new Error('poster did not load'))
+        image.src = src
+      }),
+    poster!,
+  )
+  expect(size).toEqual({ width: 1280, height: 720 })
 
   const open = row.getByRole('button', { name: 'Open demo.mp4 full screen' })
   await open.click()
