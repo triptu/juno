@@ -21,7 +21,7 @@ import { prefs } from '@juno/store'
 import { EngineConfig } from './config'
 import { Workspace } from './workspace'
 import { AiCredentials } from './aiCredentials'
-import { AiSpend } from './aiSpend'
+import { AiBackground, AiSpend } from './aiSpend'
 import { AiAudit } from './aiAudit'
 import { HostLink } from './protocol/host'
 
@@ -71,6 +71,9 @@ interface TaskInfo {
 
 const subjectOf = (key: string): Pick<HostAiCall, 'subjectKind' | 'subjectId'> =>
   key === '' ? { subjectKind: '', subjectId: '' } : { subjectKind: parseTopicId(key) === undefined ? 'channel' : 'topic', subjectId: key }
+
+/** Tasks that are always backlog work for the spend cap (`AiBackground`). */
+const BACKGROUND_TASKS = new Set(['settledScore', 'followUps', 'homeTitle', 'automatedChannel'])
 
 const MISSING: Decision<never> = { _tag: 'NoDecision', reason: 'missing-key', meta: { model: '', latencyMillis: 0, attempts: 0 } }
 /** A key change cut the call short: to the job it is `missing-key`, to the log it was cancelled. */
@@ -143,10 +146,12 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
         config.ai === 'fake' ? Effect.succeed(FAKE_MODEL) : readConfig.pipe(Effect.map((current) => modelFor(tier, current)))
       const logged = audited(audit, providerName, modelOf)
       const run = <A>(task: TaskInfo, input: unknown, request: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> => logged(task, input, Effect.gen(function* () {
+        // Home's tasks are backlog work; the art job says per topic.
+        const asked = BACKGROUND_TASKS.has(task.name) ? request.pipe(Effect.provideService(AiBackground, true)) : request
         // Tests count the calls that reached the fake model; one the cap blocked made no attempt.
         const call = config.e2e && config.ai === 'fake'
-          ? request.pipe(Effect.tap((decision) => (decision.meta.attempts > 0 ? host.send({ _tag: 'aiCall', task: task.name }) : Effect.void)))
-          : request
+          ? asked.pipe(Effect.tap((decision) => (decision.meta.attempts > 0 ? host.send({ _tag: 'aiCall', task: task.name }) : Effect.void)))
+          : asked
         if (!gated) return yield* call
         const revision = yield* credentials.revision
         if (!(yield* credentials.key)) return MISSING

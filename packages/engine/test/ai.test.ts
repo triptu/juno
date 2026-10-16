@@ -5,7 +5,7 @@ import type { TopicId } from '@juno/domain'
 import { expect, it, vi } from 'vitest'
 import { AiProviderLive } from '../src/ai'
 import { AiCredentials } from '../src/aiCredentials'
-import { AiSpend } from '../src/aiSpend'
+import { AiBackground, AiSpend } from '../src/aiSpend'
 import { AiAudit } from '../src/aiAudit'
 import type { EngineConfig as Config } from '@juno/contract'
 import { EngineConfig } from '../src/config'
@@ -104,5 +104,21 @@ it('reads the latest key for every live provider call and reserves before it', a
   } finally {
     await runtime.dispose()
     provider.mockRestore()
+  }
+})
+
+it('asks the ledger as backlog for a call made as background work, and as foreground otherwise', async () => {
+  const { runtime, setKey, ledger } = engineAi({ userData: '', e2e: true, dev: false, ai: 'fake', fakeAiRequiresKey: true })
+  const agent = ledger(() => 'reserved')
+  try {
+    await setKey('fake-key')
+    expect(await runtime.runPromise(generate)).toMatchObject({ _tag: 'Decided' })
+    expect(await runtime.runPromise(generate.pipe(Effect.provideService(AiBackground, true)))).toMatchObject({ _tag: 'Decided' })
+    const reserves = agent.answered.filter(ask => ask._tag === 'reserve')
+    expect(reserves.map(ask => ask._tag === 'reserve' && ask.background === true)).toEqual([false, true])
+    expect(reserves.every(ask => ask._tag === 'reserve' && ask.amount > 0)).toBe(true)
+  } finally {
+    await agent.stop()
+    await runtime.dispose()
   }
 })

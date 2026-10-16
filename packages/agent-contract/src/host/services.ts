@@ -111,8 +111,11 @@ export const HostViewRpcs = RpcGroup.make(hostViewsList, hostViewsCreate, hostVi
  * it. The agent applies an ask once by its id, so a repeat is harmless.
  */
 export const HostSpendAsk = Schema.Union([
-  /** Reserve `amount` under this id. */
-  Schema.TaggedStruct('reserve', { id: Schema.String, amount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) }),
+  /**
+   * Reserve `amount` under this id. `background` marks the engine's backlog
+   * (art for older topics, Home), which may use three quarters of the engine's half.
+   */
+  Schema.TaggedStruct('reserve', { id: Schema.String, amount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), background: Schema.optionalKey(Schema.Boolean) }),
   /** Settle the reservation with this id: the reported cost, or null when it is unknown. */
   Schema.TaggedStruct('settle', { id: Schema.String, actual: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))) }),
 ])

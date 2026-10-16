@@ -6,7 +6,9 @@
  * blocked: an engine call never runs outside the cap. A settlement is
  * offered until the agent takes it, also across an agent restart.
  *
- * Amounts cross the port as integer nanodollars, rounded up.
+ * Amounts cross the port as integer nanodollars, rounded up. A call made
+ * under `AiBackground` asks as the backlog, which the ledger stops at three
+ * quarters of the engine's half, so new threads and Redraw keep the rest.
  */
 import { randomUUID } from 'node:crypto'
 import type { Admission } from '@juno/ai'
@@ -20,6 +22,9 @@ const ANSWER_TIMEOUT = '10 seconds'
 type Answer = { readonly id: string; readonly ask: 'reserve' | 'settle'; readonly result: 'reserved' | 'blocked' | 'settled' }
 
 const nanodollars = (usd: number): number => Math.max(0, Math.ceil(usd * NANODOLLARS))
+
+/** The call is backlog work: art for older topics, Home's checks, the automated channel check. */
+export const AiBackground = Context.Reference<boolean>('juno/engine/AiBackground', { defaultValue: () => false })
 
 export class AiSpend extends Context.Service<AiSpend, {
   /** Reserves `upperUsd` in the agent's ledger, or says the call is blocked. */
@@ -48,7 +53,8 @@ export class AiSpend extends Context.Service<AiSpend, {
       const id = randomUUID()
       const answer = yield* Deferred.make<'reserved' | 'blocked'>()
       waiting.set(id, answer)
-      yield* offer({ _tag: 'reserve', id, amount: nanodollars(upperUsd) })
+      const background = yield* AiBackground
+      yield* offer({ _tag: 'reserve', id, amount: nanodollars(upperUsd), ...(background ? { background } : {}) })
       const result = yield* Deferred.await(answer).pipe(
         Effect.timeoutOption(ANSWER_TIMEOUT),
         // Not answered: stop offering it, and release it in case the agent reserved it after all.
