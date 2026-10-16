@@ -24,11 +24,12 @@ const bootOnce = (runtime: SyncRuntime) => {
 }
 
 export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope>) => {
-  const { state, config, cycle, phase, settle, refreshEmoji } = runtime
+  const { state, config, cycle, phase, settle, refreshEmoji, refreshUsergroups } = runtime
   const attempt = bootOnce(runtime)
   /** A `force_reload`: boot again from the current store. */
   const reboot = cycle(attempt.pipe(
     Effect.andThen(settle),
+    Effect.andThen(refreshUsergroups),
     Effect.andThen(refreshEmoji),
     Effect.andThen(followPassIfDue(runtime)),
     Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
@@ -50,6 +51,7 @@ export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void
     }
     state.booted = true
     yield* settle()
+    yield* refreshUsergroups
     yield* refreshEmoji
     yield* followPassIfDue(runtime)
   }))

@@ -11,11 +11,11 @@
  * - by message ts, the row it built and the inputs it built it from. A
  *   message whose stored version, reactions, thread link and group start are
  *   unchanged keeps its row object and is not parsed again;
- * - the names of users and channels and the custom emoji the bodies looked
+ * - the names of users, channels and user groups and the custom emoji the bodies looked
  *   up. Bodies are parsed with lookups from these maps; ids a body asked for
  *   that the maps lack are read in one statement and only those bodies are
- *   parsed again. The handler drops the maps when `users`, `conversations`
- *   or `emoji` change, which rebuilds every row once.
+ *   parsed again. The handler drops the maps when `users`, `conversations`,
+ *   `usergroups` or `emoji` change, which rebuilds every row once.
  *
  * `rev` is a hash of the shaped row, so a rebuilt row that shows the same
  * thing keeps its `rev` and does not travel. The sender is a ref: a new
@@ -39,7 +39,7 @@ import {
   type UserId,
   type Me,
 } from '@juno/domain'
-import { emojiUnicode, messageBody, plainText, splitEmojiName, type Lookups, type MessageBody, type MessageContent } from '@juno/richtext'
+import { emojiUnicode, messageBody, plainText, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import type { PendingFile } from '@juno/sync'
 import { windowCovered } from './coverage'
@@ -74,6 +74,8 @@ export interface MessageCache {
   /** Users read so far, `null` for an id with no row. */
   users: Map<string, UserRow | null>
   channels: Map<string, string | null>
+  /** User groups read so far, `null` for an id with no row. */
+  usergroups: Map<string, UsergroupName | null>
   /** Custom emoji image urls, `null` for a name with no custom emoji. */
   emoji: Map<string, string | null>
   /** Custom aliases with no image, to the name they end at (a standard emoji, or a missing one). */
@@ -90,6 +92,7 @@ export const makeMessageCache = (): MessageCache => ({
   bodies: new Map(),
   users: new Map(),
   channels: new Map(),
+  usergroups: new Map(),
   emoji: new Map(),
   emojiAliases: new Map(),
   epoch: 0,
@@ -98,10 +101,11 @@ export const makeMessageCache = (): MessageCache => ({
   membership: '',
 })
 
-/** Drops the names and emoji a cache has read, after `users`, `conversations` or `emoji` changed. */
+/** Drops the names and emoji a cache has read, after `users`, `conversations`, `usergroups` or `emoji` changed. */
 export function forgetLookups(cache: MessageCache): void {
   cache.users = new Map()
   cache.channels = new Map()
+  cache.usergroups = new Map()
   cache.emoji = new Map()
   cache.emojiAliases = new Map()
   cache.epoch += 1
@@ -218,9 +222,10 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     if (selfId !== undefined) senders.add(selfId)
     for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
     yield* readUsers(sql, cache, senders)
-    const wanted = { users: new Set<string>(), channels: new Set<string>(), emoji: new Set<string>() }
+    const wanted = { users: new Set<string>(), channels: new Set<string>(), usergroups: new Set<string>(), emoji: new Set<string>() }
     const lookups = {
       ...(selfId === undefined ? {} : { me: selfId }),
+      ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
       user: (id: string) => {
         const user = cache.users.get(id)
         if (user === undefined) wanted.users.add(id)
@@ -230,6 +235,11 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         const name = cache.channels.get(id)
         if (name === undefined) wanted.channels.add(id)
         return name ?? undefined
+      },
+      usergroup: (id: string) => {
+        const group = cache.usergroups.get(id)
+        if (group === undefined) wanted.usergroups.add(id)
+        return group ?? undefined
       },
       emoji: (name: string) => {
         const url = cache.emoji.get(name)
@@ -261,9 +271,10 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     // Emoji names in reactions are looked up too, so the second pass has them.
     for (const list of reactions.values()) for (const reaction of list) if (emojiUnicode(reaction.name) === undefined) lookups.emoji(splitEmojiName(reaction.name).name)
-    if (wanted.users.size + wanted.channels.size + wanted.emoji.size > 0) {
+    if (wanted.users.size + wanted.channels.size + wanted.usergroups.size + wanted.emoji.size > 0) {
       yield* readUsers(sql, cache, wanted.users)
       yield* readChannels(sql, cache, wanted.channels)
+      yield* readUsergroups(sql, cache, wanted.usergroups)
       yield* readEmoji(sql, cache, wanted.emoji)
       for (const row of parsedNow) bodies.set(row.ts, parse(row))
     }
@@ -338,6 +349,17 @@ const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterab
     if (missing.length === 0) return
     for (const id of missing) cache.channels.set(id, null)
     for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(missing)}`) cache.channels.set(row.id, row.name)
+  })
+
+/** User groups by id. A deleted group keeps its handle. */
+const readUsergroups = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
+  Effect.gen(function* () {
+    const missing = [...ids].filter((id) => !cache.usergroups.has(id))
+    if (missing.length === 0) return
+    for (const id of missing) cache.usergroups.set(id, null)
+    for (const row of yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in(missing)}`) {
+      cache.usergroups.set(row.id, { handle: row.handle, ...(row.name === null ? {} : { name: row.name }) })
+    }
   })
 
 /** Custom emoji by name, following an alias to another custom emoji (`alias:name`) up to three times. */

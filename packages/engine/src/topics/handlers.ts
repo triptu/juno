@@ -34,10 +34,10 @@ import { Workspace, type StoreServices } from '../workspace'
 import { renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
 import { setSubscribed } from '../follow'
-import { countTopics, forgetUsers, listTopics, makeRowCache } from './query'
+import { countTopics, forgetUsergroups, forgetUsers, listTopics, makeRowCache } from './query'
 import { listIgnoredChannels } from './ignored'
 
-const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
+const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'usergroups', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
 /** The sidebar list and counts also follow the views: a view's conversations and Keep these out of All. All topics does not. */
 const SIDEBAR_KEYS: InvalidationKeys = [...LIST_KEYS, 'sidebar_views', 'sync_state']
 const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'ignored_channels', 'thread_subs', 'sidebar_views']
@@ -78,12 +78,16 @@ function liveRuns<A>(
   )
 }
 
-/** A row cache for one subscription that forgets the users it read whenever the `users` table changes. */
+/** A row cache for one subscription that forgets the users or groups it read whenever their table changes. */
 const rowCacheForSubscription = Effect.gen(function* () {
   const cache = makeRowCache({ keepUsers: true })
   const invalidation = yield* Invalidation
   yield* Effect.acquireRelease(
     Effect.sync(() => invalidation.subscribeUnsafe(['users'], () => forgetUsers(cache))),
+    (cancel) => Effect.sync(cancel),
+  )
+  yield* Effect.acquireRelease(
+    Effect.sync(() => invalidation.subscribeUnsafe(['usergroups'], () => forgetUsergroups(cache))),
     (cancel) => Effect.sync(cancel),
   )
   return cache

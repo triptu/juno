@@ -210,7 +210,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
       )
     case 'usergroup':
       return (
-        <Chip variant="filled" size="inline">
+        <Chip variant={inline.isMine ? 'accent' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
           <bdi>@{inline.handle}</bdi>
         </Chip>
       )

@@ -35,7 +35,7 @@ interface BackgroundPacing {
  * - `edge:users/info`: 20 a minute (edge limits unknown). Each call names up
  *   to 100 people, so a boot makes a handful.
  * - any other method: 20 a minute. These are rare on the background lane
- *   (the follow pass, lookups, emoji, a reconnect's metadata).
+ *   (the follow pass, lookups, emoji, user groups, a reconnect's metadata).
  * - all methods together: 120 a minute.
  */
 const defaultBackgroundPacing: BackgroundPacing = {

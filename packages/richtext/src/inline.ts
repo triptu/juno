@@ -103,8 +103,18 @@ export function channelInline(id: string, fallbackName: string | undefined, look
   return { kind: 'channel', id, name: lookups.channel?.(id) ?? fallbackName ?? id }
 }
 
+/** The handle shown for a user group whose handle has not arrived yet. Never the raw id. */
+export const UNKNOWN_USERGROUP = 'group'
+
 export function usergroupInline(id: string, fallbackHandle: string | undefined, lookups: Lookups): Inline {
-  return { kind: 'usergroup', id, handle: lookups.usergroup?.(id) ?? fallbackHandle ?? id }
+  const known = lookups.usergroup?.(id)
+  return {
+    kind: 'usergroup',
+    id,
+    handle: known?.handle ?? fallbackHandle ?? UNKNOWN_USERGROUP,
+    ...(known?.name ? { name: known.name } : {}),
+    isMine: lookups.myUsergroups?.includes(id) ?? false,
+  }
 }
 
 export function emojiInline(rawName: string, lookups: Lookups, hex?: string): Inline {
