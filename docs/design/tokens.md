@@ -417,6 +417,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Several images in a message are one grid of this size, two columns, gap 6. File cards are `--thumb-max-width` wide |
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
 | `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
+| `--viewer-bar-width` | 560px. The media viewer's header bar: one width for every item, so moving between items never moves its buttons. |
 
 ### Controls
 

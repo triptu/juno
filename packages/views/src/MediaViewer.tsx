@@ -99,7 +99,7 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
     }
     if (event.key !== 'Tab') return
     // Focus stays inside the viewer: Tab goes round its controls.
-    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), video'))
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, video'))
     const first = controls[0]
     const last = controls[controls.length - 1]
     if (first === undefined || last === undefined) return
@@ -120,6 +120,8 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
   const height = file.height ?? file.thumb.height
   const full = file.kind === 'image' ? file.full : undefined
   const canDownload = file.download !== undefined
+  const anyDownload = items.some((item) => item.download !== undefined)
+  const anyImage = items.some((item) => item.kind === 'image')
   const meta = [viewing.sender, messageTime(viewing.at, now), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
   return (
     <div ref={root} role="dialog" aria-modal="true" aria-label={file.name} data-media-viewer="" onKeyDown={onKeyDown} onClick={onBackdrop} {...stylex.props(styles.backdrop)}>
@@ -133,9 +135,16 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
               {meta}
             </Text>
           </span>
-          {canDownload && onDownload !== undefined ? <IconButton icon={DownloadSimple} label="Download" size={28} iconSize={16} onClick={() => onDownload(file)} /> : null}
-          {canDownload && onOpenFile !== undefined ? <IconButton icon={ArrowSquareOut} label="Open in default app" size={28} iconSize={16} onClick={() => onOpenFile(file)} /> : null}
-          {file.kind === 'image' && onCopyImage !== undefined ? <IconButton icon={Copy} label="Copy image" size={28} iconSize={16} onClick={() => onCopyImage(file)} /> : null}
+          {/* The same buttons for every item, so the bar never moves; one that does not apply to this item is dimmed. */}
+          {anyDownload && onDownload !== undefined ? (
+            <IconButton icon={DownloadSimple} label="Download" size={28} iconSize={16} dimmed={!canDownload} onClick={() => canDownload && onDownload(file)} />
+          ) : null}
+          {anyDownload && onOpenFile !== undefined ? (
+            <IconButton icon={ArrowSquareOut} label="Open in default app" size={28} iconSize={16} dimmed={!canDownload} onClick={() => canDownload && onOpenFile(file)} />
+          ) : null}
+          {anyImage && onCopyImage !== undefined ? (
+            <IconButton icon={Copy} label="Copy image" size={28} iconSize={16} dimmed={file.kind !== 'image'} onClick={() => file.kind === 'image' && onCopyImage(file)} />
+          ) : null}
           <IconButton data-viewer-close="" icon={X} label="Close" size={28} iconSize={16} onClick={onClose} />
         </Surface>
       </div>
@@ -155,10 +164,10 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
         {several ? (
           <>
             <span {...stylex.props(styles.arrow, styles.arrowStart)}>
-              <IconButton icon={CaretLeft} label="Previous" variant="raised" radius="full" size={36} iconSize={18} disabled={index === 0} onClick={() => go(index - 1)} />
+              <IconButton icon={CaretLeft} label="Previous" variant="raised" radius="full" size={36} iconSize={18} dimmed={index === 0} onClick={() => go(index - 1)} />
             </span>
             <span {...stylex.props(styles.arrow, styles.arrowEnd)}>
-              <IconButton icon={CaretRight} label="Next" variant="raised" radius="full" size={36} iconSize={18} disabled={index === items.length - 1} onClick={() => go(index + 1)} />
+              <IconButton icon={CaretRight} label="Next" variant="raised" radius="full" size={36} iconSize={18} dimmed={index === items.length - 1} onClick={() => go(index + 1)} />
             </span>
           </>
         ) : null}
@@ -218,17 +227,20 @@ const styles = stylex.create({
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-3'],
   },
+  // One width for every item, so moving between them never moves the buttons.
   barSurface: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
-    maxWidth: layout['--composer-width'],
+    width: layout['--viewer-bar-width'],
+    maxWidth: '100%',
     minWidth: 0,
     paddingInlineStart: spacing['--space-3'],
   },
   heading: {
     display: 'flex',
     flexDirection: 'column',
+    flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
     marginInlineEnd: spacing['--space-2'],

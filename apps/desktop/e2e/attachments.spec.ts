@@ -352,7 +352,7 @@ test('several images open in the viewer at the one clicked, and the keys and the
 
   await win.keyboard.press('ArrowRight')
   await expect(current).toHaveAttribute('data-viewer-item', '4')
-  await expect(viewer.getByRole('button', { name: 'Next' })).toBeDisabled()
+  await expect(viewer.getByRole('button', { name: 'Next' })).toHaveAttribute('aria-disabled', 'true')
   await win.keyboard.press('ArrowRight')
   await expect(current).toHaveAttribute('data-viewer-item', '4')
   await win.keyboard.press('ArrowLeft')
@@ -361,7 +361,7 @@ test('several images open in the viewer at the one clicked, and the keys and the
   await strip.getByRole('button', { name: 'Show rack-front.png' }).click()
   await expect(current).toHaveAttribute('data-viewer-item', '1')
   await expect(strip.getByRole('button', { name: 'Show rack-front.png' })).toHaveAttribute('aria-current', 'true')
-  await expect(viewer.getByRole('button', { name: 'Previous' })).toBeDisabled()
+  await expect(viewer.getByRole('button', { name: 'Previous' })).toHaveAttribute('aria-disabled', 'true')
   await win.keyboard.press('End')
   await expect(current).toHaveAttribute('data-viewer-item', '4')
   await win.keyboard.press('Home')

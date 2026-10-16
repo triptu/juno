@@ -783,6 +783,8 @@ export const layout = stylex.defineVars({
   '--thumb-max-height': '240px',
   // A tile of a message's image grid: two rows and the gap fill --thumb-max-height.
   '--thumb-tile-height': '117px',
+  // The media viewer's header bar, the same for every item.
+  '--viewer-bar-width': '560px',
   // A picture in the media viewer's filmstrip, square.
   '--filmstrip-thumb': '56px',
   '--search-field-width': '260px',
