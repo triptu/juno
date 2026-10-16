@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, useOptionListKeys } from '@juno/ui'
@@ -28,6 +28,34 @@ const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`
 const MAIN_ID = 'pick-main'
 const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
 
+/**
+ * Enter while the rows for the typed query are still loading picks the first
+ * row once they land, so a name typed and entered at once is not lost. Typing
+ * again drops the waiting Enter.
+ */
+function usePendingEnter(loading: boolean, ids: ReadonlyArray<string>, pick: (id: string) => void, onKeyDown: (event: KeyboardEvent<HTMLElement>) => void, onQuery: (query: string) => void) {
+  const pending = useRef(false)
+  useEffect(() => {
+    if (!pending.current || loading) return
+    pending.current = false
+    if (ids[0] !== undefined) pick(ids[0])
+  }, [loading, ids, pick])
+  return {
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key === 'Enter' && loading) {
+        event.preventDefault()
+        pending.current = true
+        return
+      }
+      onKeyDown(event)
+    },
+    onQuery: (query: string) => {
+      pending.current = false
+      onQuery(query)
+    },
+  }
+}
+
 /** The highlighted row: the one the pointer or the arrows chose, or the first. */
 function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (id: string) => void] {
   const [chosen, setChosen] = useState<string | undefined>(undefined)
@@ -50,10 +78,11 @@ export function ConversationList({ query, onQuery, conversations, onPickConversa
     const row = rows[ids.indexOf(id)]
     if (row !== undefined) onPickConversation(row)
   }
-  const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
+  const search = usePendingEnter(conversations === undefined, ids, pick, keys, onQuery)
   return (
     <>
-      <PickerSearch query={query} onQuery={onQuery} placeholder="Search people and channels" onKeyDown={onKeyDown} activeId={activeId} />
+      <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search people and channels" onKeyDown={search.onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Conversations" {...(activeId === undefined ? {} : { activeId })}>
           {sections.map(([title, items]) =>
@@ -92,10 +121,11 @@ export function ThreadList({ query, onQuery, conversation, threads, now, onPickT
   const ids = [...(main ? [MAIN_ID] : []), ...rows.map((row) => rowId('thread', row.id))]
   const [activeId, setActive] = useActive(ids)
   const pick = (id: string) => (id === MAIN_ID ? onPickThread(undefined) : onPickThread(rows[ids.indexOf(id) - (main ? 1 : 0)]))
-  const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
+  const search = usePendingEnter(threads === undefined, ids, pick, keys, onQuery)
   return (
     <>
-      <PickerSearch query={query} onQuery={onQuery} placeholder="Search threads" onKeyDown={onKeyDown} activeId={activeId} />
+      <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search threads" onKeyDown={search.onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Threads" {...(activeId === undefined ? {} : { activeId })}>
           {conversation === undefined ? <OptionGroupLabel>Recent threads</OptionGroupLabel> : null}
