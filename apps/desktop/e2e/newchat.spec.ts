@@ -48,7 +48,7 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
     await expect(newChat.root).toHaveCount(0)
     expect(await newChat.field.boundingBox()).toEqual(before)
     await expect(juno.sidebar.row('Cutover moves to Thursday night').root).toBeVisible()
-    await juno.sidebar.row('Cutover moves to Thursday night').expectUnread(0)
+    await juno.sidebar.row('Cutover moves to Thursday night').expectRead()
     await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
     await topic.composer.fill('An unfinished reply')
     await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
