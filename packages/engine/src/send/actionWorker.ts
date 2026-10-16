@@ -40,7 +40,21 @@
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
-import { actionDone, checkCopyDelete, deferAction, dropAction, flushActions, pendingActions, placeOf, settleOnFailedPost, storedMe, type Acted, type PendingAction, type TopicFetcher } from '@juno/sync'
+import {
+  actionDone,
+  checkCopyDelete,
+  deferAction,
+  dropAction,
+  flushActions,
+  pendingActions,
+  placeOf,
+  readAction,
+  settleOnFailedPost,
+  storedMe,
+  type Acted,
+  type PendingAction,
+  type TopicFetcher,
+} from '@juno/sync'
 import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
@@ -203,8 +217,11 @@ export class ActionWorker extends Context.Service<
           // A copy's delete waits for the catch-up, which wakes the worker, but not past this; then the check keeps the copy.
           const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + COPY_CATCH_UP_MILLIS
           let copyWait: number | undefined
-          for (const action of yield* local(pendingActions)) {
-            if (held.has(action.channel)) continue
+          for (const listed of yield* local(pendingActions)) {
+            if (held.has(listed.channel)) continue
+            // An earlier call in this pass may have taken a while: the row may have changed or ended since.
+            const action = yield* local(readAction(listed.id))
+            if (action === undefined) continue
             held.add(action.channel)
             if (action.nextAt > now) continue
             if (!caughtUp && now < catchUpDeadline && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null) {
@@ -212,6 +229,8 @@ export class ActionWorker extends Context.Service<
               continue
             }
             if (yield* run(open, fetcher, action)) waiting.add(action.id)
+            // A row that ended lets the channel's next row go in this pass, before rows of later channels.
+            else if ((yield* local(readAction(action.id))) === undefined) held.delete(action.channel)
           }
           // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
           const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null))

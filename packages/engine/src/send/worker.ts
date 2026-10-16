@@ -276,7 +276,11 @@ export class PostWorker extends Context.Service<
             // Checked per row, not per pass: an earlier row's call may have outlasted the socket. Its return wakes the worker.
             if (!(yield* link.online)) return undefined
             if (row.state === 'queued') yield* post(open, fetcher, row)
-            else if (row.state === 'unknown') yield* lookUp(open, fetcher, row)
+            else if (row.state === 'unknown') {
+              yield* lookUp(open, fetcher, row)
+              // A lookup that finds nothing puts the row back in the queue, ahead of later rows: start again.
+              return 0
+            }
           }
           const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed')
           if (rest.length === 0) return undefined

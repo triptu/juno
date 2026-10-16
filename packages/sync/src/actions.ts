@@ -98,7 +98,8 @@ const channelActions = (channel: string): Effect.Effect<ReadonlyArray<PendingAct
     return rows.map(toAction)
   })
 
-const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
+/** The row with `id` as it is now, or undefined once it ended. */
+export const readAction = (id: number): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE id = ?`, [id])
