@@ -3,7 +3,7 @@
  * opens, and the position it holds while rows change (performance 3.3).
  */
 import type { RefObject } from 'react'
-import type { MessageView } from '@juno/contract'
+import type { MessageView, Person } from '@juno/contract'
 import type { MessageWindow, ScrollSnapshot } from '@juno/state'
 import type { MessageListItem } from '@juno/views'
 
@@ -36,14 +36,30 @@ const ROW = '[data-message-row]'
 
 const items = new WeakMap<MessageView, MessageListItem>()
 
-/** The window's rows with their senders. A row keeps its object while its message and sender do, so `Message` stays memoized. */
+/** The people who reacted to `message`, from the window's refs, or undefined when no reaction lists anyone. */
+function reactorsOf(message: MessageView, people: ReadonlyMap<string, Person>): ReadonlyMap<string, Person> | undefined {
+  let found: Map<string, Person> | undefined
+  for (const reaction of message.reactions) {
+    for (const id of reaction.users ?? []) {
+      const person = people.get(id)
+      if (person !== undefined) (found ??= new Map()).set(id, person)
+    }
+  }
+  return found
+}
+
+const samePeople = (a: ReadonlyMap<string, Person> | undefined, b: ReadonlyMap<string, Person> | undefined) =>
+  a === b || (a !== undefined && b !== undefined && a.size === b.size && [...a].every(([id, person]) => b.get(id) === person))
+
+/** The window's rows with their senders and reactors. A row keeps its object while its message and people do, so `Message` stays memoized. */
 export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
   return window.order.map((ts) => {
     const message = window.rows.get(ts)!
     const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
+    const reactors = reactorsOf(message, window.refs.people)
     const held = items.get(message)
-    if (held !== undefined && held.sender === sender) return held
-    const item = { message, sender }
+    if (held !== undefined && held.sender === sender && samePeople(held.reactors, reactors)) return held
+    const item = { message, sender, ...(reactors === undefined ? {} : { reactors }) }
     items.set(message, item)
     return item
   })

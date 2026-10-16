@@ -8,6 +8,7 @@ import { EngineStatus } from './EngineStatus'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
 import { openSettings } from './navigation'
 import { NotificationsPage } from './Notifications'
+import { QuickReactions } from './QuickReactions'
 import { Updates } from './Updates'
 
 const modelsAtom = liveQuery(prefsGet)({ key: 'aiModels' })
@@ -98,7 +99,7 @@ function General() {
     newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
-/** Theme, accent and density, saved to main for the next launch's first frame. */
+/** Theme, accent and density, saved to main for the next launch's first frame; then the quick reactions. */
 function Appearance() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
@@ -115,7 +116,7 @@ function Appearance() {
     setDensity(next)
     persistDensity(next)
   }
-  return <SettingsAppearance theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} />
+  return <SettingsAppearance theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
 }
 
 function Ignored() {

@@ -4,11 +4,11 @@
  * hooks stay out of the React Compiler, as `useMessageActions` does.
  */
 import { Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { MessageView } from '@juno/contract'
+import type { MessageView, QuickReaction } from '@juno/contract'
 import { Floating, SelectionQuote } from '@juno/views'
 import { chunk } from '../chunks'
 import type { ComposerHandle } from '../messageActions'
-import { recentEmoji } from '../recentEmoji'
+import { frequentEmoji } from '../recentEmoji'
 import { focusRow, middleOf, type Picker } from './messageCommands'
 
 const emojiPicker = chunk(() => import('../EmojiPickerPanel'))
@@ -95,6 +95,7 @@ export function floatingOf(
   react: (message: MessageView, name: string) => void,
   scrollRef: RefObject<HTMLElement | null>,
   composer: RefObject<ComposerHandle | null>,
+  quick: ReadonlyArray<QuickReaction>,
 ) {
   const quoteSelection = () => {
     const current = window.getSelection()
@@ -118,7 +119,7 @@ export function floatingOf(
   return picker !== undefined ? (
     <Suspense fallback={null}>
       <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
-        <EmojiPickerPanel recent={recentEmoji()} onPick={pick} onClose={closePicker} />
+        <EmojiPickerPanel recent={frequentEmoji(quick)} onPick={pick} onClose={closePicker} />
       </Floating>
     </Suspense>
   ) : selection !== undefined ? (

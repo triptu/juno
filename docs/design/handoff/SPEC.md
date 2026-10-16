@@ -190,8 +190,9 @@ The header has no bar. Two islands float over the top of the message list, 8px u
 - **Stable geometry.** The list is as dense as Slack's. A message is as tall as what it shows; no space is held for something that might arrive later. Space is reserved only for content the message already has: an image or file of known size, and reactions or a thread link the data already lists, while their images and counts load. A first reaction or a new thread link grows its message at the bottom, a rare and small change that is better than empty space under every message. The time sits right after the sender's name; a name that resolves late moves the time along its line once. What never moves is what the user is reading: rows in view stay still when anything changes above them (scroll anchoring), and at the bottom the list keeps its bottom, so a message that grows there lifts the rows above it in the same frame. The Threads counter keeps a fixed-width slot. Home enters by opacity only; its greeting and rows stay in their final positions.
 - **Where it opens.** A topic opens at a "N new" divider when it has unread messages, otherwise at the bottom. There is no summary card at the divider; to catch up, ask Juno in the panel.
 - **Mentions.** @people and #channels render as soft chips. Mentions of you get the accent colour and a lightly tinted message background. Clicking a #channel filters the sidebar to it.
-- **Hover toolbar:**  Reactions are toggleable chips under the message.
-  - Three one-click reactions (👍 ✅ 👀).
+- **Reactions** are toggleable chips under the message. Hovering a chip, or focusing it with the keyboard, shows who reacted after the usual tooltip delay: the emoji large with its name (`:+1:`), then each person with their avatar, "You" first when you reacted. More than ten people, or people Slack did not list, end in "and N others". The pointer can move into the card. It never moves anything and stays inside the window. Clicking the chip still toggles your reaction.
+- **Hover toolbar:** it straddles the top edge of the message, mostly above it, so it never covers the message's own text. Where there is no room above, under the header, it sits below the message instead.
+  - One-click quick reactions, 👍 ✅ 👀 by default. You choose up to seven, and their order, in Settings › Appearance. Where the message list is too narrow for all of them, the toolbar shows as many as fit, then the full picker's button; it never runs past the message.
   - A full emoji picker.
   - Quote.
   - In Main threads, Start thread or Open thread.
@@ -234,7 +235,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 - **Mentions.** Typing @ suggests people and # suggests channels, with arrow keys and Enter or Tab to pick.
 - **Audience check.** When what you type reads like hiring or people details and the channel is public, a quiet amber line warns you as you type.
 
-- **Emoji suggestions.** In every composer and the inline edit field, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then common emoji (👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌, in that order), then prefix, then substring, so `:thumbs` offers 👍 first. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
+- **Emoji suggestions.** In every composer and the inline edit field, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then common emoji (your quick reactions in their order, then 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌), then prefix, then substring, so `:thumbs` offers 👍 first. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
 
 ### Checks on send
 
@@ -549,11 +550,12 @@ The read switch says: “When you read something in Juno, Slack shows it as read
 
 **Settings › Ignored** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
 
-**Settings › Appearance** has three choices and nothing else:
+**Settings › Appearance** has three choices for the look, then the quick reactions:
 
 - **Theme:** System (the default), Light or Dark.
 - **Accent:** the accent colours in `docs/design/tokens.md`, Coral by default.
 - **Density:** Comfortable (the default) or Compact, which fits more text in the sidebar and the messages.
+- **Quick reactions:** the hover toolbar's one-click reactions (section 7), in order. 👍 ✅ 👀 by default; up to seven. Add opens the emoji picker, with search and the workspace's custom emoji. Each can be removed, except the last one, and moved by dragging or with ⌥← and ⌥→. Reset to default brings back the three. Saved for the workspace. The `:emoji` suggestions rank them first among common emoji (section 8).
 
 **Settings › About** shows the version and an opt-in "Download updates automatically" setting. Checks and downloads are quiet. Once downloaded, one line says "Juno {version} is ready" with **Restart to update**. Updates are off in development and tests; ordinary quit never installs an update. About also holds the diagnostics: the sync engine's state ("Engine catching up, 30 of 143") and Ping engine.
 

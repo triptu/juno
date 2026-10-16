@@ -783,14 +783,11 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
-  // The message hover toolbar: its height, and the width a message header
-  // keeps free at its end so the name and time never run under it. The Main
-  // toolbar is 223px (seven 28px buttons, 2px gaps, a 5px rule, 4px padding)
-  // plus a 20px gap.
+  // The message hover toolbar's height. It straddles the row's top edge, so
+  // a header keeps no room for it.
   '--toolbar-height': '36px',
-  '--toolbar-reserve': '243px',
   // How far a message row may paint outside its box: the toolbar's height
-  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // and its shadow, for the toolbar above (or flipped below) the row. A length, not
   // a calc(): Chromium ignores calc() in overflow-clip-margin.
   '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
@@ -819,6 +816,8 @@ export const layout = stylex.defineVars({
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',
+  // Who reacted (the reaction chip's card): narrow enough for one short name, no wider than a menu.
+  '--reactors-min-width': '160px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',

@@ -65,6 +65,7 @@ export { TooltipLayer } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
 export { SettingsPage, settingsSections } from './SettingsPage'
 export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
+export { QuickReactionsSetting } from './QuickReactionsSetting'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
 

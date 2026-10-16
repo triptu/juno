@@ -1,0 +1,1 @@
+- 10-16 17:31 · quick-reactions · Quick reactions are chosen in Settings › Appearance, not General: it is the shorter page and is about how messages look and feel; up to seven, at least one, saved as the `quickReactions` workspace preference in user.db with each emoji's glyph or image, so the toolbar never waits for the emoji catalog.
