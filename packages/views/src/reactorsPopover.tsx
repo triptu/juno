@@ -3,8 +3,13 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent, t
 import { createPortal } from 'react-dom'
 import type { Person, ReactionView } from '@juno/contract'
 import { z } from '@juno/tokens/tokens.stylex'
+import { chunk } from '@juno/ui'
 import { hueFor } from './look'
-import { ReactorsCard, type Reactor } from './ReactorsCard'
+import type { Reactor } from './ReactorsCard'
+
+// The card loads during the hover delay, so it stays out of the start bundle.
+const reactorsCard = chunk(() => import('./ReactorsCard'))
+const ReactorsCard = reactorsCard.component((module) => module.ReactorsCard)
 
 /** How long the pointer or keyboard focus rests on a chip before its card shows: the tooltip's delay, as on macOS. */
 const DELAY_MS = 700
@@ -55,6 +60,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const muted = useRef<HTMLElement | undefined>(undefined)
   const cardRef = useRef<HTMLDivElement>(null)
+  const ready = reactorsCard.useReady()
 
   const cancel = () => clearTimeout(timer.current)
   const later = (run: () => void, ms: number) => {
@@ -63,6 +69,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   }
   // From one chip to the next while a card shows, the next one's shows at once.
   const show = (name: string, chip: HTMLElement) => {
+    void reactorsCard.load()
     if (people !== undefined && chip !== muted.current) later(() => setOpen({ name, chip }), open === undefined ? DELAY_MS : 0)
   }
   const hideSoon = () => hide(true)
@@ -79,7 +86,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
     place(card, open.chip)
     open.chip.setAttribute('aria-describedby', id)
     return () => open.chip.removeAttribute('aria-describedby')
-  }, [open, id])
+  }, [open, id, ready])
 
   const chipProps = (name: string) => ({
     onPointerEnter: (event: { readonly currentTarget: HTMLElement }) => show(name, event.currentTarget),
@@ -100,7 +107,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   })
 
   const reaction = open === undefined || !open.chip.isConnected ? undefined : reactions.find((each) => each.name === open.name)
-  const card = reaction === undefined || people === undefined ? null : <ReactorsLayer reaction={reaction} people={people} id={id} layerRef={cardRef} onEnter={cancel} onLeave={hideSoon} />
+  const card = reaction === undefined || people === undefined || !ready ? null : <ReactorsLayer reaction={reaction} people={people} id={id} layerRef={cardRef} onEnter={cancel} onLeave={hideSoon} />
   return { chipProps, card }
 }
 
