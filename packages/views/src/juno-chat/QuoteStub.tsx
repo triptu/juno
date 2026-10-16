@@ -77,6 +77,7 @@ const styles = stylex.create({
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
 })

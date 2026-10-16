@@ -6,6 +6,7 @@ import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import type { HueName } from './internal/hue'
 import { interactive } from './internal/interactive'
+import { ringRoom } from './ringRoom'
 import { variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
@@ -103,7 +104,7 @@ export function Chip(props: ChipProps) {
   const content = (
     <>
       {icon ? <Icon icon={icon} size={iconSize ?? iconBySize[size]} /> : null}
-      {children !== undefined && children !== null ? <span {...stylex.props(styles.label, rest.interactive === true && rest.pop && styles.pop)}>{children}</span> : null}
+      {children !== undefined && children !== null ? <span {...stylex.props(styles.label, ringRoom.all, rest.interactive === true && rest.pop && styles.pop)}>{children}</span> : null}
       {onRemove ? (
         <IconButton icon={X} label={removeLabel} size={20} iconSize={12} tone="muted" onClick={onRemove} noTooltip />
       ) : null}
@@ -176,6 +177,7 @@ const styles = stylex.create({
   weightMedium: {
     fontWeight: weights['--weight-medium'],
   },
+  // Clips for the ellipsis; ringRoom keeps a text button inside it (Resume) whole when focused.
   label: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
