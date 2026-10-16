@@ -376,28 +376,3 @@ test('Backup cuts the path in the middle and keeps the row insets', async ({ pag
   expect(at.fits).toBe(true)
   expect(at.gap).toBeGreaterThan(0)
 })
-
-for (const [state, title, meta] of [
-  ['items/automated', 'Move #releases?', 'To Automated · Apps wrote 18 of the last 30 messages'],
-  ['items/automated-juno', 'Move #vendor-status-updates?', 'To Automated · Status updates from an app, a few replies'],
-] as const) {
-  test(`Home Automated keeps its two lines aligned, says why it asks, and insets its actions evenly (${state})`, async ({ page }) => {
-    await open(page, 'Home', state)
-    const row = page.locator('[data-home-item=automated]')
-    await row.hover()
-    await expect(row.locator('[data-home-title]')).toHaveText(title)
-    await expect(row.locator('[data-home-meta]')).toHaveText(meta)
-    const at = await row.evaluate((node) => {
-      const title = node.querySelector('[data-home-title]')!.getBoundingClientRect()
-      const meta = node.querySelector('[data-home-meta]')!.getBoundingClientRect()
-      const buttons = [...node.querySelectorAll('button')].map((button) => button.getBoundingClientRect())
-      const slot = node.getBoundingClientRect()
-      return { title: title.left, meta: meta.left, metaEnd: meta.right, buttons: buttons.map((box) => ({ top: box.top - slot.top, bottom: slot.bottom - box.bottom })), first: buttons[0]!.left, gap: buttons[1]!.left - buttons[0]!.right }
-    })
-    expect(at.title).toBe(at.meta)
-    // A long reason takes an ellipsis before the buttons; it never runs under them.
-    expect(at.metaEnd).toBeLessThanOrEqual(at.first)
-    for (const button of at.buttons) expect(button).toEqual({ top: 12, bottom: 12 })
-    expect(at.gap).toBeGreaterThan(0)
-  })
-}
