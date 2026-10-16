@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type RefObject } from 'react'
-import { composerEmojiAtom } from '@juno/state'
+import type { QuickReaction } from '@juno/contract'
+import { composerEmojiAtom, quickReactionsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { MentionSuggestions, mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
 import { noteRecentEmoji, recentEmoji } from './recentEmoji'
@@ -31,20 +32,29 @@ function useEmojiRows(open: boolean) {
     return () => { live = false }
   }, [open, standard])
   // The workspace answer alone owns alias resolution and sorting, never a standard-catalog update.
-  const workspace = useMemo(() => {
-    if (answer._tag !== 'Success' || answer.value.length === 0) return EMPTY_ROWS
-    const byName = new Map(answer.value.map((emoji) => [emoji.name, emoji]))
-    return answer.value.flatMap((emoji) => {
-      let target: typeof emoji | undefined = emoji
-      const seen = new Set<string>()
-      while (target?.url == null && target?.alias_for != null && !seen.has(target.name)) {
-        seen.add(target.name)
-        target = byName.get(target.alias_for)
-      }
-      return target?.url == null ? [] : [{ id: emoji.name, name: emoji.name, insert: `:${emoji.name}:`, url: target.url }]
-    }).toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
-  }, [answer])
+  const workspace = useMemo(() => answer._tag !== 'Success' ? EMPTY_ROWS : customEmoji(answer.value).map((emoji) => ({ id: emoji.name, name: emoji.name, insert: `:${emoji.name}:`, url: emoji.url })), [answer])
   return useMemo(() => mergeRows(standard, workspace), [standard, workspace])
+}
+
+interface WorkspaceEmoji {
+  readonly name: string
+  readonly url: string | null
+  readonly alias_for: string | null
+}
+
+/** The workspace's custom emoji with images, aliases resolved to their target's image, in name order. */
+export function customEmoji(rows: ReadonlyArray<WorkspaceEmoji>): ReadonlyArray<{ readonly name: string; readonly url: string }> {
+  if (rows.length === 0) return []
+  const byName = new Map(rows.map((emoji) => [emoji.name, emoji]))
+  return rows.flatMap((emoji) => {
+    let target: WorkspaceEmoji | undefined = emoji
+    const seen = new Set<string>()
+    while (target?.url == null && target?.alias_for != null && !seen.has(target.name)) {
+      seen.add(target.name)
+      target = byName.get(target.alias_for)
+    }
+    return target?.url == null ? [] : [{ name: emoji.name, url: target.url }]
+  }).toSorted((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
 }
 
 /** Both inputs are sorted; custom names replace standard names without sorting the catalog again. */
@@ -60,17 +70,30 @@ function mergeRows(standard: ReadonlyArray<EmojiSuggestion>, custom: ReadonlyArr
   return [...rows, ...custom.slice(at)]
 }
 
-/** Common emoji, ranked after recent use and before name order, so `:thumbs` offers 👍 before 👎 (SPEC 8). */
+/**
+ * The common prior, ranked after recent use and before name order, so `:thumbs` offers 👍 before 👎 (SPEC 8):
+ * the user's quick reactions in their order, then these common emoji.
+ */
 const COMMON = ['👍', '✅', '👀', '🙏', '🎉', '❤️', '😂', '🔥', '💯', '🙌'].map((glyph) => glyph.replaceAll('\uFE0F', ''))
-const commonRank = (row: EmojiSuggestion) => COMMON.indexOf(row.insert.replaceAll('\uFE0F', ''))
+const plain = (glyph: string) => glyph.replaceAll('\uFE0F', '')
 
-function matching(rows: ReadonlyArray<EmojiSuggestion>, query: string) {
+/** A row's place in the common prior, or -1. A standard quick reaction also ranks its aliases, which insert the same glyph. */
+function commonRank(row: EmojiSuggestion, quick: ReadonlyArray<QuickReaction>): number {
+  const glyph = plain(row.insert)
+  const own = quick.findIndex((reaction) => reaction.name === row.name || (reaction.url === undefined && row.url === undefined && plain(reaction.unicode) === glyph))
+  if (own >= 0) return own
+  const common = COMMON.indexOf(glyph)
+  return common < 0 ? -1 : quick.length + common
+}
+
+function matching(rows: ReadonlyArray<EmojiSuggestion>, query: string, quick: ReadonlyArray<QuickReaction>) {
   const recent = recentEmoji()
   const matches = rows.filter((row) => row.name.includes(query))
   const frequent = recent.flatMap((name) => matches.find((row) => row.name === name) ?? [])
   const rest = matches.filter((row) => !recent.includes(row.name))
-  const common = rest.filter((row) => commonRank(row) >= 0).toSorted((a, b) => commonRank(a) - commonRank(b))
-  const others = rest.filter((row) => commonRank(row) < 0)
+  const rank = new Map(rest.map((row) => [row, commonRank(row, quick)]))
+  const common = rest.filter((row) => rank.get(row)! >= 0).toSorted((a, b) => rank.get(a)! - rank.get(b)!)
+  const others = rest.filter((row) => rank.get(row)! < 0)
   return [...frequent, ...common, ...others.filter((row) => row.name.startsWith(query)), ...others.filter((row) => !row.name.startsWith(query))].slice(0, 8)
 }
 
@@ -84,7 +107,8 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   const loading = typed !== undefined && (/^[a-z]/.test(typed.text) || typed.text.length >= 2)
   const catalog = useEmojiRows(loading && typed.start !== dismissed)
   const query = typed === undefined || typed.start === dismissed || typed.text.length < 2 ? undefined : typed
-  const rows = query === undefined ? [] : matching(catalog, query.text)
+  const quick = useAtomValue(quickReactionsAtom)
+  const rows = query === undefined ? [] : matching(catalog, query.text, quick)
   const ids = rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const pick = (id: string) => {
