@@ -125,20 +125,58 @@ export const OwnerMessageItem = Schema.TaggedStruct('owner', {
 })
 export type OwnerMessageItem = typeof OwnerMessageItem.Type
 
+/** Bold and italic on a run of Juno's text. Absent means off. */
+const Marks = {
+  bold: Schema.optionalKey(Schema.Literal(true)),
+  italic: Schema.optionalKey(Schema.Literal(true)),
+}
+
 /**
- * Juno's text is plain. The mark-up is a recall citation, which links to the
+ * A run of Juno's text. The links are a recall citation, which links to the
  * day it quotes and scrolls the chat there ("On 12 Mar you said …"), and a
  * source (plan v3 §19.1): words Juno took from a Slack message it read in
  * that reply, which open the topic at that message. `place` is the channel
  * as the owner sees it ("#eng"); the view adds the message's time for the
- * tooltip, from `ts`.
+ * tooltip, from `ts`. `code` is inline code, shown in the mono font.
  */
 export const JunoInline = Schema.Union([
-  Schema.TaggedStruct('text', { text: Schema.String }),
-  Schema.TaggedStruct('cite', { text: Schema.String, messageId: ChatMessageId }),
-  Schema.TaggedStruct('source', { text: Schema.String, channelId: Schema.String, ts: Schema.String, place: Schema.String }),
+  Schema.TaggedStruct('text', { text: Schema.String, ...Marks }),
+  Schema.TaggedStruct('code', { text: Schema.String }),
+  Schema.TaggedStruct('cite', { text: Schema.String, messageId: ChatMessageId, ...Marks }),
+  Schema.TaggedStruct('source', { text: Schema.String, channelId: Schema.String, ts: Schema.String, place: Schema.String, ...Marks }),
 ])
 export type JunoInline = typeof JunoInline.Type
+
+/**
+ * A block of a Juno bubble: the small markdown subset the chat renders
+ * (SPEC 13.1). A heading shows as a bold line, not large type. A paragraph
+ * keeps its single line breaks as `\n` in its text.
+ */
+export const JunoBlock = Schema.Union([
+  Schema.TaggedStruct('paragraph', { inlines: Schema.Array(JunoInline) }),
+  Schema.TaggedStruct('heading', { inlines: Schema.Array(JunoInline) }),
+  Schema.TaggedStruct('list', { ordered: Schema.Boolean, start: Schema.optionalKey(Schema.Number), items: Schema.Array(Schema.Array(JunoInline)) }),
+  Schema.TaggedStruct('codeBlock', { text: Schema.String }),
+])
+export type JunoBlock = typeof JunoBlock.Type
+
+const inlineText = (inlines: ReadonlyArray<JunoInline>) => inlines.map((inline) => inline.text).join('')
+
+/** A bubble's body as plain text, for a quote's preview and Copy: blocks on their own lines, list items with "•" or their number. */
+export const junoText = (body: ReadonlyArray<JunoBlock>): string =>
+  body
+    .map((block) => {
+      switch (block._tag) {
+        case 'paragraph':
+        case 'heading':
+          return inlineText(block.inlines)
+        case 'list':
+          return block.items.map((item, n) => `${block.ordered ? `${(block.start ?? 1) + n}.` : '•'} ${inlineText(item)}`).join('\n')
+        case 'codeBlock':
+          return block.text
+      }
+    })
+    .join('\n')
 
 /**
  * How a run ended. `complete` is the normal case and shows nothing. Every
@@ -174,7 +212,7 @@ export type Ending = typeof Ending.Type
 export const JunoBubbleItem = Schema.TaggedStruct('juno', {
   id: BubbleId,
   runId: RunId,
-  body: Schema.Array(JunoInline),
+  body: Schema.Array(JunoBlock),
   at: Schema.Number,
   origin: Origin,
   /** Juno replied to one owner message. */

@@ -2,7 +2,7 @@
 // (`providerTurns`) over HTTP against a fake local model server, behind the same guard and ledger.
 import { afterEach, expect, it } from 'vitest'
 import { startFakeOpenAi, type FakeOpenAi, type FakeOpenAiOptions } from '@juno/agent-testing'
-import type { ChatItem, ChatPage, OpId } from '@juno/agent-contract'
+import { junoText, type ChatItem, type ChatPage, type OpId } from '@juno/agent-contract'
 import { run, served } from './serve-harness'
 
 const servers: FakeOpenAi[] = []
@@ -11,7 +11,7 @@ afterEach(async () => {
 })
 
 const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
-const texts = (page: ChatPage) => of(page, 'juno').map((item) => item.body[0]?.text)
+const texts = (page: ChatPage) => of(page, 'juno').map((item) => junoText(item.body))
 
 async function endpoint(options: FakeOpenAiOptions & { readonly ownerKey?: string | null } = {}) {
   const server = await startFakeOpenAi(options)

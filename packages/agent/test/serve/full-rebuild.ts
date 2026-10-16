@@ -32,7 +32,6 @@ import type {
   Ending,
   GroupPosition,
   JobId,
-  JunoInline,
   OpId,
   Origin,
   Quote,
@@ -42,11 +41,12 @@ import type {
   SendContext,
 } from '@juno/agent-contract'
 import type { CardView } from '../../src/actions/cards'
-import { aboutOf } from '@juno/agent-contract'
+import { aboutOf, junoText } from '@juno/agent-contract'
 import type { Job } from '../../src/jobs/jobs'
 import { ownerOpOf } from '../../src/router/input'
 import type { RunState } from '../../src/router/events'
 import { parseOutput } from '../../src/router/output'
+import { blocksOf } from '../../src/router/rich'
 import { resolveSpans, sourceTable, type BubbleSpan } from '../../src/router/sources'
 import type { Store } from '../../src/store/store'
 
@@ -192,7 +192,8 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
       junoEntries.push({ by: 'line', at: bubbles[0]!.at, item: { _tag: 'groupLabel', id: `label:${run.id}`, origin, text: labelOf(origin, source.jobs) } })
     }
     for (const bubble of bubbles) {
-      bubbleTexts.set(bubble.id, bubble.text)
+      const body = blocksOf(bubble.body)
+      bubbleTexts.set(bubble.id, junoText(body))
       const replyTo = bubble.replyTo === undefined ? undefined : ({ _tag: 'owner', opId: ownerOp(bubble.replyTo) as OpId } as const)
       junoEntries.push({
         by: 'juno',
@@ -202,7 +203,7 @@ export function chatItems(source: ChatSource): ReadonlyArray<ChatItem> {
           _tag: 'juno',
           id: bubble.id as BubbleId,
           runId: run.id as RunId,
-          body: bubble.body.map(inlineOf),
+          body,
           at: bubble.at,
           origin,
           ...(replyTo ? { replyTo: quoteOf(replyTo) } : {}),
@@ -280,12 +281,6 @@ function archivedBubbles(store: Store, runId: string, rows: ReadonlyArray<{ text
     return { id: `${runId}:${n}`, text: bubble.text, body, at: times[n] ?? entries.at(-1)?.at ?? startedAt, ...(replyTo ? { replyTo } : {}) }
   })
 }
-
-/** A span of a bubble as the chat shows it. A source the host did not name a channel for shows its channel id as the place. */
-const inlineOf = (span: BubbleSpan): JunoInline =>
-  'source' in span
-    ? { _tag: 'source', text: span.text, channelId: span.source.channelId, ts: span.source.ts, place: span.source.place ?? span.source.channelId }
-    : { _tag: 'text', text: span.text }
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 

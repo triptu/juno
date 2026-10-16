@@ -4,7 +4,7 @@ import { expect, it } from 'vitest'
 import { Effect, Stream } from 'effect'
 import { fakeActionHost, rateLimited, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Digest, Revision } from '@juno/agent-cards'
-import type { CardId, ChatItem, ChatPage, OpId } from '@juno/agent-contract'
+import { junoText, type CardId, type ChatItem, type ChatPage, type OpId } from '@juno/agent-contract'
 import type { HostReads } from '../src/index'
 import { ONLINE, run, served as chat } from './serve-harness'
 import { deferred, say } from './turns-harness'
@@ -25,8 +25,8 @@ it('a sent message shows as the owner bubble, then Juno answers it, and reading 
   expect(of(answered, 'owner')[0]).toMatchObject({ opId: 'op-1', text: 'what is on today?', delivery: { _tag: 'sent' }, group: 'single' })
   expect(of(answered, 'newDivider')[0]).toEqual({ _tag: 'newDivider', count: 2 })
   const [first, second] = of(answered, 'juno')
-  expect(first).toMatchObject({ body: [{ _tag: 'text', text: 'Morning.' }], origin: { _tag: 'owner' }, group: 'first', unread: true })
-  expect(second).toMatchObject({ body: [{ _tag: 'text', text: 'Two meetings today.' }], group: 'last', unread: true })
+  expect(first).toMatchObject({ body: [{ _tag: 'paragraph', inlines: [{ _tag: 'text', text: 'Morning.' }] }], origin: { _tag: 'owner' }, group: 'first', unread: true })
+  expect(second).toMatchObject({ body: [{ _tag: 'paragraph', inlines: [{ _tag: 'text', text: 'Two meetings today.' }] }], group: 'last', unread: true })
 
   const summary = await Effect.runPromise(client['agent.chat.summary']().pipe(Stream.take(1), Stream.runCollect))
   expect(summary).toEqual([{ unread: 2, busy: false, mayAuthorize: true }])
@@ -51,11 +51,14 @@ it('words Juno took from a Slack message it read show as a source, and an unknow
 
   const answered = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 0, 'the answer and no status')
   expect(of(answered, 'juno')[0]!.body).toEqual([
-    { _tag: 'text', text: 'It moved to ' },
-    { _tag: 'source', text: 'Thursday', channelId: 'C0ENG', ts: '1760500000.000100', place: '#eng' },
-    { _tag: 'text', text: ', says ' },
-    { _tag: 'text', text: 'Maya' },
-    { _tag: 'text', text: '.' },
+    {
+      _tag: 'paragraph',
+      inlines: [
+        { _tag: 'text', text: 'It moved to ' },
+        { _tag: 'source', text: 'Thursday', channelId: 'C0ENG', ts: '1760500000.000100', place: '#eng' },
+        { _tag: 'text', text: ', says Maya.' },
+      ],
+    },
   ])
 })
 
@@ -72,7 +75,7 @@ it('a reaction shows on its bubble, and a reply quotes what it answers', async (
   await run(client['agent.chat.send']({ opId: 'op-3' as OpId, text: 'which deploy?', replyTo: { _tag: 'bubble', id: bubble.id } }))
   const replied = await pageWhere((p) => of(p, 'juno').length === 2 && of(p, 'status').length === 0, 'the second answer')
   expect(of(replied, 'owner')[1]).toMatchObject({ text: 'which deploy?', replyTo: { target: { _tag: 'bubble', id: bubble.id }, preview: 'The deploy is green.' } })
-  expect(of(replied, 'juno')[1]).toMatchObject({ body: [{ text: 'The one on staging.' }], replyTo: { target: { _tag: 'owner', opId: 'op-3' }, preview: 'which deploy?' } })
+  expect(of(replied, 'juno')[1]).toMatchObject({ body: [{ inlines: [{ text: 'The one on staging.' }] }], replyTo: { target: { _tag: 'owner', opId: 'op-3' }, preview: 'which deploy?' } })
 })
 
 it('a failed run shows its ending line, and Try again sends the same message without a second bubble', async () => {
@@ -128,7 +131,7 @@ it('pages above an anchor and reports what lies on each side', async () => {
   const [snapshot] = above
   expect(snapshot!.page.moreAbove).toBe(true)
   expect(snapshot!.page.moreBelow).toBe(true)
-  expect(snapshot!.page.items.map((item) => (item._tag === 'owner' ? item.text : item._tag === 'juno' ? (item.body[0] as { text: string }).text : item._tag))).toEqual([
+  expect(snapshot!.page.items.map((item) => (item._tag === 'owner' ? item.text : item._tag === 'juno' ? junoText(item.body) : item._tag))).toEqual([
     'Answer 1.',
     'question 2',
   ])
@@ -193,8 +196,8 @@ it('a bubble read while its run is live stays read, and in place, when the run e
   release.resolve()
   await h.ended('op-1')
   const ended = await pageWhere((p) => of(p, 'juno').length === 2 && of(p, 'status').length === 0, 'the run ended')
-  expect(of(ended, 'juno').map((item) => [item.body[0]!.text, item.unread])).toEqual([['Looking now.', false], ['Done.', true]])
-  expect(ended.items.filter((item) => item._tag === 'owner' || item._tag === 'juno').map((item) => (item._tag === 'owner' ? item.text : item.body[0]!.text))).toEqual([
+  expect(of(ended, 'juno').map((item) => [junoText(item.body), item.unread])).toEqual([['Looking now.', false], ['Done.', true]])
+  expect(ended.items.filter((item) => item._tag === 'owner' || item._tag === 'juno').map((item) => (item._tag === 'owner' ? item.text : junoText(item.body)))).toEqual([
     'check the deploy',
     'Looking now.',
     'and staging',

@@ -1,12 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
-import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
+import type { JunoBubbleItem } from '@juno/agent-contract'
 import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
 import { ringRoom, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
-import { InlineLink } from './InlineLink'
+import { JunoRichText } from './JunoRichText'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
 import { RowActions } from './RowActions'
 import { fullTime, messageTime } from '../time'
@@ -46,10 +46,8 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
         >
-          <Text variant="bodySmall" tone="default" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
-            {item.body.map((inline, index) => (
-              <Inline key={index} inline={inline} now={now} actions={actions} />
-            ))}
+          <Text variant="bodySmall" tone="default" selectable dir="auto" as="div" sx={[rowStyles.bubbleText, styles.blocks]}>
+            <JunoRichText body={item.body} now={now} actions={actions} />
           </Text>
           <ReactionBadge reactions={item.reactions} corner="end" />
         </div>
@@ -62,32 +60,6 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
     </div>
   )
 })
-
-/** A Slack message's `ts` ("1760500000.000123", seconds) as epoch milliseconds. */
-const tsMillis = (ts: string) => Math.round(Number(ts) * 1000)
-
-function Inline({ inline, now, actions }: { readonly inline: JunoInline; readonly now: number; readonly actions: ChatActions }) {
-  switch (inline._tag) {
-    case 'text':
-      return inline.text
-    case 'cite':
-      return (
-        <InlineLink data-cite={inline.messageId} onOpen={(event) => actions.onOpen({ _tag: 'chatMessage', messageId: inline.messageId }, event)}>
-          {inline.text}
-        </InlineLink>
-      )
-    case 'source':
-      return (
-        <InlineLink
-          data-source={`${inline.channelId}/${inline.ts}`}
-          title={`${inline.place} · ${messageTime(tsMillis(inline.ts), now)}`}
-          onOpen={(event) => actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts }, event)}
-        >
-          {inline.text}
-        </InlineLink>
-      )
-  }
-}
 
 const appear = stylex.keyframes({
   from: { opacity: 0 },
@@ -107,6 +79,13 @@ const styles = stylex.create({
     animationDuration: motion['--duration-appear'],
     animationTimingFunction: motion['--ease-out'],
     animationFillMode: 'both',
+  },
+  // Blocks of a bubble sit a short step apart, closer than bubbles do.
+  blocks: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-1-5'],
+    minWidth: 0,
   },
   bubble: {
     backgroundColor: chat['--juno-bubble-bg'],

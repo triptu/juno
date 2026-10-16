@@ -15,6 +15,7 @@ import type {
   Ending,
   GroupPosition,
   JobId,
+  JunoBlock,
   JunoInline,
   OpId,
   OpenTarget,
@@ -125,8 +126,23 @@ export interface JunoOptions {
  * row per card, and the ending line when the run did not end `complete`.
  * Spread it into a transcript.
  */
-export const juno = (id: string, body: ReadonlyArray<JunoInline> | string, options: JunoOptions = {}): ReadonlyArray<ChatItem> => {
-  const inlines = typeof body === 'string' ? (body.length === 0 ? [] : [text(body)]) : body
+/** A paragraph block. */
+export const para = (...inlines: ReadonlyArray<JunoInline>): JunoBlock => ({ _tag: 'paragraph', inlines })
+export const bold = (value: string): JunoInline => ({ _tag: 'text', text: value, bold: true })
+export const italic = (value: string): JunoInline => ({ _tag: 'text', text: value, italic: true })
+export const code = (value: string): JunoInline => ({ _tag: 'code', text: value })
+
+const isBlock = (part: JunoBlock | JunoInline): part is JunoBlock => part._tag === 'paragraph' || part._tag === 'heading' || part._tag === 'list' || part._tag === 'codeBlock'
+
+/** A body as blocks: a string is one paragraph per blank-line-separated part, inlines one paragraph. */
+const blocksOf = (body: ReadonlyArray<JunoBlock> | ReadonlyArray<JunoInline> | string): ReadonlyArray<JunoBlock> => {
+  if (typeof body === 'string') return body.split(/\n{2,}/).filter((part) => part !== '').map((part) => para(text(part)))
+  if (body.length === 0) return []
+  return body.every(isBlock) ? body : [para(...(body as ReadonlyArray<JunoInline>))]
+}
+
+export const juno = (id: string, body: ReadonlyArray<JunoBlock> | ReadonlyArray<JunoInline> | string, options: JunoOptions = {}): ReadonlyArray<ChatItem> => {
+  const inlines = blocksOf(body)
   const run = runId(`run-${id}`)
   const ending = options.ending ?? { _tag: 'complete' }
   return [
@@ -478,6 +494,28 @@ export const sourced = (linked: boolean): ReadonlyArray<ChatItem> => {
     ...juno('m-123', [text('Nothing else needs you today.')], { group: 'last', at: NOW - 3 * MINUTE }),
   ]
 }
+
+/**
+ * A catch-up with the rich text the chat renders (SPEC 13.1): bold labels
+ * before cited sentences, a heading, a bullet and a numbered list, inline
+ * code and a code block.
+ */
+export const richReply: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-160', 'Catch me up on #devops and #eng', 'single', { _tag: 'sent' }, NOW - 5 * MINUTE),
+  ...juno(
+    'm-161',
+    [
+      para(bold('Staging fix (#devops):'), text(' '), source('Leo rolled back the cache change, and staging is green again', '#devops', 50), text('.')),
+      para(bold('Postgres 16 (#eng):'), text(' '), source('Maya wants a reviewer for the migration plan before Thursday', '#eng', 40), text('. It is '), italic('not'), text(' blocked yet.')),
+      { _tag: 'heading', inlines: [text('What needs you')] },
+      { _tag: 'list', ordered: false, items: [[text('Review '), source("Maya's migration plan", '#eng', 40)], [text('Answer Leo about '), code('CACHE_TTL'), text(' on staging')]] },
+      { _tag: 'list', ordered: true, items: [[text('Run '), code('pnpm db:migrate --dry-run')], [text('Check the lock waits it reports')]] },
+      { _tag: 'codeBlock', text: "SELECT pid, wait_event\nFROM pg_stat_activity\nWHERE state = 'active';" },
+    ],
+    { at: NOW - 4 * MINUTE },
+  ),
+]
 
 /** Reactions both ways: the owner's on a bubble and a card, Juno's on the owner's message instead of a reply. */
 export const reactions: ReadonlyArray<ChatItem> = [

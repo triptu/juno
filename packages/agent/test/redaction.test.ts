@@ -6,7 +6,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
-import type { Card, CardBinding, ChatItem, ChatPage, OpId, ChatMessageId } from '@juno/agent-contract'
+import { junoText, type Card, type CardBinding, type ChatItem, type ChatPage, type OpId, type ChatMessageId } from '@juno/agent-contract'
 import { liveGrant, mintGrant, type RemovalBackup, type Turns } from '../src/index'
 import { ONLINE, run, served } from './serve-harness'
 import { createChatCache, type ChatSource } from '../src/serve/chat'
@@ -367,7 +367,7 @@ it('the owner removes a message from the sheet with AI assist off, and the chat 
   expect(of(page, 'owner').map((o) => o.text)).toEqual(['and the shed is blue'])
   // The reply that quoted it now reads Removed, and Juno's reply to it is gone.
   expect(of(page, 'owner')[0]!.replyTo).toMatchObject({ removed: true })
-  expect(of(page, 'juno').map((j) => j.body.map((b) => ('text' in b ? b.text : '')).join(''))).toEqual(['Sure.'])
+  expect(of(page, 'juno').map((j) => junoText(j.body))).toEqual(['Sure.'])
   expect(JSON.stringify(page)).not.toContain(SECRET)
   // A message that is not in the chat.
   const missing = await run(client['agent.chat.remove']({ opId: 'remove-2' as OpId, messageId: '999' as ChatMessageId, alsoRemoveReply: false }))
