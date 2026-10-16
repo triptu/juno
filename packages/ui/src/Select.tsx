@@ -11,11 +11,11 @@ export interface SelectOption {
 
 export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'style' | 'className' | 'size'> {
   readonly options: ReadonlyArray<SelectOption>
-  readonly size?: 30 | 32
+  readonly size?: 28 | 30 | 32
   readonly label?: string
 }
 
-/** A native select styled like a 30 or 32px field. The menu is the OS's. */
+/** A native select styled like a 28, 30 or 32px field, as wide as its longest option. The menu is the OS's. */
 export function Select({ options, size = 32, label, ...rest }: SelectProps) {
   return (
     <select aria-label={label} {...rest} {...stylex.props(styles.select, typeVariants.ui, sizeStyles[size])}>
@@ -65,6 +65,7 @@ const styles = stylex.create({
 })
 
 const sizeStyles = stylex.create({
+  28: { height: sizes['--control-28'] },
   30: { height: sizes['--control-30'] },
   32: { height: sizes['--control-32'] },
 })
