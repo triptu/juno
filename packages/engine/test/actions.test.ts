@@ -338,3 +338,25 @@ describe('reactions', () => {
     await rows((list) => chip(rowWith(list, 'Fresh off the press'), 'rocket')?.count === 1, 'one chip, stored')
   })
 })
+
+// Found by the conformance replay (test/conformance). `outbox` ids are SQLite rowids, which are reused:
+// a delete that replaces an edit whose call is out can take the edit's id, and the edit's answer
+// (`actionDone`, which reads the row by id) then ends the delete as if it were the edit.
+// `it.fails` until that is fixed; then make it `it`.
+describe('actions: a delete while an edit is out', () => {
+  it.fails('deletes the message once the edit has answered (fails: the delete is lost)', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    const message = await sent(engine, 'Edit, then delete', rows)
+    engine.fake.gate((method) => method === 'chat.update')
+    valueOf(await editMessage(engine.registry, refOf(message), 'Edited once'))
+    const edit = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the edit at Slack')
+    valueOf(await deleteMessage(engine.registry, refOf(message)))
+    engine.fake.decide(edit.id, 'run')
+    await waitFor(() => engine.fake.gated().find((call) => call.id === edit.id && call.stage === 'answer'), WAIT_MS, 'the edit run')
+    engine.fake.gate(undefined)
+    await waitFor(() => (readDb(engine, 'user.db', (db) => (db.prepare('SELECT count(*) AS n FROM outbox').get() as { n: number }).n) === 0 ? true : undefined), WAIT_MS, 'the outbox empty')
+    expect(engine.fake.messages('C0ENG').some((m) => m.ts === message.ts)).toBe(false)
+  })
+})

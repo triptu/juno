@@ -25,13 +25,14 @@ export const attach = (key: string, files: ReadonlyArray<File>) =>
 /**
  * A composer's attachments (spec section 8): the attach button, the chips
  * and the handler for pasted and dropped files, for the composer whose
- * draft `key` owns (a topic, or a New chat tab).
+ * draft `key` owns (a topic, or a New chat tab). Without `tabbable` the
+ * attach button is out of the Tab order and works by pointer.
  */
-export function useAttachments(key: string) {
+export function useAttachments(key: string, { tabbable = true }: { readonly tabbable?: boolean } = {}) {
   const files = useAtomValue(attachmentsAtom(key))
   useEffect(preload, [])
   const onFiles = useCallback((list: ReadonlyArray<File>) => attach(key, list), [key])
-  const leading = useMemo(() => <AttachButton onFiles={onFiles} />, [onFiles])
+  const leading = useMemo(() => <AttachButton onFiles={onFiles} tabbable={tabbable} />, [onFiles, tabbable])
   const onRemove = useCallback((id: string) => removeAttachment(registry, key, id), [key])
   const chips = files.length === 0 ? undefined : <AttachmentChipsPanel files={files} onRemove={onRemove} />
   return { files, onFiles, leading, chips }

@@ -1441,6 +1441,18 @@ export class TopicPane {
     return lastMenu(this.win)
   }
 
+  /** The right island's Follow, on a thread you do not follow: it opens the Follow menu. */
+  get followButton() {
+    return this.header.getByRole('button', { name: 'Follow', exact: true })
+  }
+
+  /** Opens the Follow menu and picks a choice. */
+  async chooseInFollowMenu(item: 'notify-matters' | 'notify-every'): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.followButton.click()
+    return lastMenu(this.win)
+  }
+
   /** Opens the topic menu by right-clicking the title and picks `item`. */
   async chooseInTitleMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
     await chooseNextMenuItem(this.win, item)
@@ -1881,6 +1893,24 @@ export class PaletteDriver {
     await expect(this.input).toBeFocused()
   }
 
+  /** One of the two tabs in the segmented control. */
+  tab(name: 'Conversations' | 'Messages'): Locator {
+    return this.root.getByRole('radio', { name })
+  }
+
+  async expectTab(name: 'Conversations' | 'Messages'): Promise<void> {
+    await expect(this.tab(name)).toHaveAttribute('aria-checked', 'true')
+    await expect(this.input).toBeFocused()
+  }
+
+  /** ⌘K, then Tab to the Messages tab: the message search. */
+  async openMessages(): Promise<void> {
+    await this.open()
+    await this.expectTab('Conversations')
+    await this.press('Tab')
+    await this.expectTab('Messages')
+  }
+
   async expectClosed(): Promise<void> {
     await expect(this.root).toHaveCount(0)
   }
@@ -1903,8 +1933,8 @@ export class PaletteDriver {
     await this.input.press(key)
   }
 
-  /** A section of rows: Recent, Results or Juno. */
-  section(heading: 'Recent' | 'Results' | 'Juno'): Locator {
+  /** A section of rows: Frequent, Conversations, Commands, the open topic's name, Recent, Results or Juno. */
+  section(heading: string): Locator {
     return this.root.getByRole('group', { name: heading })
   }
 

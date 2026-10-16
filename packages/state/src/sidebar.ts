@@ -25,6 +25,7 @@ import { ignoredChannelsAtom } from './ignored'
 import { topicAtom } from './messages'
 import { tabsAtom, tabTopic, type Tabs } from './tabs'
 import { engineStatusAtom } from './engine'
+import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
@@ -62,6 +63,7 @@ export const nowAtom = Atom.make<number>((get) => {
 
 /** The window the sidebar shows, and the filter it belongs to. */
 export interface SidebarWindow extends ListWindow<TopicRow> {
+  readonly quietDays: number
   /** The filter of these rows. It lags `sidebarFilterAtom` until the new filter's first snapshot arrives. */
   readonly filter: TopicListFilter
   /** Rows held for open tabs, including those that become unread again. */
@@ -104,16 +106,16 @@ function sameChannel(a: RowChannel, b: RowChannel): boolean {
 /** Keep previously visible read-dependent rows while a tab still shows them. */
 export function retainOpenTopics(
   shown: SidebarWindow,
-  next: ListWindow<TopicRow>,
+  next: SidebarWindow,
   tabs: Tabs,
   details: ReadonlyMap<string, TopicDetail | null>,
 ): SidebarWindow {
   const open = new Set(tabs.tabs.map(tabTopic))
-  const rows = new Map(next.rows)
+  let retainedRows: Map<string, TopicRow> | undefined
   const retained = new Set<string>()
   for (const id of shown.order) {
     if (!open.has(id)) continue
-    if (rows.has(id)) {
+    if (next.rows.has(id)) {
       if (shown.retained?.has(id)) retained.add(id)
       continue
     }
@@ -124,16 +126,23 @@ export function retainOpenTopics(
     retained.add(id)
     // The filtered query no longer carries this row. Its open topic's live
     // header supplies read state, including marks from another Slack client.
-    rows.set(id, detail === undefined || (old.unreadCount === detail.unreadCount && old.unreadExact === detail.unreadExact && old.mentionsMe === detail.mentionsMe)
+    retainedRows ??= new Map(next.rows)
+    retainedRows.set(id, detail === undefined || (old.unreadCount === detail.unreadCount && old.unreadExact === detail.unreadExact && old.mentionsMe === detail.mentionsMe)
       ? old
       : { ...old, unreadCount: detail.unreadCount, unreadExact: detail.unreadExact, mentionsMe: detail.mentionsMe })
   }
-  if (retained.size === 0 && !shown.retained?.size) return { ...next, filter: shown.filter }
+  if (retained.size === 0 && !shown.retained?.size) return next
+  const rows = retainedRows ?? next.rows
   const kept = shown.order.filter((id) => rows.has(id))
   const known = new Set(kept)
   const order = [...kept, ...next.order.filter((id) => !known.has(id))]
+  const orderUnchanged = sameOrder(shown.order, order)
+  if (orderUnchanged && retained.size === (shown.retained?.size ?? 0) &&
+    [...retained].every((id) => shown.retained?.has(id)) &&
+    rows.size === shown.rows.size && [...rows].every(([id, row]) => shown.rows.get(id) === row) &&
+    next.meta === shown.meta && next.refs === shown.refs) return shown
   return {
-    ...next, rows, order: sameOrder(shown.order, order) ? shown.order : order,
+    ...next, rows, order: orderUnchanged ? shown.order : order,
     filter: shown.filter, retained,
   }
 }
@@ -145,26 +154,27 @@ export function retainOpenTopics(
  */
 const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const filter = get(sidebarFilterAtom)
+  const quietDays = get(quietDaysAtom)
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
-  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter }
+  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, quietDays }
   const status = get(engineStatusAtom)
-  const syncing = status._tag !== 'Success' || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
-  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter }
+  const syncing = status._tag !== 'Success' || status.value.syncing || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
+  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter, quietDays }
   if (shown?.meta.windowCovered === false && syncing) return shown
   const next = carryOver(shown, result.value)
   if (shown !== undefined && shown.filter === filter) {
     // Finishing sync is not a reason to reorder a painted list. The next live
     // activity or an explicit filter change resumes the ordinary recency order.
-    if (shown.meta === next.meta) return shown
-    if (syncing) {
+    if (shown.meta === next.meta) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
+    if (syncing || quietDays > shown.quietDays) {
       const kept = shown.order.filter((id) => next.rows.has(id))
       const known = new Set(kept)
       const order = [...kept, ...next.order.filter((id) => !known.has(id))]
-      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter }
+      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter, quietDays }
     }
   }
-  return { ...next, filter }
+  return { ...next, filter, quietDays }
 })
 
 /** The source window plus previously visible topics still shown by a tab. */
@@ -174,11 +184,12 @@ export const sidebarListAtom = Atom.make((get): SidebarWindow => {
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
   if (shown === undefined || shown.filter !== next.filter) return next
   const details = new Map<string, TopicDetail | null>()
-  for (const tab of tabs.tabs) {
-    const id = tabTopic(tab)
-    if (id === undefined || !shown.rows.has(id) || next.rows.has(id)) continue
-    const ignored = get(ignoredChannelsAtom)
-    if (AsyncResult.isSuccess(ignored) && ignored.value.some((channel) => channel.id === shown.rows.get(id)!.channel.id)) {
+  const candidates = tabs.tabs.map(tabTopic).filter((id): id is string =>
+    id !== undefined && shown.rows.has(id) && !next.rows.has(id),
+  )
+  const ignored = candidates.length > 0 ? get(ignoredChannelsAtom) : undefined
+  for (const id of candidates) {
+    if (ignored !== undefined && AsyncResult.isSuccess(ignored) && ignored.value.some((channel) => channel.id === shown.rows.get(id)!.channel.id)) {
       details.set(id, null)
     } else {
       const detail = get(topicAtom(id))

@@ -1,0 +1,1 @@
+- 10-16 14:40 · sidebar-row · A stored column that changes meaning bumps `@juno/sync` `INDEX_VERSION`; the sync re-indexes stored topics from local messages on start, 200 per transaction, with no Slack calls, instead of bumping `CACHE_SCHEMA_VERSION` and resyncing.

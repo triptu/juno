@@ -15,6 +15,8 @@ export type NoDecisionReason =
   | 'invalid-output'
   /** Network, auth or provider error, after one retry. */
   | 'provider-error'
+  /** The daily spend cap refused the call; nothing was sent. */
+  | 'budget'
 
 export interface AiCallMeta {
   readonly model: string

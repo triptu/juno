@@ -31,3 +31,18 @@ Build before repeating desktop tests:
 pnpm build
 node scripts/heavy.mjs node scripts/stress-flakes.mjs desktop 20 pnpm --filter @juno/desktop exec playwright test e2e/sidebar.spec.ts e2e/session.spec.ts --grep 'hovering a row shows|signs out:|comes back signed in' --retries=0
 ```
+
+## Conformance
+
+`test/conformance` replays Quint traces of `specs/outbox.qnt` against the engine and the fake Slack, and compares the two after every round (`specs/README.md`, "Conformance"). Run it with the root script, which generates the traces first:
+
+```sh
+pnpm specs:conformance                                  # here, behind the machine lock
+pnpm remote specs:conformance                           # on a machine of its own
+CONFORMANCE_ONLY=copy-7 pnpm specs:conformance          # only the traces whose file name contains this
+```
+
+- `itf.ts` reads ITF. `replay.ts` is the loop for any spec: it cuts a trace into rounds (a step the harness drives, then the steps Juno takes on its own), drives the first step, waits until the projections agree, and reports the first round where they do not, with the fields that differ, the gated calls and the outbox.
+- `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry.
+- The files are not `*.test.ts`, so `pnpm test` does not run them: they need the generated traces. `vitest.conformance.config.ts` runs up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once (default 6); each boots its own engine and fake.
+- A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.

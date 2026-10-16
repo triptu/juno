@@ -99,9 +99,8 @@ describe('cold boot', () => {
       subscribed: true,
       titleSource: 'fallback',
     })
-    // The stack leaves out the signed-in user (Tushar), who replied in the thread.
-    expect(postgres?.participants.map((p) => p.name)).toEqual(['Dev', 'Leo'])
-    expect(postgres?.participants[0]?.avatarUrl).toContain('/avatars/U0DEV.svg')
+    // The thread is read, so the stack is empty: it names only the people talking in unread messages.
+    expect(postgres?.participants).toEqual([])
 
     // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
     // Main has no follow.

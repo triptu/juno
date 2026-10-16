@@ -7,6 +7,7 @@
  */
 import type { Static, TSchema } from '@earendil-works/pi-ai'
 import { Effect, Layer } from 'effect'
+import type { Admission } from '../config'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision } from '../provider'
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import type { TitleTopicInput } from '../tasks/titleTopic'
@@ -35,6 +36,8 @@ const textRules: Record<string, (input: never) => string> = {
 export interface FakeAiOptions {
   /** How long every answer takes. Past the task's timeout the answer is `timeout`. */
   readonly delayMillis?: number
+  /** Asked before every answer with a cost of zero, as the real provider asks with its upper cost. Blocked gives `budget`. */
+  readonly admit?: () => Effect.Effect<Admission>
 }
 
 export class FakeAiProvider extends AiProvider {
@@ -45,8 +48,16 @@ export class FakeAiProvider extends AiProvider {
 export function makeFakeAiProvider(options: FakeAiOptions = {}): AiProviderShape {
   const meta: AiCallMeta = { model: FAKE_MODEL, latencyMillis: 0, costUsd: 0, attempts: 1 }
   const delay = options.delayMillis ?? 0
+  const admit = options.admit
 
   const late = <A>(timeoutMillis: number, answer: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> =>
+    admit === undefined ? timed(timeoutMillis, answer) : Effect.gen(function* () {
+      const admission = yield* admit()
+      if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', meta: { ...meta, attempts: 0 } } as Decision<A>
+      return yield* timed(timeoutMillis, answer).pipe(Effect.onExit(() => admission.settle(0)))
+    })
+
+  const timed = <A>(timeoutMillis: number, answer: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> =>
     delay <= 0
       ? answer
       : Effect.sleep(delay).pipe(

@@ -1,7 +1,8 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { encodeMentions, type PickConversation, type PickThread } from '@juno/contract'
 import {
   newChatAtom,
+  setNewChat,
   frequentConversationsAtom,
   nowAtom,
   pickConversation,
@@ -15,11 +16,11 @@ import {
   type NewChat as NewChatState,
 } from '@juno/state'
 import { afterPaint, mark } from '@juno/state/perf'
-import { useAtom, useAtomValue } from '@juno/state/react'
+import { useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useMentions } from './mentions'
-import { onNewChatFocus, settleSentChat } from './navigation'
+import { settleSentChat } from './navigation'
 import { useNewChatChecks } from './newChatChecks'
 import type { Destination } from './sendChecks'
 import { TopicPreview } from './TopicView'
@@ -50,7 +51,8 @@ export interface NewChatTabProps {
  * the composer takes focus.
  */
 export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
-  const [chat, setChat] = useAtom(newChatAtom(tabId))
+  const chat = useAtomValue(newChatAtom(tabId))
+  const setChat = (next: NewChatState) => setNewChat(registry, tabId, next)
   const [open, setOpen] = useState<PickerName | undefined>(undefined)
   const [query, setQuery] = useState('')
   const [sending, setSending] = useState(false)
@@ -58,21 +60,23 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const frequent = useAtomValue(frequentConversationsAtom)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // The files stay with the draft through every change of destination (spec section 9).
-  const files = useAttachments(tabId)
+  const files = useAttachments(tabId, { tabbable: false })
 
-  useEffect(() => {
+  // Before the first paint, so keys typed right after ⌘N reach the field.
+  useLayoutEffect(() => {
     inputRef.current?.focus()
     afterPaint(() => {
       if (inputRef.current === document.activeElement) mark('juno.composer-ready')
     })
   }, [])
-  useEffect(() => onNewChatFocus((id) => id === tabId && inputRef.current?.focus()), [tabId])
 
   const conversationList = useAtomValue(pickConversationsAtom(open === 'conversation' ? query : undefined))
   // A person never messaged has no threads: only Main.
   const channel = chat.conversation?.channelId
   const threadsOpen = open === 'thread' && (chat.conversation === undefined || channel !== undefined)
   const threadList = useAtomValue(pickThreadsAtom(threadsOpen ? { channel, query } : undefined))
+  const conversations = useHeld(conversationList._tag === 'Success' ? conversationList.value : undefined, open === 'conversation')
+  const threads = useHeld(threadList._tag === 'Success' ? threadList.value : undefined, threadsOpen)
 
   const openPicker = useCallback((picker: PickerName | undefined) => {
     setQuery('')
@@ -94,7 +98,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     const attached = takeAttachments(tabId)
     if (attached === undefined) return
     setSending(true)
-    const exit = await sendMessage(registry, target, encodeMentions(body, chat.mentions), undefined, attached.ids)
+    const exit = await sendMessage(registry, target, encodeMentions(body, chat.mentions), undefined, attached.ids, chat.thread === undefined && target.kind === 'channel' && target.threadTs === undefined && chat.conversation?.kind !== 'im')
     if (exit._tag === 'Success') return settleSentChat(tabId, exit.value.topicId)
     // The draft and its files stay; the send can be tried again.
     attached.restore()
@@ -145,8 +149,9 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
               onOpen={openPicker}
               query={query}
               onQuery={setQuery}
-              conversations={conversationList._tag === 'Success' ? conversationList.value : undefined}
-              threads={threadsOpen ? (threadList._tag === 'Success' ? threadList.value : undefined) : []}
+              conversations={conversations.value}
+              threads={threadsOpen ? threads.value : []}
+              loading={conversations.loading || threads.loading}
               now={now}
               onPickConversation={(conversation: PickConversation) => picked((current) => pickConversation(current, conversation))}
               onPickThread={(thread: PickThread | undefined) => picked((current) => pickThread(current, thread))}
@@ -157,3 +162,15 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     />
   )
 })
+
+/**
+ * A picker list's rows, kept while the next query's rows load, so typing
+ * never draws an empty list (inventory 8). `loading` says the rows are an
+ * earlier query's. Closing the list drops them, so it opens on fresh rows.
+ */
+function useHeld<A>(value: A | undefined, open: boolean): { readonly value: A | undefined; readonly loading: boolean } {
+  const [held, setHeld] = useState<A | undefined>(undefined)
+  if (!open && held !== undefined) setHeld(undefined)
+  else if (open && value !== undefined && value !== held) setHeld(value)
+  return { value: open ? (value ?? held) : undefined, loading: open && value === undefined }
+}

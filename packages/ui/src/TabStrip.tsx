@@ -58,7 +58,10 @@ const styles = stylex.create({
     boxSizing: 'border-box',
     height: layout['--titlebar-height'],
     paddingInline: spacing['--space-2-5'],
-    backgroundColor: colors['--background-subtle'],
+    backgroundColor: colors['--tab-strip'],
+    // The strip's own buttons ("+", and Back and Forward with the sidebar
+    // hidden) hover with the tabs' fill; the usual one is the strip's.
+    '--surface-hover': colors['--tab-hover'],
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-default'],
@@ -81,10 +84,11 @@ const styles = stylex.create({
   // The tabs scroll sideways inside the strip. The scroller hangs 1px over
   // the strip's bottom border so the active tab can paint across it. It
   // takes only the tabs' width, and shrinks to scroll once they overflow.
+  // Tabs touch, as in Safari and Finder; dividers separate inactive ones.
   scroller: {
     display: 'flex',
     alignItems: 'flex-end',
-    gap: spacing['--space-0-5'],
+    gap: 0,
     flexGrow: 0,
     flexShrink: 1,
     minWidth: 0,

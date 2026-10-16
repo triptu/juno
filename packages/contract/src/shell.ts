@@ -105,6 +105,7 @@ const ContextMenuLeaf = Schema.Union([
     label: Schema.String,
     enabled: Schema.optionalKey(Schema.Boolean),
     checked: Schema.optionalKey(Schema.Boolean),
+    sublabel: Schema.optionalKey(Schema.String),
     accelerator: Schema.optionalKey(Schema.String),
   }),
   Schema.Struct({ separator: Schema.Literal(true) }),

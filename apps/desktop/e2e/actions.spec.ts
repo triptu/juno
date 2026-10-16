@@ -8,7 +8,7 @@ test.describe.configure({ timeout: 90_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const ALERTS_MAIN = '#alerts-prod'
 

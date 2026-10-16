@@ -36,6 +36,15 @@ describe('topic status', () => {
     expect(topicStatus(t, ctx)).toBe(expected)
   })
 
+  it.each([1, 3, 7, 14])('uses a %i-day window and preserves pins and unread', (quietDays) => {
+    const rules = { now: NOW, quietDays }
+    expect(topicStatus(topic({ ago: quietDays * DAY }), rules)).toBe('open')
+    expect(topicStatus(topic({ ago: quietDays * DAY + 1 }), rules)).toBe('quiet')
+    expect(sidebarPlacement(topic({ ago: 20 * DAY, overlay: { pinnedAt: NOW } }), rules)).toBe('pinned')
+    expect(sidebarPlacement(topic({ ago: 20 * DAY, unread: 1 }), rules)).toBe('recent')
+    expect(topicStatus(topic({ kind: 'main', ago: 20 * DAY, channelAgo: (quietDays - 0.5) * DAY }), rules)).toBe('open')
+  })
+
   it('uses the configured quiet window, capped at 14 days', () => {
     const tenDays = topic({ ago: 10 * DAY })
     expect(topicStatus(tenDays, { now: NOW, quietDays: 14 })).toBe('open')

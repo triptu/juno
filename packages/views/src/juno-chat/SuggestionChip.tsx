@@ -7,21 +7,19 @@ export interface SuggestionChipProps {
   /** Verb-first, sentence case: the text the chip sends. */
   readonly label: string
   readonly onSend: () => void
-  /** Extra attributes for tests (`data-catch-me-up`). */
-  readonly data?: Readonly<Record<`data-${string}`, string>>
 }
 
 const HOVER = '@media (hover: hover)'
 
 /**
- * A suggestion Juno offers, as an action rather than a reply (SPEC 7,
+ * A suggestion Juno offers, as an action rather than a reply (SPEC
  * 13.1): a quiet outlined pill with a small icon, on whatever surface it
- * sits on. Clicking it sends its label as the owner's message. Used for
- * Catch me up above the panel's composer and the Juno tab's empty state.
+ * sits on. Clicking it sends its label as the owner's message. Used in
+ * the empty chat.
  */
-export function SuggestionChip({ icon, label, onSend, data }: SuggestionChipProps) {
+export function SuggestionChip({ icon, label, onSend }: SuggestionChipProps) {
   return (
-    <button type="button" {...data} onClick={onSend} {...stylex.props(styles.chip)}>
+    <button type="button" onClick={onSend} {...stylex.props(styles.chip)}>
       <span {...stylex.props(styles.icon)}>
         <Icon icon={icon} size={14} />
       </span>

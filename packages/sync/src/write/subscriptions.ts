@@ -110,7 +110,18 @@ export const applyRootSubscription = (
 ): Effect.Effect<ThreadSubOutcome, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     if (root.subscribed === undefined) return 'ignored'
-    if (root.subscribed === false && (yield* threadSub(channel, root.ts)) === undefined) return 'ignored'
+    if (root.subscribed === false) {
+      const existing = yield* threadSub(channel, root.ts)
+      if (existing === undefined) return 'ignored'
+      const sql = yield* StoreWriter
+      // Slack starts following an author once replies arrive. Keep the local
+      // author follow before then, unless the user explicitly changed it.
+      if (!existing.commanded) {
+        const own = yield* sql`SELECT 1 FROM started_threads st JOIN messages m ON m.channel = st.channel AND m.ts = st.root_ts
+          WHERE st.channel = ${channel} AND st.root_ts = ${root.ts} AND m.reply_count = 0 LIMIT 1`
+        if (own.length > 0) return 'ignored'
+      }
+    }
     return yield* setThreadSub(channel, root.ts, root.subscribed, root.subscribed ? root.last_read : undefined, { kind: 'page', requestedAt })
   })
 

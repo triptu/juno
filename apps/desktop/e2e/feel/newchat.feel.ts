@@ -1,5 +1,5 @@
 import { expect } from '../fixtures'
-import { landsAndStays, noFlicker } from './checks'
+import { landsAndStays, neverZero, noFlicker } from './checks'
 import { test } from './feel'
 
 test('Frequent stays in place when a destination is chosen', async ({ juno, feel }) => {
@@ -20,5 +20,51 @@ test('Frequent stays in place when a destination is chosen', async ({ juno, feel
   }, async () => {
     await list.getByRole('button').first().click()
     await expect(juno.newChat.composer).toBeFocused()
+  })
+})
+
+test('New chat opens a thread without moving the composer or root', async ({ juno, fake, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.newChat.pickConversation('eng', 'eng')
+  await juno.newChat.write('first')
+  fake.holdNext({ method: 'chat.postMessage', before: true })
+  await feel.run({
+    name: 'new-chat-thread',
+    title: 'Send from New chat Main, then acknowledge the new thread in place',
+    probes: [
+      { kind: 'box', name: 'composer', selector: '[data-composer] textarea' },
+      { kind: 'box', name: 'root', selector: '[data-topic-view] [data-message-row]' },
+    ],
+    regions: { root: '[data-topic-view] [data-message-row]' },
+    checks: [landsAndStays('composer', 'composer', { tolerance: 0 }), landsAndStays('root', 'thread root', { tolerance: 0 }), noFlicker('root', 'thread root')],
+  }, async () => {
+    await juno.newChat.send()
+    await juno.topic.expectMessage('first')
+    await expect(juno.sidebar.row('first').root).toBeVisible()
+    await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
+    fake.release()
+    await juno.topic.expectSent('first')
+  })
+})
+
+test('the conversation list keeps its rows while a search is typed', async ({ juno, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tabs.newTabButton.click()
+  await juno.newChat.conversationButton.click()
+  await expect(juno.newChat.option('eng')).toBeVisible()
+  await feel.run({
+    name: 'new-chat-picker-typing',
+    title: 'Type a search into the conversation list; it never draws empty',
+    probes: [{ kind: 'count', name: 'rows', within: '[data-new-chat] [role="listbox"]', selector: '[role="option"]' }],
+    regions: { list: '[data-new-chat] [role="listbox"]' },
+    checks: [neverZero('rows', 'the conversation list', { from: 'type' }), noFlicker('list', 'the conversation list', { from: 'type' })],
+  }, async (rec) => {
+    await rec.mark('type')
+    // One key at a time, each a new query, as a person types.
+    await juno.newChat.search.pressSequentially('eng', { delay: 60 })
+    await expect(juno.newChat.option('eng')).toBeVisible()
+    await juno.win.waitForTimeout(200)
   })
 })

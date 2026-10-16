@@ -1,0 +1,1 @@
+- 10-16 13:34 · juno-panel · The Juno chat lays out its last screenful of rows in full, so it opens at the newest message on the first frame; at the 38px estimate the rows in view grew after the bottom was set.

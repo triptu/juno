@@ -7,10 +7,11 @@ import { TopicSwitcher } from './TopicSwitcher'
 const noop = () => {}
 
 // The app always gives the title its switcher, so the title is the switcher's button here too, closed.
-const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'juno' | 'switcher'> = {
+const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'follow' | 'juno' | 'switcher'> = {
   onMenu: noop,
   onPill: noop,
   onResolve: noop,
+  follow: { open: false, onOpen: noop },
   juno: { open: false, onToggle: noop },
   switcher: { open: false, onOpen: noop, content: null },
 }
@@ -23,6 +24,9 @@ const switcher = (currentId: string, query = '') => ({
   onOpen: noop,
   content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId={currentId} threads={engTopics} now={NOW} query={query} onQuery={noop} onOpen={noop} />,
 })
+
+/** The same threads, not followed (Notify me is Never). */
+const unfollowed = <D extends TopicHeaderProps['detail']>(detail: D): D => ({ ...detail, subscribed: false, status: 'unsubscribed' })
 
 // The header lies over the top of its area; the frame is that area's top, the band's height.
 const narrow: FixtureFrame = { width: 336, height: 68 }
@@ -57,6 +61,20 @@ export default defineFixtures(
     Resolve: {
       'resolved-no-juno': fixture<TopicHeaderProps>({ detail: { ...details.postgres, resolved: true, status: 'resolved' }, onMenu: noop, onPill: noop, onResolve: noop }),
       'resolved-336': state({ detail: { ...details.hiring, resolved: true, status: 'resolved' } }, narrow),
+    },
+    // A thread you do not follow shows Follow in Resolve's place; its menu is native, so only the open button shows.
+    // Follow keeps Resolve's width, so following moves nothing.
+    Follow: {
+      follow: state({ detail: unfollowed(details.postgres) }),
+      'follow-open': state({ detail: unfollowed(details.postgres), follow: { open: true, onOpen: noop } }),
+      followed: state({ detail: details.postgres }),
+      'follow-resolved': state({ detail: { ...unfollowed(details.postgres), resolved: true } }),
+      'follow-long': state({ detail: unfollowed(details.long) }),
+      'follow-336': state({ detail: unfollowed(details.hiring) }, narrow),
+      'followed-336': state({ detail: details.hiring }, narrow),
+      'hover-follow': state({ detail: unfollowed(details.postgres) }, { hover: 'button[aria-label="Follow"]' }),
+      'focus-follow': state({ detail: unfollowed(details.postgres) }, { focus: 'button[aria-label="Follow"]' }),
+      'press-follow': state({ detail: unfollowed(details.postgres) }, { press: 'button[aria-label="Follow"]' }),
     },
     // The topic menu is native; ⋯ shows it is open, from ⋯ or a right-click on the title.
     Menu: {

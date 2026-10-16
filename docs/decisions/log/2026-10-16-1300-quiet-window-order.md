@@ -1,0 +1,1 @@
+- 10-16 13:00 · quiet-window-c · Settings › General puts Topics first, then Tabs, Peek, Read status and AI assist, because the window shapes the sidebar; its sub says pinned, unread and open-in-a-tab topics always show.

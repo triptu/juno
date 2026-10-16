@@ -88,11 +88,12 @@ export interface ParsedColumns {
   readonly members: ReadonlyArray<string>
 }
 
-export const MAX_PARTICIPANTS = 4
+/** How many of the row's people the avatar stack draws; the rest travel as a count. */
+export const SHOWN_PARTICIPANTS = 4
 
 export function parseColumns(row: JoinedRow): ParsedColumns {
   return {
-    participants: parseIds(row.participants_json).slice(0, MAX_PARTICIPANTS),
+    participants: parseIds(row.participants_json),
     preview: parsePreview(row.preview_json),
     members: row.c_kind === 'mpim' ? parseIds(row.c_members) : [],
   }
@@ -119,7 +120,7 @@ function parsePreview(json: string | null): StoredPreview {
 
 /** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and the people the root mentions (for the title). */
 export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<string>): void {
-  for (const id of columns.participants) into.add(id)
+  for (const id of columns.participants.slice(0, SHOWN_PARTICIPANTS)) into.add(id)
   for (const id of columns.members) into.add(id)
   if (row.c_user_id !== null) into.add(row.c_user_id)
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)

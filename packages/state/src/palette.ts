@@ -9,12 +9,18 @@
  * and never delay the local rows.
  */
 import * as Atom from 'effect/reactivity/Atom'
-import { searchCommand, searchQuery, searchSlack } from '@juno/contract'
+import { newChatRanked, searchCommand, searchQuery, searchSlack } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
 /** The palette is open. Kept for the session, so a hidden window brings it back as it was. */
 export const paletteOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
+
+/** The palette's two tabs (spec section 10): conversations and commands, or message search. */
+export type PaletteTab = 'conversations' | 'messages'
+
+/** The tab shown. Each open starts on Conversations; ⌘1 and ⌘2 from the app menu set it while it is open. */
+export const paletteTabAtom = Atom.make<PaletteTab>('conversations').pipe(Atom.keepAlive)
 
 /** Results the palette asks the engine for: it shows 8 rows, 6 under a command (inventory 9). */
 export const PALETTE_RESULTS = 8
@@ -36,6 +42,11 @@ export const searchAtom = (query: string) => {
   const text = query.trim()
   return searchFamily({ query: text, limit: text === '' ? PALETTE_RECENT : PALETTE_RESULTS })
 }
+
+const conversationsFamily = liveQuery(newChatRanked)
+
+/** The Conversations tab's rows for the text (without a leading ">"), trimmed. */
+export const paletteConversationsAtom = (query: string) => conversationsFamily({ query: query.trim() })
 
 /** Slack's message search for `query`. Empty when Slack cannot be reached. */
 export const searchSlackMessages = (registry: Registry, query: string) => runCommand(registry, searchSlack, { query: query.trim() })

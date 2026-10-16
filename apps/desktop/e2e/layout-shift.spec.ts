@@ -15,7 +15,7 @@ const growingEdge = async (list: Locator): Promise<'top' | 'bottom'> =>
   }))
     ? 'bottom'
     : 'top'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const) {
   test(`stable open: ${path}`, async ({ juno, win, fake }) => {

@@ -4,8 +4,8 @@
  * read `topic_index` are in `pickerStatements`, so the plan test can check
  * that each one reads it through an index (performance 6).
  */
-import { PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
-import { channelLabelBare, contextTint, frequentDestinations, firstWords, mainTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
+import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
+import { channelLabelBare, contextTint, frequentDestinations, firstWords, mainTopicId, parseTopicId, rankConversations, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -234,4 +234,60 @@ export const queryFrequent = Effect.fn('newChat.frequent')(function* () {
   const chosen = ids.flatMap(id => { const row = byId.get(id); return row === undefined ? [] : [row] })
   const users = yield* readUsers(sql, peopleOf(chosen))
   return chosen.map(row => pickOf(row, users, selfId))
+})
+
+/** The latest activity of each of `ids`, read through the channel index. */
+export const activityStatement = (ids: ReadonlyArray<string>) => ({
+  sql: `SELECT channel, MAX(last_activity_ts) AS activity FROM topic_index WHERE channel IN (${ids.map(() => '?').join(', ')}) GROUP BY channel`,
+  params: ids,
+})
+
+/** Own sends and topic visits, each a use of its conversation, for the palette's ranking. */
+const usesOf = (sql: SqlClient.SqlClient, selfId: string | undefined, now: number) =>
+  Effect.gen(function* () {
+    const statement = frequentSendsStatement(selfId ?? '', now)
+    const sends = yield* sql.unsafe<{ channel: string; ts: string }>(statement.sql, statement.params)
+    const visits = yield* sql<{ topic_id: string; seen_at: string | number }>`SELECT topic_id, seen_at FROM topic_visits`
+    return [
+      ...sends.map((row) => ({ channel: row.channel, at: Number(row.ts) * 1000 })),
+      ...visits.flatMap((row) => {
+        const parsed = parseTopicId(row.topic_id)
+        return parsed === undefined ? [] : [{ channel: parsed.channel as string, at: Number(row.seen_at) }]
+      }),
+    ]
+  })
+
+/**
+ * The ⌘K Conversations tab (spec section 10): DMs, group DMs and channels
+ * by how much you use them, own sends and topic visits decaying by half
+ * each week, then by activity. With text, the conversations the New chat
+ * picker finds for it, ranked the same way, names that start with the text
+ * first among the unused. Local only.
+ */
+export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (text: string) {
+  const sql = yield* StoreReader
+  const selfId = yield* selfIdOf(sql)
+  const now = yield* Clock.currentTimeMillis
+  const uses = yield* usesOf(sql, selfId, now)
+  if (ftsQuery(text.trim()) === '') {
+    const rows = yield* sql.unsafe<ConversationRow & { activity: string | null }>(frequentConversationsStatement)
+    const ids = rankConversations(rows.map((row) => ({ id: row.id, kind: row.kind, lastActivityAt: Number(row.activity ?? 0) * 1000 })), uses, now).slice(0, PALETTE_CONVERSATIONS)
+    const byId = new Map(rows.map((row) => [row.id, row]))
+    const chosen = ids.flatMap((id) => byId.get(id) ?? [])
+    const users = yield* readUsers(sql, peopleOf(chosen))
+    return chosen.map((row) => pickOf(row, users, selfId))
+  }
+  const found = yield* queryConversations(text)
+  const candidates = [...found.people, ...found.channels]
+  const ids = candidates.flatMap((pick) => pick.channelId ?? [])
+  const activity = new Map<string, number>()
+  if (ids.length > 0) {
+    const statement = activityStatement(ids)
+    for (const row of yield* sql.unsafe<{ channel: string; activity: string | null }>(statement.sql, statement.params)) activity.set(row.channel, Number(row.activity ?? 0) * 1000)
+  }
+  const typed = text.trim().toLowerCase()
+  const starts = new Set(candidates.filter((pick) => pick.name.toLowerCase().startsWith(typed)).map((pick) => pick.key))
+  const order = rankConversations(candidates.map((pick) => ({ id: pick.key, kind: pick.kind, lastActivityAt: activity.get(pick.key) ?? 0 })), uses, now, starts)
+  const byKey = new Map(candidates.map((pick) => [pick.key, pick]))
+  return order.slice(0, PALETTE_CONVERSATIONS).flatMap((key) => byKey.get(key) ?? [])
 })

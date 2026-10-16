@@ -46,7 +46,7 @@ export const SendTarget = Schema.Union([
 export type SendTarget = typeof SendTarget.Type
 
 export const SendResult = Schema.Struct({
-  /** The topic the message shows in: the thread, or the conversation's Main. */
+  /** The thread or Main; a New chat root starts with its durable pending topic identity. */
   topicId: Schema.String,
 })
 export type SendResult = typeof SendResult.Type
@@ -65,6 +65,8 @@ export const messagesSend = Rpc.make('messages.send', {
     text: Schema.String,
     clientMsgId: Schema.String,
     draftOf: Schema.optionalKey(Schema.String),
+    /** New chat Main sends in channels and group DMs open a locally followed thread. */
+    startThread: Schema.optionalKey(Schema.Boolean),
     files: Schema.optionalKey(Schema.Array(Schema.String)),
   },
   success: SendResult,

@@ -24,6 +24,8 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons; send-check bar; segmented control track |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
+| `--panel-surface` | `hsla(48, 22%, 95.5%, 1)` | #F6F5F1 | redesign | The Juno panel: a step below the page (1.05:1) and the field on it (1.05:1); muted text 4.7:1 |
+| `--panel-bubble` | `hsla(48, 40%, 99%, 1)` | #FDFDFB | redesign | Juno's bubble on the panel, lighter than the panel as the field is (1.07:1) |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
 | `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | The topic switcher's unread count, pressed state |
@@ -32,8 +34,10 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
 | `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, outline button hover |
 | `--foreground-default` | `hsla(48, 15%, 12%, 1)` | #23211A | css | Body text, toast background |
-| `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, unread preview, pill text |
+| `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, pill text |
+| `--foreground-secondary` | `hsla(48, 8%, 28%, 1)` | #4D4B42 | redesign | The middle of a list row's three text levels: the sidebar preview. See 1.7 |
 | `--foreground-muted` | `hsla(48, 5%, 42%, 1)` | #706E66 | **proto** (overrides css 52%) | Meta, time, placeholders, section labels. See 1.6 |
+| `--foreground-muted-on-fill` | `hsla(48, 8%, 35%, 1)` | #605E52 | redesign | Muted text on a selected row's `--secondary-default` fill. See 1.7 |
 | `--accent-default` | `hsla(48, 30%, 8%, 1)` | #1B180E | css | Ink accent: send button, "new" divider, @you chip, Now chip |
 | `--accent-hover` | `hsla(48, 30%, 10%, 1)` | #1F1C11 | css | |
 | `--accent-active` | `hsla(48, 30%, 13%, 1)` | #292516 | css | |
@@ -42,6 +46,9 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--accent-foreground-muted` | `hsla(48, 20%, 70%, 1)` | #BDB8A3 | css | |
 | `--selection-background` | `hsla(200, 50%, 80%, 1)` | #B3D4E6 | css | `::selection`; prototype also uses it for the focus ring (see 1.7) |
 | `--input-border` | `hsla(48, 14%, 82%, 1)` | #D8D5CB | proto | Composer, text fields, selects, search fields, send-card textarea |
+| `--tab-strip` | `hsla(48, 26%, 94%, 1)` | #F4F2EC | redesign 10-16 | The tab strip and inactive tabs. 1.08:1 under the active tab, so tabs read apart (inventory 4) |
+| `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
+| `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
 | `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the image viewer: the page at 94%, so only the picture reads |
 
 ### 1.2 Base palette, dark
@@ -56,6 +63,8 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--panel-surface` | #201E1B | 0.235 | 1.05:1 over the page, the field 1.07:1 over it | redesign |
+| `--panel-bubble` | #2D2B28 | 0.29 | 1.18:1 over the panel (the hover surface) | redesign |
 | `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
 | `--secondary-hover` | #383633 | 0.335 | | redesign |
 | `--secondary-active` | #403E3B | 0.365 | | redesign |
@@ -64,9 +73,14 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--border-strong` | #3C3A37 | 0.35 | 1.37:1 on a card | redesign |
 | `--border-strongest` | #4C4A47 | 0.41 | 1.99:1 on the page | redesign |
 | `--input-border` | #464541 | 0.39 | 1.62:1 on the composer | redesign |
+| `--tab-strip` | #0D0C0A | 0.15 | 1.12:1 under the active tab | redesign 10-16 |
+| `--tab-hover` | #151411 | 0.19 | 1.06:1 over the strip, 1.05:1 under the page; label 10.6:1 | redesign 10-16 |
+| `--tab-divider` | #3A3835 | 0.37 | 1.67:1 on the strip | redesign 10-16 |
 | `--foreground-default` | #EEEBE2 | 0.94 | 14.7:1 on the page | redesign |
 | `--foreground-subtle` | #C6C4BE | 0.82 | 10.1:1 page, 7.7:1 `--secondary-default`, 6.1:1 `--secondary-active`, 7.0:1 popovers | redesign |
+| `--foreground-secondary` | #C0BEB8 | 0.80 | 9.9:1 sidebar, 7.6:1 hover, 7.2:1 `--secondary-default` | redesign |
 | `--foreground-muted` | #A09E9A | 0.70 | 6.6:1 page, 6.9:1 sidebar, 5.8:1 cards, 5.3:1 hover, 5.0:1 `--secondary-default`, 4.6:1 popovers | redesign |
+| `--foreground-muted-on-fill` | #A09E9A | 0.70 | Same as muted, which passes on the fill in dark | redesign |
 | `--accent-default` | `hsla(48, 30%, 90%, 1)` #EDEADE | | The ink accent's dark fill | css |
 | `--accent-hover` | `hsla(48, 30%, 95%, 1)` | | | css |
 | `--accent-active` | `hsla(48, 30%, 99%, 1)` | | | css |
@@ -199,6 +213,14 @@ Measured, light: midnight #C3C2D9 / #28214D (8.5:1), claret #E3C3C6 / #5D1F2C (7
 | `--secondary-active` #EAE6D7 | | 4.06:1 |
 
 Rule that follows: muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`. On `--secondary-*` surfaces use `--foreground-subtle` (the prototype already does this for unread count tags, status chips and pills). The read-count tag (muted on `--secondary-default`, 4.39:1) is the one exception; [proposed] use `--foreground-subtle` there too.
+
+**Sidebar row levels.** A row has three text levels: title `--foreground-default`, preview `--foreground-secondary`, place and time `--foreground-muted`. Light subtle sits only 0.06 OKLCH lightness from muted, too close to read as a level, so the preview takes `--foreground-secondary`, which sits midway between the title and the meta in both themes (OKLCH L, light 0.25 / 0.41 / 0.54, dark 0.94 / 0.80 / 0.70). Dark meta cannot go lower: it must keep 4.5:1 on the selected row. On the selected row muted points at `--foreground-muted-on-fill`. Measured in Chromium by the gallery test `contrast.spec.ts` (title / preview / meta):
+
+| Row on | Light | Dark |
+| --- | --- | --- |
+| Sidebar `--background-subtle` | 15.3 / 8.3 / 4.85 | 15.5 / 9.9 / 6.9 |
+| Hover `--surface-hover` | 14.4 / 7.8 / 4.56 | 11.8 / 7.6 / 5.3 |
+| Selected `--secondary-default` | 13.9 / 7.5 / 5.6 | 11.2 / 7.2 / 5.0 |
 
 Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
@@ -360,6 +382,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
 | `--tab-unread-dot` | 6px round, `--foreground-muted` |
+| `--tab-divider-height` | 16px, the divider between two inactive tabs, centred on the tab's height |
 | `--header-island-top` | 8px from the top of the topic area (or Juno tab, or panel) to the header islands |
 | `--header-island-height` | 36px: a 28px control plus 3px padding and the 1px transparent border |
 | `--header-band` | 68px: the band behind the islands, solid `--background` to `--header-band-solid` 44px (the islands' bottom), then fading to transparent. Also the list's `scroll-padding-top` and the scrollbar track's top margin |
@@ -428,7 +451,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--surface-default` with 1.5% of `--hl` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. 3% read as pink on paper in light; 1.5% is a tint you notice only beside the page.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--panel-surface` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. It carries no accent: a tint of `--hl` read as pink, yellow or purple depending on the accent, and the field and Juno's bubbles were the panel's own colour. `--juno-bubble-bg` is Juno's bubble and the status bubble (`--surface-hover`); the panel sets it to `--panel-bubble`.
 
 ### Illustrations and the mark
 
@@ -465,6 +488,7 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
+| `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
 | `--panel-shadow` | `0 0 0 1px oklch(0 0 0 / .05), 0 1px 2px 0 oklch(0 0 0 / .04), 0 8px 24px -6px oklch(0 0 0 / .08), 0 24px 56px -12px oklch(0 0 0 / .12)` | `inset 0 0 0 1px oklch(1 0 0 / .06), 0 0 0 1px oklch(0 0 0 / .5), 0 1px 2px 0 oklch(0 0 0 / .3), 0 8px 24px -6px oklch(0 0 0 / .4), 0 24px 56px -12px oklch(0 0 0 / .5)` | 10-16 | The Juno panel floating over the page: a hairline ring, a contact shadow, two wide soft ones; in dark a faint light inner edge |
 
 Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
@@ -562,7 +586,5 @@ Other literal lengths and colours require tokens, or a trailing
 | --- | --- | --- |
 | `--all-topics-place-width` | 160px | Native place select while options load. |
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
-| `--topic-people-width` | 60px | Four overlapping participant avatars. |
-| `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
 | `--threads-button-width` | 128px | Threads button before and after its count arrives. |
 | `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

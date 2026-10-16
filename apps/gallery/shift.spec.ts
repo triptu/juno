@@ -692,6 +692,31 @@ test.describe('Topic header', () => {
   })
 })
 
+/** Following a thread from its header swaps Follow for Resolve, which must move nothing (SPEC 7). */
+test.describe('Topic header Follow', () => {
+  const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
+
+  test('Follow and Resolve are one width, roomy and narrow, so following moves nothing', async ({ page }) => {
+    const box = async (state: string, name: string) => {
+      await open(page, 'TopicHeader', state)
+      const button = page.getByRole('button', { name, exact: true })
+      await expect(button).toBeVisible()
+      return (await button.boundingBox())!
+    }
+    for (const [follow, followed] of [
+      ['follow/follow', 'follow/followed'],
+      ['follow/follow-336', 'follow/followed-336'],
+    ] as const) {
+      const before = await box(follow, 'Follow')
+      const after = await box(followed, 'Resolve')
+      expect(after.x).toBeCloseTo(before.x, 1)
+      expect(after.width).toBeCloseTo(before.width, 1)
+    }
+    await open(page, 'TopicHeader', 'follow/follow')
+    await expect(page.getByRole('button', { name: 'Follow', exact: true })).toHaveText('Follow', { useInnerText: true })
+  })
+})
+
 /**
  * Attachments (SPEC section 8): a chip leaving the composer, the upload line
  * under a sending message and a card's Download button move nothing.

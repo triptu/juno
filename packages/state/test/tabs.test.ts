@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   activateTab,
+  acknowledgeTopic,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
@@ -196,12 +197,12 @@ describe('a New chat that sends', () => {
     expect(historyTarget(stepHistory(sent, -1), 1)).toEqual(topicPlace('d'))
   })
 
-  it('closes and focuses the tab that already shows the topic, leaving nothing to reopen', () => {
+  it('stays and shows the topic when another tab already shows it too', () => {
     const chat = openPlace(three, newChatPlace, { newTab: true })
     const sent = settleNewChat(chat, chat.active!, 'c')
-    expect(shown(sent)).toEqual(['a', 'b', 'c'])
+    expect(shown(sent)).toEqual(['a', 'b', 'c', 'c'])
+    expect(sent.active).toBe(chat.active)
     expect(activeShows(sent)).toBe('c')
-    expect(sent.closed).toEqual(chat.closed)
   })
 
   it('changes nothing once the tab shows something else', () => {
@@ -380,4 +381,20 @@ describe('the divider', () => {
     expect(dividerIndex(order, '1.000001', mine)).toBe(3)
     expect(dividerIndex(order.slice(0, 3), '1.000001', mine)).toBe(-1)
   })
+})
+
+
+it('acknowledges a pending thread in place, including closed history and saved view identity', () => {
+  const pending = 'p:C1:client-1'
+  const acknowledged = 't:C1:100.000001'
+  const before = open(open(noTabs, 'm:C1'), pending)
+  const after = acknowledgeTopic(before, pending, acknowledged)
+  expect(after.active).toBe(before.active)
+  expect(after.tabs[0]?.id).toBe(before.tabs[0]?.id)
+  expect(after.tabs[0]?.history.index).toBe(before.tabs[0]?.history.index)
+  expect(after.tabs[0]?.history.entries).toEqual([topicPlace('m:C1'), { kind: 'topic', topicId: acknowledged, viewId: pending }])
+  expect(parseTabs(savedTabs(after)).tabs[0]?.history.entries).toEqual([{ kind: 'topic', topicId: acknowledged, viewId: pending }])
+  const closed = closeTab(before, before.active!)
+  const reopened = reopenClosedTab(acknowledgeTopic(closed, pending, acknowledged))
+  expect(reopened.tabs[0]?.history).toEqual(after.tabs[0]?.history)
 })

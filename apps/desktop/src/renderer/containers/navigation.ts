@@ -50,6 +50,7 @@ import {
   messageWindowSpecAtom,
   mountedTabs,
   newChatAtom,
+  setNewChat,
   newChatPlace,
   newTabPageAtom,
   emptyNewChat,
@@ -88,6 +89,7 @@ import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
 import { toggleSidebar } from './layout'
+import { paletteTakesTabNumber } from './paletteActions'
 import { togglePrivacy } from './privacy'
 
 /** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
@@ -132,7 +134,8 @@ const activeTopic = (tabs: Tabs): string | undefined => {
 const activeView = (tabs: Tabs): string | undefined => {
   const tab = activeTab(tabs)
   const topic = tab === undefined ? undefined : tabTopic(tab)
-  return topic === undefined ? undefined : topicView(topic, tab!.id)
+  const place = tab === undefined ? undefined : currentPlace(tab)
+  return topic === undefined ? undefined : topicView(place?.kind === 'topic' ? place.viewId ?? topic : topic, tab!.id)
 }
 
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
@@ -254,7 +257,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
     return
   }
   registry.set(selectedTopicAtom, topic.id)
-  pending = { id: topic.id, at, name: topic.name }
+  pending = { id: topicOfView(topic.view ?? topic.id), at, name: topic.name }
   const topicReady = whenReady(topic.view ?? topic.id, topic.fresh, topic.target)
   const landing = topic.fresh
     ? (tabs: Tabs) => {
@@ -308,31 +311,14 @@ function keepsNewChat(tabs: Tabs): boolean {
 }
 
 /**
- * ⌘N and the sidebar's New chat button: a New chat in a new tab (spec
- * section 9), or the New chat tab that is still untouched.
+ * ⌘N, "+", ⌘T and the sidebar's New chat button: a New chat in a new tab
+ * (spec section 9), every time. Each New chat tab keeps its own draft.
  */
 export function openNewChat(): void {
-  const blank = registry.get(tabsAtom).tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
-  if (blank !== undefined) {
-    // Already on screen, its composer may have lost focus: ask for it now. Not after the next paint, which on a
-    // still page can come only after the user's next key and steal focus from what that key opened. A hidden tab
-    // shown again focuses its composer by itself.
-    if (registry.get(tabsAtom).active === blank.id) newChatFocus.forEach((focus) => focus(blank.id))
-    else switchToTab(blank.id)
-    return
-  }
+  // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘N must not land in
+  // the field the old tab had focused.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
-}
-
-/** New chat tabs listening for "focus your composer", by tab id. */
-const newChatFocus = new Set<(tabId: string) => void>()
-
-/** A New chat tab's composer takes focus when ⌘N, ⌘T or "+" lands on that tab. Returns the unsubscribe. */
-export function onNewChatFocus(focus: (tabId: string) => void): () => void {
-  newChatFocus.add(focus)
-  return () => {
-    newChatFocus.delete(focus)
-  }
 }
 
 /** ⌘T and the strip's "+": a new tab with what Settings › General chooses, a New chat (the default) or Home. */
@@ -344,9 +330,8 @@ export function openNewTab(): void {
 /** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
 export function openNewChatTo(conversation: PickConversation): void {
   show((tabs) => {
-    const blank = tabs.tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
-    const next = blank === undefined ? openHere(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
-    if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
+    const next = openHere(tabs, newChatPlace, { newTab: true })
+    if (next.active !== undefined) setNewChat(registry, next.active, pickConversation(emptyNewChat, conversation))
     return next
   }, undefined)
 }
@@ -421,7 +406,8 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
   if (options.flash === true) flashMessage(registry, id, ts)
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
-    const view = topicView(id, showing.id)
+    const place = currentPlace(showing)
+    const view = topicView(place.kind === 'topic' ? place.viewId ?? id : id, showing.id)
     const list = registry.get(messageListAtom(view))
     if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(view), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
     return switchToTab(showing.id)
@@ -504,7 +490,7 @@ export function openAllTopics(options: OpenOptions = {}): void {
 export function settleSentChat(tabId: string, topicId: string): void {
   show(
     (tabs) => {
-      registry.set(newChatAtom(tabId), emptyNewChat)
+      setNewChat(registry, tabId, emptyNewChat)
       return settleNewChat(tabs, tabId, topicId)
     },
     { id: topicId, fresh: true, name: 'juno.topic-open' },
@@ -518,7 +504,7 @@ function arriving(tabs: Tabs, tabId: string, place: Place | undefined, fresh: bo
   // A mounted tab that keeps its page shows in the next frame.
   const tab = tabs.tabs.find((other) => other.id === tabId)
   if (tab !== undefined && mountedTabs(tabs).has(tabId) && tabTopic(tab) === place.topicId) return undefined
-  return { id: place.topicId, view: topicView(place.topicId, tabId), fresh, name: 'juno.tab-switch' as const }
+  return { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tabId), fresh, name: 'juno.tab-switch' as const }
 }
 
 /**
@@ -556,7 +542,7 @@ export function goToTabEntry(index: number): void {
   const tab = activeTab(tabs)
   const place = tab?.history.entries[index]
   if (tab === undefined || place === undefined || index === tab.history.index) return
-  const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
+  const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
   show((current) => goToEntry(current, index), topic)
 }
 
@@ -638,7 +624,9 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'settings.open':
       return openSettings()
     default: {
-      const tab = tabByNumber(tabs, Number(command.slice('tab.select.'.length)))
+      const number = Number(command.slice('tab.select.'.length))
+      if (paletteTakesTabNumber(number)) return
+      const tab = tabByNumber(tabs, number)
       if (tab !== undefined) switchToTab(tab.id)
     }
   }

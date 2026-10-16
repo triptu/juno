@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
-import { chatCopy, type About, type Place, type SendContext } from '@juno/agent-contract'
+import { useState } from 'react'
+import { type About, type Place, type SendContext } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
-import { catchUpDoneAtom, junoAboutAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
+import { junoAboutAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoHeader, JunoPanelActions, JunoPanelContext, type PanelPlace } from '@juno/views'
 import { closeJunoPanel, moveJunoToTab, openJunoPage, resumeJuno } from './actions'
@@ -47,8 +47,7 @@ const panelPlaceOf = (detail: TopicDetail): PanelPlace => ({ tint: detail.channe
  * chat, opened at the bottom. A message sent from it carries the topic, the
  * messages on screen, the "new" divider and the selection, or the About
  * chip's person or channel instead. The chip and the draft belong to the
- * tab, so they wait there while the panel shows in another tab. Catch me up shows while the topic opened
- * at a "new" divider and nothing has been sent about it from here.
+ * tab, so they wait there while the panel shows in another tab.
  */
 export function JunoPanel({ tabId, topicId }: { readonly tabId: string; readonly topicId: string }) {
   return useNoProvider() ? <NoProviderFrame column="panel" actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />} /> : <PanelChat tabId={tabId} topicId={topicId} />
@@ -59,10 +58,8 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
   const detail = result._tag === 'Success' ? (result.value ?? undefined) : undefined
   const about = useAtomValue(junoAboutAtom(tabId))
   const newFrom = useAtomValue(openedAtNewAtom(topicId))
-  const catchUpDone = useAtomValue(catchUpDoneAtom(topicId))
   const [selection, clearSelection] = useTopicSelection(topicId)
   const [menuOpen, setMenuOpen] = useState(false)
-  const sendRef = useRef<((text: string) => void) | null>(null)
 
   const contextOf = (): SendContext | undefined => {
     if (about !== undefined) return chipContext(about)
@@ -82,7 +79,6 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
 
   const onSent = (context: SendContext | undefined) => {
     if (context?._tag !== 'topic') return
-    registry.set(catchUpDoneAtom(topicId), true)
     clearSelection()
   }
 
@@ -104,13 +100,11 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
       contextOf={contextOf}
       onSent={onSent}
       onEscape={close}
-      sendRef={sendRef}
       composerContext={
         <JunoPanelContext
           {...(detail === undefined ? {} : { place: panelPlaceOf(detail) })}
           {...(selection === undefined ? {} : { selection, onRemoveSelection: clearSelection })}
           {...(about === undefined ? {} : { about, onRemoveAbout: () => registry.set(junoAboutAtom(tabId), undefined) })}
-          {...(newFrom !== undefined && !catchUpDone ? { onCatchMeUp: () => sendRef.current?.(chatCopy.panel.catchMeUp) } : {})}
         />
       }
     />

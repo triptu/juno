@@ -63,6 +63,30 @@ interface HoldRule {
   readonly waiting: Array<{ readonly resume: () => void; readonly args: Record<string, unknown> }>
 }
 
+/** A call stopped at a gate (`FakeServer.gate`): the test decides what Slack does with it. */
+export interface GatedCall {
+  readonly id: number
+  readonly method: string
+  readonly args: Readonly<Record<string, string>>
+  /** `before`: Slack has not run it yet. `answer`: Slack ran it, or refused it, and the answer waits. The id stays the same. */
+  readonly stage: 'before' | 'answer'
+  /** At `answer`: `ran`, or the error Slack refused it with. */
+  readonly outcome?: string
+}
+
+/**
+ * What Slack does with a gated call. At `before`: run it, refuse it with
+ * `error` (with `status` 429, a rate limit), or drop it: the connection
+ * closes and nothing runs. At `answer`: send the answer, or lose it: the
+ * connection closes with no answer.
+ */
+export type GateDecision = 'run' | 'drop' | 'answer' | 'lose' | { readonly error: string; readonly status?: number; readonly retryAfter?: number }
+
+interface GateWaiter {
+  readonly call: GatedCall
+  readonly decide: (decision: GateDecision) => void
+}
+
 export class FakeServer {
   readonly sessions = new Map<string, Session>()
   readonly calls: CallRecord[] = []
@@ -72,7 +96,11 @@ export class FakeServer {
   readonly #holds = new Map<string, HoldRule>()
   readonly #stalls = new Map<string, HoldRule>()
   readonly #lost = new Map<string, number>()
+  #gate: ((method: string, args: Readonly<Record<string, string>>) => boolean) | undefined
+  readonly #gated = new Map<number, GateWaiter>()
+  #gateSerial = 0
   #frameHold: ReadonlySet<string> | undefined
+  #frameWhere: ((frame: RtmFrame) => boolean) | undefined
   #fileDelayMs = 0
   #failedUploads = 0
   #uploadsBeforeFailing = 0
@@ -96,7 +124,7 @@ export class FakeServer {
     })
     this.#http.on('upgrade', (request, socket, head) => this.#upgrade(request, socket, head))
     workspace.onEvent((frame) => {
-      if (this.#frameHold?.has(frame.type) === true) this.#heldFrames.push(frame)
+      if (this.#frameHold?.has(frame.type) === true || this.#frameWhere?.(frame) === true) this.#heldFrames.push(frame)
       else this.broadcast(frame)
     })
   }
@@ -244,6 +272,45 @@ export class FakeServer {
     return true
   }
 
+  // Gated calls
+
+  /**
+   * From now on, every API call `where` matches stops twice: before its
+   * handler runs and before its answer, until the test `decide`s. Without
+   * `where`, the gate opens: waiting calls run and answer.
+   */
+  gate(where: ((method: string, args: Readonly<Record<string, string>>) => boolean) | undefined): void {
+    this.#gate = where
+    if (where === undefined) for (const waiter of this.#gated.values()) waiter.decide(waiter.call.stage === 'before' ? 'run' : 'answer')
+  }
+
+  /** The calls waiting at the gate, oldest first. */
+  gated(): ReadonlyArray<GatedCall> {
+    return [...this.#gated.values()].map((waiter) => waiter.call)
+  }
+
+  /** Decides a waiting call. A decision that does not fit its stage throws. */
+  decide(id: number, decision: GateDecision): void {
+    const waiter = this.#gated.get(id)
+    if (waiter === undefined) throw new Error(`no gated call ${id}`)
+    const before = decision === 'run' || decision === 'drop' || typeof decision === 'object'
+    if (before !== (waiter.call.stage === 'before')) throw new Error(`call ${id} is at ${waiter.call.stage}, not a stage for ${JSON.stringify(decision)}`)
+    waiter.decide(decision)
+  }
+
+  #atGate(call: Omit<GatedCall, 'id'>, id: number): Promise<GateDecision> {
+    return new Promise((resolve) => {
+      const entry: GatedCall = { id, ...call }
+      this.#gated.set(id, {
+        call: entry,
+        decide: (decision) => {
+          this.#gated.delete(id)
+          resolve(decision)
+        },
+      })
+    })
+  }
+
   // Held frames
 
   /** File downloads answer after `ms`, so images arrive late. 0 turns it off. */
@@ -268,8 +335,24 @@ export class FakeServer {
    */
   releaseFrames(count?: number, drop = false): void {
     const frames = this.#heldFrames.splice(0, count ?? this.#heldFrames.length)
-    if (count === undefined) this.#frameHold = undefined
+    if (count === undefined) {
+      this.#frameHold = undefined
+      this.#frameWhere = undefined
+    }
     if (!drop) for (const frame of frames) this.broadcast(frame)
+  }
+
+  /** From now on, frames `where` matches wait for `releaseFramesWhere`, besides any `holdFrames` types. Undefined stops. */
+  holdFramesWhere(where: ((frame: RtmFrame) => boolean) | undefined): void {
+    this.#frameWhere = where
+  }
+
+  /** Sends (or with `drop`, discards) the held frames `where` matches, in order. Answers how many. */
+  releaseFramesWhere(where: (frame: RtmFrame) => boolean, drop = false): number {
+    const frames = this.#heldFrames.filter(where)
+    for (const frame of frames) this.#heldFrames.splice(this.#heldFrames.indexOf(frame), 1)
+    if (!drop) for (const frame of frames) this.broadcast(frame)
+    return frames.length
   }
 
   /** The frames waiting for `releaseFrames`, oldest first. */
@@ -410,15 +493,30 @@ export class FakeServer {
     if (!isMethodName(method)) return record(200, { ok: false, error: 'unknown_method' })
     const stalled = this.#hold(this.#stalls, method, redact(fields))
     if (stalled !== undefined) await stalled
-    const forced = this.#takeFailure(method)
+    const gated = this.#gate?.(method, redact(fields)) === true
+    const lose = () => {
+      this.calls.push({ at: this.workspace.clock.now(), kind: 'api', method, args: redact(fields), status: 0, ok: false, error: 'lost' })
+      response.socket?.destroy()
+    }
+    let gateError: { readonly error: string; readonly status?: number; readonly retryAfter?: number } | undefined
+    // One id for both stops of a call.
+    const gateId = gated ? ++this.#gateSerial : 0
+    if (gated) {
+      const decision = await this.#atGate({ method, args: redact(fields), stage: 'before' }, gateId)
+      if (decision === 'drop') return lose()
+      if (typeof decision === 'object') gateError = decision
+    }
+    const forced = gateError?.error ?? this.#takeFailure(method)
     const result = forced === undefined ? this.#run(method, fields) : undefined
     // The handler has run (state changed, events sent), or a forced error stands in for it; only the answer waits.
     const held = this.#hold(this.#holds, method, redact(fields))
     if (held !== undefined) await held
-    if (this.#takeLost(method)) {
-      this.calls.push({ at: this.workspace.clock.now(), kind: 'api', method, args: redact(fields), status: 0, ok: false, error: 'lost' })
-      response.socket?.destroy()
-      return
+    // A gate opened meanwhile lets the answer go.
+    if (gated && this.#gate !== undefined && (await this.#atGate({ method, args: redact(fields), stage: 'answer', outcome: forced ?? 'ran' }, gateId)) === 'lose') return lose()
+    if (this.#takeLost(method)) return lose()
+    if (gateError?.status !== undefined) {
+      if (gateError.retryAfter !== undefined) response.setHeader('Retry-After', String(gateError.retryAfter))
+      return record(gateError.status, { ok: false, error: gateError.error })
     }
     if (forced !== undefined) return record(200, { ok: false, error: forced })
     if (result === undefined) return

@@ -5,7 +5,7 @@ export { SPEND_MIGRATIONS } from './schema'
 
 /** Integer nanodollars. Round each reservation up, never down. */
 export const DOLLAR = 1_000_000_000
-export type SpendPath = 'chat' | 'subagent' | 'compaction'
+export type SpendPath = 'chat' | 'subagent' | 'compaction' | 'engine'
 export function dollars(value: number): number {
   return money(Math.ceil(value * DOLLAR))
 }
@@ -49,28 +49,37 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       codexTurns: Number(db.prepare('SELECT count(*) AS n FROM codex_turns WHERE day = ?').get(day)!.n),
     }
   }
+  /** What one path holds today: open and unknown reservations in full, settled ones at their reported cost. */
+  const usedBy = (day: string, path: SpendPath) => Number(db.prepare(
+    "SELECT coalesce(sum(CASE WHEN state = 'settled' THEN actual ELSE amount END), 0) AS n FROM spend_reservations WHERE day = ? AND path = ?",
+  ).get(day, path)!.n)
   /**
    * A provider may report more than was reserved, and the ledger records what
-   * it reports, so a day can end above its cap. Once a day (or compaction's
+   * it reports, so a day can end above its cap. Once a day (or a path's
    * share) is at or over its limit, nothing new is reserved, whatever the
-   * amount, until midnight or a raise.
+   * amount, until midnight or a raise. Compaction may use a quarter of the
+   * limit and the engine's background calls half, so chat always keeps the rest.
    */
   const fits = (day: string, path: SpendPath, amount: number) => {
     const s = snapshot(day)
     const limit = money(s.cap + s.raises)
     const used = s.reserved + s.actual
     if (used >= limit || used + amount > limit) return false
-    const share = Math.floor(limit / 4)
-    return path !== 'compaction' || (s.compaction < share && s.compaction + amount <= share)
+    const share = path === 'compaction' ? Math.floor(limit / 4) : path === 'engine' ? Math.floor(limit / 2) : undefined
+    if (share === undefined) return true
+    const mine = path === 'compaction' ? s.compaction : usedBy(day, path)
+    return mine < share && mine + amount <= share
   }
   return {
     snapshot,
-    reserve: (path: SpendPath, amount: number): Reservation => transaction(db, () => {
+    /** `as` makes the reservation idempotent: a reservation with that id already made is returned as it is. */
+    reserve: (path: SpendPath, amount: number, as?: string): Reservation => transaction(db, () => {
       money(amount)
+      if (as !== undefined && db.prepare('SELECT 1 FROM spend_reservations WHERE id = ?').get(as)) return { kind: 'reserved', id: as }
       const day = today()
       ensureDay(day)
       if (!fits(day, path, amount)) return { kind: 'blocked', reason: 'budget' }
-      const id = uuidv7(store.now())
+      const id = as ?? uuidv7(store.now())
       db.prepare("INSERT INTO spend_reservations(id, day, path, amount, state) VALUES (?, ?, ?, ?, 'reserved')").run(id, day, path, amount)
       return { kind: 'reserved', id }
     }),
@@ -80,7 +89,7 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       const row = db.prepare("SELECT day, path, amount FROM spend_reservations WHERE id = ? AND state = 'reserved'").get(id)
       if (!row) return false
       const path = row.path
-      if (path !== 'chat' && path !== 'subagent' && path !== 'compaction') throw new Error('Invalid spend path')
+      if (path !== 'chat' && path !== 'subagent' && path !== 'compaction' && path !== 'engine') throw new Error('Invalid spend path')
       if (amount <= Number(row.amount)) return true
       if (!fits(String(row.day), path, amount - Number(row.amount))) return false
       db.prepare('UPDATE spend_reservations SET amount = ? WHERE id = ?').run(amount, id)

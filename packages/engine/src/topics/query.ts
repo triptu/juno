@@ -68,6 +68,7 @@ import {
   channelRefOf,
   parseColumns,
   personFrom,
+  SHOWN_PARTICIPANTS,
   topicFrom,
   TOPIC_COLUMNS,
   TOPIC_FROM,
@@ -116,6 +117,8 @@ export interface CacheEntry {
   /** The people the row names: the participants and the DM partner. */
   readonly named: ReadonlyArray<Person>
   readonly participantIds: ReadonlyArray<string>
+  /** The row's people beyond `participantIds`, for the stack's "+N". */
+  readonly moreParticipants: number
   /** The preview's sender as the row shows it. */
   readonly sender: string
   /** The title, with the people a fallback title mentions named. */
@@ -179,7 +182,7 @@ export const settings = Effect.gen(function* () {
  * `topic_index_channel_activity`. No pointer counts nothing.
  */
 const NEW_THREADS = `CASE WHEN i.kind = 'main' THEN (SELECT count(*) FROM topic_index t
-      WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts) ELSE 0 END AS new_threads`
+      WHERE t.channel = i.channel AND t.last_activity_ts > r.last_read_ts AND t.kind = 'thread' AND t.root_ts > r.last_read_ts AND NOT EXISTS (SELECT 1 FROM started_threads st WHERE st.topic_id = t.topic_id OR (st.channel = t.channel AND st.root_ts = t.root_ts))) ELSE 0 END AS new_threads`
 
 export const SELECT = `${TOPIC_COLUMNS}, ${NEW_THREADS},
     CASE WHEN i.kind = 'main' THEN (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = i.channel) END AS channel_activity_ts`
@@ -479,7 +482,7 @@ function entryOf(
   columns: ParsedColumns,
   selfId: string | undefined,
   personOf: (id: string) => Person,
-): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'sender' | 'title'> {
+): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'moreParticipants' | 'sender' | 'title'> {
   const { participants, preview } = columns
   const used: Array<Person> = []
   const use = (id: string): Person => {
@@ -489,9 +492,10 @@ function entryOf(
   }
   const info = channelInfoOf(row, columns, selfId, (id) => use(id).name)
   const partner = row.c_kind === 'im' && row.c_user_id !== null ? use(row.c_user_id) : undefined
-  // The meta line's people (SPEC section 5): never you, and none in a DM, whose title already names everyone.
-  // The index leaves you out already; rows indexed before it did may still hold you until they are reindexed.
-  const shown = row.c_kind === 'im' || row.c_kind === 'mpim' ? [] : participants.filter((id) => id !== selfId)
+  // The meta line's people (SPEC section 5): the senders of the unread messages, never you, and none in a DM,
+  // whose title already names everyone. The stack draws four; the rest are a count.
+  const people = row.c_kind === 'im' || row.c_kind === 'mpim' ? [] : participants.filter((id) => id !== selfId)
+  const shown = people.slice(0, SHOWN_PARTICIPANTS)
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
   const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
@@ -503,6 +507,7 @@ function entryOf(
     channel: channelRefOf(info, partner?.id),
     named,
     participantIds: shown,
+    moreParticipants: people.length - shown.length,
     sender,
   }
 }
@@ -536,6 +541,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     sender,
     title.text,
     title.source,
+    entry.moreParticipants,
     ...entry.participantIds,
   ].join('\u0001')
 
@@ -550,6 +556,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     preview: { sender, text: stored.text },
     channelId: topic.channel.id,
     participantIds: entry.participantIds,
+    ...(entry.moreParticipants === 0 ? {} : { moreParticipants: entry.moreParticipants }),
     messageCount: topic.activity.messageCount,
     unreadCount: topic.activity.unreadCount,
     unreadExact: topic.activity.unreadExact !== false,

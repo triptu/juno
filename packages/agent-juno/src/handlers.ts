@@ -10,6 +10,8 @@
  *   a disabled host refuses before recording an attempt.
  * - Resolve uses the local topic command and retains its Undo.
  * - OS notification delivery remains unsupported.
+ * - Spend asks go the other way: the engine's model calls offer
+ *   reservations and settlements, and the agent answers from its ledger.
  *
  * `host.hello` answers the one protocol the host serves; the agent refuses
  * a host whose protocol differs from its own.
@@ -81,6 +83,8 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.schedule.changes': () => host.schedule?.changes ?? Stream.empty,
         'host.presence': () => host.presence,
         'host.notification.deliver': () => unsupported('Juno cannot show notifications for the agent yet.'),
+        'host.spend.asks': () => host.spend?.asks ?? Stream.never,
+        'host.spend.answer': (answer) => host.spend?.answer(answer) ?? Effect.void,
       })
     }),
   )

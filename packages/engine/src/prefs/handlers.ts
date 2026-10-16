@@ -3,16 +3,22 @@ import { keys, liveQuery, prefs, transaction } from '@juno/store'
 import { Effect, Schema, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { decisionProviderAvailable } from '../ai'
+import { AiCredentials } from '../aiCredentials'
+import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { Workspace } from '../workspace'
 
 export const PrefsHandlers = PrefsRoutes.toLayer(
   Effect.gen(function* () {
-    const available = yield* decisionProviderAvailable
+    const config = yield* EngineConfig
+    const credentials = yield* AiCredentials
     const workspace = yield* Workspace
     const worker = yield* MarkWorker
     return {
-      'ai.available': () => serveLiveValue(Stream.fromEffect(Effect.result(timed(Effect.succeed(available))))),
+      // Answers again whenever main hands over a new key or takes it away.
+      'ai.available': () => serveLiveValue(credentials.revisions.pipe(
+        Stream.mapEffect(() => Effect.result(timed(decisionProviderAvailable.pipe(Effect.provideService(EngineConfig, config), Effect.provideService(AiCredentials, credentials))))),
+      )),
       'prefs.get': ({ key }) => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {

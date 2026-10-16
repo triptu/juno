@@ -298,6 +298,32 @@ describe('send', () => {
     expect(inSlack(engine, id)).toBe(1)
   })
 
+  // Found by the conformance replay (test/conformance): the worker checks the socket once per pass, so
+  // after a post that answers once the socket has dropped, the next queued post goes out while Juno is offline.
+  it.fails('waits out a lost connection that comes while another post is out (fails: the check is per pass)', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    // Both posts wait for the socket, so the pass after the reconnect takes them both.
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    await send(engine, 'Out when the socket drops', rows)
+    valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'Queued behind it', 'm:C0PRODUCT'))
+    engine.fake.goOnline()
+    const first = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the first post at Slack')
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.decide(first.id, 'run')
+    await waitFor(() => engine.fake.gated().find((call) => call.id === first.id && call.stage === 'answer'), WAIT_MS, 'the first post run')
+    engine.fake.decide(first.id, 'answer')
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    const second = engine.fake.gated().filter((call) => call.id !== first.id)
+    engine.fake.gate(undefined)
+    // SPEC 8: sends wait out a lost connection.
+    expect(second).toHaveLength(0)
+  })
+
   it('posts in a thread', async () => {
     const engine = await booted()
     const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
@@ -334,4 +360,24 @@ describe('send', () => {
     valueOf(await sendMessage(engine.registry, eng, 'Half a thought, finished', MAIN))
     await waitFor(() => (draft() === '' ? true : undefined), WAIT_MS, 'the draft cleared')
   })
+})
+
+
+it.each(['C0ENG', 'G0MAYALEO'])('New chat in %s queues a thread root and acknowledges its dependent reply once', async channelId => {
+  const engine = await booted()
+  const target = { kind: 'channel', channelId } as const
+  engine.fake.holdNext({ method: 'chat.postMessage', before: true })
+  const sent = valueOf(await sendMessage(engine.registry, target, 'first', undefined, undefined, true))
+  expect(sent.topicId.startsWith(`p:${channelId}:`)).toBe(true)
+  const thread = watch(engine, sent.topicId)
+  const initial = await thread(rows => rows.length === 1 && rows[0]?.pending === 'sending', 'pending root')
+  expect(initial[0]?.root).toBe(true)
+  await sendMessage(engine.registry, { ...target, threadTs: initial[0]!.ts }, 'second')
+  await thread(rows => rows.length === 2, 'pending reply')
+  expect(engine.fake.messages(channelId).filter(message => message.text === 'second')).toHaveLength(0)
+  engine.fake.release()
+  await thread(rows => rows.length === 2 && rows.every(row => row.pending === undefined), 'acknowledged thread')
+  const root = engine.fake.messages(channelId).find(message => message.text === 'first')!
+  expect(engine.fake.messages(channelId).find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
+  expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(2)
 })

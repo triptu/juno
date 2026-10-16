@@ -26,10 +26,10 @@ export const EngineConfig = Schema.Struct({
   fakeSlackUrl: Schema.optionalKey(Schema.String),
   /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
   ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
-  /** The OpenRouter key, in memory, for the live provider. Absent means every AI task answers "no decision" (ADR 0006). */
-  openRouterApiKey: Schema.optionalKey(Schema.String),
   /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */
   fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
+  /** Tests only: the fake provider answers only with an OpenRouter key from main (`aiKey`) and inside the spend cap, as the live one does. */
+  fakeAiRequiresKey: Schema.optionalKey(Schema.Boolean),
 })
 export type EngineConfig = typeof EngineConfig.Type
 
@@ -52,6 +52,8 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('port', {}),
   /** The app window has painted; background provider warm-up may start. */
   Schema.TaggedStruct('painted', {}),
+  /** OpenRouter credentials, memory only. Null removes the key and cancels current calls. */
+  Schema.TaggedStruct('aiKey', { key: Schema.NullOr(Schema.String) }),
   /** A port to the agent utility process, in `ports[0]`. The engine serves the AgentHost group on it (ADR 0012). */
   Schema.TaggedStruct('agentPort', {}),
   /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */
@@ -79,6 +81,8 @@ export type MainToEngine = typeof MainToEngine.Type
 
 /** engine -> main over parentPort. */
 export const EngineToMain = Schema.Union([
+  /** Tests only: a fake provider call started. No input or credentials. */
+  Schema.TaggedStruct('aiCall', { task: Schema.String }),
   /** The engine is serving; main may hand it ports. */
   Schema.TaggedStruct('ready', {}),
   /** Please send the stored secrets (`secrets`, possibly null). */

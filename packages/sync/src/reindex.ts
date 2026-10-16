@@ -18,7 +18,6 @@
 import {
   compareTs,
   indexTopic,
-  MAX_PARTICIPANTS,
   maxTs,
   parseTopicId,
   UNKNOWN_PERSON,
@@ -193,13 +192,6 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     }
 
     const activity = indexed.activity
-    const participants = [...activity.participants]
-    if (root?.reply_users_json !== null && root?.reply_users_json !== undefined) {
-      for (const user of JSON.parse(root.reply_users_json) as Array<string>) {
-        if (participants.length >= MAX_PARTICIPANTS) break
-        if (user !== options.me.userId && !participants.includes(user as UserId)) participants.push(user as UserId)
-      }
-    }
     const rootText = root !== undefined && root.deleted === 0 ? indexed.rootText?.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
       sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
@@ -213,7 +205,7 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       kind: parsed.kind,
       last_activity_ts: countersActivity === undefined ? activity.lastActivityTs : maxTs(activity.lastActivityTs, countersActivity),
       message_count: Math.max(activity.messageCount, countersCount),
-      participants_json: JSON.stringify(participants),
+      participants_json: JSON.stringify(activity.participants),
       root_ts: parsed.kind === 'thread' ? parsed.threadTs : (indexed.rootTs ?? null),
       unread_count: Math.max(activity.unreadCount, unreadFloor),
       unread_exact: activity.unreadExact === false ? 0 : 1,
@@ -239,3 +231,16 @@ function sameIndexRow(a: TopicIndexRow, b: TopicIndexRow): boolean {
   }
   return true
 }
+
+
+/** The initial projection of a locally started thread, before its first sync reindex. */
+export const indexStartedThread = (input: {
+  readonly id: string; readonly channel: string; readonly root: string; readonly at: string
+  readonly text: string; readonly userId: string; readonly previous?: string
+}) => Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  if (input.previous !== undefined) yield* sql`DELETE FROM topic_index WHERE topic_id = ${input.previous}`
+  yield* sql`INSERT INTO topic_index (topic_id, channel, kind, root_ts, last_activity_ts, message_count, participants_json, unread_count, unread_exact, mentions_me, preview_json, rev)
+    VALUES (${input.id}, ${input.channel}, 'thread', ${input.root}, ${input.at}, 1, ${JSON.stringify([input.userId])}, 0, 1, 0,
+      ${JSON.stringify({ sender: 'You', senderId: input.userId, text: input.text, rootText: input.text.slice(0, ROOT_TEXT_CHARS) })}, 1) ON CONFLICT DO NOTHING`
+})

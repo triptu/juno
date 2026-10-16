@@ -6,6 +6,7 @@ import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { askGrammar } from './grammar'
 import { aiAssistOn, decisionProviderAvailable } from '../ai'
+import type { AiCredentials } from '../aiCredentials'
 import type { EngineConfig } from '../config'
 import { channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userName, type JoinedRow, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
@@ -156,7 +157,7 @@ const clarity = (text: string, options: ClarityPrefs): ClarityFinding | undefine
 }
 
 /** The checks on Enter for one draft. Empty when there is nothing to say. Reads the store only. */
-export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig> =>
+export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
     if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return {}
@@ -169,7 +170,7 @@ export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never,
   })
 
 /** Only Main routing runs while typing pauses. */
-export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig> =>
+export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
     if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return
@@ -192,7 +193,7 @@ const checkPrefs = Effect.gen(function* () {
 })
 
 /** Runs only after a Juno send. Local fixes and grammar never hold Enter. */
-export const postcheckMessage = (text: string, clientMsgId: string): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig> =>
+export const postcheckMessage = (text: string, clientMsgId: string): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     if ([...text].length > 1000 || text.trim() === '') return {}
     const open = yield* (yield* Workspace).current

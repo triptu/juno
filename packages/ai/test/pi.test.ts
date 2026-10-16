@@ -121,6 +121,35 @@ describe('PiAiProvider decisions', () => {
     expect(faux.state.callCount).toBe(0)
   })
 
+  it('reserves before the request and settles the reported cost; at the cap it makes no request', async () => {
+    const asked: number[] = []
+    const settled: Array<number | undefined> = []
+    let open = true
+    const admit = (upper: number) => Effect.sync(() => {
+      asked.push(upper)
+      return open ? { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) } : { _tag: 'Blocked' as const }
+    })
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))], { ...chatConfig, admit })
+    const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
+    expect(decision).toMatchObject({ _tag: 'Decided' })
+    expect(asked).toHaveLength(1)
+    expect(asked[0]).toBeGreaterThanOrEqual(decision.meta.costUsd ?? 0)
+    expect(settled).toEqual([decision.meta.costUsd])
+    open = false
+    expect(noDecision(await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput)))).toEqual({ reason: 'budget', attempts: 0 })
+    expect(faux.state.callCount).toBe(1)
+    expect(settled).toHaveLength(1)
+  })
+
+  it('keeps the whole reservation when the cost is unknown: a timeout', async () => {
+    const settled: Array<number | undefined> = []
+    const admit = () => Effect.succeed({ _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) })
+    const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
+    const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
+    expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
+    expect(settled).toEqual([undefined])
+  })
+
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {
     const { provider } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))])
     const decision = await Effect.runPromise(provider.decide(writtenRoute, routeInput))

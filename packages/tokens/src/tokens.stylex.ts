@@ -34,6 +34,15 @@ export const colors = stylex.defineVars({
   // both themes (the selected segment of a segmented control).
   '--surface-raised': 'hsla(48, 30%, 98%, 1)',
 
+  // The Juno panel, a secondary surface like a macOS inspector: a step
+  // below the page in light (between the sidebar and the chips), a step
+  // above it in dark, so it separates without a border and the composer
+  // field and Juno's bubbles read on it. No accent in it.
+  '--panel-surface': 'hsla(48, 22%, 95.5%, 1)',
+  // Juno's bubble on the panel: lighter than the panel in light, as the
+  // field is; in dark the usual hover surface already is.
+  '--panel-bubble': 'hsla(48, 40%, 99%, 1)',
+
   // Secondary fills: secondary buttons, selected rows, chips, tiles.
   '--secondary-default': 'hsla(48, 30%, 92%, 1)',
   '--secondary-hover': 'hsla(48, 30%, 90%, 1)',
@@ -46,11 +55,27 @@ export const colors = stylex.defineVars({
   '--border-strongest': 'hsla(48, 30%, 82%, 1)',
   '--input-border': 'hsla(48, 14%, 82%, 1)',
 
+  // The tab strip, a step below the sidebar so the page-coloured active tab
+  // stands out of it, as in Safari and Finder. Inactive tabs are the strip;
+  // a hovered one takes --tab-hover, and a thin divider separates two
+  // inactive neighbours.
+  '--tab-strip': 'hsla(48, 26%, 94%, 1)',
+  '--tab-hover': 'hsla(48, 24%, 90.5%, 1)',
+  '--tab-divider': 'hsla(48, 14%, 80%, 1)',
+
   // Foreground. Warm neutrals, never pure black. Muted is darkened from the
   // handoff's 52% to 42% lightness so meta text reaches 4.5:1 on paper.
   '--foreground-default': 'hsla(48, 15%, 12%, 1)',
   '--foreground-subtle': 'hsla(48, 8%, 35%, 1)',
   '--foreground-muted': 'hsla(48, 5%, 42%, 1)',
+  // The middle step of a list row's three text levels (title, this, meta):
+  // the sidebar preview. It sits between default and muted in both themes;
+  // subtle is too close to muted in light to read as its own level.
+  '--foreground-secondary': 'hsla(48, 8%, 28%, 1)',
+  // Muted text on a secondary fill (a selected row), where light muted
+  // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
+  // its step below the preview.
+  '--foreground-muted-on-fill': 'hsla(48, 8%, 35%, 1)',
 
   // Ink accent. The default accent theme points --hl at this.
   '--accent-default': 'hsla(48, 30%, 8%, 1)',
@@ -180,14 +205,15 @@ export const chat = stylex.defineVars({
   },
   // How far a reaction badge sits out over its bubble's top corner.
   '--reaction-offset': '10px',
-  // The Juno panel's material: the surface with a breath of the accent, so
-  // it reads as Juno's without colouring anything in it. Beside a topic it
-  // sits on the page colour alone, so it is drawn opaque and costs nothing
-  // to composite. Over the topic (a narrow window) it is the same fill, let
+  // The Juno panel's material (`--panel-surface`). Beside a topic it sits
+  // on the page colour alone, so it is drawn opaque and costs nothing to
+  // composite. Over the topic (a narrow window) it is the same fill, let
   // through and blurred like a macOS inspector; the header band fades the
   // list into the opaque fill.
-  '--panel-fill': `color-mix(in oklch, ${accent['--hl']} 1.5%, ${colors['--surface-default']})`,
-  '--panel-glass': `color-mix(in oklch, ${accent['--hl']} 1.5%, color-mix(in oklch, ${colors['--surface-default']} 80%, transparent))`,
+  '--panel-fill': colors['--panel-surface'],
+  '--panel-glass': `color-mix(in oklch, ${colors['--panel-surface']} 80%, transparent)`,
+  // Juno's bubble and the status bubble; the panel sets `--panel-bubble`.
+  '--juno-bubble-bg': colors['--surface-hover'],
   '--panel-backdrop': 'blur(24px) saturate(1.6)',
 })
 
@@ -340,6 +366,9 @@ export const shadows = stylex.defineVars({
   // The Juno panel floating over the page: a hairline ring, a tight contact
   // shadow and two wide soft ones, so it lifts without a border.
   '--panel-shadow': '0 0 0 1px oklch(0 0 0 / 0.05), 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 8px 24px -6px oklch(0 0 0 / 0.08), 0 24px 56px -12px oklch(0 0 0 / 0.12)',
+  // The active tab lifted out of the strip: a soft shadow up and to the
+  // sides only, so nothing falls on the page it joins.
+  '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.08)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -808,8 +837,6 @@ export const sizes = stylex.defineVars({
   '--control-22': '22px',
   '--control-24': '24px',
   '--topic-time-width': '48px',
-  '--topic-people-width': '60px',
-  '--topic-tags-width': '76px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
   '--control-26': '26px',
@@ -875,6 +902,8 @@ export const sizes = stylex.defineVars({
   '--slider-width': '200px',
   '--unread-dot': '5px',
   '--tab-unread-dot': '6px',
+  // The divider between two inactive tabs, centred on their height.
+  '--tab-divider-height': '16px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
   // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).

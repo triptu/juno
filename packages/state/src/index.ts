@@ -14,6 +14,7 @@ export {
   type AllTopicsLayout,
 } from './allTopics'
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
+export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
 export {
@@ -73,6 +74,7 @@ export {
   scrollSnapshotAtom,
   setPinned,
   settleNewChat,
+  acknowledgeTopic,
   tabByNumber,
   tabsAtom,
   tabShowing,
@@ -80,6 +82,7 @@ export {
   tabTopic,
   topicPlace,
   updateTabs,
+  setNewChat,
   type OpenOptions,
   type JunoTabPage,
   type Place,
@@ -171,7 +174,6 @@ export {
   type ToastContent,
 } from './undo'
 export {
-  catchUpDoneAtom,
   flashMessage,
   focusJunoComposer,
   JUNO_TAB_ABOUT,
@@ -206,7 +208,9 @@ export {
   PALETTE_RECENT,
   PALETTE_RESULTS,
   PALETTE_SLACK_RESULTS,
+  paletteConversationsAtom,
   paletteOpenAtom,
+  paletteTabAtom,
   readCommand,
   searchAtom,
   searchSlackMessages,

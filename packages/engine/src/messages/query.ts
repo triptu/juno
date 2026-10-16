@@ -155,7 +155,16 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const statement = pendingStatement(target)
       for (const row of yield* sql.unsafe<PendingRow>(statement.sql, statement.params)) pending.set(pendingRowId(row.client_msg_id), row)
     }
-    const withPending: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+    const ownRoots = new Map<string, string>()
+    const clients = [...stored.flatMap(row => row.client_msg_id === null ? [] : [row.client_msg_id]), ...[...pending.values()].map(row => row.client_msg_id)]
+    if (target.kind === 'main' && clients.length > 0) {
+      for (const root of yield* sql<{ client_msg_id: string; topic_id: string; root_ts: string | null }>`SELECT client_msg_id, topic_id, root_ts FROM started_threads
+        WHERE channel = ${target.channel} AND client_msg_id IN ${sql.in(clients)}`) {
+        ownRoots.set(root.root_ts ?? pendingRowId(root.client_msg_id), root.root_ts === null ? root.topic_id : `t:${target.channel}:${root.root_ts}`)
+      }
+    }
+    const threadId = (row: WindowMessage) => ownRoots.get(row.ts) ?? threadTopicId(target.channel as ChannelId, row.ts as Ts)
+    const withPending: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => ({ ...pendingMessage(row, selfId), ...(ownRoots.has(pendingRowId(row.client_msg_id)) ? { thread_ts: pendingRowId(row.client_msg_id) } : {}) }))]
     // A network copy of a post that shares files is hidden but not deleted (ADR 0014).
     const hiddenCopies = withPending.length === 0 ? [] : yield* sql.unsafe<{ ts: string }>(hiddenCopiesStatement(target.channel).sql, hiddenCopiesStatement(target.channel).params)
     const hidden = new Set(hiddenCopies.map((row) => row.ts))
@@ -187,7 +196,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const titles = new Map<string, { readonly manual_title: string | null; readonly ai_title: string | null }>()
     let conversation: ConversationInfo | undefined
     if (target.kind === 'main') {
-      const linked = rows.filter((row) => row.reply_count > 0 && row.thread_ts === row.ts).map((row) => threadTopicId(target.channel as ChannelId, row.ts as Ts))
+      const linked = rows.filter((row) => row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts))).map(threadId)
       if (linked.length > 0) {
         const statement = threadTitlesStatement(linked)
         for (const title of yield* sql.unsafe<{ topic_id: string; manual_title: string | null; ai_title: string | null }>(statement.sql, statement.params)) titles.set(title.topic_id, title)
@@ -266,7 +275,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       previous = group
       const intent = intentOf(actions, row)
       const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions)
-      const topicId = target.kind === 'main' && row.reply_count > 0 && row.thread_ts === row.ts ? threadTopicId(target.channel as ChannelId, row.ts as Ts) : undefined
+      const topicId = target.kind === 'main' && row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts)) ? threadId(row) : undefined
       const title = topicId === undefined ? undefined : titles.get(topicId)
       const key = [
         row.version,

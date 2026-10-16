@@ -111,6 +111,8 @@ export type ContextMenuLeaf =
       readonly enabled?: boolean
       /** Draws a checkmark beside the item (the current Notify me choice). */
       readonly checked?: boolean
+      /** A second, smaller line under the label (macOS 14.4 and later). */
+      readonly sublabel?: string
       /** Shown in the shortcut column, in Electron's accelerator form ("CommandOrControl+W"). Display only. */
       readonly accelerator?: string
     }

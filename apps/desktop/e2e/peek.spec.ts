@@ -8,7 +8,7 @@ import { expect, test } from './fixtures'
 test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 /**
  * A text field with focus. The composer is not built yet (M6), so a plain

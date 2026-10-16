@@ -32,11 +32,11 @@ import { watchSentMessage } from './sentSuggestions'
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
  * Resolves with the `Exit`; on success, the topic.
  */
-export const sendMessage = async (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>) => {
+export const sendMessage = async (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>, startThread = false) => {
   const clientMsgId = crypto.randomUUID()
   const sentAt = performance.now()
   const exit = await runCommand(registry, messagesSend, {
-    to, text, clientMsgId,
+    to, text, startThread, clientMsgId,
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })

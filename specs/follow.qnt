@@ -19,13 +19,13 @@ module followProtocol {
   type Fetch = { key: int, value: int, at: int, version: int, kind: str }
 
   var s: {
-    clock: int, eventClock: int,
+    clock: int, eventClock: int, localRoots: Set[int],
     local: int -> int, server: int -> int, serverAt: int -> int,
     observedAt: int -> int, updatedEvent: int -> int,
     intent: int -> int, previous: int -> int, wroteAt: int -> int,
     accepted: int -> int, unfollowAt: int -> int, commanded: Set[int],
     pending: Set[int], noted: Set[int], refresh: Set[int], failed: Set[int], success: Set[int],
-    activity: Set[int], stale: Set[int], events: Set[Event], fetches: Set[Fetch],
+    activeWindow: Set[int], activity: Set[int], stale: Set[int], events: Set[Event], fetches: Set[Fetch],
     connected: bool, duePass: bool, catchup: bool,
     scan: List[int], phase: str, listed: Set[int], passAt: int, pageDone: bool,
     sealed: bool, label: str, target: int, failedVersion: int, before: int
@@ -34,7 +34,7 @@ module followProtocol {
 
   action init = all {
     s' = {
-      clock: 0, eventClock: 0,
+      clock: 0, eventClock: 0, localRoots: Set(),
       local: threads.mapBy(k => if (window.contains(k)) 1 else -1),
       server: threads.mapBy(k => if (window.contains(k)) 1 else 0),
       serverAt: threads.mapBy(_ => 0), observedAt: threads.mapBy(_ => 0),
@@ -42,12 +42,27 @@ module followProtocol {
       previous: threads.mapBy(_ => -1), wroteAt: threads.mapBy(_ => 0),
       accepted: threads.mapBy(_ => 0), unfollowAt: threads.mapBy(_ => 0), commanded: Set(),
       pending: Set(), noted: Set(), refresh: Set(), failed: Set(), success: Set(), activity: Set(),
-      stale: threads.exclude(window), events: Set(), fetches: Set(), connected: true, duePass: true, catchup: false,
+      activeWindow: window, stale: threads.exclude(window), events: Set(), fetches: Set(), connected: true, duePass: true, catchup: false,
       scan: List(), phase: "idle", listed: Set(), passAt: 0, pageDone: false,
       sealed: false, label: "init", target: 0, failedVersion: 0, before: -1
     },
     remaining' = drainLimit
   }
+
+  // A New chat root is followed locally before Slack follows its author on a reply.
+  action authoredRoot(k: int): bool = all {
+    not(s.sealed), s.local.get(k) == -1,
+    s' = { ...s, localRoots: s.localRoots.union(Set(k)), local: s.local.set(k, 1),
+      server: s.server.set(k, 0), activity: s.activity.union(Set(k)), stale: s.stale.exclude(Set(k)), label: "authoredRoot", target: k }
+  }
+
+  action authoredRootStep = tick(
+    if (s.sealed) progress(true, true, false, true) else
+    if (s.label == "init") authoredRoot(3) else
+    if (s.label == "authoredRoot") startFetch(3, "root") else
+    if (s.label == "startFetch") { nondet f = s.fetches.oneOf(); finishFetch(f, true) } else
+    if (s.label == "finishFetch") seal else progress(true, true, false, true)
+  )
 
   action localChange(k: int, value: int): bool = all {
     not(s.sealed), not(s.pending.contains(k)), not(s.refresh.contains(k)),
@@ -100,6 +115,7 @@ module followProtocol {
     not(s.sealed), s.events.size() < eventLimit,
     s' = { ...s, eventClock: s.eventClock + 1, server: s.server.set(k, value),
       serverAt: s.serverAt.set(k, s.eventClock + 1),
+      localRoots: if (source == "reply" or source == "officialFollow") s.localRoots.exclude(Set(k)) else s.localRoots,
       activity: if (source == "reply") s.activity.union(Set(k)) else s.activity,
       events: if (s.connected) s.events.union(Set({ key: k, value: value, at: s.eventClock + 1, kind: source })) else s.events,
       label: source, target: k }
@@ -148,7 +164,8 @@ module followProtocol {
   action finishFetch(f: Fetch, guard: bool): bool = {
     val present = f.value != -1 and (f.kind != "view" or f.value == 1)
     val newer = not(guard) or f.at > s.observedAt.get(f.key)
-    val applies = present and newer and not(s.pending.contains(f.key))
+    val ownRoot = s.localRoots.contains(f.key) and not(s.commanded.contains(f.key)) and f.value == 0
+    val applies = present and newer and not(s.pending.contains(f.key)) and not(ownRoot)
     val forget = f.kind == "failure" and f.value == 0 and s.previous.get(f.key) == -1
     val keepUnknown = s.local.get(f.key) == -1 and f.value == 0 and (f.kind == "root" or f.kind == "lookup")
     val value = if (forget or keepUnknown) -1 else f.value
@@ -199,7 +216,7 @@ module followProtocol {
 
   // Passage of the quiet window can make an old observation stale.
   action age(k: int): bool = all {
-    not(s.sealed), not(window.contains(k)),
+    not(s.sealed), not(s.activeWindow.contains(k)),
     s' = { ...s, activity: s.activity.exclude(Set(k)), stale: s.stale.union(Set(k)), label: "age", target: k }
   }
   // Thread 3 starts outside the window. A reply makes it active; a stale
@@ -223,7 +240,13 @@ module followProtocol {
   action hourlyPass = all {
     not(s.sealed), not(s.duePass), s' = { ...s, duePass: true, label: "hourlyPass" }
   }
-  val covered = window.union(s.activity)
+  // Window changes wait for the work permit; the next pass uses the new scope.
+  action widenWindow = all {
+    not(s.sealed), s.phase == "idle", s.fetches.size() == 0,
+    s.activeWindow != threads,
+    s' = { ...s, activeWindow: threads, duePass: true, label: "widenWindow" }
+  }
+  val covered = s.activeWindow.union(s.activity)
   pure def ordered(selected: Set[int]): List[int] = List(1, 2, 3).select(k => selected.contains(k))
   // A reconnect reads only recent activity, and never probes missing rows.
   action startScan = all {
@@ -262,7 +285,7 @@ module followProtocol {
   val quiet = s.connected and settledWork and s.phase == "idle" and not(s.duePass) and not(s.catchup)
   // Unknown is retained for an unfollowed root that never had a row. This
   // predicate describes storage agreement; it is not the sidebar's read rule.
-  val agreed = covered.forall(k => s.local.get(k) == s.server.get(k) or (s.local.get(k) == -1 and s.server.get(k) == 0))
+  val agreed = covered.forall(k => s.local.get(k) == s.server.get(k) or (s.local.get(k) == -1 and s.server.get(k) == 0) or (s.localRoots.contains(k) and not(s.commanded.contains(k)) and s.local.get(k) == 1 and s.server.get(k) == 0))
   val quietAgreement = s.sealed and quiet implies agreed
   val pendingIntentWins = threads.forall(k => s.pending.contains(k) implies s.local.get(k) == s.intent.get(k))
   // The strong property the three guards exist for; its bug schedules show each one.
@@ -279,7 +302,8 @@ module followProtocol {
     implies s.local.get(s.target) == s.server.get(s.target)
   val reachedAgreement = s.sealed and quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
-  val invariants = pendingIntentWins and acceptedUnfollow and quietAgreement and failedCallReverted and
+  val authorFollowSurvivesPage = s.label == "finishFetch" and s.localRoots.contains(s.target) and not(s.commanded.contains(s.target)) implies s.local.get(s.target) == 1
+  val invariants = authorFollowSurvivesPage and pendingIntentWins and acceptedUnfollow and quietAgreement and failedCallReverted and
     missingChangesNothing and unknownStaysUnknown and fallbackKeepsLatestEvent and drainBound
 
   action work(fetchGuard: bool, eventGuard: bool): bool = any {
@@ -303,7 +327,7 @@ module followProtocol {
     nondet value = Set(0, 1).oneOf()
     any {
       subscribe(k), unsubscribe(k), officialFollow(k, value), reply(k), threadMarked(k),
-      otherReply(k), age(k), undatedEvent(k), reject(k), failLookup(k), missingRoot(k), disconnect, hourlyPass, seal,
+      otherReply(k), age(k), undatedEvent(k), reject(k), failLookup(k), missingRoot(k), disconnect, hourlyPass, widenWindow, seal,
       all { s.phase == "idle", startFetch(k, "root") }
     }
   }
@@ -457,6 +481,13 @@ module followProtocol {
     if (s.label == "officialFollow") reconnect else
     if (s.label == "reconnect" and activity) otherReply(3) else
     if (s.label == "reconnect" or s.label == "otherReply") seal else progress(true, true, false, true)
+  )
+  action widerWindowStep = tick(
+    if (s.sealed) progress(true, true, false, true) else
+    if (s.label == "init") disconnect else
+    if (s.label == "disconnect") officialFollow(3, 1) else
+    if (s.label == "officialFollow") widenWindow else
+    if (s.label == "widenWindow") seal else progress(true, true, false, true)
   )
   action oldFollowActivityStep = oldFollow(true)
   action oldFollowQuietStep = oldFollow(false)
