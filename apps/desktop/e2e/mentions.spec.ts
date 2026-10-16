@@ -11,7 +11,7 @@ const ENG_MAIN = '#eng'
 const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: string; readonly args: Record<string, unknown> }> }) =>
   fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => String(call.args['text']))
 
-test('mention a person in a reply: it posts as <@U…> and shows as a mention', async ({ juno, fake }) => {
+test('mention a person in a reply: Backspace removes it whole, and it posts as <@U…> and shows as a mention', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
@@ -32,7 +32,18 @@ test('mention a person in a reply: it posts as <@U…> and shows as a mention', 
   await expect(topic.composerChips).toHaveText(['@Maya'])
   await expect(topic.composerChips.first()).toHaveAttribute('data-mark', 'person')
 
-  await topic.composer.pressSequentially('the plan works.')
+  // Backspace into the picked name removes it whole, and ⌘Z brings it back, chip and all.
+  await topic.composer.press('Backspace')
+  await expect(topic.composer).toHaveValue('Thanks @Maya')
+  await topic.composer.press('Backspace')
+  await expect(topic.composer).toHaveValue('Thanks ')
+  await expect(topic.composerChips).toHaveCount(0)
+  await topic.composer.press('ControlOrMeta+z')
+  await expect(topic.composer).toHaveValue('Thanks @Maya')
+  await expect(topic.composerChips).toHaveText(['@Maya'])
+
+  await topic.composer.press('End')
+  await topic.composer.pressSequentially(' the plan works.')
   await topic.composer.press('Enter')
   await topic.expectSent('Thanks')
   expect(postedText(fake).at(-1)).toBe('Thanks <@U0MAYA> the plan works.')
@@ -127,28 +138,6 @@ test('arrows move through the list, and Esc closes it and keeps the text', async
   expect(postedText(fake).at(-1)).toBe('@march')
 })
 
-test('Backspace into a picked name removes it whole', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
-  await juno.sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-
-  await topic.composer.pressSequentially('Hi @le')
-  await expect(topic.suggestion('Leo')).toBeVisible()
-  await topic.composer.press('Enter')
-  await expect(topic.composer).toHaveValue('Hi @Leo ')
-  await topic.composer.press('Backspace')
-  await expect(topic.composer).toHaveValue('Hi @Leo')
-  await topic.composer.press('Backspace')
-  await expect(topic.composer).toHaveValue('Hi ')
-  await expect(topic.composerChips).toHaveCount(0)
-  // ⌘Z brings it back, chip and all.
-  await topic.composer.press('ControlOrMeta+z')
-  await expect(topic.composer).toHaveValue('Hi @Leo')
-  await expect(topic.composerChips).toHaveText(['@Leo'])
-})
-
 test('a draft keeps its mentions across tab switches', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
@@ -193,7 +182,14 @@ test('suggestions in New chat, before and after picking where it goes', async ({
   await newChat.composer.press('Enter')
   await expect(newChat.composer).toHaveValue('Pairing with @Leo in #platform ')
 
+  // Colon emoji work here too, picked with Tab.
+  await newChat.composer.pressSequentially(':smi')
+  await expect(newChat.suggestions).toBeVisible()
+  await newChat.composer.press('Tab')
+  await expect(newChat.composer).toHaveValue('Pairing with @Leo in #platform 😄 ')
+  await expect(newChat.composer).toBeFocused()
+
   await newChat.send()
   await topic.expectMessage('Pairing with')
-  expect(postedText(fake).at(-1)).toBe('Pairing with <@U0LEO> in <#C0PLATFORM|platform>')
+  expect(postedText(fake).at(-1)).toBe('Pairing with <@U0LEO> in <#C0PLATFORM|platform> 😄')
 })

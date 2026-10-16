@@ -158,6 +158,12 @@ function wordCount(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length
 }
 
+/** The longest message the checks on send read, in Unicode characters (spec section 8). */
+export const CHECKED_MAX_CHARS = 1000
+
+/** Whether the checks on send look at `text` at all: grammar, local fixes and routing skip empty and overlong messages. */
+export const sendChecksApply = (text: string): boolean => text.trim() !== '' && [...text].length <= CHECKED_MAX_CHARS
+
 /** Runs the check. Returns `undefined` when there is nothing to say, so the message just sends. */
 export function clarityCheck(text: string, prefs: ClarityPrefs = {}): ClarityResult | undefined {
   const fixes: ClarityFix[] = []

@@ -2,7 +2,8 @@
 // seed, 300 ms per call (live calls took 257 to 446 ms) and the production
 // request pacing. The sidebar shows rows within the quick-start budget
 // (performance.md, "First sync"), then keeps filling in while the
-// background lane reads history, with no reload.
+// background lane reads history, with no reload. The preview test needs busy
+// channels, not the budget's size, so it uses a smaller seed.
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,10 +16,11 @@ const QUICK_START_BUDGET_MS = 5_000
 const PREVIEW_BUDGET_MS = 10_000
 const LATENCY_MS = 300
 
-const large = test.extend({
+/** A first sign-in against a seed of this size, with live latency and pacing. */
+const signInOn = (seed: Parameters<typeof largeSeed>[0]) => test.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: largeSeed(), latencyMillis: LATENCY_MS })
+    const fake = await startFakeSlack({ seed: largeSeed(seed), latencyMillis: LATENCY_MS })
     await use(fake)
     await fake.close()
   },
@@ -33,6 +35,11 @@ const large = test.extend({
     await running.close()
   },
 })
+
+/** The budget is for the large seed. */
+const large = signInOn({})
+/** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */
+const medium = signInOn({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } })
 
 large('first sign-in shows threads, channels and DMs within the budget, then fills in without a reload', async ({ juno }) => {
   test.setTimeout(180_000)
@@ -62,7 +69,7 @@ large('first sign-in shows threads, channels and DMs within the budget, then fil
   await expect.poll(withPreview, { timeout: 120_000 }).toBeGreaterThan(previewsAtStart)
 })
 
-large('the busiest channels show a preview seconds after sign-in, before their history is read', async ({ juno, fake }) => {
+medium('the busiest channels show a preview seconds after sign-in, before their history is read', async ({ juno, fake }) => {
   test.setTimeout(120_000)
   // History waits: any channel preview now comes from the preview search after the quick start.
   fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })

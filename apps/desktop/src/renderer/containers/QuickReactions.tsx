@@ -9,9 +9,8 @@ import { composerEmojiAtom, quickReactionsAtom, registry, setQuickReactions } fr
 import { useAtomValue } from '@juno/state/react'
 import { QuickReactionsSetting } from '@juno/views'
 import { chunk } from './chunks'
-import { customEmoji } from './emojiSuggestions'
 import { frequentEmoji } from './recentEmoji'
-import type { QuickReaction } from '@juno/contract'
+import { customEmoji, type QuickReaction } from '@juno/contract'
 
 const pickerChunk = chunk(() => import('./QuickReactionPicker'))
 const QuickReactionPicker = pickerChunk.component((module) => module.default)

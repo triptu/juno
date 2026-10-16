@@ -5,7 +5,9 @@ const POSTGRES = 'Draft plan is in the doc'
 const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: string; readonly args: Record<string, unknown> }> }) =>
   fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => String(call.args['text']))
 
-test('colon suggestions insert Unicode in a reply and send it to Slack', async ({ juno, fake }) => {
+// Which emoji match and in what order, and that a colon inside a word starts no list, are domain rules
+// (packages/domain/test/composer-emoji.test.ts). New chat's Tab pick is in mentions.spec.ts.
+test('colon suggestions insert Unicode in a reply and send it to Slack; in Main, Esc keeps the colon text and a closing colon converts it', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
@@ -18,13 +20,9 @@ test('colon suggestions insert Unicode in a reply and send it to Slack', async (
   await expect(topic.composer).toHaveValue('Looking good 😄 ')
   await topic.composer.press('Enter')
   await expect.poll(() => postedText(fake).at(-1)).toBe('Looking good 😄')
-})
 
-test('Esc keeps colon text; an exact closing colon converts it in Main', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
-  const { topic } = juno
+  await topic.expectTitle('Main')
   await topic.composer.pressSequentially(':smi')
   await expect(topic.suggestions).toBeVisible()
   await topic.composer.press('Escape')
@@ -34,22 +32,6 @@ test('Esc keeps colon text; an exact closing colon converts it in Main', async (
   await expect(topic.composer).toHaveValue('😄')
   await topic.composer.press('Enter')
   await expect.poll(() => postedText(fake).at(-1)).toBe('😄')
-})
-
-test('New chat supports Tab and leaves colons inside words alone', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.tabs.menu('new-chat')
-  const field = juno.newChat.composer
-  await field.pressSequentially('time:smi')
-  await expect(juno.newChat.suggestions).toHaveCount(0)
-  await field.fill(':s')
-  await expect(juno.newChat.suggestions).toHaveCount(0)
-  await field.pressSequentially('mi')
-  await expect(juno.newChat.suggestions).toBeVisible()
-  await field.press('Tab')
-  await expect(field).toHaveValue('😄 ')
-  await expect(field).toBeFocused()
 })
 
 test('workspace emoji and aliases show images and send shortcodes', async ({ juno, fake }) => {

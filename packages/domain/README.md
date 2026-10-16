@@ -11,7 +11,8 @@ Pure product rules. No I/O, no Effect services, no React. The same code runs in 
 - The shared vocabulary as `Schema.Literals`, declared once here and re-exported by `@juno/contract` for the wire: `ConversationKind`, `ContextTint`, `TopicKind`, `RowTag`, `AllTopicsStatus`, `ChannelIcon` and `ChannelColor`. A channel's default icon and hue (`defaultChannelStyle`, `defaultPersonColor`) use the keys `@juno/ui` draws (`channelIcons`, `hueNames`), so no layer translates them.
 - `reindexTopics` inputs: the topic index row computed from source rows.
 - The read-state merge rule and the notification decision order.
-- Clarity and audience checks before send.
+- Clarity and audience checks before send, and which messages the checks read (`sendChecksApply`: not empty, at most 1,000 characters).
+- The composer's colon emoji: the query at the caret, custom emoji with aliases resolved, and ranking (`composer-emoji.ts`).
 - `frequentDestinations`: New chat’s six destinations, ranked by decayed own sends and filled by activity.
 - `rankConversations`: the same ranking over any uses (own sends and topic visits), uncapped, for the ⌘K Conversations tab.
 - The command palette grammar (`parseCommand`, with `confidenceLabel`), mention detection, context menu item lists.
