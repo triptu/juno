@@ -595,6 +595,15 @@ the trace must contain more than 100 measured frames in each mode. Both
 values remain in the run log, and either timing failure fails the run.
 The ordinary gate remains unchanged despite its documented noise.
 
+One `pnpm perf -g scroll` run on this branch measured ordinary / held-clock
+p95 of 10.1 / 5.2 ms (sidebar), 14.8 / 6.0 ms (All topics), 10.5 / 2.7 ms
+(messages), and 9.4 / 4.0 ms (chat). All held-clock gates passed; all ordinary
+gates failed. All topics also recorded four long animation frames. Every
+structural ceiling and dropped-frame limit passed. The exclusive lock was
+held throughout; load at each scroll reading was 3.4–4.5. This single run
+confirms the gates execute, not the cause of the ordinary tail. The log is
+`.juno-status/perf-gates-1017/scroll.log`.
+
 ### Engine speed measurements (2026-10-15)
 
 Five alternating baseline/revised runs on the shared Apple M2, through the
