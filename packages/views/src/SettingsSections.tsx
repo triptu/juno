@@ -37,7 +37,7 @@ export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPee
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
         </Surface>
       </Section>
-      <Section heading="AI assist" sub="Use a fast model for decisions. Turn this off to use the decision chat model.">
+      <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <Checkbox label="Use fast classifier" checked={classifier} onChange={(event) => onClassifierChange(event.currentTarget.checked)} />
         </Surface>
