@@ -21,19 +21,7 @@ export { type SlackCookie } from './cookies.ts'
 export { LocalConfigTeam, pickTeam } from './localConfig.ts'
 export { snappyUncompress } from './snappy.ts'
 
-export {
-  COOKIES_FILES,
-  copySlackAppData,
-  KEYCHAIN_SERVICE,
-  LOCAL_STORAGE_DIR,
-  locateSlackAppData,
-  slackAppCandidates,
-  type CookiesFile,
-  type SlackAppCandidate,
-  type SlackAppData,
-  type SlackAppLocation,
-  type SlackAppVariant,
-} from './locate.ts'
+export { copySlackAppData, KEYCHAIN_SERVICE, locateSlackAppData, slackAppCandidates, type SlackAppCandidate } from './locate.ts'
 
 export const SESSION_COOKIE = 'd'
 
