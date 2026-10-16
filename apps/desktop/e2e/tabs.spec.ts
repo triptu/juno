@@ -3,7 +3,8 @@
 // closing focuses the neighbour and never leaves no tab, what a new tab
 // opens, where "+" sits, the app menu's tab items, the row menu's Open in
 // new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
-// each tab shows its topic's art or the DM person's photo.
+// each tab shows its topic's art or the DM person's photo, and a tab not
+// viewed for a day closes by itself.
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
@@ -217,6 +218,30 @@ test('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno
   // The DM photo is the URL the sidebar row shows, so it was loaded already.
   const rowPhoto = await sidebar.row('Maya', { exact: true }).root.locator('img').first().getAttribute('src')
   await expect(tabs.tile('Maya')).toHaveAttribute('src', rowPhoto ?? '')
+})
+
+test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a tab with a draft stays', async ({ juno, win }) => {
+  // The sweep runs hourly on the page's clock, so install the fake one before any tab is viewed.
+  await win.clock.install()
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(POSTGRES).open()
+  await sidebar.row(RINA).openInNewTab()
+  await topic.composer.fill('Half a thought about the onsite')
+  // Let the draft save.
+  await win.waitForTimeout(800)
+  await sidebar.row(ROADMAP).openInNewTab()
+  await tabs.expectActive(ROADMAP)
+
+  // A day and an hour later: the tab left a day ago closes, the one with a draft and the active one stay.
+  await win.clock.fastForward('25:00:00')
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+  await tabs.expectActive(ROADMAP)
+
+  await tabs.menu('reopen-tab')
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+  await tabs.expectActive(POSTGRES)
 })
 
 test.describe('one topic in two tabs', () => {
