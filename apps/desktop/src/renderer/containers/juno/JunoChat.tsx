@@ -5,7 +5,7 @@ import { junoDraftAtom, nowAtom, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useReactionPicker, useRemoval } from './chatActions'
-import { useBubbleMeasure, useChatPosition, useChatTarget, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
+import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 
 /** Times change at most at a day boundary; re-render for it this often. */
@@ -74,7 +74,6 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const { toBottom, send } = useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
-  useChatTarget(column, positioned, items, scrollRef, pinnedRef, setWindow)
   const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval })
 
   return (

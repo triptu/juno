@@ -99,7 +99,7 @@ export const notificationsStatus = liveValueRoute('notifications.status', { valu
  */
 export const Why = Schema.Struct({
   notified: Schema.Boolean,
-  /** "Notified you at 13:42", "Didn't notify you", "In the 9am summary". */
+  /** "Notified you at 13:42", "Didn't notify you". */
   title: Schema.String,
   reason: Schema.String,
   action: Schema.Union([

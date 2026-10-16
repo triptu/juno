@@ -402,7 +402,6 @@ Juno speaks on its own only about things you set up: schedules you asked for, pr
   - **From the menu.** Tell me if nobody replies in your own message's menu (section 7) sets the watch at once, without asking Juno: your click is the approval. A reply from anyone but you counts. The wait is one notification day: the same time on your next notification day, or the start of your notification hours if that time falls outside them. A toast says "Watching for a reply until Thu 9:00 · Undo", and the chat shows the watch as a Schedule card. To change the time or who must reply, reply to the card or just say so. The item is disabled while Juno is paused or working on your other Mac.
   - A reply ends the watch quietly. If the wait runs out with no reply, Juno says so and brings a Send message card with a nudge draft in that thread, written to sound like you. You can edit it, and it sends only on your click. If a reply arrives while the card is open, the card expires. Juno never sets a watch again on its own. Watches are listed on Scheduled with the schedules.
 - **The label.** A proactive group carries a small label ("Scheduled · Daily catch-up", "T3 Code · Fix the sidebar flake") with "Why this?" and one quiet action: "Pause schedule" on a schedule's group, "Mute updates" on a job's group. Mute updates stops Juno's updates about that job; the job runs on and stops only from its Task card.
-- **The summary when notification hours start** (section 14) also lands in the chat as one Juno message labelled "Summary", one line per message with a link to it. The app writes it from the list the notification counts, not the model, so it costs nothing.
 - **Nothing to say, nothing shown.** A wake that finds nothing worth saying shows nothing in the chat; Activity records that it ran.
 - **Delivery.** The chat always gets the message. Whether your Mac notifies follows section 14. A schedule either notifies or doesn't; there is no digest.
 
@@ -494,26 +493,26 @@ Destructive actions and purchases of Juno's own (a connection's delete tool asks
 Everything is always visible when you open Juno. Notification settings only decide when the operating system interrupts you, which is the main fix for constant pings during a manager's day. Juno's judgement does most of the work; you set a few things in plain words. Design: `docs/design/notifications/`.
 
 - **Two sets of hours**, each with days and a from and to time, both weekdays 9am to 7pm by default:
-  - **Notification hours.** Outside them your Mac does not notify. When they start, one notification sums up anything that would have notified you meanwhile, if there was any ("3 messages need you · In #eng, Maya Chen and #hiring"). The same summary is posted in the Juno chat (13.6), with a link to each message, and clicking the notification opens the chat at it. With AI assist off, clicking it opens the first of those messages. Juno also writes these hours to Slack's own notification schedule, so your phone goes quiet too (once verified, section 19).
+  - **Notification hours.** Outside them your Mac does not notify. Held messages stay in Juno. Starting notification hours or launching the app never sends a summary notification or posts a summary in the Juno chat. Juno also writes these hours to Slack's own notification schedule, so your phone goes quiet too (once verified, section 19).
   - **Active hours.** Inside them Slack shows you as active, outside as away. Juno sets presence at each switch, on launch and on wake. It can only do so while it runs: if it is closed when your active hours start, you stay away until you open it. The page says so in one line.
 - **Juno decides** each message inside notification hours: notify now, or hold. Held means no notification; the message is in Juno as always. There is no threshold to set.
 - **What matters to you** is a short text you write ("The launch and hiring. Anything from my reports that needs a decision today."). Juno reads it with every message.
 - **People, channels and threads** have three settings, chosen from their context menu (Notify me; for a thread also the header's topic menu, and what each choice does to following is in section 5): **Every message** (notifies, even outside notification hours), **When it matters** (the default: Juno decides) and **Never** (no notifications, still in Juno). There is no order: if a person and a channel disagree, Every message wins, so nothing important is silently lost.
 - **Away by hand.** The avatar menu's Set yourself away or Set yourself active changes presence until the next switch in your active hours.
 - **Why.** A message's context menu has "Why did this notify?" or "Why no notification?", with the reason in words ("#design-review is set to Never", "Juno: asks you to approve the release before 2pm"). A setting reason offers Change; a Juno reason offers Tell Juno, which opens the chat quoting the message. The page has one line for today ("4 messages interrupted you. Juno held 23.") with Show why, listing the messages that interrupted you.
-- **Say it to Juno.** "Stop pinging me about #design-review", "I'm off Friday", "Sam can always reach me" change these settings from the chat, with Undo (13.9). Extra digests are Juno schedules ("summarise what you held at 1pm on weekdays").
+- **Say it to Juno.** "Stop pinging me about #design-review", "I'm off Friday", "Sam can always reach me" change these settings from the chat, with Undo (13.9). Requested digests are Juno schedules ("summarise what you held at 1pm on weekdays").
 - **Corrections teach.** When you tell Juno a call was wrong ("that wasn't important", "this should have pinged me"), from Tell Juno or in your own words, Juno updates What matters to you so the next call like it goes the other way. It rewrites the text as a whole rather than adding to it, and shows the new text with Undo (13.9). If the correction may be a one-off, Juno may ask first. The text stays yours to edit on the Notifications page.
 - **AI assist off.** DMs and mentions notify inside notification hours, as in Slack. Every message and Never still apply.
 
-The order: ignored channel → Every message (thread, channel or person) → Never → outside notification hours (into the summary if it would have notified) → AI assist off (DMs and mentions) → Juno.
+The order: ignored channel → Every message (thread, channel or person) → Never → outside notification hours (hold) → AI assist off (DMs and mentions) → Juno.
 
 **Juno's own messages** (section 13.6) skip the people and channel settings and follow this table. The chat always gets the message; this only decides whether your Mac notifies.
 
 | Juno message | OS notification |
 | --- | --- |
 | A scheduled message | At its time, at any hour, since you set the time; or none if the schedule says so. Set from your words and editable on Scheduled |
-| A job needs a decision, failed, or has been quiet for 30 minutes | Now inside notification hours, in the summary outside them |
-| A job you started finished | Now inside notification hours, in the summary outside them |
+| A job needs a decision, failed, or has been quiet for 30 minutes | Now inside notification hours; no notification outside them |
+| A job you started finished | Now inside notification hours; no notification outside them |
 | A job started | None |
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:

@@ -661,7 +661,7 @@ The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (
 - **View (WP12).** `JunoBubble`'s inline renders `source` as the citation `TextButton` (`data-source`), with "#eng · 14:02" (the place and the message's time) as its tooltip. A click calls `onOpen` with the `message` target.
 - **Open (WP14).** `message` opens the topic that holds the message (its thread, or Main) at that message, in the current tab or a new one with ⌘, and flashes it. It reuses the open-topic path with a target `ts`.
 - **Prompt and eval.** The prompt says that claims about Slack carry a source. The eval adds the share of Slack claims with a source, and checks that no unresolved handle renders as a link.
-- **Hours-start summary** (decided 10-14 23:25). The engine's `hoursStartSummary` (M10) also hands its list to the agent through the host port (WP13). The agent appends one Juno message with origin `summary` and one `source` inline per message, with no run and no model call, so it costs no spend. Clicking the OS notification opens the Juno tab at that message. Contract (WP7): `Origin` gains `summary { at }`, labelled "Summary". With AI assist off there is no chat, and the click opens the first message.
+- **Hours-start summary**: removed by the owner on 10-16, reversing 10-14. Notification hours no longer produce a summary notification or chat message.
 - **Specs.** None.
 
 ### 19.2 Reply watches and the nudge draft (SPEC 13.6, principle 5)
@@ -719,5 +719,5 @@ The owner adopted six ideas from `docs/research/agent-native-chat-products.md` (
 ### 19.7 For the owner
 
 - The nudge draft is the one place Juno writes in the owner's voice. Principle 5 and SPEC 15 now say so.
-- Decided 10-14 23:25: the menu's watch is created in code with a default wait from a rule (one notification day), and asks no wait time; the hours-start summary is also a chat message, and its notification opens the chat there.
+- Decided 10-14 23:25: the menu's watch is created in code with a default wait from a rule (one notification day), and asks no wait time. The hours-start summary decision from that date was reversed by the owner on 10-16.
 - A correction that came through Tell Juno costs a click (a Change card), because the quoted message is Slack content. A correction typed without a quote needs none.
