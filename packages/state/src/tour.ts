@@ -1,14 +1,14 @@
 /**
  * The tour (SPEC 4.1): a few steps that show a Slack user how Juno is laid
- * out. It opens by itself once per workspace, over the app after the first
- * sign-in (and after "Set up Juno" when that shows), and again only when
- * the owner asks for it: Help › Show the Tour, ⌘K "Show the tour" or
- * Settings › About.
+ * out. It opens by itself over the app after a first sign-in made in this
+ * run (after "Set up Juno" when that shows), unless the workspace has seen
+ * it, and otherwise only when the owner asks for it: Help › Show the Tour,
+ * ⌘K "Show the tour" or Settings › About. A relaunch, or signing in again
+ * after Slack expired the session, never opens it.
  *
  * Seen is one workspace preference, `tourSeen`, written when the tour
  * closes by any way (Skip tour, Esc, Done). It lives in the workspace's
- * cache, so signing out, which deletes the cache, makes the next sign-in a
- * first one again.
+ * cache; signing out deletes the cache, so the next sign-in is a first one.
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
@@ -32,6 +32,13 @@ interface TourRequest {
 
 const tourRequestAtom = Atom.make<TourRequest>({ teamId: undefined, request: 'auto' }).pipe(Atom.keepAlive)
 
+/**
+ * A first sign-in started in this run (the sign-in page, not "Slack signed
+ * you out"): the tour may open by itself once it succeeds. Not kept across
+ * a relaunch.
+ */
+const tourAfterSignInAtom = Atom.make(false).pipe(Atom.keepAlive)
+
 /** The step on screen. Starts at the first each time the tour opens. */
 export const tourStepAtom = Atom.make(0).pipe(Atom.keepAlive)
 
@@ -44,9 +51,20 @@ export const tourOpenAtom = Atom.make((get): boolean => {
   if (teamId === undefined) return false
   const { teamId: forTeam, request } = get(tourRequestAtom)
   if (forTeam === teamId && request !== 'auto') return request === 'open'
+  if (!get(tourAfterSignInAtom)) return false
   const saved = get(savedTourSeenAtom)
   return AsyncResult.isSuccess(saved) && saved.value !== true
 })
+
+/**
+ * A sign-in is starting. From the sign-in page (`firstRun`) the tour may
+ * open once it succeeds, and the workspace's preference decides afresh:
+ * what was closed earlier in this run belonged to a session that has ended.
+ */
+export function tourAfterSignIn(registry: Registry, firstRun: boolean): void {
+  registry.set(tourAfterSignInAtom, firstRun)
+  if (firstRun) registry.set(tourRequestAtom, { teamId: undefined, request: 'auto' })
+}
 
 /** Opens the tour at its first step, seen or not. */
 export function showTour(registry: Registry): void {
