@@ -2,6 +2,7 @@ import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
 import { codexHome } from './codex'
@@ -146,6 +147,20 @@ const notifier = new Notifier({
 supervisor.onReady(() => notifier.engineReady())
 
 /**
+ * Whether the owner is at the Mac, so Slack shows them active (activity.ts). Under JUNO_E2E a test
+ * sets the idle time (`junoTest.systemIdle`); it starts at 0, a user at the Mac.
+ */
+let idleForTests = 0
+let screenLocked = false
+const activity = createActivityWatch({
+  idleSeconds: () => (e2e ? idleForTests : powerMonitor.getSystemIdleTime()),
+  locked: () => screenLocked,
+  send: (message) => supervisor.send(message),
+})
+// A new engine hears at once, not at the next poll.
+supervisor.onReady(() => activity.poll())
+
+/**
  * Whether macOS lets Juno notify (notificationPermission.ts). Under JUNO_E2E a test sets it
  * (`junoTest.notificationPermission`); a request then answers allowed, as if the user clicked Allow.
  */
@@ -219,6 +234,13 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   powerMonitor.on('resume', () => notifier.wake())
+  powerMonitor.on('lock-screen', () => {
+    screenLocked = true
+  })
+  powerMonitor.on('unlock-screen', () => {
+    screenLocked = false
+    activity.poll()
+  })
   const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
     updates,
@@ -255,6 +277,7 @@ app.whenReady().then(() => {
 
   // Fork the engine and open the window in the same tick; neither waits.
   supervisor.start()
+  activity.start()
   void providers.load()
   openWindow()
   updates.start()
@@ -289,6 +312,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  activity.stop()
   screenWatch.stop()
   updates.stop()
   supervisor.stop()
@@ -339,6 +363,11 @@ if (e2e) {
       },
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
       wake: () => notifier.wake(),
+      // The activity watch's seam: the Mac's idle time in seconds, read at once.
+      systemIdle: (seconds: number) => {
+        idleForTests = seconds
+        activity.poll()
+      },
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {
         sharedForTests = shared

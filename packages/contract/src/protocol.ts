@@ -82,6 +82,8 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('viewing', { topicId: Schema.NullOr(Schema.String) }),
   /** The Mac woke from sleep: apply the presence schedule again. */
   Schema.TaggedStruct('wake', {}),
+  /** The owner used the Mac in the last 20 s and the screen is not locked. Sent every 10 s while so. */
+  Schema.TaggedStruct('active', {}),
 ])
 export type MainToEngine = typeof MainToEngine.Type
 
