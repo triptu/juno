@@ -331,9 +331,9 @@ A full page in a tab, listing everything: quiet, resolved, unfollowed. On an emp
 
 ## 12. Home
 
-Home is a calm resting page: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three things that want you, an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Design: `docs/design/home/` (layout A).
+Home is a calm resting page: a small scene with Juno's mascot that changes with the time of day, a short greeting, at most three things that want you, an "Ask Juno…" field, and an all-caught-up scene when nothing needs you. Home has no link to All topics, which is in the sidebar. Design: `docs/design/home/` (layout A).
 
-On a cold visit, the greeting says "Syncing with Slack." and reserves space for the possible rows and the Browse link. Rows fill the reserved slots from the top as conversations land; a row shown never moves, so one that lands later goes below it even when it ranks higher. When sync finishes, the rows shown stay, the empty slots take the next items, and the space stays for the visit, so the greeting and Ask Juno field do not move. Later visits use the items available when Home opens.
+On a cold visit, the greeting says "Syncing with Slack." and reserves space for the possible rows. Rows fill the reserved slots from the top as conversations land; a row shown never moves, so one that lands later goes below it even when it ranks higher. When sync finishes, the rows shown stay, the empty slots take the next items, and the space stays for the visit, so the greeting and Ask Juno field do not move. Later visits use the items available when Home opens.
 
 - **Getting there.** Home is the first item in the sidebar navigation. It opens in a tab like any page: a plain click focuses a tab that shows it, and ⌘-click opens another (section 6). New tabs can open Home instead of a New chat (Settings › General).
 - **What wants you.** Each item is one row with a title line and a plain meta line. The kinds, ranked:

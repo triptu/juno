@@ -22,7 +22,7 @@ Files:
 
 Ship **A**. It keeps the calm of the current empty state and it is the one layout that still looks right at the minimum window size, with zero items, and with three. B is the better picture at 1400px and up but needs a breakpoint, and C turns a resting place into another list page. If the owner wants the figure larger, A can take the scene at 150px without any other change.
 
-The caught-up state uses A with no items: the sunk-back scene, "All caught up.", one line of reason, the ask field, and a quiet "Browse all topics" link as the next step (SPEC §16: empty states say why and offer one step).
+The caught-up state uses A with no items: the sunk-back scene, "All caught up.", one line of reason, and the ask field. It had a quiet "Browse all topics" link; it was removed on 10-17 because All topics is always in the sidebar.
 
 ## Copy
 

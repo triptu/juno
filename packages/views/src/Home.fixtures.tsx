@@ -15,7 +15,6 @@ const base: HomeProps = {
   line: 'Three things want you.',
   items: [homeItems.waiting, homeItems.resume, homeItems.moved],
   now: NOW,
-  caughtUp: false,
   enter: false,
   onOpen: noop,
   onMarkDone: noop,
@@ -23,7 +22,6 @@ const base: HomeProps = {
   onSort: noop,
   onItemMenu: noop,
   onAsk: noop,
-  onBrowseAll: noop,
 }
 
 const state = (props: Partial<HomeProps> = {}, frame?: FixtureFrame) => fixture<HomeProps>({ ...base, ...props }, frame)
@@ -58,7 +56,7 @@ export default defineFixtures(
       'short-window': state({ line: 'Two things want you.', items: [homeItems.waiting, homeItems.resume] }, { width: 720, height: 520, padded: false }),
     },
     Empty: {
-      'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', line: 'Nothing is waiting on you.', items: [], caughtUp: true }),
+      'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', line: 'Nothing is waiting on you.', items: [] }),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
       syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3 }),
       // Mid-sync: the rows that landed so far, with room kept for the rest.

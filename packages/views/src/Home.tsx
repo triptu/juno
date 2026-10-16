@@ -21,8 +21,6 @@ export interface HomeProps {
   /** Items whose button was used: the button is gone, its slot stays. */
   readonly done?: ReadonlySet<string>
   readonly now: number
-  /** Nothing waits: the "Browse all topics" link shows under the ask field when `onBrowseAll` is given. */
-  readonly caughtUp: boolean
   /** Play the entrance. False when Home comes back from a hidden tab. */
   readonly enter?: boolean
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
@@ -37,8 +35,6 @@ export interface HomeProps {
   readonly onAsk?: () => void
   /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
   readonly askLine?: string
-  /** "Browse all topics". Fires on mouse down; `event.metaKey` asks for a new tab. */
-  readonly onBrowseAll?: (event: ActivateEvent) => void
   /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
@@ -51,7 +47,7 @@ export interface HomeProps {
  * Every size is fixed before data arrives, so nothing moves when a title
  * line is rewritten: a title is one ellipsised line in a 52px row.
  */
-export function Home({ scene, title, line, items, done, now, caughtUp, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, onBrowseAll, loading = false, reservedItems = 0 }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, loading = false, reservedItems = 0 }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -95,11 +91,6 @@ export function Home({ scene, title, line, items, done, now, caughtUp, enter = t
             <Kbd look="key">⌘J</Kbd>
           </button>
         )}
-        {(caughtUp || reservedItems > 0) && onBrowseAll !== undefined ? (
-          <button type="button" {...activateHandlers<HTMLButtonElement>(onBrowseAll)} {...stylex.props(styles.quietLink, !caughtUp && styles.hidden, ...part())}>
-            Browse all topics
-          </button>
-        ) : null}
       </div>
     </div>
   )
@@ -256,7 +247,6 @@ const styles = stylex.create({
   line: {
     marginTop: spacing['--space-1-5'],
   },
-  hidden: { visibility: 'hidden' },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {
     display: 'flex',
@@ -400,25 +390,6 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     color: colors['--foreground-muted'],
-  },
-  quietLink: {
-    marginTop: spacing['--space-4'],
-    padding: spacing['--space-1'],
-    border: 'none',
-    borderRadius: radii['--radius-md'],
-    backgroundColor: 'transparent',
-    fontFamily: text['--text-ui-family'],
-    fontSize: text['--text-ui-size'],
-    color: {
-      default: colors['--foreground-muted'],
-      ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
-    },
-    cursor: 'default',
-    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
   rise: {
     animationName: rise,

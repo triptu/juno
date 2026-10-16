@@ -5,16 +5,11 @@ import { junoNavAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
 import { openJunoTab } from './juno/actions'
-import { openAllTopics, openTopic } from './navigation'
+import { openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
 
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
-}
-
-/** "Browse all topics" in the caught-up state: the All topics tab. */
-function browseAll(event: ActivateEvent): void {
-  openAllTopics({ newTab: event.metaKey })
 }
 
 /** Ask Juno opens the Juno chat with its composer focused (SPEC section 12), as ⌘J does outside a topic. */
@@ -104,7 +99,6 @@ export function HomePage() {
       items={view.items}
       done={shown.used}
       now={shown.now}
-      caughtUp={shown.caughtUp}
       enter={shown.enter}
       onOpen={openItem}
       onMarkDone={markDone}
@@ -113,7 +107,6 @@ export function HomePage() {
       onItemMenu={itemMenu}
       {...(junoOn ? { onAsk: askJuno } : {})}
       {...(jobLine === undefined ? {} : { askLine: jobLine })}
-      onBrowseAll={browseAll}
     />
   )
 }
