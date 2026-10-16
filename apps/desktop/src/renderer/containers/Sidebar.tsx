@@ -13,6 +13,7 @@ import {
   sidebarFilterAtom,
   sidebarListAtom,
   signedInAtom,
+  sessionProfileAtom,
   tabsAtom,
   viewPillsAtom,
   viewSheetAtom,
@@ -92,6 +93,8 @@ export function Sidebar() {
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
   const user = useAtomValue(signedInAtom)
+  const profile = useAtomValue(sessionProfileAtom)
+  const person = profile._tag === 'Success' ? profile.value : null
   const activeNav = useAtomValue(tabsAtom, activeNavOf)
   const junoUnread = useAtomValue(junoNavAtom, (nav) => nav.unread)
   const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
@@ -104,8 +107,8 @@ export function Sidebar() {
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
-  const name = user?.userName ?? ''
-  const account = { name, initials: initials(name) || '?', hue: hueFor('', user?.userId ?? '') }
+  const name = person?.name ?? user?.userName ?? ''
+  const account = { ...(person?.avatarUrl ? { avatarUrl: person.avatarUrl } : {}), name, initials: initials(name) || '?', hue: hueFor('', user?.userId ?? '') }
 
   const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', label: status.value.presenceLabel } : undefined
   const paused = status._tag === 'Success' ? status.value.paused : undefined
