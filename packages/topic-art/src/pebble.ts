@@ -11,7 +11,7 @@
  * about 30px across at 40px, so the placeholder weighs the same as a line
  * drawing beside it and is a shape among shapes, not a box.
  */
-import { HUE_NAMES, tideVar } from './palette'
+import { HUE_NAMES, tideVar, type HueName } from './palette'
 import type { ArtSize } from './render'
 import { SMALL_BELOW } from './render'
 
@@ -85,6 +85,16 @@ function pebblePath(r: Rng): string {
     d += ` C${f(c1[0]!)} ${f(c1[1]!)} ${f(c2[0]!)} ${f(c2[1]!)} ${f(p2[0])} ${f(p2[1])}`
   }
   return `${d} Z`
+}
+
+/**
+ * The hue a topic is drawn in: the pebble's main hue, the first draw of its
+ * seeded stream. The art takes it too, in place of the hue the model named,
+ * so neighbouring topics spread over all eight hues and the art keeps the
+ * colour of the pebble it replaces (docs/design/topic-art/v3).
+ */
+export function pebbleHue(topicId: string): HueName {
+  return HUE_NAMES[rng(hashId(topicId)).int(0, HUE_NAMES.length - 1)]!
 }
 
 /**

@@ -48,14 +48,18 @@ function renderElement(element: RecipeElement, hue: HueName, small: boolean): st
   return `<${element.tag}${joined}/>`
 }
 
-/** The recipe as inline SVG for one size. The same string serves both themes. */
-export function renderArt(recipe: Recipe, size: ArtSize): string {
+/**
+ * The recipe as inline SVG for one size. The same string serves both themes.
+ * `hue` paints the drawing in another hue than the one the recipe names; the
+ * app passes the topic's `pebbleHue`.
+ */
+export function renderArt(recipe: Recipe, size: ArtSize, hue: HueName = recipe.hue): string {
   const small = size < SMALL_BELOW
   const stroke = small ? STROKE * SMALL_STROKE_SCALE : STROKE
-  const body = recipe.elements.map((element) => renderElement(element, recipe.hue, small)).join('')
+  const body = recipe.elements.map((element) => renderElement(element, hue, small)).join('')
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true" focusable="false">` +
-    `<g fill="none" stroke="${artVar(recipe.hue, 'ink')}" stroke-width="${fixed(stroke)}" stroke-linecap="round" stroke-linejoin="round">${body}</g>` +
+    `<g fill="none" stroke="${artVar(hue, 'ink')}" stroke-width="${fixed(stroke)}" stroke-linecap="round" stroke-linejoin="round">${body}</g>` +
     `</svg>`
   )
 }

@@ -56,6 +56,18 @@ const topics = {
 
 const sizes: ReadonlyArray<TopicArtSize> = [40, 20, 16]
 
+/** One topic id per hue: a drawing takes its topic's pebble hue, not the recipe's. */
+const byHue = [
+  't:C0ENG:1760000000.000020', // coral
+  't:C0ENG:1760000000.000000', // amber
+  't:C0ENG:1760000000.000013', // olive
+  't:C0ENG:1760000000.000006', // sage
+  't:C0ENG:1760000000.000001', // teal
+  't:C0ENG:1760000000.000034', // sky
+  't:C0ENG:1760000000.000017', // periwinkle
+  't:C0ENG:1760000000.000015', // plum
+] as const
+
 /**
  * The placeholder until a button brings the art, so the layout-shift guard
  * (which presses every button) checks the swap, and a person can watch it.
@@ -105,6 +117,18 @@ export default defineFixtures(TopicArt, {
             <TopicArt topicId={topics.bill} recipe={recipes.coins} size={size} />
             <TopicArt topicId={topics.lunch} size={size} />
             <TopicArt topicId={topics.alerts} size={size} />
+          </Row>
+        ))}
+      </Stack>
+    )),
+    // Every hue at every size, the four drawings in turn: the palette as a set (docs/design/topic-art/v3).
+    'every-hue': scene(() => (
+      <Stack>
+        {sizes.map((size) => (
+          <Row key={size}>
+            {byHue.map((id, index) => (
+              <TopicArt key={id} topicId={id} recipe={[recipes.database, recipes.calendar, recipes.people, recipes.coins][index % 4]} size={size} />
+            ))}
           </Row>
         ))}
       </Stack>

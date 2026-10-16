@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef } from 'react'
-import { parseRecipe, renderArt, renderPebble, type ArtSize } from '@juno/topic-art'
+import { parseRecipe, pebbleHue, renderArt, renderPebble, type ArtSize } from '@juno/topic-art'
 import { sizes as tokenSizes } from '@juno/tokens/tokens.stylex'
 import { rootDuration } from './motion'
 
@@ -37,13 +37,18 @@ function remember(key: string, make: () => string): string {
   return markup
 }
 
-/** The art for a recipe, or `undefined` when the stored text does not pass the vocabulary: that topic keeps its pebble. */
-function artMarkup(recipe: string, size: TopicArtSize): string | undefined {
-  const key = `${size}:${recipe}`
+/**
+ * The art for a recipe, or `undefined` when the stored text does not pass the
+ * vocabulary: that topic keeps its pebble. Drawn in the topic's pebble hue,
+ * not the recipe's, so the list spreads over every hue and the swap keeps
+ * the pebble's colour.
+ */
+function artMarkup(topicId: string, recipe: string, size: TopicArtSize): string | undefined {
+  const key = `${size}:${topicId}:${recipe}`
   const hit = rendered.get(key)
   if (hit !== undefined) return hit === '' ? undefined : hit
   const parsed = parseRecipe(recipe)
-  const markup = parsed.ok && parsed.recipe.confident ? renderArt(parsed.recipe, size) : ''
+  const markup = parsed.ok && parsed.recipe.confident ? renderArt(parsed.recipe, size, pebbleHue(topicId)) : ''
   remember(key, () => markup)
   return markup === '' ? undefined : markup
 }
@@ -79,7 +84,7 @@ function fade(layer: HTMLElement, from: number, to: number): void {
  * late moves nothing (performance 3.3).
  */
 export function TopicArt({ topicId, recipe, size = 40, label }: TopicArtProps) {
-  const art = recipe === undefined ? undefined : artMarkup(recipe, size)
+  const art = recipe === undefined ? undefined : artMarkup(topicId, recipe, size)
   const pebble = remember(`${size}:pebble:${topicId}`, () => renderPebble(topicId, size))
   const hasArt = art !== undefined
   const pebbleLayer = useRef<HTMLSpanElement>(null)
