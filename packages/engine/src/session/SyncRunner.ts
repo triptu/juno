@@ -25,6 +25,7 @@ import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'e
 import { RequestQueue } from '@juno/slack'
 import { AiProvider } from '@juno/ai'
 import { sortClearCases } from '../automatedView'
+import { OwnerActivity, startActivity } from '../activity'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import type { SlackAuthRequired } from '@juno/slack'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
@@ -44,7 +45,7 @@ export class SyncRunner extends Context.Service<
     readonly slowedUntil: Stream.Stream<number | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink | AiProvider | NotificationControl> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink | AiProvider | NotificationControl | OwnerActivity> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
@@ -83,8 +84,9 @@ export class SyncRunner extends Context.Service<
             })
           const program = Effect.gen(function* () {
             const { onEvent, onSelfPresence } = yield* startNotifications
+            const activity = yield* startActivity
             return yield* runSync({
-              onEvent,
+              onEvent: (event, me) => onEvent(event, me).pipe(Effect.andThen(activity.onEvent(event))),
               onSelfPresence,
               onCycle: (event) =>
                 (event === 'finished' ? link.caughtUp : Effect.void).pipe(

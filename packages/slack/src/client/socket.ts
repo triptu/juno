@@ -27,6 +27,11 @@
  * logged by type only and skipped. `pong`, `reconnect_url`, `error`,
  * `goodbye` and `user_session_expiration` are handled here and also
  * forwarded.
+ *
+ * `tickle` tells Slack the user is here, as the official client does while
+ * the Mac is in use (research section 4, Presence). It is fire and forget
+ * and paced here: at most one per `tickleSpacingMillis` (19 s), counted
+ * across reconnects.
  */
 import type { Agent } from 'node:http'
 import { Cause, Clock, Context, Effect, Layer, Queue, Ref, Scope, Stream } from 'effect'
@@ -81,6 +86,8 @@ export interface SlackSocketShape {
   readonly events: Effect.Effect<Stream.Stream<SocketEvent, SlackAuthRequired>, never, Scope.Scope>
   /** Sends a frame on the open socket with the next id. False when not connected. */
   send(frame: RtmOutgoingFrame): Effect.Effect<boolean>
+  /** Sends `tickle` unless one went out within `tickleSpacingMillis`. True when it was sent. */
+  tickle(reason: string): Effect.Effect<boolean>
 }
 
 type Incoming =
@@ -307,7 +314,17 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
           return true
         })
 
-      return SlackSocket.of({ events, send })
+      let lastTickle: number | undefined
+      const tickle = (reason: string) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis
+          if (lastTickle !== undefined && now - lastTickle < config.socket.tickleSpacingMillis) return false
+          const sent = yield* send({ type: 'tickle', reason })
+          if (sent) lastTickle = now
+          return sent
+        })
+
+      return SlackSocket.of({ events, send, tickle })
     }),
   )
 }

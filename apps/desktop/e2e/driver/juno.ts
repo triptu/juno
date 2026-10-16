@@ -894,6 +894,11 @@ export class Juno {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notificationSettingsOpened: () => number } }).junoTest.notificationSettingsOpened())
   }
 
+  /** The Mac's idle time from now on, in seconds (main's seam for `powerMonitor`); 0 at launch, a user at the Mac. */
+  async setSystemIdle(seconds: number): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { systemIdle: (s: number) => void } }).junoTest.systemIdle(value), seconds)
+  }
+
   /** The dock's badge text: "•" with unread mentions, else empty. */
   dockBadge(): Promise<string> {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())

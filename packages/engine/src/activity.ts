@@ -1,0 +1,52 @@
+/**
+ * Keeps the owner shown as active in Slack while they use the Mac (SPEC 14,
+ * "Active in Slack"; docs/research/slack-data-access.md section 3, Presence).
+ *
+ * Main reads the Mac's idle time every 10 s and sends `active` while the
+ * owner used the Mac in the last 20 s and the screen is not locked. On each
+ * one, and when the socket connects within that window, the running session
+ * sends a socket `tickle`, which `SlackSocket` paces to one per 19 s, as the
+ * official client does. Nothing is sent while the owner's presence is away
+ * (Set yourself away, or outside active hours), so Slack keeps them away.
+ * When the Mac goes idle the tickles stop and Slack's own timeout shows the
+ * owner away; when Juno quits, the socket closes.
+ */
+import { Clock, Context, Effect, Layer, Stream, SubscriptionRef } from 'effect'
+import { SlackSocket, type SocketEvent } from '@juno/slack'
+import { NotificationControl } from './notificationRuntime'
+import { HostLink } from './protocol/host'
+
+/** How long one `active` from main counts: main sends it every 10 s, for use in the last 20 s. */
+export const ACTIVE_WINDOW_MILLIS = 20_000
+
+export class OwnerActivity extends Context.Service<OwnerActivity, {
+  /** When main last said the owner is at the Mac, on the engine's clock. */
+  readonly lastActiveAt: SubscriptionRef.SubscriptionRef<number | undefined>
+}>()('juno/engine/OwnerActivity') {
+  static readonly layer = Layer.effect(OwnerActivity, Effect.gen(function* () {
+    const lastActiveAt = yield* SubscriptionRef.make<number | undefined>(undefined)
+    const link = yield* HostLink
+    const fromMain = yield* link.messages
+    yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) =>
+      message._tag === 'active' ? Effect.flatMap(Clock.currentTimeMillis, (now) => SubscriptionRef.set(lastActiveAt, now)) : Effect.void))
+    return OwnerActivity.of({ lastActiveAt })
+  }))
+}
+
+/** Runs inside the session scope, next to the sync, and shares its socket. */
+export const startActivity = Effect.gen(function* () {
+  const socket = yield* SlackSocket
+  const activity = yield* OwnerActivity
+  const control = yield* NotificationControl
+  const tickle = Effect.gen(function* () {
+    const at = yield* SubscriptionRef.get(activity.lastActiveAt)
+    if (at === undefined || (yield* Clock.currentTimeMillis) - at > ACTIVE_WINDOW_MILLIS) return
+    // Manual away stays away, as in the official client.
+    if ((yield* control.currentPresence) === 'away') return
+    yield* socket.tickle('polling')
+  })
+  yield* Effect.forkScoped(Stream.runForEach(SubscriptionRef.changes(activity.lastActiveAt), () => tickle))
+  return {
+    onEvent: (event: SocketEvent) => event._tag === 'Connected' ? tickle : Effect.void,
+  }
+})

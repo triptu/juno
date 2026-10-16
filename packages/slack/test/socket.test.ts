@@ -62,6 +62,34 @@ describe('SlackSocket', () => {
     }),
   )
 
+  it.live('sends at most one tickle per spacing, across reconnects', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeSlack
+      const tickles = () => fake.received.filter((frame) => frame.type === 'tickle')
+      const program = Effect.gen(function* () {
+        const socket = yield* SlackSocket
+        const { queue } = yield* collect(yield* socket.events)
+        yield* takeUntil(queue, isConnected)
+        assert.isTrue(yield* socket.tickle('polling'))
+        assert.isFalse(yield* socket.tickle('polling'))
+        yield* eventually(() => tickles().length === 1)
+        assert.strictEqual(tickles()[0]?.reason, 'polling')
+
+        // A new connection does not reset the spacing.
+        fake.dropSocket()
+        yield* takeUntil(queue, isConnected)
+        assert.isFalse(yield* socket.tickle('polling'))
+        yield* Effect.sleep(1_500)
+        assert.isTrue(yield* socket.tickle('polling'))
+        yield* eventually(() => tickles().length === 2)
+        assert.strictEqual(fake.selfPresence(), 'active')
+      })
+      yield* program.pipe(Effect.provide(clientLayer(fake, { socket: { tickleSpacingMillis: 1_500 } })), Effect.scoped)
+      // The socket closed: Slack shows the user away.
+      yield* eventually(() => fake.selfPresence() === 'away')
+    }),
+  )
+
   it.live('passes unknown frames through and skips known types with a bad shape', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack

@@ -37,6 +37,22 @@ export interface CallRecord {
   readonly error?: string
 }
 
+/** A frame a client sent on the socket, other than `ping`. */
+export interface ReceivedFrame {
+  readonly at: number
+  readonly type: string
+  /** `tickle`'s reason. */
+  readonly reason?: string
+  /** `presence_sub`'s ids. */
+  readonly ids?: ReadonlyArray<string>
+}
+
+/**
+ * How long Slack shows the self user active after their last `tickle`. Slack's real value is
+ * unknown (research section 3, Presence); the fake's clock moves past it with `advanceClock`.
+ */
+export const AUTO_AWAY_MILLIS = 10 * 60_000
+
 const RECONNECT_URL_FIRST_MILLIS = 200
 const RECONNECT_URL_INTERVAL_MILLIS = 30_000
 
@@ -91,6 +107,11 @@ export class FakeServer {
   readonly sessions = new Map<string, Session>()
   readonly calls: CallRecord[] = []
   readonly sockets = new Set<WebSocket>()
+  /** Frames clients sent on the socket, other than `ping`, oldest first. */
+  readonly received: ReceivedFrame[] = []
+  /** Open sockets of the self user. */
+  readonly #selfSockets = new Set<WebSocket>()
+  #lastTickleAt: number | undefined
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
   readonly #holds = new Map<string, HoldRule>()
@@ -420,6 +441,8 @@ export class FakeServer {
    */
   #connected(ws: WebSocket, session: Session): void {
     this.sockets.add(ws)
+    const self = session.userId === this.workspace.selfId
+    if (self) this.#selfSockets.add(ws)
     const reconnectUrl = () => {
       if (ws.readyState !== ws.OPEN) return
       const url = new URL(this.socketUrl())
@@ -432,6 +455,7 @@ export class FakeServer {
       clearTimeout(first)
       clearInterval(repeat)
       this.sockets.delete(ws)
+      this.#selfSockets.delete(ws)
     })
     ws.on('message', (raw) => {
       let frame: Record<string, unknown>
@@ -440,6 +464,15 @@ export class FakeServer {
       } catch {
         return
       }
+      if (typeof frame['type'] === 'string' && frame['type'] !== 'ping') {
+        this.received.push({
+          at: this.workspace.clock.now(),
+          type: frame['type'],
+          ...(typeof frame['reason'] === 'string' ? { reason: frame['reason'] } : {}),
+          ...(Array.isArray(frame['ids']) ? { ids: frame['ids'].filter((id): id is string => typeof id === 'string') } : {}),
+        })
+      }
+      if (frame['type'] === 'tickle' && self) this.#lastTickleAt = this.workspace.clock.now()
       if (frame['type'] === 'ping' && typeof frame['id'] === 'number') {
         ws.send(JSON.stringify(encodeRtmFrame({ type: 'pong', reply_to: frame['id'] })))
       } else if (frame['type'] === 'presence_sub' && Array.isArray(frame['ids'])) {
@@ -451,6 +484,16 @@ export class FakeServer {
       }
     })
     ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false, start: true })))
+  }
+
+  /**
+   * What colleagues see for the self user, as Slack decides it: active while a socket of theirs is
+   * open, their `manual_presence` is `active` and a `tickle` came within `AUTO_AWAY_MILLIS`.
+   */
+  selfPresence(): 'active' | 'away' {
+    const now = this.workspace.clock.now()
+    const recent = this.#lastTickleAt !== undefined && now - this.#lastTickleAt <= AUTO_AWAY_MILLIS
+    return this.#selfSockets.size > 0 && this.workspace.manualPresence === 'active' && recent ? 'active' : 'away'
   }
 
   // HTTP
