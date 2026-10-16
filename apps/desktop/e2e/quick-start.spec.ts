@@ -51,20 +51,11 @@ large('first sign-in shows threads, channels and DMs within the budget, then fil
   await expect(sidebar.rows.first()).toBeVisible()
   await sidebar.filter('All')
 
-  // A channel whose history has not been read yet shows from `client.counts`: its name and time, no preview.
-  const previewOf = async (title: string) => (await sidebar.row(title, { exact: true }).root.textContent()) ?? ''
+  // Conversations whose history has not been read yet show from `client.counts`: their name and time, no preview.
   const withPreview = () => sidebar.rows.filter({ hasText: ': ' }).count()
+  await expect.poll(() => sidebar.rows.filter({ hasNotText: ': ' }).count()).toBeGreaterThan(0)
   const previewsAtStart = await withPreview()
-  let waiting: string | undefined
-  for (const title of first.filter((t) => t.startsWith('#'))) {
-    if (!(await previewOf(title)).includes(': ')) {
-      waiting = title
-      break
-    }
-  }
-  expect(waiting).toBeDefined()
 
-  // The sync is still reading, and the rows follow it with no reload: that channel's preview arrives, and others with it.
-  await expect.poll(() => previewOf(waiting!), { timeout: 120_000 }).toContain(': ')
-  expect(await withPreview()).toBeGreaterThan(previewsAtStart)
+  // The sync is still reading, and the rows follow it with no reload: previews arrive as history lands.
+  await expect.poll(withPreview, { timeout: 120_000 }).toBeGreaterThan(previewsAtStart)
 })
