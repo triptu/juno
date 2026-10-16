@@ -1,7 +1,7 @@
 export { AccountMenu, type AccountMenuAction } from './AccountMenu'
 export { AppearanceSettings } from './AppearanceSettings'
 export { AppInfoView } from './AppInfoView'
-export { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection } from './CommandPalette'
+export { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from './CommandPalette'
 export { AttachButton } from './AttachButton'
 export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
 
@@ -49,6 +49,7 @@ export { hueFor, initials } from './look'
 export { relativeTime } from './time'
 // The theme entry point for apps, so the shell reaches ui through views.
 export {
+  accentLabels,
   applyPrivacy,
   applyTheme,
   type AccentName,
@@ -60,7 +61,7 @@ export {
 // The topic tile, for the header and tab containers in the desktop app, which does not depend on ui.
 export { TopicArt } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
-export { SettingsPage } from './SettingsPage'
+export { SettingsPage, settingsSections } from './SettingsPage'
 export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'

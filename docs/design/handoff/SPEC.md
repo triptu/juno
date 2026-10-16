@@ -268,11 +268,16 @@ A conversation where you write first and choose where it goes, with frequent des
 
 ## 10. Search and commands (⌘K)
 
-- **Search.** ⌘K searches topic titles, message text, channels and people. With an empty query it shows recent topics.
-- **DMs.** A person's result reads "Message Maya Chen" and opens your Main with them, or a New chat addressed to them when you have never messaged (section 9).
-- **Channels.** A channel has two results: open its Main, and "Show its topics", which narrows the sidebar to it.
-- **Placeholder.** "Search, or ask Juno".
-- **Commands.** Natural-language input is recognised as a command:  The command appears as the top result with a small confidence badge. Enter runs it.
+- **Two tabs.** A small segmented control at the top of the palette switches between **Conversations** and **Messages**. Each open starts on Conversations. Tab and Shift Tab, or ⌘1 and ⌘2, switch tabs; the text stays, and focus stays in the field.
+- **Conversations.** DMs, group DMs and channels. With an empty query it lists the ones you use most ("Frequent"): your own messages and your topic visits from the last 30 days, each counted as `0.5 ^ (age_in_days / 7)` (the ranking of New chat's Frequent, section 9), then the rest by latest activity, DMs first. Typing filters by name or, for a group DM, by member, ranked the same way, names that start with the text first among the unused ones. DMs show the person's avatar, channels # or a lock, group DMs the group icon. Enter opens the conversation's Main in the current tab, or a New chat to a person you have never messaged; ⌘Enter opens it in a new tab.
+- **Commands.** In Conversations, the commands that match the text show beside the conversations, at most four of each group; a leading ">" lists them all and nothing else, and filters them by what follows.
+  - Global: Theme (Light, Dark, Match system), each accent, New tab, New chat, Settings by section, Hide or Show message text, and Set yourself away or active. The current theme and accent say "Current".
+  - For the topic in the active tab, grouped under its name at the top: Resolve or Reopen, Pin or Unpin, Mark as unread or as read, Open or Close Juno panel (when Juno is on), Copy Slack link, Open in Slack, Rename thread (threads only), and Start thread when a message was selected in a Main as the palette opened, which opens that message's thread.
+- **Messages.** The message search: topic titles, message text, channels and people. With an empty query it shows recent topics.
+  - **DMs.** A person's result reads "Message Maya Chen" and opens your Main with them, or a New chat addressed to them when you have never messaged (section 9).
+  - **Channels.** A channel has two results: open its Main, and "Show its topics", which narrows the sidebar to it.
+- **Placeholder.** "Find a conversation, or type >" in Conversations; "Search, or ask Juno" in Messages.
+- **Juno commands.** Natural-language input is recognised as a command, in both tabs: above the results in Messages, under the conversations in Conversations. The command shows with a small confidence badge. Enter runs it.
   - "tell maya …" or "post in #eng …": an instant send card.
   - "summarize …" or "what did I miss": opens Juno with that request.
   - "resolve pricing": resolves the best-matching topic.
@@ -604,7 +609,7 @@ Use the Littlebird design system's tokens.
 
 | Keys | Action |
 | --- | --- |
-| ⌘K | Search and commands |
+| ⌘K | Search and commands. Inside it, Tab or ⌘1 and ⌘2 switch between Conversations and Messages (section 10) |
 | ⌘, | Settings (section 14) |
 | ⌘N | New chat in a new tab (section 9) |
 | ⌘T | New tab: a New chat, or Home if Settings › General says so (section 6) |

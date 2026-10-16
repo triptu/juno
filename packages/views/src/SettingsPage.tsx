@@ -13,7 +13,7 @@ import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { NavItem, type PhosphorIcon } from '@juno/ui'
 
 /** Each section's name in the list, in the list's order (SPEC 14). */
-const settingsSections: ReadonlyArray<{ readonly section: SettingsSection; readonly label: string; readonly icon: PhosphorIcon }> = [
+export const settingsSections: ReadonlyArray<{ readonly section: SettingsSection; readonly label: string; readonly icon: PhosphorIcon }> = [
   { section: 'general', label: 'General', icon: Gear },
   { section: 'appearance', label: 'Appearance', icon: Palette },
   { section: 'notifications', label: 'Notifications', icon: Bell },

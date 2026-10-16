@@ -1,16 +1,27 @@
 /**
- * ⌘K (spec section 10, inventory 9, performance 5.3). Local results come
- * from `searchAtom` through `useDeferredValue`, so a keystroke paints the
- * text at once and the rows follow in the same frame budget. After a pause
- * in typing, the command reading and Slack's search are asked for; a
- * command shows above the results, and Slack's matches are added under the
- * rows already shown, never moving them. Rows open topics (at a message,
- * which then flashes), a channel's Main or a person's DM, narrow the
- * sidebar, start a New chat to someone never messaged, or run the command.
- * Its own chunk: `Palette.tsx` loads it on idle after the first paint.
+ * ⌘K (spec section 10, inventory 9, performance 5.3), in two tabs.
+ *
+ * Conversations, the default: DMs, group DMs and channels from
+ * `paletteConversationsAtom`, by use with an empty query; the commands
+ * that match the text (`paletteCommands.ts`), or all of them after a
+ * leading ">", with the open topic's own commands first under its name.
+ *
+ * Messages: the message search. Local results come from `searchAtom`;
+ * after a pause in typing, Slack's search is asked for and its matches are
+ * added under the rows already shown, never moving them.
+ *
+ * Both tabs' local rows follow the text through `useDeferredValue`, so a
+ * keystroke paints the text at once and the rows follow in the same frame
+ * budget, and switching tabs shows rows that are already there. The
+ * command reading is asked for after a pause in typing and shows as
+ * "Juno": above the Messages results, under the conversations. Rows open
+ * topics (at a message, which then flashes), a channel's Main or a
+ * person's DM, narrow the sidebar, start a New chat to someone never
+ * messaged, or run a command. Its own chunk: `Palette.tsx` loads it on
+ * idle after the first paint.
  */
 import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ConversationKind, PaletteCommand, SearchChannel, SearchMessage, SearchPerson, SearchResult } from '@juno/contract'
+import type { ConversationKind, PaletteCommand, PickConversation, SearchChannel, SearchMessage, SearchPerson, SearchResult } from '@juno/contract'
 import {
   appendUnseen,
   COMMAND_DELAY_MS,
@@ -19,6 +30,8 @@ import {
   PALETTE_RECENT,
   PALETTE_RESULTS,
   PALETTE_SLACK_RESULTS,
+  paletteConversationsAtom,
+  paletteTabAtom,
   readCommand,
   registry,
   searchAtom,
@@ -32,10 +45,11 @@ import {
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection } from '@juno/views'
+import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { openNewChatTo, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette } from './paletteActions'
+import { globalCommands, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { scopeToChannel, showChannelMenu, type MenuChannel } from './placeMenus'
 
@@ -97,6 +111,8 @@ interface Row extends PaletteItem {
   readonly topicId?: string
   readonly channel?: MenuChannel
   readonly run: (options: OpenOptions) => void
+  /** It opens nothing that takes focus, so closing gives focus back to where it was. */
+  readonly stays?: boolean
 }
 
 const kindLabel: Record<ConversationKind, string> = { public: 'Public channel', private: 'Private channel', im: 'Direct message', mpim: 'Group DM' }
@@ -152,6 +168,25 @@ function rowsOf(result: SearchResult): ReadonlyArray<Row> {
   }
 }
 
+/** A Conversations row: its Main, or a New chat to a person never messaged. */
+const conversationRow = (pick: PickConversation): Row => {
+  const mainId = pick.mainId
+  return {
+    id: `conversation:${pick.key}`,
+    icon: placeIcon[pick.kind],
+    label: pick.name,
+    compact: true,
+    ...(pick.person === undefined ? {} : { person: pick.person }),
+    ...(mainId === undefined ? { sub: 'Starts a conversation' } : { opensTab: true, topicId: mainId }),
+    run: (options) => (mainId === undefined ? openNewChatTo(pick) : openTopic(mainId, options)),
+  }
+}
+
+const commandRunRow = (command: CommandRow): Row => ({ ...command, run: () => command.run() })
+
+/** Commands shown beside conversations when the text is not a ">" listing. */
+const COMMANDS_WITH_TEXT = 4
+
 const commandIcon: Record<PaletteCommand['kind'], PaletteIconName> = { 'send-dm': 'send', post: 'send', 'open-dm': 'open-dm', ask: 'ask', resolve: 'resolve' }
 
 const commandRow = (command: PaletteCommand): Row => ({
@@ -169,34 +204,83 @@ interface Query {
   readonly text: string
 }
 
-/** The palette while it is open: mounted on open, so each open starts empty. */
+/**
+ * The rows of the last text that has results, held until the next text's
+ * arrive, so typing never flashes an empty list. `settled` when they
+ * belong to the current text.
+ */
+function useHeld<A>(request: Query, deferred: Query, result: { readonly _tag: string; readonly value?: A }): { readonly local: { readonly request: Query; readonly value: A } | undefined; readonly settled: boolean } {
+  const [held, setHeld] = useState<{ readonly request: Query; readonly value: A } | undefined>(undefined)
+  const current = deferred === request && result._tag === 'Success'
+  if (current && (held?.request !== request || held.value !== result.value)) setHeld({ request, value: result.value as A })
+  const local = current ? { request, value: result.value as A } : held
+  return { local, settled: local?.request === request }
+}
+
+/** The text after a leading ">", or undefined when the text lists no commands. */
+function commandListing(text: string): string | undefined {
+  const start = text.trimStart()
+  return start.startsWith('>') ? start.slice(1) : undefined
+}
+
+/** The palette while it is open: mounted on open, so each open starts empty, on Conversations. */
 export function OpenPalette() {
+  const tab = useAtomValue(paletteTabAtom)
   const [request, setRequest] = useState<Query>({ text: '' })
   const query = request.text
   const deferred = useDeferredValue(request)
-  const result = useAtomValue(searchAtom(deferred.text))
+  const listing = commandListing(deferred.text)
+  const messages = useHeld(request, deferred, useAtomValue(searchAtom(deferred.text)))
+  const conversations = useHeld(request, deferred, useAtomValue(paletteConversationsAtom(listing === undefined ? deferred.text : '')))
   const now = useAtomValue(nowAtom)
+  // What the commands act on is read once, as the palette opens.
+  const [commands] = useState(() => ({ global: globalCommands(), topic: topicCommands() }))
 
-  // The rows of the last text that has results, held until the next text's arrive, so typing never flashes an empty list.
-  const [held, setHeld] = useState<{ readonly request: Query; readonly results: ReadonlyArray<SearchResult> } | undefined>(undefined)
-  const current = deferred === request && result._tag === 'Success'
-  if (current && (held?.request !== request || held.results !== result.value)) setHeld({ request, results: result.value })
-  const local = current ? { request, results: result.value } : held
-  const settled = local?.request === request
+  const command = useLater(request, commandListing(request.text) === undefined ? COMMAND_MIN_LENGTH : Infinity, COMMAND_DELAY_MS, readCommand)
+  const slack = useLater(request, tab === 'messages' ? SLACK_MIN_LENGTH : Infinity, SLACK_DELAY_MS, searchSlackMessages)
 
-  const command = useLater(request, COMMAND_MIN_LENGTH, COMMAND_DELAY_MS, readCommand)
-  const slack = useLater(request, SLACK_MIN_LENGTH, SLACK_DELAY_MS, searchSlackMessages)
+  const conversationsTab = tab === 'conversations'
+  const listingNow = commandListing(request.text)
+  const settled = conversationsTab ? listingNow !== undefined || conversations.settled : messages.settled
+  const shownText = conversationsTab ? (listingNow !== undefined ? request.text.trim() : (conversations.local?.request.text.trim() ?? '')) : (messages.local?.request.text.trim() ?? '')
+  const shownCommand = settled ? (command ?? null) : null
 
-  const results = local?.results ?? []
-  const shownCommand = settled ? command ?? null : null
-  const max = local?.request.text.trim() === '' ? PALETTE_RECENT : shownCommand !== null ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
-  const localRows = results.flatMap(rowsOf).slice(0, max)
-  const rows = settled && slack !== undefined && query.trim() !== '' ? appendUnseen(localRows, slack.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
-  const sections: ReadonlyArray<PaletteSection> = [
-    ...(shownCommand === null ? [] : [{ heading: 'Juno' as const, items: [commandRow(shownCommand)] }]),
-    { heading: local?.request.text.trim() === '' ? ('Recent' as const) : ('Results' as const), items: rows },
-  ]
-  const byId = new Map<string, Row>([...(shownCommand === null ? [] : [commandRow(shownCommand)]), ...rows].map((row) => [row.id, row]))
+  let sections: ReadonlyArray<PaletteSection>
+  let rows: ReadonlyArray<Row>
+  if (conversationsTab) {
+    const topic = commands.topic
+    if (listingNow !== undefined) {
+      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, listingNow).map(commandRunRow)
+      const globalRows = matchCommands(commands.global, listingNow).map(commandRunRow)
+      sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]), { heading: 'Commands', items: globalRows }]
+      rows = [...topicRows, ...globalRows]
+    } else if (shownText === '') {
+      const found = (conversations.local?.value ?? []).map(conversationRow)
+      sections = [{ heading: 'Frequent', items: found }]
+      rows = found
+    } else {
+      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, shownText).slice(0, COMMANDS_WITH_TEXT).map(commandRunRow)
+      const found = (conversations.local?.value ?? []).map(conversationRow)
+      const globalRows = matchCommands(commands.global, shownText).slice(0, COMMANDS_WITH_TEXT).map(commandRunRow)
+      const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
+      sections = [
+        ...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]),
+        { heading: 'Conversations', items: found },
+        { heading: 'Commands', items: globalRows },
+        { heading: 'Juno', items: juno },
+      ]
+      rows = [...topicRows, ...found, ...globalRows, ...juno]
+    }
+  } else {
+    const results = messages.local?.value ?? []
+    const max = shownText === '' ? PALETTE_RECENT : shownCommand !== null ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
+    const localRows = results.flatMap(rowsOf).slice(0, max)
+    const found = messages.settled && slack !== undefined && query.trim() !== '' ? appendUnseen(localRows, slack.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
+    const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
+    sections = [{ heading: 'Juno', items: juno }, { heading: shownText === '' ? 'Recent' : 'Results', items: found }]
+    rows = [...juno, ...found]
+  }
+  const byId = new Map<string, Row>(rows.map((row) => [row.id, row]))
 
   // juno.palette-open: from ⌘K or the button to the first paint with rows. juno.palette-results: from a keystroke to its rows painted.
   const opened = useRef(false)
@@ -208,7 +292,7 @@ export function OpenPalette() {
       afterPaint(() => measure('juno.palette-open', 'juno.palette-open'))
     }
     const keystroke = typed.current
-    if (keystroke !== undefined && keystroke.text === local?.request.text.trim()) {
+    if (keystroke !== undefined && keystroke.text === shownText) {
       typed.current = undefined
       afterPaint(() => measure('juno.palette-results', keystroke.at, { detail: { rows: rows.length } }))
     }
@@ -219,10 +303,12 @@ export function OpenPalette() {
     setRequest({ text: next })
   }
 
+  const onTab = (next: PaletteTab) => registry.set(paletteTabAtom, next)
+
   const onSelect = (id: string, options: { readonly newTab: boolean }) => {
     const row = byId.get(id)
     if (row === undefined) return
-    closePalette(false)
+    closePalette(row.stays === true)
     row.run(options.newTab ? { newTab: true } : {})
   }
 
@@ -236,8 +322,10 @@ export function OpenPalette() {
 
   return (
     <CommandPalette
+      tab={tab}
+      onTab={onTab}
       query={query}
-      resultsQuery={local?.request.text.trim() ?? ''}
+      resultsQuery={shownText}
       onQuery={onQuery}
       sections={sections}
       settled={settled}

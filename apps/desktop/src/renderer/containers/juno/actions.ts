@@ -52,7 +52,8 @@ export function takePanelOpenStart(): number | undefined {
   return at
 }
 
-function openPanel(): void {
+/** Opens the Juno panel beside the active topic, with its composer focused. */
+export function openPanel(): void {
   if (!registry.get(junoPanelOpenAtom)) panelOpenedAt = performance.now()
   setJunoPanelOpen(registry, true)
   focusJunoComposer(registry, 'panel')

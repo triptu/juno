@@ -1,5 +1,6 @@
 // ⌘K (spec section 10): open it with the shortcut and the Search button,
-// recent topics on an empty query, a topic by its title, a message by its
+// the two tabs, a conversation from Conversations, the commands (global
+// and the open topic's), and in Messages: recent topics on an empty query, a topic by its title, a message by its
 // text (landing on it), a channel's Main and "show its topics" (also from
 // its menu), a person's DM and a New chat to someone never messaged, a
 // command, Slack's search for what the cache lacks, and all of it from the
@@ -9,31 +10,37 @@ import { expect, test } from './fixtures'
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
+const ROADMAP = 'Proposal: cut offline mode and public'
 const WAL = 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.'
 
-test('opens with ⌘K and the Search button, shows recent topics, and closes with Esc, ⌘K or a press outside', async ({ juno }) => {
+test('opens on Conversations with frequent ones, Tab switches to Messages and back, and it closes with Esc, ⌘K or a press outside', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { palette, sidebar, tabs } = juno
 
   await palette.open()
+  await palette.expectTab('Conversations')
   await palette.expectResults()
-  await expect(palette.section('Recent')).toBeVisible()
+  await expect(palette.section('Frequent').getByRole('option').first()).toBeVisible()
+  await expect(palette.input).toHaveAttribute('placeholder', 'Find a conversation, or type >')
+  // Tab and Shift Tab switch tabs; focus stays in the field, never reaching the window under the dim.
+  await palette.press('Tab')
+  await palette.expectTab('Messages')
+  await palette.expectResults()
   await expect(palette.section('Recent').getByRole('option')).toHaveCount(6)
   await expect(palette.input).toHaveAttribute('placeholder', 'Search, or ask Juno')
-  // The first recent topic is active, and Enter opens it.
-  const first = await palette.activeText()
-  expect(first).not.toBe('')
-  // The field is the only stop: Tab never reaches the window under the dim.
-  await palette.press('Tab')
-  await expect(palette.input).toBeFocused()
   await palette.press('Shift+Tab')
-  await expect(palette.input).toBeFocused()
+  await palette.expectTab('Conversations')
+  // The control switches too, and the field keeps focus.
+  await palette.tab('Messages').click()
+  await palette.expectTab('Messages')
   await palette.press('Escape')
   await palette.expectClosed()
 
+  // Each open starts on Conversations.
   await sidebar.searchButton.click()
   await palette.expectOpen()
+  await palette.expectTab('Conversations')
   await palette.shortcut()
   await palette.expectClosed()
 
@@ -42,11 +49,90 @@ test('opens with ⌘K and the Search button, shows recent topics, and closes wit
   await juno.win.mouse.click(10, 300)
   await palette.expectClosed()
 
+  // The first frequent conversation is active, and Enter opens it in the current tab.
   await palette.open()
   await palette.expectResults()
+  expect(await palette.activeText()).not.toBe('')
   await palette.press('Enter')
   await palette.expectClosed()
   await tabs.expectCount(1)
+})
+
+test('a channel typed in Conversations opens its Main with Enter, a person their DM, and ⌘Enter a new tab', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { palette, topic, tabs } = juno
+
+  await palette.open()
+  await palette.type('platfo')
+  await palette.expectResults()
+  await palette.expectActive(/^platform/)
+  await palette.press('Enter')
+  await palette.expectClosed()
+  await topic.expectTitle('Main')
+  await expect(topic.header).toContainText('platform')
+  await tabs.expectCount(1)
+
+  await palette.open()
+  await palette.type('maya')
+  await palette.expectResults()
+  // Maya's DM, or a group DM she is in, whichever is used most.
+  await palette.expectActive(/Maya/)
+  await palette.press('Meta+Enter')
+  await palette.expectClosed()
+  await tabs.expectCount(2)
+  await topic.expectTitle('Main')
+})
+
+test('">" lists the commands, and ">theme" then Dark switches the theme', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { palette } = juno
+  const scheme = () => juno.win.evaluate(() => getComputedStyle(document.documentElement).colorScheme)
+
+  await palette.open()
+  await palette.type('>')
+  await expect(palette.section('Commands').getByRole('option', { name: /New tab/ })).toBeVisible()
+  await expect(palette.section('Commands').getByRole('option', { name: /Settings: Appearance/ })).toBeVisible()
+  await palette.type('theme')
+  await expect(palette.section('Commands').getByRole('option')).toHaveCount(3)
+  await palette.choose('Theme: Dark')
+  await palette.expectClosed()
+  await expect.poll(scheme).toBe('dark')
+
+  // Typed without ">", a command shows beside the conversations.
+  await palette.open()
+  await palette.type('theme light')
+  await palette.expectActive(/Theme: Light/)
+  await palette.press('Enter')
+  await expect.poll(scheme).toBe('light')
+})
+
+test('with a topic open, its commands come first under its name, and "resolve" resolves it', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { palette, sidebar } = juno
+  const roadmap = sidebar.row(ROADMAP)
+
+  await roadmap.open()
+  await palette.open()
+  await palette.type('>')
+  const group = palette.section(ROADMAP)
+  await expect(group.getByRole('option', { name: /Pin/ })).toBeVisible()
+  await expect(group.getByRole('option', { name: /Copy Slack link/ })).toBeVisible()
+  await expect(group.getByRole('option', { name: /Rename thread/ })).toBeVisible()
+  await palette.clear()
+  await palette.type('resolve')
+  await palette.expectActive(/^Resolve/)
+  await palette.press('Enter')
+  await palette.expectClosed()
+  await juno.expectToast(`Resolved · ${ROADMAP}`)
+  await expect(juno.topic.header.getByRole('button', { name: 'Reopen' })).toBeVisible()
+  // The command gave focus back to where it was.
+  await expect(palette.input).toHaveCount(0)
+  await palette.open()
+  await palette.type('>')
+  await expect(group.getByRole('option', { name: /^Reopen/ })).toBeVisible()
 })
 
 test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab', async ({ juno }) => {
@@ -54,7 +140,7 @@ test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab',
   await juno.waitForSync()
   const { palette, topic, tabs } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('draft pla')
   await palette.expectResults()
@@ -64,7 +150,7 @@ test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab',
   await topic.expectMessage('4 minutes is fine for us')
   await tabs.expectCount(1)
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('on-call handoff')
   await palette.expectResults()
@@ -80,7 +166,7 @@ test('finds a message by its text and lands on it in its thread, flashing it; th
   await juno.waitForSync()
   const { palette, topic, privacy } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('WAL position')
   await palette.expectResults()
@@ -121,7 +207,7 @@ test('a channel has its Main and "show its topics", also from its menu', async (
   await juno.waitForSync()
   const { palette, sidebar, tabs } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('platfo')
   await palette.expectResults()
@@ -131,7 +217,7 @@ test('a channel has its Main and "show its topics", also from its menu', async (
   await palette.expectClosed()
   await sidebar.expectScope('platform')
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('eng')
   await palette.expectResults()
@@ -140,7 +226,7 @@ test('a channel has its Main and "show its topics", also from its menu', async (
   await palette.expectClosed()
   await sidebar.expectScope('eng')
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('eng')
   await palette.expectResults()
@@ -153,7 +239,7 @@ test("a person's result opens your DM, or a New chat to them when you have never
   await juno.waitForSync()
   const { palette, topic, newChat } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('maya')
   await palette.expectResults()
@@ -162,7 +248,7 @@ test("a person's result opens your DM, or a New chat to them when you have never
   await palette.choose('Message Maya Chen')
   await topic.expectMessage('Running 5 late to the planning sync')
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('jonas')
   await palette.expectResults()
@@ -176,7 +262,7 @@ test('a command shows above the results with its confidence, and Enter runs it',
   await juno.waitForSync()
   const { palette } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('tell maya the wednesday slot works')
   await palette.expectResults()
@@ -197,7 +283,7 @@ test("Slack's search adds what the cache lacks under the local rows, and opening
   slack.as('Sam').postedLongAgo('eng', 'The WAL position was approved sixty days ago', 60)
 
   fake.holdNext({ method: 'search.modules.messages', reason: 'palette' })
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('WAL position')
   await palette.expectResults()
@@ -224,7 +310,7 @@ test('keyboard only: ⌘K, type, arrows, Enter and Esc', async ({ juno }) => {
   await juno.waitForSync()
   const { palette, sidebar } = juno
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('platfo')
   await palette.expectResults()
@@ -244,7 +330,7 @@ test('keyboard only: ⌘K, type, arrows, Enter and Esc', async ({ juno }) => {
   await palette.expectClosed()
   await sidebar.expectScope('platform')
 
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('nothing like this anywhere')
   await palette.expectResults()
@@ -259,7 +345,7 @@ test('a better local match arriving later does not change what Enter opens', asy
   await juno.signIn()
   await juno.waitForSync()
   const { palette, topic } = juno
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('handoff')
   await palette.expectResults()
@@ -283,7 +369,7 @@ test('an older Slack search cannot replace the results of a newer query', async 
   slack.as('Sam').postedLongAgo('platform', 'Violet archive evidence', 60)
 
   fake.holdNext({ method: 'search.modules.messages', reason: 'palette' })
-  await palette.open()
+  await palette.openMessages()
   await palette.expectResults()
   await palette.type('Amber archive')
   await palette.expectResults()
