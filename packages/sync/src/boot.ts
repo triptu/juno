@@ -10,7 +10,8 @@
  * interactive lane. Then the quick-start marker (`QUICK_START_KEY`): the
  * sidebar shows rows from here on. The other `getView` pages (10 per page
  * live, back to the quiet window) then run beside one history page per
- * active conversation (newest first, background lane, skipping
+ * active conversation (`historyOrder`: DMs, mentions, unread followed
+ * threads and the user's own channels first, then newest first; background lane, skipping
  * conversations an interrupted boot already covered). After history:
  * unknown users from the edge, and beside each other a latest-reply fetch
  * for the unfollowed threads with the most recent activity, so their rows
@@ -32,7 +33,7 @@ import type { Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
-import { activeConversations, loadCounts } from './counts'
+import { activeConversations, historyOrder, loadCounts } from './counts'
 import { discoverSince } from './discovery'
 import { readMetadata, storeMetadata } from './metadata'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
@@ -419,7 +420,8 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const history = Effect.gen(function* () {
       yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
       let done = 0
-      for (const conversation of active) {
+      // DMs, mentions and unread followed threads first; the user's own channels next; the rest by recency.
+      for (const conversation of yield* historyOrder(ctx, active, counts)) {
         // A boot that failed half way left ranges behind; what they cover is not fetched again.
         if (!(yield* covered(conversation.id, start, conversation.latest))) {
           yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
