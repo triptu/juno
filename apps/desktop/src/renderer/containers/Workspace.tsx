@@ -28,14 +28,12 @@ import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
-import { closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { AllTopicsPage, closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
-/** The All topics page is its own chunk (performance 2.1), loaded on idle once the window is up. */
-const AllTopicsPage = lazy(loadAllTopicsPage)
 // Rare pages load on first open, to keep the first bundle in budget.
 const SettingsTab = lazy(() => import('./Settings').then((chunk) => ({ default: chunk.SettingsTab })))
 

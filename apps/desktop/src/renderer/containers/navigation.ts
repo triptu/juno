@@ -86,6 +86,7 @@ import {
 import { chatCopy, type JunoPage } from '@juno/agent-contract'
 import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
+import { chunk } from './chunks'
 import { toggleSidebar } from './layout'
 import { togglePrivacy } from './privacy'
 
@@ -443,11 +444,10 @@ export function takeAllTopicsOpenStart(): number | undefined {
   return start
 }
 
-/** The All topics page's code, loaded once; the sidebar loads it on idle after its first paint. */
-export const loadAllTopicsPage = (() => {
-  let loading: Promise<typeof import('./AllTopics')> | undefined
-  return () => (loading ??= import('./AllTopics'))
-})()
+/** The All topics page, its own chunk (performance 2.1), loaded once; the workspace loads it on idle after its first paint. */
+const allTopicsChunk = chunk(() => import('./AllTopics'))
+export const loadAllTopicsPage = allTopicsChunk.load
+export const AllTopicsPage = allTopicsChunk.component((module) => module.default)
 
 /**
  * Resolves once the page's code is loaded and its first window is local,
