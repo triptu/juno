@@ -9,10 +9,11 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import { JUNO_PANEL_WIDTH } from '@juno/contract/channels'
 import { chat, colors, layout, radii, shadows, spacing, z } from '@juno/tokens/tokens.stylex'
-import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
+import { Avatar, EmptyState, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
+import { hueFor, initials } from './look'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
 export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'settings'
@@ -22,13 +23,25 @@ export interface WorkspaceTab {
   /** The topic title, the channel name for Main (no "#"), or the page name. */
   readonly title: string
   readonly icon: WorkspaceTabIcon
-  /** The topic's art, drawn in the 15px icon slot instead of the icon. */
-  readonly art?: ReactNode
+  /** What the 16px icon slot shows instead of `icon`. */
+  readonly tile?: WorkspaceTabTile
   /** Pinned: first in the strip, icon only, no close button. */
   readonly pinned?: boolean
   /** The topic has unread messages: the soft grey dot, on inactive tabs only. */
   readonly unread?: boolean
 }
+
+/**
+ * A tab's tile: the topic's art (its placeholder shape until the art is
+ * drawn), or the other person's photo in a DM, its Main and its threads.
+ * The photo is the URL the sidebar shows, so it is already loaded. `blank`
+ * keeps the slot empty while a topic's header loads, so no glyph shows
+ * that the art or photo then replaces.
+ */
+export type WorkspaceTabTile =
+  | { readonly kind: 'blank' }
+  | { readonly kind: 'art'; readonly topicId: string; readonly recipe?: string }
+  | { readonly kind: 'person'; readonly id: string; readonly name: string; readonly color: string; readonly src?: string }
 
 export interface WorkspaceProps {
   /** Default none: the strip is empty and the page shows the empty state. */
@@ -41,6 +54,11 @@ export interface WorkspaceProps {
   readonly onNewTab?: () => void
   /** The "+" button's name, after what a new tab opens. Default "New chat". */
   readonly newTabLabel?: string
+  /**
+   * A tab dragged, or moved with ⌃⇧← and ⌃⇧→, to `index` in the strip. The
+   * strip keeps pinned tabs among themselves; the owner clamps too.
+   */
+  readonly onMoveTab?: (id: string, index: number) => void
   /** Right-click on a tab: the tab menu. */
   readonly onTabContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
   /** Before the tabs while the sidebar is hidden: Show sidebar, Back and Forward. */
@@ -82,6 +100,26 @@ const COVER = '@container workspace-body (width < 856px)'
 
 const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }
 
+/** ⌃⇧← and ⌃⇧→ move the focused tab, as Firefox's ⌃⇧Page Up and Page Down do (which work too). */
+function moveStep(event: KeyboardEvent<HTMLDivElement>): -1 | 1 | undefined {
+  if (!event.ctrlKey || !event.shiftKey || event.metaKey || event.altKey) return undefined
+  if (event.key === 'ArrowLeft' || event.key === 'PageUp') return -1
+  if (event.key === 'ArrowRight' || event.key === 'PageDown') return 1
+  return undefined
+}
+
+/** The places `index` can move to: among the pinned tabs, or after them. */
+function groupOf(tabs: ReadonlyArray<WorkspaceTab>, index: number): { readonly first: number; readonly last: number } {
+  const pinned = tabs.filter((tab) => tab.pinned === true).length
+  return tabs[index]?.pinned === true ? { first: 0, last: pinned - 1 } : { first: pinned, last: tabs.length - 1 }
+}
+
+function TabTile({ tile }: { readonly tile: WorkspaceTabTile }) {
+  if (tile.kind === 'blank') return null
+  if (tile.kind === 'art') return <TopicArt topicId={tile.topicId} recipe={tile.recipe} size={16} />
+  return <Avatar label={initials(tile.name)} size={16} hue={hueFor(tile.color, tile.id)} {...(tile.src === undefined ? {} : { src: tile.src })} />
+}
+
 /** The tab the arrow keys select from `index`: Left and Right wrap, Home and End go to the ends. */
 function stepIndex(key: string, index: number, count: number): number | undefined {
   switch (key) {
@@ -100,15 +138,52 @@ function stepIndex(key: string, index: number, count: number): number | undefine
 
 /**
  * The right pane: the tab strip (a window drag region) over the page.
- * Tabs carry the kind icon or the topic's art in a fixed slot, the title,
- * the unread dot and a close button; pinned tabs come first as icons. "+"
- * sits right after the last tab and opens a new tab. While the sidebar is hidden, `leading`
- * holds its controls. The strip is an APG tablist: the active tab is the one Tab stop, the arrow
- * keys select its neighbours, Delete closes it.
+ * Tabs carry the topic's art, a DM person's photo or the page's icon in a
+ * fixed slot, the title, the unread dot and a close button; pinned tabs
+ * come first as icons. "+" sits right after the last tab and opens a new
+ * tab. While the sidebar is hidden, `leading` holds its controls. The strip
+ * is an APG tablist: the active tab is the one Tab stop, the arrow keys
+ * select its neighbours, Delete closes it, and ⌃⇧← and ⌃⇧→ move it, which
+ * a screen reader hears as its new position. A tab also drags to a new place.
  */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onTabContextMenu, leading, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
+  const section = useRef<HTMLElement>(null)
+  // The tab a move asked for and how many moves there were, so the same position is read again after a second move.
+  const [moved, setMoved] = useState<{ readonly id: string; readonly count: number } | undefined>(undefined)
+  const refocus = useRef(false)
+  const latest = useRef(tabs)
+  latest.current = tabs
+  const move = useCallback(
+    (id: string, index: number) => {
+      onMoveTab?.(id, index)
+      setMoved((last) => ({ id, count: (last?.count ?? 0) + 1 }))
+    },
+    [onMoveTab],
+  )
+  const onDrop = useCallback((from: number, to: number) => {
+    const tab = latest.current[from]
+    if (tab !== undefined) move(tab.id, to)
+  }, [move])
+  // React moves the tabs' nodes to their new order, which can take focus off the moved tab; it gets it back.
+  useLayoutEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    section.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true })
+  }, [tabs])
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
+    if (!(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
+    const step = moveStep(event)
+    if (step !== undefined) {
+      event.preventDefault()
+      const at = tabs.findIndex((tab) => tab.id === activeId)
+      const { first, last } = groupOf(tabs, at)
+      const to = Math.min(Math.max(at + step, first), last)
+      if (at < 0 || onMoveTab === undefined || to === at) return
+      refocus.current = true
+      move(tabs[at]!.id, to)
+      return
+    }
+    if (onSelectTab === undefined) return
     const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
     const target = next === undefined ? undefined : tabs[next]
     if (target === undefined) return
@@ -116,13 +191,14 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
     onSelectTab(target.id, keyboard)
   }
   return (
-    <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label={`${newTabLabel} ⌘T`} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+    <section ref={section} aria-label="Workspace" {...stylex.props(styles.root)}>
+      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} trailing={<IconButton icon={Plus} label={`${newTabLabel} ⌘T`} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
             icon={icons[tab.icon]}
-            leading={tab.art}
+            leading={tab.tile === undefined ? undefined : <TabTile tile={tab.tile} />}
+            movable={onMoveTab !== undefined}
             label={tab.title}
             active={tab.id === activeId}
             pinned={tab.pinned === true}
@@ -133,6 +209,9 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
           />
         ))}
       </TabStrip>
+      <span role="status" {...stylex.props(styles.announce)}>
+        {movedText(tabs, moved)}
+      </span>
       <div {...stylex.props(styles.body)}>
         <main {...stylex.props(styles.page)}>
           {children}
@@ -146,6 +225,14 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
       </div>
     </section>
   )
+}
+
+/** What a screen reader hears after a move: the tab's new position. A trailing space on every other move makes a repeat read again. */
+function movedText(tabs: ReadonlyArray<WorkspaceTab>, moved: { readonly id: string; readonly count: number } | undefined): string {
+  if (moved === undefined) return ''
+  const at = tabs.findIndex((tab) => tab.id === moved.id)
+  if (at < 0) return ''
+  return `Moved to position ${at + 1} of ${tabs.length}.${moved.count % 2 === 0 ? '\u00a0' : ''}`
 }
 
 interface SidePanelProps {
@@ -234,6 +321,15 @@ export function WorkspaceEmpty() {
 }
 
 const styles = stylex.create({
+  // Read by screen readers only.
+  announce: {
+    position: 'absolute',
+    width: '1px', // tokens-allow: The smallest box a screen reader still reads.
+    height: '1px', // tokens-allow: The smallest box a screen reader still reads.
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
+  },
   root: {
     display: 'flex',
     flexDirection: 'column',

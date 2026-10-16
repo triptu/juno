@@ -23,17 +23,17 @@ import {
 } from '@juno/state'
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
-import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
+import { Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
-import { AllTopicsPage, closeTabById, loadAllTopicsPage, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
+import { AllTopicsPage, closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
-import { hasArt, TopicTab } from './TopicView'
+import { TopicTab } from './TopicView'
 
 // Settings warms on idle after the first paint, outside the startup bundle.
 const settings = chunk(() => import('./Settings'))
@@ -48,7 +48,26 @@ const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
 
 const tabs = new WeakMap<TabSummary, WorkspaceTab>()
 
-/** A tab as the strip draws it: the topic title, or the channel name for Main, with the topic's art in the icon slot. */
+const blank = { tile: { kind: 'blank' } } as const
+
+/**
+ * A topic tab's tile: the other person's photo in a DM (its Main and its
+ * threads), the same URL the sidebar row shows; the group glyph in a group
+ * DM; otherwise the topic's art or its placeholder. Empty while the header loads.
+ */
+function tileOf(detail: TopicDetail | null | undefined): Pick<WorkspaceTab, 'tile'> {
+  if (detail === undefined) return blank
+  if (detail === null || detail.channel.kind === 'mpim') return {}
+  if (detail.channel.kind === 'im') {
+    const { channel } = detail
+    const partner = channel.partner
+    const src = partner?.avatarUrl === undefined ? undefined : partner.avatarLargeUrl || partner.avatarUrl
+    return { tile: { kind: 'person', id: partner?.id ?? channel.id, name: partner?.name ?? channel.name, color: partner?.color ?? channel.color, ...(src === undefined ? {} : { src }) } }
+  }
+  return { tile: { kind: 'art', topicId: detail.id, ...(detail.art === undefined ? {} : { recipe: detail.art }) } }
+}
+
+/** A tab as the strip draws it: the topic title, or the channel name for Main, with the topic's art or the DM person's photo in the icon slot. */
 function stripTab(summary: TabSummary): WorkspaceTab {
   const held = tabs.get(summary)
   if (held !== undefined) return held
@@ -68,12 +87,12 @@ function stripTab(summary: TabSummary): WorkspaceTab {
               : place.kind === 'junoPage'
                 ? { ...base, title: chatCopy.pageTitles[place.page], icon: 'juno' }
                 : {
-          ...base,
-          title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
-          icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
-          unread: detail != null && detail.unreadCount > 0,
-          ...(detail != null && hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={16} /> } : {}),
-        }
+                    ...base,
+                    title: detail == null ? '' : detail.kind === 'main' ? detail.channel.name : detail.title,
+                    icon: detail == null ? 'hash' : kindIcons[detail.channel.kind],
+                    unread: detail != null && detail.unreadCount > 0,
+                    ...tileOf(detail),
+                  }
   tabs.set(summary, tab)
   return tab
 }
@@ -244,6 +263,7 @@ export function Workspace() {
       {...(state.active === undefined ? {} : { activeId: state.active })}
       onSelectTab={selectTab}
       onCloseTab={closeTabById}
+      onMoveTab={moveTabTo}
       onNewTab={openNewTab}
       onTabContextMenu={tabMenu}
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}

@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { colors, layout, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { colors, layout, opacity, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
@@ -25,9 +25,10 @@ const PINNED_DOT_OFFSET = '-2px'
 export interface TabProps {
   readonly icon: PhosphorIcon
   /**
-   * Fills the 16px icon slot instead of `icon`: a topic's art, drawn at the
-   * slot's size. The slot keeps its size either way, so swapping one for
-   * the other never moves the label.
+   * Fills the 16px icon slot instead of `icon`: a topic's art or a person's
+   * photo, drawn at the slot's size. The slot keeps its size either way, so
+   * swapping one for the other never moves the label. On an inactive tab it
+   * dims with the label, as the glyph does.
    */
   readonly leading?: ReactNode
   readonly label: string
@@ -46,6 +47,8 @@ export interface TabProps {
   readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
   /** Accessible name for the close button. Default "Close tab". */
   readonly closeLabel?: string
+  /** The strip moves the tab with ⌃⇧← and ⌃⇧→ (and by dragging): named in `aria-keyshortcuts`. */
+  readonly movable?: boolean
 }
 
 const isTab = (node: Element | null): node is HTMLElement => node instanceof HTMLElement && node.getAttribute('role') === 'tab'
@@ -75,7 +78,7 @@ function focusTarget(box: HTMLElement): HTMLElement | undefined {
  * focused tab. The tab names it with `aria-actions`, which VoiceOver offers
  * as the tab's action, and the pointer clicks it where it always was.
  */
-export function Tab({ icon, leading, label, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab' }: TabProps) {
+export function Tab({ icon, leading, label, active = false, pinned = false, unread = false, onSelect, onClose, onContextMenu, closeLabel = 'Close tab', movable = false }: TabProps) {
   const ref = useRef<HTMLDivElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const closeId = useId()
@@ -106,11 +109,13 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
   }
 
   const dot = unread && !active
+  const shortcuts = [onClose ? 'Delete' : undefined, movable ? 'Control+Shift+ArrowLeft Control+Shift+ArrowRight' : undefined].filter((keys) => keys !== undefined).join(' ')
 
   return (
     <div
       ref={boxRef}
       data-tab=""
+      data-tab-pinned={pinned ? '' : undefined}
       {...stylex.props(styles.box, active ? styles.boxActive : styles.boxInactive, pinned && styles.boxPinned)}
     >
       <div
@@ -121,7 +126,7 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
         aria-description={dot ? 'Unread' : undefined}
         aria-label={pinned ? label : undefined}
         aria-actions={onClose ? closeId : undefined}
-        aria-keyshortcuts={onClose ? 'Delete' : undefined}
+        aria-keyshortcuts={shortcuts === '' ? undefined : shortcuts}
         data-pinned={pinned ? '' : undefined}
         data-unread={dot ? '' : undefined}
         title={label}
@@ -153,7 +158,7 @@ function TabContent({ icon, leading, label, pinned, dot }: Pick<TabProps, 'icon'
   return (
     <>
       <span {...stylex.props(styles.iconSlot, pinned && styles.iconSlotPinned)}>
-        {leading ?? <Icon icon={icon} size={15} dim />}
+        {leading === undefined ? <Icon icon={icon} size={15} dim /> : <span {...stylex.props(styles.leading)}>{leading}</span>}
         {pinned ? <span aria-hidden {...stylex.props(styles.pinnedDot, dot && styles.dotShown)} /> : null}
       </span>
       {pinned ? null : (
@@ -201,6 +206,7 @@ const styles = stylex.create({
   boxActive: {
     zIndex: 1,
     color: colors['--foreground-default'],
+    '--tab-icon-opacity': '1',
     '--tab-divider-opacity': '0',
     '--tab-cover-opacity': '1',
   },
@@ -210,6 +216,11 @@ const styles = stylex.create({
     color: {
       default: colors['--foreground-subtle'],
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
+    },
+    // Art and photos dim with the label, and come up with it on hover.
+    '--tab-icon-opacity': {
+      default: opacity['--opacity-tab-icon'],
+      ':hover': { default: null, [HOVER]: '1' },
     },
     // The tab's fill, read by the tab and by what sits on it (the narrow
     // close button's backing, the pinned dot's ring).
@@ -300,6 +311,10 @@ const styles = stylex.create({
     width: sizes['--icon-16'],
     height: sizes['--icon-16'],
     overflow: 'hidden',
+  },
+  leading: {
+    display: 'inline-flex',
+    opacity: 'var(--tab-icon-opacity)',
   },
   iconSlotPinned: {
     overflow: 'visible',
