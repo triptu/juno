@@ -538,7 +538,8 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | --- | --- | --- |
 | `--duration-fast` | 150ms | Press scale, hover colour, focus ring, the avatar photo fade |
 | `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
-| `--duration-appear` | 240ms | Toast, popover, palette, card and empty-state entrance |
+| `--duration-appear` | 240ms | Toast, palette, card and empty-state entrance |
+| `--duration-menu-in` | 80ms | Popover and menu entrance: menus come in fast and may leave slower (owner, 10-17) |
 | `--duration-exit` | 150ms | Every exit |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
@@ -551,7 +552,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
 | Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |
-| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear`, origin at the anchor corner. Exit opacity only | |
+| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear` (`--duration-menu-in` for popovers and menus), origin at the anchor corner. Exit opacity only | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
 | Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue | |
@@ -559,7 +560,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |
 
-Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
+Menus and popovers enter in 80ms, other entrances in 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
 
 ## 9. Opacity
 

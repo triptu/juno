@@ -66,7 +66,8 @@ const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:n
 
 /**
  * Floats a popover Surface next to its anchor. Appears with a short fade
- * and scale from the anchor corner (--duration-appear); closing is instant,
+ * and scale from the anchor corner (--duration-menu-in, 80ms: menus come
+ * in fast); closing is instant,
  * since the panel is unmounted. Scrolling is contained so the page behind
  * never moves. The panel stays inside its pane: one that would run past an
  * edge moves in, and one wider than the pane narrows. Closing with Escape while focus is inside puts focus back on
@@ -195,7 +196,7 @@ const styles = stylex.create({
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     animationName: appear,
-    animationDuration: motion['--duration-appear'],
+    animationDuration: motion['--duration-menu-in'],
     animationTimingFunction: motion['--ease-out'],
     animationFillMode: 'both',
   },

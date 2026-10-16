@@ -1,0 +1,1 @@
+- 10-17 00:40 · orchestrator · Menus and popovers enter in 80ms (`--duration-menu-in`), down from 240ms; they may leave slower. Tushar: a slow entrance makes the interface feel slow (profile popover, threads dropdown).

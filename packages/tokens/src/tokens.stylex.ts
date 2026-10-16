@@ -669,8 +669,9 @@ export const text = stylex.defineVars({
 /**
  * Three ideas: instant for what you do constantly, a quick ease-out for
  * presses and toggles, and a small spring for the few moments that deserve
- * it (a reaction landing, a toggle filling, a resolve check). Entrances are
- * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate.
+ * it (a reaction landing, a toggle filling, a resolve check). Menus and
+ * popovers enter in 80ms; other entrances are 240ms, exits 150ms, pops
+ * 220ms; rows, tabs and typing never animate.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.
@@ -691,6 +692,12 @@ export const motion = stylex.defineVars({
   },
   '--duration-exit': {
     default: '150ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  // Menus and popovers come in at once and may leave slower: a slow
+  // entrance makes the interface feel slow (owner, 10-17).
+  '--duration-menu-in': {
+    default: '80ms',
     [REDUCED_MOTION]: '0.01ms',
   },
   // How long a send may take before its pending row dims (inventory 6.1).
