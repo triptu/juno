@@ -113,7 +113,7 @@ export function fakeHomeTitle(input: HomeTitleInput): unknown {
 export function fakeAutomatedChannel(input: AutomatedChannelInput): unknown {
   if (input.messages.length === 0) return { probability: 0, reason: 'no messages' }
   const apps = input.messages.filter((message) => message.fromApp === true).length
-  return { probability: Math.round((apps / input.messages.length) * 100) / 100, reason: 'share of app messages' }
+  return { probability: Math.round((apps / input.messages.length) * 100) / 100, reason: `${apps} of ${input.messages.length} messages from apps` }
 }
 
 export function fakeTitle(input: TitleTopicInput): string {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyConversation, integrationName, junoVerdict, type Sender } from '../src'
+import { automatedReason, classifyConversation, integrationName, junoVerdict, type Sender } from '../src'
 
 const senders = (apps: number, people: number, you = 0): ReadonlyArray<Sender> => [
   ...Array<Sender>(apps).fill('app'),
@@ -36,19 +36,27 @@ describe('classifying a conversation', () => {
     expect(channel('team-sync', senders(5, 5))).toBe('ambiguous')
   })
 
-  it('asks when apps send a fair share, or the name says integration and some app writes there', () => {
-    expect(channel('releases', senders(4, 6))).toBe('ambiguous')
-    expect(channel('ci', senders(1, 9))).toBe('ambiguous')
+  it('asks when apps send half, or a third in a channel named for an integration', () => {
+    expect(channel('releases', senders(3, 3))).toBe('ambiguous')
+    expect(channel('releases', senders(18, 12))).toBe('ambiguous')
+    expect(channel('deploys', senders(10, 20))).toBe('ambiguous')
   })
 
-  it('asks instead of moving when the user writes there too', () => {
-    expect(channel('alerts-prod', senders(9, 0, 1))).toBe('ambiguous')
-  })
-
-  it('leaves people talking in All', () => {
-    expect(channel('eng', senders(0, 12, 3))).toBe('people')
+  it('leaves people talking in All, even where an app posts a minority of the messages', () => {
+    expect(channel('eng', senders(0, 30))).toBe('people')
     expect(channel('eng', senders(2, 10))).toBe('people')
+    // A meeting-notes app posting after each meeting, and people discussing the notes.
+    expect(channel('proj-meeting-notes', senders(9, 21))).toBe('people')
+    expect(channel('proj-meeting-notes', senders(14, 16))).toBe('people')
+    // An on-call channel where people work through the alerts.
+    expect(channel('oncall', senders(12, 18))).toBe('people')
+    expect(channel('ci', senders(1, 9))).toBe('people')
     expect(channel('alerts-team', senders(0, 8))).toBe('people')
+  })
+
+  it('leaves a channel the user wrote in alone, however much apps post there', () => {
+    expect(channel('alerts-prod', senders(29, 0, 1))).toBe('people')
+    expect(channel('releases', senders(18, 6, 6))).toBe('people')
   })
 
   it('says nothing until there are a few messages', () => {
@@ -68,7 +76,25 @@ describe("Juno's answer", () => {
     expect(junoVerdict(0.9)).toBe('automated')
     expect(junoVerdict(0.85)).toBe('automated')
     expect(junoVerdict(0.5)).toBe('ambiguous')
+    expect(junoVerdict(0.4)).toBe('people')
     expect(junoVerdict(0.2)).toBe('people')
     expect(junoVerdict(0.05)).toBe('people')
+  })
+})
+
+describe("Home's reason for asking", () => {
+  it("gives Juno's reason as a sentence when Juno gave one", () => {
+    expect(automatedReason({ apps: 18, of: 30, juno: 'mostly release tags from a bot.' })).toBe('Mostly release tags from a bot')
+  })
+
+  it('else says how many of the latest messages apps wrote', () => {
+    expect(automatedReason({ apps: 18, of: 30 })).toBe('Apps wrote 18 of the last 30 messages')
+    expect(automatedReason({ apps: 18, of: 30, juno: ' ' })).toBe('Apps wrote 18 of the last 30 messages')
+    expect(automatedReason({ apps: 1, of: 4 })).toBe('An app wrote 1 of the last 4 messages')
+  })
+
+  it('says nothing when neither is known', () => {
+    expect(automatedReason({})).toBeUndefined()
+    expect(automatedReason({ apps: null, of: null, juno: null })).toBeUndefined()
   })
 })

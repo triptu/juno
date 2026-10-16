@@ -357,6 +357,24 @@ export const examples: ReadonlyArray<Example> = [
     },
     (o) => o.probability < 0.5,
   ),
+  ex(
+    tasks.automatedChannel,
+    'a project channel where a meeting-notes app posts and people talk',
+    {
+      channelId: 'C0PROJNOTES',
+      channel: '#proj-meeting-notes',
+      messages: [
+        { ...m('Notetaker', 'Notes from Weekly sync: launch date, pricing page, beta feedback', 120), fromApp: true },
+        m('Maya Chen', 'Thanks. I think the launch date slipped to the 28th, not the 21st.', 110),
+        m('Dev Patel', 'Right, the 28th. I will fix it in the doc.', 105),
+        { ...m('Notetaker', 'Notes from Design review: onboarding flow, empty states', 60), fromApp: true },
+        m('Elena Ruiz', 'Can someone share the Figma link from the review?', 50),
+        { ...m('Notetaker', 'Notes from Pricing call: annual discount, seat minimums', 20), fromApp: true },
+        m('Maya Chen', 'Seat minimum of 5 felt high to me. Let us talk Thursday.', 10),
+      ],
+    },
+    (o) => o.probability <= 0.4,
+  ),
 ]
 
 /** The structured examples, which carry an expectation. */

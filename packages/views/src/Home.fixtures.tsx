@@ -49,6 +49,8 @@ export default defineFixtures(
       'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
       // The Automated question, after the ones it ranks below.
       automated: state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { hover: '[data-home-item=automated]' }),
+      // Juno's reason in place of the count; in a narrow window the meta line takes an ellipsis.
+      'automated-juno': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.automatedByJuno] }, { width: 720, height: 520, padded: false, hover: '[data-home-item=automated]' }),
       one: state({ scene: 'friday', title: 'Happy Friday, Tushar.', line: 'One thing wants you.', items: [homeItems.resume] }),
       // A running job's state line in place of "Ask Juno…" (SPEC 13.4); a long one takes an ellipsis.
       'ask-job-line': state({ askLine: 'T3 Code · tests running, 2 of 5' }),

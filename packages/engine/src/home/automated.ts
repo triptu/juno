@@ -17,7 +17,8 @@
  * - ambiguous: with AI assist on, Juno judges it once (`automatedChannel`,
  *   a decision over the latest 20 messages, kept in `ai_cache`). Sure it is
  *   automated: it goes in. Sure it is not: it stays. Otherwise, or with AI
- *   off or no provider, Home asks (`ask`).
+ *   off or no provider, Home asks (`ask`), with why: how many of the
+ *   latest messages apps wrote, and Juno's reason when it gave one.
  * - people or too few messages: it stays, and an open question goes.
  *
  * Nothing runs once the user deleted the view.
@@ -52,15 +53,21 @@ interface Memory {
   readonly deferred: Map<string, { readonly until: number; readonly attempts: number }>
 }
 
-/** Juno's stored probability for the conversation, if it answered before. */
+interface Answer {
+  readonly probability: number
+  readonly reason?: string
+}
+
+/** Juno's stored answer for the conversation, if it answered before. */
 const storedAnswer = (channel: string) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const row = (yield* sql<{ output_json: string }>`SELECT output_json FROM ai_cache WHERE task = 'automatedChannel' AND key = ${channel}`)[0]
     if (row === undefined) return undefined
     try {
-      const value = JSON.parse(row.output_json) as { probability?: unknown }
-      return typeof value.probability === 'number' ? value.probability : undefined
+      const value = JSON.parse(row.output_json) as { probability?: unknown; reason?: unknown }
+      if (typeof value.probability !== 'number') return undefined
+      return { probability: value.probability, ...(typeof value.reason === 'string' ? { reason: value.reason } : {}) } satisfies Answer
     } catch {
       return undefined
     }
@@ -90,8 +97,8 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         seen()
         continue
       }
-      let probability = ai ? yield* storedAnswer(row.id) : undefined
-      if (ai && probability === undefined && calls > 0 && (memory.deferred.get(row.id)?.until ?? 0) <= now) {
+      let answer: Answer | undefined = ai ? yield* storedAnswer(row.id) : undefined
+      if (ai && answer === undefined && calls > 0 && (memory.deferred.get(row.id)?.until ?? 0) <= now) {
         calls -= 1
         const decision = yield* decideAndStore(tasks.automatedChannel, {
           channelId: row.id,
@@ -99,19 +106,24 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
           ...(row.topic === null || row.topic === '' ? {} : { topic: row.topic }),
           messages: yield* junoSample(sample.slice(0, JUNO_MESSAGES), selfId),
         })
-        if (decision._tag === 'Decided') probability = decision.value.probability
+        if (decision._tag === 'Decided') answer = decision.value
         else {
           const attempts = (memory.deferred.get(row.id)?.attempts ?? 0) + 1
           memory.deferred.set(row.id, { until: now + Math.min(DEFER_CAP_MILLIS, DEFER_BASE_MILLIS * 2 ** (attempts - 1)), attempts })
         }
       }
-      const judged = probability === undefined ? 'ambiguous' : junoVerdict(probability)
+      const judged = answer === undefined ? 'ambiguous' : junoVerdict(answer.probability)
       if (judged === 'automated') yield* write(moveToAutomated(row.id, 'juno', now))
       else if (judged === 'people') {
         if (row.verdict === 'ask') yield* write(clearVerdict(row.id))
-      } else if (row.verdict !== 'ask') yield* write(setVerdict(row.id, 'ask', probability === undefined ? 'rules' : 'juno', now))
+      } else {
+        // Written only when something Home says changed, so a pass waiting on Juno does not wake the next.
+        const by = answer === undefined ? 'rules' : 'juno'
+        const why = { apps: sample.filter((message) => senderOf(message, selfId) === 'app').length, sampled: sample.length, ...(answer?.reason === undefined ? {} : { reason: answer.reason }) }
+        if (row.verdict !== 'ask' || row.by !== by || row.apps !== why.apps || row.sampled !== why.sampled || row.reason !== (why.reason ?? null)) yield* write(setVerdict(row.id, 'ask', by, now, why))
+      }
       // Without Juno's answer yet, Home asks meanwhile and Juno is asked on a later pass.
-      if (!ai || probability !== undefined) seen()
+      if (!ai || answer !== undefined) seen()
     }
   })
 

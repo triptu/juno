@@ -26,7 +26,7 @@
 import { HOME_ITEM_LIMIT, type HomeItem, type HomeTopic, type HomeView } from '@juno/contract'
 import {
   asksUser,
-  AUTOMATED_SAMPLE,
+  automatedReason,
   AUTOMATED_VIEW_ID,
   channelLabel,
   channelLabelBare,
@@ -96,13 +96,10 @@ export const homeStatements = {
       ORDER BY +i.last_activity_ts DESC LIMIT 1`,
     params: [AUTOMATED_VIEW_ID],
   }),
-  /** How many of a conversation's latest messages came from apps, for the meta line. */
-  fromApps: (channel: string): Statement => ({
-    sql: `SELECT count(*) AS of, coalesce(sum(app), 0) AS apps FROM (
-        SELECT (m.subtype = 'bot_message' OR u.is_bot = 1 OR m.user_id LIKE 'B%') AS app FROM messages m LEFT JOIN users u ON u.id = m.user_id
-        WHERE m.channel = ? AND m.deleted = 0 AND (m.subtype IS NULL OR m.subtype IN ('bot_message', 'thread_broadcast', 'file_share', 'me_message'))
-        ORDER BY m.ts DESC LIMIT ?)`,
-    params: [channel, AUTOMATED_SAMPLE],
+  /** Why Home asks about a conversation, stored with its question. */
+  askedWhy: (channel: string): Statement => ({
+    sql: `SELECT apps, sampled, reason FROM automated_channels WHERE channel = ?`,
+    params: [channel],
   }),
   mainAfter: (channel: string, after: string, limit = QUESTION_WINDOW): Statement => ({
     sql: `SELECT ts, user_id, text FROM messages WHERE channel = ? AND ts > ? AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND deleted = 0
@@ -241,14 +238,15 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     // Automated: a conversation the rules and Juno could not place. Asked with AI on or off.
     const [asked] = yield* run(homeStatements.automated())
     if (asked !== undefined) {
-      const counts = (yield* sql.unsafe<{ apps: number; of: number }>(homeStatements.fromApps(asked.channel).sql, homeStatements.fromApps(asked.channel).params))[0]
+      const why = (yield* sql.unsafe<{ apps: number | null; sampled: number | null; reason: string | null }>(homeStatements.askedWhy(asked.channel).sql, homeStatements.askedWhy(asked.channel).params))[0]
+      const reason = why === undefined ? undefined : automatedReason({ apps: why.apps, of: why.sampled, juno: why.reason })
       add(
         {
           id: `automated:${asked.channel}`,
           kind: 'automated',
           title: '',
           ...(asked.last_activity_ts === null ? {} : { at: tsToMillis(asked.last_activity_ts as Ts) }),
-          ...(counts === undefined ? {} : { fromApps: { apps: counts.apps, of: counts.of } }),
+          ...(reason === undefined ? {} : { reason }),
         },
         [asked],
       )

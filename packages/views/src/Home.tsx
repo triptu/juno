@@ -118,7 +118,7 @@ interface HomeRowProps {
 
 /** The meta line: plain data, the same with and without AI. */
 function metaOf(item: HomeItem, now: number): string {
-  if (item.kind === 'automated') return 'To Automated'
+  if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
   if (item.kind === 'tidyUp') return item.topics.map((topic) => topic.title).join(', ')
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
