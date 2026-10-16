@@ -1,0 +1,1 @@
+- 10-16 15:02 · codemode-1 · Codemode for the Juno Agent stays off by default (`agent.codemode`): scripts may only read, and on the scripted measurement they save one turn on multi-step connection reads but add about 1,000 prompt tokens to every request (docs/research/codemode.md).
