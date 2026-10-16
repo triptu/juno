@@ -1,7 +1,7 @@
 import type { Attachment } from '@juno/slack-schema'
 
-/** Invented link previews; every image is served by the fake. */
-export function unfurlFixtures(base: string): Readonly<Record<'xImage' | 'xText' | 'failed' | 'youtube' | 'github' | 'docs' | 'generic', Attachment>> {
+/** Invented link previews, and a shared Slack message; every image is served by the fake. */
+export function unfurlFixtures(base: string): Readonly<Record<'xImage' | 'xText' | 'failed' | 'youtube' | 'github' | 'docs' | 'generic' | 'shared', Attachment>> {
   const image = `${base}/avatars/U0MAYA.svg`
   const post = { service_name: 'X', service_icon: image, author_name: 'Avery Example (@avery_example)', author_icon: image, title: 'Avery Example on X', from_url: 'https://example.test/post/1', text: 'Small experiments make the next decision clearer.', footer: 'X', ts: 1792141200 }
   return {
@@ -11,6 +11,12 @@ export function unfurlFixtures(base: string): Readonly<Record<'xImage' | 'xText'
     youtube: { service_name: 'YouTube', service_icon: image, author_name: 'Example Studio', title: 'How the demo works', title_link: 'https://example.test/watch/demo', text: 'A short tour of the prototype.', thumb_url: image, image_width: 640, image_height: 360 },
     github: { service_name: 'GitHub', title: 'sample/project', text: 'A small demonstration project.', from_url: 'https://example.test/sample/project', thumb_url: image },
     docs: { service_name: 'Google Docs', title: 'Planning notes', text: 'Decisions for the next iteration.', from_url: 'https://example.test/document/1', service_icon: image },
+    // As Slack sends a shared message: its words as rich text in `message_blocks`, again as mrkdwn `text`, and in `fallback`.
+    shared: {
+      is_msg_unfurl: true, author_name: 'Maya', author_icon: image, from_url: 'https://example.test/archives/C0ENG/p1792141200000100', ts: '1792141200.000100',
+      footer: 'Thread in Slack conversation', fallback: '[October 16th, 2026 10:30 AM] Maya: Shared words appear once.', text: 'Shared words appear once.', mrkdwn_in: ['text'],
+      message_blocks: [{ message: { blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'Shared words appear once.' }] }] }] } }],
+    },
     generic: { service_name: 'Example Journal', title: 'A useful observation', text: 'The summary supplied by the page.', from_url: 'https://example.test/article/1', image_url: image, image_width: 800, image_height: 420 },
   }
 }

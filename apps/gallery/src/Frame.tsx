@@ -64,4 +64,5 @@ const surfaces = stylex.create({
   background: { backgroundColor: colors['--background'] },
   subtle: { backgroundColor: colors['--background-subtle'] },
   surface: { backgroundColor: colors['--surface-default'] },
+  raised: { backgroundColor: colors['--surface-raised'] },
 })

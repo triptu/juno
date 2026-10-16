@@ -108,6 +108,8 @@ export const Attachment = S.Struct({
   service_name: opt(S.String),
   service_icon: opt(S.String),
   is_msg_unfurl: opt(S.Boolean),
+  /** A shared or linked Slack message: its own blocks, beside the same words as mrkdwn `text`. */
+  message_blocks: opt(S.Array(S.Struct({ message: opt(S.Struct({ blocks: opt(Blocks) })) }))),
 })
 export type Attachment = typeof Attachment.Type
 

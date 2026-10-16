@@ -98,6 +98,9 @@ export const colors = stylex.defineVars({
   // text on their own (2.1:1 and 3.9:1).
   '--danger': '#C41E3A',
   '--success': '#00674F',
+  // The active presence dot: a clear green, 3:1 against the menu it sits in.
+  // --success is too deep for a 6px dot (it reads grey, 1.8:1 in dark).
+  '--presence-active': '#1F9D66',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 
@@ -128,6 +131,8 @@ export const colors = stylex.defineVars({
  * - --hl-count, --hl-count-fg: the sidebar's counters, the accent at reduced
  *   brightness: a tint of it over the sidebar for the fill and a deeper
  *   (light) or dimmer (dark) accent for the text, held to 4.5:1 on the fill
+ * - --hl-mention, --hl-mention-fg: the @you chip in a message, held to 6:1;
+ *   in light the accents whose fill is lighter take the deeper --hl-text
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
@@ -143,6 +148,8 @@ export const accent = stylex.defineVars({
   '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
   '--hl-count': '#F7DED4',
   '--hl-count-fg': '#B3371B',
+  '--hl-mention': '#B4351F',
+  '--hl-mention-fg': '#FFFFFF',
   '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
   '--focus-ring': '#B4351F',

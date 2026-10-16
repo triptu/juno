@@ -80,7 +80,7 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 
 | Prop | Values | Notes |
 | --- | --- | --- |
-| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; the topic switcher's unread count), `count` (`--hl-count` / `--hl-count-fg`; the sidebar's counters), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse, @you), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
+| `variant` | `outline` (Main), `filled` (Reopened, Open, Digest, #channel), `strong` (`--secondary-active`; the topic switcher's unread count), `count` (`--hl-count` / `--hl-count-fg`; the sidebar's counters), `soft` (`--hl-soft` + inset ring; @), `accent` (`--hl`; Now, @ in Browse), `mention` (`--hl-mention` / `--hl-mention-fg`; @you in a message), `success` (resolved tint), `quiet` (transparent, muted), `surface` (`--surface-hover`), `person` (the inline @mention: `hue` mixed 16% into the surface and 40% into the text, weight 600; `hue` as Avatar) | Every chip is a pill (`--radius-tag`) |
 | `size` | 18 (tag), 20 (badge), 22 (status), 24 (summary, reaction), 26 (scope), 28 (notification setting tag), `inline` (follows the surrounding line; padding 0 5) | Text 11 / 11 / 12 / 12 / 12.5 / 13 / inherited |
 | `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge |
 | `numeric` | boolean | tabular figures |
@@ -110,7 +110,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 10. Popover and OptionList
 
-`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-end` | `top-start` | `top-end`), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. Appears with opacity and a 0.98 → 1 scale from the anchor corner over `--duration-appear`; closing is instant (the panel unmounts).
+`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-center` | `bottom-end` | `top-start` | `top-end`; `bottom-center` centres the panel under the anchor, as the avatar menu does), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. Appears with opacity and a 0.98 → 1 scale from the anchor corner over `--duration-appear`; closing is instant (the panel unmounts).
 
 Menus are not a separate primitive: an in-app menu (the account menu) is an `OptionList` with `role="menu"` inside a `Popover`; its rows become `menuitem`s. In a `listbox`, rows are `option`s and `aria-selected` is the real selection only (the keyboard highlight is `aria-activedescendant`). Real context menus are native.
 

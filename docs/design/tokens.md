@@ -103,13 +103,14 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 
 | Token | What it is | Coral light | Coral dark |
 | --- | --- | --- | --- |
-| `--hl` | The fill: primary button, send, @you chip, Now chip, own bubbles | #CC4628 | #FF8A73 |
+| `--hl` | The fill: primary button, send, Now chip, own bubbles | #CC4628 | #FF8A73 |
 | `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
 | `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item | #B4351F | #FF9C87 |
 | `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
 | `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
 | `--hl-count`, `--hl-count-fg` | The sidebar's counters (row unread counts, the Juno nav count): the accent at reduced brightness. Literal values per accent, below | #F7DED4 / #B3371B | #462E26 / #F8846D |
+| `--hl-mention`, `--hl-mention-fg` | The @you chip in a message, held to 6:1. `--hl` and `--hl-fg`, except in light where that pair is under 6:1 (coral, teal, cyan): there the fill is `--hl-text` with white text. Values below | #B4351F / #FFFFFF | #FF8A73 / #2A0D06 |
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
 | `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
@@ -128,6 +129,21 @@ Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mix
 | Emerald | #D5E1D8 | #00674F | 5.1:1 | #26392F | #44BA98 | 5.14:1 |
 | Claret | #E9D4D3 | #7F1734 | 7.17:1 | #432E2F | #ED889D | 5.16:1 |
 | Cyan | #D7E6EA | #006B8F | 4.69:1 | #28393E | #48B6DB | 5.14:1 |
+
+**@you chip** (decided 10-17, the owner: the light coral chip read poorly). White on the coral fill was 4.69:1, and the cyan chip's near-black text on its mid blue 5.12:1: both pass AA but read weakly in body text. The chip takes its own pair, measured (WCAG 2, sRGB) and checked by `apps/gallery/contrast.spec.ts`:
+
+| Accent | Light fill / text | Light contrast | Dark contrast |
+| --- | --- | --- | --- |
+| Coral | #B4351F / #FFFFFF | 6.05:1 | 7.88:1 |
+| Ink | `--hl` / `--hl-fg` | 16.12:1 | 16.89:1 |
+| Marigold | `--hl` / `--hl-fg` | 8.11:1 | 9.16:1 |
+| Teal | #096762 / #FFFFFF | 6.71:1 | 7.87:1 |
+| Midnight | `--hl` / `--hl-fg` | 13.45:1 | 7.99:1 |
+| Emerald | `--hl` / `--hl-fg` | 6.59:1 | 7.5:1 |
+| Claret | `--hl` / `--hl-fg` | 9.7:1 | 7.17:1 |
+| Cyan | #006A8A / #FFFFFF | 6.12:1 | 8.5:1 |
+
+In dark every chip is `--hl` / `--hl-fg`.
 
 Ink stays neutral, as everywhere else. The quick filters show no counts, only the unread dot, so nothing else in the sidebar changes.
 
@@ -190,6 +206,7 @@ Used by: page header context pill, Juno send-card pill. Icons: `hash` (public), 
 | --- | --- | --- | --- |
 | `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
+| `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark) |
 | `--warning` | #E0A500 | css | Only ever mixed (private tint, audience guard). As text it is 2.13:1, never use raw |
 | `--info` | #008AB3 | css | Only mixed (DM tint). 3.85:1 as text |
 | Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |

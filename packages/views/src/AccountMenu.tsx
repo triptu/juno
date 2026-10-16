@@ -134,13 +134,14 @@ const styles = stylex.create({
     borderRadius: radii['--radius-full'],
     borderWidth: sizes['--focus-ring-width'],
     borderStyle: 'solid',
-    borderColor: colors['--surface-default'],
+    // The menu is a popover, on the raised surface.
+    borderColor: colors['--surface-raised'],
   },
   dotActive: {
-    backgroundColor: colors['--success'],
+    backgroundColor: colors['--presence-active'],
   },
   dotAway: {
-    backgroundColor: colors['--surface-default'],
+    backgroundColor: colors['--surface-raised'],
     boxShadow: `inset 0 0 0 1px ${colors['--foreground-muted']}`, // tokens-allow: The inset ring is a 1px hairline.
   },
   section: {

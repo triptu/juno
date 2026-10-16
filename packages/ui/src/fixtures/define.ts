@@ -6,8 +6,8 @@ export interface FixtureFrame {
   readonly width?: number
   /** Fixed frame height in px. Default: shrink to content. */
   readonly height?: number
-  /** Surface behind the component. Default `background`. */
-  readonly surface?: 'background' | 'subtle' | 'surface'
+  /** Surface behind the component. Default `background`. `raised` is a popover's. */
+  readonly surface?: 'background' | 'subtle' | 'surface' | 'raised'
   /** Padding around the component. Default true. */
   readonly padded?: boolean
   /**

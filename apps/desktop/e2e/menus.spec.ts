@@ -17,6 +17,11 @@ test('the avatar menu has one active item: hover, then the keyboard, then hover 
   await juno.signIn()
   const { accountMenu } = juno
   await accountMenu.open()
+  // The menu opens centred under the avatar (inventory 2.1), not off to its left.
+  const avatar = await win.locator('aside [aria-label="Account and settings"]').boundingBox()
+  const menu = await accountMenu.root.boundingBox()
+  expect(Math.abs(menu!.x + menu!.width / 2 - (avatar!.x + avatar!.width / 2))).toBeLessThanOrEqual(1)
+  expect(menu!.y).toBeGreaterThan(avatar!.y + avatar!.height)
   const list = accountMenu.root.getByRole('menu', { name: 'Account' })
   const notifications = accountMenu.item(/^Notifications/)
 

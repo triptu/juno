@@ -14,7 +14,8 @@ const HOVER = '@media (hover: hover)'
 /**
  * `person` is the inline @mention chip: the person's hue mixed lightly into
  * the surface and the text, weight 600, so a name reads as that person
- * wherever it appears. `@you` stays `accent`; `#channel` stays `filled`.
+ * wherever it appears. `@you` is `mention`: the accent fill, deeper in light
+ * where the plain fill is under 6:1 with its text. `#channel` stays `filled`.
  */
 export type ChipVariant =
   | 'outline'
@@ -23,6 +24,7 @@ export type ChipVariant =
   | 'count'
   | 'soft'
   | 'accent'
+  | 'mention'
   | 'success'
   | 'quiet'
   | 'surface'
@@ -256,6 +258,10 @@ export const chipVariants = stylex.create({
   accent: {
     color: accent['--hl-fg'],
     backgroundColor: accent['--hl'],
+  },
+  mention: {
+    color: accent['--hl-mention-fg'],
+    backgroundColor: accent['--hl-mention'],
   },
   success: {
     color: tints['--tint-resolved-fg'],

@@ -20,3 +20,16 @@ wire messages. Parser tests and the fake-server e2e use invented, valid content.
 GitHub-like and Linear-like labels describe synthetic examples, not provider
 identification from the sample. Alert fields, footer dates and images are
 synthetic coverage for cases not observed here.
+
+## Shared Slack messages (10-17)
+
+A message shared or linked from another conversation arrives as an attachment
+with `is_msg_unfurl`, `author_name` and `author_icon`, `from_url`, `ts`, a
+`footer` such as "Thread in Slack conversation" or "Posted in #channel", the
+words as mrkdwn `text`, again in `fallback` ("[date] Name: words"), and as rich
+text in `message_blocks[].message.blocks`. This comes from Slack's API shape;
+no live sample was recorded. The owner saw the words drawn twice. The parser now
+reads `message_blocks` and attachment `blocks`, and draws `text` only when they
+give nothing, as a message's own body does. Unknown: which of the two block
+fields the owner's message carried; both are covered by
+`packages/richtext/test/attachments.test.ts`.
