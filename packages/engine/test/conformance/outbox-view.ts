@@ -67,7 +67,8 @@ export interface DraftView {
 export interface View {
   readonly d1: DraftView
   readonly d2: DraftView
-  readonly connected: boolean
+  /** The socket is up. The engine's side says so when the fake and the engine disagree (`observeConnection`). */
+  readonly connected: boolean | string
 }
 
 // The model's side
@@ -306,3 +307,16 @@ export function observeDraft(world: World, k: Draft): DraftView {
     act,
   }
 }
+
+/**
+ * The socket as the fake and the engine see it. Until the engine has seen a
+ * drop its workers still send, so the two must agree. A closed app has none.
+ */
+export function observeConnection(world: World): View['connected'] {
+  if (world.closed) return false
+  const socket = world.engine.fake.socketCount() > 0
+  const online = world.engine.online()
+  return socket === online ? socket : `socket ${socket ? 'up' : 'down'}, engine ${online ? 'online' : 'offline'}`
+}
+
+export const observe = (world: World): View => ({ d1: observeDraft(world, 1), d2: observeDraft(world, 2), connected: observeConnection(world) })

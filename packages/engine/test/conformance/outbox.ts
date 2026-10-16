@@ -41,7 +41,7 @@ import {
   isCopyDelete,
   isLookup,
   isPost,
-  observeDraft,
+  observe,
   readStore,
   sOf,
   storedMessages,
@@ -391,10 +391,8 @@ export const outboxSpec: Spec<World, View> = {
         .join(', ')}`,
       `  outbox: ${JSON.stringify(readDb(world.engine, 'user.db', (db) => db.prepare('SELECT kind, target_key, depends_on, payload_json, attempts, next_at, last_error FROM outbox').all()))}`,
     ].join('\n'),
-  observe: (world) => ({
-    d1: observeDraft(world, 1),
-    d2: observeDraft(world, 2),
-    connected: !world.closed && world.engine.fake.socketCount() > 0,
-  }),
+  observe,
+  // A catch-up's reads are not gated: one still running would store what the next step puts in Slack.
+  busy: (world) => !world.closed && world.engine.syncing(),
 }
 

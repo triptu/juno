@@ -6,8 +6,13 @@
  * the steps Juno takes on its own after it (a claim, a lookup, the
  * catch-up). The harness drives the first step, then waits until the
  * engine's projection equals the model's projection of the state at the
- * end of the round, and stays equal for `STABLE_MS`. A round that never
- * gets there is a divergence: the engine and the model disagree.
+ * end of the round, and stays equal for `STABLE_MS` while the engine's own
+ * work is done (`busy`). A round that never gets there is a divergence:
+ * the engine and the model disagree.
+ *
+ * Equal for a while is not enough on a loaded machine: a catch-up whose
+ * reads change nothing the projection shows can still be running, and its
+ * reads then land after the next step the harness drives.
  */
 import { sleep } from '../harness'
 import type { Trace, TraceState } from './itf'
@@ -29,6 +34,8 @@ export interface Spec<W, V> {
   readonly expected: (states: ReadonlyArray<TraceState>, index: number) => V
   /** The same projection, read from the engine and the fake. */
   readonly observe: (world: W) => Promise<V> | V
+  /** Whether Juno's own work that the projection does not show is still running; a round is not reached until it ends. */
+  readonly busy?: (world: W) => boolean
   /** How long a round of these steps may take, when not `ROUND_MS`. */
   readonly roundMs?: (steps: ReadonlyArray<TraceState>) => number | undefined
   /** What else to print about the engine and the fake at a divergence. */
@@ -73,15 +80,18 @@ export async function replay<W, V>(spec: Spec<W, V>, trace: Trace, options: { re
     const roundMs = options.roundMs ?? spec.roundMs?.(states.slice(from, to + 1)) ?? ROUND_MS
     let since: number | undefined
     let actual: V | undefined
+    let busy = false
     while (Date.now() - started < roundMs) {
       actual = await spec.observe(world)
-      if (json(actual) === want) {
+      busy = spec.busy?.(world) ?? false
+      if (json(actual) === want && !busy) {
         since ??= Date.now()
         if (Date.now() - since >= STABLE_MS) return undefined
       } else since = undefined
       await sleep(25)
     }
-    return { from, to, steps: steps(from, to), reason: 'the engine did not reach the model state', expected, actual, ...(spec.debug === undefined ? {} : { debug: spec.debug(world) }) }
+    const reason = json(actual) === want && busy ? 'the engine reached the model state but its own work did not end' : 'the engine did not reach the model state'
+    return { from, to, steps: steps(from, to), reason, expected, actual, ...(spec.debug === undefined ? {} : { debug: spec.debug(world) }) }
   }
   try {
     let at = end(0)

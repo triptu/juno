@@ -139,6 +139,10 @@ export interface RunningEngine {
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
   /** Waits for boot or reconnect and its follow pass to finish. Does not drain socket events or command retries. */
   readonly syncIdle: () => Promise<void>
+  /** Whether a sync cycle (boot, catch-up or sweep, with its follow pass) is running now. */
+  readonly syncing: () => boolean
+  /** Whether the engine's outbox workers see the socket as up (`SyncLink.online`). */
+  readonly online: () => boolean
   readonly phase: (tag: EngineStatus['phase']['_tag'], timeoutMs?: number) => Promise<EngineStatus['phase']>
   /** The mounted list atom for a filter. */
   readonly topicsAtom: (filter?: TopicListFilter) => ReturnType<typeof topicListAtom>
@@ -183,6 +187,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   const transport = memoryTransport()
   let cycles = 0
   let pendingCycles = 0
+  let online = false
   const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }) }, {
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
@@ -199,6 +204,9 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
           cycles += 1
           pendingCycles += 1
         } else pendingCycles -= 1
+      },
+      onConnection: (next) => {
+        online = next
       },
     },
   })
@@ -252,6 +260,8 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     syncIdle: async () => {
       await waitFor(() => (cycles > 0 && pendingCycles === 0 ? true : undefined), WAIT_MS, 'the sync cycle to finish')
     },
+    syncing: () => pendingCycles > 0,
+    online: () => online,
     phase: (tag, timeoutMs = WAIT_MS) =>
       waitFor(
         () => {

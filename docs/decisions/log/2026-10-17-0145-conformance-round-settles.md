@@ -1,0 +1,1 @@
+- 10-17 01:45 · ci-fix-10 · A conformance round counts as reached only once no sync cycle runs in the engine, and `connected` compares the engine's view of the socket too: under load a catch-up outlasted the 300 ms stable window and a dropped socket was not yet seen, so the engine ran past the step the trace was at.
