@@ -1,0 +1,1 @@
+- 10-17 00:51 · presence-active · Presence: Juno keeps the owner active in Slack as the official desktop app does, with a socket `tickle` at most every 19 s while the Mac's idle time is at most 20 s and the screen is unlocked, never while presence is away; an idle Mac or a quit sends nothing.
