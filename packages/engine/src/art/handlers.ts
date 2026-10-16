@@ -7,10 +7,11 @@ import { AiProvider } from '@juno/ai'
 import { AiUnavailable, ArtRoutes, NotFound, NotSignedIn, type StoredArt, type UndoCommand } from '@juno/contract'
 import { parseTopicId } from '@juno/domain'
 import { StoreReader, type SqlError, type TopicArtRow } from '@juno/store'
-import { Effect } from 'effect'
-import { aiAssistOn } from '../ai'
+import { Clock, Effect } from 'effect'
+import { AiPurpose, aiAssistOn } from '../ai'
+import { AiAudit } from '../aiAudit'
 import { Workspace, type StoreServices } from '../workspace'
-import { ART_SELECT, canDraw, drawTopic, restoreArt } from './draw'
+import { ART_SELECT, canDraw, drawTopic, restoreArt, type ArtOutcome } from './draw'
 import type { JoinedRow } from '../topicRows'
 
 const topicRow = (id: string): Effect.Effect<{ readonly row: JoinedRow | undefined; readonly art: TopicArtRow | undefined; readonly selfId: string | undefined }, SqlError, StoreReader> =>
@@ -21,6 +22,16 @@ const topicRow = (id: string): Effect.Effect<{ readonly row: JoinedRow | undefin
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     return { row: rows[0], art: art[0], selfId: team[0]?.self_user_id ?? undefined }
   })
+
+/** What the renderer says when a redraw made no drawing. */
+const UNAVAILABLE: Record<Exclude<ArtOutcome, 'ok' | 'unsure'>, AiUnavailable['reason']> = {
+  failed: 'invalid',
+  'missing-key': 'no-key',
+  timeout: 'timeout',
+  'provider-error': 'provider',
+  budget: 'budget',
+  'no-agent': 'no-agent',
+}
 
 const storedOf = (art: TopicArtRow): StoredArt => ({
   recipe: art.recipe,
@@ -37,6 +48,7 @@ export const ArtHandlers = ArtRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
+    const audit = yield* AiAudit
     return {
       'art.redraw': ({ id }) =>
         Effect.gen(function* () {
@@ -47,12 +59,20 @@ export const ArtHandlers = ArtRoutes.toLayer(
           // A store failure is a bug, not a state the user can act on (architecture 2.6).
           const local = <A>(effect: Effect.Effect<A, SqlError, StoreServices | AiProvider>): Effect.Effect<A> =>
             effect.pipe(Effect.provide(open.context), Effect.provideService(AiProvider, provider), Effect.orDie)
-          if (!(yield* local(aiAssistOn))) return yield* new AiUnavailable({ reason: 'off' })
+          if (!(yield* local(aiAssistOn))) {
+            yield* audit.record({
+              at: yield* Clock.currentTimeMillis, feature: 'topicArt.redraw', subjectKind: 'topic', subjectId: id, provider: '', model: '',
+              outcome: 'blocked', kind: 'assist-off', message: '', durationMs: 0, inputTokens: null, outputTokens: null, costUsd: null, summary: '',
+            })
+            return yield* new AiUnavailable({ reason: 'off' })
+          }
           const { row, art, selfId } = yield* local(topicRow(id))
           if (row === undefined || !canDraw(row)) return yield* new NotFound({ kind: 'topic', id })
           const avoid = art === undefined || art.status !== 'ok' ? undefined : { hue: art.hue, summary: `the ${art.hue} drawing shown so far` }
-          const outcome = yield* local(drawTopic(row, selfId, { source: 'redraw', ...(avoid === undefined ? {} : { avoid }) }))
-          if (outcome !== 'ok' && outcome !== 'unsure' && outcome !== 'failed') return yield* new AiUnavailable({ reason: 'provider' })
+          const outcome = yield* local(drawTopic(row, selfId, { source: 'redraw', ...(avoid === undefined ? {} : { avoid }) })).pipe(
+            Effect.provideService(AiPurpose, 'topicArt.redraw'),
+          )
+          if (outcome !== 'ok' && outcome !== 'unsure') return yield* new AiUnavailable({ reason: UNAVAILABLE[outcome] })
           return { undo: { _tag: 'art.restore', id, previous: art === undefined ? null : storedOf(art) } satisfies UndoCommand }
         }),
       'art.restore': ({ id, previous }) =>

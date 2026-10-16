@@ -1,8 +1,8 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
+import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus } from './EngineStatus'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
@@ -44,6 +44,8 @@ function Section({ section }: { readonly section: SettingsSection }) {
       return <Ignored />
     case 'juno':
       return <JunoSettings />
+    case 'ai-activity':
+      return <AiActivity />
     case 'connections':
       return <JunoConnections />
     case 'backup':
@@ -141,4 +143,12 @@ function Appearance() {
 function Ignored() {
   const ignored = useAtomValue(ignoredChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
   return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
+}
+
+/** AI activity: the engine's log of model calls, from the engine and the agent. */
+function AiActivity() {
+  const activity = useAtomValue(aiActivityAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
+  // A row's time reads "10:42" or "Yesterday": a minute is fine enough.
+  const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
+  return <AiActivityPage activity={activity} now={now} onCopyDetails={copyText} />
 }

@@ -526,7 +526,7 @@ export class SettingsPage {
   }
 }
 
-export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'Connections' | 'Backup & This Mac' | 'About'
+export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
 /** Settings › Notifications (inventory 13). */
 export class NotificationsPage {

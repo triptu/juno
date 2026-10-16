@@ -85,6 +85,7 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.notification.deliver': () => unsupported('Juno cannot show notifications for the agent yet.'),
         'host.spend.asks': () => host.spend?.asks ?? Stream.never,
         'host.spend.answer': (answer) => host.spend?.answer(answer) ?? Effect.void,
+        'host.ai.record': ({ call }) => host.ai?.record(call) ?? Effect.void,
       })
     }),
   )

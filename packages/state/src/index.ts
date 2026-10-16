@@ -165,7 +165,8 @@ export {
   type Theme,
 } from './shell'
 export type { PortLike } from './transport'
-export { redrawTopic } from './art'
+export { redrawTopic, type RedrawProblem } from './art'
+export { aiActivityAtom } from './aiActivity'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
