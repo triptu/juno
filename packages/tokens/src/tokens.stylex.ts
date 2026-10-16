@@ -836,7 +836,7 @@ export const layout = stylex.defineVars({
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
   '--palette-width': '560px',
-  // The tour sheet (inventory 2.9): its screenshots are the window at its minimum size, 720 by 480 at 1x
+  // The tour sheet (inventory 1.2): its screenshots are the window at its minimum size, 720 by 480 at 1x
   // (1440 by 960 files), the sheet adds its 20px padding on each side. On a
   // short window the picture shrinks by its aspect ratio first, keeping room
   // for the tour's text, dots and buttons (--tour-chrome-height).

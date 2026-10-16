@@ -13,7 +13,7 @@ import { Workspace } from './containers/Workspace'
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
 const SetUpJuno = setup.component((module) => module.SetUpJuno)
-// The tour (SPEC 4.1) opens over the app right after a first sign-in, so it warms with the setup page.
+// The tour (SPEC 4) opens over the app right after a first sign-in, so it warms with the setup page.
 const tour = chunk(() => import('./containers/Tour'))
 const Tour = tour.component((module) => module.Tour)
 

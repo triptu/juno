@@ -1,5 +1,5 @@
 /**
- * The tour's words (SPEC 4.1, "The tour"). Each step has one job, a
+ * The tour's words (SPEC 4, "The tour"). Each step has one job, a
  * heading of a few words, one or two short sentences and at most three
  * callouts. A callout names an anchor that `pnpm tour:shots` measured in
  * the step's screenshot (`shots/manifest.json`), so a label always points

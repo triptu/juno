@@ -1,5 +1,5 @@
 /**
- * The tour's screenshots (SPEC 4.1, "The tour"). `pnpm tour:shots` runs this
+ * The tour's screenshots (SPEC 4, "The tour"). `pnpm tour:shots` runs this
  * against the built gallery: it opens each `TourScene` state in light and
  * dark, shoots the scene at 2x into
  * `packages/views/src/tour/shots/<step>-<theme>.webp`, and measures the

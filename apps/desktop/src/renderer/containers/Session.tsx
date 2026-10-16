@@ -63,7 +63,7 @@ export function Session() {
   }
 
   const mode = value._tag === 'authRequired' ? 'expired' : 'first-run'
-  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10), then the tour (SPEC 4.1).
+  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10), then the tour (SPEC 4).
   const setUpAfter = () => {
     registry.set(junoSetupPendingAtom, mode === 'first-run' && noProvider)
     tourAfterSignIn(registry, mode === 'first-run')

@@ -1,5 +1,5 @@
 /**
- * The scenes the tour's screenshots are taken from (SPEC 4.1, "The tour").
+ * The scenes the tour's screenshots are taken from (SPEC 4, "The tour").
  * Each is the window at its minimum size, 720 by 480, built from the real
  * views with gallery fixture data, so a screenshot shows the UI as it is
  * and nothing in it is real Slack content. `pnpm tour:shots` shoots every

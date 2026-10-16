@@ -1,5 +1,5 @@
 /**
- * The tour (SPEC 4.1): a few steps that show a Slack user how Juno is laid
+ * The tour (SPEC 4): a few steps that show a Slack user how Juno is laid
  * out. It opens by itself over the app after a first sign-in made in this
  * run (after "Set up Juno" when that shows), unless the workspace has seen
  * it, and otherwise only when the owner asks for it: Help › Show the Tour,
@@ -7,8 +7,9 @@
  * after Slack expired the session, never opens it.
  *
  * Seen is one workspace preference, `tourSeen`, written when the tour
- * closes by any way (Skip tour, Esc, Done). It lives in the workspace's
- * cache; signing out deletes the cache, so the next sign-in is a first one.
+ * closes by any way (Skip tour, Esc, Done). Preferences live in the
+ * workspace's user.db, which signing out keeps, so signing out and in
+ * again does not bring the tour back.
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
@@ -58,8 +59,8 @@ export const tourOpenAtom = Atom.make((get): boolean => {
 
 /**
  * A sign-in is starting. From the sign-in page (`firstRun`) the tour may
- * open once it succeeds, and the workspace's preference decides afresh:
- * what was closed earlier in this run belonged to a session that has ended.
+ * open once it succeeds, and the workspace's preference decides, not what
+ * an earlier session in this run did.
  */
 export function tourAfterSignIn(registry: Registry, firstRun: boolean): void {
   registry.set(tourAfterSignInAtom, firstRun)

@@ -145,7 +145,7 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     ...themes.map((option) => row(`theme-${option.theme}`, option.icon, `Theme: ${option.label}`, 'appearance mode', () => setTheme(option.theme), { ...stays, family: 'theme', ...(option.theme === theme ? { sub: 'Current' } : {}) })),
     ...AccentSchema.literals.map((name) => row(`accent-${name}`, 'theme-system', `Accent: ${accentLabels[name]}`, 'appearance', () => setAccent(name), { ...stays, family: 'accent colour color', accent: name, ...(name === accent ? { sub: 'Current' } : {}) })),
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
-    // The tour (SPEC 4.1), as Help › Show the Tour opens it.
+    // The tour (SPEC 4), as Help › Show the Tour opens it.
     row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTour(registry)),
     privacy
       ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: '⌃⌘H' })

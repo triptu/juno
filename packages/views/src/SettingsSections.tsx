@@ -170,7 +170,7 @@ export interface SettingsAboutProps {
   readonly updates: ReactNode
   /** The engine's status line and Ping engine. */
   readonly diagnostics: ReactNode
-  /** Opens the tour again (SPEC 4.1). */
+  /** Opens the tour again (SPEC 4, "The tour"). */
   readonly onShowTour: () => void
 }
 
