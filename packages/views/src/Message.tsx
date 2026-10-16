@@ -90,45 +90,31 @@ const HOVER = '@media (hover: hover)'
 
 const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 
-// A row too narrow to keep the toolbar's reserve and still leave the name and
-// time 160px: the reserve (243) + 160 + the gutter (32), its gap (12) and the
-// row's inline padding (16). There the header takes the whole line and the
-// toolbar rises above the row's top edge, over the end of the row before, as
-// Slack's does, so it never covers the name or the time.
-const NARROW_ROW = '@container message (width < 464px)'
-
-// Each quick reaction past three makes the toolbar one 28px button and its
-// 2px gap wider, so the header's reserve grows by that much and the row
-// counts as narrow 30px sooner: its toolbar rises above the row rather than
-// cover the name or the time.
-const EXTRA_REACTION = `(${sizes['--control-28']} + ${spacing['--space-0-5']})`
-const NARROW_ROW_4 = '@container message (width < 494px)'
-const NARROW_ROW_5 = '@container message (width < 524px)'
-const NARROW_ROW_6 = '@container message (width < 554px)'
-const NARROW_ROW_7 = '@container message (width < 584px)'
-const RAISED = `var(--row-toolbar-top, calc(-1 * ${layout['--toolbar-height']}))`
+// How far the toolbar's bottom edge comes into the row: the row's top padding
+// less 2px (2px, or none in compact density). The name's text box starts
+// that far in, so the toolbar straddles the row's top edge, as Slack's does,
+// and never covers the name, the time or the first line of a grouped row.
+const STRADDLE = `(${density['--density-message-padding-block']} - ${spacing['--space-0-5']})`
 
 /**
- * Where a narrow row's toolbar goes, decided once as the row is pointed at or
- * focused (never per frame). It rises above the row unless that would put it
- * under the header band at the list's top, where the band's fade washes it
- * out; there it drops inside the row, under the name and time line so they
- * stay readable, or at the top of a continuation row, which has no such line.
- * The answer is a custom property on the row, so nothing re-renders.
+ * Where the toolbar goes, decided once as the row is pointed at or focused
+ * (never per frame). It rises above the row's top edge unless that would put
+ * it under the header band at the list's top, where the band's fade washes
+ * it out and the list clips it; there it flips below the row, straddling the
+ * bottom edge the same way. The answer is a custom property on the row, so
+ * nothing re-renders.
  */
 function placeToolbar(row: HTMLElement): void {
   const scroller = row.closest('[data-scroll-area]')
   if (scroller === null) return
-  const rowTop = row.getBoundingClientRect().top
+  const box = row.getBoundingClientRect()
   const style = getComputedStyle(scroller)
   const listTop = scroller.getBoundingClientRect().top + (Number.parseFloat(style.scrollPaddingTop) || 0)
   const toolbarHeight = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
-  if (rowTop - toolbarHeight >= listTop) {
-    row.style.removeProperty('--row-toolbar-top')
-    return
-  }
-  const header = row.querySelector('[data-message-header]')
-  row.style.setProperty('--row-toolbar-top', header === null ? 'var(--space-0-5)' : `${header.getBoundingClientRect().bottom - rowTop}px`)
+  const rowStyle = getComputedStyle(row)
+  const straddle = (Number.parseFloat(rowStyle.paddingTop) || 0) - (Number.parseFloat(rowStyle.getPropertyValue('--space-0-5')) || 0)
+  if (box.top + straddle - toolbarHeight >= listTop) row.style.removeProperty('--row-toolbar-top')
+  else row.style.setProperty('--row-toolbar-top', `${Math.round(box.height - straddle)}px`)
 }
 
 const dim = stylex.keyframes({
@@ -141,11 +127,10 @@ const dim = stylex.keyframes({
  * time on the first message of a run, the body, files, reactions and, in
  * Main, the thread link. A message that mentions you sits on the accent
  * tint. The hover toolbar sits at the top right of the row and shows by
- * opacity and display only, absolutely placed, so showing it never forces a layout. On a row
- * with a toolbar the header keeps its end free, so the toolbar covers the end
- * of the first body line but never the name or the time; in a narrow row it
- * rises above the row's top edge instead. The header is the same height with
- * or without a toolbar, so every list of messages has one rhythm.
+ * opacity and display only, absolutely placed, so showing it never forces a layout. It
+ * straddles the row's top edge, mostly above it, so it covers neither the
+ * name and time nor the first line of a grouped row. The header is the same
+ * height with or without a toolbar, so every list of messages has one rhythm.
  *
  * A message Juno is still sending looks like the message it becomes, so the
  * swap moves nothing; a send that takes longer than `--delay-pending` dims
@@ -186,8 +171,6 @@ export const Message = memo(function Message({
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
   }
-  // 0 with three reactions or fewer, else the variant for how many more.
-  const extra = Math.max(0, Math.min(4, (actions?.quickReactions?.length ?? 3) - 3))
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const { pending, clientMsgId } = message
   // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to act on.
@@ -237,7 +220,7 @@ export const Message = memo(function Message({
       </span>
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
-          <span data-message-header="" {...stylex.props(styles.header, actions !== undefined && headerReserve[extra])}>
+          <span data-message-header="" {...stylex.props(styles.header)}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
               {name}
             </Text>
@@ -292,7 +275,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar, toolbarTop[extra])}>{toolbar}</span> : null}
+      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
   )
 })
@@ -314,8 +297,8 @@ const styles = stylex.create({
     contain: 'content',
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
-    // Paint containment clips at the row's edge; the raised toolbar of a
-    // narrow row (NARROW_ROW) and its shadow paint this far above it. A plain
+    // Paint containment clips at the row's edge; the toolbar above the row
+    // (or below it, when flipped) and its shadow paint this far out. A plain
     // token: Chromium drops overflow-clip-margin given any calc().
     overflowClipMargin: layout['--toolbar-clip-margin'],
     containerName: 'message',
@@ -346,6 +329,13 @@ const styles = stylex.create({
     // laid out but transparent it was most of the list's style and layout work
     // when a topic opened or the pane changed width (performance.md 8). It is
     // absolutely placed in a reserved slot, so showing it moves nothing.
+    // The active row paints over its neighbours, which its toolbar overlaps.
+    zIndex: {
+      default: 'auto',
+      ':hover': { default: null, [HOVER]: z['--z-toolbar'] },
+      ':focus-visible': z['--z-toolbar'],
+      ':has(:focus-visible)': z['--z-toolbar'],
+    },
     '--row-toolbar-display': {
       default: 'none',
       ':hover': { default: null, [HOVER]: 'block' },
@@ -364,6 +354,7 @@ const styles = stylex.create({
   },
   // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.
   rowHeld: {
+    zIndex: z['--z-toolbar'],
     backgroundColor: colors['--surface-hover'],
     '--row-action-opacity': '1',
     '--row-toolbar-display': 'block',
@@ -420,28 +411,6 @@ const styles = stylex.create({
     marginBottom: spacing['--space-0-5'],
     userSelect: 'none',
   },
-  // The toolbar's footprint (inventory 6.5): the name and time stay clear of
-  // it. The header is no taller for it, so the toolbar covers the end of the
-  // first body line on hover, as on a continuation row. A narrow row gives
-  // the whole line to the name, since its toolbar rises above the row.
-  headerWithToolbar: {
-    paddingInlineEnd: {
-      default: layout['--toolbar-reserve'],
-      [NARROW_ROW]: 0,
-    },
-  },
-  headerWithToolbar4: {
-    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + ${EXTRA_REACTION})`, [NARROW_ROW_4]: 0 },
-  },
-  headerWithToolbar5: {
-    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 2 * ${EXTRA_REACTION})`, [NARROW_ROW_5]: 0 },
-  },
-  headerWithToolbar6: {
-    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 3 * ${EXTRA_REACTION})`, [NARROW_ROW_6]: 0 },
-  },
-  headerWithToolbar7: {
-    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 4 * ${EXTRA_REACTION})`, [NARROW_ROW_7]: 0 },
-  },
   // The time follows the name at the header's gap, as in Slack.
   name: {
     flexShrink: 1,
@@ -476,31 +445,16 @@ const styles = stylex.create({
     marginTop: spacing['--space-0-5'],
     userSelect: 'none',
   },
-  // Top right, over the header line's empty end. In a narrow row it sits on
-  // the row's top edge, wholly above it: paint containment would clip it
-  // there, so the row's overflow-clip-margin lets it paint.
+  // At the row's top right, mostly above the row: its bottom edge comes
+  // STRADDLE into the row, above the first line. placeToolbar flips it below
+  // a row whose top is under the header band. Paint containment would clip it
+  // outside the row, so the row's overflow-clip-margin lets it paint.
   toolbar: {
     display: 'var(--row-toolbar-display)',
     position: 'absolute',
-    top: {
-      default: spacing['--space-0-5'],
-      // Raised, unless placeToolbar found the row too near the list's top.
-      [NARROW_ROW]: RAISED,
-    },
+    top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
   },
 })
-
-// The toolbar with four to seven quick reactions rises sooner (EXTRA_REACTION).
-const raisedFrom = stylex.create({
-  4: { top: { default: spacing['--space-0-5'], [NARROW_ROW_4]: RAISED } },
-  5: { top: { default: spacing['--space-0-5'], [NARROW_ROW_5]: RAISED } },
-  6: { top: { default: spacing['--space-0-5'], [NARROW_ROW_6]: RAISED } },
-  7: { top: { default: spacing['--space-0-5'], [NARROW_ROW_7]: RAISED } },
-})
-
-/** By quick reactions past three. */
-const headerReserve = [styles.headerWithToolbar, styles.headerWithToolbar4, styles.headerWithToolbar5, styles.headerWithToolbar6, styles.headerWithToolbar7]
-const toolbarTop = [null, raisedFrom[4], raisedFrom[5], raisedFrom[6], raisedFrom[7]]
