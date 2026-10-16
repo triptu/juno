@@ -103,7 +103,7 @@ export const chatCopy = {
   },
   /** `chip` is the header chip; `line` is the full sentence (the chip's title, or the one line under the list for AI off). */
   banner: {
-    paused: { chip: 'Juno is paused', line: 'Juno is paused. Messages wait until you resume.', resume: 'Resume' },
+    paused: { chip: 'Juno is paused', line: 'Juno is paused. Messages you send wait until you resume.', resume: 'Resume' },
     aiOff: { chip: 'Juno is off', line: 'Juno is off. Turn on AI assist in Settings.' },
     offline: { chip: "You're offline", line: "You're offline. Juno shows what it has and catches up when you're back." },
     recovery: { chip: 'Juno restored from backup', line: "Juno restored from backup. It won't act until you check pending actions.", review: 'Review' },

@@ -69,7 +69,7 @@ picker('the chat model picker offers the newest usable model per family and hide
   await expect.poll(names, { timeout: 15_000 }).toEqual(['Claude Sonnet 6', 'Claude Opus 5.5', 'Muse Wonder', 'GPT-6.1 Sol', 'Grok 4.7'])
 })
 
-picker('the model settings offer Sol through Codex', async ({ fake, slackApp, userData, model }) => {
+picker('the model settings do not offer Codex while it is coming soon', async ({ fake, slackApp, userData, model }) => {
   const { startFakeCodex } = await import('@juno/agent-testing/codex')
   const codex = startFakeCodex()
   codex.signIn(join(userData, 'agent', 'codex'))
@@ -83,16 +83,7 @@ picker('the model settings offer Sol through Codex', async ({ fake, slackApp, us
     await ready(juno)
     const page = await openSettings(juno, 'Juno')
     const select = page.getByLabel('Chat model')
-    const option = select.locator('option').filter({ hasText: /Sol.*Codex/ })
-    await expect(option).toHaveCount(1)
-    await expect(option).toContainText('Uses your ChatGPT plan')
-    await select.selectOption({ label: await option.innerText() })
-    await expect(select).toHaveValue('codex:GPT Sol')
-    const chat = await openChat(juno)
-    await chat.send('Hello')
-    await chat.expectJuno('Hello from local Codex.')
-    expect(codex.invocations().filter((call) => call.command === 'exec')).toHaveLength(1)
-    expect(model.requests.filter((request) => !request.compaction)).toHaveLength(0)
+    await expect(select.locator('option').filter({ hasText: /Codex/ })).toHaveCount(0)
   } finally {
     if (previousPath === undefined) delete process.env.PATH
     else process.env.PATH = previousPath
@@ -104,7 +95,7 @@ picker('the model settings offer Sol through Codex', async ({ fake, slackApp, us
 test('while Juno is paused a message waits for Resume, then runs', async ({ juno, model }) => {
   await ready(juno)
   const settings = await openSettings(juno, 'Juno')
-  await settings.getByLabel('Juno is paused').check()
+  await settings.getByLabel('Pause Juno').check()
   const chat = await openChat(juno)
   await expect(chat.root.locator('[data-banner="paused"]')).toHaveText(`${chatCopy.banner.paused.chip} · ${chatCopy.banner.paused.resume}`)
 

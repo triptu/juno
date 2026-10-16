@@ -3,7 +3,7 @@ import { chatCopy, type ModelChoice } from '@juno/agent-contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Chip, ListRow, Segmented, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './juno-pages/cell'
-import { modelOptions } from './juno-pages/JunoSettingsPage'
+import { CODEX_ENABLED, modelOptions } from './juno-pages/JunoSettingsPage'
 import { SignInPage } from './SignInPage'
 import type { ProviderDrafts } from './juno-pages/ProviderSection'
 
@@ -66,7 +66,7 @@ export function SetUpJunoView(props: SetUpJunoViewProps) {
     { value: 'openRouter', label: chatCopy.providers.openRouter },
     { value: 'custom', label: chatCopy.providers.custom },
   ]
-  if (codex !== undefined && codex !== 'missing') choices.push({ value: 'codex', label: copy.codex })
+  if (CODEX_ENABLED && codex !== undefined && codex !== 'missing') choices.push({ value: 'codex', label: copy.codex })
   const status = busy !== undefined ? { text: copy.busy[busy], tone: 'muted' as const } : error === undefined ? undefined : { text: error, tone: 'danger' as const }
   return (
     <SignInPage titleId="set-up-title" title={copy.title} body={copy.body} {...(status === undefined ? {} : { status })} data-set-up-juno="">

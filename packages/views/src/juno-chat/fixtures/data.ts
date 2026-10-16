@@ -317,7 +317,7 @@ export const provider = (id: string, cardStatus: CardStatus = open): Card => ({
   status: cardStatus,
   options: [
     { id: 'openrouter', label: 'OpenRouter', note: 'Needs an API key' },
-    { id: 'codex', label: 'Codex', note: 'Uses your ChatGPT plan on this Mac' },
+    { id: 'codex', label: 'Codex', note: 'Coming soon' },
   ],
 })
 

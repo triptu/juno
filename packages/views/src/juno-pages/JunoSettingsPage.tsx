@@ -40,10 +40,11 @@ function commitModel(text: string, current: string, onChatModel: (id: string) =>
 }
 
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
+export const CODEX_ENABLED = false
 
 /** The model select's rows: the resolved name, Codex, and the price, as Settings › Juno and Set up Juno show them. */
 export function modelOptions(models: ReadonlyArray<ModelChoice>) {
-  return models.map((model) => ({
+  return models.filter(model => CODEX_ENABLED || model.provider !== 'codex').map((model) => ({
     value: modelChoiceKey(model),
     // A custom endpoint's row is a model id, its own name.
     label:
@@ -126,7 +127,7 @@ export function JunoSettingsPage({
               </span>
             </ListRow>
           ) : null}
-          {page.modelTyped !== true || page.chatModels.some(model => model.provider === 'codex') ? (
+          {page.modelTyped !== true ? (
             <ListRow
               divider={!custom}
               trailing={<Select size={30} label="Chat model" options={modelOptions(page.chatModels)} value={chatSelected} onChange={(event) => onChatModel(event.currentTarget.value)} />}
@@ -193,7 +194,7 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      {(
+      {
         <Section heading="Codex">
           <Surface kind="group">
             <ListRow
@@ -201,10 +202,12 @@ export function JunoSettingsPage({
               data-codex={page.codex._tag}
               trailing={
                 <span {...stylex.props(cell.controls)}>
-                  <Chip variant={page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20} data-codex-chip="">
-                    {page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'}
+                  <Chip variant={CODEX_ENABLED && page.codex._tag === 'ready' ? 'filled' : 'outline'} size={20} data-codex-chip="">
+                    {CODEX_ENABLED
+                      ? page.codex._tag === 'ready' ? `Ready · ${page.codex.version}` : page.codex._tag === 'signedOut' ? 'Signed out' : 'Not installed'
+                      : 'Coming soon'}
                   </Chip>
-                  {page.codex._tag === 'signedOut' && onSignInCodex !== undefined ? (
+                  {CODEX_ENABLED && page.codex._tag === 'signedOut' && onSignInCodex !== undefined ? (
                     <Button variant="ghost" size="xs" tone="subtle" onClick={onSignInCodex}>
                       Sign in
                     </Button>
@@ -212,14 +215,14 @@ export function JunoSettingsPage({
                 </span>
               }
             >
-              <Text variant="body">Uses your ChatGPT plan on this Mac.</Text>
+              <Text variant="body">{CODEX_ENABLED ? 'Uses your ChatGPT plan on this Mac.' : 'Use your ChatGPT plan instead of an API key.'}</Text>
             </ListRow>
           </Surface>
         </Section>
-      )}
+      }
 
       {onRuleChange === undefined || onRuleRemove === undefined || onRuleAdd === undefined ? null : (
-        <Section heading="Rules" sub="One line each. Rules can only make Juno ask more, never less.">
+        <Section heading="Rules" sub={'Tell Juno when to check with you before it does something. Write one rule per line, for example: “Always ask before messaging my manager.” Rules only add checks. They never let Juno skip one.'}>
           <Surface kind="group">
             {page.rules.map((rule) => (
               <ListRow
@@ -260,10 +263,10 @@ export function JunoSettingsPage({
         </Section>
       )}
 
-      <Section heading="Pause" sub="Stops the current reply, asks every running job to stop, and starts nothing new. Messages wait for Resume.">
+      <Section heading="Pause Juno" sub="Stops Juno from doing anything. Whatever it is working on stops now, and it starts nothing new. Messages you send it wait until you turn this off.">
         <Surface kind="group">
           <ListRow divider={false}>
-            <Checkbox size="lg" label="Juno is paused" checked={page.paused} onChange={(event) => onPaused(event.currentTarget.checked)} />
+            <Checkbox size="lg" label="Pause Juno" checked={page.paused} onChange={(event) => onPaused(event.currentTarget.checked)} />
           </ListRow>
         </Surface>
       </Section>
