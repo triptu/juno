@@ -186,11 +186,11 @@ The fake gates every call Slack decides in the model (`gate`, `decide` and `hold
 
 ### Differences found
 
-The first runs found these. The real bugs have tests marked `it.fails`, which pass while the bug is there; when it is fixed, make each an ordinary test. `outbox-conformance.qnt` keeps the bugs out of its schedules, with a comment for each, so the random traces check the rest.
+The first runs found these. A real bug has a test marked `it.fails` while it is there, and `outbox-conformance.qnt` keeps it out of its schedules, with a comment, so the random traces check the rest. Once fixed, its test is an ordinary test and the random traces cover it again.
 
 | Difference | Kind | Where |
 | --- | --- | --- |
-| A delete queued while an edit of the same message is out is lost. `outbox` ids are SQLite rowids, which are reused: the delete's new row takes the edit's id, and the edit's answer (`actionDone`) then deletes it. The model sends it after the edit (`stale`). | bug | `actions.test.ts`, "a delete while an edit is out" |
+| A delete queued while an edit of the same message was out was lost. `outbox` ids were SQLite rowids, which SQLite reuses: the delete's new row took the edit's id, and the edit's answer (`actionDone`) then deleted it. The model sends it after the edit (`stale`). Fixed: `outbox` ids are `AUTOINCREMENT`, so a finished call ends only the row it read. Marks and follows end their rows by topic, under `exclusive`, so they did not have the bug. | fixed bug | `actions.test.ts`, "a delete while an edit is out" |
 | The check before a copy's delete runs before the call waits for the send lane. If the user deletes the kept message on another device during that wait, Slack ends with no copy of the post. `outbox.qnt` assumes this window away, but the lane makes it as long as the slowest write. Review S1 is not fully closed. | bug | `send-copies.test.ts`, "a copy whose delete waits for the send lane" |
 | The user's delete of a message whose network copy Juno has not stored yet brings the copy back. When the copy arrives, the check finds the kept message deleted, keeps the copy and makes it the message: it cannot tell the user's own delete from one made on another device. Slack keeps the copy and Juno shows it. | bug | `send-copies.test.ts`, "the user deletes a message before Juno has seen its copy" |
 | The post worker checks the socket once per pass, not per row. When the socket drops while one post is out, the next queued post still goes (`sendsWaitOffline`, SPEC 8). | bug | `send.test.ts`, "waits out a lost connection that comes while another post is out" |

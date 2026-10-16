@@ -339,12 +339,11 @@ describe('reactions', () => {
   })
 })
 
-// Found by the conformance replay (test/conformance). `outbox` ids are SQLite rowids, which are reused:
-// a delete that replaces an edit whose call is out can take the edit's id, and the edit's answer
-// (`actionDone`, which reads the row by id) then ends the delete as if it were the edit.
-// `it.fails` until that is fixed; then make it `it`.
+// Found by the conformance replay (test/conformance). `outbox` ids were SQLite rowids, which are reused:
+// a delete that replaced an edit whose call was out took the edit's id, and the edit's answer
+// (`actionDone`, which reads the row by id) ended the delete as if it were the edit. Ids are now never reused.
 describe('actions: a delete while an edit is out', () => {
-  it.fails('deletes the message once the edit has answered (fails: the delete is lost)', async () => {
+  it('deletes the message once the edit has answered', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')

@@ -257,7 +257,7 @@ notification_log     (id PK, at, channel, ts, UNIQUE(channel, ts), topic_id, pre
                       reason, candidate_json, judgement_json, summary_due_at, delivered_at, suppressed_at)
 juno_chat       (id PK, role, content_json, created_at)
 drafts          (topic_id PK, text, updated_at)
-outbox          (id PK, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
+outbox          (id PK AUTOINCREMENT, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
 prefs           (key PK, value_json)
 topic_art       (topic_id PK, recipe, recipe_hash, input_hash, model, status 'ok'|'unsure'|'failed', hue,
                  title_source, source 'ai'|'redraw', created_at)

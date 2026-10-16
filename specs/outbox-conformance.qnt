@@ -34,9 +34,6 @@
 // random traces check the rest; each has a directed engine test
 // (README, "Conformance", "Differences found"):
 //
-// - A delete queued while an edit of the same message is out is lost: its
-//   row can take the edit's id, and the edit's answer ends it. No delete
-//   replaces a change in flight here.
 // - The user's delete of a message whose copy's delete waits brings the
 //   copy back: the check before that delete finds the kept message
 //   deleted and makes the copy the message. No user delete comes while a
@@ -195,7 +192,7 @@ module outbox_conformance {
     val atAct = atSlack(actCall(k))
     any {
       all { open, send(k), auxAll("world", lane, actFirst, copyFrame, closed, "", if (firstSent == 0) k else firstSent, retrying) }, all { open, retry(k), same }, all { open, discard(k), same },
-      all { open, shown(k), not(kind == "delete" and actInFlight(k) and s.actKind.get(k) == "change"),
+      all { open, shown(k),
         not(kind == "delete" and copyInSlack(k) and s.copyRow.get(k) != "kept"), queueAction(k, kind), world(lane, first, copyFrame, closed) },
       all { atPost, accept(k, withEcho), same }, all { atPost, refuse(k, later), same }, all { atPost, drop(k), same },
       all { Set("accepted", "refused", "later").contains(s.request.get(k)), lost(k), ended("post", without(postCall(k)), actFirst) },
