@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest'
 import { AiProviderLive } from '../src/ai'
 import { AiCredentials } from '../src/aiCredentials'
 import { AiSpend } from '../src/aiSpend'
+import { AiAudit } from '../src/aiAudit'
 import type { EngineConfig as Config } from '@juno/contract'
 import { EngineConfig } from '../src/config'
 import { HostLink, memoryHost } from '../src/protocol/host'
@@ -20,6 +21,7 @@ function engineAi(config: Config) {
   const runtime = ManagedRuntime.make(AiProviderLive.pipe(
     Layer.provideMerge(AiCredentials.layer),
     Layer.provideMerge(AiSpend.layer),
+    Layer.provideMerge(AiAudit.layer),
     Layer.provide(Workspace.layer),
     Layer.provide(HostLink.layer(host)),
     Layer.provide(EngineConfig.layer(config)),

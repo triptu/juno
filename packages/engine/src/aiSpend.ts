@@ -44,7 +44,7 @@ export class AiSpend extends Context.Service<AiSpend, {
     const settle = (id: string, usd: number | undefined) => offer({ _tag: 'settle', id, actual: usd === undefined ? null : nanodollars(usd) })
 
     const admit = (upperUsd: number): Effect.Effect<Admission> => Effect.gen(function* () {
-      if (listeners === 0) return { _tag: 'Blocked' } as const
+      if (listeners === 0) return { _tag: 'Blocked', reason: 'no-agent' } as const
       const id = randomUUID()
       const answer = yield* Deferred.make<'reserved' | 'blocked'>()
       waiting.set(id, answer)
@@ -57,7 +57,8 @@ export class AiSpend extends Context.Service<AiSpend, {
           : drop(id, 'reserve').pipe(Effect.andThen(settle(id, 0)))),
         Effect.ensuring(Effect.sync(() => waiting.delete(id))),
       )
-      if (result._tag === 'None' || result.value === 'blocked') return { _tag: 'Blocked' } as const
+      if (result._tag === 'None') return { _tag: 'Blocked', reason: 'no-answer' } as const
+      if (result.value === 'blocked') return { _tag: 'Blocked', reason: 'cap' } as const
       return { _tag: 'Admitted', settle: (usd: number | undefined) => settle(id, usd) } as const
     })
 

@@ -1,4 +1,4 @@
-import type { ProviderState } from '@juno/contract'
+import type { AiActivity, AiCallRow, ProviderState } from '@juno/contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
@@ -9,6 +9,7 @@ import { ProviderSection } from './juno-pages/ProviderSection'
 import { NotificationsPage } from './NotificationsPage'
 import { notificationsBase } from './NotificationsPage.fixtures'
 import { SettingsPage, type SettingsPageProps } from './SettingsPage'
+import { AiActivityPage } from './AiActivityPage'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 import { UpdateSettings } from './UpdateSettings'
 
@@ -30,6 +31,24 @@ const ignored = [
   { id: 'C3', name: 'oncall-pages', kind: 'private' as const, hidden: 1 },
 ]
 
+/** Five calls: titles and art with costs, a Redraw blocked at the cap, and a chat turn. */
+const call = (id: number, minutesAgo: number, rest: Partial<AiCallRow>): AiCallRow => ({
+  id: String(id), at: NOW - minutesAgo * 60_000, lastAt: NOW - minutesAgo * 60_000, repeats: 1, source: 'engine', feature: 'titleTopic',
+  subject: { kind: 'topic', id: `t:C1:${id}`, name: 'Postgres migration plan' }, provider: 'openrouter', model: 'anthropic/claude-sonnet-5.5',
+  outcome: 'ok', kind: '', message: '', durationMs: 2300, inputTokens: 812, outputTokens: 9, costUsd: 0.0017, summary: 'title, 3 words', ...rest,
+})
+const aiActivity: AiActivity = {
+  todayUsd: 0.0123,
+  todayCalls: 4,
+  calls: [
+    call(5, 2, { feature: 'chat', source: 'agent', subject: { kind: 'chat', id: '', name: '' }, inputTokens: 5210, outputTokens: 240, costUsd: 0.0064, summary: 'reply, 820 characters' }),
+    call(4, 6, { feature: 'topicArt.redraw', outcome: 'blocked', kind: 'cap', repeats: 3, model: 'google/gemini-3.8-flash', durationMs: 4, inputTokens: null, outputTokens: null, costUsd: null, summary: '' }),
+    call(3, 9, { feature: 'topicArt', model: 'google/gemini-3.8-flash', durationMs: 5400, inputTokens: 1900, outputTokens: 880, costUsd: 0.0031, summary: 'drawing, 612 characters' }),
+    call(2, 12, { outcome: 'timeout', kind: 'timeout', durationMs: 20000, inputTokens: null, outputTokens: null, costUsd: null, summary: '' }),
+    call(1, 15, { subject: { kind: 'topic', id: 't:C1:1', name: 'Kafka retention' } }),
+  ],
+}
+
 const about = (
   <SettingsAbout
     build={<AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" compact />}
@@ -47,6 +66,7 @@ export default defineFixtures(
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
       juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />),
+      'ai-activity': at('ai-activity', <AiActivityPage activity={aiActivity} now={NOW} onCopyDetails={noop} />),
       connections: at('connections', <ConnectionsPage page={connections} onAction={noop} onConfigure={noop} onAdd={noop} />),
       backup: at('backup', <JunoBackupPage {...backup} page={settings} />),
       about: at('about', about),
@@ -55,6 +75,7 @@ export default defineFixtures(
       'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
+      'ai-activity-empty': at('ai-activity', <AiActivityPage activity={{ calls: [], todayUsd: 0, todayCalls: 0 }} now={NOW} onCopyDetails={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),
       'juno-trouble': at('juno', <JunoSettingsPage {...juno} page={settingsTrouble} providers={provider(openRouter)} />),

@@ -125,4 +125,36 @@ export const hostSpendAnswer = Rpc.make('host.spend.answer', {
 })
 export const HostSpendRpcs = RpcGroup.make(hostSpendAsks, hostSpendAnswer)
 
-export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs, HostSpendRpcs)
+/**
+ * One model call for the AI activity log in Settings › Juno, or one the cap
+ * or a missing key refused. Never prompt or response text: `summary` is at
+ * most a short shape such as "reply, 120 words", and `message` an error's
+ * short text. The engine stores it in the open workspace's `user.db`.
+ */
+export const AiCallOutcome = Schema.Literals(['ok', 'error', 'blocked', 'cancelled', 'timeout'])
+export type AiCallOutcome = typeof AiCallOutcome.Type
+export const HostAiCall = Schema.Struct({
+  /** Milliseconds since the epoch, when the call started. */
+  at: Schema.Number,
+  /** What the call was for: `chat`, `subagent`, `compaction`, or an engine task name. */
+  feature: Schema.String,
+  /** What it was about: `topic`, `channel`, `chat`, `job`, or '' for nothing in particular. */
+  subjectKind: Schema.String,
+  subjectId: Schema.String,
+  provider: Schema.String,
+  model: Schema.String,
+  outcome: AiCallOutcome,
+  /** Why it was not ok: an error kind or what blocked it. '' when ok. */
+  kind: Schema.String,
+  message: Schema.String,
+  durationMs: Schema.Number,
+  inputTokens: Schema.NullOr(Schema.Number),
+  outputTokens: Schema.NullOr(Schema.Number),
+  costUsd: Schema.NullOr(Schema.Number),
+  summary: Schema.String,
+})
+export type HostAiCall = typeof HostAiCall.Type
+export const hostAiRecord = Rpc.make('host.ai.record', { payload: { call: HostAiCall }, success: Schema.Void })
+export const HostAiRpcs = RpcGroup.make(hostAiRecord)
+
+export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs, HostSpendRpcs, HostAiRpcs)

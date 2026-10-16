@@ -62,6 +62,7 @@ export {
 export { TopicArt } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
 export { SettingsPage, settingsSections } from './SettingsPage'
+export { AiActivityPage } from './AiActivityPage'
 export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'

@@ -484,6 +484,8 @@ The Juno header menu (the chevron beside "Juno" in the Juno tab and the panel) o
 
 Topic art, topic titles and Home’s background AI use the saved OpenRouter key, including when chat uses an OpenAI-compatible endpoint. With AI assist on and no OpenRouter key, Settings › Juno shows one quiet line: “Topic art and AI titles need an OpenRouter key.” Saving a key starts these jobs without restarting the app; removing it cancels their current requests and stops new calls. They spend inside the same daily cap as chat and may use at most half of it, so chat always keeps the rest; today's spend includes them. Recent sidebar threads get AI titles after first sync without being opened, once per thread, within the background title budget; a renamed thread keeps your title.
 
+**Settings › AI activity**, under Juno in the list, shows every model call Juno made, newest first: from the app (thread titles, topic art and Redraw, Home's checks, the automated channel check, search commands) and from Juno (chat turns, background jobs, compaction). A row names the reason in plain words ("Title for a thread", "Topic art"), the topic or chat it was for, the model, the outcome (OK, Error, Blocked, Cancelled or Timed out) and the estimated cost; a blocked call says why ("Daily spend cap reached", "No OpenRouter key"). A refusal that repeats is one row with a count. Clicking a row shows its details (time, provider, model, duration, tokens, cost, a short shape of the result such as "title, 3 words") and Copy details. Filters for feature, outcome and model sit above the list, and Today shows the estimated cost since midnight. The last 500 calls are kept on this Mac, without any prompt or answer text. When Redraw cannot draw, its toast says why in the same words.
+
 ### 13.11 Writing
 
 Section 17 applies to the app's own copy. Juno says "I" in its own bubbles; the app around it has no voice. Status lines are present tense and name real things. Card buttons start with a verb. How Juno writes is the model's judgement, guided by a short prompt, not by fixed rules.
@@ -527,7 +529,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 - **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
-- **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
+- **Juno**, **AI activity**, **Connections**, and **Backup & This Mac** (section 13.10).
 
 The read switch says: “When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read.” When enabled and earlier Juno read pointers are ahead of known Slack pointers, offer “Also mark what you already read in Juno” once. Catch-up uses background pacing and a reserved progress line. Existing installs that never chose the preference catch up automatically once with the new default. Peek, stealth and the focused-bottom read rule stay unchanged.
 

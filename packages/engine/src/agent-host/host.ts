@@ -24,6 +24,7 @@ import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
 import { recordSend, storedMe } from '@juno/sync'
 import { AiSpend } from '../aiSpend'
+import { AiAudit } from '../aiAudit'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { resolve, undoResolve } from './resolve'
@@ -87,7 +88,7 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend | AiAudit> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
     const config = yield* EngineConfig
@@ -97,6 +98,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const link = yield* SyncLink
     const phases = yield* PhaseSource
     const spend = yield* AiSpend
+    const audit = yield* AiAudit
 
     /** Runs a store read on the open workspace. A store failure is a bug, so it dies. */
     const inStore = <A, E>(effect: Effect.Effect<A, E, StoreServices>): Effect.Effect<A, Exclude<E, SqlError> | AgentHostError> =>
@@ -222,6 +224,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,
       spend: spend.host,
+      ai: { record: audit.record },
       schedule: {
         hours: inStore(watchHours),
         changes: watchChanges(workspace),
