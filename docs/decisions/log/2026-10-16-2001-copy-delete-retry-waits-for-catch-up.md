@@ -1,0 +1,1 @@
+- 10-16 20:01 · flakes-1017 · A copy's delete whose call retries after a socket drop waits for the catch-up, as the pass does, instead of keeping the copy as not rechecked.
