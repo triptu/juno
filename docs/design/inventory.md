@@ -284,7 +284,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 
 - Message: flex, gap 12, padding by density (Compact `2 8`, Comfortable `4 8`), radius 8, `tabindex="0"`. Hover bg `--surface-hover` (the same token as every other hovered row; the prototype's `--background-subtle` is 1.02:1 against the page and invisible). Mentions you: bg `--hl-soft` permanently.
 - Grouping: consecutive messages by the same sender share one header. First of a group has margin-top 6/12 (Compact/Comfortable) unless it is the first message or sits right after the "new" divider. A quoted message always starts a new header.
-- Avatar column 32px. Avatar 32 round, margin-top 2, initials 12/600, shown on the first message of a group.
+- Avatar column 32px. Avatar 32 round, margin-top 2, initials 12/600, shown on the first message of a group. On a continuation row the column is one body line tall, so a one-line message adds no height (it was the avatar's 34px until 10-16, 11px under every short grouped message).
 - Header: name 14/600, time 12 muted, gap 8, baseline aligned.
 - Body: 14 Compact, 14.5 Comfortable, lh 1.6, `overflow-wrap: anywhere`, `white-space: pre-wrap`, `text-wrap: pretty`; blocks stacked with gap 2. Selectable.
 - Timestamps: "9:12" (same day), "Yesterday", weekday "Sat", "Oct 3".
