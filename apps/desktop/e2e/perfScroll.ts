@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 import { expect } from './fixtures'
 import { traced, type FrameWork } from './perfTrace'
 
-/** Diagnostic only: keep two cores busy without changing the renderer's workload. */
+/** Keep two cores busy without changing the renderer's workload. */
 async function holdClock(): Promise<() => Promise<void>> {
   const workers = Array.from({ length: 2 }, () => new Worker(`
     const { parentPort } = require('node:worker_threads')
@@ -26,7 +26,7 @@ async function holdClock(): Promise<() => Promise<void>> {
 
 const percentile = (values: ReadonlyArray<number>, q: number): number => values.toSorted((a, b) => a - b)[Math.max(0, Math.ceil(values.length * q) - 1)] ?? 0
 
-/** Two ordinary sweeps are the gate. The same two sweeps held-clock are diagnostic. */
+/** Gate the pooled p95 of two ordinary sweeps and two held-clock sweeps separately. */
 export async function scrollReading(win: Page, name: string, options: {
   readonly steps: number
   readonly direction: 1 | -1
@@ -112,5 +112,6 @@ export async function scrollReading(win: Page, name: string, options: {
   expect.soft(ordinary.reduce((n, s) => n + s.placeholders, 0), 'visible placeholders').toBe(0)
   expect.soft(ordinary.reduce((n, s) => n + s.loaf, 0), 'long animation frames').toBe(0)
   expect.soft(dropped / frames.length, 'dropped frames').toBeLessThan(0.01)
+  expect.soft(percentile(heldWork, 0.95), `${name}: held-clock frame work p95, budget 7 ms`).toBeLessThanOrEqual(7)
   expect.soft(percentile(work, 0.95), `${name}: pooled frame work p95, budget 8.3 ms`).toBeLessThanOrEqual(8.3)
 }
