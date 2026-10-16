@@ -6,7 +6,7 @@ import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@jun
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { QuietWindowSetting } from './QuietWindowSetting'
-import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
+import { NewTabSetting, TabExpirySetting, type NewTabPageName, type TabExpiryName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
@@ -20,6 +20,9 @@ export interface SettingsGeneralProps {
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
+  /** How long a tab can go unseen before it closes by itself. */
+  readonly tabExpiry: TabExpiryName
+  readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
   readonly mirrorReads: boolean
@@ -31,7 +34,7 @@ export interface SettingsGeneralProps {
 }
 
 /** General: topic recency, tabs, peek, Slack read mirroring and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -40,9 +43,10 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
           <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
         </Surface>
       </Section>
-      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
+      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open, and when tabs you left close. Tabs with a draft stay; ⌘⇧T reopens one.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
+          <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
         </Surface>
       </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">

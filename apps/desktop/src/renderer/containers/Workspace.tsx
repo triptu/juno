@@ -13,6 +13,7 @@ import {
   registry,
   setJunoPanelWidth,
   sidebarLayoutAtom,
+  startTabExpiry,
   startVisitLog,
   tabsAtom,
   tabStripAtom,
@@ -210,6 +211,8 @@ function useWorkspaceEffects(active: string | undefined): void {
   useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
   useEffect(() => startVisitLog(registry), [])
+  // Tabs not viewed in the chosen time close, at launch and hourly (SPEC 6).
+  useEffect(() => startTabExpiry(registry), [])
   useEffect(() => {
     const idle = requestIdleCallback(
       () => {
