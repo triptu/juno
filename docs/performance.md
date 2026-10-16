@@ -640,7 +640,9 @@ A cold popover mounts its frame and contents together, then clamps to its
 pane. Emoji's boundary likewise contains the whole floating surface.
 Attachment staging and send-check publication wait for their component's
 chunk, so the composer grows once with the finished content. Frequent
-rows retain one reserved slot per destination. Full-page and image-viewer
+rows retain one reserved slot per destination and read `chunk.useReady()`: if
+they arrive before the idle import finishes, their first lazy render waits for
+readiness rather than suspending and starting another 300 ms throttle. Full-page and image-viewer
 boundaries retain their existing full-area placement.
 
 The perf scenario `first open in a second app` signs in once, closes that
@@ -651,6 +653,32 @@ their activating event; Settings starts at `pointerdown`. This excludes
 the driver's deliberate 60 ms mouse hold from click-activated controls.
 The `launch warm start` scenario also reports process creation to the
 first painted, focused New chat composer (`juno.composer-ready`).
+
+Five fresh second-app opens per build on the same Mac, measured separately
+before and after (ms, median and range):
+
+- Account: **321.4 → 17.2** (318.1–332.0 → 14.0–19.6).
+- Topic switcher: **316.1 → 12.1** (309.0–318.6 → 8.2–16.2).
+- Emoji picker: **336.6 → 30.4** (334.2–350.9 → 27.0–37.6).
+- Settings: **319.3 → 15.9** (314.1–326.2 → 15.4–16.6).
+
+Every final first-open sample passed 50 ms. Five warm launches per build
+measured **461.8 → 444.0 ms** median to the focused composer, with ranges
+423.5–535.2 and 441.7–501.7 ms. The ranges overlap; this does not establish
+a startup speedup. The final initial JS is **969.8 KB** (314.3 KB gzip),
+and CSS is 124.1 KB. The launch filmstrip has the composer and all Frequent
+rows in its first recorded frame, with no composer movement. The four
+focused feel scenarios and the New chat desktop rerun passed.
+
+The required `pnpm perf -g "open|menu|switcher|launch"` run passed seven
+of eight scenarios. The remaining failure was All topics' ordinary scroll
+p95, 17.9 ms against 8.3 ms (held-clock 6.0 ms), the known section 8.4 gap.
+Typecheck, lint and all four desktop shards passed. The gallery geometry
+check passed after the whole-popover boundary retained the gallery's
+hidden code-loading marker. `pnpm affected --base origin/main` also found
+an engine warm-boot request-count failure at `sync.test.ts:299`: one extra
+`conversations.replies` call. It reproduced in an isolated remote rerun;
+this change does not alter the engine or its sync dependencies.
 
 ### Held-clock scroll gates (10-17)
 

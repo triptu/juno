@@ -1,4 +1,4 @@
-import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
+import { lazy, useSyncExternalStore, type ComponentType, type LazyExoticComponent } from 'react'
 
 /**
  * A chunk of code loaded once, and lazy components from it that render in
@@ -15,9 +15,16 @@ import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 export function chunk<M>(importer: () => Promise<M>) {
   let loading: Promise<M> | undefined
   let loaded: M | undefined
+  const listeners = new Set<() => void>()
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  }
+  const ready = () => loaded !== undefined
   const load = (): Promise<M> =>
     (loading ??= importer().then((module) => {
       loaded = module
+      for (const listener of listeners) listener()
       return module
     }))
   function component<P>(pick: (module: M) => ComponentType<P>): LazyExoticComponent<ComponentType<P>> {
@@ -29,5 +36,9 @@ export function chunk<M>(importer: () => Promise<M>) {
       return { then: (resolve: (value: typeof settled) => void) => resolve(settled) } as unknown as Promise<typeof settled>
     })
   }
-  return { load, component }
+  /** A reserved placeholder can fill as soon as idle loading ends, without suspending first. */
+  function useReady(): boolean {
+    return useSyncExternalStore(subscribe, ready, ready)
+  }
+  return { load, component, useReady }
 }

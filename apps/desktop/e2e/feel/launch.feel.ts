@@ -15,6 +15,7 @@ test('launch shows the default New chat composer', async ({ juno, running, userD
       name: 'launch', title: 'Launch into the default New chat',
       probes: [
         { kind: 'box', name: 'composer', selector: '[data-new-chat] [data-composer]' },
+        { kind: 'count', name: 'frequentRows', within: '[data-frequent-block]', selector: '[data-frequent-name]' },
         { kind: 'text', name: 'tab', selector: '[role="tab"][aria-selected="true"]' },
       ],
       checks: [landsAndStays('composer', 'composer', { tolerance: 0 }), ({ recording }) => {
@@ -24,6 +25,7 @@ test('launch shows the default New chat composer', async ({ juno, running, userD
     }, async () => {
       await expect(again.newChat.composer).toBeVisible()
       await expect(again.newChat.composer).toBeFocused()
+      await expect(next.win.locator('[data-frequent-name]')).toHaveCount(6)
     })
   } finally { await next.close() }
 })

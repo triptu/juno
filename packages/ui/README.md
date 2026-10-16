@@ -29,7 +29,8 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 
 `chunk(importer)` shares one import between idle or intent preloading (`load`)
 and its components (`component`). A preloaded component renders in the same
-commit on its first mount. Views and desktop containers use the same helper;
+commit on its first mount. `useReady()` lets an eager reserved placeholder fill
+as soon as loading finishes without ever committing a Suspense fallback. Views and desktop containers use the same helper;
 `@juno/views` re-exports it for containers.
 
 `Popover` holds its whole floating panel behind Suspense. A cold chunk never

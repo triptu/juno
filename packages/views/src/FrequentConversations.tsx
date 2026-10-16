@@ -2,7 +2,6 @@ import * as stylex from '@stylexjs/stylex'
 import type { PickConversation } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { chunk, Text } from '@juno/ui'
-import { Suspense } from 'react'
 
 const frequent = chunk(() => import('./FrequentRows'))
 export const loadFrequentRows = frequent.load
@@ -16,13 +15,16 @@ export interface FrequentConversationsProps {
 
 /** Standard list rows; every destination is a separate Tab stop. */
 export function FrequentConversations({ conversations, selected, onPick }: FrequentConversationsProps) {
+  const ready = frequent.useReady()
   return (
     <div data-frequent-block="" {...stylex.props(styles.block)}>
       <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>Frequent</Text>
       <div role="list" aria-label="Frequent conversations">
-        <Suspense fallback={<div data-chunk-pending="" aria-hidden="true">{conversations.map(conversation => <div key={conversation.key} {...stylex.props(styles.placeholder)} />)}</div>}>
+        {ready ? (
           <FrequentRows conversations={conversations} selected={selected} onPick={onPick} />
-        </Suspense>
+        ) : (
+          <div data-chunk-pending="" aria-hidden="true">{conversations.map(conversation => <div key={conversation.key} {...stylex.props(styles.placeholder)} />)}</div>
+        )}
       </div>
       <Text variant="meta" tone="muted" as="div" sx={styles.hint}>Write your message, then pick where it goes.</Text>
     </div>
