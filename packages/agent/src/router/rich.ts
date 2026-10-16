@@ -57,8 +57,12 @@ class Builder {
   private paragraph: string[] = []
   private list: { ordered: boolean; start?: number; items: string[] } | undefined
   private blank = false
+  // A plain field: the agent runs from source with Node's type stripping, which has no parameter properties.
+  private readonly sources: Sources
 
-  constructor(private readonly sources: Sources) {}
+  constructor(sources: Sources) {
+    this.sources = sources
+  }
 
   private inlines(text: string): ReadonlyArray<JunoInline> {
     return inlinesOf(text.trim(), this.sources)
