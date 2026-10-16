@@ -70,7 +70,8 @@ export function createCodexHarness(options: CodexOptions & { readonly store: Sto
       pending.delete(key)
       if (!request) throw new Error('No admitted Codex request')
       const agent = await api.agent(context)
-      const server = await serveMcp(agent.tools.filter(tool => tool.name !== HARNESS_TOOL).map(tool => ({
+      // Not codemode: scripts through the Codex bridge are not checked yet (docs/research/codemode.md).
+      const server = await serveMcp(agent.tools.filter(tool => tool.name !== HARNESS_TOOL && tool.name !== 'codemode').map(tool => ({
         name: tool.name, description: tool.description, inputSchema: parseObject(tool.parameters),
         call: async (input: unknown) => {
           // Recheck removal and pin revisions before every nested call.

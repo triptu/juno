@@ -16,6 +16,7 @@ import { REDACTION_MIGRATIONS, type Redaction, type RemovalBackup } from '../red
 import { type JunoTool, type ToolRun } from '../request/tool'
 import { openCore, type UpdateNeeded } from '../runtime/core'
 import { type Extension, type Journal, type JournalSettings } from '../runtime/journal'
+import { SCRIPT_MIGRATIONS, type CodemodeRunner } from '../scripts'
 import { SCHEDULE_MIGRATIONS, type Scheduler, type SchedulerOptions } from '../schedule'
 import { driveScheduler } from '../schedule/driver'
 import { SETTINGS_MIGRATIONS } from '../settings/schema'
@@ -101,6 +102,11 @@ export interface TurnsOptions {
    */
   readonly stopExternalJob?: (job: Job, click: string | undefined) => Promise<boolean>
   readonly jobDrivers?: () => ReadonlyArray<JobDriver>
+  /**
+   * The `agent.codemode` flag: with it the model also gets pi's code mode tool,
+   * whose scripts may only read (`scripts/`). Off without it.
+   */
+  readonly codemode?: CodemodeRunner
   /** Other folders' migration sets. Spend, turns and jobs are always applied. */
   readonly migrations?: ReadonlyArray<MigrationSet>
   /** Host socket availability. Stored input waits until it is online. */
@@ -202,7 +208,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   return openCore({
     agentDir: options.agentDir,
     ...(options.now ? { now: options.now } : {}),
-    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
     router: {
       beforeOpen: async () => {
         // A restore staged before the restart replaces agent.sqlite now (§14.4).
@@ -272,15 +278,16 @@ async function start(
   const session = createTurnSession(store, options, () => models.running(), () => compactor?.poke())
   const models = createTurnModels(store, guard, initial, options, session.journal, () => services.tools())
   const services = createTurnServices({ store, guard, initial, options, session, models, backup, poke: () => compactor?.poke() })
-  const { router, jobs, actions, redaction, ownership, scheduler, tools, section } = services
+  const { router, jobs, actions, redaction, ownership, scheduler, tools, section, scripts } = services
   relay.notify = ownership.notify
   const extension = {
     name: 'juno',
     tools: tools().map((tool) => tool.registration),
-    sections: [{ key: 'juno', render: section }],
+    sections: [{ key: 'juno', render: section }, ...(scripts ? [scripts.section] : [])],
     hooks: [
       { task: 'pi.generation', handlers: router.hooks.generation },
-      { task: 'pi.tool', handlers: router.hooks.tool },
+      // A script's call that is not a read is refused before the router counts it.
+      { task: 'pi.tool', handlers: scripts ? { beforeTool: (call: Parameters<typeof scripts.guard>[0]) => scripts.guard(call) ?? router.hooks.tool.beforeTool(call) } : router.hooks.tool },
     ],
   } as Extension
   const settings: JournalSettings = {
