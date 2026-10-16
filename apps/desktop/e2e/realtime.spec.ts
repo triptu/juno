@@ -41,21 +41,24 @@ test('an edit, a delete and a reaction made while the socket is down show once i
   await expect(topic.message('Release notes are up.').getByRole('button', { name: /^1 🎉/ })).toBeVisible()
 })
 
+// The header notice also takes the same slot each time, so the pages below it never move.
 test('a 429 storm: the line says Slack asked us to slow down, every method waits out Retry-After, and the gap still arrives', async ({ juno, fake, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  fake.goOffline()
-  await sidebar.expectSyncStatus("You're offline")
-  slack.as('Priya').postIn('product', 'Pricing page copy is live.')
-  fake.resetCalls()
+  await juno.allTopics.open()
   // Every method the catch-up calls gets a 429 asking for six seconds, longer than the interactive lane waits.
   const methods = ['client.counts', 'conversations.history', 'subscriptions.thread.getView', 'search.modules.messages']
-  for (const method of methods) fake.force429({ method, retryAfter: 6 })
-  fake.goOnline()
-
-  await sidebar.expectSyncStatus('Slack asked us to slow down')
-  await sidebar.expectNoSyncStatus(60_000)
+  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
+    fake.goOffline()
+    await sidebar.expectSyncStatus("You're offline")
+    slack.as('Priya').postIn('product', 'Pricing page copy is live.')
+    fake.resetCalls()
+    for (const method of methods) fake.force429({ method, retryAfter: 6 })
+    fake.goOnline()
+    await sidebar.expectSyncStatus('Slack asked us to slow down')
+    await sidebar.expectNoSyncStatus(60_000)
+  })
   await expect(sidebar.row('#product').preview).toContainText('Pricing page copy is live.', { timeout: 30_000 })
 
   await juno.expectEngineLive(60_000)
@@ -160,17 +163,3 @@ for (const change of ['rename', 'leave', 'archive'] as const) {
     } else await expect(juno.sidebar.row(ENG_MAIN).root).toHaveCount(0)
   })
 }
-
-test('header notices replace the same slot without moving the pages below', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.allTopics.open()
-  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
-    fake.goOffline()
-    await juno.sidebar.expectSyncStatus("You're offline")
-    for (const method of ['client.counts', 'conversations.history', 'subscriptions.thread.getView', 'search.modules.messages']) fake.force429({ method, retryAfter: 6 })
-    fake.goOnline()
-    await juno.sidebar.expectSyncStatus('Slack asked us to slow down')
-    await juno.sidebar.expectNoSyncStatus(60_000)
-  })
-})
