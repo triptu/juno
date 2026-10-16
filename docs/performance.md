@@ -36,8 +36,23 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: one socket event transaction, including `reindexTopics` | 5 ms | Backfill transactions ≤ 200 rows and ≤ 20 ms. |
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
 | Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`. Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
-| Renderer bundle | Initial JS ≤ 1.0 MB uncompressed, CSS ≤ 150 KB; pages other than the sidebar and topic view are lazy chunks | The built shell ships 634 KB of JS (202 KB gzip) and 85 KB of CSS, minified (M3, with the React Compiler on). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
+| Renderer bundle | Initial JS ≤ 1.0 MB uncompressed, CSS ≤ 150 KB; pages other than the sidebar and topic view are lazy chunks | The built shell ships 946.5 KB of JS (306.2 KB gzip) and 124.0 KB of CSS, minified (2026-10-16, with the React Compiler on). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
+
+### Startup bundle split (2026-10-16)
+
+`pnpm --filter @juno/desktop build`, against `origin/main` at `404ffb34`, measured initial JS at **999.7 KB → 946.5 KB** (gzip **324.0 KB → 306.2 KB**). This frees 53.2 KB without changing the 1,000 KB budget. CSS stays at 124.0 KB (35.4 KB gzip).
+
+A temporary Rollup `generateBundle` hook inspected each chunk's `modules` and `renderedLength`; no dependency or build instrumentation remains. These lengths are before final minification: React DOM (644.6 KB) and Effect dominate the entry, followed by required message and sidebar code. Candidates outside the shell's first paint included DestinationPickers (18.5 KB), the New chat container (9.7 KB), ViewSheet (9.4 KB), TopicSwitcher (9.9 KB), and AccountMenu (4.9 KB).
+
+| Moved out of initial JS | Built lazy chunk, minified | Loading |
+| --- | --- | --- |
+| New chat, Frequent destinations, destination pickers and New chat send checks | 21.76 KB | Preloaded on idle with All topics. An early navigation waits for the chunk while keeping the current page visible; a restored New chat uses the workspace's full-size pane. Delayed autofocus leaves an open dialog or menu in control. |
+| New/edit view sheet | 8.41 KB | Preloaded on sidebar idle; opens in the existing popover. |
+| Account menu content and its exclusive icons | 7.45 KB | Preloaded on sidebar idle; opens in the existing popover. |
+| Topic switcher content | 5.87 KB | Preloaded when the topic's deferred rows have mounted, alongside its existing local query warming. The header and queries remain eager; the list opens in the existing popover. |
+
+Shared picker code also leaves the entry, so the chunk sizes do not sum to the entry reduction. Message rendering (including integration cards and Block Kit), the sidebar, topic view and composer remain eager. Settings, Set up Juno and Configure were already deferred; the small why popover and date helpers stay as they were. Only container boundaries changed; the views and their geometry are unchanged.
 
 Where these numbers come from: 100 ms is the limit under which a response feels immediate and 10 ms per frame is the animation target in Google's RAIL model ([web.dev/rail](https://web.dev/articles/rail)); Juno targets a frame (16 ms, or 8.3 ms at 120 Hz) for direct feedback because native macOS apps do. 50 ms is the long-animation-frame threshold ([Chrome LoAF](https://developer.chrome.com/docs/web-platform/long-animation-frames)) and 200 ms is the "good" Interaction to Next Paint limit ([web.dev/inp](https://web.dev/articles/inp)); Juno's interaction budgets sit well under it. Apple's 120 Hz guidance is in [WWDC21 session 10147](https://developer.apple.com/videos/play/wwdc2021/10147/).
 
