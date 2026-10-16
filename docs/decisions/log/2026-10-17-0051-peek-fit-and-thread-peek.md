@@ -1,0 +1,1 @@
+- 10-17 00:51 · peek-polish · Peek is 640px wide and as tall as its messages, in compact rows whatever the density; holding the peek key over a Main message with a thread, or its reply summary, peeks the thread below (or above) the message without opening it.

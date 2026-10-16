@@ -152,7 +152,7 @@ The row leaves when the last tab showing it closes or navigates elsewhere. Histo
   - Ignore #channel
 - **Channel context menu** (right-click a topic's context pill, a #channel chip in a message, or a channel result in ⌘K): Show its topics, Open Main, Mark channel as read or unread, Notify me, Add to view, Ignore channel, and Ask Juno (section 7, Juno panel).
 - **Person menu** (right-click a sender's name or avatar in a message, or an @person chip): Notify me about them, and Ask Juno.
-- **Peek** is how you read without marking anything read. Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row while holding the key switches the peek; releasing it closes the popover. The key defaults to ⌥ Option, which works while you type; Settings › General can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
+- **Peek** is how you read without marking anything read. Hold the peek key while the pointer is over a sidebar row and the topic opens in a popover to the right of the sidebar. In a channel or DM Main, hold it over a message that has a thread, or over its reply summary ("3 replies"), and the thread opens in the same popover just below the message (above it when there is more room there). The popover is a reading width wide, as tall as its messages up to the room in the window, and shows its messages in compact rows whatever the density setting. It is read-only and scrolls, and it does not mark anything read, open a tab or move focus, so you stay where you were. Moving to another row, or another message with a thread, while holding the key switches the peek; releasing it closes the popover. A thread peek stays open while the pointer is on it, and the wheel scrolls the peek, not the Main. The key defaults to ⌥ Option, which works while you type; Settings › General can change it to Space, which works only when no text field has focus. (Fn is not offered: macOS does not report it to apps reliably.)
 - **Rename** happens inline in the row or the topic header. Enter saves and Esc cancels.
 - **Undo toasts** appear bottom-left for reversible actions only. Info-only toasts like "Prompt copied" never show Undo.
 
@@ -662,7 +662,7 @@ Use the Littlebird design system's tokens.
 | ⌘Z | Undo the last topic action: resolve, reopen, pin, rename, mark read or unread, Notify me change or ignore. Sends are final (ADR 0010) |
 | ⌘ click / ⌘ Enter | Open in a new tab |
 | ↑ in an empty composer, then ↑ ↓ | Select a message. E edits and Delete or Backspace deletes your own selected message |
-| Hold ⌥ (or Space) over a sidebar row | Peek at the topic without opening it or marking it read |
+| Hold ⌥ (or Space) over a sidebar row, or a Main message with a thread | Peek at the topic, or the thread, without opening it or marking it read |
 | Enter / Shift Enter | Send / new line. During a send check, Enter takes the first option. |
 | Esc | Close a menu or palette, or dismiss a send check. In the Juno panel with an empty composer, close the panel |
 
