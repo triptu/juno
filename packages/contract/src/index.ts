@@ -12,6 +12,7 @@ export {
   Events,
   SIDEBAR_WIDTH,
   JUNO_PANEL_WIDTH,
+  menuShortcuts,
   type ContextMenuAt,
   type ContextMenuItem,
   type ContextMenuLeaf,
@@ -21,6 +22,7 @@ export * from './errors'
 export * from './live'
 export * from './protocol'
 export * from './routes/engine'
+export * from './routes/ai'
 export * from './routes/session'
 export * from './routes/topics'
 export * from './routes/allTopics'

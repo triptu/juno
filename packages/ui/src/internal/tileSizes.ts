@@ -9,5 +9,8 @@ export const tileSizes = stylex.create({
   24: { width: sizes['--avatar-24'], height: sizes['--avatar-24'], fontSize: sizes['--initials-24'] },
   20: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], fontSize: sizes['--initials-20'] },
   18: { width: sizes['--avatar-18'], height: sizes['--avatar-18'], fontSize: sizes['--initials-18'] },
+  16: { width: sizes['--avatar-16'], height: sizes['--avatar-16'], fontSize: sizes['--initials-16'] },
+  // Too small for a letter: the photo or the person's colour alone.
+  11: { width: sizes['--avatar-11'], height: sizes['--avatar-11'], fontSize: 0 },
 })
 

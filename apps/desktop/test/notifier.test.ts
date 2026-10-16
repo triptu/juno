@@ -37,6 +37,7 @@ function connect(engine: RunningEngine) {
       badge = text
     },
     open: (target) => opened.push(target),
+    focus: () => {},
     send: (message: MainToEngine) => engine.main.host.deliver(message),
     privacy: () => privacy,
   })

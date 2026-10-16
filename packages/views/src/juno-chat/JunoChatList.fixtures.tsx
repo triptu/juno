@@ -3,7 +3,7 @@ import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
-import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
+import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, richReply, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
 const noop = () => {}
@@ -128,6 +128,10 @@ export default defineFixtures(
     Sources: {
       linked: list(sourced(true)),
       hover: list(sourced(true), {}, { ...frame, hover: '[data-source]' }),
+    },
+    Formatting: {
+      'rich-text': list(richReply, {}, { ...frame, height: 880 }),
+      'rich-text-hover': list(richReply, {}, { ...frame, height: 880, hover: '[data-source]' }),
     },
     Reactions: {
       'both-ways': list(reactions),

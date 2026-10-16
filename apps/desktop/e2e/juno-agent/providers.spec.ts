@@ -69,7 +69,7 @@ type Settings = {
   readonly spendUntracked?: true
   readonly chatModels: ReadonlyArray<{ readonly family: string; readonly resolved?: string; readonly price?: string; readonly selected: boolean }>
 }
-type ChatPage = { readonly page: { readonly items: ReadonlyArray<{ readonly _tag: string; readonly body?: ReadonlyArray<{ readonly text?: string }> }> } }
+type ChatPage = { readonly page: { readonly items: ReadonlyArray<{ readonly _tag: string; readonly body?: ReadonlyArray<{ readonly inlines?: ReadonlyArray<{ readonly text?: string }> }> }> } }
 type ProviderState = { readonly active: string | null; readonly openRouter: { readonly key: string }; readonly custom: { readonly baseUrl: string; readonly key: string } }
 
 const NONE: ProviderState = { active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } }
@@ -87,7 +87,7 @@ async function watchProvider(win: Page) {
 async function bubbles(agent: Awaited<ReturnType<typeof agentClient>>, text: string) {
   const chat = await agent.follow<ChatPage>('agent.chat.page', { window: { _tag: 'latest', limit: 50 } })
   await agent.command('agent.chat.send', { opId: 'op-send', text })
-  return () => chat.latest().then((page) => page?.page.items.filter((item) => item._tag === 'juno').map((item) => item.body?.[0]?.text))
+  return () => chat.latest().then((page) => page?.page.items.filter((item) => item._tag === 'juno').map((item) => item.body?.[0]?.inlines?.map((inline) => inline.text).join('')))
 }
 
 // SPEC 13.10: with no provider set up the agent does not run, and asking for its port says so at once.

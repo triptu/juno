@@ -1,0 +1,1 @@
+- 10-16 22:58 · idle-cpu · Idle CPU budget: after sync, with nothing happening, the engine uses under 3 % of one core; a re-index asks only for people the users table lacks, so naming a stored person never re-indexes and asks again.

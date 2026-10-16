@@ -1,5 +1,6 @@
-import type { Hours, NotifyTag } from '@juno/contract'
-import { notificationSettingsAtom, notificationsPageAtom, registry, setHours, setMatters } from '@juno/state'
+import { useEffect, useState } from 'react'
+import type { Hours, NotificationPermission, NotifyTag } from '@juno/contract'
+import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, sendTestNotification, setHours, setMatters } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
@@ -17,15 +18,51 @@ function remove(tag: NotifyTag): void {
   setNotifyLevel({ kind: tag.kind, id: tag.id }, 'matters', tag.kind === 'channel' && tag.channelKind !== 'im' && tag.channelKind !== 'mpim' ? `#${tag.name}` : tag.name)
 }
 
+/** The last answer, so the page opens again with it and nothing moves while main answers. */
+let lastPermission: NotificationPermission | undefined
+
+/**
+ * Whether macOS lets Juno notify, asked when the page opens and again each
+ * time the window regains focus, so the line goes once the owner turns
+ * notifications on in System Settings and comes back.
+ */
+function useNotificationPermission(): readonly [NotificationPermission | undefined, () => void] {
+  const [permission, setPermission] = useState(lastPermission)
+  useEffect(() => {
+    let live = true
+    const read = () =>
+      void getNotificationPermission().then((next) => {
+        lastPermission = next
+        if (live) setPermission(next)
+      })
+    read()
+    window.addEventListener('focus', read)
+    return () => {
+      live = false
+      window.removeEventListener('focus', read)
+    }
+  }, [])
+  // macOS shows its prompt once. When it does not (an unsigned build), System Settings is the way left.
+  const allow = () =>
+    void requestNotificationPermission().then((next) => {
+      lastPermission = next
+      setPermission(next)
+      if (next === 'notDetermined') openNotificationSettings()
+    })
+  return [permission, allow]
+}
+
 /**
  * The Notifications page (SPEC 14): the settings and the page's lists and
- * today from the engine. Nothing shows until the settings arrive, which
- * are local and come at once.
+ * today from the engine, and macOS's permission from main. Nothing shows
+ * until the settings and the permission arrive, which are local and come
+ * at once.
  */
 export function NotificationsPage() {
   const settings = useAtomValue(notificationSettingsAtom)
   const page = useAtomValue(notificationsPageAtom)
-  if (settings._tag !== 'Success') return null
+  const [permission, allow] = useNotificationPermission()
+  if (settings._tag !== 'Success' || permission === undefined) return null
   const lists = page._tag === 'Success' ? page.value : { every: [], never: [], interrupted: 0, held: 0, today: [] }
   return (
     <NotificationsPageView
@@ -41,6 +78,10 @@ export function NotificationsPage() {
       onHoursChange={changeHours}
       onMattersSave={saveMatters}
       onRemove={remove}
+      permission={permission}
+      onSendTest={sendTestNotification}
+      onOpenSettings={openNotificationSettings}
+      onAllow={allow}
     />
   )
 }

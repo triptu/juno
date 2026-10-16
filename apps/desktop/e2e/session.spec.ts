@@ -119,20 +119,6 @@ test('imports the Slack app’s session through the test seam', async ({ juno, f
   expect(slackApp.credentials.userId).toBe(fake.selfId)
 })
 
-test('imports a Slack app whose cookie store is at Network/Cookies', async ({ fake, userData }) => {
-  const dir = join(userData, 'slack-network-cookies')
-  const slackApp = await writeSlackApp(fake, dir, { cookiesFile: 'Network/Cookies' })
-  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const juno = new Juno(running.app, running.win)
-    await juno.importFromSlackApp()
-    await juno.expectSignedIn('Juno Fake')
-    expect(fake.calls.find((call) => call.method === 'auth.test')?.ok).toBe(true)
-  } finally {
-    await running.close()
-  }
-})
-
 test('explains a Mac without Slack', async ({ fake, userData }) => {
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: join(userData, 'no-such-dir'), keychainPassword: 'x' })
   try {

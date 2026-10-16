@@ -6,7 +6,8 @@
  *
  * An edit keeps the message's mentions: the composer text names people and
  * channels as "@Maya Chen" and "#eng", so the names the message mentioned
- * are turned back into Slack's ids when it is composed again.
+ * are turned back into Slack's ids when it is composed again. Its linked
+ * words show as their text, so they are linked again where they still stand.
  */
 import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, Rejected, type MessageActionError, type MessageRef } from '@juno/contract'
@@ -46,7 +47,27 @@ const idsIn = (pattern: RegExp, sources: ReadonlyArray<string | null>): Readonly
   return [...ids]
 }
 
-/** The people and channels a message mentions, by the names its edit text shows them with. */
+/** The words a message's `link` elements put a link on, from its blocks. */
+const linkedWords = (blocksJson: string | null): ReadonlyArray<{ readonly text: string; readonly url: string }> => {
+  if (blocksJson === null) return []
+  const out: Array<{ readonly text: string; readonly url: string }> = []
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) node.forEach(walk)
+    else if (node !== null && typeof node === 'object') {
+      const el = node as Record<string, unknown>
+      if (el['type'] === 'link' && typeof el['url'] === 'string' && typeof el['text'] === 'string') out.push({ text: el['text'], url: el['url'] })
+      Object.values(el).forEach(walk)
+    }
+  }
+  try {
+    walk(JSON.parse(blocksJson))
+  } catch {
+    return []
+  }
+  return out
+}
+
+/** The people and channels a message mentions, by the names its edit text shows them with, and its linked words. */
 const mentionTargets = (text: string, blocksJson: string | null): Effect.Effect<MentionTargets, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
@@ -57,6 +78,7 @@ const mentionTargets = (text: string, blocksJson: string | null): Effect.Effect<
     return {
       people: users.map((user) => ({ id: user.id, name: userName(user.id, user) })),
       channels: channels.flatMap((channel) => (channel.name === null ? [] : [{ id: channel.id, name: channel.name }])),
+      links: linkedWords(blocksJson),
     }
   })
 

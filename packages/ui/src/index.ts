@@ -1,6 +1,7 @@
 export { Avatar, hueForId, hueNames, type HueName } from './Avatar'
 export { AvatarButton } from './AvatarButton'
 export { AvatarStack, type AvatarStackPerson } from './AvatarStack'
+export { GroupAvatar } from './GroupAvatar'
 export { Button } from './Button'
 
 export { ChannelIcon, channelColorNames, channelIconNames, channelIcons, type ChannelColorName, type ChannelIconName } from './ChannelIcon'
@@ -39,6 +40,7 @@ export { Text } from './Text'
 export { Textarea, type TextareaMark } from './Textarea'
 export { TextField } from './TextField'
 export { Toast, ToastRegion } from './Toast'
+export { TooltipLayer, tooltip } from './Tooltip'
 export { TopicArt } from './TopicArt'
 export {
   accentLabels,

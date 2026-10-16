@@ -6,8 +6,8 @@ import { expect, launchApp, test as base } from '../fixtures'
 
 /**
  * The model the e2e agent talks to. It answers each message by echoing its
- * words, reacts with 🎉 when asked to "react", and says nothing to a
- * reaction. `requests` is what the agent sent.
+ * words, reacts with 🎉 when asked to "react", answers "formatting" with
+ * markdown and HTML bold, and says nothing to a reaction. `requests` is what the agent sent.
  */
 export function answer(request: OpenRouterRequest): string {
   const input = request.input
@@ -15,6 +15,7 @@ export function answer(request: OpenRouterRequest): string {
   const id = /<message id="(n\d+)">/.exec(input)?.[1]
   const words = input.replace(/<about[^>]*\/>|<about[\s\S]*?<\/about>|<quote[\s\S]*?<\/quote>|<[^>]*>/g, '').trim()
   if (/\breact\b/.test(words) && id !== undefined) return `<react to="${id}">🎉</react><say>Reacted to ${words}</say>`
+  if (/\bformatting\b/.test(words)) return '<say>**Staging** is green, and <b>deploys</b> run at 14:00.</say>'
   return `<say>You said: ${words}</say>`
 }
 

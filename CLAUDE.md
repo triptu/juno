@@ -28,15 +28,11 @@ Read the parts relevant to your task, and the package's README, before changing 
 
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
-- Merge first, test in full afterwards (`docs/development.md`, "Testing"). Many agents work at once, so no agent runs a full suite. Before you report, run only what your change touches:
-  - `pnpm typecheck` (fast local Bun check) and `pnpm lint` (about 3 s).
-  - The unit test files your change reaches: `pnpm remote test <files>`.
-  - The e2e spec files you added or changed, and the ones for the feature you changed: `pnpm remote test:desktop <files>`.
-  - Gallery shots only for components you changed: `GALLERY_SHIFT_ONLY=<Component,...> pnpm remote test:gallery`.
-  - `pnpm specs:check` only when you changed a spec or the sync code it models.
-  Do not run bare `pnpm affected` or `pnpm remote test:desktop` with no files until `docs/development.md` says it is narrow again: today it asks for about 8 machines at once. `pnpm typecheck:tsc` is manual only.
+- Merge first, test in full afterwards (`docs/development.md`, "Testing"). Many agents work at once, so no agent runs a full suite. Before you report, run `pnpm affected`: the local Bun typecheck and lint, then only the tests your change reaches, as one plan on one remote machine (desktop e2e specs picked by coverage, gallery specs by component). `pnpm affected --plan` shows what it would run and why.
+  - To run a few unit test files by hand: `pnpm remote test --passWithNoTests <files>`, with paths relative to their package (`test/messages.test.ts`, not `packages/engine/test/messages.test.ts`); the script runs vitest in every package. One e2e spec: `pnpm remote test:desktop <files>`.
+  `pnpm typecheck:tsc` is manual only.
 - The CI keeper, an agent the orchestrator runs, tests main in full once several merges have landed or enough time has passed, and fixes or routes what fails. If it asks you about a failure in code you wrote, fix that first.
-- Remote machines are shared by every agent, capped at 24 vCPU: one remote run at a time per agent, never several in parallel, and never a loop of reruns. `perf`, `test:feel` and e2e tests tagged `@mac` run only on the Mac.
+- Remote machines are shared by every agent, capped at 48 vCPU (six 8x16 machines, the one standard shape): one remote run at a time per agent, never several in parallel, and never a loop of reruns. `perf`, `test:feel` and e2e tests tagged `@mac` run only on the Mac.
 - This Mac has 8 cores and 8 GB of memory and is also the owner's computer. Do not run e2e, gallery or spec suites locally. A local `pnpm --filter <package> build` or one package's typecheck is fine. Anything heavy that must run locally goes through the root `pnpm` scripts, which queue behind a machine-wide lock (`scripts/heavy.mjs`). Do not leave dev servers or watchers running. Stop only your own processes, by PID; never `pkill -f` or `killall` with a broad pattern.
 - Sync protocols (follow state, read state, and later merge and the outbox) are specified in Quint in `specs/`. A change to how sync behaves updates the spec in the same change and passes `pnpm specs:check`.
 - A new import of an unstable Effect module needs an entry in the `unstable` list in `scripts/check-deps.mjs` and a note in the effect skill.

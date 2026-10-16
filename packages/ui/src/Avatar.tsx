@@ -7,7 +7,7 @@ import { hueForId, hueNames, type HueName } from './internal/hue'
 export { hueForId, hueNames, type HueName }
 
 export type AvatarKind = 'person' | 'group'
-export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18
+export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18 | 16
 /** The surface an avatar ring must cut through: page, sidebar or a card. */
 export type AvatarRingSurface = 'background' | 'subtle' | 'surface'
 
@@ -18,7 +18,8 @@ export interface AvatarProps {
   readonly label: string
   /** The person's full name, for the accessible name. Omit for decoration. */
   readonly name?: string
-  readonly size?: AvatarSize
+  /** 11 is a group member in a tab icon (`GroupAvatar`): no letter fits, so the label should be empty. */
+  readonly size?: AvatarSize | 11
   /** Person colour. Use `hueForId` to pick one from a Slack id. */
   readonly hue?: HueName
   /**

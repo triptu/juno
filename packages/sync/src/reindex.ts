@@ -45,6 +45,8 @@ export interface ReindexOptions {
   readonly me: Me
   /** A sender or a mention had no row in `users`. The caller fetches the user and re-indexes the topic. */
   readonly onMissingUser?: (userId: string, topicId: string) => void
+  /** A user group mention had no row in `usergroups`. The caller re-indexes the topic once the groups arrive. */
+  readonly onMissingUsergroup?: (topicId: string) => void
   /** Give a Main with nothing stored a provisional row from `client.counts` (cold boot). An existing provisional row is kept without it. */
   readonly provisionalMain?: boolean
 }
@@ -66,6 +68,7 @@ export const ROOT_TEXT_CHARS = 240
 
 const MENTION = /<@([A-Z0-9]+)(?:\|[^>]*)?>/g
 const CHANNEL_MENTION = /<#([A-Z0-9]+)(?:\|[^>]*)?>/g
+const USERGROUP_MENTION = /<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g
 
 /** Recomputes the index rows for `ids`. Returns the ids whose row changed. */
 export const reindexTopics = (
@@ -114,36 +117,53 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const reads = yield* readState(id)
     const root = parsed.kind === 'thread' ? rows.find((r) => r.ts === parsed.threadTs) : undefined
 
-    // Names for the preview: the latest live message's sender and mentions.
+    // Names for the preview: the latest live message's sender and mentions. The root's text is stored raw and named at read time.
     const live = rows.filter((r) => r.deleted === 0)
     let latest: MessageRow | undefined
     for (const row of live) if (latest === undefined || compareTs(row.ts, latest.ts) > 0) latest = row
     const userIds = new Set<string>()
     const channelIds = new Set<string>()
+    const usergroupIds = new Set<string>()
     if (latest !== undefined) {
       if (latest.user_id !== null) userIds.add(latest.user_id)
       for (const match of latest.text.matchAll(MENTION)) userIds.add(match[1]!)
       for (const match of latest.text.matchAll(CHANNEL_MENTION)) channelIds.add(match[1]!)
+      for (const match of latest.text.matchAll(USERGROUP_MENTION)) usergroupIds.add(match[1]!)
     }
     const users = new Map<string, string>()
-    if (userIds.size > 0) {
-      const found = yield* sql<{ id: string; display_name: string | null; real_name: string | null; name: string | null }>`
-        SELECT id, display_name, real_name, name FROM users WHERE id IN ${sql.in([...userIds])}`
-      for (const user of found) users.set(user.id, user.display_name ?? user.real_name ?? user.name ?? user.id)
-    }
+    const loadUsers = (ids: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        if (ids.length === 0) return 0
+        const found = yield* sql<{ id: string; display_name: string | null; real_name: string | null; name: string | null }>`
+          SELECT id, display_name, real_name, name FROM users WHERE id IN ${sql.in(ids)}`
+        for (const user of found) users.set(user.id, user.display_name ?? user.real_name ?? user.name ?? user.id)
+        return found.length
+      })
+    yield* loadUsers([...userIds])
     const channels = new Map<string, string>()
     if (channelIds.size > 0) {
       const found = yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in([...channelIds])}`
       for (const c of found) if (c.name !== null) channels.set(c.id, c.name)
     }
+    const usergroups = new Map<string, { readonly handle: string; readonly name?: string }>()
+    if (usergroupIds.size > 0) {
+      const found = yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in([...usergroupIds])}`
+      for (const group of found) usergroups.set(group.id, { handle: group.handle, ...(group.name === null ? {} : { name: group.name }) })
+      if (found.length < usergroupIds.size) options.onMissingUsergroup?.(id)
+    }
+    // The rule also names people in other messages (mentions in unread ones, blocks, attachments). It asks
+    // through `lookups`; names not loaded above are noted here and looked up after.
+    const asked = new Set<string>()
     const missing = (userId: string) => {
-      options.onMissingUser?.(userId, id)
+      asked.add(userId)
       return undefined
     }
     const lookups: IndexInput['lookups'] = {
       me: options.me.userId,
       user: (userId) => users.get(userId) ?? missing(userId),
       channel: (channelId) => channels.get(channelId),
+      usergroup: (groupId) => usergroups.get(groupId),
+      ...(options.me.usergroupIds === undefined ? {} : { myUsergroups: options.me.usergroupIds }),
     }
     const senderName = (userId: UserId | undefined) => (userId === undefined ? 'Unknown' : (users.get(userId) ?? missing(userId) ?? UNKNOWN_PERSON))
 
@@ -191,7 +211,15 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         return row.blocks_json === null ? undefined : (JSON.parse(row.blocks_json) as ReadonlyArray<Block>)
       },
     }))
-    const indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
+    let indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
+    if (asked.size > 0) {
+      const requested = [...asked]
+      asked.clear()
+      // Stored people the first pass did not load: run the rule again with their names.
+      if ((yield* loadUsers(requested)) > 0) indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
+      // Only a person with no `users` row is missing. Asking for a stored one would re-index this topic and ask again, without end.
+      for (const userId of requested) if (!users.has(userId)) options.onMissingUser?.(userId, id)
+    }
 
     const existing = (yield* sql<TopicIndexRow>`SELECT * FROM topic_index WHERE topic_id = ${id}`)[0]
     if (indexed === undefined && parsed.kind === 'main' && live.length === 0 && (options.provisionalMain === true || existing?.message_count === 0)) {

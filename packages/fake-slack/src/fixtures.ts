@@ -77,6 +77,13 @@ export interface SeedFile {
 }
 
 /** An image and a PDF in the product thread "Proposal: cut offline mode…", for attachment tests. */
+/** User groups, mentioned as `<!subteam^S…>`. Self is in none; tests add them with `setSelfUsergroups`. One is deleted. */
+export const USERGROUPS: ReadonlyArray<{ readonly id: string; readonly handle: string; readonly name: string; readonly deleted?: boolean }> = [
+  { id: 'S0PLATFORM', handle: 'platform', name: 'Platform team' },
+  { id: 'S0DESIGN', handle: 'design-crew', name: 'Design crew' },
+  { id: 'S0OLDOPS', handle: 'old-ops', name: 'Old operations', deleted: true },
+]
+
 export const EARLY_ACCESS_PNG: SeedFile = {
   id: 'F0SEEDFLOW',
   name: 'early-access-flow.png',
@@ -483,6 +490,7 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   const baseUrl = avatarBase.replace(/\/avatars$/, '')
 
   for (const person of PEOPLE) workspace.addUser(userObject(person, avatarBase))
+  for (const group of USERGROUPS) workspace.putUsergroup(group, false)
 
   workspace.prefs = {
     muted_channels: 'C0DEPLOYS',

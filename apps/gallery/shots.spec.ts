@@ -12,7 +12,7 @@ const only = process.env.GALLERY_SHOTS_ONLY?.split(',').map((name) => name.trim(
 /** Puts the state into the look its frame asks for; returns the cleanup. */
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
   const frame = page.locator('[data-fixture-frame]')
-  const { hover, press, focus } = route.frame
+  const { hover, press, focus, tooltip, drag } = route.frame
   // The pointer stays where the last state left it; park it off the frame so
   // a state that asks for no hover does not show one.
   await page.mouse.move(0, 0)
@@ -23,6 +23,10 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
     await page.keyboard.press('Tab')
   }
   if (hover) await frame.locator(hover).first().hover()
+  if (tooltip) {
+    await frame.locator(tooltip).first().hover()
+    await page.locator('[role="tooltip"]').waitFor()
+  }
   if (press) {
     // The press scale is a transition that reduced motion collapses, so the
     // shot runs with motion on and waits for the 150ms to finish.
@@ -33,6 +37,22 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
     await page.mouse.down()
     await page.waitForTimeout(200)
     return async () => {
+      await page.mouse.up()
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+    }
+  }
+  if (drag) {
+    // The tabs it passes slide aside over 150ms, which reduced motion collapses; the shot waits for them.
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    const box = await frame.locator(drag.from).first().boundingBox()
+    if (!box) throw new Error(`Nothing to drag at ${drag.from} in ${route.route}`)
+    const y = box.y + box.height / 2
+    await page.mouse.move(box.x + box.width / 2, y)
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2 + drag.by, y, { steps: 12 })
+    await page.waitForTimeout(250)
+    return async () => {
+      await page.keyboard.press('Escape')
       await page.mouse.up()
       await page.emulateMedia({ reducedMotion: 'reduce' })
     }

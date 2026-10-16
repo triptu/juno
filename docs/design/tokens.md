@@ -152,6 +152,22 @@ Ink stays neutral, as everywhere else. The quick filters show no counts, only th
 | Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
 | Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 8.96 | 9.89 | 8.01 | 7.79 | 8.52 |
 
+### 1.3a Icon tints
+
+`iconTints` (`--icon-tint-<accent>`, `--icon-tint-neutral`) colour a sidebar view's icon (SPEC 5, Views). Each is its accent's `--hl-text`, light and dark (`darkIconTints` in themes.stylex.ts), so it reads on the sidebar and on a selected pill's `--secondary-default` fill; neutral is `--foreground-muted`, the plain pill icon. An icon needs 3:1 (WCAG 1.4.11); measured, WCAG 2:
+
+| Tint | On sidebar, light | On selected fill, light | On sidebar, dark | On selected fill, dark |
+| --- | --- | --- | --- | --- |
+| Neutral | 4.82 | 4.39 | 6.89 | 5.01 |
+| Coral | 5.74 | 5.22 | 9.08 | 6.60 |
+| Near-black (ink) | 16.84 | 15.31 | 15.30 | 11.12 |
+| Marigold | 6.41 | 5.83 | 10.35 | 7.52 |
+| Teal | 6.37 | 5.79 | 9.96 | 7.24 |
+| Midnight blue | 13.32 | 12.11 | 9.33 | 6.78 |
+| Dark emerald | 6.53 | 5.93 | 9.80 | 7.12 |
+| Claret | 9.60 | 8.73 | 9.06 | 6.59 |
+| Cyan | 5.81 | 5.28 | 10.39 | 7.55 |
+
 ### 1.4 Context tints (public / private / DM)
 
 Always derived from the base palette so they follow dark mode. Formulas from the prototype; hex measured in Chromium.
@@ -302,7 +318,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
 | Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |
-| Avatar initials | 7.5 / 8.5 / 9 / 9.5 / 11 / 12 / 14px | 600 | | | derived | By tile size (18 / 18 / 20 / 24 / 28 / 32 / 44) |
+| Avatar initials | 7 / 7.5 / 8.5 / 9 / 9.5 / 11 / 12 / 14px | 600 | | | derived | By tile size (16 / 18 / 18 / 20 / 24 / 28 / 32 / 44) |
 
 [proposed] Token names: `--text-10-5, --text-11, --text-11-5, --text-12, --text-12-5, --text-13, --text-13-5, --text-14, --text-14-5, --text-15, --text-20, --display-30, --display-32, --display-34, --display-38`. The half-pixel sizes are deliberate in the prototype; keep them rather than rounding, they are what makes the hierarchy quiet.
 
@@ -398,7 +414,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
+| `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
+| `--reactors-min-width` | 160px: the narrowest the reaction chip's card of who reacted gets; it grows to `--menu-width` |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
@@ -412,8 +430,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
-| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so a narrow row's toolbar can sit above it. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
-| `--toolbar-height` / `--toolbar-reserve` | 36px / 243px. The message hover toolbar's height, and the width a message header keeps free at its end so the name, the time and the first body line never run under it (inventory 6.5). The Main toolbar measures 223px with More (M6b), plus a 20px gap |
+| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
+| `--toolbar-height` | 36px. The message hover toolbar's height. It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 223px with More (M6b) |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Images next to each other share a two-column grid this wide, cells 177 × 120, gap 6. File cards are `--thumb-max-width` wide |
 
 ### Controls
@@ -446,10 +464,12 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--avatar-xs` | 24px | Titlebar me avatar; initials 9.5 |
 | `--avatar-2xs` | 20px | Mention and To-picker rows; initials 9 |
 | `--avatar-3xs` | 18px | Avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
+| `--avatar-16` | 16px | A DM tab's photo in the tab icon slot; initials 7 (`--initials-16`) |
+| `--avatar-11` | 11px | A group DM member in a 16px tab icon (`GroupAvatar`); no initial fits, so the photo or the colour alone. In the 44px row tile the members use `--avatar-28` |
 
 ### Icons
 
-Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity; a tab's art or photo dims to the same 0.75 on an inactive tab and comes up to full on hover and on the active tab. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
 
 ### Juno chat
 
@@ -468,7 +488,7 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 | Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
 | Compact | 80 / 99 | 8px | 1px | 13.5px |
 
-[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
+[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
 Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
@@ -510,6 +530,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
 | `--z-toast` | 45 | Toast |
+| `--z-tooltip` | 50 | Tooltip, over everything |
 
 ## 8. Motion
 
@@ -519,7 +540,8 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | --- | --- | --- |
 | `--duration-fast` | 150ms | Press scale, hover colour, focus ring, the avatar photo fade |
 | `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
-| `--duration-appear` | 240ms | Toast, popover, palette, card and empty-state entrance |
+| `--duration-appear` | 240ms | Toast, palette, card and empty-state entrance |
+| `--duration-menu-in` | 80ms | Popover and menu entrance: menus come in fast and may leave slower (owner, 10-17) |
 | `--duration-exit` | 150ms | Every exit |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
@@ -532,7 +554,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
 | Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |
-| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear`, origin at the anchor corner. Exit opacity only | |
+| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear` (`--duration-menu-in` for popovers and menus), origin at the anchor corner. Exit opacity only | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
 | Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue | |
@@ -540,7 +562,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |
 
-Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
+Menus and popovers enter in 80ms, other entrances in 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
 
 ## 9. Opacity
 

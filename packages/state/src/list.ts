@@ -105,6 +105,7 @@ const sameChannel = (a: ChannelRef, b: ChannelRef): boolean =>
     a.tint === b.tint &&
     a.icon === b.icon &&
     a.color === b.color &&
-    a.partnerId === b.partnerId)
+    a.partnerId === b.partnerId &&
+    (a.memberIds ?? []).join() === (b.memberIds ?? []).join())
 
 const sameArt = (a: TopicArt, b: TopicArt): boolean => a === b || (a.id === b.id && a.recipe === b.recipe)

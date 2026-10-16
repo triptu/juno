@@ -44,7 +44,10 @@ export const defaultModelPrefs: ModelPrefs = {
  */
 export type Admission =
   | { readonly _tag: 'Admitted'; readonly settle: (actualUsd: number | undefined) => Effect.Effect<void> }
-  | { readonly _tag: 'Blocked' }
+  | { readonly _tag: 'Blocked'; readonly reason?: BlockedReason }
+
+/** Why a reservation was refused: the cap, no ledger to ask, or no answer from it in time. */
+export type BlockedReason = 'cap' | 'no-agent' | 'no-answer'
 
 export interface AiConfig {
   /** The OpenRouter key. Absent until the owner adds one; every call then returns no decision. */

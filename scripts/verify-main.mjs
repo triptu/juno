@@ -1,4 +1,4 @@
-// The scheduled full run: every suite against main, remotely and in parallel,
+// The scheduled full run: every suite against main, on one remote machine,
 // then a short summary.
 //
 //   pnpm verify:main                 local main
@@ -8,9 +8,10 @@
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (with no cache: every Quint run),
-// `test:gallery` and `test:desktop` through scripts/remote.mjs at the same time.
-// The summary goes to .juno-status/verify-main.md and .json in this checkout,
-// the full logs to .juno-status/verify-main/<run>/. The exit code is 1 if any
+// `test:gallery` and `test:desktop` as one plan on one machine
+// (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
+// .juno-status/verify-main.md and .json in this checkout, each suite's lines
+// to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. perf and test:feel time the Mac, so they run only with
 // --with-mac, one after the other, each holding the whole machine; the feel
 // contact sheet is copied next to the logs.
@@ -51,11 +52,10 @@ process.on('exit', removeCheckout)
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exit(130))
 
 const suites = [
-  { name: 'test', args: ['test'] },
-  { name: 'specs:check', args: ['--env', 'SPECS_CACHE=off', 'specs:check'], env: { SPECS_CACHE: 'off' } },
-  // Every component: 8x16 keeps it near a minute and a half (docs/development.md, "Machine shapes").
-  { name: 'test:gallery', args: ['--machine', 'linux/amd64:8x16', 'test:gallery'] },
-  { name: 'test:desktop', args: ['--env', 'JUNO_COVERAGE=1', 'test:desktop'] },
+  { name: 'test', words: ['test'] },
+  { name: 'specs:check', words: ['SPECS_CACHE=off', 'specs:check'] },
+  { name: 'test:gallery', words: ['test:gallery'] },
+  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'test:desktop'] },
 ]
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -73,20 +73,35 @@ function run(suite, command, args, cwd, env = {}) {
   })
 }
 
+/** Splits the plan's log into one log per suite, by each line's `[<script>] ` prefix, with the plan's own lines in every log. */
+function splitPlan(planned) {
+  let text = ''
+  try { text = readFileSync(planned.log, 'utf8') } catch { /* The run left no log. */ }
+  const lines = text.split('\n')
+  return suites.map((suite, index) => {
+    const prefix = `[${suite.name}] `
+    const log = join(logDir, `${suite.name.replace(/[^\w-]/g, '_')}.log`)
+    writeFileSync(log, lines.filter((line) => line.startsWith(prefix) || !line.startsWith('[')).map((line) => line.startsWith(prefix) ? line.slice(prefix.length) : line).join('\n'))
+    const result = lines.map((line) => new RegExp(`^plan: step ${index} \\S+ exited with (\\d+) after (\\d+) s`).exec(line)).find(Boolean)
+    return { suite: suite.name, code: result ? Number(result[1]) : planned.code || 1, seconds: result ? Number(result[2]) : planned.seconds, log }
+  })
+}
+
 console.log(`verify:main: ${commit.slice(0, 10)} ${subject}`)
-const runs = suites.map((suite) => run(suite.name, process.execPath, [join(checkout, 'scripts/remote.mjs'), ...suite.args], checkout, suite.env))
+const words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
+const runs = [run('plan', process.execPath, [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout, { SPECS_CACHE: 'off' }).then((planned) => splitPlan(planned))]
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(
     (async () => {
       const install = spawnSync('pnpm', ['install', '--frozen-lockfile', '--reporter=silent'], { cwd: checkout, stdio: 'ignore' })
-      if (install.status !== 0) return { suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }
-      return run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout)
+      if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
+      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout)]
     })(),
   )
 }
-const started = Date.now()
-let results = await Promise.all(runs)
+const planStarted = Date.now()
+let results = (await Promise.all(runs)).flat()
 
 // The coverage map, from the partials this run's desktop machines brought back
 // (scripts/coverage-map.mjs). A failed test still ran its code, so a failure
@@ -95,7 +110,7 @@ let results = await Promise.all(runs)
 const partials = existsSync(join(checkout, '.remote'))
   ? readdirSync(join(checkout, '.remote'), { recursive: true })
       .map((name) => join(checkout, '.remote', String(name)))
-      .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= started)
+      .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= planStarted)
   : []
 let coverageNote = 'no coverage partials came back; the coverage map was not refreshed'
 if (partials.length > 0) {

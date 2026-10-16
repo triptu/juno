@@ -1,16 +1,16 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, type ReactNode, type Ref, type TextareaHTMLAttributes, type UIEvent } from 'react'
-import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { chipVariants, personHues } from './Chip'
 import type { HueName } from './internal/hue'
 
 export type TextareaVariant = 'inline' | 'card'
 
-/** A run of the text drawn as a chip: a picked @person or #channel. */
+/** A run of the text drawn as a chip (a picked @person or #channel) or as a link. */
 export interface TextareaMark {
   readonly start: number
   readonly end: number
-  readonly look: 'person' | 'channel'
+  readonly look: 'person' | 'channel' | 'link'
   /** The person's hue, as their avatar and message chips have it. */
   readonly hue?: HueName
 }
@@ -101,8 +101,11 @@ function drawn(value: string, marks: ReadonlyArray<TextareaMark>, anchorAt: numb
   for (const mark of marks) {
     if (mark.start < at || mark.end > value.length) continue
     plain(mark.start)
+    // The anchor inside a mark is the mark: the link editor lines up under linked words.
+    const anchored = anchorAt !== undefined && anchorAt >= mark.start && anchorAt < mark.end
+    const look = mark.look === 'link' ? styles.link : [styles.chip, mark.look === 'channel' ? chipVariants.filled : personHues[mark.hue ?? 'rose']]
     out.push(
-      <span key={mark.start} data-mark={mark.look} {...stylex.props(styles.chip, mark.look === 'channel' ? chipVariants.filled : personHues[mark.hue ?? 'rose'])}>
+      <span key={mark.start} data-mark={mark.look} {...stylex.props(look, anchored && styles.anchor)}>
         {value.slice(mark.start, mark.end)}
       </span>,
     )
@@ -166,6 +169,13 @@ const styles = stylex.create({
   },
   anchor: {
     anchorName: TEXTAREA_ANCHOR,
+  },
+  // As links in messages are drawn, with no change of width.
+  link: {
+    color: accent['--hl-text'],
+    textDecorationLine: 'underline',
+    textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
+    textUnderlineOffset: sizes['--link-underline-offset'],
   },
 })
 

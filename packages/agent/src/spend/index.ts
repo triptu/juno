@@ -59,8 +59,11 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
    * share) is at or over its limit, nothing new is reserved, whatever the
    * amount, until midnight or a raise. Compaction may use a quarter of the
    * limit and the engine's background calls half, so chat always keeps the rest.
+   * The engine's backlog (`background`) stops at three eighths, counted
+   * against all the engine holds, so new threads and Redraw keep the rest of
+   * its half (spec `engineBackground`).
    */
-  const fits = (day: string, path: SpendPath, amount: number) => {
+  const fits = (day: string, path: SpendPath, amount: number, background = false) => {
     const s = snapshot(day)
     const limit = money(s.cap + s.raises)
     const used = s.reserved + s.actual
@@ -68,17 +71,18 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
     const share = path === 'compaction' ? Math.floor(limit / 4) : path === 'engine' ? Math.floor(limit / 2) : undefined
     if (share === undefined) return true
     const mine = path === 'compaction' ? s.compaction : usedBy(day, path)
+    if (background && path === 'engine' && mine + amount > Math.floor((limit * 3) / 8)) return false
     return mine < share && mine + amount <= share
   }
   return {
     snapshot,
     /** `as` makes the reservation idempotent: a reservation with that id already made is returned as it is. */
-    reserve: (path: SpendPath, amount: number, as?: string): Reservation => transaction(db, () => {
+    reserve: (path: SpendPath, amount: number, as?: string, background = false): Reservation => transaction(db, () => {
       money(amount)
       if (as !== undefined && db.prepare('SELECT 1 FROM spend_reservations WHERE id = ?').get(as)) return { kind: 'reserved', id: as }
       const day = today()
       ensureDay(day)
-      if (!fits(day, path, amount)) return { kind: 'blocked', reason: 'budget' }
+      if (!fits(day, path, amount, background)) return { kind: 'blocked', reason: 'budget' }
       const id = as ?? uuidv7(store.now())
       db.prepare("INSERT INTO spend_reservations(id, day, path, amount, state) VALUES (?, ?, ?, ?, 'reserved')").run(id, day, path, amount)
       return { kind: 'reserved', id }

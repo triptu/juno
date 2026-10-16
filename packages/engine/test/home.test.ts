@@ -2,7 +2,7 @@
 // the fake Slack and the fake AI provider.
 import { afterEach, describe, expect, it } from 'vitest'
 import { homeMarkDone, homeView, homeVisit, prefsSet, type HomeView } from '@juno/contract'
-import { liveQuery, runCommand } from '@juno/state'
+import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine, threadId, valueOf } from './scenario'
 
@@ -13,11 +13,11 @@ afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
-function homeUntil(engine: RunningEngine, predicate: (value: HomeView) => boolean, label: string): Promise<HomeView> {
+function homeUntil(engine: RunningEngine, predicate: (value: HomeView) => boolean, label: string, registry: Registry = engine.registry): Promise<HomeView> {
   const atom = liveQuery(homeView)(undefined)
-  unmounts.push(engine.registry.mount(atom))
+  unmounts.push(registry.mount(atom))
   return waitFor(() => {
-    const result = engine.registry.get(atom) as { _tag: string; value?: HomeView }
+    const result = registry.get(atom) as { _tag: string; value?: HomeView }
     return result._tag === 'Success' && predicate(result.value!) ? { value: result.value! } : undefined
   }, WAIT_MS, label).then((found) => found.value)
 }
@@ -34,11 +34,10 @@ describe('Home', () => {
     const engine = await bootedEngine(engines)
     const first = await homeUntil(engine, (view) => view.ready && view.items.length > 0, 'the first subscription')
     for (const unmount of unmounts.splice(0)) unmount()
-    // Past the renderer's idle time, so the subscription ends and a new one starts.
-    await new Promise((resolve) => setTimeout(resolve, 31_000))
-    const again = await homeUntil(engine, (view) => view.ready, 'the second subscription')
+    // A new subscription to the same engine: a second window, as a remount after the renderer's idle time would be.
+    const again = await homeUntil(engine, (view) => view.ready, 'the second subscription', engine.openWindow())
     expect(again.items.map((item) => item.id)).toContain(first.items[0]!.id)
-  }, 90_000)
+  })
 
   it('with AI assist off, ranks what waits, where the user left off and what moved, and adds nothing from the assistant', async () => {
     const engine = await bootedEngine(engines)

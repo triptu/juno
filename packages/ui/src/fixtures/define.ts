@@ -26,6 +26,18 @@ export interface FixtureFrame {
    * from the keyboard, so the focus ring and `:focus-within` styles show.
    */
   readonly focus?: string
+  /**
+   * Before the screenshot, press the first element matching `from` and move
+   * the pointer `by` px sideways, holding the button, so a drag shows
+   * mid-way. Reduced motion is turned off for the shot.
+   */
+  readonly drag?: { readonly from: string; readonly by: number }
+  /**
+   * Before the screenshot, move the pointer over the first element matching
+   * this selector and wait for its tooltip (`TooltipLayer` in the fixture),
+   * so the shot holds the tooltip whatever the delay.
+   */
+  readonly tooltip?: string
 }
 
 export interface Fixture<P> {

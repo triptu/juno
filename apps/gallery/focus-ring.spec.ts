@@ -1,13 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openState, readRoutes, type Route, type Theme } from './support'
+import { claimQueue, openState, readRoutes, type Route } from './support'
 
 /**
  * A focus ring must show whole. Every state of each main surface is tabbed
- * through from the keyboard, in light and dark. For each element that draws
+ * through from the keyboard. For each element that draws
  * a ring, the ring's box (the element's box grown by the outline's width and
  * offset) must sit inside the client box of every ancestor that clips: one
  * whose overflow is not visible on that axis, or with paint containment. A
  * ring that is cut off shows as `( )` around a pill.
+ *
+ * Light only: a theme sets colours and shadows, never a size, an outline
+ * width or offset, an overflow or a containment, so dark draws every ring in
+ * the same box and the same clips.
  *
  * To look at one component: GALLERY_RING_ONLY=Sidebar pnpm test:gallery
  * (GALLERY_RING_ONLY=* walks every component).
@@ -55,7 +59,8 @@ const surfaces = [
   'ConnectionToolsSheet',
 ]
 
-const themes: ReadonlyArray<Theme> = ['light', 'dark']
+/** The parts share the states through one queue, so they run in parallel and finish together. */
+const parts = Number(process.env.GALLERY_RING_PARTS ?? 4)
 
 /** Tab stops tried per state; enough to leave every frame in the gallery. */
 const maxStops = 60
@@ -170,15 +175,16 @@ async function tabThrough(page: Page, route: Route): Promise<Clip[]> {
   return clips
 }
 
-for (const theme of themes) {
-  test(`a focus ring is never cut off by a scroller, in ${theme}`, async ({ page }) => {
+for (let part = 0; part < parts; part++) {
+  test(`a focus ring is never cut off by a scroller (part ${part + 1} of ${parts})`, async ({ page }) => {
     test.setTimeout(15 * 60_000)
     const wanted = only ?? surfaces
     const routes = (await readRoutes(page)).filter((route) => (wanted.includes('*') || wanted.includes(route.component)) && !exempt.has(route.route))
     expect(routes.length).toBeGreaterThan(0)
+    const queue = claimQueue('ring')
     const failures: string[] = []
-    for (const route of routes) {
-      await openState(page, route, theme)
+    for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+      await openState(page, route)
       // A key first, so the browser is in keyboard mode and :focus-visible matches.
       await page.keyboard.press('Shift')
       for (const clip of await tabThrough(page, route)) {

@@ -170,6 +170,24 @@ export const accentSwatches = stylex.defineVars({
 })
 
 /**
+ * An icon drawn in an accent's colour (a sidebar view's icon): each
+ * accent's text colour, which holds 4.5:1 on the page and 3:1 or more on
+ * the secondary fill of a selected pill, in both themes. The dark values
+ * are in themes.stylex.ts. `--icon-tint-neutral` is the plain muted icon.
+ */
+export const iconTints = stylex.defineVars({
+  '--icon-tint-neutral': colors['--foreground-muted'],
+  '--icon-tint-coral': '#B4351F',
+  '--icon-tint-ink': 'hsla(48, 30%, 8%, 1)',
+  '--icon-tint-marigold': '#7F5200',
+  '--icon-tint-teal': '#096762',
+  '--icon-tint-midnight': '#2E1F64',
+  '--icon-tint-emerald': '#00674F',
+  '--icon-tint-claret': '#7F1734',
+  '--icon-tint-cyan': '#006A8A',
+})
+
+/**
  * The Juno chat (SPEC section 13, inventory section 12). The owner bubble's
  * colour is still the owner's choice between options A to D
  * (docs/design/juno-chat/README.md): this is option B, the accent tint.
@@ -651,8 +669,10 @@ export const text = stylex.defineVars({
 /**
  * Three ideas: instant for what you do constantly, a quick ease-out for
  * presses and toggles, and a small spring for the few moments that deserve
- * it (a reaction landing, a toggle filling, a resolve check). Entrances are
- * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate.
+ * it (a reaction landing, a toggle filling, a resolve check). Menus and
+ * popovers enter in 80ms; other entrances are 240ms, exits 150ms, pops
+ * 220ms; rows, tabs and typing never animate, except a tab being dragged,
+ * whose neighbours slide aside over --duration-fast.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.
@@ -673,6 +693,12 @@ export const motion = stylex.defineVars({
   },
   '--duration-exit': {
     default: '150ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  // Menus and popovers come in at once and may leave slower: a slow
+  // entrance makes the interface feel slow (owner, 10-17).
+  '--duration-menu-in': {
+    default: '80ms',
     [REDUCED_MOTION]: '0.01ms',
   },
   // How long a send may take before its pending row dims (inventory 6.1).
@@ -717,6 +743,8 @@ export const motion = stylex.defineVars({
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
   '--chat-empty-width': '520px',
+  // A tooltip wraps past this; most are one short line.
+  '--tooltip-max-width': '280px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '280px',
@@ -763,14 +791,11 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
-  // The message hover toolbar: its height, and the width a message header
-  // keeps free at its end so the name and time never run under it. The Main
-  // toolbar is 223px (seven 28px buttons, 2px gaps, a 5px rule, 4px padding)
-  // plus a 20px gap.
+  // The message hover toolbar's height. It straddles the row's top edge, so
+  // a header keeps no room for it.
   '--toolbar-height': '36px',
-  '--toolbar-reserve': '243px',
   // How far a message row may paint outside its box: the toolbar's height
-  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // and its shadow, for the toolbar above (or flipped below) the row. A length, not
   // a calc(): Chromium ignores calc() in overflow-clip-margin.
   '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
@@ -799,6 +824,8 @@ export const layout = stylex.defineVars({
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',
+  // Who reacted (the reaction chip's card): narrow enough for one short name, no wider than a menu.
+  '--reactors-min-width': '160px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
@@ -856,6 +883,9 @@ export const sizes = stylex.defineVars({
   // in Comfortable) whatever it shows, so the off-screen estimate
   // (contain-intrinsic-size) is exact and rows never land on a fraction.
   '--row-topic-estimate': '66px',
+  // A Main row (a channel's, a DM's or a group DM's) has no meta line: the
+  // title and the preview only (64px in Comfortable).
+  '--row-topic-two-line-estimate': '42px',
   // The same estimate for off-screen message rows: one line of body under a
   // name, without the row's block padding (performance.md 3.3).
   '--row-message-estimate': '56px',
@@ -869,6 +899,9 @@ export const sizes = stylex.defineVars({
   '--avatar-24': '24px',
   '--avatar-20': '20px',
   '--avatar-18': '18px',
+  '--avatar-16': '16px',
+  // A group DM's member in a 16px tab icon (GroupAvatar).
+  '--avatar-11': '11px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
 
@@ -879,6 +912,7 @@ export const sizes = stylex.defineVars({
   '--initials-24': '9.5px',
   '--initials-20': '9px',
   '--initials-18': '8.5px',
+  '--initials-16': '7px',
 
   // Phosphor glyphs are filled paths; weight comes from the variant, so
   // there is no stroke token.
@@ -931,6 +965,8 @@ export const density = stylex.defineVars({
   '--density-row-tile-zoom': '1',
   // The row's content-box estimate for off-screen rows.
   '--density-row-estimate': sizes['--row-topic-estimate'],
+  // The same for a row with no meta line (any Main).
+  '--density-row-two-line-estimate': sizes['--row-topic-two-line-estimate'],
   '--density-message-padding-block': '4px',
   // Above the first message of a sender group.
   '--density-message-group-gap': '12px',
@@ -950,6 +986,8 @@ export const z = stylex.defineVars({
   '--z-selection': '35',
   '--z-context': '40',
   '--z-toast': '45',
+  // A tooltip names what is under the pointer, so it sits over everything.
+  '--z-tooltip': '50',
 })
 
 export const opacity = stylex.defineVars({

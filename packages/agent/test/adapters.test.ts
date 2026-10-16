@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { fakeProvider, reply, startFakeMcpServer, json, type FakeTool } from '@juno/agent-testing'
 import { createProviderGuard, openTurns } from '../src'
 import { createMcpManager, MCP_MIGRATIONS, T3, LITTLEBIRD, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
@@ -12,8 +12,19 @@ import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
 import { initialize } from '../src/store/store'
 
+// The T3 watcher polls a session every 10 s (src/t3/watch.ts). A test that watches several polls
+// sets `polls.scale` to run them faster; every other test keeps the real waits.
+const polls = vi.hoisted(() => ({ scale: 1 }))
+vi.mock('node:timers/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:timers/promises')>()
+  return { ...real, setTimeout: (ms?: number, ...rest: [unknown?, Parameters<typeof real.setTimeout>[2]?]) => real.setTimeout((ms ?? 0) * polls.scale, ...rest) }
+})
+
 const cleanup: Array<() => Promise<void>> = []
-afterEach(async () => { for (const close of cleanup.splice(0).toReversed()) await close() })
+afterEach(async () => {
+  polls.scale = 1
+  for (const close of cleanup.splice(0).toReversed()) await close()
+})
 const str = { type: 'string' }
 const start = { project: 'project-test', baseBranch: 'main', title: 'Fix test', brief: 'Fix the synthetic test.', planFirst: false }
 const launch: FakeTool = {
@@ -509,9 +520,12 @@ it('writes a job only when its phase or line changes', async () => {
 })
 
 it('reports each new T3 question even while the session already waits', async () => {
+  // Polls every 200 ms instead of every 10 s.
+  polls.scale = 0.02
   const requestIds = ['request-test']
+  let reads = 0
   const tools: FakeTool[] = [launch,
-    { name: 't3_thread_read', inputSchema: threadArgs, call: () => json({ thread: { status: 'waiting' } }) },
+    { name: 't3_thread_read', inputSchema: threadArgs, call: () => { reads += 1; return json({ thread: { status: 'waiting' } }) } },
     t3Tools[2]!,
     { name: 't3_pending_request_list', inputSchema: threadArgs, call: () => json({ requestIds }) },
     { name: 't3_pending_request_read', inputSchema: { type: 'object', properties: { threadId: str, requestId: str } }, call: (args) => json({ requestId: args.requestId, questions: [{ id: 'q1', question: 'Use the small fix?', options: [{ label: 'Yes' }, { label: 'No' }] }] }) },
@@ -531,6 +545,7 @@ it('reports each new T3 question even while the session already waits', async ()
   expect(turns.jobs.list()[0]?.phase).toBe('needsYou')
   expect(turns.actions.views().filter((view) => view.card._tag === 'question')).toHaveLength(2)
   // Repeated observations of the same pending requests produce no new inbox reports.
-  await new Promise((resolve) => setTimeout(resolve, 11_000))
+  const seen = reads
+  await expect.poll(() => reads, { timeout: 15_000 }).toBeGreaterThanOrEqual(seen + 3)
   expect(reports()).toHaveLength(2)
 })

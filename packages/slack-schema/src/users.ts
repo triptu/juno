@@ -4,7 +4,7 @@
  * Source: docs/research/slack-data-access.md sections 1 (edge transport) and 3.
  */
 import { Schema as S } from 'effect'
-import { ErrorResponse } from './common.ts'
+import { ErrorResponse, FormBoolean } from './common.ts'
 
 const opt = S.optionalKey
 
@@ -105,6 +105,19 @@ export const Subteam = S.Struct({
   prefs: opt(S.Unknown),
 })
 export type Subteam = typeof Subteam.Type
+
+// usergroups.list: every group in the workspace. `include_disabled` adds
+// deleted groups (`date_delete` > 0); the live answer has no paging and no
+// `users` unless `include_users` is set (research section 3, User groups).
+
+export const UsergroupsListArgs = S.Struct({
+  include_disabled: opt(FormBoolean),
+  include_count: opt(FormBoolean),
+  include_users: opt(FormBoolean),
+})
+export const UsergroupsListFields = {
+  usergroups: S.Array(Subteam),
+} as const
 
 // auth.test: the cheapest check that a token and cookie pair still works.
 // The engine calls it once at start (architecture 16, M2). `enterprise_id`

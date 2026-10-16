@@ -47,6 +47,14 @@ export interface ConversationRow {
   readonly updated: string | null
 }
 
+/** A user group, by its `S…` id. `deleted` groups keep their last handle. */
+export interface UsergroupRow {
+  readonly id: string
+  readonly handle: string
+  readonly name: string | null
+  readonly deleted: Flag
+}
+
 export interface UserRow {
   readonly id: string
   readonly name: string | null

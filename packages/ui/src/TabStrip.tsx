@@ -1,7 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { revealFocus } from './internal/revealFocus'
+import type { TabDrag } from './internal/tabDrag'
+
+// The drag code is not needed to paint the strip, so it loads after startup (performance 1, the bundle budget): when the strip is idle, or on the first press.
+let tabDragModule: Promise<typeof import('./internal/tabDrag')> | undefined
+const loadTabDrag = () => (tabDragModule ??= import('./internal/tabDrag'))
 
 export interface TabStripProps {
   readonly label?: string
@@ -22,6 +27,11 @@ export interface TabStripProps {
    * tablist pattern with automatic activation). Delete closes the tab.
    */
   readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
+  /**
+   * A tab was dragged from index `from` to index `to`, within its pinned or
+   * unpinned group. Without it the tabs do not drag.
+   */
+  readonly onMove?: (from: number, to: number) => void
   readonly children?: ReactNode
 }
 
@@ -33,12 +43,61 @@ export interface TabStripProps {
  * view when it changes, like browser tabs, and a tab that takes keyboard
  * focus scrolls into view whole. Tabs draw the inset ring, so the strip
  * needs no room around them.
+ *
+ * With `onMove`, a tab drags along the strip to a new place, as in Safari
+ * (`internal/tabDrag.ts`): transforms only, written once a frame, and no tab
+ * re-renders until the drop.
  */
-export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
+export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, onMove, children }: TabStripProps) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const drag = useRef<TabDrag | undefined>(undefined)
+  const move = useRef(onMove)
+  const movable = onMove !== undefined
+  // A drop asked for a new order; this commit shows it, so the dragged tabs' transforms go before paint.
+  useLayoutEffect(() => {
+    move.current = onMove
+    drag.current?.settled()
+  })
+  // Makes the strip's drag once its code has loaded. Returns it, or undefined once the strip has stopped dragging.
+  const ensure = useRef<() => Promise<TabDrag | undefined>>(async () => undefined)
+  useEffect(() => {
+    const element = scroller.current
+    if (!movable || element === null) return
+    let stopped = false
+    ensure.current = async () => {
+      const { TabDrag } = await loadTabDrag()
+      if (stopped) return undefined
+      drag.current ??= new TabDrag(element, { onMove: (from, to) => move.current?.(from, to) })
+      return drag.current
+    }
+    const idle = requestIdleCallback(() => void ensure.current(), { timeout: 5_000 })
+    return () => {
+      stopped = true
+      cancelIdleCallback(idle)
+      drag.current?.dispose()
+      drag.current = undefined
+    }
+  }, [movable])
+  // A press before the code has loaded still drags: the press is passed on once it has.
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const press = event.nativeEvent
+    if (drag.current !== undefined) {
+      drag.current.pointerDown(press)
+      return
+    }
+    // A press released while the code loads was a click, not a drag.
+    let released = false
+    const release = () => (released = true)
+    window.addEventListener('pointerup', release, { once: true, capture: true })
+    void ensure.current().then((ready) => {
+      window.removeEventListener('pointerup', release, { capture: true })
+      if (!released) ready?.pointerDown(press)
+    })
+  }
   return (
     <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} {...stylex.props(styles.scroller)}>
+      <div ref={scroller} role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} onPointerDown={movable ? onPointerDown : undefined} {...stylex.props(styles.scroller)}>
         {children}
       </div>
       {trailing ? (
@@ -88,7 +147,9 @@ const styles = stylex.create({
   // the strip's bottom border so the active tab can paint across it. It
   // takes only the tabs' width, and shrinks to scroll once they overflow.
   // Tabs touch, as in Safari and Finder; dividers separate inactive ones.
+  // Positioned, so each tab's offsetLeft is measured from it when a drag starts.
   scroller: {
+    position: 'relative',
     display: 'flex',
     alignItems: 'flex-end',
     gap: 0,

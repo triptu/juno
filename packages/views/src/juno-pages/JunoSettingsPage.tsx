@@ -5,10 +5,6 @@ import type { ReactNode } from 'react'
 import { BackupSection, ThisMacSection, type BackupSectionProps, type ThisMacSectionProps } from './BackupSections'
 import { cell } from './cell'
 
-/**
- * A section whose work is not built yet is left out by leaving out its
- * callbacks: Rules (`onRuleChange`, `onRuleRemove`, `onRuleAdd`).
- */
 export interface JunoSettingsPageProps {
   /** The agent's page. Absent while no provider is set up, as no agent runs: the page shows the provider alone. */
   readonly page?: JunoSettingsPageModel
@@ -20,13 +16,6 @@ export interface JunoSettingsPageProps {
   readonly onCap: (usd: number) => void
   readonly onPaused: (paused: boolean) => void
   readonly onSignInCodex?: () => void
-  readonly onRuleChange?: (id: string, text: string) => void
-  readonly onRuleRemove?: (id: string) => void
-  readonly onRuleAdd?: () => void
-  /** A rule field lost focus or took Enter: the edited list is saved as a whole. */
-  readonly onRulesCommit?: () => void
-  /** Why the agent refused the list: "Each rule is one line of up to 280 bytes, and there are at most 20." */
-  readonly rulesError?: string
 }
 
 function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
@@ -58,7 +47,7 @@ export function modelOptions(models: ReadonlyArray<ModelChoice>) {
 
 /**
  * Settings › Juno (SPEC 13.10): the providers, the models, today's spend
- * and the cap, Codex, the owner's rules and Pause. Settings change only
+ * and the cap, Codex and Pause. The owner's rules are on Connections. Settings change only
  * here; no conversation can change them.
  */
 export function JunoSettingsPage({
@@ -68,11 +57,6 @@ export function JunoSettingsPage({
   onCap,
   providers,
   onSignInCodex,
-  onRuleChange,
-  onRuleRemove,
-  onRuleAdd,
-  onRulesCommit,
-  rulesError,
   onPaused,
 }: JunoSettingsPageProps) {
   if (page === undefined) {
@@ -91,10 +75,7 @@ export function JunoSettingsPage({
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
   return (
     <Page width="settings">
-      <PageHeader
-        title="Juno"
-        subtitle={onRuleChange !== undefined ? 'Models, spend, the provider and your rules. Only you can change these.' : 'Models, spend and the provider. Only you can change these.'}
-      />
+      <PageHeader title="Juno" subtitle="Models, spend and the provider. Only you can change these." />
 
       {providers}
 
@@ -220,48 +201,6 @@ export function JunoSettingsPage({
           </Surface>
         </Section>
       }
-
-      {onRuleChange === undefined || onRuleRemove === undefined || onRuleAdd === undefined ? null : (
-        <Section heading="Rules" sub={'Tell Juno when to check with you before it does something. Write one rule per line, for example: “Always ask before messaging my manager.” Rules only add checks. They never let Juno skip one.'}>
-          <Surface kind="group">
-            {page.rules.map((rule) => (
-              <ListRow
-                key={rule.id}
-                trailing={
-                  <Button variant="ghost" size="xs" tone="subtle" aria-label="Remove rule" onClick={() => onRuleRemove(rule.id)}>
-                    Remove
-                  </Button>
-                }
-              >
-                <TextField
-                  size={30}
-                  label="Rule"
-                  value={rule.text}
-                  onChange={(event) => onRuleChange(rule.id, event.currentTarget.value)}
-                  onBlur={() => onRulesCommit?.()}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') onRulesCommit?.()
-                  }}
-                  autoFocus={rule.text === ''}
-                  dir="auto"
-                />
-              </ListRow>
-            ))}
-            <ListRow divider={false} minHeight={44}>
-              <span {...stylex.props(cell.lines)}>
-                <Button variant="ghost" size="sm" tone="subtle" onClick={onRuleAdd}>
-                  Add a rule
-                </Button>
-                {rulesError === undefined ? null : (
-                  <Text variant="meta" tone="danger" data-rules-error="">
-                    {rulesError}
-                  </Text>
-                )}
-              </span>
-            </ListRow>
-          </Surface>
-        </Section>
-      )}
 
       <Section heading="Pause Juno" sub="Stops Juno from doing anything. Whatever it is working on stops now, and it starts nothing new. Messages you send it wait until you turn this off.">
         <Surface kind="group">

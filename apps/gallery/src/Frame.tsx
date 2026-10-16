@@ -17,6 +17,8 @@ export function Frame({ entry, state }: { readonly entry: ComponentEntry; readon
     <div
       // The route, so the test runners can wait for this state's frame.
       data-fixture-frame={state.route}
+      // A tooltip stays inside the frame, as it stays inside the window in the app.
+      data-tooltip-bounds=""
       {...stylex.props(
         styles.frame,
         frame.padded !== false && styles.framePadded,

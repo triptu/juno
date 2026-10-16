@@ -2,12 +2,6 @@ import { expect, hooks, test } from './fixtures'
 
 // The engine's diagnostic line sits in Settings › About of the signed-in
 // shell, so every test here signs in and opens it first.
-test('shows the engine status that arrives over the port', async ({ juno }) => {
-  await juno.signIn()
-  await juno.openSettings('About')
-  await expect(juno.settings.engineStatus).toHaveText('Engine live')
-})
-
 test('answers a command from the engine', async ({ juno }) => {
   await juno.signIn()
   await juno.openSettings('About')

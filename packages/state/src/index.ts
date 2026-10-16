@@ -17,6 +17,8 @@ export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
+export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
+export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
   currentRowAtom,
   focusedTopicAtom,
@@ -62,6 +64,7 @@ export {
   goToEntry,
   historyStateAtom,
   mountedTabs,
+  moveTab,
   allTopicsPlace,
   allTopicsTab,
   homePlace,
@@ -145,12 +148,20 @@ export {
   openInSlack,
   persistAccent,
   persistDensity,
+  getSharingSetting,
+  getNotificationPermission,
+  onSharingPrivacy,
+  openNotificationSettings,
+  requestNotificationPermission,
+  sendTestNotification,
   persistPrivacy,
   persistSidebar,
   persistTheme,
   popupContextMenu,
   privacyAtom,
+  privacySharingAtom,
   resolvedThemeAtom,
+  setSharingSetting,
   setViewing,
   sidebarLayoutAtom,
   themeAtom,
@@ -160,7 +171,8 @@ export {
   type Theme,
 } from './shell'
 export type { PortLike } from './transport'
-export { redrawTopic } from './art'
+export { redrawTopic, type RedrawProblem } from './art'
+export { aiActivityAtom } from './aiActivity'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {

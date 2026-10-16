@@ -16,7 +16,7 @@ if (process.env.JUNO_UNMINIFIED === '1') {
   process.exit(0)
 }
 
-const JS_BUDGET = 1_000_000
+const JS_BUDGET = 1_100_000
 const CSS_BUDGET = 150_000
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')

@@ -46,7 +46,7 @@ export const chatCopy = {
   /** The Juno panel (SPEC 7, inventory 12.1). */
   panel: {
     openInTab: 'Open in a tab',
-    close: 'Close Juno ⌘J',
+    close: 'Close Juno',
     removeQuote: 'Remove quote',
     /** The context chips in the composer: what Juno sees with the next message. */
     contextLabel: (place: string) => `Juno sees ${place}`,

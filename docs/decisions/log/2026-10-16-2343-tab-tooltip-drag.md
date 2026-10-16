@@ -1,0 +1,1 @@
+- 10-16 23:43 · tab-drag-icons · Tabs show their title through the shared Tooltip instead of the browser title, and no tooltip shows while a mouse button is held, so dragging a tab past its neighbours shows none.

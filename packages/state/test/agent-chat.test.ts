@@ -110,7 +110,7 @@ it('a send shows at once, then as the agent stored it, and Juno answers it', asy
   const sentAt = (page: ChatPage) => page.items.findIndex((item) => item._tag === 'owner' && item.opId === opId)
   expect(pages.filter((page) => sentAt(page) < 1 || page.items[sentAt(page) - 1]?._tag !== 'day')).toEqual([])
   const bubble = answered.items.find((item) => item._tag === 'juno')!
-  expect(bubble).toMatchObject({ body: [{ _tag: 'text', text: 'Morning. Two meetings today.' }], unread: true })
+  expect(bubble).toMatchObject({ body: [{ _tag: 'paragraph', inlines: [{ _tag: 'text', text: 'Morning. Two meetings today.' }] }], unread: true })
 
   await eventually(() => {
     const summary = registry.get(chatSummaryAtom)

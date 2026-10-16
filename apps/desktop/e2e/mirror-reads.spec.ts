@@ -3,7 +3,7 @@ import { expect, test } from './fixtures'
 const RINA = 'Rina finished the onsite.'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const SWITCH = 'Mark messages read in Slack too'
-const CATCH_UP = 'Also mark what you already read in Juno'
+const CATCH_UP = 'Mark earlier reads in Slack'
 
 test('default mirroring, peeking, switching off and catching up earlier reads', async ({ juno, slack }) => {
   await juno.signIn()
@@ -44,4 +44,5 @@ test('default mirroring, peeking, switching off and catching up earlier reads', 
   await expect.poll(() => marks().length).toBe(1)
   await expect(juno.settings.root.getByRole('button', { name: CATCH_UP })).toHaveCount(0)
   await expect(juno.settings.root.getByText(/Marking earlier reads in Slack/)).toHaveCount(0)
+  await expect(juno.settings.root.getByText('Earlier reads are in Slack')).toBeVisible()
 })

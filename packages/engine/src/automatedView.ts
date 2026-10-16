@@ -33,12 +33,30 @@ export const automatedViewState: Effect.Effect<AutomatedViewState, SqlError, Sto
   return row?.live === 1 ? 'live' : row?.made === 1 ? 'deleted' : 'missing'
 })
 
-/** Records where a conversation stands. */
-export const setVerdict = (channel: string, verdict: Verdict, by: SortedBy, now: number) =>
+/** Why a question was asked, for Home's line: the count the rules read, and Juno's reason when it gave one. */
+export interface AskedWhy {
+  readonly apps: number
+  readonly sampled: number
+  readonly reason?: string
+}
+
+/**
+ * Records where a conversation stands. With `why` (a question), it is kept
+ * for Home; without, what an earlier question stored stays, so an Undo back
+ * to the question still says why.
+ */
+export const setVerdict = (channel: string, verdict: Verdict, by: SortedBy, now: number, why?: AskedWhy) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`INSERT INTO automated_channels (channel, verdict, by, at) VALUES (${channel}, ${verdict}, ${by}, ${String(now)})
-      ON CONFLICT (channel) DO UPDATE SET verdict = excluded.verdict, by = excluded.by, at = excluded.at`
+    if (why === undefined) {
+      yield* sql`INSERT INTO automated_channels (channel, verdict, by, at) VALUES (${channel}, ${verdict}, ${by}, ${String(now)})
+        ON CONFLICT (channel) DO UPDATE SET verdict = excluded.verdict, by = excluded.by, at = excluded.at`
+      return
+    }
+    yield* sql`INSERT INTO automated_channels (channel, verdict, by, at, apps, sampled, reason)
+      VALUES (${channel}, ${verdict}, ${by}, ${String(now)}, ${why.apps}, ${why.sampled}, ${why.reason ?? null})
+      ON CONFLICT (channel) DO UPDATE SET verdict = excluded.verdict, by = excluded.by, at = excluded.at,
+        apps = excluded.apps, sampled = excluded.sampled, reason = excluded.reason`
   })
 
 export const clearVerdict = (channel: string) =>
@@ -104,6 +122,11 @@ export interface Candidate {
   readonly partner_is_bot: number | null
   readonly activity: string
   readonly verdict: 'ask' | null
+  /** For an open question: who asked and what it stored (`AskedWhy`). */
+  readonly by: 'rules' | 'juno' | null
+  readonly apps: number | null
+  readonly sampled: number | null
+  readonly reason: string | null
 }
 
 export interface SampleRow {
@@ -117,7 +140,7 @@ export interface SampleRow {
 /** Message subtypes people and apps write; joins, topic changes and the like say nothing. */
 const SAID = `(m.subtype IS NULL OR m.subtype IN ('bot_message', 'thread_broadcast', 'file_share', 'me_message'))`
 
-const CANDIDATES = `SELECT c.id, c.kind, c.name, c.topic, u.is_bot AS partner_is_bot, a.verdict,
+const CANDIDATES = `SELECT c.id, c.kind, c.name, c.topic, u.is_bot AS partner_is_bot, a.verdict, a.by, a.apps, a.sampled, a.reason,
     (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = c.id) AS activity
   FROM conversations c
   LEFT JOIN users u ON c.kind = 'im' AND u.id = c.user_id

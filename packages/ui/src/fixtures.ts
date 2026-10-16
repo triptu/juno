@@ -7,6 +7,7 @@ import type { FixtureSet } from './fixtures/define'
 import Avatar from './Avatar.fixtures'
 import AvatarButton from './AvatarButton.fixtures'
 import AvatarStack from './AvatarStack.fixtures'
+import GroupAvatar from './GroupAvatar.fixtures'
 import Button from './Button.fixtures'
 import Card from './Card.fixtures'
 import ChannelIcon from './ChannelIcon.fixtures'
@@ -41,6 +42,7 @@ import Text from './Text.fixtures'
 import Textarea from './Textarea.fixtures'
 import TextField from './TextField.fixtures'
 import Toast from './Toast.fixtures'
+import Tooltip from './Tooltip.fixtures'
 import TopicArt from './TopicArt.fixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,6 +50,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Avatar,
   AvatarButton,
   AvatarStack,
+  GroupAvatar,
   Button,
   Card,
   ChannelIcon,
@@ -82,6 +85,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Textarea,
   TextField,
   Toast,
+  Tooltip,
   TopicArt,
 }
 

@@ -191,7 +191,7 @@ export class SidebarRow {
     await expect(this.root.locator('[title="Mentions you"]')).toHaveText('@')
   }
 
-  async expectTag(tag: 'Main' | 'Reopened'): Promise<void> {
+  async expectTag(tag: 'Reopened'): Promise<void> {
     await expect(this.root.getByText(tag, { exact: true })).toBeVisible()
   }
 
@@ -339,10 +339,10 @@ export class Sidebar {
 
   /**
    * Makes a view through the New view pill and the sheet: the name, an icon
-   * by its label, the conversations by searching for each name, and Keep
+   * and its colour by their labels, the conversations by searching for each name, and Keep
    * these out of All. A new view is selected once saved.
    */
-  async createView(view: { readonly name: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async createView(view: { readonly name: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     await this.root.getByRole('button', { name: 'New view', exact: true }).click()
     await expect(this.viewSheet).toBeVisible()
     await this.fillViewSheet(view)
@@ -352,10 +352,11 @@ export class Sidebar {
   }
 
   /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
-  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     const sheet = this.viewSheet
     if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
     if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('button', { name: view.color, exact: true }).click()
     for (const conversation of view.conversations ?? []) {
       await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
       await sheet.getByRole('option', { name: conversation, exact: true }).click()
@@ -525,7 +526,7 @@ export class SettingsPage {
   }
 }
 
-export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'Connections' | 'Backup & This Mac' | 'About'
+export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
 /** Settings › Notifications (inventory 13). */
 export class NotificationsPage {
@@ -694,6 +695,11 @@ export class Juno {
   /** The text the app last put on the clipboard. */
   clipboard(): Promise<string> {
     return this.app.evaluate(({ clipboard }) => clipboard.readText())
+  }
+
+  /** The links a click sent to the browser, oldest first. */
+  browserLinks(): Promise<string[]> {
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { browserLinks: string[] } }).junoTest.browserLinks])
   }
 
   /** The `slack://` links Open in Slack opened, oldest first. */
@@ -871,6 +877,16 @@ export class Juno {
   /** Clicks the OS notification at `index`, as the user would in Notification Center. */
   async clickOsNotification(index: number): Promise<void> {
     await this.app.evaluate((_electron, at) => (globalThis as unknown as { junoTest: { clickNotification: (i: number) => void } }).junoTest.clickNotification(at), index)
+  }
+
+  /** What macOS says about Juno's notifications from now on (main's seam); `allowed` at launch. */
+  async setNotificationPermission(permission: 'allowed' | 'denied' | 'notDetermined' | 'unknown'): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { notificationPermission: (p: string) => void } }).junoTest.notificationPermission(value), permission)
+  }
+
+  /** How many times Open Notification Settings opened System Settings. */
+  notificationSettingsOpened(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notificationSettingsOpened: () => number } }).junoTest.notificationSettingsOpened())
   }
 
   /** The dock's badge text: "•" with unread mentions, else empty. */
@@ -1375,6 +1391,17 @@ export class TopicPane {
     return this.root.locator('[data-composer] [data-mark]')
   }
 
+  /** The links drawn in the composer's field: typed URLs and linked words. */
+  get composerLinks(): Locator {
+    return this.root.locator('[data-composer] [data-mark="link"]')
+  }
+
+  /** The link editor ⌘K opens on words selected in the composer. */
+  get linkEditor() {
+    const root = this.root.locator('[data-link-editor]')
+    return { root, url: root.getByRole('textbox', { name: 'Link' }), remove: root.getByRole('button', { name: 'Remove' }) }
+  }
+
   /** The composer's box, which must not move as rows come and go. */
   get composerField(): Locator {
     return this.root.locator('[data-composer-field]')
@@ -1775,9 +1802,34 @@ export class TabStrip {
     return pointAt(this.win, this.tab(title))
   }
 
+  /**
+   * Drags the tab titled `title` with the real mouse until its left edge is
+   * over the left edge of the tab titled `onto`, in small steps, then drops it.
+   */
+  async drag(title: string, onto: string): Promise<void> {
+    const from = await this.tab(title).boundingBox()
+    const to = await this.tab(onto).boundingBox()
+    if (!from || !to) throw new Error(`No tab "${title}" or "${onto}"`)
+    const y = from.y + from.height / 2
+    await this.win.mouse.move(from.x + 24, y)
+    await this.win.mouse.down()
+    await this.win.mouse.move(to.x + 24, y, { steps: 20 })
+    await this.win.mouse.up()
+  }
+
+  /** What a screen reader last heard about a tab's move. */
+  get announcement(): Locator {
+    return this.win.locator('[data-tab-announce]')
+  }
+
+  /** The art or photo in a tab's icon slot. */
+  tile(title: string): Locator {
+    return this.tab(title).locator('[data-topic-art], img')
+  }
+
   /** Tab titles, left to right. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('title') ?? ''))
+    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
   }
 
   async expectCount(count: number): Promise<void> {
@@ -2122,13 +2174,40 @@ export class PrivacyMode {
     await expect.poll(() => this.filterOf(target)).toBe(blurred ? 'blur(6px)' : 'none')
   }
 
+  /** ⌃⌘H through View, and waits until main has the change (the menu names the other action). */
   async toggleWithMenu(): Promise<void> {
+    const before = await this.menuLabel()
     await clickAppMenu(this.app, 'toggle-privacy')
+    await expect.poll(() => this.menuLabel()).not.toBe(before)
   }
 
   /** View › Hide or Show Message Text, which names what it will do. */
   menuLabel(): Promise<string | undefined> {
     return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
+  }
+
+  /** The footer's text: "Message text hidden", or "… while sharing" when sharing turned it on. */
+  footerText(): Promise<string> {
+    return this.footer.getByText(/^Message text hidden/).innerText()
+  }
+
+  /** Another app starts capturing the screen, as main's screen watch would see it (the JUNO_E2E seam). */
+  async startSharing(): Promise<void> {
+    await this.screenShared(true)
+  }
+
+  /** The capture ends. */
+  async stopSharing(): Promise<void> {
+    await this.screenShared(false)
+  }
+
+  /** Moves the screen watch's clock on, as if the signal had stayed as it is for that long. */
+  async elapse(ms: number): Promise<void> {
+    await this.app.evaluate((_electron, by) => (globalThis as unknown as { junoTest: { screenWatchElapse: (ms: number) => void } }).junoTest.screenWatchElapse(by), ms)
+  }
+
+  private async screenShared(shared: boolean): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
   }
 }
 

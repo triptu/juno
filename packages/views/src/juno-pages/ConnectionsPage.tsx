@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type ConnectionId, type ConnectionRow, type ConnectionState, type ConnectionsPage as ConnectionsPageModel, type T3Address } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, EmptyState, ListRow, Page, PageHeader, Section, Surface, Text, TextField } from '@juno/ui'
@@ -8,6 +8,8 @@ export type ConnectionAction = 'connect' | 'disconnect' | 'remove'
 
 export interface ConnectionsPageProps {
   readonly page: ConnectionsPageModel
+  /** When Juno asks first, with the owner's rules (`RulesSection`), above the servers. */
+  readonly rules?: ReactNode
   /** A command the agent refused, shown under that row, or under Add a server for `new`. */
   readonly error?: { readonly id: ConnectionId | 'new'; readonly message: string }
   /** Connect (or Sign in) opens the server's sign-in in the browser when it asks for one. Disconnect forgets the sign-in. */
@@ -28,32 +30,36 @@ const stateLabel: Record<ConnectionState, string> = {
 }
 
 /**
- * Each server as one compact row (SPEC 13.10): its name and state, the
+ * When Juno asks first and the owner's rules, then each server as one
+ * compact row (SPEC 13.10): its name and state, the
  * address in use, Connect, Sign in or Disconnect, and Configure, which opens
  * its tools with their Enabled switches and auto-review rules. Below the
  * servers, the owner adds another one by its address.
  */
-export function ConnectionsPage({ page, error, onAction, onConfigure, onAdd }: ConnectionsPageProps) {
+export function ConnectionsPage({ page, rules, error, onAction, onConfigure, onAdd }: ConnectionsPageProps) {
   const copy = chatCopy.pages.connections
   return (
     <Page width="settings">
       <PageHeader title="Connections" subtitle={copy.intro} />
-      {page.connections.length === 0 ? (
-        <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} />
-      ) : (
-        <Surface kind="group" data-connections="">
-          {page.connections.map((row, index) => (
-            <Connection
-              key={row.id}
-              row={row}
-              last={index === page.connections.length - 1}
-              error={error?.id === row.id ? error.message : undefined}
-              onAction={onAction}
-              onConfigure={onConfigure}
-            />
-          ))}
-        </Surface>
-      )}
+      {rules}
+      <Section heading="Servers">
+        {page.connections.length === 0 ? (
+          <EmptyState illustration="nothing-here" title="No connections" body="Juno's connections show up here once they are set up." enter={false} />
+        ) : (
+          <Surface kind="group" data-connections="">
+            {page.connections.map((row, index) => (
+              <Connection
+                key={row.id}
+                row={row}
+                last={index === page.connections.length - 1}
+                error={error?.id === row.id ? error.message : undefined}
+                onAction={onAction}
+                onConfigure={onConfigure}
+              />
+            ))}
+          </Surface>
+        )}
+      </Section>
       <AddServer error={error?.id === 'new' ? error.message : undefined} onAdd={onAdd} />
     </Page>
   )

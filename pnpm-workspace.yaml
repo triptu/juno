@@ -15,6 +15,10 @@ allowBuilds:
   # OpenRouter provider and does not need their postinstall scripts.
   "@google/genai": false
   protobufjs: false
+  # koffi's install script only checks that its prebuilt binary loads, and
+  # builds from source with CMake when it does not. The binary comes from its
+  # @koromix/koffi-<platform> optional dependency, so the script is not needed.
+  koffi: false
 
 # pnpm 12 holds back versions younger than its minimum release age. effect
 # 4.0.3 was published a day before this file was written, so it is excluded

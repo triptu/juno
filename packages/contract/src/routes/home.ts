@@ -49,8 +49,8 @@ export const HomeItem = Schema.Struct({
   messageTs: Schema.optionalKey(Schema.String),
   /** Automated: the conversation asked about, for Move, Keep in All and its menu. Its Main is `topics[0]`. */
   channel: Schema.optionalKey(ChannelRef),
-  /** Automated: how many of its latest messages came from apps, for the meta line. */
-  fromApps: Schema.optionalKey(Schema.Struct({ apps: Schema.Int, of: Schema.Int })),
+  /** Automated: why it is asked, one plain line for the meta line: "Apps wrote 18 of the last 30 messages", or Juno's reason. */
+  reason: Schema.optionalKey(Schema.String),
 })
 export type HomeItem = typeof HomeItem.Type
 

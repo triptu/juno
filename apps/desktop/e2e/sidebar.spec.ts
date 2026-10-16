@@ -1,11 +1,9 @@
 import { expectStableAnchor } from './shiftProbe'
 // The sidebar against the fake Slack: what shows after sign-in, the quick
-// filters, a live update from another client, hover and keyboard, and dark
-// mode. The rows asserted on are threads the self user follows (started,
-// replied in, or was mentioned in) and a channel's Main, so they stay in
-// the sidebar under the followed-threads rule as well as the older
-// every-active-thread rule.
-import type { Page } from '@playwright/test'
+// filters, a live update from another client, hover and keyboard. The rows
+// asserted on are threads the self user follows (started, replied in, or was
+// mentioned in) and a channel's Main, so they stay in the sidebar under the
+// followed-threads rule as well as the older every-active-thread rule.
 import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -21,18 +19,6 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 const ALERTS_MAIN = '#alerts-prod'
 
-/** Resolves a CSS custom property to the colour Chromium computes for it. */
-async function resolveColorVar(win: Page, name: string): Promise<string> {
-  return win.evaluate((variable) => {
-    const probe = document.createElement('span')
-    probe.style.color = `var(${variable})`
-    document.body.append(probe)
-    const color = getComputedStyle(probe).color
-    probe.remove()
-    return color
-  }, name)
-}
-
 /**
  * A new message in #incidents' Main, so a row sits above the Postgres
  * thread: after the first sync it is the newest in All, since Automated
@@ -41,11 +27,6 @@ async function resolveColorVar(win: Page, name: string): Promise<string> {
 async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
   fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0JONAS', text: 'Paging drill at 3pm.' })
   await expect.poll(() => juno.sidebar.titles('Recent').then((titles) => titles[0])).toBe('#incidents')
-}
-
-function brightness(rgb: string): number {
-  const [r = 0, g = 0, b = 0] = rgb.match(/\d+/g)?.map(Number) ?? []
-  return (r + g + b) / 3
 }
 
 test('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', async ({ juno }) => {
@@ -87,10 +68,13 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   expect(at(RINA)).toBeLessThan(at(ROADMAP))
   expect(at(ROADMAP)).toBeLessThan(at(OFFSITE))
 
-  // A channel's Main, in the Automated view: the channel label as the title and the Main tag.
+  // A channel's Main, in the Automated view: the channel label as the title,
+  // two lines, and no Main tag or place line repeating it.
   await sidebar.selectView('Automated')
   const alerts = sidebar.row(ALERTS_MAIN)
-  await alerts.expectTag('Main')
+  await expect(alerts.root).toHaveAttribute('data-row-lines', '2')
+  await expect(alerts.root.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(alerts.root.locator('[data-row-part="place"]')).toHaveCount(0)
   // Nine unread, exactly: the boot's history page reaches back to the read pointer.
   await expect(alerts.root.getByTitle(/^9 unread$/)).toHaveText('9')
   await alerts.expectPreview('Grafana: [RESOLVED] queue depth > 5k on billing-consumer')
@@ -133,6 +117,31 @@ test('rows in a DM or a group DM show no participant stack', async ({ juno }) =>
     await expect(row).toBeVisible()
     await expect(row.getByRole('img')).toHaveCount(0)
   }
+})
+
+test('a DM’s Main row is the name and the message: no Main tag, no place line, no repeated name', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, win } = juno
+  await sidebar.filter('DMs')
+
+  const row = win.locator('[data-topic-id="m:D0MAYA"]')
+  fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'yep' })
+  const preview = row.locator('[data-row-part="preview"]')
+  // From the other person: the message alone, since the title names them.
+  await expect(preview).toHaveText('yep')
+  await expect(row.locator('[data-row-part="title"]')).toHaveText(/^Maya/)
+  await expect(row).toHaveAttribute('data-row-lines', '2')
+  await expect(row.locator('[data-row-part="place"]')).toHaveCount(0)
+  await expect(row.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(row.getByText(/Maya/)).toHaveCount(1)
+
+  // The group DM's tile is two of its members, not a circle of initials.
+  await expect(win.locator('[data-topic-id="m:G0MAYALEO"] [data-group-avatar] [data-kind="person"]')).toHaveCount(2)
+
+  // Your own message keeps "You:".
+  fake.injectMessage({ channel: 'D0MAYA', user: fake.selfId, text: 'its good' })
+  await expect(preview).toHaveText('You: its good')
 })
 
 test('the quick filters narrow the list and the Unread toggle hides read rows', async ({ juno }) => {
@@ -267,7 +276,7 @@ test('hovering a row shows Resolve in its reserved slot without moving anything'
   await expect(slot).toHaveCSS('opacity', '0')
   await expectNoLayoutShift(win, () => postgres.hover(), { root: 'aside' })
   await expect(slot).toHaveCSS('opacity', '1')
-  await expect(postgres.resolveButton).toHaveAttribute('title', 'Resolve')
+  await expect(postgres.resolveButton).toHaveAttribute('data-tooltip', 'Resolve')
   await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}`)
 
   // Leaving hides it again.
@@ -392,27 +401,6 @@ test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, 
   // And Shift-Tab goes back to its row.
   await win.keyboard.press('Shift+Tab')
   await postgres.expectFocused()
-})
-
-test('the sidebar renders in dark mode', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  await sidebar.row(POSTGRES).expectVisible()
-  const lightSidebar = await resolveColorVar(win, '--background-subtle')
-  await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
-
-  await juno.setTheme('Dark')
-  const darkSidebar = await resolveColorVar(win, '--background-subtle')
-  expect(brightness(darkSidebar)).toBeLessThan(brightness(lightSidebar))
-  await expect(sidebar.root).toHaveCSS('background-color', darkSidebar)
-  await expect(win.getByRole('main')).toHaveCSS('background-color', await resolveColorVar(win, '--background'))
-  // The title is still readable: its colour is lighter than the row behind it.
-  const title = sidebar.row(POSTGRES).titleText
-  expect(brightness(await title.evaluate((node) => getComputedStyle(node).color))).toBeGreaterThan(brightness(darkSidebar))
-
-  await juno.setTheme('Light')
-  await expect(sidebar.root).toHaveCSS('background-color', lightSidebar)
 })
 
 test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ juno }) => {

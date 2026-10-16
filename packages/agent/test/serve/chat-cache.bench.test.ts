@@ -22,7 +22,12 @@ const measure = (mode: BenchmarkMode) => {
 it('5,000 messages: event to encoded window, query and payload stay within budget', () => {
   const before = []
   const after = []
-  for (let n = 0; n < (process.env.JUNO_CHAT_PROFILE ? 1 : 5); n++) { before.push(measure('full')); after.push(measure('cached')) }
+  // The uncached baseline (about 6 s a run) is only for the comparison report; the budgets below check the cache.
+  const compare = process.env.JUNO_CHAT_BENCH_REPORT !== undefined
+  for (let n = 0; n < (process.env.JUNO_CHAT_PROFILE ? 1 : 5); n++) {
+    if (compare) before.push(measure('full'))
+    after.push(measure('cached'))
+  }
   const report = JSON.stringify({ messages: 5000, window: 40, before, after })
   console.log(report)
   if (process.env.JUNO_CHAT_BENCH_REPORT) writeFileSync(process.env.JUNO_CHAT_BENCH_REPORT, report)

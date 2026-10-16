@@ -28,9 +28,19 @@ const files = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exc
   encoding: 'utf8',
   maxBuffer: 64 * 1024 * 1024,
 })
-// A copy without git (pnpm remote) has no earlier build to reuse: build.
+// A copy without git has no earlier build to reuse: build. Inside a remote
+// container (JUNO_REMOTE_CONTAINER=1) the sources cannot change during the run
+// and the output starts empty, so a build made earlier in the same run is reused:
+// a plan's steps build the desktop app once.
 if (files.status !== 0) {
+  const marker = join(app, outDir, '.built-in-container')
+  const container = process.env.JUNO_REMOTE_CONTAINER === '1' && process.env.JUNO_REBUILD !== '1'
+  if (container && existsSync(marker) && readFileSync(marker, 'utf8') === command.join(' ')) {
+    console.log(`build-cached: ${outDir}/ was built earlier in this run, skipping \`${command.join(' ')}\``)
+    process.exit(0)
+  }
   const built = spawnSync(command[0], command.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
+  if (container && built.status === 0) writeFileSync(marker, command.join(' '))
   process.exit(built.status ?? 1)
 }
 

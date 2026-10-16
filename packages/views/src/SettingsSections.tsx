@@ -1,17 +1,25 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel, SendCheckPref } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { QuietWindowSetting } from './QuietWindowSetting'
-import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
+import { NewTabSetting, TabExpirySetting, type NewTabPageName, type TabExpiryName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
 // Juno, Connections and Backup & This Mac are their own pages. Each section
 // is a settings page with its title; `SettingsPage` puts the list beside it.
+
+export type SharingDetection = 'available' | 'missing' | 'alwaysOn'
+
+const SHARING_LINE: Record<SharingDetection, string> = {
+  available: 'When another app starts recording or sharing the screen, Juno hides message text as ⌃⌘H does, and shows it again when that stops.',
+  missing: 'This Mac does not tell Juno when the screen is shared. Use ⌃⌘H to hide message text.',
+  alwaysOn: "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text.",
+}
 
 const checkLabels: Record<SendCheckPref, string> = {
   wrongPlace: 'Wrong place', typos: 'Typos and doubled words', capitalI: 'Capital i',
@@ -28,18 +36,30 @@ export interface SettingsGeneralProps {
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
+  /** How long a tab can go unseen before it closes by itself. */
+  readonly tabExpiry: TabExpiryName
+  readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
   readonly mirrorReads: boolean
   readonly onMirrorReadsChange: (enabled: boolean) => void
-  readonly catchUp: { readonly available: number; readonly pending: number }
+  /** Earlier reads still to send to Slack (`reads.catchUpStatus`); undefined until it arrives. */
+  readonly catchUp: { readonly available: number; readonly pending: number } | undefined
   readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
+  /** Privacy mode turns on while the screen is shared (SPEC section 5). */
+  readonly hideWhileSharing: boolean
+  /**
+   * Whether Juno can tell that the screen is shared. `missing`: macOS does not say, so the switch
+   * is off and disabled. `alwaysOn`: another app captures the screen all the time, so a line says so.
+   */
+  readonly sharingDetection: SharingDetection
+  readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Slack read mirroring, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -48,9 +68,10 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
           <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
         </Surface>
       </Section>
-      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
-        <Surface kind="group" padding="md" sx={styles.card}>
+      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open, and when tabs you left close. Tabs with a draft stay; ⌘⇧T reopens one.">
+        <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
+          <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
         </Surface>
       </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
@@ -64,9 +85,18 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
             onChange={(event) => onMirrorReadsChange(event.currentTarget.checked)}
             description="When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read." />
           <div {...stylex.props(styles.catchUp)} aria-live="polite">
-            {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
-              : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
+            {!mirrorReads || catchUp === undefined ? null
+              : catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
+              : catchUp.available > 0 ? <Button variant="secondary" size="sm" onClick={onCatchUp}>Mark earlier reads in Slack</Button>
+              : <Text variant="meta" tone="muted">Earlier reads are in Slack</Text>}
           </div>
+        </Surface>
+      </Section>
+      <Section heading="Screen sharing">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Hide message text while sharing the screen" checked={sharingDetection !== 'missing' && hideWhileSharing} disabled={sharingDetection === 'missing'}
+            onChange={(event) => onHideWhileSharingChange(event.currentTarget.checked)}
+            description={SHARING_LINE[sharingDetection]} />
         </Surface>
       </Section>
       <Section heading="Message checks" sub="Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit.">
@@ -77,7 +107,7 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
           </div>
         </Surface>
       </Section>
-      <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">
+      <Section heading="AI assist" sub="A fast model decides which messages notify you, when a message may be in the wrong place and when a topic looks settled. Off, a slower chat model decides.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <Checkbox label="Use fast classifier" checked={classifier} onChange={(event) => onClassifierChange(event.currentTarget.checked)} />
         </Surface>
@@ -86,14 +116,26 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
   )
 }
 
-/** Appearance: theme, accent and density, and nothing else. */
-export function SettingsAppearance(props: AppearanceSettingsProps) {
+export interface SettingsAppearanceProps extends AppearanceSettingsProps {
+  /** The quick reactions setting (`QuickReactionsSetting`), in its own section under the look. */
+  readonly quickReactions?: ReactNode
+}
+
+/** Appearance: theme, accent and density, then the message toolbar's quick reactions. */
+export function SettingsAppearance({ quickReactions, ...props }: SettingsAppearanceProps) {
   return (
     <Page width="settings">
       <PageHeader title="Appearance" subtitle="System follows macOS. Density changes the sidebar and the messages." />
       <Surface kind="group" padding="md" sx={styles.card}>
         <AppearanceSettings {...props} />
       </Surface>
+      {quickReactions === undefined ? null : (
+        <Section heading="Quick reactions" sub="One click each in the toolbar over a message. Up to 7.">
+          <Surface kind="group" padding="md" sx={styles.card}>
+            {quickReactions}
+          </Surface>
+        </Section>
+      )}
     </Page>
   )
 }
@@ -156,8 +198,16 @@ const styles = stylex.create({
   card: {
     paddingInline: spacing['--space-3-5'],
   },
+  // A card with two rows: they sit apart as Appearance's do.
+  rows: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-2'],
+  },
+  // Starts on the switch label's text: past the 15px box and the Checkbox's 10px gap.
   catchUp: {
     minHeight: spacing['--space-8'],
+    paddingInlineStart: `calc(${sizes['--checkbox']} + ${spacing['--space-2-5']})`,
     display: 'flex',
     alignItems: 'center',
   },

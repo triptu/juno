@@ -53,6 +53,15 @@ test('the Juno tab sends a message at once and shows the answer, both ways a rea
   await chat.send('which one?')
   await expect(chat.ownerBubble('which one?').locator('[data-quote="bubble"]')).toContainText('You said: what is on today?')
   await expect.poll(() => model.inputs().at(-1)).toContain('<quote from="juno">You said: what is on today?</quote>which one?')
+
+  // Markdown bold and the HTML bold models write both show as bold words, with no markup on screen.
+  await chat.send('show formatting')
+  const rich = chat.junoBubble('Staging is green, and deploys run at 14:00.')
+  await expect(rich).toBeVisible({ timeout: 15_000 })
+  await expect(rich.locator('strong')).toHaveText(['Staging', 'deploys'])
+  await expect(rich.locator('strong').first()).toHaveCSS('font-weight', '600')
+  await expect(rich).not.toContainText('<')
+  await expect(rich).not.toContainText('*')
 })
 
 test('two Juno tabs show the one chat: a message sent in one shows in both', async ({ juno }) => {

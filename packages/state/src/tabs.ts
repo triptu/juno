@@ -19,13 +19,18 @@
  *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
  *   (⌘⇧T) takes the last one back. The bulk closes leave pinned tabs open.
  * - `setPinned`: pinned tabs sit first, in pin order.
+ * - `stampViewed` and `expireTabs`: a tab not viewed for the time Settings ›
+ *   General chooses closes by itself, onto the reopen stack, unless it is
+ *   active or holds an unsent draft.
+ * - `moveTab`: a tab dragged, or moved with ⌃⇧← and ⌃⇧→, to another place
+ *   in the strip, within its pinned or unpinned group.
  * - `activateTab`, `cycleTab` (⌃Tab, ⌘⇧] and ⌘⇧[), `tabByNumber` (⌘1 to ⌘9).
  * - `mountedTabs`: the active tab and the 4 most recently active stay
  *   mounted in `<Activity>`; the rest unmount and keep a `ScrollSnapshot`.
  *
  * `tabsAtom` holds the tabs of the signed-in workspace. They are saved to
  * the workspace preference `TABS_PREF` on every change and read back from
- * it after a restart, with their pinned flags and the place each shows. History and the reopen stack are in memory only.
+ * it after a restart, with their pinned flags, the place each shows and when each was last viewed. History and the reopen stack are in memory only.
  * `updateTabs` is the one way to change them.
  */
 import { Option, Schema } from 'effect'
@@ -75,6 +80,8 @@ export interface Tab {
   readonly history: TabHistory
   /** The Juno panel is open in this tab (SPEC 7). It shows while the tab shows a topic. */
   readonly junoPanel?: true
+  /** When the tab was last on screen, in ms: stamped when it becomes active and when it is left. Saved with the tab. */
+  readonly lastViewedAt?: number
 }
 
 /** A closed tab and where it was in the strip. */
@@ -322,6 +329,47 @@ export function setPinned(tabs: Tabs, id: string, pinned: boolean): Tabs {
   return { ...tabs, tabs: rest.toSpliced(pinnedCount(rest), 0, { ...tab, pinned }) }
 }
 
+/**
+ * Moves tab `id` to `index` in the strip, as a drag or ⌃⇧← and ⌃⇧→ do. A
+ * pinned tab stays among the pinned ones and an unpinned tab after them, so
+ * `index` is clamped to the tab's group. The active tab and history do not change.
+ */
+export function moveTab(tabs: Tabs, id: string, index: number): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === id)
+  const tab = tabs.tabs[at]
+  if (tab === undefined) return tabs
+  const pinned = pinnedCount(tabs.tabs)
+  const to = tab.pinned ? Math.min(Math.max(index, 0), pinned - 1) : Math.min(Math.max(index, pinned), tabs.tabs.length - 1)
+  if (to === at) return tabs
+  return { ...tabs, tabs: tabs.tabs.toSpliced(at, 1).toSpliced(to, 0, tab) }
+}
+
+/** Tabs close after this long unseen (Settings › General, "Close tabs not viewed in"); `never` keeps them. */
+export type TabExpiry = 'never' | '1d' | '3d' | '7d'
+export const TAB_EXPIRY_DEFAULT: TabExpiry = '1d'
+const DAY_MS = 24 * 60 * 60 * 1000
+export const tabExpiryMs: Record<TabExpiry, number> = { never: Number.POSITIVE_INFINITY, '1d': DAY_MS, '3d': 3 * DAY_MS, '7d': 7 * DAY_MS }
+
+/** Stamps `ids` as viewed at `now`. */
+export function stampViewed(tabs: Tabs, ids: ReadonlyArray<string | undefined>, now: number): Tabs {
+  if (!tabs.tabs.some((tab) => ids.includes(tab.id) && tab.lastViewedAt !== now)) return tabs
+  return { ...tabs, tabs: tabs.tabs.map((tab) => (ids.includes(tab.id) && tab.lastViewedAt !== now ? { ...tab, lastViewedAt: now } : tab)) }
+}
+
+/**
+ * Closes the tabs not viewed for `maxAge` ms, onto the reopen stack, so ⌘⇧T
+ * brings them back. The active tab and a tab with an unsent draft
+ * (`hasDraft`: a New chat's, or its topic's) stay. A tab saved before tabs
+ * kept a time is stamped `now`, so it gets the full time from here. The
+ * timing is coarse: the sweep runs at launch and about hourly.
+ */
+export function expireTabs(tabs: Tabs, now: number, maxAge: number, hasDraft: (tab: Tab) => boolean = () => false): Tabs {
+  const unstamped = tabs.tabs.filter((tab) => tab.lastViewedAt === undefined).map((tab) => tab.id)
+  const stamped = stampViewed(tabs, unstamped, now)
+  const old = stamped.tabs.filter((tab) => tab.id !== stamped.active && now - tab.lastViewedAt! > maxAge && !hasDraft(tab))
+  return closeEach(stamped, old.map((tab) => tab.id))
+}
+
 /** Opens or closes the Juno panel in one tab; the other tabs keep theirs. */
 export function setJunoPanel(tabs: Tabs, id: string, open: boolean): Tabs {
   const at = tabs.tabs.findIndex((tab) => tab.id === id)
@@ -399,7 +447,7 @@ function placeOf(saved: typeof PlaceJson.Type): Place {
  * is dropped.
  */
 const TabJson = Schema.Union([
-  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), newChat: Schema.optionalKey(Schema.Unknown) }),
+  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), lastViewedAt: Schema.optionalKey(Schema.Number), newChat: Schema.optionalKey(Schema.Unknown) }),
   Schema.Struct({ id: Schema.String }),
 ])
 const TabsJson = Schema.Struct({
@@ -417,7 +465,7 @@ export function parseTabs(value: unknown): Tabs {
       const ids = new Set(saved.tabs.map((tab) => tab.id))
       if (ids.size !== saved.tabs.length) return noTabs
       const read = saved.tabs.map((tab): Tab =>
-        'place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [placeOf(tab.place)], index: 0 }, ...(tab.junoPanel === true ? { junoPanel: true } : {}) } : freshTab(tab.id, topicPlace(tab.id)),
+        'place' in tab ? { id: tab.id, pinned: tab.pinned, history: { entries: [placeOf(tab.place)], index: 0 }, ...(tab.junoPanel === true ? { junoPanel: true } : {}), ...(tab.lastViewedAt === undefined ? {} : { lastViewedAt: tab.lastViewedAt }) } : freshTab(tab.id, topicPlace(tab.id)),
       )
       // Old Preferences, Notifications and Settings › Juno tabs all read as Settings, which has one tab.
       const firstSettings = read.find((tab) => currentPlace(tab).kind === 'settings')
@@ -462,6 +510,7 @@ export function savedTabs(tabs: Tabs, chatOf: (tabId: string) => NewChat | undef
         id: tab.id,
         pinned: tab.pinned,
         place,
+        ...(tab.lastViewedAt === undefined ? {} : { lastViewedAt: tab.lastViewedAt }),
         ...(tab.junoPanel === true ? { junoPanel: true } : {}),
         ...(chat === undefined || untouched(chat) ? {} : { newChat: savedNewChat(chat) }),
       }
@@ -524,7 +573,9 @@ export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Ta
   const current = registry.get(tabsAtom)
   if (teamId === undefined) return current
   const changed = change(current)
-  const next = changed === current ? current : ensureTab(changed, newTabPlace(registry.get(newTabPageAtom)))
+  const ensured = changed === current ? current : ensureTab(changed, newTabPlace(registry.get(newTabPageAtom)))
+  // The tab that became active and the one left are both viewed now; expiry counts from there.
+  const next = ensured.active === current.active ? ensured : stampViewed(ensured, [ensured.active, current.active], Date.now())
   if (next === current) return current
   registry.set(changedTabsAtom(teamId), next)
   saveTabs(registry, next)

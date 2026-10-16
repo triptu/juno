@@ -3,6 +3,7 @@
 //   pnpm remote [--dry-run] [--machine linux/amd64:4x8] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
 //   pnpm remote specs:check --memory
+//   pnpm remote test:plan test + test:desktop   several scripts on one machine (scripts/plan.mjs)
 //   pnpm remote --shards 2 specs:check     one script split across machines
 //   pnpm remote --status | --drain
 //
@@ -29,29 +30,17 @@ import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { runnerConfig, checkRunner, runnerCommand } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
-import { runShards, runCombined } from './remote/shards.mjs'
-import { acquire, destroy, keep, reap, release, status } from './remote/pool.mjs'
+import { runShards } from './remote/shards.mjs'
+import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const started = Date.now()
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
-// Measured shapes and rejected alternatives: docs/development.md, "Machine shapes".
-const remoteShapes = {
-  lint: '2x4',
-  test: '2x4',
-  'test:remote-pool': '2x4',
-  'test:agent': '2x4',
-  'test:agent-contracts': '2x4',
-  'test:agent-testing': '2x4',
-  'test:gallery': '8x16',
-  'test:desktop': '4x8',
-  'test:e2e': '4x8',
-  'specs:check': '8x16',
-  'specs:traces': '8x16',
-  'specs:conformance': '4x8',
-}
+const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:plan', 'test:remote-pool']
+// Every script uses one shape, so a free machine fits any waiting run and warm
+// machines are reused. Measurements: docs/development.md, "Machine shapes".
+const standardShape = '8x16'
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
@@ -70,9 +59,8 @@ function parse(argv) {
   if (!script) throw new Error('usage: pnpm remote [--dry-run] [--machine linux/amd64:8x16] [--keep] <script> [args...]')
   if (localOnly[script]) throw new Error(`${script} measures ${localOnly[script]} and runs only on the Mac. Run pnpm ${script} locally.`)
   if (!remoteScripts.includes(script)) throw new Error(`${script} is not set up for remote runs. Remote scripts: ${remoteScripts.join(', ')}`)
-  const gallerySelection = options.env.findLast((pair) => pair.startsWith('GALLERY_SHIFT_ONLY='))?.slice('GALLERY_SHIFT_ONLY='.length)
-  const partialGallery = script === 'test:gallery' && gallerySelection
-  options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${partialGallery ? '4x8' : remoteShapes[script] ?? '4x8'}`
+  options.explicitMachine = Boolean(options.machine ?? process.env.JUNO_REMOTE_MACHINE)
+  options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${standardShape}`
   return { ...options, script, args }
 }
 
@@ -122,25 +110,13 @@ if (process.argv[2] === '--drain') {
 const shardsAt = process.argv.indexOf('--shards')
 const withoutShards = process.argv.slice(2).filter((_, index) => shardsAt < 0 || (index !== shardsAt - 2 && index !== shardsAt - 1))
 const combined = parse(withoutShards)
-if (combined.script === 'test:e2e') {
-  if (combined.args.length) throw new Error('Select files with test:desktop or test:gallery')
-  const args = process.argv.slice(2)
-  process.exit(await runCombined({ args, scriptAt: args.indexOf('test:e2e'), self, root }))
-}
+if (combined.script === 'test:e2e' && combined.args.length) throw new Error('Select files with test:desktop or test:gallery')
 if (shardsAt > 1) {
   const total = Number(process.argv[shardsAt + 1])
   const rest = process.argv.slice(2).filter((_, index) => index !== shardsAt - 2 && index !== shardsAt - 1)
   const parsed = parse(rest)
   const desktop = parsed.script === 'test:desktop' && !parsed.args.some((arg) => arg.startsWith('--repeat-each'))
   process.exit(await runShards({ total, rest, self, root, desktop, dryRun: parsed.dryRun }))
-}
-
-if (!process.env.JUNO_REMOTE_SHARDED) {
-  const parsed = parse(process.argv.slice(2))
-  const count = Number(process.env.JUNO_REMOTE_DESKTOP_SHARDS ?? 4)
-  if (parsed.script === 'test:desktop' && !process.argv.includes('--machine') && !process.env.JUNO_REMOTE_MACHINE && !parsed.args.some((arg) => arg.startsWith('--repeat-each')) && count !== 1) {
-    process.exit(await runShards({ total: count, rest: process.argv.slice(2), self, root, desktop: true, dryRun: parsed.dryRun }))
-  }
 }
 
 let options
@@ -155,13 +131,13 @@ try {
 const { files, bytes } = snapshotted
 const runId = `${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${process.pid}-${randomUUID().slice(0, 8)}`
 
-// Spec checks take the Mac's cache of passing results along (staged in the
-// ignored .remote/ folder) and bring back what they add.
+// Spec checks, alone or in a plan, take the Mac's cache of passing results
+// along (staged in the ignored .remote/ folder) and bring back what they add.
 const carried = { 'specs:': { name: 'specs', env: 'SPECS_CACHE_DIR' } }
-const carry = Object.entries(carried).find(([prefix]) => options.script.startsWith(prefix))?.[1]
+const carry = Object.entries(carried).find(([prefix]) => options.script.startsWith(prefix) || (options.script === 'test:plan' && options.args.some((arg) => arg.startsWith(prefix))))?.[1]
 const specCache = carry && join(tmpdir(), 'juno-cache', carry.name)
 const stagedCache = carry && `.remote/cache-${runId}/${carry.name}`
-const carriesCache = carry !== undefined && process.env.SPECS_CACHE !== 'off' && !options.args.includes('--no-cache')
+const carriesCache = carry !== undefined && process.env.SPECS_CACHE !== 'off' && !options.args.includes('--no-cache') && !options.args.includes('SPECS_CACHE=off')
 if (carriesCache && !options.dryRun) {
   mkdirSync(join(root, stagedCache), { recursive: true })
   if (existsSync(specCache)) cpSync(specCache, join(root, stagedCache), { recursive: true })
@@ -174,7 +150,7 @@ const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const outputDir = `/tmp/juno-remote-${runId}`
 let backend = 'namespace'
 let runner
-const cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
+let cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
 const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, command]] : ['nsc', ['ssh', '-T', id, command]]
 const container = (image) =>
   `echo __juno_remote_started; rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${backend === 'ssh' ? `--cpus ${cores} -e JUNO_RUNNER_JOB_CORES=${cores}` : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
@@ -189,7 +165,7 @@ if (options.dryRun) {
   console.log(`  a warm ${options.machine} machine from the pool, or nsc ${create('3h').map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
   console.log(`  nsc ssh -T <id> 'cat ${outputDir}/reports.tgz' | tar -xzf - -C .remote/${runId}`)
-  console.log(`  back to the pool after a clean run (destroyed when idle for 1 minute), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
+  console.log(`  back to the pool after a clean run (destroyed when idle for ${idleMinutes} minutes), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
   process.exit(0)
 }
 
@@ -250,11 +226,13 @@ try {
     if (health.reachable) {
       backend = 'ssh'
       if (options.keep) throw new Error('--keep is only available for Namespace')
+      // The standard shape is a Namespace size; a smaller runner runs the job on what it has.
+      if (cores > health.cores && !options.explicitMachine) cores = health.cores
       if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
       if (!runner.image) throw new Error('Set JUNO_RUNNER_IMAGE to the preloaded Juno image; pnpm runner:check verifies it')
     } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
   }
-  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
+  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
   appendFileSync(runLog, `remote: backend ${backend}\n`)
   if (backend === 'ssh') {
     image = runner.image

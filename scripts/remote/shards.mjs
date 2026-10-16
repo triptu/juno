@@ -14,7 +14,7 @@ export async function runShards({ total, rest, self, root, desktop, dryRun }) {
   const codes = await Promise.all(Array.from({ length: total }, (_, index) => new Promise((resolve) => {
     const args = [self, '--env', `JUNO_SHARD=${index}/${total}`, ...rest]
     if (desktop) args.push(`--shard=${index + 1}/${total}`, '--reporter=line,blob')
-    const child = spawn(process.execPath, args, { cwd: root, env: { ...process.env, JUNO_REMOTE_SHARDED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(process.execPath, args, { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
     children.add(child)
     let report
     for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => {
@@ -42,20 +42,5 @@ export async function runShards({ total, rest, self, root, desktop, dryRun }) {
     console.log(`remote: merged desktop report in ${join(group, 'html')}`)
   }
   console.error(`remote: shards exited with ${codes.join(', ')}`)
-  return Math.max(...codes)
-}
-
-// Run the two suites with their own shapes. Passing Playwright shards to the
-// combined root shell script would repeat desktop tests or lose gallery states.
-export async function runCombined({ args, scriptAt, self, root }) {
-  const children = new Set()
-  forwardSignals(children)
-  const codes = await Promise.all(['test:desktop', 'test:gallery'].map((script) => new Promise((resolve) => {
-    const child = spawn(process.execPath, [self, ...args.slice(0, scriptAt), script], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
-    children.add(child)
-    for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => console.log(`[${script}] ${line}`))
-    child.on('error', () => resolve(255))
-    child.on('close', (code) => { children.delete(child); resolve(code ?? 1) })
-  })))
   return Math.max(...codes)
 }

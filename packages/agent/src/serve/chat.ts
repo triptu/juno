@@ -32,7 +32,7 @@ import type {
   Ending,
   GroupPosition,
   JobId,
-  JunoInline,
+  JunoBlock,
   OpId,
   Origin,
   Quote,
@@ -44,10 +44,11 @@ import type {
 } from '@juno/agent-contract'
 import type { CardView } from '../actions/cards'
 import { sessionOf } from '../t3/protocol'
-import { aboutOf } from '@juno/agent-contract'
+import { aboutOf, junoText } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
+import { blocksOf } from '../router/rich'
 import { resolveSpans, sourceTable, type BubbleSpan } from '../router/sources'
 import type { Store } from '../store/store'
 import { chatRevisions, keyedMemo, memo } from './cache'
@@ -354,7 +355,8 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
         () => ({ by: 'line', at, item: { _tag: 'groupLabel', id: `label:${run.id}`, origin, text } })))
     }
     for (const bubble of bubbles) {
-      bubbleTexts.set(bubble.id, bubble.text)
+      const body = blocksFor(bubble.body)
+      bubbleTexts.set(bubble.id, junoText(body))
       const at = seen(bubble.id, bubble.at)
       const replyOp = live === undefined ? handles.get(`n${Number(/^n(\d+)$/.exec(bubble.replyTo ?? '')?.[1])}`) : bubble.replyTo
       const replyTo = replyOp === undefined ? undefined : ({ _tag: 'owner', opId: ownerOp(replyOp) as OpId } as const)
@@ -368,7 +370,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
           _tag: 'juno',
           id: bubble.id as BubbleId,
           runId: run.id as RunId,
-          body: bubble.body.map(inlineOf),
+          body,
           at,
           origin,
           ...(quote ? { replyTo: quote } : {}),
@@ -480,11 +482,17 @@ function archivedBubbles(store: Store, runId: string, rows: ReadonlyArray<{ text
   })
 }
 
-/** A span of a bubble as the chat shows it. A source the host did not name a channel for shows its channel id as the place. */
-const inlineOf = (span: BubbleSpan): JunoInline =>
-  'source' in span
-    ? { _tag: 'source', text: span.text, channelId: span.source.channelId, ts: span.source.ts, place: span.source.place ?? span.source.channelId }
-    : { _tag: 'text', text: span.text }
+const blocks = new WeakMap<ReadonlyArray<BubbleSpan>, ReadonlyArray<JunoBlock>>()
+
+/** A bubble's spans as the chat shows them, parsed once per spans array: archived and live bubbles keep theirs across rebuilds. */
+function blocksFor(spans: ReadonlyArray<BubbleSpan>): ReadonlyArray<JunoBlock> {
+  let found = blocks.get(spans)
+  if (found === undefined) {
+    found = blocksOf(spans)
+    blocks.set(spans, found)
+  }
+  return found
+}
 
 const reportJob = (opId: string) => /^report:([^:]+):/.exec(opId)?.[1]
 

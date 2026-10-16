@@ -39,7 +39,7 @@ import type {
   Card,
   SendContext,
 } from '@juno/agent-contract'
-import { aboutOf } from '@juno/agent-contract'
+import { aboutOf, junoText } from '@juno/agent-contract'
 import type { Registry } from '../client'
 import { agentProviderAtom } from './provider'
 import { AgentClient } from './client'
@@ -127,7 +127,7 @@ function quoteIn(items: ReadonlyArray<ChatItem>, target: ReplyTarget): NonNullab
       (target._tag === 'card' && item._tag === 'card' && item.card.id === target.id) ||
       (target._tag === 'owner' && item._tag === 'owner' && item.opId === target.opId),
   )
-  const preview = found?._tag === 'juno' ? firstLine(found.body.map((part) => part.text).join('')) : found?._tag === 'owner' ? firstLine(found.text) : ''
+  const preview = found?._tag === 'juno' ? firstLine(junoText(found.body)) : found?._tag === 'owner' ? firstLine(found.text) : ''
   return { target, preview }
 }
 

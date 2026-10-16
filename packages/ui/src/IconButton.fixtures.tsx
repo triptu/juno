@@ -27,7 +27,7 @@ function AllVariants() {
 
 export default defineFixtures(IconButton, {
   'Titlebar and header': {
-    titlebar: fixture({ icon: MagnifyingGlass, label: 'Search ⌘K', size: 30 }),
+    titlebar: fixture({ icon: MagnifyingGlass, label: 'Search', shortcut: '⌘K', size: 30 }),
     pressed: fixture({ icon: Hash, label: 'Browse channels and people', size: 30, pressed: true }),
     header: fixture({ icon: PushPin, label: 'Pin', size: 32 }),
     // Toggles: outline when off, filled when on.

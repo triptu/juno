@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, useOptionListKeys } from '@juno/ui'
+import { Highlighted } from './Highlighted'
 import { hueFor, initials, kindIcon } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
@@ -98,7 +99,7 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
                       size={36}
                       active={id === activeId}
                       leading={<ConversationMark conversation={row} />}
-                      label={row.name}
+                      label={<Highlighted text={row.name} ranges={row.highlight} />}
                       sub={conversationSub(row)}
                       onSelect={() => onPickConversation(row)}
                       onActivate={() => setActive(id)}

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { aiAssistOnAtom, copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
@@ -16,7 +16,7 @@ import {
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
 import { openSettings } from '../navigation'
 import { junoCommands, openJunoTab } from './actions'
 import { useBackupSettings } from './BackupSettings'
@@ -59,7 +59,8 @@ export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: 
 
 /**
  * Settings › Juno. The provider comes from main (juno-providers); the models,
- * spend, Pause (juno-settings) and the owner's rules (WP15) from the agent.
+ * spend and Pause (juno-settings) from the agent. The owner's rules are on
+ * Connections (`useRules`).
  * Codex's sign-in (WP20) gets no callback, so the view leaves it out until
  * it is built. The key goes from the field to main's keychain, never
  * through the page.
@@ -68,30 +69,13 @@ export function JunoSettings() {
   const result = useAtomValue(junoSettingsAtom)
   // A change shows at once (performance 1: one frame for direct feedback) and gives way when the agent's page agrees or refuses it.
   const [shown, setShown] = useState<Shown>({})
-  // The rules list while the owner edits it, saved as a whole.
-  const [rules, setRules] = useState<ReadonlyArray<Rule> | undefined>(undefined)
-  const [rulesError, setRulesError] = useState<string | undefined>(undefined)
   const served = result._tag === 'Success' ? result.value : undefined
   const left = served === undefined ? shown : unconfirmed(served, shown)
   if (left !== shown) setShown(left)
-  // The saved list gives way to the agent's once the page shows it.
-  if (served !== undefined && rules !== undefined && rulesError === undefined && sameRules(served.rules, rules)) setRules(undefined)
   const providers = <Providers rejected={served?.openRouterKey === 'rejected' || served?.customKeyRejected === true} />
   // No agent runs until a provider is set up, and none answers until it starts: the provider section alone.
   if (served === undefined) return <JunoSettingsPage providers={providers} onChatModel={noop} onCompactionModel={noop} onCap={noop} onPaused={noop} />
-  const shownPage = withShown(served, shown)
-  const page = rules === undefined ? shownPage : { ...shownPage, rules }
-  // The rules are saved as a whole list when a field loses focus; empty rows are dropped, as the agent takes no empty rule.
-  const commitRules = (next: ReadonlyArray<Rule> | undefined = rules) => {
-    if (next === undefined) return
-    const kept = next.filter((rule) => rule.text.trim() !== '')
-    void actions.settings({ _tag: 'rules', rules: kept }).then((outcome) => {
-      if (outcome === 'ok') {
-        setRules(kept)
-        setRulesError(undefined)
-      } else setRulesError(chatCopy.pages.settings.rulesInvalid)
-    })
-  }
+  const page = withShown(served, shown)
   const change = (next: Shown, request: JunoSettingsChange) => {
     setShown({ ...shown, ...next })
     void actions.settings(request).then((outcome) => {
@@ -111,10 +95,43 @@ export function JunoSettings() {
       onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
       onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
-      onRuleChange={(id, text) => setRules(page.rules.map((rule) => (rule.id === id ? { id, text } : rule)))}
-      onRuleAdd={() => setRules([...page.rules, { id: crypto.randomUUID(), text: '' }])}
+    />
+  )
+}
+
+/**
+ * When Juno asks first, on Connections: the owner's rules (WP15) from the
+ * agent's settings page, edited here and saved as a whole list. Undefined
+ * until the page arrives.
+ */
+function useRules(): ReactNode | undefined {
+  const result = useAtomValue(junoSettingsAtom)
+  // The rules list while the owner edits it, saved as a whole.
+  const [rules, setRules] = useState<ReadonlyArray<Rule> | undefined>(undefined)
+  const [rulesError, setRulesError] = useState<string | undefined>(undefined)
+  const served = result._tag === 'Success' ? result.value.rules : undefined
+  // The saved list gives way to the agent's once the page shows it.
+  if (served !== undefined && rules !== undefined && rulesError === undefined && sameRules(served, rules)) setRules(undefined)
+  if (served === undefined) return undefined
+  const shown = rules ?? served
+  // The rules are saved as a whole list when a field loses focus; empty rows are dropped, as the agent takes no empty rule.
+  const commitRules = (next: ReadonlyArray<Rule> | undefined = rules) => {
+    if (next === undefined) return
+    const kept = next.filter((rule) => rule.text.trim() !== '')
+    void actions.settings({ _tag: 'rules', rules: kept }).then((outcome) => {
+      if (outcome === 'ok') {
+        setRules(kept)
+        setRulesError(undefined)
+      } else setRulesError(chatCopy.pages.settings.rulesInvalid)
+    })
+  }
+  return (
+    <RulesSection
+      rules={shown}
+      onRuleChange={(id, text) => setRules(shown.map((rule) => (rule.id === id ? { id, text } : rule)))}
+      onRuleAdd={() => setRules([...shown, { id: crypto.randomUUID(), text: '' }])}
       onRuleRemove={(id) => {
-        const next = page.rules.filter((rule) => rule.id !== id)
+        const next = shown.filter((rule) => rule.id !== id)
         setRules(next)
         commitRules(next)
       }}
@@ -312,9 +329,11 @@ function Scheduled() {
 
 export function JunoConnections() {
   const result = useAtomValue(connectionsPageAtom)
+  const rules = useRules()
   const [error, setError] = useState<{ readonly id: ConnectionId | 'new'; readonly message: string } | undefined>(undefined)
   const [configuring, setConfiguring] = useState<ConnectionId | undefined>(undefined)
-  if (result._tag !== 'Success') return null
+  // Both pages come from the agent; the page draws once both have arrived, so the servers never move down under the rules.
+  if (result._tag !== 'Success' || rules === undefined) return null
   const page = result.value
   const copy = chatCopy.pages.connections
   // An address the agent refused says so; anything else is one plain line.
@@ -324,6 +343,7 @@ export function JunoConnections() {
     <>
       <ConnectionsPage
         page={page}
+        rules={rules}
         {...(error === undefined ? {} : { error })}
         onAction={(id, action) => {
           setError(undefined)

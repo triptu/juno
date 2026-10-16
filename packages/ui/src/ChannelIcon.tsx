@@ -78,12 +78,15 @@ export interface ChannelIconProps {
   readonly color?: ChannelColorName
   /** The channel id, for the deterministic default colour. */
   readonly id?: string
-  readonly size?: AvatarSize
+  readonly size?: ChannelIconSize
   /** Accessible name. Omit when the name is visible next to the tile. */
   readonly label?: string
 }
 
-const iconBySize: Record<AvatarSize, IconSize> = { 44: 20, 36: 18, 32: 16, 28: 15, 24: 13, 20: 12, 18: 12 }
+/** The avatar sizes but the tab's 16, which only people take. */
+export type ChannelIconSize = Exclude<AvatarSize, 16>
+
+const iconBySize: Record<ChannelIconSize, IconSize> = { 44: 20, 36: 18, 32: 16, 28: 15, 24: 13, 20: 12, 18: 12 }
 
 /**
  * A square tile for a channel: a chosen Phosphor icon, or the first letter,

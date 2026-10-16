@@ -9,6 +9,7 @@ const postgres = { id: 't:C0ENG:1759990000.000100', title: 'Postgres 16 migratio
 const proposal = { id: 't:C0PRODUCT:1759990000.000200', title: 'Proposal: cut offline mode and public API v3 from Q4', place: 'product', art: art.calendar }
 const packet = { id: 'm:D0SAM', title: 'Sam Okafor', place: 'Sam Okafor' }
 const releases = { id: 'm:C0RELEASES', title: '#releases', place: 'releases' }
+const vendorStatus = { id: 'm:C0VENDORSTATUSUPDATES', title: '#vendor-status-updates', place: 'vendor-status-updates' }
 
 export const homeItems = {
   waiting: { id: `waiting:${hiring.id}`, kind: 'waiting', title: 'Elena asked you something', topics: [hiring], at: NOW - 12 * MINUTE },
@@ -39,7 +40,17 @@ export const homeItems = {
     topics: [releases],
     at: NOW - 35 * MINUTE,
     channel: { id: 'C0RELEASES', kind: 'public', name: 'releases', label: '#releases', tint: 'public', icon: 'rocket', color: 'cyan' },
-    fromApps: { apps: 12, of: 30 },
+    reason: 'Apps wrote 18 of the last 30 messages',
+  },
+  /** Asked after Juno judged it: Juno's reason, on a long channel name. */
+  automatedByJuno: {
+    id: 'automated:C0VENDORSTATUSUPDATES',
+    kind: 'automated',
+    title: 'Move #vendor-status-updates?',
+    topics: [vendorStatus],
+    at: NOW - 3 * 60 * MINUTE,
+    channel: { id: 'C0VENDORSTATUSUPDATES', kind: 'public', name: 'vendor-status-updates', label: '#vendor-status-updates', tint: 'public', icon: 'hash', color: 'midnight' },
+    reason: 'Status updates from an app, a few replies',
   },
 } satisfies Record<string, HomeItem>
 

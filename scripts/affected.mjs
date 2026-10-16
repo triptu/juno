@@ -1,6 +1,6 @@
 // Works out which tests a change can affect, and runs only those.
 //
-//   pnpm affected                 local Bun check, then affected suites on Namespace
+//   pnpm affected                 local Bun check, then the affected suites on one Namespace machine
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
 //   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
@@ -287,37 +287,55 @@ if (plan.length === 0) console.log('  nothing to run')
 if (renderer) console.log('  (UI changed: run pnpm test:feel and pnpm perf on the Mac before a milestone review)')
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
-// Each step runs at once: on its own Namespace machine, or one after another locally.
+// The remote steps run as one plan on one Namespace machine (scripts/plan.mjs),
+// beside the local steps; --local runs every step one after another here.
 const children = new Set()
 forwardSignals(children)
 const localAll = flag('--local')
-const run = (step) =>
+const spawnStep = (command, env, onLine) =>
   new Promise((resolvePromise) => {
-    const local = localAll || step.local
-    const env = Object.entries(step.env ?? {}).flatMap(([key, value]) => ['--env', `${key}=${value}`])
-    const machine = step.machine && !process.env.JUNO_REMOTE_MACHINE ? ['--machine', step.machine] : []
-    const command = local ? ['pnpm', [step.script, ...step.args]] : ['node', [join(root, 'scripts/remote.mjs'), ...machine, ...env, step.script, ...step.args]]
-    const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(local ? step.env : {}) } })
+    const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } })
     children.add(child)
     child.on('close', () => children.delete(child))
-    const prefix = `[${step.script}] `
     for (const stream of [child.stdout, child.stderr]) {
       let rest = ''
       stream.on('data', (chunk) => {
         const lines = (rest + chunk).split('\n')
         rest = lines.pop()
-        for (const line of lines) process.stdout.write(prefix + line + '\n')
+        for (const line of lines) onLine(line)
       })
     }
-    child.on('close', (code) => resolvePromise({ step, code: code ?? 1 }))
+    child.on('close', (code) => resolvePromise(code ?? 1))
   })
+const run = async (step) => ({ step, code: await spawnStep(['pnpm', [step.script, ...step.args]], step.env, (line) => process.stdout.write(`[${step.script}] ${line}\n`)) })
+/** One remote machine for every remote step; each step's result comes from the plan's `plan: step` lines. */
+const runRemote = async (steps) => {
+  const words = steps.flatMap((step, index) => [...(index ? ['+'] : []), ...Object.entries(step.env ?? {}).map(([key, value]) => `${key}=${value}`), step.script, ...step.args])
+  const codes = new Map()
+  const code = await spawnStep(['node', [join(root, 'scripts/remote.mjs'), 'test:plan', ...words]], {}, (line) => {
+    const result = /^plan: step (\d+) \S+ exited with (\d+)/.exec(line)
+    if (result) codes.set(Number(result[1]), Number(result[2]))
+    process.stdout.write(`${line}\n`)
+  })
+  // A step with no result line did not finish: the run failed before or during it.
+  return steps.map((step, index) => ({ step, code: codes.get(index) ?? (code || 1) }))
+}
 // Fail on local type errors before paying for remote machines.
 const localTypecheck = plan.find((step) => step.script === 'typecheck')
 const results = localTypecheck ? [await run(localTypecheck)] : []
 if (results.some(({ code }) => code !== 0)) process.exit(1)
 const remaining = plan.filter((step) => step !== localTypecheck)
 if (localAll) for (const step of remaining) results.push(await run(step))
-else results.push(...await Promise.all(remaining.map(run)))
+else {
+  const remote = remaining.filter((step) => !step.local)
+  const local = (async () => {
+    const done = []
+    for (const step of remaining.filter((item) => item.local)) done.push(await run(step))
+    return done
+  })()
+  const [localResults, remoteResults] = await Promise.all([local, remote.length ? runRemote(remote) : []])
+  results.push(...localResults, ...remoteResults)
+}
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')

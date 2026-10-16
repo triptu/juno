@@ -18,8 +18,8 @@ import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef, Person } from '../refs'
 
-/** Where a result lives, without the DM partner's id. */
-const { partnerId: _partnerId, ...placeFields } = ChannelRef.fields
+/** Where a result lives, without the DM partner's or group members' ids. */
+const { partnerId: _partnerId, memberIds: _memberIds, ...placeFields } = ChannelRef.fields
 export const SearchPlace = Schema.Struct(placeFields)
 export type SearchPlace = typeof SearchPlace.Type
 

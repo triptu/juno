@@ -1,0 +1,1 @@
+- 10-16 17:52 · Tushar · In a one-to-one DM the preview drops the sender when it is the other person ("yep", not "Dmitriy Vasilyuk: yep"); your own messages keep "You:". Group DMs and channels keep the sender's name.

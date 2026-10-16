@@ -20,7 +20,7 @@ export interface AutomatedChannelInput {
 
 export const AutomatedChannelOutput = Type.Object({
   probability: Type.Number({ minimum: 0, maximum: 1 }),
-  /** One short clause from a chat model. A decision model gives none. */
+  /** One short clause from a chat model, shown on Home's question. A decision model gives none. */
   reason: Type.Optional(Type.String({ maxLength: 120 })),
 })
 
@@ -36,7 +36,7 @@ const render = (input: AutomatedChannelInput): string => {
  */
 export const automatedChannel = defineStructuredTask<AutomatedChannelInput, typeof AutomatedChannelOutput>({
   name: 'automatedChannel',
-  version: 1,
+  version: 2,
   tier: 'decision',
   timeoutMillis: 3000,
   prompt,

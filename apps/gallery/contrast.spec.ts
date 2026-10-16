@@ -43,10 +43,12 @@ test.describe('sidebar row contrast', () => {
       }
       return Array.from(frame.querySelectorAll('[data-topic-row]')).map((row) => {
         const part = (name: string) => {
-          const node = row.querySelector(`[data-row-part="${name}"]`)!
-          return ratio(rgba(getComputedStyle(node).color), backdrop(node))
+          const node = row.querySelector(`[data-row-part="${name}"]`)
+          return node === null ? undefined : ratio(rgba(getComputedStyle(node).color), backdrop(node))
         }
-        return { id: row.getAttribute('data-topic-id'), title: part('title'), preview: part('preview'), place: part('place'), time: part('time') }
+        // A DM's Main has no meta line; its time is the same level.
+        const time = part('time')!
+        return { id: row.getAttribute('data-topic-id'), title: part('title')!, preview: part('preview')!, place: part('place') ?? time, time }
       })
     })
 

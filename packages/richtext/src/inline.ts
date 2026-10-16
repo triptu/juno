@@ -2,6 +2,7 @@
 import type { Inline, InlineStyle, Lookups } from './model'
 import type { RichTextStyle } from '@juno/slack-schema'
 import { emojiUnicode, splitEmojiName, unicodeFromHex } from './emoji'
+import { findLinks } from './links'
 
 export function toStyle(style: RichTextStyle | undefined): InlineStyle | undefined {
   if (!style) return undefined
@@ -30,6 +31,26 @@ export function textRuns(text: string, style?: InlineStyle): Inline[] {
     if (i > 0) out.push({ kind: 'break' })
     if (line.length > 0) out.push(style ? { kind: 'text', text: line, style } : { kind: 'text', text: line })
   })
+  return out
+}
+
+/**
+ * `textRuns`, with the URLs, addresses and domains in it as links. Slack's
+ * clients send those as `link` elements; a text element holds one only when
+ * a bot or an older Juno sent it, and it shows as a link all the same. Code
+ * stays as it is.
+ */
+export function linkedRuns(text: string, style?: InlineStyle): Inline[] {
+  const found = style?.code === true ? [] : findLinks(text)
+  if (found.length === 0) return textRuns(text, style)
+  const out: Inline[] = []
+  let last = 0
+  for (const link of found) {
+    out.push(...textRuns(text.slice(last, link.start), style))
+    out.push(style ? { kind: 'link', url: link.url, text: link.text, style } : { kind: 'link', url: link.url, text: link.text })
+    last = link.end
+  }
+  out.push(...textRuns(text.slice(last), style))
   return out
 }
 
@@ -82,8 +103,18 @@ export function channelInline(id: string, fallbackName: string | undefined, look
   return { kind: 'channel', id, name: lookups.channel?.(id) ?? fallbackName ?? id }
 }
 
+/** The handle shown for a user group whose handle has not arrived yet. Never the raw id. */
+export const UNKNOWN_USERGROUP = 'group'
+
 export function usergroupInline(id: string, fallbackHandle: string | undefined, lookups: Lookups): Inline {
-  return { kind: 'usergroup', id, handle: lookups.usergroup?.(id) ?? fallbackHandle ?? id }
+  const known = lookups.usergroup?.(id)
+  return {
+    kind: 'usergroup',
+    id,
+    handle: known?.handle ?? fallbackHandle ?? UNKNOWN_USERGROUP,
+    ...(known?.name ? { name: known.name } : {}),
+    isMine: lookups.myUsergroups?.includes(id) ?? false,
+  }
 }
 
 export function emojiInline(rawName: string, lookups: Lookups, hex?: string): Inline {
