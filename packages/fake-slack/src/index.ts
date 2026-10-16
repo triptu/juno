@@ -166,6 +166,11 @@ export class FakeSlack {
     this.workspace.selfUsergroups = [...input.ids]
   }
 
+  /** Adds or changes a user group from another client. Emits `subteam_created` or `subteam_updated`. */
+  putUsergroup(input: { id: string; handle: string; name: string; deleted?: boolean }): void {
+    this.workspace.putUsergroup(input)
+  }
+
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
     const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)
@@ -385,6 +390,7 @@ export class FakeSlack {
       followThread: (i) => this.followThread(i),
       unfollowThread: (i) => this.unfollowThread(i),
       setSelfUsergroups: (i) => this.setSelfUsergroups(i),
+      putUsergroup: (i) => this.putUsergroup(i),
       typing: (i) => this.typing(i),
       emitFrame: (i) => this.emitFrame(i),
       dropSocket: () => this.dropSocket(),

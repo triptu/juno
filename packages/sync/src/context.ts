@@ -36,6 +36,8 @@ export interface SyncContext {
   usersOnBackground: boolean
   /** Hands the user's own presence from `client.userBoot` to whoever shows it. */
   readonly onSelfPresence: (presence: 'active' | 'away') => Effect.Effect<void>
+  /** Topics whose preview or title mentions a user group with no `usergroups` row. Re-indexed when groups arrive (`usergroups.ts`). Bounded by the topics stored. */
+  readonly usergroupTopics: Set<string>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
   /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */
@@ -89,4 +91,7 @@ export const wantUsers = (ctx: SyncContext, ids: Iterable<string>, background = 
 export const reindexOptions = (ctx: SyncContext) => ({
   me: ctx.me,
   onMissingUser: (userId: string, topicId: string) => wantUsers(ctx, [userId], false, topicId),
+  onMissingUsergroup: (topicId: string) => {
+    ctx.usergroupTopics.add(topicId)
+  },
 })

@@ -20,6 +20,7 @@ import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
+import { applyUsergroups, changeOwnUsergroup } from './usergroups'
 import {
   changeReaction,
   observeRead,
@@ -190,6 +191,18 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(patchMetadata(ctx.metadata, frame.channel, { is_member: frame.type === 'member_joined_channel' ? 1 : 0 }))
       case 'user_change':
         return yield* transaction(upsertUsers([frame.user]))
+      case 'subteam_created':
+      case 'subteam_updated':
+        return yield* transaction(applyUsergroups(ctx, [frame.subteam]))
+      case 'subteam_members_changed': {
+        const joined = frame.added_users?.includes(ctx.me.userId) === true
+        const left = frame.removed_users?.includes(ctx.me.userId) === true
+        if (joined === left) return
+        return yield* transaction(changeOwnUsergroup(ctx, frame.subteam_id, joined))
+      }
+      case 'subteam_self_added':
+      case 'subteam_self_removed':
+        return yield* transaction(changeOwnUsergroup(ctx, frame.subteam_id, frame.type === 'subteam_self_added'))
       case 'pref_change':
         return yield* transaction(setPref(frame.name, frame.value))
       default:

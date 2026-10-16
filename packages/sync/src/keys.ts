@@ -7,7 +7,7 @@
  *   subscribes to the table; a topic detail subscribes to its id.
  * - `{ messages: [topicId] }`: the messages or reactions of one topic. A
  *   message write fires every topic that shows it (`messagesOf`).
- * - `conversations`, `users`, `team`, `channel_reads`, `thread_subs`:
+ * - `conversations`, `users`, `usergroups`, `team`, `channel_reads`, `thread_subs`:
  *   mirror tables the view models join.
  * - `{ topic_reads: [id] }`, `{ topic_overlay: [id] }`, `ignored_channels`: Juno's own state.
  */
@@ -38,6 +38,7 @@ export const syncKeys = {
   messagesOf: (row: Parameters<typeof messageTopics>[0]) => ({ messages: [...messageTopics(row), `channel:${row.channel}`] }) satisfies InvalidationKeys,
   conversations: ['conversations'] satisfies InvalidationKeys,
   users: ['users'] satisfies InvalidationKeys,
+  usergroups: ['usergroups'] satisfies InvalidationKeys,
   team: ['team'] satisfies InvalidationKeys,
   channelReads: ['channel_reads'] satisfies InvalidationKeys,
   threadSubs: ['thread_subs'] satisfies InvalidationKeys,

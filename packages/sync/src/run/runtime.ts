@@ -6,6 +6,7 @@ import type { BootState, Phase } from '../boot'
 import { SyncConfig } from '../config'
 import type { RootFetch, SyncContext } from '../context'
 import { syncEmoji } from '../emoji'
+import { syncUsergroups } from '../usergroups'
 
 import type { RunSyncOptions } from '../sync'
 
@@ -27,6 +28,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     usersOnBackground: false,
     onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
     unknownUsers: new Set(),
+    usergroupTopics: new Set(),
     lateReactions: new Map(),
     fetchesInFlight: new Set(),
     metadata: new Set(),
@@ -49,10 +51,11 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     )
   const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
   const refreshEmoji = syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
+  const refreshUsergroups = syncUsergroups(ctx).pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: user groups refresh failed', { tag: error._tag })))
   const reportBoot: Phase = phase
   // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
   const background = yield* FiberSet.make<void, SlackAuthRequired>()
-  return { socket, ctx, state, work, phase, cycle, settle, refreshEmoji, reportBoot, background, config, options }
+  return { socket, ctx, state, work, phase, cycle, settle, refreshEmoji, refreshUsergroups, reportBoot, background, config, options }
 })
 
 export type SyncRuntime = Effect.Success<ReturnType<typeof makeSyncRuntime>>

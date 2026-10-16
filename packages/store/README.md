@@ -17,6 +17,8 @@ The unused `topic_overlay.tracked` column remains from the initial migration. Re
 - `SqlClient` (type) and `SqlError`, re-exported so callers do not import `effect/sql`.
 - Row types (`MessageRow`, `TopicIndexRow`, ...) and the migrations lists.
 
+`usergroups` in cache.db holds the workspace's user groups (`id`, `handle`, `name`, `deleted`), so a group mention shows its handle.
+
 To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. For `cache.db`, also bump `CACHE_SCHEMA_VERSION`.
 
 The topic view's Main window reads the partial index `messages_main (channel, ts)` over roots and broadcast replies; a query uses it only when its WHERE clause repeats the index's condition. Invalidation keys in the record form may give a table an empty id list (`{ messages: [topicId], users: [] }`), which subscribes to the whole table.
