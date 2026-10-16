@@ -16,9 +16,13 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('AllTopics', 'filters/narrow'), false],
   [route('Home', 'items/minimum-window'), false],
   [route('CommandPalette', 'states/minimum-window'), false],
+  [route('SettingsPage', 'states/notifications-minimum-window'), false],
   [route('JunoChatList', 'chat/minimum-window'), false],
   [route('JunoHeader', 'banner/recovery-minimum-window'), false],
   [route('JunoHeader', 'banner/paused-minimum-window'), false],
+  [route('TopicView', 'interaction/minimum-window'), false],
+  [route('Workspace', 'page/minimum-window'), false],
+  [route('Shell', 'window/sidebar-hidden-minimum-window'), false],
 ]
 
 const frameOf = (page: Page, at: Route) => page.locator(`[data-fixture-frame="${at.route}"]`)

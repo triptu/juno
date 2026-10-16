@@ -840,6 +840,8 @@ export const layout = stylex.defineVars({
   // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
   // Settings' list of sections, beside the section's page. Fits "Backup & This Mac" with the sidebar's insets.
   '--settings-nav-width': '200px',
+  // A wrapping ListRow keeps its text at least this wide; under it the controls go to a line of their own.
+  '--list-row-wrap-min': '200px',
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',

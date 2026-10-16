@@ -595,7 +595,7 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 **Hours** (no sub)
 
-- Two rows, min-height 60, padding `8 14` (the ListRow settings inset, the same at both ends), gap 12: label block 260px (title 14/500, sub 12 muted) · flexible gap · seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm").
+- Two rows, min-height 60, padding `8 14` (the ListRow settings inset, the same at both ends), gap 12: label block 260px (title 14/500, sub 12 muted) · flexible gap · seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm"). When the label would get narrower than 200px the controls move under it (ListRow `wrap`), the days and the times wrapping as two groups.
   - "Notifications" — sub "Outside these hours, messages stay in Juno without notifying you." Once Slack's schedule is verified and written, the sub adds "Slack on your phone pauses too."
   - "Active in Slack" — sub "Outside these hours you show as away."
 - Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."

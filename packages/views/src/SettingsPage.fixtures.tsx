@@ -1,6 +1,6 @@
 import { DEFAULT_QUICK_REACTIONS, sendCheckDefaults, sendCheckPrefKeys, type AiActivity, type AiCallRow, type ProviderState } from '@juno/contract'
 import { useLayoutEffect, type ReactNode } from 'react'
-import { defineFixtures, fixture, scene } from '@juno/ui'
+import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
 import { connections, NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './juno-pages/fixtures'
@@ -20,7 +20,7 @@ import { UpdateSettings } from './UpdateSettings'
 /** As a new install has them: all on except Capital i. */
 const checks = sendCheckPrefKeys.map((key) => ({ key, enabled: sendCheckDefaults[key] }))
 const noop = () => {}
-const at = (section: SettingsPageProps['section'], children: SettingsPageProps['children']) => fixture<SettingsPageProps>({ section, onSection: noop, children })
+const at = (section: SettingsPageProps['section'], children: SettingsPageProps['children'], frame?: FixtureFrame) => fixture<SettingsPageProps>({ section, onSection: noop, children }, frame)
 
 /** General scrolled to its last section before the first paint. */
 function ScrolledToEnd({ children }: { readonly children: ReactNode }) {
@@ -97,6 +97,8 @@ export default defineFixtures(
       'sharing-always-on': at('general', <SettingsGeneral hideWhileSharing sharingDetection="alwaysOn" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'read-mirroring-off': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'appearance-quick-reactions': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={sevenQuickReactions} onChange={noop} onAdd={noop} />} />),
+      // The minimum window with the sidebar hidden: the hours rows put their days and times under the label.
+      'notifications-minimum-window': at('notifications', <NotificationsPage {...notificationsBase} />, { width: 720, height: 436, padded: false }),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       'ai-activity-empty': at('ai-activity', <AiActivityPage activity={{ calls: [], todayUsd: 0, todayCalls: 0 }} now={NOW} onCopyDetails={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.

@@ -142,7 +142,7 @@ The composer is a feature component: `Surface field` + slots + `IconButton` + `T
 
 ## 13. ListRow
 
-Generic row for settings groups, logs and tables: `minHeight` 32 | 44 | 48 | 52, `padding` `settings` (8 14, the same inset at both ends) | `table` | `log` | `navigation` (0 12, sidebar navigation’s 8px gap, 20px leading slot, 4px body gap and radius 12; a `selected` navigation row takes NavItem's `--hl-nav` fill, so it reads apart from a hovered row), bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. Sidebar topic rows and All topics rows are feature components built on this.
+Generic row for settings groups, logs and tables: `minHeight` 32 | 44 | 48 | 52, `padding` `settings` (8 14, the same inset at both ends) | `table` | `log` | `navigation` (0 12, sidebar navigation’s 8px gap, 20px leading slot, 4px body gap and radius 12; a `selected` navigation row takes NavItem's `--hl-nav` fill, so it reads apart from a hovered row), bottom `divider` (default on), `leading`, `trailing`, children. With `onSelect` it is a focusable `role="button"` with a hover background and radius 16 (`selected` for the current row; muted text inside a selected row renders subtle). Rows set `contain: content`. With `wrap`, a row whose text would get narrower than `--list-row-wrap-min` (200) puts its trailing controls on a line of their own under the text, at the start, where they wrap too (the Notifications hours rows). Sidebar topic rows and All topics rows are feature components built on this.
 
 ## 14. Toast
 
