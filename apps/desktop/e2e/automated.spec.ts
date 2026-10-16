@@ -9,6 +9,8 @@ import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
+// Juno's judgement of unclear channels is a background AI job.
+test.use({ aiJobs: true })
 
 const ALERTS_MAIN = '#alerts-prod'
 const DEPLOYS_MAIN = '#deploys'

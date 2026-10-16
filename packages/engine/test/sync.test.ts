@@ -441,9 +441,11 @@ describe('realtime', () => {
     const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const pricing = before.find((r) => r.title === 'Final copy for pricing is in')!
 
-    // The overlay exists before the resolve command does: write the resolve the way the command will.
+    // The overlay exists before the resolve command does: write the resolve the way the command will. The AI title
+    // job may already have made the topic's overlay row, so this updates it if it is there.
     const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db'))
-    db.prepare(`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts) VALUES (?, ?, ?)`).run(pricing.id, String(Date.now()), pricing.lastActivityTs)
+    db.prepare(`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts) VALUES (?, ?, ?)
+      ON CONFLICT (topic_id) DO UPDATE SET resolved_at = excluded.resolved_at, resolved_activity_ts = excluded.resolved_activity_ts`).run(pricing.id, String(Date.now()), pricing.lastActivityTs)
     db.close()
 
     engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Legal signed off.', threadTs: pricing.id.split(':')[2]! })

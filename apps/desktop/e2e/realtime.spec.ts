@@ -58,7 +58,8 @@ test('a 429 storm: the line says Slack asked us to slow down, every method waits
     fake.goOnline()
     await sidebar.expectSyncStatus('Slack asked us to slow down')
     await sidebar.expectNoSyncStatus(60_000)
-  })
+    // The gap can land inside this window: #product's Main then takes its place at the top of the list. Only that move is skipped.
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   await expect(sidebar.row('#product').preview).toContainText('Pricing page copy is live.', { timeout: 30_000 })
 
   await juno.expectEngineLive(60_000)

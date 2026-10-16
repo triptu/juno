@@ -173,6 +173,11 @@ export const aiAssistOn = prefs.get<unknown>(AI_ASSIST_PREF).pipe(
   Effect.catch(() => Effect.succeed(true)),
 )
 
+/** Whether the background AI jobs may call the model: always in the app; tests turn them off with `aiJobs: false` unless they opt in. */
+export const aiJobsOn = Effect.gen(function* () {
+  return (yield* EngineConfig).aiJobs !== false
+})
+
 /** Availability for decision features, independent of the saved AI assist switch: a key, unless the fake runs ungated. */
 export const decisionProviderAvailable = Effect.gen(function* () {
   const config = yield* EngineConfig

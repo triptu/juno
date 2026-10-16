@@ -19,7 +19,7 @@ afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
-const bootedEngine = (options: Parameters<typeof boot>[1] = {}) => boot(engines, options)
+const bootedEngine = (options: Parameters<typeof boot>[1] = {}) => boot(engines, { aiJobs: true, ...options })
 
 const isMain = (row: TopicRow) => row.kind === 'main'
 const isDmMain = (row: TopicRow) => row.kind === 'main' && (row.channel.kind === 'im' || row.channel.kind === 'mpim')

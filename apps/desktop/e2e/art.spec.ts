@@ -10,6 +10,8 @@ import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
+// These tests watch the background art job.
+test.use({ aiJobs: true })
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
@@ -46,7 +48,7 @@ test('with AI assist off, the topic menu has no Redraw art', async ({ juno, fake
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
   db.close()
 
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
   try {
     const { sidebar } = new Juno(again.app, again.win)
     const row = sidebar.row(POSTGRES)
@@ -65,7 +67,7 @@ test('Redraw art shows only with an OpenRouter key and under the daily spend cap
   const model = await startFakeOpenRouter({ key: KEY })
   const running = await launchApp(userData, {
     fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-    fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true,
+    fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true, aiJobs: true,
   })
   try {
     const juno = new Juno(running.app, running.win)

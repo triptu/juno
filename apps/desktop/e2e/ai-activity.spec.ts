@@ -10,7 +10,7 @@ test('a saved key gives a new thread an AI title and art, Redraw draws it again,
   test.setTimeout(180_000)
   const running = await launchApp(userData, {
     fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-    agent: true, fakeAiRequiresKey: true,
+    agent: true, fakeAiRequiresKey: true, aiJobs: true,
   })
   const juno = new Juno(running.app, running.win)
   try {

@@ -16,6 +16,7 @@ import { HomeRoutes, NotSignedIn } from '@juno/contract'
 import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
+import { aiJobsOn } from '../ai'
 import { aiWakes } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
@@ -50,6 +51,7 @@ export const HomeHandlers = HomeRoutes.toLayer(
     const workspace = yield* Workspace
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
+    const jobs = yield* aiJobsOn
     const scope = yield* Effect.scope
     /** Items asked about, by workspace, with the activity they were asked at, so one is asked once until its topic moves. */
     const asked = new Map<string, Map<string, string>>()
@@ -97,7 +99,7 @@ export const HomeHandlers = HomeRoutes.toLayer(
               ? Stream.empty
               : liveQuery(
                   KEYS,
-                  timed(readHome().pipe(Effect.tap((run) => (run.aiAssist && run.view.ready ? rewrite(open, run, revision) : Effect.void)))).pipe(
+                  timed(readHome().pipe(Effect.tap((run) => (jobs && run.aiAssist && run.view.ready ? rewrite(open, run, revision) : Effect.void)))).pipe(
                     Effect.map((timedRun) => ({ value: timedRun.value.view, queryMs: timedRun.queryMs })),
                   ),
                 ).pipe(Stream.provide(open.context)),

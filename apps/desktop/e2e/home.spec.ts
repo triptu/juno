@@ -9,6 +9,8 @@ import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 150_000 })
+// Home's AI items and title rewrites come from the background AI jobs.
+test.use({ aiJobs: true })
 
 /** Home reads its items when it appears: show a topic, then Home again. */
 async function freshHome(juno: Juno, via: string): Promise<string[]> {
@@ -163,7 +165,7 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
   db.close()
 
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
   try {
     const { home } = new Juno(again.app, again.win)
     // The relaunch restores the session first.

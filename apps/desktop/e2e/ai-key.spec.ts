@@ -14,7 +14,7 @@ test('a saved key starts art and titles for recent topics, survives an engine re
   const model = await startFakeOpenRouter({ key: KEY })
   const running = await launchApp(userData, {
     fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-    fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true,
+    fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true, aiJobs: true,
   })
   const juno = new Juno(running.app, running.win)
   /** A followed thread in #eng: Leo asks, you reply. */

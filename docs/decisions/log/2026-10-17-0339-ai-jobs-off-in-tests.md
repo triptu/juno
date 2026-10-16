@@ -1,0 +1,1 @@
+- 10-17 03:39 · ci-fix-14 · Tests run the engine's background AI jobs (titles, art, Home's AI items and title rewrites, Juno's Automated check) only when they opt in with `aiJobs: true`; `EngineConfig.aiJobs` is unset, so on, in the app. With them off the Automated job keeps its rules and asks on Home about unclear channels, as with AI assist off.
