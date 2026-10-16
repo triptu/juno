@@ -60,8 +60,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const files = useAttachments(tabId)
 
   useEffect(() => {
-    // A lazy mount can finish after the owner opens a popover. Keep focus there.
-    if (document.querySelector('[role="dialog"], [role="menu"]') === null) inputRef.current?.focus()
+    inputRef.current?.focus()
   }, [])
   useEffect(() => onNewChatFocus((id) => id === tabId && inputRef.current?.focus()), [tabId])
 

@@ -770,6 +770,7 @@ export const layout = stylex.defineVars({
   '--menu-width-mention': '280px',
   // The New chat pickers' lists.
   '--menu-width-picker': '340px',
+  '--destination-list-max-height': '360px',
   // A sidebar view's name pill (inventory 2.3): longer names end with an ellipsis.
   '--filter-pill-max-width': '120px',
   // The view sheet's conversation list (inventory 2.3), which scrolls past this.
