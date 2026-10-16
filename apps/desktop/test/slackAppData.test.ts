@@ -57,7 +57,7 @@ function reportOf(outcome: Awaited<ReturnType<typeof read>>): string {
   return text
 }
 
-describe('readSlackApp', () => {
+describe('readSlackApp: where it looks', () => {
   it('imports from the App Store container with Network/Cookies and reports what it chose', async () => {
     const { root, candidates, appStore } = await home()
     await writeSlackAppFixture(appStore, { team, cookie: COOKIE, keychainPassword: PASSWORD, cookiesFile: 'Network/Cookies' })
@@ -86,6 +86,29 @@ describe('readSlackApp', () => {
     expect(report).toContain('Failed at: no install: no Slack data folder exists')
   })
 
+  it('reports data it cannot read by the error’s name only', async () => {
+    const { root, candidates, direct } = await home()
+    await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
+    await writeFile(join(direct, 'Cookies'), 'not a database')
+    const outcome = await read(root, candidates, keychainWith({ 'Slack Safe Storage': PASSWORD }).keychain)
+    expect(outcome.result).toMatchObject({ ok: false, kind: 'other', message: UNREADABLE })
+    expect(reportOf(outcome)).toMatch(/Failed at: the Slack data could not be read \(\w+\)$/)
+  })
+
+  it('names the Slack app’s version and build from its bundle', async () => {
+    const { root, candidates } = await home()
+    const bundle = join(root, 'Applications', 'Slack.app')
+    await mkdir(join(bundle, 'Contents', '_MASReceipt'), { recursive: true })
+    await writeFile(
+      join(bundle, 'Contents', 'Info.plist'),
+      '<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key>\n<string>4.52.178</string></dict></plist>',
+    )
+    const outcome = await read(root, candidates, keychainWith({}).keychain, [join(root, 'missing', 'Slack.app'), bundle])
+    expect(reportOf(outcome)).toContain('Slack app: 4.52.178, App Store build, ~/Applications/Slack.app')
+  })
+})
+
+describe('readSlackApp: a Slack app that is not signed in', () => {
   it('reports a data folder without a cookie database as signed out', async () => {
     const { root, candidates, direct } = await home()
     await mkdir(join(direct, 'Local Storage', 'leveldb'), { recursive: true })
@@ -135,6 +158,9 @@ describe('readSlackApp', () => {
     expect(reportOf(outcome)).toContain('Failed at: token missing: no team in localConfig_v2 has a session token')
   })
 
+})
+
+describe('readSlackApp: the keychain', () => {
   it('reports a refused keychain prompt', async () => {
     const { root, candidates, direct } = await home()
     await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
@@ -193,26 +219,6 @@ describe('readSlackApp', () => {
     expect(reportOf(outcome)).toContain('Failed at: keychain denied: macOS did not give the password')
   })
 
-  it('reports data it cannot read by the error’s name only', async () => {
-    const { root, candidates, direct } = await home()
-    await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
-    await writeFile(join(direct, 'Cookies'), 'not a database')
-    const outcome = await read(root, candidates, keychainWith({ 'Slack Safe Storage': PASSWORD }).keychain)
-    expect(outcome.result).toMatchObject({ ok: false, kind: 'other', message: UNREADABLE })
-    expect(reportOf(outcome)).toMatch(/Failed at: the Slack data could not be read \(\w+\)$/)
-  })
-
-  it('names the Slack app’s version and build from its bundle', async () => {
-    const { root, candidates } = await home()
-    const bundle = join(root, 'Applications', 'Slack.app')
-    await mkdir(join(bundle, 'Contents', '_MASReceipt'), { recursive: true })
-    await writeFile(
-      join(bundle, 'Contents', 'Info.plist'),
-      '<?xml version="1.0"?><plist><dict><key>CFBundleShortVersionString</key>\n<string>4.52.178</string></dict></plist>',
-    )
-    const outcome = await read(root, candidates, keychainWith({}).keychain, [join(root, 'missing', 'Slack.app'), bundle])
-    expect(reportOf(outcome)).toContain('Slack app: 4.52.178, App Store build, ~/Applications/Slack.app')
-  })
 })
 
 describe('securityKeychain', () => {
