@@ -5,6 +5,7 @@
 // Writes renders/<direction>-<sidebar|privacy|small>-<theme>.png.
 import { createServer } from 'node:http'
 import { readFile, mkdir } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { createRequire } from 'node:module'
 const only = process.argv[2]
@@ -29,6 +30,18 @@ const page = await browser.newPage({ viewport: { width: 1200, height: 1800 }, de
 await page.emulateMedia({ reducedMotion: 'reduce' })
 const states = [['every-row', 'sidebar'], ['every-row-privacy', 'privacy']]
 // Direction 5: each drawing takes the hue the Tide pebble of its topic takes (the first draw of the pebble's seeded stream).
+// Round 2 painted each drawing in the hue its recipe names; main now paints the
+// topic's pebble hue, so a 'recipe' direction puts the recipe's hue back.
+const fixture = readFileSync(join(here, '../../../../packages/views/src/fixtures/artRows.ts'), 'utf8')
+const recipeHue = Object.fromEntries([...fixture.matchAll(/^  (\w+): "<svg.*?data-hue=\\"(\w+)\\"/gm)].map((m) => [m[1], m[2]]))
+const hueById = Object.fromEntries([...fixture.matchAll(/row\(\{\s+id: '([^']+)',[\s\S]*?art: studyArt\.(\w+),/g)].map((m) => [m[1], recipeHue[m[2]]]))
+const byRecipe = `
+  const hues = ${JSON.stringify(hueById)}
+  for (const row of document.querySelectorAll('[data-topic-id]')) {
+    const layer = row.querySelector('[data-topic-art="art"] > span:last-child')
+    const hue = hues[row.getAttribute('data-topic-id')]
+    if (layer && hue) layer.innerHTML = layer.innerHTML.replace(/--art-[a-z]+-/g, '--art-' + hue + '-')
+  }`
 const byTopic = `
   const names = ${JSON.stringify(Object.keys(HUES))}
   const hash = (id) => { let h = 0x811c9dc5; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 0x01000193) } return h >>> 0 }
@@ -43,14 +56,14 @@ for (const d of directions) {
   if (only && !only.split(',').includes(d.id)) continue
   for (const theme of ['light', 'dark']) {
     for (const [state, tag] of states) {
-      if (tag === 'privacy' && !['0-now', '4-two-tone'].includes(d.id)) continue
+      if (tag === 'privacy' && !['0-now', '4-two-tone', ...(d.privacy ? [d.id] : [])].includes(d.id)) continue
       await page.goto(`http://localhost:${port}/#/Sidebar?__state=art/${state}${theme === 'dark' ? '&theme=dark' : ''}`)
       await page.locator('[data-fixture-frame]').waitFor()
       await page.evaluate(({ css, script }) => {
         document.getElementById('dir-css')?.remove()
         const s = document.createElement('style'); s.id = 'dir-css'; s.textContent = '[data-fixture-frame]{height:1640px!important;max-height:none!important}' + css; document.head.append(s)
         if (script) new Function(script)()
-      }, { css: css(d, theme), script: d.hueOf === 'topic' ? byTopic : '' })
+      }, { css: css(d, theme), script: d.hueOf === 'topic' ? byTopic : d.hueOf === 'recipe' ? byRecipe : '' })
       await page.waitForTimeout(150)
       await page.locator('[data-fixture-frame]').screenshot({ path: join(outDir, `${d.id}-${tag}-${theme}.png`) })
       // Tabs at 16 and header at 20: draw the same recipes at small sizes in a strip.
