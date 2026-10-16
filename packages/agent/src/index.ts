@@ -9,6 +9,8 @@ export { type MigrationSet } from './store/schema'
 
 export { createSpend, dollars, SPEND_MIGRATIONS, type SpendLedger } from './spend'
 export * from './providers'
+export type { CodemodeRunner } from './scripts'
+export { probeSandbox } from './runtime/codemode'
 export { openTurns, type ArchiveMessage, type ModelRef, type Turns, type TurnsOptions } from './router/open'
 
 export { parseOutput, type Output } from './router/output'

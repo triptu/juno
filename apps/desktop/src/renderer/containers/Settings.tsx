@@ -1,6 +1,6 @@
-import { memo, Suspense } from 'react'
-import { prefsGet, prefsSet, type SettingsSection } from '@juno/contract'
-import { sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { memo, Suspense, useState } from 'react'
+import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SettingsSection } from '@juno/contract'
+import { sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -58,6 +58,18 @@ function General() {
   const available = useAtomValue(aiAvailableAtom)
   const aiAssist = useAtomValue(aiAssistOnAtom)
   const grammarUnavailable = !aiAssist ? 'Turn on AI assist to check grammar.' : available._tag !== 'Success' || !available.value ? 'Add an OpenRouter key to check grammar.' : undefined
+  const mirror = useAtomValue(mirrorReadsAtom)
+  const served = mirror._tag === 'Success' ? mirror.value.on : true
+  // The switch moves on the click; the saved value takes over once it agrees, or if the save fails.
+  const [shown, setShown] = useState<boolean | undefined>(undefined)
+  if (shown !== undefined && shown === served) setShown(undefined)
+  const changeMirror = (value: boolean) => {
+    setShown(value)
+    void runCommand(registry, prefsSet, { key: MIRROR_READS_PREF, value }).then((exit) => {
+      if (exit._tag === 'Failure') setShown(undefined)
+    })
+  }
+  const catchUp = useAtomValue(readCatchUpAtom)
   const models = useAtomValue(modelsAtom)
   const modelPrefs = models._tag === 'Success' && typeof models.value === 'object' && models.value !== null && !Array.isArray(models.value) ? models.value : {}
   const classifier = !('classifier' in modelPrefs) || modelPrefs.classifier !== ''
@@ -67,7 +79,11 @@ function General() {
   }
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
-  return <SettingsGeneral checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={(key, enabled) => void setSendCheckPref(registry, key, enabled)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
+  return <SettingsGeneral mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
+    catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
+    onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
+    checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={(key, enabled) => void setSendCheckPref(registry, key, enabled)}
+    newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /** Theme, accent and density, saved to main for the next launch's first frame. */

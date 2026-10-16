@@ -17,6 +17,8 @@ export const Person = Schema.Struct({
   id: Schema.String,
   /** The display name. The raw id when the store does not know the user. */
   name: Schema.String,
+  avatarSmallUrl: Schema.optionalKey(Schema.String),
+  avatarLargeUrl: Schema.optionalKey(Schema.String),
   avatarUrl: Schema.optionalKey(Schema.String),
   /** The ui hue for the initials when there is no photo. */
   color: ChannelColor,

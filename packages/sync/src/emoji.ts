@@ -1,5 +1,5 @@
 import { SlackEdge } from '@juno/slack'
-import { EdgeEmojisListOk, type CustomEmoji } from '@juno/slack-schema'
+import { EdgeEmojisListOk, customEmojiRow, type CustomEmoji } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction } from '@juno/store'
 import { Effect } from 'effect'
 
@@ -22,7 +22,7 @@ export const syncEmoji = Effect.fn('sync.emoji')(function* () {
     yield* sql`DELETE FROM emoji`
     const unique = [...new Map(emojis.map((emoji) => [emoji.name, emoji])).values()]
     for (let offset = 0; offset < unique.length; offset += 200) {
-      const rows = unique.slice(offset, offset + 200).map((emoji) => ({ name: emoji.name, url: emoji.url ?? null, alias_for: emoji.alias_for ?? null }))
+      const rows = unique.slice(offset, offset + 200).map(customEmojiRow)
       yield* sql`INSERT INTO emoji ${sql.insert(rows)}`
       yield* Effect.yieldNow
     }

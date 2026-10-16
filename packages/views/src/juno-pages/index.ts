@@ -1,7 +1,7 @@
 export { ActivityPage } from './ActivityPage'
 export { ConnectionsPage } from './ConnectionsPage'
 export { ConnectionToolsSheet } from './ConnectionToolsSheet'
-export { JunoBackupPage, JunoSettingsPage, type JunoBackupPageProps } from './JunoSettingsPage'
+export { CODEX_ENABLED, JunoBackupPage, JunoSettingsPage, type JunoBackupPageProps } from './JunoSettingsPage'
 export { MemoryPage } from './MemoryPage'
 export { ProviderSection, type ProviderDrafts } from './ProviderSection'
 export { RemembersPage } from './RemembersPage'

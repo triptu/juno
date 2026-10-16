@@ -12,6 +12,9 @@ import type { ArchiveMessage, Turns, TurnsOptions } from './open'
 import type { createTurnServices } from './services'
 import type { createTurnSession } from './session'
 
+const PAUSED = 'Juno was paused, so the script stopped. Reads it had not finished were cancelled. Do not run it again until Juno is resumed.'
+const OFF = 'AI assist was turned off, so the script stopped. Reads it had not finished were cancelled.'
+
 interface CloseContext {
   readonly scheduleDriver: ReturnType<typeof driveScheduler>
   readonly services: ReturnType<typeof createTurnServices>
@@ -21,7 +24,7 @@ interface CloseContext {
   readonly release: () => void
 }
 
-export function closeTurns({ scheduleDriver, services: { redaction, actions, jobs, router }, compactor, session, backup, release }: CloseContext) {
+export function closeTurns({ scheduleDriver, services: { redaction, actions, jobs, router, scripts }, compactor, session, backup, release }: CloseContext) {
   let closed: Promise<void> | undefined
   return () => (closed ??= (async () => {
     await scheduleDriver.close()
@@ -32,6 +35,7 @@ export function closeTurns({ scheduleDriver, services: { redaction, actions, job
     const stopped = router.close()
     await session.close()
     await stopped
+    await scripts?.close()
     // The backup is the last writer: its final export sees every change.
     await backup?.close()
     release()
@@ -47,7 +51,7 @@ interface ApiContext extends Omit<CloseContext, 'release'> {
   readonly close: () => Promise<void>
 }
 
-export function turnApi({ store, guard, opened, options, services: { router, actions, redaction, ownership, jobs, scheduler }, session, models, compactor, backup, scheduleDriver, close }: ApiContext): Turns {
+export function turnApi({ store, guard, opened, options, services: { router, actions, redaction, ownership, jobs, scheduler, scripts }, session, models, compactor, backup, scheduleDriver, close }: ApiContext): Turns {
   return {
     _tag: 'running',
     scheduler,
@@ -62,6 +66,8 @@ export function turnApi({ store, guard, opened, options, services: { router, act
     mode: router.mode,
     setMode: (next) => {
       actions.beforeMode(next)
+      // Pause and AI off stop a running script; the reply goes on without its result (SPEC 13.9).
+      if (next !== 'on') scripts?.cancelAll(next === 'paused' ? PAUSED : OFF)
       router.setMode(next)
       actions.afterMode(next)
       compactor?.poke()

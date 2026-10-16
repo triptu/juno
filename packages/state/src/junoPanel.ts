@@ -7,15 +7,17 @@
  *   panel can be open in one tab and closed in another.
  * - `junoPanelWidthAtom`: the panel's width, one for every tab, saved to the
  *   workspace preference `JUNO_PANEL_PREF`.
- * - `junoAboutAtom`: the About chip from Ask Juno in a person's or channel's
- *   menu. It holds until removed or the panel closes.
+ * - `junoAboutAtom(key)`: the About chip from Ask Juno in a person's or
+ *   channel's menu, for the panel of one tab (by tab id) or for the Juno tab
+ *   (`JUNO_TAB_ABOUT`). It holds until removed or that tab's panel closes.
+ * - `junoDraftAtom(key)`: the Juno composer's draft, for the panel of one tab
+ *   (`panel:<tabId>`) or one Juno tab (`tab:<tabId>`), so it is kept while
+ *   the panel is closed or the tab is put away.
  * - `openedAtNewAtom(topicId)`: the first message under the "new" divider the
  *   topic opened at, set by the topic view. The panel offers Catch me up
  *   until a message about the topic is sent from it (`catchUpDoneAtom`).
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
- * - `junoChatTargetAtom`: a Juno message the Juno tab should scroll to and
- *   flash once it shows, from the hours-start summary's notification.
  * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
  *   why popover's Tell Juno (SPEC 14). The panel beside that topic takes it
  *   as its selection quote.
@@ -50,7 +52,7 @@ export function setJunoPanelOpen(registry: Registry, open: boolean): void {
   const tab = activeTab(registry.get(tabsAtom))
   if (tab === undefined || (tab.junoPanel === true) === open) return
   updateTabs(registry, (tabs) => setJunoPanel(tabs, tab.id, open))
-  if (!open) registry.set(junoAboutAtom, undefined)
+  if (!open) registry.set(junoAboutAtom(tab.id), undefined)
 }
 
 const savedPanelAtom = liveQuery(prefsGet)({ key: JUNO_PANEL_PREF })
@@ -77,7 +79,12 @@ export function setJunoPanelWidth(registry: Registry, width: number): void {
   void runCommand(registry, prefsSet, { key: JUNO_PANEL_PREF, value: { width } })
 }
 
-export const junoAboutAtom = Atom.make<Exclude<About, { _tag: 'topic' }> | undefined>(undefined).pipe(Atom.keepAlive)
+/** The About chip's key for the Juno tab, which Ask Juno uses when no topic tab is active. */
+export const JUNO_TAB_ABOUT = 'juno-tab'
+
+export const junoAboutAtom = Atom.family((_key: string) => Atom.make<Exclude<About, { _tag: 'topic' }> | undefined>(undefined).pipe(Atom.keepAlive))
+
+export const junoDraftAtom = Atom.family((_key: string) => Atom.make('').pipe(Atom.keepAlive))
 
 export const openedAtNewAtom = Atom.family((_topicId: string) => Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive))
 export const catchUpDoneAtom = Atom.family((_topicId: string) => Atom.make(false).pipe(Atom.keepAlive))
@@ -89,15 +96,6 @@ export interface JunoFocusRequest {
 }
 
 export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' }).pipe(Atom.keepAlive)
-
-/** A Juno message for the Juno tab to show and flash; `n` counts requests. The tab clears it once taken. */
-export const junoChatTargetAtom = Atom.make<{ readonly n: number; readonly id: string } | undefined>(undefined).pipe(Atom.keepAlive)
-
-let chatTargets = 0
-
-export function showInJunoChat(registry: Registry, id: string): void {
-  registry.set(junoChatTargetAtom, { n: ++chatTargets, id })
-}
 
 /** A topic message to quote in the Juno panel's composer; `n` counts requests, so each is taken once. */
 export interface JunoQuoteRequest {

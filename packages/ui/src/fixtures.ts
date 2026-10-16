@@ -29,6 +29,7 @@ import NavItem from './NavItem.fixtures'
 import OptionList from './OptionList.fixtures'
 import Page from './Page.fixtures'
 import Popover from './Popover.fixtures'
+import ProgressRing from './ProgressRing.fixtures'
 import ScrollArea from './ScrollArea.fixtures'
 import Segmented from './Segmented.fixtures'
 import Select from './Select.fixtures'
@@ -69,6 +70,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   OptionList,
   Page,
   Popover,
+  ProgressRing,
   ScrollArea,
   Segmented,
   Select,

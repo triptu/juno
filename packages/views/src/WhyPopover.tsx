@@ -5,7 +5,7 @@ import { Button, Popover, Text } from '@juno/ui'
 export interface WhyPopoverProps {
   /** Where the message menu opened, in window pixels. The popover hangs below it. */
   readonly at: { readonly x: number; readonly y: number }
-  /** "Notified you at 13:42", "Didn't notify you", "In the 9am summary". */
+  /** "Notified you at 13:42", "Didn't notify you". */
   readonly title: string
   /** The decision's reason, in words. */
   readonly reason: string

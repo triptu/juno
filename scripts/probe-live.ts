@@ -27,6 +27,9 @@
  * (senders, mentions, DM and group DM members) through the edge
  * `users/info`, one page of edge `users/list` and one of `users.list`.
  *
+ * `--only emoji` reads every edge `emojis/list` page and prints the result
+ * keys and how image urls and aliases are spelled.
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -57,8 +60,8 @@ const READ_ONLY_METHODS = [
   'api.getFlannelHttpUrl',
   'users.list',
 ] as const
-/** Edge methods `--only users` may call, all reads. */
-const READ_ONLY_EDGE = ['users/info', 'users/list'] as const
+/** Edge methods `--only users` and `--only emoji` may call, all reads. */
+const READ_ONLY_EDGE = ['users/info', 'users/list', 'emojis/list'] as const
 type ReadOnlyMethod = (typeof READ_ONLY_METHODS)[number]
 
 const SPACING_MILLIS = 1_500
@@ -178,7 +181,7 @@ async function main(): Promise<number> {
     await searchOnly(call, now)
     return writeShapes(out)
   }
-  if (flag('--only') === 'users') {
+  if (flag('--only') === 'users' || flag('--only') === 'emoji') {
     const edge = async (method: (typeof READ_ONLY_EDGE)[number], base: string, body: Json, purpose: string): Promise<Json | undefined> => {
       if (!(READ_ONLY_EDGE as ReadonlyArray<string>).includes(method)) throw new Error(`refusing edge ${method}`)
       const wait = lastStart + SPACING_MILLIS - Date.now()
@@ -202,7 +205,7 @@ async function main(): Promise<number> {
       if (json !== undefined && !shapes.has(`edge.${method.replace('/', '.')}.${purpose}`)) shapes.set(`edge.${method.replace('/', '.')}.${purpose}`, redact(json))
       return json
     }
-    console.log(JSON.stringify(await usersOnly(call, edge, session.teamId), null, 2))
+    console.log(JSON.stringify(flag('--only') === 'emoji' ? await emojiOnly(call, edge) : await usersOnly(call, edge, session.teamId), null, 2))
     return writeShapes(out)
   }
 
@@ -356,6 +359,34 @@ async function writeShapes(out: string): Promise<number> {
 }
 
 type Edge = (method: (typeof READ_ONLY_EDGE)[number], base: string, body: Json, purpose: string) => Promise<Json | undefined>
+
+/** `--only emoji`: the edge `emojis/list` result keys, and how aliases and image urls are spelled. Counts only. */
+async function emojiOnly(call: Call, edge: Edge): Promise<unknown> {
+  const flannel = await call('api.getFlannelHttpUrl', { include_external_workspaces: true }, 'emoji')
+  const base = String(flannel?.['url'] ?? '').replace(/\/+$/, '')
+  const results: Array<Json> = []
+  let marker: string | undefined
+  let pages = 0
+  do {
+    const page = await edge('emojis/list', base, { count: 1000, ...(marker === undefined ? {} : { marker }) }, 'emoji')
+    const list = page?.['results']
+    if (Array.isArray(list)) results.push(...(list as Array<Json>))
+    marker = typeof page?.['next_marker'] === 'string' && page['next_marker'] !== '' ? page['next_marker'] : undefined
+    pages++
+  } while (marker !== undefined && pages < 20)
+  const urlish = (value: unknown) => (typeof value !== 'string' ? typeof value : value.startsWith('alias:') ? 'alias:' : value.startsWith('https://') ? 'https' : 'other')
+  return {
+    pages,
+    results: results.length,
+    keys: keyCensus(results),
+    stringValueKinds: Object.fromEntries(
+      ['url', 'value', 'alias_for', 'alias', 'is_alias'].map((key) => [key, countBy(results, (r) => (key in r ? urlish(r[key]) : 'absent'))]),
+    ),
+    // An object `value` and an alias entry, by shape only.
+    valueObjects: keyCensus(results.flatMap((r) => (r['value'] !== null && typeof r['value'] === 'object' ? [r['value']] : []))),
+    aliasEntries: countBy(results.filter((r) => r['is_alias'] === true || 'alias' in r), (r) => `value:${urlish(r['value'])} alias:${urlish(r['alias'])} aliasNamesAnEntry:${results.some((o) => o['name'] === r['alias'] || `alias:${o['name']}` === r['value'])}`),
+  }
+}
 
 /** `--only users`: which ids the store would hold and what the edge says about them. Counts only. */
 async function usersOnly(call: Call, edge: Edge, teamId: string): Promise<unknown> {

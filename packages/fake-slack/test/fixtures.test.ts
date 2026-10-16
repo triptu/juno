@@ -189,9 +189,10 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     const response = Schema.decodeUnknownSync(EdgeUsersInfoResponse)(raw)
     if (!response.ok) throw new Error(response.error)
     expect(response.results.map((u) => u.id)).toEqual(['U0MAYA'])
-    expect(response.results[0]?.profile?.image_72).toBe(`${fake.url}/avatars/U0MAYA.svg`)
+    expect(response.results[0]?.profile?.image_72).toBe(`${fake.url}/avatars/U0MAYA.svg?size=72`)
     expect(response.failed_ids).toEqual(['U0NOBODY'])
-    const avatar = await fetch(response.results[0]!.profile!.image_72!)
+    expect((await fetch(response.results[0]!.profile!.image_72!)).status).toBe(401)
+    const avatar = await fetch(response.results[0]!.profile!.image_72!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(avatar.headers.get('content-type')).toBe('image/svg+xml')
   })
 

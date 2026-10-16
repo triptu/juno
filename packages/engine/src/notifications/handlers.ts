@@ -31,7 +31,6 @@ import {
 import {
   channelLabel,
   decideWithCause,
-  hourLabel,
   localTime,
   notifyChoice,
   parseTopicId,
@@ -96,14 +95,13 @@ const tagsFor = (settings: NotificationSettings, level: 'every' | 'never') =>
 interface LogRow {
   readonly id: number
   readonly at: string
-  readonly outcome: 'now' | 'summary' | 'hold'
+  readonly outcome: 'now' | 'hold'
   readonly reason: string | null
   readonly preview: string | null
   readonly candidate_json: string | null
   readonly judgement_json: string | null
   readonly delivered_at: string | null
   readonly suppressed_at: string | null
-  readonly summary_due_at: string | null
 }
 
 const decodeCandidate = (json: string | null): Candidate | undefined => {
@@ -151,9 +149,7 @@ const whyOfRow = (row: LogRow, settings: NotificationSettings, aiAssist: boolean
   const notified = row.outcome === 'now' && row.delivered_at !== null
   const title = notified
     ? `Notified you at ${clock(row.delivered_at ?? row.at)}`
-    : row.outcome === 'summary'
-      ? row.summary_due_at === null ? 'Kept for your summary' : `In the ${hourLabel(localTime(new Date(row.summary_due_at).getTime()).minutes)} summary`
-      : "Didn't notify you"
+    : "Didn't notify you"
   const candidate = decodeCandidate(row.candidate_json)
   if (candidate === undefined) return { notified, title, reason, action: { kind: 'none' } }
   const judgement = row.judgement_json === null ? undefined : Schema.decodeUnknownOption(Judgement)(JSON.parse(row.judgement_json))

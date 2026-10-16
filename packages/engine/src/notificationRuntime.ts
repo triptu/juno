@@ -3,8 +3,6 @@ import { ChannelId, UserId, isDm, messageMentionsMe, type Me, type Presence } fr
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
 import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
-import type { NotificationSource, NotificationTarget } from '@juno/contract'
-import { HostChannelId, HostMessageTs, type HostSummary } from '@juno/agent-contract'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Queue, Ref, Stream, SubscriptionRef } from 'effect'
 import { HostLink } from './protocol/host'
@@ -16,15 +14,8 @@ export interface NotificationHost {
   readonly notifier: Notifier
   /** Whether any topic has an unread mention, on every change. Main shows the dock badge. */
   readonly badge?: (mentions: boolean) => Effect.Effect<void>
-  /** The hours-start summaries waiting for the agent to append them to the Juno chat (`host.notification.summaries`). */
-  readonly summaries?: ChatSummaries
 }
 
-/** Summaries offered to the agent until it says it appended them. Held in memory: a summary not taken before the engine stops is lost from the chat, not from the OS notification. */
-export interface ChatSummaries {
-  readonly pending: Stream.Stream<ReadonlyArray<HostSummary>>
-  readonly taken: (id: string) => Effect.Effect<void>
-}
 export class NotificationControl extends Context.Service<NotificationControl, {
   readonly attach: (notifications: Notifications | undefined) => Effect.Effect<void>
   readonly wake: Effect.Effect<void>
@@ -58,60 +49,21 @@ export class NotificationControl extends Context.Service<NotificationControl, {
 export const NotificationHost = Context.Reference<NotificationHost>('juno/engine/NotificationHost', {
   defaultValue: () => ({ notifier: {
     show: () => Effect.void,
-    summary: ({ id }) => Effect.succeed(id),
     viewing: () => Effect.succeed(false),
   } }),
 })
 
-/**
- * The host for the Electron engine: notifications go to main over the host
- * link, and main says which topic is on screen in a focused window. The
- * hours-start summary is offered to the agent, which appends it to the Juno
- * chat as one message keyed by the summary's id (plan v3 §19.1); the click
- * opens the chat at it, and keeps the first message for when Juno is off by
- * then.
- */
 export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(function* () {
   const link = yield* HostLink
   const viewing = yield* Ref.make<string | null>(null)
-  const firstOf = new Map<string, NotificationSource>()
-  const pending = yield* SubscriptionRef.make<ReadonlyArray<HostSummary>>([])
   const messages = yield* link.messages
   yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : Effect.void))
   const host: NotificationHost = {
     notifier: {
-      show: ({ id, title, body, target }) => Effect.gen(function* () {
-        let to: NotificationTarget
-        if (target.kind === 'message') to = { _tag: 'message', source: target.source }
-        else {
-          const first = firstOf.get(target.id)
-          if (first === undefined) return
-          firstOf.delete(target.id)
-          to = { _tag: 'summary', id: target.id, first }
-        }
-        yield* link.send({ _tag: 'notify', notification: { id, title, body, target: to } })
-      }),
-      summary: ({ id, at, title, sources }) => Effect.gen(function* () {
-        const first = sources[0]
-        if (first === undefined) return id
-        firstOf.set(id, { channelId: first.channelId, ts: first.ts, topicId: first.topicId })
-        const summary: HostSummary = {
-          id, at: new Date(at).getTime(), title,
-          sources: sources.map((source) => ({
-            channelId: HostChannelId.make(source.channelId), ts: HostMessageTs.make(source.ts), place: source.place,
-            ...(source.sender === undefined ? {} : { sender: source.sender }),
-          })),
-        }
-        yield* SubscriptionRef.update(pending, (list) => (list.some((known) => known.id === id) ? list : [...list, summary]))
-        return id
-      }),
+      show: ({ id, title, body, target }) => link.send({ _tag: 'notify', notification: { id, title, body, target: { _tag: 'message', source: target.source } } }),
       viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
     },
     badge: (mentions) => link.send({ _tag: 'badge', mentions }),
-    summaries: {
-      pending: SubscriptionRef.changes(pending),
-      taken: (id) => SubscriptionRef.update(pending, (list) => list.filter((known) => known.id !== id)),
-    },
   }
   return host
 }))
@@ -128,7 +80,6 @@ export const startNotifications = Effect.gen(function* () {
   const notifier: Notifier = {
     viewing: host.notifier.viewing,
     show: (notification) => host.notifier.show({ ...notification, id: `${session.teamId}:${notification.id}` }),
-    summary: (summary) => host.notifier.summary({ ...summary, id: `${session.teamId}:${summary.id}` }),
   }
   const notifications = yield* makeNotifications(notifier, (presence) => api.call('presence.set', { presence }, { lane: 'send' }).pipe(
     Effect.as(true), Effect.catch(() => Effect.succeed(false)),

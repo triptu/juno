@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
-import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, tints, z } from '@juno/tokens/tokens.stylex'
+import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
@@ -212,7 +212,7 @@ export const Message = memo(function Message({
           <TextButton onClick={suggestion.onEdit}>Edit</TextButton>
         </span>
       ) : null}
-      <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
+      <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
         ) : (
@@ -258,14 +258,8 @@ export const Message = memo(function Message({
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
-        <div {...stylex.props(styles.reactionSlot)}>
-          <Reactions reactions={message.reactions} onToggle={toggle} />
-        </div>
-        {main ? (
-          <div {...stylex.props(styles.threadSlot)}>
-            {message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
-          </div>
-        ) : null}
+        <Reactions reactions={message.reactions} onToggle={toggle} />
+        {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
             <span {...stylex.props(styles.failedIcon)}>
@@ -390,6 +384,13 @@ const styles = stylex.create({
     marginTop: spacing['--space-0-5'],
     userSelect: 'none',
   },
+  // A continuation row is as tall as its body: the gutter is one body line,
+  // with the hover time centred on it, not the avatar's 32px box.
+  gutterContinuation: {
+    minHeight: 0,
+    height: `calc(${text['--text-body-size']} * ${text['--text-body-leading']})`,
+    marginTop: 0,
+  },
   gutterTime: {
     opacity: 'var(--row-action-opacity)',
     whiteSpace: 'nowrap',
@@ -425,18 +426,8 @@ const styles = stylex.create({
       [NARROW_ROW]: 0,
     },
   },
-  reactionSlot: {
-    display: 'flex',
-    minHeight: `calc(${sizes['--control-24']} + ${spacing['--space-1-5']})`,
-    width: '100%',
-  },
-  threadSlot: {
-    display: 'flex',
-    minHeight: `calc(${sizes['--control-26']} + ${spacing['--space-1-5']})`,
-    maxWidth: '100%',
-  },
+  // The time follows the name at the header's gap, as in Slack.
   name: {
-    width: sizes['--message-sender-width'],
     flexShrink: 1,
     minWidth: 0,
   },

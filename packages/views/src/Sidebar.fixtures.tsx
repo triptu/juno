@@ -1,9 +1,11 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
+import { useState } from 'react'
 import { AccountMenu } from './AccountMenu'
 import { AppearanceSettings } from './AppearanceSettings'
 import { EngineNotice, SyncProgress } from './EngineStatusView'
+import { useFixtureControl } from './juno-chat/fixtures/control'
 import { PrivacyOn } from './fixtures/privacy'
-import { hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
+import { art, hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
 import { TitlebarNav } from './TitlebarNav'
@@ -104,6 +106,36 @@ const full = (overrides: Partial<SidebarProps> = {}, listProps: Partial<TopicLis
   </Sidebar>
 )
 
+/** Thirty rows still waiting for their art. The one that gets it is in the last ten, far below the view. */
+const waiting = Array.from({ length: 3 }, (_, round) => recentIds.map((id) => ({ ...rowsById.get(id)!, id: `${id}:${round}`, art: undefined }))).flat()
+const lastWaiting = `${rows.postgres.id}:2`
+
+/**
+ * The last row's art arrives while it is off screen, through
+ * `window.__fixtureControls.art`. The test scrolls it into view after the
+ * fade's time and checks that its first frame shows the art at full opacity.
+ */
+function ArtOffScreen() {
+  const [arrived, setArrived] = useState(false)
+  useFixtureControl('art', () => setArrived(true))
+  const byId = new Map(waiting.map((row) => [row.id, row.id === lastWaiting && arrived ? { ...row, art: art.calendar } : row]))
+  return (
+    <Sidebar {...chrome}>
+      <TopicList
+        sections={[{ id: 'recent', ids: waiting.map((row) => row.id) }]}
+        renderRow={(id) => {
+          const row = byId.get(id)!
+          return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={false} tabbable={id === waiting[0]!.id} onOpen={noop} onResolve={noop} />
+        }}
+        enterEmpty={false}
+      />
+    </Sidebar>
+  )
+}
+
+// The first rows a sync brings, for the states with rows.
+const firstRows = recentIds.slice(0, 4)
+
 const frame: FixtureFrame = { width: 384, height: 720, padded: false, surface: 'subtle' }
 
 export default defineFixtures(
@@ -165,12 +197,15 @@ export default defineFixtures(
       'scoped-private': scene(() => full({ scope: { name: 'hiring', kind: 'private' }, dots: { channels: false, dms: false } }, { sections: [{ id: 'recent', ids: [rows.hiring.id] }] })),
       'scoped-empty': scene(() => full({ scope: { name: 'design-review', kind: 'public' }, dots: { channels: false, dms: false } }, { sections: [], empty: 'filtered', onClearFilters: noop, onViewAll: noop })),
     },
-    // The status line under the filters; the rows stay as they were.
+    // The status card at the foot of the sidebar; the rows stay as they were.
     Sync: {
+      listing: scene(() => full({ dots: { channels: false, dms: false }, status: <SyncProgress /> }, { sections: [], empty: 'syncing' })),
+      'first sync': scene(() => full({ dots: { channels: false, dms: false }, status: <SyncProgress done={11} total={148} /> }, { sections: [], empty: 'syncing' })),
+      'first sync rows': scene(() => full({ status: <SyncProgress done={64} total={148} /> }, { sections: [{ id: 'recent', ids: firstRows }] })),
       offline: scene(() => full({ status: <EngineNotice kind="offline" /> })),
       'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
-      'first sync': scene(() => full({ status: <SyncProgress done={30} total={143} /> })),
+      'with privacy': scene(() => <PrivacyOn>{full({ status: <EngineNotice kind="offline" />, privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
     },
     Nav: {
       // Home tab active, or no tab open.
@@ -181,6 +216,10 @@ export default defineFixtures(
       // A job runs: the sparkle is duotone, with the count beside it.
       'juno-busy': scene(() => full({ junoUnread: 1, junoBusy: true })),
       'no-dots': scene(() => full({ dots: { channels: false, dms: false } })),
+    },
+    // Art that arrives while its row is off screen shows whole when the row scrolls in.
+    Art: {
+      'off-screen': scene(() => <ArtOffScreen />),
     },
     // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
     Privacy: {

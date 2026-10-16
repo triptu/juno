@@ -15,6 +15,7 @@ import agentResolves from './202610160100_agent_resolves'
 import automatedView from './202610152300_automated_view'
 import sentPosts from './202610161000_sent_posts'
 import keptCopies from './202610170900_kept_copies'
+import noNotificationSummary from './202610171000_no_notification_summary'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -37,4 +38,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610160200_drop_for_you_cards': dropForYouCards,
   '202610161000_sent_posts': sentPosts,
   '202610170900_kept_copies': keptCopies,
+  '202610171000_no_notification_summary': noNotificationSummary,
 }

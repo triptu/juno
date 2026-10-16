@@ -262,7 +262,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const shownRows = ranked.flatMap((candidate) => candidate.value.rows.filter((row) => candidate.topicIds.includes(row.topic_id)))
     for (const row of shownRows) userIdsOf(row, parseColumns(row), userIds)
     const users = new Map<string, UserRow>()
-    if (userIds.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
+    if (userIds.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...userIds])}`) users.set(user.id, user)
     const nameOf = (id: string) => userName(id, users.get(id))
 
     const topicOf = (row: HomeRow): HomeTopic => {

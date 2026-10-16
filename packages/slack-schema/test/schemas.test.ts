@@ -4,6 +4,8 @@ import {
   Block,
   ChatPostMessageArgs,
   compareTs,
+  customEmojiRow,
+  EdgeEmojisListOk,
   decodeRtmFrame,
   encodeRtmFrame,
   Message,
@@ -193,5 +195,30 @@ describe('ts helpers', () => {
     expect(permalinkPath('C0ENG', '1760000000.000200', '1760000000.000100')).toBe(
       '/archives/C0ENG/p1760000000000200?thread_ts=1760000000.000100&cid=C0ENG',
     )
+  })
+})
+
+describe('custom emoji', () => {
+  // The shapes observed live on 2026-10-16 (research section 3), with invented names and urls.
+  const decode = (results: ReadonlyArray<unknown>) => Schema.decodeUnknownSync(EdgeEmojisListOk)({ ok: true, results }).results.map(customEmojiRow)
+
+  it('stores the image url from value, and an alias from value or alias', () => {
+    expect(
+      decode([
+        { name: 'wave', value: 'https://emoji.example.invalid/wave.png', updated: 1700000000 },
+        { name: 'hi', value: 'alias:wave', alias: 'wave', is_alias: true },
+        { name: 'yes', value: 'alias:thumbsup', alias: 'thumbsup', is_alias: true },
+        { name: 'flag', value: { apple: 'https://emoji.example.invalid/a.png', google: 'https://emoji.example.invalid/g.png' } },
+      ]),
+    ).toEqual([
+      { name: 'wave', url: 'https://emoji.example.invalid/wave.png', alias_for: null },
+      { name: 'hi', url: null, alias_for: 'wave' },
+      { name: 'yes', url: null, alias_for: 'thumbsup' },
+      { name: 'flag', url: 'https://emoji.example.invalid/a.png', alias_for: null },
+    ])
+  })
+
+  it('keeps an entry with neither image nor alias, without either', () => {
+    expect(decode([{ name: 'empty' }])).toEqual([{ name: 'empty', url: null, alias_for: null }])
   })
 })

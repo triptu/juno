@@ -1,9 +1,11 @@
 /** Atoms for the session feature. */
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { sessionImportFromSlackApp, sessionSignIn, sessionSignOut, sessionStatus, type SessionStatus } from '@juno/contract'
+import { sessionImportFromSlackApp, sessionSignIn, sessionSignOut, sessionProfile, sessionStatus, type SessionStatus } from '@juno/contract'
 import { command, liveQuery } from './atoms'
 import { connectionStateAtom } from './client'
+
+export const sessionProfileAtom = liveQuery(sessionProfile)(undefined)
 
 export const sessionStatusAtom = liveQuery(sessionStatus)(undefined)
 

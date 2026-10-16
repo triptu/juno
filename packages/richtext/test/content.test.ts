@@ -10,7 +10,7 @@ const emoji = customEmojiLookup([
   { name: 'broken', alias_for: 'missing' },
   { name: 'cycle', alias_for: 'cycle' },
 ])
-const render = (payload: unknown) => messageBody(Schema.decodeUnknownSync(Message)(payload), { emoji })
+const render = (payload: unknown) => messageBody(Schema.decodeUnknownSync(Message)(payload), { emoji, emojiAlias: (name) => (name === 'yes' ? 'thumbsup' : undefined) })
 
 describe('message content from Slack', () => {
   it.each([
@@ -54,5 +54,10 @@ describe('message content from Slack', () => {
       expect(inline).toMatchObject({ url: 'https://example.test/wave.gif' })
       expect(display).toEqual({ kind: 'image', url: 'https://example.test/wave.gif' })
     }
+  })
+
+  it('renders a workspace alias of a standard emoji as that emoji', () => {
+    const body = render({ ts: '1700000000.000000', blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'emoji', name: 'yes' }] }] }] })
+    expect(inlinesOf(body).find((item) => item.kind === 'emoji')).toEqual({ kind: 'emoji', name: 'yes', unicode: '👍' })
   })
 })

@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel, SendCheckPref } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
@@ -26,12 +26,16 @@ export interface SettingsGeneralProps {
   readonly onNewTabPageChange: (page: NewTabPageName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
+  readonly mirrorReads: boolean
+  readonly onMirrorReadsChange: (enabled: boolean) => void
+  readonly catchUp: { readonly available: number; readonly pending: number }
+  readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
 }
 
-/** General: what a new tab opens, the peek key and the fast classifier. */
-export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, checks, grammarUnavailable, onCheckChange }: SettingsGeneralProps) {
+/** General: tabs, peek, Slack read mirroring, message checks and the fast classifier. */
+export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -43,6 +47,17 @@ export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPee
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
+        </Surface>
+      </Section>
+      <Section heading="Read status">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Mark messages read in Slack too" checked={mirrorReads}
+            onChange={(event) => onMirrorReadsChange(event.currentTarget.checked)}
+            description="When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read." />
+          <div {...stylex.props(styles.catchUp)} aria-live="polite">
+            {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
+              : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
+          </div>
         </Surface>
       </Section>
       <Section heading="Message checks" sub="Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit.">
@@ -131,6 +146,11 @@ const styles = stylex.create({
   // on the same line as the rows of Notifications, Juno, Connections and Backup.
   card: {
     paddingInline: spacing['--space-3-5'],
+  },
+  catchUp: {
+    minHeight: spacing['--space-8'],
+    display: 'flex',
+    alignItems: 'center',
   },
   stack: {
     display: 'flex',

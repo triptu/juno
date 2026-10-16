@@ -22,9 +22,9 @@ Run these from the repo root.
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
-| `pnpm typecheck:bun` | Checks pending Bun-compatible projects locally through the typecheck queue. `pnpm affected` also schedules any TypeScript fallback. |
-| `pnpm typecheck:parity` | Compares Bun and TypeScript diagnostics across all projects without result caches. |
-| `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
+| `pnpm typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
+| `pnpm typecheck:tsc` | Manual TypeScript check of every project. |
+| `pnpm typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
 | `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
 | `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
@@ -356,7 +356,7 @@ milliseconds only, and writes redacted shapes to `--out DIR` (a temporary direct
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
 `-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
 `users/info` about every person the newest conversations reference and reads one page of each
-users list (about 14 calls). A full run is about 34 calls. The
+users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
 
 ## The live sync dry run
@@ -437,6 +437,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
 | Mouse-down activation, cursor rule, state switcher, in a real browser | `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
 | No layout shift on hover, press or focus, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
+| Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `pnpm test:feel` |
 
@@ -561,41 +562,17 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). The local Bun planner also uses that alias to read inherited compiler options. No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and parity comparison. Routine checks use Bun 1.4.3, installed as an exact root devDependency. `pnpm exec bun` resolves the pinned binary; the global Bun install is not used.
 
-Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
+`pnpm typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 29 project configs support Bun.
 
-- **Skips what passed.** A project's key is a hash of its package's files, the files of every workspace package it depends on (directly or not), its tsconfig chain, `tsconfig.base.json`, the lockfile and the TypeScript version. A passing key is recorded in the system temp folder (`juno-cache/typecheck`), shared by every worktree; `pnpm remote typecheck` brings its results back. An unchanged project costs nothing. `--no-cache` checks everything.
-- **Incremental.** A project that runs uses `tsc --incremental`, with its build info in the package's `node_modules/.cache/tsc/`, so only what changed is checked again.
-- **Queued.** At most `JUNO_TYPECHECK_JOBS` (default 2) tsc processes in one run, and at most two at once on the Mac across every worktree (a separate `typecheck` queue in `scripts/heavy.mjs`, apart from the test slots).
-
-TypeScript 7 against 5.9.3 (2026-10-15), the same `pnpm typecheck --no-cache` with no build info, run back to back on the Mac at load 6 to 24: 102 s and 54 s with 7.0.2, against 511 s and 341 s with 5.9.3. The peak memory of the tsc processes (two at once) was about the same: 961 and 975 MB against 970 and 904 MB. One project alone (`apps/desktop` web) took 5.2 s and up to 910 MB with 7.0.2, against 64 to 91 s and up to 505 MB with 5.9.3; a warm incremental run took 0.5 s against 8 to 12.5 s. On a 16x32 machine with nothing cached the whole typecheck takes 5.5 s (14.5 s with 5.9.3).
-
-Earlier timings, all with TypeScript 5.9.3 (2026-10-15):
-
-| Run | Old `pnpm -r typecheck` | `pnpm typecheck` |
-| --- | --- | --- |
-| Mac, quiet (load 3 to 5), nothing cached or built | 35.6 s | 36.6 s (same work, two tsc at once) |
-| Mac, quiet, incremental build info only (`--no-cache`) | 35.6 s | 15.4 s |
-| Mac, nothing changed | 35.6 s | 3.9 s |
-| Mac, one engine test file changed (5 projects) | 35.6 s | 8.2 s |
-| Mac, a dozen worktrees at once | over 30 minutes (reported) | at most two tsc on the Mac; the rest wait or are cached |
-| 16x32 remote, nothing cached | 34 s | 14.5 s |
-| 16x32 remote, all cached | | 0.0 s (about 30 s end to end, warm) |
+`pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
 ## Local Bun checks
 
-Bun 1.4.3 is an exact root devDependency installed by pnpm, including its approved postinstall. `pnpm exec bun` uses this binary on Darwin ARM64 and Linux x64. The global Bun install is not used. The remote image installs the same pin and checks its version during the build.
-
-`pnpm affected` runs `pnpm typecheck:bun` before starting the other steps. It gets the project list and input hashes from `scripts/typecheck.mjs --projects-json`, writes a temporary solution config referencing the pending projects, and runs `bun check -b --no-pretty --all`. Errors use `file(line,column): error TS…` locations that VS Code can open. A type error stops the run before remote suites start. The local check uses the machine-wide typecheck queue.
-
-Passing Bun results live in a separate `juno-cache/typecheck-bun` directory. Their keys include the existing project input hash, the pinned Bun version and both checker scripts. Generated `.tsbuildinfo` files are excluded from project inputs. Bun itself has no incremental build cache. Its results never populate the TypeScript cache. `--no-cache` bypasses result caches.
-
-The planner reads effective compiler options, including inherited options and project references. Plugins, emit requirements, declaration options, composite builds or config parse errors send that project to remote `pnpm typecheck --projects <JSON config list>`, which uses `tsc -b` for the selected configs. A passing TypeScript cache key skips that fallback. All 29 current configs support Bun. `--local` also runs fallback TypeScript locally.
-
-`pnpm typecheck`, scheduled main verification and `batch-merge.mjs` keep the existing authoritative TypeScript checks. `pnpm typecheck:parity` runs Bun and `tsc -b --force` against one solution containing all projects. It compares unique diagnostic locations, codes and full messages, ignoring duplicates and timing summaries. Matching errors count as parity; different errors or a tool failure fail the command. Parity bypasses result caches and refuses unsupported configs rather than reporting a partial comparison.
+`pnpm affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
 
 ## Affected tests
 
@@ -612,7 +589,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
 | Only e2e spec files | `pnpm test:desktop <those files>` |
-| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck:bun` locally for pending projects, with remote TypeScript fallback for unsupported configs |
+| Any `.ts`, `.tsx` or config a typecheck project reads | `pnpm typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
 | Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
@@ -731,7 +708,7 @@ Causes found so far (2026-10-15):
 
 | Script | Shape | Script time | Why not smaller or bigger |
 | --- | --- | --- | --- |
-| `typecheck`, `lint`, `test:agent*` | 2x4 | typecheck with nothing cached 31 s (5.5 s on 16x32) | small and short; a bigger machine costs more than it saves |
+| `lint`, `test:agent*` | 2x4 | | small and short; a bigger machine costs more than it saves |
 | `test` | 2x4 | 262 s in the current full suite; 156 s on 4x8 | uses less script compute in this pilot but takes longer; see the measurements below |
 | `test:gallery`, some components | 4x8 | a few components take under a minute | |
 | `test:gallery`, every component | 8x16, including `pnpm affected` | 132–146 s at 78–87% busy; 215 s at 73% on 4x8 | four cores miss three minutes; selected components still use 4x8 |
@@ -771,7 +748,7 @@ Both wall times include waiting for machines, because other worktrees still on 1
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Running a package's tests directly bypasses the queue, so prefer the root scripts. `pnpm test:health` and `pnpm test:remote-pool` skip the queue: they are small Node tests that should not wait behind perf or package runs.
 
 
 ## Releasing
