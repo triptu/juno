@@ -375,6 +375,74 @@ for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji
   })
 }
 
+/** Measures the first frame containing the finished content, starting at the actual input. */
+async function firstOpen(win: Page, eventType: 'click' | 'pointerdown', selector: string, action: () => Promise<void>): Promise<number> {
+  await win.evaluate(({ selector, eventType }) => {
+    const w = window as unknown as { __firstOpen: Promise<number> }
+    w.__firstOpen = new Promise((resolve) => {
+      window.addEventListener(eventType, (event) => {
+        const tick = () => {
+          const content = document.querySelector<HTMLElement>(selector)
+          if (content?.checkVisibility()) setTimeout(() => resolve(performance.now() - event.timeStamp), 0)
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }, { once: true, capture: true })
+    })
+  }, { selector, eventType })
+  await action()
+  return win.evaluate(() => (window as unknown as { __firstOpen: Promise<number> }).__firstOpen)
+}
+
+test('first open in a second app: account menu, topic switcher, emoji picker and Settings', async ({ juno, fake, slackApp, userData, running }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const fresh = new Juno(again.app, again.win)
+    await fresh.waitForSync()
+    const hidden = await countHidden(again.win)
+    const measure = async (name: string, selector: string, action: () => Promise<void>) => {
+      const elapsed = await firstOpen(again.win, name === 'Settings' ? 'pointerdown' : 'click', selector, action)
+      within(`${name}, first open`, stats(`${name}, first open in a second app`, [elapsed]).p95, 50)
+    }
+    await measure('account menu', '[role="menuitem"]', async () => {
+      await fresh.sidebar.accountButton.hover()
+      await press(again.win)
+    })
+    await expect(fresh.accountMenu.item(/^Settings/)).toBeVisible()
+    await fresh.accountMenu.close()
+    await fresh.sidebar.row(POSTGRES).open()
+    await fresh.topic.expectTitle(POSTGRES)
+    await again.win.waitForTimeout(500)
+    await measure('topic switcher', '[role="dialog"] [role="option"]', async () => {
+      await fresh.topic.titleButton.hover()
+      await press(again.win)
+    })
+    await expect(again.win.getByRole('textbox', { name: 'Search this channel' })).toBeFocused()
+    await again.win.keyboard.press('Escape')
+    const row = fresh.topic.list.locator('[data-message-row]').last()
+    await row.hover()
+    await measure('emoji picker', '[data-emoji-picker] [data-emoji]', async () => {
+      await row.getByRole('button', { name: 'More reactions' }).hover()
+      await press(again.win)
+    })
+    await expect(again.win.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
+    await again.win.keyboard.press('Escape')
+    await fresh.accountMenu.open()
+    await measure('Settings', 'nav[aria-label="Settings"]', async () => {
+      await fresh.accountMenu.item(/^Settings/).hover()
+      await press(again.win)
+    })
+    await expect(fresh.settings.section('General')).toHaveAttribute('aria-current', 'page')
+    expect(await hidden()).toBe(0)
+  } finally {
+    await again.close()
+  }
+})
+
 test('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
   test.setTimeout(180_000)
   await juno.signIn()
@@ -450,9 +518,10 @@ test.describe('large workspace', () => {
     await rm(slackDir, { recursive: true, force: true })
   })
 
-  test('warm start: main process to shell and rows, snapshot to rows, the longest frame', async () => {
+  test('launch warm start: main process to shell and rows, snapshot to rows, the longest frame', async () => {
     test.setTimeout(300_000)
     const runs: Array<Awaited<ReturnType<Juno['startupTimes']>>> = []
+    const composers: number[] = []
     // The first launch warms the OS and V8 caches and is not counted.
     for (let i = 0; i < 6; i++) {
       const running = await launch()
@@ -469,13 +538,16 @@ test.describe('large workspace', () => {
         })
         const page = await running.win.evaluate(() => {
           const first = (name: string) => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? Number.NaN
-          return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot') }
+          return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot'), composer: first('juno.composer-ready') }
         })
+        if (i > 0) composers.push(page.origin + page.composer - created)
         if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
     }
+    expect(composers.every(Number.isFinite)).toBe(true)
+    stats('launch to focused composer', composers)
     console.log(`rows in the window: ${runs.map((run) => run.rows).join(' ')}`)
     stats('warm start, main process created to shell painted', runs.map((run) => run.mainToShell))
     const rows = stats('warm start, main process created to sidebar rows painted', runs.map((run) => run.mainToRows))

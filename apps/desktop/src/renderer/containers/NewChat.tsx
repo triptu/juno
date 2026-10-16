@@ -14,6 +14,7 @@ import {
   sendTarget,
   type NewChat as NewChatState,
 } from '@juno/state'
+import { afterPaint, mark } from '@juno/state/perf'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
@@ -61,6 +62,9 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
 
   useEffect(() => {
     inputRef.current?.focus()
+    afterPaint(() => {
+      if (inputRef.current === document.activeElement) mark('juno.composer-ready')
+    })
   }, [])
   useEffect(() => onNewChatFocus((id) => id === tabId && inputRef.current?.focus()), [tabId])
 
