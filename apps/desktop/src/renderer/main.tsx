@@ -8,6 +8,7 @@ import { RegistryContext } from '@juno/state/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { clearCaretsLeftBehind } from './containers/caret'
 
 mark('juno.start')
 
@@ -56,6 +57,7 @@ releaseSidebar = registry.subscribe(
 
 // Frame and input observers run always; tests and DevTools read the counters.
 Object.assign(window, { __juno: { perf: observeFrames() } })
+clearCaretsLeftBehind()
 
 const found = document.getElementById('root')
 if (!found) throw new Error('Missing #root element')
