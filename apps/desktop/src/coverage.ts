@@ -4,11 +4,13 @@
  * When JUNO_E2E_COVERAGE names a directory, this process records which of its
  * functions run, through its own inspector, from the moment this module loads.
  * It is the first import of every Node entry (main, engine, agent), so it
- * starts before the rest of the bundle runs. Every two seconds, when asked and
- * when the process ends, it writes the start offsets of the functions that ran
- * since the last write to `<dir>/<process>-<pid>-<n>.json`. Main records each
+ * starts before the rest of the bundle runs. When asked and when the process
+ * ends, it writes the start offsets of the functions that ran since the last
+ * write to `<dir>/<process>-<pid>-<n>.json`; the engine and the agent also
+ * write every two seconds, as some tests kill them. Main records each
  * window's renderer the same way over the DevTools protocol
- * (`recordWindowCoverage`). `scripts/coverage-map.mjs` maps the offsets back
+ * (`recordWindowCoverage`), only when asked, so a run's frames are not
+ * disturbed. `scripts/coverage-map.mjs` maps the offsets back
  * to source files with the build's source maps.
  *
  * A normal launch never sets the variable, and then nothing here runs.
@@ -54,10 +56,10 @@ export const flushCoverage: () => void = (() => {
   // The script URLs in each write tell the engine and the agent apart.
   const kind = process.type === 'browser' ? 'main' : 'utility'
   const flush = () => session.post('Profiler.takePreciseCoverage', (error, taken) => error === null && write(kind, taken.result))
-  setInterval(flush, 2000).unref()
   process.on('exit', flush)
-  // Main ends a utility process with SIGTERM, which skips exit handlers: write, then end as the signal would.
   if (process.type === 'utility') {
+    setInterval(flush, 2000).unref()
+    // Main ends a utility process with SIGTERM, which skips exit handlers: write, then end as the signal would.
     process.once('SIGTERM', () => {
       flush()
       process.kill(process.pid, 'SIGTERM')
@@ -84,12 +86,8 @@ export function recordWindowCoverage(app: App): void {
       const taken = (await contents.debugger.sendCommand('Profiler.takePreciseCoverage').catch(() => undefined)) as { result: Array<ScriptCoverage> } | undefined
       if (taken !== undefined) write('renderer', taken.result)
     }
-    const timer = setInterval(() => void flush(), 2000)
     windows.add(flush)
-    contents.once('destroyed', () => {
-      clearInterval(timer)
-      windows.delete(flush)
-    })
+    contents.once('destroyed', () => windows.delete(flush))
   })
 }
 
