@@ -96,6 +96,11 @@ export interface SidebarProps {
   readonly onSearch: () => void
   /** The New chat button: a New chat in a new tab. */
   readonly onNewChat: () => void
+  /**
+   * The unified Home (proposal, `docs/design/home-merged/round-4`): All topics
+   * takes the New chat button's place in the title bar and leaves the nav list.
+   */
+  readonly allTopicsInTitlebar?: boolean
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   /** Right-click on a page item: its menu (Open in new tab). */
@@ -156,6 +161,7 @@ export function Sidebar({
   onAccountMenu,
   onSearch,
   onNewChat,
+  allTopicsInTitlebar = false,
   onNavigate,
   onNavigateMenu,
   onFilterKind,
@@ -184,7 +190,7 @@ export function Sidebar({
   const navMenu = (target: SidebarNavTarget) =>
     onNavigateMenu === undefined
       ? undefined
-      : (event: MouseEvent<HTMLDivElement>) => {
+      : (event: MouseEvent<HTMLElement>) => {
           event.preventDefault()
           onNavigateMenu(target)
         }
@@ -195,7 +201,18 @@ export function Sidebar({
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
             <IconButton icon={MagnifyingGlass} label="Search" shortcut={menuKeys('palette.toggle')} size={30} onClick={onSearch} />
-            <IconButton icon={NotePencil} label="New chat" shortcut={menuKeys('chat.new')} size={30} onClick={onNewChat} />
+            {allTopicsInTitlebar ? (
+              <IconButton
+                icon={ListBullets}
+                label="All topics"
+                size={30}
+                current={activeNav === 'all-topics'}
+                {...activateHandlers<HTMLButtonElement>((event) => onNavigate('all-topics', event))}
+                onContextMenu={navMenu('all-topics')}
+              />
+            ) : (
+              <IconButton icon={NotePencil} label="New chat" shortcut={menuKeys('chat.new')} size={30} onClick={onNewChat} />
+            )}
             <span {...stylex.props(styles.account)}>
               <Popover
                 open={accountMenuOpen}
@@ -226,9 +243,11 @@ export function Sidebar({
         <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')}>
           Home
         </NavItem>
-        <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)} onContextMenu={navMenu('all-topics')}>
-          All topics
-        </NavItem>
+        {allTopicsInTitlebar ? null : (
+          <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)} onContextMenu={navMenu('all-topics')}>
+            All topics
+          </NavItem>
+        )}
         <NavItem
           icon={Sparkle}
           iconWeight={junoBusy ? 'duotone' : undefined}
