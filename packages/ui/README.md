@@ -25,6 +25,17 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Composer growth is `field-sizing: content` on the inline `Textarea`; nothing reads `scrollHeight` on a keystroke.
 - Scroll containers are `ScrollArea`. Its gutter is always the 10px from `global.css`, even before the content overflows (`scrollbar-gutter: stable`), so the first overflow never narrows the content; `scrollbar="hover"` keeps the track and thumb transparent until the pointer is over the area by changing one colour variable, so showing the thumb never moves content. The sidebar list uses it; other scroll areas adopt it by prop.
 
+## Deferred components
+
+`chunk(importer)` shares one import between idle or intent preloading (`load`)
+and its components (`component`). A preloaded component renders in the same
+commit on its first mount. Views and desktop containers use the same helper;
+`@juno/views` re-exports it for containers.
+
+`Popover` holds its whole floating panel behind Suspense. A cold chunk never
+shows a short empty panel that grows when the content arrives. The panel
+clamps to its pane when it mounts, including after a deferred load.
+
 ## Mouse-down activation
 
 Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) activate on `pointerdown`, not `click`, so the app answers the moment the button goes down. The shared handlers live in `src/internal/activate.ts`:

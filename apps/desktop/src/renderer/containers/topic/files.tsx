@@ -1,16 +1,18 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import type { FileView } from '@juno/contract'
 import { downloadFile, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
+import { chunk } from '../chunks'
 
-const ImageViewerPanel = lazy(() => import('../ImageViewerPanel'))
+const viewer = chunk(() => import('../ImageViewerPanel'))
+const ImageViewerPanel = viewer.component((module) => module.default)
 
 /** Fetch the viewer's chunk once a topic has painted, so the first open does not wait for it. */
 let viewerLoaded = false
 function preloadViewer(): void {
   if (viewerLoaded) return
   viewerLoaded = true
-  window.requestIdleCallback(() => void import('../ImageViewerPanel'))
+  window.requestIdleCallback(() => void viewer.load())
 }
 
 /** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */

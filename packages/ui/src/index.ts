@@ -57,3 +57,4 @@ export { pointerMoved } from './internal/pointer'
 export { activateHandlers, type ActivateEvent } from './internal/activate'
 
 export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'
+export { chunk } from './chunks'

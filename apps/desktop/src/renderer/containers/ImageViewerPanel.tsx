@@ -1,5 +1,5 @@
 /**
- * The image viewer. Loaded on its own (`lazy` in `TopicView.tsx`), so it is
+ * The image viewer. Loaded on its own (`chunk` in `topic/files.tsx`), so it is
  * not in the first bundle; the chunk is fetched when a topic has painted,
  * before the first open.
  */

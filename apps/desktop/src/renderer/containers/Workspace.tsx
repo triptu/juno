@@ -1,4 +1,4 @@
-import { Activity, lazy, Suspense, useEffect } from 'react'
+import { Activity, Suspense, useEffect } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
 import {
@@ -24,6 +24,7 @@ import {
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
 import { TopicArt, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
+import { chunk } from './chunks'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
@@ -34,8 +35,9 @@ import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { hasArt, TopicTab } from './TopicView'
 
-// Rare pages load on first open, to keep the first bundle in budget.
-const SettingsTab = lazy(() => import('./Settings').then((chunk) => ({ default: chunk.SettingsTab })))
+// Settings warms on idle after the first paint, outside the startup bundle.
+const settings = chunk(() => import('./Settings'))
+const SettingsTab = settings.component((module) => module.SettingsTab)
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -172,6 +174,7 @@ export function Workspace() {
   useEffect(() => {
     const idle = requestIdleCallback(
       () => {
+        void settings.load()
         void loadAllTopicsPage()
         if (registry.get(junoAvailableAtom)) void loadJuno()
       },

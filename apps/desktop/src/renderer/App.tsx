@@ -1,15 +1,17 @@
-import { lazy, Suspense, useLayoutEffect } from 'react'
+import { Suspense, useEffect, useLayoutEffect } from 'react'
 import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { chunk } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { Peek } from './containers/Peek'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
 
-// Shown once, after a first sign-in, so it loads on demand (performance.md, bundle budget).
-const SetUpJuno = lazy(() => import('./containers/SetUpJuno').then((chunk) => ({ default: chunk.SetUpJuno })))
+// Warm the setup page while signed out, after the sign-in frame has painted.
+const setup = chunk(() => import('./containers/SetUpJuno'))
+const SetUpJuno = setup.component((module) => module.SetUpJuno)
 
 // The contract's names and the tokens' names must be the same set. These
 // assignments fail to compile if either side drifts.
@@ -38,6 +40,12 @@ export function App() {
   const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
+
+  useEffect(() => {
+    if (signedIn !== undefined) return
+    const idle = requestIdleCallback(() => void setup.load())
+    return () => cancelIdleCallback(idle)
+  }, [signedIn])
 
   useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
 

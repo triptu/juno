@@ -626,6 +626,32 @@ perf scenario traces the first two panel opens (`panel-open-0`, the
 first, and `panel-open-1`, a usual one). Logs are under
 `.juno-status/panel-1017/`.
 
+**Remaining deferred surfaces.** Set up Juno, Settings, send checks,
+attachment chips, view sheets, Account, emoji, the image viewer, the topic
+switcher and New chat's deferred lists now use the same helper. Its
+implementation lives in `packages/ui/src/chunks.ts`; views and
+`containers/chunks.ts` re-export it without adding a dependency edge.
+Settings joins the workspace's idle preload. Set up Juno warms on idle
+while signed out; the other surfaces keep their existing idle or intent
+preloads. The topic switcher's preload waits for idle after its deferred
+rows have painted.
+
+A cold popover mounts its frame and contents together, then clamps to its
+pane. Emoji's boundary likewise contains the whole floating surface.
+Attachment staging and send-check publication wait for their component's
+chunk, so the composer grows once with the finished content. Frequent
+rows retain one reserved slot per destination. Full-page and image-viewer
+boundaries retain their existing full-area placement.
+
+The perf scenario `first open in a second app` signs in once, closes that
+app, then measures the four first opens in a fresh renderer, each against
+50 ms. It observes actual content on the first presented frame, not the
+empty popover wrapper. Account, the switcher and emoji start at `click`,
+their activating event; Settings starts at `pointerdown`. This excludes
+the driver's deliberate 60 ms mouse hold from click-activated controls.
+The `launch warm start` scenario also reports process creation to the
+first painted, focused New chat composer (`juno.composer-ready`).
+
 ### Held-clock scroll gates (10-17)
 
 Sidebar, All topics, messages and chat each keep the ordinary 8.3 ms p95

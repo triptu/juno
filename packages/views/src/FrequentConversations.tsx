@@ -1,11 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 import type { PickConversation } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Text } from '@juno/ui'
-import { lazy, Suspense } from 'react'
+import { chunk, Text } from '@juno/ui'
+import { Suspense } from 'react'
 
-export const loadFrequentRows = () => import('./FrequentRows')
-const FrequentRows = lazy(loadFrequentRows)
+const frequent = chunk(() => import('./FrequentRows'))
+export const loadFrequentRows = frequent.load
+const FrequentRows = frequent.component((module) => module.default)
 
 export interface FrequentConversationsProps {
   readonly conversations: ReadonlyArray<PickConversation>

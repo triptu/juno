@@ -1,4 +1,4 @@
-import { lazy, Suspense, startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import {
   activeTab,
   connectionStateAtom,
@@ -21,6 +21,7 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
+import { chunk } from './chunks'
 import { SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
@@ -32,10 +33,12 @@ import { TopicList } from './TopicList'
 import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
 
 // Popover content warms on idle; the sidebar chrome stays in the initial bundle.
-const loadViewSheet = () => import('./ViewSheet').then((chunk) => ({ default: chunk.ViewSheet }))
-const loadAccountMenu = () => import('./AccountMenuContent')
-const ViewSheet = lazy(loadViewSheet)
-const AccountMenu = lazy(loadAccountMenu)
+const viewSheet = chunk(() => import('./ViewSheet'))
+const loadViewSheet = viewSheet.load
+const accountMenu = chunk(() => import('./AccountMenuContent'))
+const loadAccountMenu = accountMenu.load
+const ViewSheet = viewSheet.component((module) => module.ViewSheet)
+const AccountMenu = accountMenu.component((module) => module.default)
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
@@ -136,16 +139,14 @@ export function Sidebar() {
       accountMenuOpen={menuOpen}
       onAccountMenu={setMenuOpen}
       accountMenu={
-        <Suspense fallback={null}>
-          <AccountMenu
-            {...account}
-            workspace={user?.teamName ?? ''}
-            {...(presence === undefined ? {} : { presence })}
-            {...(paused === undefined ? {} : { paused })}
-            privacy={privacy}
-            onAction={accountAction}
-          />
-        </Suspense>
+        <AccountMenu
+          {...account}
+          workspace={user?.teamName ?? ''}
+          {...(presence === undefined ? {} : { presence })}
+          {...(paused === undefined ? {} : { paused })}
+          privacy={privacy}
+          onAction={accountAction}
+        />
       }
       onSearch={openPalette}
       {...(activeNav === undefined ? {} : { activeNav })}
@@ -160,7 +161,7 @@ export function Sidebar() {
       onNewView={newView}
       onViewMenu={(id) => void showViewPillMenu(id)}
       onMoveView={moveView}
-      {...(sheet === undefined ? {} : { viewSheet: <Suspense fallback={null}><ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /></Suspense> })}
+      {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
       onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}

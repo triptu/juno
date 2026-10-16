@@ -1,23 +1,25 @@
-import { lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, decodeMentions, encodeMentions, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
+import { chunk } from './chunks'
 import { takeAttachments, useAttachments } from './attachments'
 import { useMentions } from './mentions'
 import type { ComposerHandle } from './messageActions'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 import { cancelSendMark, markSend } from './sendMark'
 
-const SendCheckPanel = lazy(() => import('./SendCheckPanel'))
+const sendCheck = chunk(() => import('./SendCheckPanel'))
+const SendCheckPanel = sendCheck.component((module) => module.default)
 
 /** Fetch the bar's chunk once a composer has mounted, so the first bar does not wait for it. */
 let barLoaded = false
 function preloadBar(): void {
   if (barLoaded) return
   barLoaded = true
-  window.requestIdleCallback(() => void import('./SendCheckPanel'))
+  window.requestIdleCallback(() => void sendCheck.load())
 }
 
 /** Typing pauses this long before the draft is written. */
@@ -207,11 +209,13 @@ function LoadedComposer({
     const token = {}
     checking.current = token
     setWaiting(true)
-    void checkMessage(registry, here, text).then((found) => {
+    void checkMessage(registry, here, text).then(async (found) => {
+      const outcome = afterCheck(text, found)
+      // Publish the bar with its final geometry, even when Enter beats the idle preload.
+      if (outcome.kind === 'bar') await sendCheck.load()
       if (checking.current !== token) return
       mark('juno.send-checked', undefined, { replace: true })
       stopChecking()
-      const outcome = afterCheck(text, found)
       // The send measure is Enter to the pending row; a bar ends it without one.
       if (outcome.kind !== 'send') cancelSendMark()
       follow(outcome)
@@ -228,11 +232,7 @@ function LoadedComposer({
     audience === undefined && bar === undefined ? undefined : (
       <>
         {audience === undefined ? null : <AudienceWarning message={audience.message} />}
-        {bar === undefined ? null : (
-          <Suspense fallback={null}>
-            <SendCheckPanel bar={bar} onPick={pick} />
-          </Suspense>
-        )}
+        {bar === undefined ? null : <SendCheckPanel bar={bar} onPick={pick} />}
       </>
     )
 

@@ -47,3 +47,5 @@ Visual and behaviour checks run in the gallery, not in the package: `pnpm galler
 `UpdateSettings` is the dumb Settings › About update setting and downloaded-version line. Its container supplies availability, enabled state, version and callbacks.
 
 New chat's frame, empty-state hint, composer and destination buttons stay in the startup bundle because New chat is the default launch tab. `FrequentRows` and `DestinationLists` load on idle; the pickers also warm on hover and focus. The Frequent heading and hint stay in place around one reserved 32px slot per destination while its rows load.
+
+Deferred views use `chunk` from `@juno/ui`, also re-exported here for desktop containers. Frequent rows reserve their final row heights while loading; picker popovers mount their frame and content together.
