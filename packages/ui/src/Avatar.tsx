@@ -7,7 +7,7 @@ import { hueForId, hueNames, type HueName } from './internal/hue'
 export { hueForId, hueNames, type HueName }
 
 export type AvatarKind = 'person' | 'group'
-export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18
+export type AvatarSize = 44 | 36 | 32 | 28 | 24 | 20 | 18 | 16
 /** The surface an avatar ring must cut through: page, sidebar or a card. */
 export type AvatarRingSurface = 'background' | 'subtle' | 'surface'
 

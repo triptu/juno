@@ -869,6 +869,7 @@ export const sizes = stylex.defineVars({
   '--avatar-24': '24px',
   '--avatar-20': '20px',
   '--avatar-18': '18px',
+  '--avatar-16': '16px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
 
@@ -879,6 +880,7 @@ export const sizes = stylex.defineVars({
   '--initials-24': '9.5px',
   '--initials-20': '9px',
   '--initials-18': '8.5px',
+  '--initials-16': '7px',
 
   // Phosphor glyphs are filled paths; weight comes from the variant, so
   // there is no stroke token.
