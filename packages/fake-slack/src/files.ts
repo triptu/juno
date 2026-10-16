@@ -129,7 +129,8 @@ function thumbs(url: string, width: number, height: number): Partial<File> {
 export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false): File {
   const url = `${baseUrl}/files/${stored.id}/${encodeURIComponent(stored.name)}`
   const type = typeOf(stored.name, stored.mimetype)
-  const size = stored.bytes === undefined ? undefined : imageSize(stored.bytes)
+  // Live, a fresh upload's echo has no thumbnails and no size until Slack has made them.
+  const size = stored.bytes === undefined || stored.thumbsHeld === true ? undefined : imageSize(stored.bytes)
   const seconds = Math.floor(stored.created / 1000)
   return {
     id: stored.id,

@@ -55,6 +55,8 @@ export interface StoredFile {
   mimetype: string
   /** Set by `files.completeUpload`. The name stands in until then. */
   title?: string
+  /** Slack has not made the thumbnails yet: the file object has no thumbnails and no size (`holdThumbnails`). */
+  thumbsHeld?: boolean
 }
 
 export interface PostInput {
@@ -93,6 +95,8 @@ export class Workspace {
   readonly changedAt = new Map<string, number>()
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
+  /** Files uploaded while this is set start without thumbnails (`holdThumbnails`). */
+  holdThumbnails = false
   prefs: UserPrefs = {}
   /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
   selfUsergroups: Array<string> = []

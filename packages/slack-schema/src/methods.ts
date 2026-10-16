@@ -49,6 +49,8 @@ import {
   FilesGetUploadUrlFields,
   FilesShareArgs,
   FilesShareFields,
+  FilesInfoArgs,
+  FilesInfoFields,
 } from './files.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
 import { AuthTestArgs, AuthTestFields } from './users.ts'
@@ -100,6 +102,7 @@ export const Methods = {
   'files.getUploadURL': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
   'files.completeUpload': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),
   'files.share': method(FilesShareArgs, FilesShareFields),
+  'files.info': method(FilesInfoArgs, FilesInfoFields),
 } as const
 
 export type Methods = typeof Methods

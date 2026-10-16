@@ -181,4 +181,28 @@ describe('seeded files', () => {
     expect(text.trimEnd().endsWith('%%EOF')).toBe(true)
     expect(Number(download.headers.get('content-length'))).toBe(pdf?.size)
   })
+
+  it('holdThumbnails sends an image without thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    fake.holdThumbnails()
+    const file = await upload('shot.png', samplePng(640, 400), 'image/png')
+    await client.ok('files.completeUpload', { files: [{ id: file }] })
+    await client.ok('files.share', { files: [file], channel: 'C0ENG', comment: 'Held', client_msg_id: 'uuid-held-1' })
+    const echo = await socket.next(postedWith('uuid-held-1'))
+    expect(echo.files?.[0]).toMatchObject({ id: file, mimetype: 'image/png' })
+    expect(echo.files?.[0]?.thumb_360).toBeUndefined()
+    expect(echo.files?.[0]?.original_w).toBeUndefined()
+    expect((await client.ok('files.info', { file })).file.thumb_360).toBeUndefined()
+
+    const other = fake.injectImage({ channel: 'C0ENG', name: 'board.png', width: 400, height: 300 })
+    expect(other.files?.[0]?.thumb_360).toBeUndefined()
+
+    fake.releaseThumbnails()
+    const generated = await socket.next(isType('file_thumbnail_generated'))
+    expect(generated).toMatchObject({ file_id: file })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360_w: 360, thumb_360_h: 225 })
+    const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 2 })
+    expect(history.messages.map((m) => m.files?.[0]?.original_w)).toEqual([400, 640])
+  })
 })

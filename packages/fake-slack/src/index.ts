@@ -10,6 +10,8 @@ import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
 import { FakeServer, type CallRecord, type GatedCall, type GateDecision, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
+import { fileObject } from './files.ts'
+import { samplePng } from './samples.ts'
 
 export type { CallRecord, GatedCall, GateDecision, Session } from './server.ts'
 export type { Subscription } from './state.ts'
@@ -310,6 +312,50 @@ export class FakeSlack {
     this.server.failUploads(input.times ?? 1, input.after ?? 0)
   }
 
+  /**
+   * Files uploaded from now on, and images from `injectImage`, come without
+   * thumbnails and without a size, on the message and from `files.info`, as
+   * live Slack's echo of a fresh upload does, until `releaseThumbnails`.
+   */
+  holdThumbnails(): void {
+    this.workspace.holdThumbnails = true
+  }
+
+  /**
+   * Slack has made the held thumbnails: stored messages and `files.info`
+   * carry them, and each file gets a `file_thumbnail_generated` frame, as
+   * live (`event: 'file_change'` sends that instead; `'none'` sends nothing).
+   * Files uploaded later have thumbnails at once.
+   */
+  releaseThumbnails(input: { event?: 'file_thumbnail_generated' | 'file_change' | 'none' } = {}): void {
+    const ws = this.workspace
+    ws.holdThumbnails = false
+    const released = [...ws.files.values()].filter((file) => file.thumbsHeld === true)
+    for (const file of released) file.thumbsHeld = false
+    const ids = new Set(released.map((file) => file.id))
+    for (const [channel, list] of ws.messages) {
+      const isPublic = ws.conversations.get(channel)?.kind === 'public'
+      list.forEach((message, index) => {
+        if (!message.files?.some((file) => file.id !== undefined && ids.has(file.id))) return
+        list[index] = { ...message, files: message.files.map((file) => (file.id !== undefined && ids.has(file.id) ? fileObject(this.server.url, ws.files.get(file.id)!, isPublic) : file)) }
+      })
+    }
+    if (input.event === 'none') return
+    for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, event_ts: ws.eventTs() })
+  }
+
+  /** A message from another user with one PNG of `width` × `height`. Without thumbnails while `holdThumbnails` is on. Emits the socket events. */
+  injectImage(input: { channel: string; user?: string; name: string; width: number; height: number; text?: string }): Message {
+    const ws = this.workspace
+    const user = input.user ?? 'U0MAYA'
+    const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+    const bytes = samplePng(input.width, input.height)
+    const stored = { id, name: input.name, length: bytes.length, user, created: ws.clock.now(), bytes, mimetype: 'image/png', ...(ws.holdThumbnails ? { thumbsHeld: true } : {}) }
+    ws.files.set(id, stored)
+    const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
+    return ws.post({ channel: input.channel, user, ...(input.text === undefined ? {} : { text: input.text }), files: [fileObject(this.server.url, stored, isPublic)] })
+  }
+
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
   holdFrames(input: { types: ReadonlyArray<string> }): void {
     this.server.holdFrames(input.types)
@@ -402,6 +448,9 @@ export class FakeSlack {
       holdFrames: (i) => this.holdFrames(i),
       delayFiles: (i) => this.delayFiles(i),
       failUploads: (i) => this.failUploads(i),
+      holdThumbnails: () => this.holdThumbnails(),
+      releaseThumbnails: (i) => this.releaseThumbnails(i),
+      injectImage: (i) => this.injectImage(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),

@@ -268,6 +268,22 @@ export type UserChangeEvent = typeof UserChangeEvent.Type
 export const PrefChangeEvent = S.Struct({ type: S.Literal('pref_change'), name: S.String, value: S.Unknown })
 export type PrefChangeEvent = typeof PrefChangeEvent.Type
 
+// Files.
+
+/**
+ * Slack made a file's thumbnails, or the file changed. Live, a shared
+ * image's echo carries no thumbnails and no size, and
+ * `file_thumbnail_generated` follows it by a fraction of a second with the
+ * square and 360/480 thumbnail urls but no sizes. `file_change` was not seen
+ * live. Juno reads only the id and asks `files.info` (research section 3).
+ */
+export const FileEvent = S.Struct({
+  type: S.Literals(['file_change', 'file_thumbnail_generated']),
+  file_id: S.String,
+  event_ts: opt(Ts),
+})
+export type FileEvent = typeof FileEvent.Type
+
 // Notifications.
 
 /** The server's "this matters" signal (research section 7). `msg` is the message ts. */
@@ -317,6 +333,7 @@ export const KnownFrames = [
   MemberEvent,
   UserChangeEvent,
   PrefChangeEvent,
+  FileEvent,
   DesktopNotificationEvent,
 ] as const
 

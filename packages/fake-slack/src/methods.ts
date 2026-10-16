@@ -456,7 +456,16 @@ export const handlers: Handlers = {
   'files.getUploadURL': (ctx, args) => {
     const ws = ctx.workspace
     const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
-    ws.files.set(id, { id, name: args.filename, length: args.length, user: ws.selfId, created: ws.clock.now(), bytes: undefined, mimetype: 'application/octet-stream' })
+    ws.files.set(id, {
+      id,
+      name: args.filename,
+      length: args.length,
+      user: ws.selfId,
+      created: ws.clock.now(),
+      bytes: undefined,
+      mimetype: 'application/octet-stream',
+      ...(ws.holdThumbnails ? { thumbsHeld: true } : {}),
+    })
     return { upload_url: ctx.uploadUrl(id), file: id }
   },
 
@@ -502,6 +511,12 @@ export const handlers: Handlers = {
       files,
     })
     return { files }
+  },
+
+  'files.info': (ctx, args) => {
+    const file = ctx.workspace.files.get(args.file)
+    if (file?.bytes === undefined) return new ApiError('file_not_found')
+    return { file: fileObject(ctx.baseUrl, file) }
   },
 }
 
