@@ -24,7 +24,7 @@ import {
   withDownloads,
   withFiles,
 } from './fixtures/messages'
-import { albumOf, mediaAndPdf } from './fixtures/media'
+import { albumOf, mediaAndPdf, mixedMedia, singleImage, singleVideo } from './fixtures/media'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { sevenQuickReactions } from './fixtures/quickReactions'
@@ -184,6 +184,11 @@ export default defineFixtures(
     },
     Media: {
       // A message's pictures: two side by side, three with the first tall, four in 2 × 2, more as "+N" on the fourth.
+      image: state({ items: singleImage, main: false, onOpenMedia: noop }),
+      // A lone video: a player at its poster's box, with a button that opens it full screen.
+      video: state({ items: singleVideo, main: false, onOpenMedia: noop }),
+      // Pictures and a video in one message: one grid, the video's tile marked to play.
+      mixed: state({ items: mixedMedia, main: false, onOpenMedia: noop }),
       'grid-2': state({ items: albumOf(2), main: false, onOpenMedia: noop }),
       'grid-3': state({ items: albumOf(3), main: false, onOpenMedia: noop }),
       'grid-4': state({ items: albumOf(4), main: false, onOpenMedia: noop }),

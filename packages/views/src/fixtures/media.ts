@@ -21,3 +21,21 @@ export const albumOf = (count: number) => window([{ ago: 20, from: people.priya,
 
 /** Pictures and a PDF: the pictures make the grid, the PDF keeps its card. */
 export const mediaAndPdf = window([{ ago: 20, from: people.priya, text: 'Photos and the cabling plan.', files: [album[0]!, downloadable.pdf, album[1]!, album[2]!] }])
+
+/**
+ * A video Slack made a poster for: the player shows the poster until Play.
+ * The gallery plays nothing; `preload="none"` fetches only the poster.
+ */
+export const clip: FileView = {
+  ...image('F0CLIP', 'standup-recording.mp4', 1280, 720, picture(1280, 720, '#7F8FA6')),
+  kind: 'video',
+  mimetype: 'video/mp4',
+  video: '/__fixture/standup-recording.mp4',
+  download: downloadUrl('F0CLIP'),
+}
+
+/** One picture, one video, and pictures with a video, each a message of its own. */
+export const singleImage = window([{ ago: 20, from: people.priya, text: 'The new floor plan.', files: [album[0]!] }])
+export const singleVideo = window([{ ago: 20, from: people.priya, text: 'Recording of the stand-up.', files: [clip] }])
+export const mixedMedia = window([{ ago: 20, from: people.priya, text: 'Photos and the walkthrough.', files: [album[0]!, clip, album[2]!] }])
+

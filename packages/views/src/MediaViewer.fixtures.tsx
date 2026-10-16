@@ -2,8 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import type { FileView } from '@juno/contract'
 import { defineFixtures, scene } from '@juno/ui'
 import type { MediaFile } from './MediaGrid'
-import { album, albumOf } from './fixtures/media'
-import { downloadable, image, PENDING_PICTURE, picture } from './fixtures/messages'
+import { album, albumOf, clip } from './fixtures/media'
+import { downloadable, PENDING_PICTURE } from './fixtures/messages'
 import { NOW, people } from './fixtures/topics'
 import { MediaViewer, type MediaViewing } from './MediaViewer'
 import { MessageList } from './MessageList'
@@ -16,8 +16,6 @@ const media = (files: ReadonlyArray<FileView>) => files as ReadonlyArray<MediaFi
 /** As the message behind it (`albumOf`) says: its sender and its time. */
 const viewing = (items: ReadonlyArray<FileView>, index = 0): MediaViewing => ({ items: media(items), index, sender: people.priya.name, at: NOW - 20 * 60_000 })
 
-/** A video Slack made a poster for; the fixture plays nothing. */
-const video: FileView = { ...image('F0VID', 'standup-recording.mp4', 1280, 720, picture(1280, 720, '#7F8FA6')), kind: 'video', mimetype: 'video/mp4' }
 
 /** The viewer over a topic's list. The frame holds the fixed viewer, as the window does in the app. */
 function OverList({ open }: { readonly open: MediaViewing }) {
@@ -56,7 +54,7 @@ export default defineFixtures(
       // The first: Previous is off.
       'at-first': scene(() => <OverList open={viewing(album, 0)} />),
       // A video in the strip, shown by its poster.
-      'with-video': scene(() => <OverList open={viewing([album[0]!, video, album[2]!], 1)} />),
+      'with-video': scene(() => <OverList open={viewing([album[0]!, clip, album[2]!], 1)} />),
     },
   },
   { width: 816, height: 600, padded: false },

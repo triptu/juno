@@ -1,15 +1,17 @@
 /**
  * A message's images and videos as the message shows them: one picture at
- * its box, or a grid of tiles (`MediaGrid`). Split from `FileCard.tsx`,
- * which places them among the file cards.
+ * its box, one video as a player at its box, or a grid of tiles
+ * (`MediaGrid`). Split from `FileCard.tsx`, which places them among the file
+ * cards.
  */
 import * as stylex from '@stylexjs/stylex'
+import { ArrowsOut } from '@phosphor-icons/react/dist/icons/ArrowsOut'
 import { Image } from '@phosphor-icons/react/dist/icons/Image'
 import { Play } from '@phosphor-icons/react/dist/icons/Play'
 import { useState } from 'react'
 import type { FileThumb, FileView } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Icon, Text } from '@juno/ui'
+import { Icon, IconButton, Text } from '@juno/ui'
 
 /** Tiles a message's grid shows; the last says "+N" for the rest. */
 const GRID_TILES = 4
@@ -29,6 +31,8 @@ export interface MediaGridProps {
 
 /** A message's images and videos: the lone picture, or the grid. Tiles are keyed by place, so a sent file whose id changes keeps its image. */
 export function MediaGrid({ media, onOpen, tabIndex }: MediaGridProps) {
+  const only = media.length === 1 ? media[0]! : undefined
+  if (only?.kind === 'video' && only.video !== undefined) return <InlineVideo key="video:0" file={only} video={only.video} onOpen={onOpen} tabIndex={tabIndex} />
   if (media.length === 1) return <Thumbnail key="thumb:0" file={media[0]!} thumb={media[0]!.thumb} onOpen={onOpen} tabIndex={tabIndex} />
   const shown = media.slice(0, GRID_TILES)
   const more = media.length - shown.length
@@ -50,6 +54,33 @@ export function MediaGrid({ media, onOpen, tabIndex }: MediaGridProps) {
           more={index === shown.length - 1 && more > 0 ? more : undefined}
         />
       ))}
+    </div>
+  )
+}
+
+interface InlineVideoProps {
+  readonly file: MediaFile
+  readonly video: string
+  readonly onOpen: ((file: FileView) => void) | undefined
+  readonly tabIndex: number
+}
+
+/**
+ * A message's lone video: a player in the box its poster's size gives, so
+ * nothing moves when it loads, showing the poster until it plays. Nothing
+ * is fetched but the poster until Play. The corner button opens it in the
+ * media viewer.
+ */
+function InlineVideo({ file, video, onOpen, tabIndex }: InlineVideoProps) {
+  const box = thumbnailBox(file.thumb.width, file.thumb.height)
+  return (
+    <div data-thumbnail="" data-inline-video="" title={file.name} {...stylex.props(styles.thumb, styles.box(box.width, box.height, file.thumb.width, file.thumb.height))}>
+      <video src={video} poster={file.thumb.src} controls playsInline preload="none" tabIndex={tabIndex} aria-label={file.name} {...stylex.props(styles.video)} />
+      {onOpen === undefined ? null : (
+        <span {...stylex.props(styles.expand)}>
+          <IconButton icon={ArrowsOut} label={`Open ${file.name} full screen`} variant="raised" radius="full" size={28} iconSize={14} tabIndex={tabIndex} onClick={() => onOpen(file)} />
+        </span>
+      )}
     </div>
   )
 }
@@ -185,6 +216,19 @@ const styles = stylex.create({
   },
   tall: {
     gridRow: 'span 2',
+  },
+  video: {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    backgroundColor: colors['--media-scrim'],
+  },
+  expand: {
+    position: 'absolute',
+    insetBlockStart: spacing['--space-2'],
+    insetInlineEnd: spacing['--space-2'],
   },
   moreScrim: {
     position: 'absolute',

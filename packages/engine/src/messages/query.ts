@@ -783,7 +783,7 @@ function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): Rea
       const src = uploadsUrl(staged.staged_name)
       out.push({
         id: file.id,
-        name: file.title || file.name || file.id,
+        name: file.title || file.name || 'File',
         kind,
         ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
         ...(file.size === undefined ? {} : { size: file.size }),
@@ -799,7 +799,7 @@ function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): Rea
       const poster = videoOf(file)
       out.push({
         id: file.id,
-        name: file.title || file.name || file.id,
+        name: file.title || file.name || 'File',
         kind,
         ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
         ...(file.size === undefined ? {} : { size: file.size }),
@@ -813,7 +813,7 @@ function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): Rea
     const full = thumb === undefined ? undefined : file.url_private ?? file.thumb_1024
     out.push({
       id: file.id,
-      name: file.title || file.name || file.id,
+      name: file.title || file.name || 'File',
       kind,
       ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
       ...(file.size === undefined ? {} : { size: file.size }),
