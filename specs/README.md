@@ -165,7 +165,7 @@ How it runs: each Quint run takes about 5 s, mostly parsing, and up to four go a
 
 ### Rounds and Juno's own steps
 
-A round is one step the harness drives, followed by the steps Juno takes on its own. The harness drives the first step, then waits until the projections are equal and stay equal for 300 ms (at most 35 s, or 75 s when the round waits for the next try of a copy's delete). Juno's own steps are a claim, a backoff ending, a lookup leaving, an action call leaving, the catch-up, a check that keeps a copy, and storing a copy the catch-up reads. The harness cannot hold the engine back from these, so `outbox-conformance.qnt` takes them before any other step while one is enabled: first the ones that wait for nothing, then the ones that wait for a timer. Directed schedules from `outbox.qnt` say nothing about this, so the harness classifies their steps by action name.
+A round is one step the harness drives, followed by the steps Juno takes on its own. The harness drives the first step, then waits until the projections are equal and stay equal for 300 ms with no sync cycle running in the engine (at most 35 s, or 75 s when the round waits for the next try of a copy's delete). The catch-up's reads are not gated, so on a loaded machine one can outlast the 300 ms with nothing in the projection to show it, and then store what the next step puts in Slack. Juno's own steps are a claim, a backoff ending, a lookup leaving, an action call leaving, the catch-up, a check that keeps a copy, and storing a copy the catch-up reads. The harness cannot hold the engine back from these, so `outbox-conformance.qnt` takes them before any other step while one is enabled: first the ones that wait for nothing, then the ones that wait for a timer. Directed schedules from `outbox.qnt` say nothing about this, so the harness classifies their steps by action name.
 
 `outbox-conformance.qnt` imports the protocol unchanged, so every trace it writes is a trace of `outbox.qnt`. It narrows the schedules to Juno's own scheduling, which `outbox.qnt` leaves out:
 
@@ -195,7 +195,7 @@ Per draft, from the store (`pending_messages`, `sent_posts`, `kept_copies`, `out
 | `kept` | `kept` | whether `sent_posts.ts` is still the first message Juno stored |
 | `act` | `act` and `actKind` while pending | the user's `outbox` row, and its call at the gate |
 
-Plus `connected`, the model's socket against the fake's open sockets. What Juno's message list shows follows from these and is not compared apart.
+Plus `connected`, the model's socket against the fake's open sockets and the engine's view of them (`SyncLink.online`, which the post worker checks before a claim); while the two disagree, the engine side matches neither `true` nor `false`. What Juno's message list shows follows from these and is not compared apart.
 
 ### How each step is driven
 
