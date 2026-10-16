@@ -26,7 +26,8 @@ import { unescapeMrkdwn } from '@juno/richtext'
 import { Invalidation, liveQuery, StoreReader, StoreWriter, syncState, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect, Layer, Stream } from 'effect'
-import { aiAssistOn } from './ai'
+import { aiAssistOn, aiJobsOn } from './ai'
+import type { EngineConfig } from './config'
 import { AiCredentials, aiWakes } from './aiCredentials'
 import { AiSpend } from './aiSpend'
 import { Workspace, type StoreServices } from './workspace'
@@ -128,7 +129,8 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
 })
 
 /** Runs the job for the life of the engine. */
-export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend> = Layer.effectDiscard(Effect.gen(function* () {
+export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(Effect.gen(function* () {
+  if (!(yield* aiJobsOn)) return
   const workspace = yield* Workspace
   const provider = yield* AiProvider
   const wakes = yield* aiWakes

@@ -28,7 +28,8 @@ import { junoVerdict } from '@juno/domain'
 import { liveQuery, StoreReader, syncState, type InvalidationKeys, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect, Layer, Stream } from 'effect'
-import { aiAssistOn } from '../ai'
+import { aiAssistOn, aiJobsOn } from '../ai'
+import type { EngineConfig } from '../config'
 import { AiCredentials, aiWakes } from '../aiCredentials'
 import { AiSpend } from '../aiSpend'
 import { automatedViewState, candidates, classify, clearVerdict, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
@@ -73,12 +74,13 @@ const storedAnswer = (channel: string) =>
     }
   })
 
-const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>
+const runPass = (memory: Memory, jobs: boolean): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>
   Effect.gen(function* () {
     if ((yield* syncState.get(BOOT_KEY)) === undefined) return
     if ((yield* automatedViewState) === 'deleted') return
     const now = yield* Clock.currentTimeMillis
-    const ai = yield* aiAssistOn
+    // With the AI jobs off (tests that do not opt in), ambiguous channels go to Home's question as with AI assist off.
+    const ai = jobs && (yield* aiAssistOn)
     const due = (yield* candidates(now)).filter((row) => memory.seen.get(row.id) !== `${row.activity}|${ai}`)
     if (due.length === 0) return
     const selfId = yield* selfIdOf
@@ -150,11 +152,12 @@ const junoSample = (rows: ReadonlyArray<SampleRow>, selfId: string | undefined) 
   })
 
 /** Runs the job for the life of the engine. */
-export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend> = Layer.effectDiscard(
+export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
+    const jobs = yield* aiJobsOn
     const passes = workspace.changes.pipe(
       Stream.zipLatest(wakes),
       Stream.switchMap(([open]) => {
@@ -163,7 +166,7 @@ export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | Ai
         const triggers = Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK))
         return triggers.pipe(
           Stream.mapEffect(() =>
-            runPass(memory).pipe(
+            runPass(memory, jobs).pipe(
               Effect.catch((error) => Effect.logWarning('home: an Automated pass failed', error)),
               Effect.provideService(AiProvider, provider),
             ),
