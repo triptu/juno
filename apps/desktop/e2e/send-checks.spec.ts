@@ -91,7 +91,7 @@ test('local fixes send first and Edit opens a draft without changing the sent me
   await expect(juno.topic.checkBar.bar).toHaveCount(0)
   const suggestion = juno.win.locator('[data-send-suggestion]')
   await expect(suggestion).toContainText('recieve → receive')
-  const row = suggestion.locator('..')
+  const row = juno.topic.list.locator('[data-message-row]').filter({ hasText: TYPOS })
   const before = await row.boundingBox()
   await suggestion.getByRole('button', { name: 'Edit', exact: true }).click()
   const editor = row.getByRole('textbox', { name: 'Edit message' })

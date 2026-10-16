@@ -1,0 +1,1 @@
+- 10-16 15:27 · Juno · The post-send suggestion floats on a toolbar surface above the sent row's top edge instead of over its first line, so the text it corrects stays readable and still nothing reserves space.

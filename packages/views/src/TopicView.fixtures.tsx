@@ -3,7 +3,7 @@ import { Button, defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import type { TopicDetail } from '@juno/contract'
 import { TopicSwitcher } from './TopicSwitcher'
 import { ComposerSlot } from './ComposerSlot'
-import { details, emojiOnly, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
+import { details, emojiOnly, sentSlip, sentSlipText, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import type { EmojiCategory } from '@juno/contract'
 import { EmojiPicker } from './EmojiPicker'
@@ -209,6 +209,9 @@ export default defineFixtures(
           </Floating>
         ),
       }),
+      // Just after sending: the post-send check's slip floats over the sent row and reserves nothing.
+      'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: { ts: sentSlip.at(-1)!.message.ts, value: { label: sentSlipText, onEdit: noop } } } }),
+      'sent-suggestion-narrow': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: { ts: sentSlip.at(-1)!.message.ts, value: { label: sentSlipText, onEdit: noop } } } }, { width: 400, height: 640 }),
       'minimum-window': topic({ detail: details.engMain, items: main, list: { dividerBefore: mainDividerBefore } }, { width: 720, height: 480 }),
     },
   },
