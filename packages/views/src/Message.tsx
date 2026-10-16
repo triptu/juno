@@ -28,8 +28,8 @@ export interface MessageActions {
   /** Opens the emoji picker at `at`. */
   readonly onMoreReactions: (message: MessageView, at: MenuAnchor) => void
   readonly onQuote: (message: MessageView) => void
-  /** Main only: opens the message's thread. */
-  readonly onReply?: (message: MessageView) => void
+  /** Main only: opens the message's thread; with `newTab` (⌘-click or ⌘Enter) in a background tab. */
+  readonly onReply?: (message: MessageView, options?: { readonly newTab: boolean }) => void
   /** The message menu at `at`. */
   readonly onMore: (message: MessageView, at: MenuAnchor) => void
   readonly onConfirmDelete: (message: MessageView) => void
@@ -191,7 +191,7 @@ export const Message = memo(function Message({
         onReact={(reaction) => actions.onReact(message, reaction)}
         onMoreReactions={(at) => actions.onMoreReactions(message, at)}
         onQuote={() => actions.onQuote(message)}
-        {...(main && actions.onReply !== undefined ? { onReply: () => actions.onReply?.(message) } : {})}
+        {...(main && actions.onReply !== undefined ? { onReply: (options: { readonly newTab: boolean }) => actions.onReply?.(message, options) } : {})}
         onMore={(at) => actions.onMore(message, at)}
         {...(confirmingDelete ? { confirmDelete: { onConfirm: () => actions.onConfirmDelete(message), onCancel: actions.onCancelDelete } } : {})}
       />

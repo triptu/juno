@@ -112,6 +112,8 @@ export const CLOSED_LIMIT = 20
 export interface OpenOptions {
   /** A new tab after the current one, instead of the current tab. */
   readonly newTab?: boolean
+  /** With `newTab`: the current tab stays active and the new one waits behind it, as ⌘-click on Start thread opens it. */
+  readonly background?: boolean
   /** The current tab's New chat has a draft or a destination, so it stays in the history for Back. */
   readonly keepNewChat?: boolean
 }
@@ -175,7 +177,7 @@ function push(history: TabHistory, place: Place, keepNewChat: boolean): TabHisto
   return { entries, index: entries.length - 1 }
 }
 
-export function openPlace(tabs: Tabs, place: Place, { newTab = false, keepNewChat = false }: OpenOptions = {}): Tabs {
+export function openPlace(tabs: Tabs, place: Place, { newTab = false, background = false, keepNewChat = false }: OpenOptions = {}): Tabs {
   // A plain open of a place a tab shows focuses that tab. A new tab is always new, so a place can show in several.
   const showing = newTab ? undefined : tabShowingPlace(tabs, place)
   if (showing !== undefined) return activateTab(tabs, showing.id)
@@ -184,6 +186,8 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false, keepNewCha
     const tab = freshTab(nextTabId(tabs), place)
     // A new tab never lands among the pinned ones.
     const index = at < 0 ? tabs.tabs.length : Math.max(at + 1, pinnedCount(tabs.tabs))
+    // A background tab is not viewed yet, so it is not among the recent ones either.
+    if (background && at >= 0) return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab) }
     return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), active: tab.id, recent: touch(tabs.recent, tab.id) }
   }
   const current = tabs.tabs[at]!

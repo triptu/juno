@@ -200,7 +200,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
   - One-click quick reactions, 👍 ✅ 👀 by default. You choose up to seven, and their order, in Settings › Appearance. Where the message list is too narrow for all of them, the toolbar shows as many as fit, then the full picker's button; it never runs past the message.
   - A full emoji picker.
   - Quote.
-  - In Main threads, Start thread or Open thread.
+  - In Main threads, Start thread or Open thread. A click opens the thread in the current tab. ⌘-click, or ⌘Enter on the button, opens it in a new tab right after the current one and leaves the current tab active, with its scroll and focus as they were.
   - More: Edit, Delete and Tell me if nobody replies (13.6) on your own messages, Copy Slack link and Open in Slack. Right-clicking a message opens the same menu.
 - **Reaction failures.** A reaction shows at once and goes to Slack in the background. If Slack refuses it, the chip goes back to what Slack has and the message says "Reaction not added." (or "Reaction not removed.") with Retry and Dismiss. Juno never tries it again on its own. If a reaction has not reached Slack after 30 seconds, the message says "Reaction not sent yet." until it goes.
 - **Open actions.** A message keeps its active background and toolbar while its reaction picker or More menu is open.

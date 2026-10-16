@@ -293,3 +293,44 @@ test('Start thread from Main opens a new topic for the message', async ({ juno, 
   await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
   expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
 })
+
+test('⌘-click Start thread opens the thread in a background tab; this tab, its scroll and its focus stay', async ({ juno, fake }) => {
+  await openMain(juno)
+  const { topic, tabs } = juno
+  await sendOwn(juno, fake, 'A topic for later')
+  await sendOwn(juno, fake, 'One more line under it')
+  const active = tabs.root.getByRole('tab', { selected: true })
+  const mainTab = await active.getAttribute('data-tooltip')
+  const before = await tabs.titles()
+  await topic.scroller.evaluate((scroller) => {
+    scroller.scrollTop = Math.max(0, scroller.scrollTop - 24)
+  })
+  const scrollTop = await topic.scroller.evaluate((scroller) => scroller.scrollTop)
+  await topic.composer.focus()
+
+  const root = topic.message('A topic for later')
+  await root.hover()
+  await root.getByRole('button', { name: 'Start thread' }).click({ modifiers: ['Meta'] })
+  // The thread's tab joins the strip right after this one, which stays active, still at Main.
+  await tabs.expectCount(before.length + 1)
+  await expect.poll(() => tabs.titles()).toEqual(expect.arrayContaining([expect.stringMatching(/A topic for later/)]))
+  await expect(active).toHaveAttribute('data-tooltip', mainTab!)
+  await topic.expectTitle('Main')
+  await expect(topic.composer).toBeFocused()
+  expect(await topic.scroller.evaluate((scroller) => scroller.scrollTop)).toBe(scrollTop)
+
+  // ⌘Enter on Start thread does the same from the keyboard; focus stays on the button.
+  const other = topic.message('One more line under it')
+  await other.hover()
+  const start = other.getByRole('button', { name: 'Start thread' })
+  await start.focus()
+  await start.press('Meta+Enter')
+  await tabs.expectCount(before.length + 2)
+  await expect(active).toHaveAttribute('data-tooltip', mainTab!)
+  await expect(start).toBeFocused()
+
+  // The background tab opens on the new thread, ready to reply.
+  await tabs.select('A topic for later')
+  await topic.expectTitle(/A topic for later/)
+  await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+})

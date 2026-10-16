@@ -8,7 +8,7 @@ import { deleteMessage, reactToMessage, registry, type MessageWindow } from '@ju
 import type { MenuAnchor, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { isOwnEditable, landedTs, refOf } from '../messageRows'
-import { openTopic } from '../navigation'
+import { openTopic, openTopicInBackground } from '../navigation'
 import { noteRecentEmoji } from '../recentEmoji'
 import { showMessageMenu } from '../topicActions'
 
@@ -113,7 +113,8 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
         setPicker({ ts: message.ts, x: box.right - origin.left, y: (below ? box.bottom : box.top) - origin.top, placement: below ? 'below-end' : 'above-end' })
       },
       onQuote: (message) => composer.current?.quote(textOf(scrollRef.current, message.ts)),
-      onReply: (message) => openTopic(`t:${channel}:${message.ts}`),
+      // ⌘-click or ⌘Enter opens the thread in a background tab: this tab, its scroll and its focus stay (SPEC 7).
+      onReply: (message, options) => (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`),
       onMore: (message, at) => void menu(message, at),
       onConfirmDelete: confirmDelete,
       onCancelDelete: () => {

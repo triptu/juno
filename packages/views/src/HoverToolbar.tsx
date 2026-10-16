@@ -3,7 +3,7 @@ import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
-import type { MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import { DEFAULT_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Divider, EmojiButton, IconButton, Surface, Text } from '@juno/ui'
@@ -20,7 +20,8 @@ export interface HoverToolbarProps {
   /** Opens the emoji picker under the toolbar's bottom right corner. */
   readonly onMoreReactions?: (at: MenuAnchor) => void
   readonly onQuote?: () => void
-  readonly onReply?: () => void
+  /** Start thread or Open thread; `newTab` on ⌘-click or ⌘Enter, which opens it in a background tab. */
+  readonly onReply?: (options: { readonly newTab: boolean }) => void
   /** More: the message menu, under the button. */
   readonly onMore?: (at: MenuAnchor) => void
   /**
@@ -88,10 +89,29 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
       </span>
       <IconButton icon={Smiley} label="More reactions" size={28} tabIndex={tabIndex} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
       <IconButton icon={Quotes} label="Quote" size={28} tabIndex={tabIndex} onClick={onQuote} />
-      {main ? <IconButton icon={ChatsCircle} label={hasThread ? 'Open thread' : 'Start thread'} size={28} tabIndex={tabIndex} onClick={onReply} /> : null}
+      {main ? (
+        <IconButton
+          icon={ChatsCircle}
+          label={hasThread ? 'Open thread' : 'Start thread'}
+          size={28}
+          tabIndex={tabIndex}
+          // ⌘-click leaves focus where it was: the thread opens behind this tab.
+          onMouseDown={(event) => event.metaKey && event.preventDefault()}
+          onClick={onReply === undefined ? undefined : (event) => onReply({ newTab: event.metaKey })}
+          onKeyDown={onReply === undefined ? undefined : (event) => replyKey(event, onReply)}
+        />
+      ) : null}
       {onMore !== undefined ? <IconButton icon={DotsThree} label="More" size={28} tabIndex={tabIndex} onClick={(event) => onMore(below(event))} /> : null}
     </Surface>
   )
+}
+
+/** ⌘Enter on Start thread or Open thread opens it in a new tab, as ⌘-click does. */
+function replyKey(event: KeyboardEvent<HTMLButtonElement>, onReply: (options: { readonly newTab: boolean }) => void): void {
+  if (event.key !== 'Enter' || !event.metaKey) return
+  event.preventDefault()
+  event.stopPropagation()
+  onReply({ newTab: true })
 }
 
 const styles = stylex.create({

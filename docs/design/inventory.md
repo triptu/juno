@@ -339,7 +339,7 @@ Under the body, flex-wrap, gap 4, margin-top 6. Chip 24px, padding 0 8, gap 5, r
 
 Appears on hover or focus of a message: absolute, straddling the row's top edge (below), right 8, z 2, padding 2, gap 2, radius 9, bg `--surface-default`, `--pop-shadow`. Measured 191×34.
 
-Contents: the quick reactions, 👍 ✅ 👀 by default, up to seven chosen in Settings › Appearance (28×28, radius 6, emoji 15px, name "React 👍"; a custom emoji shows its image and is named "React :name:" by its name) · 1px separator (`--border-default`, margin 4 2) · **More reactions** (`smile-plus` 16) · **Quote** (`quote` 16) · **Start thread** or **Open thread** (`chats-circle` 16, Main only). Hover bg `--surface-hover`.
+Contents: the quick reactions, 👍 ✅ 👀 by default, up to seven chosen in Settings › Appearance (28×28, radius 6, emoji 15px, name "React 👍"; a custom emoji shows its image and is named "React :name:" by its name) · 1px separator (`--border-default`, margin 4 2) · **More reactions** (`smile-plus` 16) · **Quote** (`quote` 16) · **Start thread** or **Open thread** (`chats-circle` 16, Main only; ⌘-click or ⌘Enter opens it in a background tab, and the button does not take focus on ⌘-click). Hover bg `--surface-hover`.
 
 Picker: clicking More replaces the toolbar contents with 12 emoji (👍 ❤️ 😂 🎉 👀 ✅ 🙏 🔥 💯 😮 😢 🚀), 28×28 each, width 364. Esc or leaving the message closes it. [proposed] v1 ships this fixed set; a full emoji picker is a later addition.
 
