@@ -49,9 +49,9 @@ interface Candidate {
 
 /** What one workspace's job remembers between passes. */
 interface Memory {
-  day: number
-  /** Calls today that stored no title: they may have been billed. */
-  unstored: number
+  /** Calls today that stored no title: they may have been billed. Shared by every pass of the workspace. */
+  readonly spent: { day: number; unstored: number }
+  /** Waits, per wake, so a pass cut short by a wake cannot hold a thread back in the next one. */
   readonly deferred: Map<string, number>
 }
 
@@ -60,12 +60,13 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
   const sql = yield* StoreReader
   const now = yield* Clock.currentTimeMillis
   const day = now - (now % DAY)
-  if (memory.day !== day) {
-    memory.day = day
-    memory.unstored = 0
+  const spent = memory.spent
+  if (spent.day !== day) {
+    spent.day = day
+    spent.unstored = 0
   }
   const used = (yield* sql<{ n: number }>`SELECT count(*) AS n FROM ai_cache WHERE task = 'titleTopic' AND created_at >= ${String(day)}`)[0]?.n ?? 0
-  const budget = TITLE_DAILY_BUDGET - used - memory.unstored
+  const budget = TITLE_DAILY_BUDGET - used - spent.unstored
   if (budget <= 0) return
   const quiet = (yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'quietDays'`)[0]
   const raw: unknown = quiet === undefined ? undefined : JSON.parse(quiet.value_json)
@@ -96,11 +97,11 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
       messages: messages.map((m) => ({ sender: m.sender, text: unescapeMrkdwn(m.text).slice(0, 1000), at: new Date(Number(m.ts) * 1000).toISOString() })),
     }
     // Counted before the call, so a call cut short (a key change, a new workspace) still counts today.
-    memory.unstored++
+    spent.unstored++
     const answer = yield* provider.generate(tasks.titleTopic, input)
     if (answer._tag !== 'Decided') {
       if (answer.reason === 'missing-key' || answer.reason === 'budget') {
-        memory.unstored--
+        spent.unstored--
         stopped = true
         return
       }
@@ -120,7 +121,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         ON CONFLICT (topic_id) DO UPDATE SET ai_title = excluded.ai_title, ai_title_source_hash = excluded.ai_title_source_hash, ai_title_at = excluded.ai_title_at`
       yield* (yield* Invalidation).invalidate(['topic_overlay', 'ai_cache'])
     }))
-    memory.unstored--
+    spent.unstored--
     memory.deferred.delete(row.topic_id)
   }), { concurrency: CONCURRENCY, discard: true })
 })
@@ -130,14 +131,14 @@ export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCred
   const workspace = yield* Workspace
   const provider = yield* AiProvider
   const wakes = yield* aiWakes
-  const memories = new Map<string, Memory>()
+  const spending = new Map<string, Memory['spent']>()
   yield* Effect.forkScoped(workspace.changes.pipe(
     Stream.zipLatest(wakes),
     Stream.switchMap(([open]) => {
       if (open === undefined) return Stream.empty
-      const memory = memories.get(open.id) ?? { day: 0, unstored: 0, deferred: new Map() }
-      memories.set(open.id, memory)
-      memory.deferred.clear()
+      const spent = spending.get(open.id) ?? { day: 0, unstored: 0 }
+      spending.set(open.id, spent)
+      const memory: Memory = { spent, deferred: new Map() }
       return Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), Stream.tick(TICK)).pipe(
         Stream.mapEffect(() => runPass(memory).pipe(Effect.catch(() => Effect.logWarning('titles: a pass failed')), Effect.provideService(AiProvider, provider))),
         Stream.provide(open.context),

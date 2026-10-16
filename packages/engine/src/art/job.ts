@@ -88,10 +88,11 @@ const readPass = (now: number): Effect.Effect<Pass, SqlError, StoreReader> =>
 
 /** What one workspace's job remembers between passes: topics waiting after a call that did not finish, and attempts the table does not count. */
 interface Memory {
+  /** Attempts the table does not count, per workspace for the day. Shared by every pass, so a wake does not reset the budget. */
+  readonly unstored: { today: number; day: number }
+  /** Waits, per wake: a key change or a new link to the ledger starts with none, and a pass cut short by it cannot set one. */
   readonly deferred: Map<string, { readonly until: number; readonly attempts: number }>
   passDeferredUntil: number
-  unstoredToday: number
-  unstoredDay: number
 }
 
 const defer = (memory: Memory, topicId: string, now: number): void => {
@@ -106,11 +107,11 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
     const pass = yield* readPass(now)
     if (!pass.aiAssist) return
     const day = now - (now % DAY)
-    if (memory.unstoredDay !== day) {
-      memory.unstoredDay = day
-      memory.unstoredToday = 0
+    if (memory.unstored.day !== day) {
+      memory.unstored.day = day
+      memory.unstored.today = 0
     }
-    let budget = ART_DAILY_BUDGET - pass.usedToday - memory.unstoredToday
+    let budget = ART_DAILY_BUDGET - pass.usedToday - memory.unstored.today
     const due = pass.rows.filter((row) => {
       const wait = memory.deferred.get(row.topic_id)
       return wait === undefined || wait.until <= now
@@ -133,7 +134,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
             memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
             return
           }
-          memory.unstoredToday += 1
+          memory.unstored.today += 1
           defer(memory, row.topic_id, at)
         }),
       { concurrency: ART_CONCURRENCY, discard: true },
@@ -147,15 +148,14 @@ export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCreden
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
     let previous: OpenWorkspace | undefined
-    let memory: Memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
+    let unstored = { today: 0, day: 0 }
     const passes = workspace.changes.pipe(
       Stream.zipLatest(wakes),
       Stream.switchMap(([open]) => {
         if (open === undefined) return Stream.empty
-        if (previous !== open) memory = { deferred: new Map(), passDeferredUntil: 0, unstoredToday: 0, unstoredDay: 0 }
+        if (previous !== open) unstored = { today: 0, day: 0 }
         previous = open
-        memory.deferred.clear()
-        memory.passDeferredUntil = 0
+        const memory: Memory = { unstored, deferred: new Map(), passDeferredUntil: 0 }
         // The live query is the trigger; each pass reads its own fresh candidates, so a stale emission costs one query.
         return liveQuery(KEYS, Effect.void).pipe(
           Stream.debounce(DEBOUNCE),
