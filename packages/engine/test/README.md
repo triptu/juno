@@ -13,6 +13,7 @@ node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test
 - `handle.commandIdle()` waits for background command recovery fibers, including the lookup's local transaction. Await the command first so its recovery has been scheduled.
 - `rowsUntil(predicate)` waits for the actual sidebar outcome after a command or socket event.
 - `waitFor(predicate, timeout, label)` accepts synchronous or async predicates. Only a resolved value other than `undefined` completes the wait; errors reject it.
+- `openWindow()` gives a second atom registry on a new port to the same engine, as a second renderer would be: a live query mounted there is a new subscription at once, with no wait for the 30 s idle time. `stop()` disposes it; `restart()` does not, so do not combine them.
 - `quiet()` drains sync cycles and then polls for a quiet API window. Use the explicit completion helpers for budgets and command recovery.
 
 `bootedEngine()` and `restart()` wait for `live` and `syncIdle()`. Stop and restart dispose the old atom registry so its ports and subscriptions do not reconnect after shutdown. Before resetting the fake's call log or dropping the socket for a new operation, finish the preceding cycle. A fake call record says the server handled a request; it does not prove the engine applied its answer.
