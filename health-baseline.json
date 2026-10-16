@@ -8,7 +8,7 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 42,
+    "oversizedFiles": 41,
     "oversizedFunctions": 133
   },
   "clonedLines": 93,
@@ -16,7 +16,6 @@
     "apps/desktop/e2e/driver/juno.ts",
     "apps/desktop/e2e/feel/recorder.ts",
     "apps/desktop/e2e/perf.spec.ts",
-    "apps/desktop/e2e/sidebar.spec.ts",
     "apps/desktop/src/renderer/containers/navigation.ts",
     "apps/gallery/shift.spec.ts",
     "packages/agent/src/actions/cards.ts",
