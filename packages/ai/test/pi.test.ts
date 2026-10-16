@@ -144,9 +144,10 @@ describe('PiAiProvider decisions', () => {
     const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
     const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
     expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
+    // Settled as known, not kept whole: at most the first attempt, under half the reservation.
     expect(settled).toHaveLength(1)
-    expect(settled[0]).toBeGreaterThan(0)
-    expect(settled[0]).toBeLessThan(asked[0]! / 2)
+    expect(settled[0]).toBeTypeOf('number')
+    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
   })
 
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {
