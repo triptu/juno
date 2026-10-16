@@ -10,10 +10,12 @@ export class EngineConfig extends Context.Service<EngineConfig, Config>()('juno/
   static readonly layer = (config: Config): Layer.Layer<EngineConfig> => Layer.succeed(EngineConfig, config)
 }
 
-/** Host controls for observing sync cycles and overriding their schedule. */
+/** Host controls for observing sync cycles and the socket, and overriding their schedule. */
 export interface SyncControlOptions {
   readonly config?: Partial<SyncConfigShape>
   readonly onCycle?: (event: 'started' | 'finished') => void
+  /** Called when the outbox workers learn that the socket is up or down (`SyncLink.online`). */
+  readonly onConnection?: (online: boolean) => void
 }
 
 export class SyncControl extends Context.Reference<SyncControlOptions>('juno/engine/SyncControl', {

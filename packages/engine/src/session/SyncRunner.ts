@@ -53,6 +53,8 @@ export class SyncRunner extends Context.Service<
       const engineConfig = yield* EngineConfig
       const control = yield* SyncControl
       const link = yield* SyncLink
+      // The host hears it too: tests compare it with the fake's socket.
+      const setOnline = (online: boolean) => link.setOnline(online).pipe(Effect.andThen(Effect.sync(() => control.onConnection?.(online))))
       const scope = yield* Effect.scope
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
       const syncing = yield* SubscriptionRef.make(false)
@@ -64,7 +66,7 @@ export class SyncRunner extends Context.Service<
         running = undefined
         if (current !== undefined) yield* Fiber.interrupt(current.fiber)
         yield* link.setFetcher(undefined)
-        yield* link.setOnline(false)
+        yield* setOnline(false)
         yield* SubscriptionRef.set(phase, undefined)
         yield* SubscriptionRef.set(syncing, false)
         yield* SubscriptionRef.set(slowed, undefined)
@@ -94,7 +96,7 @@ export class SyncRunner extends Context.Service<
                   Effect.andThen(Effect.sync(() => control.onCycle?.(event))),
                 ),
               onPhase: (next) => SubscriptionRef.set(phase, next),
-              onConnection: link.setOnline,
+              onConnection: setOnline,
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
@@ -128,7 +130,7 @@ export class SyncRunner extends Context.Service<
               if (running?.fiber === fiber) {
                 running = undefined
                 yield* link.setFetcher(undefined)
-                yield* link.setOnline(false)
+                yield* setOnline(false)
                 yield* SubscriptionRef.set(syncing, false)
               }
               if (exit._tag === 'Failure') {
