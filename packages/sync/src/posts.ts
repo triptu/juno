@@ -189,8 +189,22 @@ export const fileUploaded = (clientMsgId: string, stagedId: string, fileId: stri
     const files = post.files.map((file) => (file.id === stagedId ? { ...file, fileId } : file))
     const sql = yield* StoreWriter
     yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(files)} WHERE client_msg_id = ${clientMsgId}`
+    // An image keeps its staged copy as the message's preview until Slack's thumbnails are stored (`files.ts`).
+    const staged = files.find((file) => file.id === stagedId)
+    if (staged?.width !== undefined && staged.height !== undefined && staged.mimetype.startsWith('image/') && !staged.stagedName.endsWith('.bin')) {
+      const now = yield* Clock.currentTimeMillis
+      yield* sql`DELETE FROM uploaded_files WHERE uploaded_at < ${now - KEEP_MILLIS}`
+      yield* sql`INSERT INTO uploaded_files (file_id, staged_name, width, height, uploaded_at) VALUES (${fileId}, ${staged.stagedName}, ${staged.width}, ${staged.height}, ${now})
+        ON CONFLICT (file_id) DO NOTHING`
+    }
     return true
   })
+
+/** The staged copies `uploaded_files` still shows, which the staging sweep keeps. */
+export const uploadedNames: Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> = Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  return (yield* sql<{ staged_name: string }>`SELECT staged_name FROM uploaded_files`).map((row) => row.staged_name)
+})
 
 /** A queued post's uploads could not reach Slack (offline, rate limited, signed out): try again at `nextAt`. */
 export const deferPost = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['queued'], 'queued', { nextAt, lastError: error, attempt: true })
