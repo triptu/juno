@@ -50,7 +50,7 @@ export class CacheMigrations extends Context.Reference<Migrations>('juno/store/C
   defaultValue: () => cacheMigrations,
 }) {}
 
-export interface StoreOptions {
+interface StoreOptions {
   /** Tests only: the cache migrations of a later build. */
   readonly cacheMigrations?: Migrations
 }

@@ -1,4 +1,4 @@
-export { Store, type StoreError, type StoreOptions, StoreReader, StoreWriter } from './clients'
+export { Store, type StoreError, StoreReader, StoreWriter } from './clients'
 export { DEFAULT_LIVE_QUERY_DEBOUNCE, Invalidation, type InvalidationKeys, invalidate, liveQuery } from './invalidation'
 export { MIGRATIONS_TABLE, migrate } from './migrate'
 export { CACHE_RESET_EPOCH, cacheMigrations } from './migrations/cache'
