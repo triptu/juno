@@ -1,6 +1,7 @@
-import { ChatMessageId, type MessageMenu, type ReplyTarget } from '@juno/agent-contract'
+import { ChatMessageId, junoText, type MessageMenu, type ReplyTarget } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
 import { parseOutput } from '../router/output'
+import { blocksOf } from '../router/rich'
 import { ownerWords } from '../router/input'
 import type { Store } from '../store/store'
 
@@ -30,7 +31,7 @@ export function messageMenu(store: Store, target: ReplyTarget): typeof MessageMe
   if (row === undefined) return null
   const reply = row.kind === 'user' ? store.db.prepare("SELECT id FROM messages WHERE origin_op = ? AND kind = 'juno' AND id > ? AND redacted_gen IS NULL ORDER BY id LIMIT 1").get(row.op, row.id) as { id: number } | undefined : undefined
   const words = ownerWords(row.text)
-  const preview = row.kind === 'user' ? Buffer.from(row.text).subarray(words.from, words.to).toString() : parseOutput(row.text).bubbles.map((bubble) => bubble.text).join('\n')
+  const preview = row.kind === 'user' ? Buffer.from(row.text).subarray(words.from, words.to).toString() : parseOutput(row.text).bubbles.map((bubble) => junoText(blocksOf(bubble.spans.map(({ text }) => ({ text }))))).join('\n')
   const messageId = ChatMessageId.make(String(row.id))
   return { messageId, revision: Revision.make(row.version), sheet: { messages: [{ messageId, preview: preview.split('\n')[0] ?? '', at: row.at }], ...(reply ? { offerReply: ChatMessageId.make(String(reply.id)) } : {}) } }
 }

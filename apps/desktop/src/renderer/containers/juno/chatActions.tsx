@@ -3,7 +3,7 @@
  * requests, the remove sheet, the reaction picker and the row callbacks.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, type ChatItem, type ChatPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { chatCopy, junoText, type ChatItem, type ChatPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
 import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } from '@juno/state'
 import { messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
@@ -169,7 +169,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
 
 function quoteOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): Quote {
   const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
-  const preview = item?._tag === 'juno' ? item.body.map((part) => part.text).join('').trim().split('\n', 1)[0] ?? '' : item?._tag === 'card' ? item.card._tag : ''
+  const preview = item?._tag === 'juno' ? junoText(item.body).trim().split('\n', 1)[0] ?? '' : item?._tag === 'card' ? item.card._tag : ''
   return { target, preview }
 }
 
@@ -202,7 +202,7 @@ async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatIte
   const reaction: ReactionTarget | undefined = target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : target.kind === 'card' ? { _tag: 'card', id: target.id } : undefined
   const message = await messages.menu(target.kind === 'owner' ? { _tag: 'owner', opId: target.opId } : target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : { _tag: 'card', id: target.id })
   const item = items.find((i) => (target.kind === 'owner' ? i._tag === 'owner' && i.opId === target.opId : target.kind === 'juno' ? i._tag === 'juno' && i.id === target.id : false))
-  const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? item.body.map((part) => part.text).join('') : ''
+  const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? junoText(item.body) : ''
   const span = selection ?? { text, startByte: 0, endByte: new TextEncoder().encode(text).length }
   const chosen = await popupContextMenu([
     { id: 'copy', label: copy.copy },
