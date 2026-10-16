@@ -58,6 +58,7 @@ const MIN_QUESTION_WORDS = 4
 
 export interface ClarityPrefs {
   readonly typos?: boolean
+  /** Off unless true: lowercase "i" and "im" stay lowercase. */
   readonly capitalI?: boolean
   readonly questionMarks?: boolean
   readonly longSentences?: boolean
@@ -114,7 +115,7 @@ function fixEditable(text: string, fixes: ClarityFix[], prefs: ClarityPrefs): st
   let out = text.replace(/\b([A-Za-z']+)\b/g, (word) => {
     const to = prefs.typos === false ? undefined : TYPOS[word.toLowerCase()]
     if (to === undefined) return word
-    const replacement = prefs.capitalI === false && word === word.toLowerCase() && to.startsWith('I') ? to.toLowerCase() : matchCase(word, to)
+    const replacement = prefs.capitalI !== true && word === word.toLowerCase() && to.startsWith('I') ? to.toLowerCase() : matchCase(word, to)
     if (replacement === word) return word
     fixes.push({ kind: 'typo', from: word, to: replacement, label: `${word} → ${replacement}` })
     return replacement
@@ -125,7 +126,7 @@ function fixEditable(text: string, fixes: ClarityFix[], prefs: ClarityPrefs): st
     return word
   })
   out = out.replace(/(^|\s)i(?=$|[\s,!?;:']|\.(?!e\b))/g, (_whole, before: string) => {
-    if (prefs.capitalI === false) return `${before}i`
+    if (prefs.capitalI !== true) return `${before}i`
     fixes.push({ kind: 'capital-i', from: 'i', to: 'I', label: 'i → I' })
     return `${before}I`
   })

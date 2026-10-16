@@ -237,7 +237,7 @@ Only **Wrong place** can stop a send. In Main, typing pauses compare the draft w
 All text fixes run **after sending**, only for messages sent from Juno. Enter never waits for grammar. Messages above 1,000 Unicode characters are skipped entirely. Code blocks, inline code, quotes, links, emails and mentions are excluded from checks and masked from the model input.
 
 - **Typos and doubled words:** the local typo table and accidental repeated words. Turning it off also suppresses doubled-word findings from grammar.
-- **Capital i:** standalone lowercase “i” to “I”. Turning it off preserves lowercase “i”; grammar never flags lowercase style.
+- **Capital i:** standalone lowercase “i” to “I”. Off by default, so lowercase style is never flagged unless the user turns it on; grammar never flags lowercase style.
 - **Question marks:** add a missing “?” to a clear question.
 - **Long sentences:** note a sentence over 40 words, without rewriting it.
 - **Grammar (uses AI):** clear it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, missing or doubled words, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Validated minimal word edits cannot change surrounding prose.

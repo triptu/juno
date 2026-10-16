@@ -256,25 +256,28 @@ test('New chat warns about the audience of the chosen channel', async ({ juno })
 })
 
 
-test('Capital i can be turned off in General and stays off after reopening Settings', async ({ juno, fake }) => {
+test('lowercase i is never flagged unless Capital i is turned on in General', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.openSettings('General')
-  const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
-  await expect(capital).toBeChecked()
-  await expect(juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true })).toBeChecked()
-  await juno.win.screenshot({ path: test.info().outputPath('send-checks-settings.png') })
-  await capital.uncheck()
-  await juno.tabs.close('Settings')
-  await juno.openSettings('General')
-  await expect(capital).not.toBeChecked()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.send('i think so')
   await juno.topic.expectSent('i think so')
-  await expect(juno.topic.checkBar.bar).toHaveCount(0)
   await juno.win.waitForTimeout(1100)
   await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
-  expect(posts(fake)[0]!.args['text']).toBe('i think so')
+
+  await juno.openSettings('General')
+  const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
+  await expect(capital).not.toBeChecked()
+  await expect(juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true })).toBeChecked()
+  await juno.win.screenshot({ path: test.info().outputPath('send-checks-settings.png') })
+  await capital.check()
+  await juno.tabs.close('Settings')
+  await juno.openSettings('General')
+  await expect(capital).toBeChecked()
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.send('i think so too')
+  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
+  expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so', 'i think so too'])
 })
 
 test('grammar offers its broken as an inline edit after sending', async ({ juno, fake }) => {
@@ -358,8 +361,8 @@ test('Wrong place and grammar can be turned off without disabling local checks',
   await juno.topic.expectSent(BILL_REPLY)
   await juno.topic.send('its broken')
   await juno.topic.expectSent('its broken')
-  await juno.topic.send('i think so')
-  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
+  await juno.topic.send('teh plan')
+  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('teh → the')
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
   try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task IN ('routeCheck', 'grammarCheck')").get()).toEqual({ n: 0 }) }
   finally { db.close() }

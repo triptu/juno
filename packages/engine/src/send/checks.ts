@@ -1,6 +1,6 @@
 /** Wrong-place prechecks and post-send message suggestions (SPEC section 8). */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
-import { type ClarityFinding, type RouteFinding, type SendCheck } from '@juno/contract'
+import { sendCheckDefaults, type ClarityFinding, type RouteFinding, type SendCheck, type SendCheckPref } from '@juno/contract'
 import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
@@ -183,8 +183,11 @@ export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dai
 const checkPrefs = Effect.gen(function* () {
   const sql = yield* StoreReader
   const rows = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key LIKE 'sendCheck.%'`
-  const disabled = new Set(rows.filter((row) => row.value_json === 'false').map((row) => row.key))
-  const enabled = (key: string) => !disabled.has(`sendCheck.${key}`)
+  const saved = new Map(rows.map((row) => [row.key, row.value_json]))
+  const enabled = (key: SendCheckPref) => {
+    const value = saved.get(`sendCheck.${key}`)
+    return value === 'true' ? true : value === 'false' ? false : sendCheckDefaults[key]
+  }
   return { wrongPlace: enabled('wrongPlace'), typos: enabled('typos'), capitalI: enabled('capitalI'), questionMarks: enabled('questionMarks'), longSentences: enabled('longSentences'), grammar: enabled('grammar') }
 })
 
