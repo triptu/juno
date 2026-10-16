@@ -1,0 +1,1 @@
+- 10-17 00:45 · ui-fixes-1017 · The active presence dot takes its own green, --presence-active (#1F9D66 light, #34C77B dark), 3:1 or better on the menu; --success read grey at 6px. Its ring is the menu's raised surface.

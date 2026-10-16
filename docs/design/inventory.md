@@ -61,7 +61,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 
 **Avatar menu** (popover, 248px wide, anchored top 36px right 0, z 20, padding 6, radius 13, `--pop-shadow`):
 
-- Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface: `--success` when active, hollow `--foreground-muted` ring when away) + "Tushar" 13/600 + "Active" or "Away until 9am" 12 muted (`untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch); padding `8 8 10`.
+- Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface `--surface-raised`: `--presence-active` green when active, hollow `--foreground-muted` ring when away) + "Tushar" 13/600 + "Active" or "Away until 9am" 12 muted (`untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch); padding `8 8 10`.
 - Separator 1px `--border-default`, margin `2 6 4`.
 - Items 32px, radius 6, padding 0 8, gap 10, icon 15 `--foreground-subtle`, label 13, right hint 11 muted:
   - Set yourself away (`moon`) / Set yourself active (`sun`) — by state; calls `presence.set` and lasts until the next switch in the active hours

@@ -65,6 +65,8 @@ export const darkColors = stylex.createTheme(colors, {
 
   // The light danger red is 3.0:1 on ink; this one is 6.6:1.
   '--danger': '#F8767E',
+  // 5.6:1 on the raised surface; the light green is 3.5:1 there.
+  '--presence-active': '#34C77B',
 
   '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
   // The dark toast is paper on ink, so the check takes more of the green.

@@ -94,6 +94,9 @@ export const colors = stylex.defineVars({
   // text on their own (2.1:1 and 3.9:1).
   '--danger': '#C41E3A',
   '--success': '#00674F',
+  // The active presence dot: a clear green, 3:1 against the menu it sits in.
+  // --success is too deep for a 6px dot (it reads grey, 1.8:1 in dark).
+  '--presence-active': '#1F9D66',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 
