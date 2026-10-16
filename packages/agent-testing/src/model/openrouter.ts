@@ -38,8 +38,8 @@ export interface ToolCallAnswer {
 export interface FakeOpenRouterOptions {
   /** When set, a request with any other key is refused with 401, as OpenRouter does. */
   readonly key?: string
-  /** What a chat request answers: fixed text, or text from the request. Default: one bubble. */
-  readonly answer?: string | ((request: OpenRouterRequest) => string | ToolCallAnswer)
+  /** What a chat request answers: fixed text, or text from the request, now or later. Default: one bubble. */
+  readonly answer?: string | ((request: OpenRouterRequest) => string | ToolCallAnswer | Promise<string | ToolCallAnswer>)
   /** How the decision model (System One, `/api/v1/systemone`) answers an auto-review. Default: `fakeReview`. */
   readonly review?: (request: FakeReviewRequest) => FakeReviewAnswers
 }
@@ -191,7 +191,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         res.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: { message: 'User not found.', code: 401 } }))
         return
       }
-      const text = request.compaction ? compactorText(users, compactions++) : typeof answer === 'string' ? answer : answer(request)
+      const text = request.compaction ? compactorText(users, compactions++) : typeof answer === 'string' ? answer : await answer(request)
       if (path === '/api/v1/messages') anthropic(res, model, text)
       else completions(res, model, text)
     })().catch(() => {
