@@ -572,6 +572,8 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 - Title "Notifications" serif 34; sub "During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." 14 lh 1.6 subtle max-width 620.
 - Section pattern: heading 15/600, optional sub 13 muted (gap 2), then a group card (radius 10, bg surface, `--card-ring`, rows divided by 1px `--border-subtle`).
 
+**Permission line** (only while macOS does not let Juno notify), between the title and Hours, the page's gap above and below: a group card with one row (padding `8 14`): bell-slash 15 · "macOS is not showing Juno's notifications." 13 · secondary button 28px **Open Notification Settings** when denied, **Allow notifications** when macOS has not asked yet. `role="status"`, named "Notification permission".
+
 **Hours** (no sub)
 
 - Two rows, min-height 60, padding `8 14` (the ListRow settings inset, the same at both ends), gap 12: label block 260px (title 14/500, sub 12 muted) · flexible gap · seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm").
@@ -594,6 +596,12 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 - One line, margin-top 8, 14 subtle: "**4** messages interrupted you. Juno held **23**." (counts 600 tabular) · ghost button **Show why** 28px. Zero: "Nothing has interrupted you today."
 - Show why expands a list under the line (rows padding `8 2`, divided by 1px `--border-subtle`, 13px): time 44px muted tabular · place 120px subtle · "**Sender** text" ellipsis; the reason on a second line, 12 muted. Only messages that notified are listed, newest first. The button becomes **Hide**.
+
+**Test** (no sub), after Today
+
+- One row in a group card, padding `8 14`: label block 260px ("Test notification" / sub "If none appears, Focus or Do Not Disturb may be on.") · secondary button 28px **Send test notification**. When Juno cannot read macOS's permission, a ghost subtle button **Open Notification Settings** sits before it, gap 8.
+
+[built 10-16] Send test notification posts through main's `Notifier` (title "Juno", body "Notifications from Juno look like this."); its click brings the window forward. The permission comes from `main/notificationPermission.ts`, which asks `UNUserNotificationCenter` through koffi; the page renders once both the settings and the permission are known, and keeps the last answer so it opens again without a shift. macOS keeps the permission per bundle id: `app.juno.desktop` when packaged, Electron's own id in development. An unsigned build may never show the prompt or may read as not determined; Allow notifications then opens System Settings, and a reading that does not come back within 3 s counts as unknown. Gallery fixtures: `Permission/denied`, `Permission/not-determined`, `Permission/unknown`.
 
 [built M10] `NotificationsPage` in `@juno/views`, Settings › Notifications (§14), opened from the avatar menu's Notifications or the section list. Hours selects are named "Notifications from", "Active in Slack to" and so on, and the day toggles are `DayToggles` in `@juno/ui` (Monday first). A change to the hours saves at once; What matters to you saves on blur. Removing a tag shows "#incidents: When it matters" with Undo. Show why opens a popover above the button (340px) with at most 50 messages, each as the time and place, the sender and text, and the reason, rather than expanding a list under the line: no interaction may move the page (the gallery's shift test), and the button keeps its label. Notification hours are not written to Slack's own schedule yet (docs/backlog.md), so the Notifications sub does not mention the phone.
 

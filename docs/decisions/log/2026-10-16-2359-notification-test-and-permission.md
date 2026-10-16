@@ -1,0 +1,1 @@
+- 10-16 23:59 · notify-test · Settings › Notifications gets Send test notification, sent through main's notifier like a message's, and a line at the top while macOS does not let Juno notify; main reads the permission from `UNUserNotificationCenter` through koffi, and when it cannot tell, Open Notification Settings shows beside the test button instead.
