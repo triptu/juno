@@ -181,14 +181,14 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       cache.bodies = new Map()
     }
 
-    // Reactions, in Slack's order.
-    const reactions = new Map<string, Array<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>>()
+    // Reactions, in Slack's order, with who reacted as far as Slack listed them.
+    const reactions = new Map<string, Array<StoredReaction>>()
     if (rows.length > 0) {
       const statement = reactionsStatement(target.channel, stored.map((row) => row.ts))
-      for (const reaction of yield* sql.unsafe<{ ts: string; name: string; count: number; me: 0 | 1 }>(statement.sql, statement.params)) {
+      for (const reaction of yield* sql.unsafe<{ ts: string; name: string; count: number; me: 0 | 1; user_ids_json: string | null }>(statement.sql, statement.params)) {
         let list = reactions.get(reaction.ts)
         if (list === undefined) reactions.set(reaction.ts, (list = []))
-        list.push(reaction)
+        list.push({ name: reaction.name, count: reaction.count, me: reaction.me, users: parseJson<Array<string>>(reaction.user_ids_json ?? '[]') ?? [] })
       }
     }
 
@@ -208,6 +208,9 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // Senders, then bodies: parse with what the maps hold, read what they lacked, parse those again.
     const senders = new Set<string>()
     for (const row of rows) if (row.user_id !== null) senders.add(row.user_id)
+    // The people a reaction's popover names, read with the senders.
+    if (selfId !== undefined) senders.add(selfId)
+    for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
     yield* readUsers(sql, cache, senders)
     const wanted = { users: new Set<string>(), channels: new Set<string>(), emoji: new Set<string>() }
     const lookups = {
@@ -274,7 +277,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const groupStart = startsGroup(previous, group)
       previous = group
       const intent = intentOf(actions, row)
-      const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions)
+      const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions, selfId)
       const topicId = target.kind === 'main' && row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts)) ? threadId(row) : undefined
       const title = topicId === undefined ? undefined : titles.get(topicId)
       const key = [
@@ -287,7 +290,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         title?.ai_title,
         conversation?.name,
         pending.get(row.ts)?.state,
-        ...own.flatMap((r) => [r.name, r.count, r.me]),
+        ...own.flatMap((r) => [r.name, r.count, r.me, r.users.join(',')]),
       ].join('\u0001')
       const held = cache.rows.get(row.ts)
       let view: MessageView
@@ -304,6 +307,9 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
           ? personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null })
           : personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId))
         people.set(view.senderId, person)
+      }
+      for (const reaction of view.reactions) {
+        for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, personFrom(id, cache.users.get(id), cache.people.get(id)))
       }
     }
     cache.rows = nextRows
@@ -396,7 +402,7 @@ interface ShapeInput {
   readonly groupStart: boolean
   readonly isRoot: boolean
   readonly selfId: string | undefined
-  readonly reactions: ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>
+  readonly reactions: ReadonlyArray<StoredReaction>
   readonly thread: ThreadLink | undefined
   readonly cache: MessageCache
   readonly pending: PendingRow | undefined
@@ -410,10 +416,12 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     const url = standard === undefined ? (input.cache.emoji.get(base) ?? undefined) : undefined
     const alias = standard === undefined && url === undefined ? input.cache.emojiAliases.get(base) : undefined
     const unicode = standard ?? (alias === undefined ? undefined : emojiUnicode(alias))
+    const users = shownReactors(reaction.users, reaction.me === 1, input.selfId)
     return {
       name: reaction.name,
       count: reaction.count,
       me: reaction.me === 1,
+      ...(users.length === 0 ? {} : { users }),
       ...(unicode === undefined ? {} : { unicode }),
       ...(url === undefined ? {} : { url }),
     }
@@ -532,18 +540,33 @@ function withIntents(rows: ReadonlyArray<WindowMessage>, intents: Intents, targe
 }
 
 /** Stored reactions with the user's own intents applied: theirs counted in or out, an emptied chip gone, a new one last. */
-function withReactionIntents(
-  stored: ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }>,
-  intents: ReadonlyMap<string, boolean>,
-): ReadonlyArray<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }> {
-  const out: Array<{ readonly name: string; readonly count: number; readonly me: 0 | 1 }> = []
+/** A reaction as the store holds it: `users` is who Slack listed, which may be fewer than `count`. */
+interface StoredReaction {
+  readonly name: string
+  readonly count: number
+  readonly me: 0 | 1
+  readonly users: ReadonlyArray<string>
+}
+
+/** How many people a reaction's popover names; the rest are "and N others". */
+const REACTORS_SHOWN = 10
+
+/** The reactors the view gets: you first when you reacted, then the others in Slack's order, at most REACTORS_SHOWN. */
+function shownReactors(users: ReadonlyArray<string>, me: boolean, selfId: string | undefined): ReadonlyArray<string> {
+  const others = users.filter((id) => id !== selfId)
+  return (me && selfId !== undefined ? [selfId, ...others] : others).slice(0, REACTORS_SHOWN)
+}
+
+function withReactionIntents(stored: ReadonlyArray<StoredReaction>, intents: ReadonlyMap<string, boolean>, selfId: string | undefined): ReadonlyArray<StoredReaction> {
+  const out: Array<StoredReaction> = []
+  const without = (users: ReadonlyArray<string>) => users.filter((id) => id !== selfId)
   for (const reaction of stored) {
     const want = intents.get(reaction.name)
     if (want === undefined || want === (reaction.me === 1)) out.push(reaction)
-    else if (want) out.push({ name: reaction.name, count: reaction.count + 1, me: 1 })
-    else if (reaction.count > 1) out.push({ name: reaction.name, count: reaction.count - 1, me: 0 })
+    else if (want) out.push({ name: reaction.name, count: reaction.count + 1, me: 1, users: selfId === undefined ? reaction.users : [...without(reaction.users), selfId] })
+    else if (reaction.count > 1) out.push({ name: reaction.name, count: reaction.count - 1, me: 0, users: without(reaction.users) })
   }
-  for (const [name, want] of intents) if (want && !stored.some((reaction) => reaction.name === name)) out.push({ name, count: 1, me: 1 })
+  for (const [name, want] of intents) if (want && !stored.some((reaction) => reaction.name === name)) out.push({ name, count: 1, me: 1, users: selfId === undefined ? [] : [selfId] })
   return out
 }
 

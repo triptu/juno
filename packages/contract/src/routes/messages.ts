@@ -50,6 +50,12 @@ export const ReactionView = Schema.Struct({
   unicode: Schema.optionalKey(Schema.String),
   /** The image, for custom emoji. A reaction with neither shows `:name:`. */
   url: Schema.optionalKey(Schema.String),
+  /**
+   * Who reacted, as user ids in the window's `refs.people`: you first when
+   * `me`, then the others in Slack's order, at most ten. Slack may list fewer
+   * than `count`; the rest are "and N others".
+   */
+  users: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type ReactionView = typeof ReactionView.Type
 

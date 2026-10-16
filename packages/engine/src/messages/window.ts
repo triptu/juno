@@ -103,7 +103,7 @@ export function hiddenCopiesStatement(channel: string): Statement {
 /** Reactions of the window's messages, by primary key. */
 export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): Statement {
   return {
-    sql: `SELECT ts, name, count, me FROM reactions WHERE channel = ? AND ts IN (${ts.map(() => '?').join(', ')}) ORDER BY ts, rowid`,
+    sql: `SELECT ts, name, count, me, user_ids_json FROM reactions WHERE channel = ? AND ts IN (${ts.map(() => '?').join(', ')}) ORDER BY ts, rowid`,
     params: [channel, ...ts],
   }
 }
