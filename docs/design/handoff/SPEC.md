@@ -232,13 +232,19 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 ### Checks on send
 
-Pressing Enter runs fast checks before anything goes out. If they find nothing, the message just sends. If they flag something, a compact bar appears inside the composer. Enter takes the first option and Esc returns to editing.
+Only **Wrong place** can stop a send. In Main, typing pauses compare the draft with the last 3–4 open topics. Enter reads a ready answer only. A confident match offers “Looks like a reply to *Staging bill doubled since August*”, with **Post in thread** or **Send to Main**. No ready answer means send. This check stays before sending because it chooses where the message goes. The audience warning remains a non-blocking typing hint.
 
-1. **Wrong place.** In a Main thread, your message is compared against the last 3–4 topics in that channel. If it looks like a reply to one, you get "Looks like a reply to *Staging bill doubled since August*", with Post in thread or Send to Main.
-2. **Local checks.** Typos and doubled words correct a small typo table and accidental repeated words. Capital i changes a standalone lowercase "i" to "I". Question marks add a missing "?" to a question. Long sentences note a sentence over 40 words without rewriting it. Each can be turned off independently in Settings › General. These checks work with AI assist off.
-3. **Grammar (uses AI).** Flags only clear errors: it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, a missing or doubled word, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Code, quotes, URLs, emails and mentions are protected. Only minimal word edits survive validation; surrounding text cannot change.
+All text fixes run **after sending**, only for messages sent from Juno. Enter never waits for grammar. Messages above 1,000 Unicode characters are skipped entirely. Code blocks, inline code, quotes, links, emails and mentions are excluded from checks and masked from the model input.
 
-Grammar runs alongside the wrong-place precheck while typing pauses, in Main and threads. It has a hard 800 ms budget and is cached by text hash, including empty and timed-out results. Enter reads ready results alongside local checks; it never waits for a model. Grammar findings merge with local fixes in the same bar: Fix and send or Send as is. A long-sentence note alone offers Send or Keep editing. Wrong-place findings appear first. Calls record their known cost in the AI cache, including failed calls.
+- **Typos and doubled words:** the local typo table and accidental repeated words. Turning it off also suppresses doubled-word findings from grammar.
+- **Capital i:** standalone lowercase “i” to “I”. Turning it off preserves lowercase “i”; grammar never flags lowercase style.
+- **Question marks:** add a missing “?” to a clear question.
+- **Long sentences:** note a sentence over 40 words, without rewriting it.
+- **Grammar (uses AI):** clear it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, missing or doubled words, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Validated minimal word edits cannot change surrounding prose.
+
+Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. The local pass and one grammar request start after the send is accepted; no typing-pause grammar requests or retries. Grammar has a 700 ms request deadline, leaving room for delivery and paint within the one-second display window. Calls count against a persisted 500-call daily limit, including failed requests, and record known cost in AI spend.
+
+A finding appears only within one second of sending and while the user is still on that topic with the app visible. Leaving the topic, late answers or missing rows drop it silently, without a badge, queue or later popup. The quiet overlay on the sent message shows the small fix, such as “its → it's”, and one action: **Edit**. It reserves no space and never moves other messages. Edit opens the existing inline editor with the fixes as an unsaved draft; only the user's Save changes the message. Esc dismisses the suggestion. Ignoring it dismisses it after eight seconds. A changed message cannot receive an old suggestion.
 
 ![Send-time routing check](screenshots/05-ui.png)
 
@@ -515,13 +521,13 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: Checks before sending (below); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); and Use fast classifier (section 15).
+- **General**: Message checks (below); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 
 ⌘,, the avatar menu's Settings and Juno › Settings… in the app menu open it at General. The avatar menu's Notifications opens it at Notifications. The Juno menu's Settings, and Add a provider when Juno needs a model, open it at Juno, with the key field focused while no provider is set up. Picking a section shows it in the same tab and adds nothing to Back.
 
-**Settings › General › Checks before sending** has the lead line "Quick checks when you press Enter. Juno only suggests small fixes and never rewrites your message." It holds six switches, each saved separately: Wrong place, Typos and doubled words, Capital i, Question marks, Long sentences, and Grammar (uses AI). All default on. Wrong place applies in Main and requires AI assist. Grammar is available only with AI assist and an OpenRouter key; otherwise it is disabled with "Turn on AI assist to check grammar." or "Add an OpenRouter key to check grammar." Its saved choice is retained while unavailable.
+**Settings › General › Message checks** has the lead line "Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit." It holds six switches, each saved separately: Wrong place, Typos and doubled words, Capital i, Question marks, Long sentences, and Grammar (uses AI). All default on. Wrong place applies in Main and requires AI assist. Grammar is available only with AI assist and an OpenRouter key; otherwise it is disabled with "Turn on AI assist to check grammar." or "Add an OpenRouter key to check grammar." Its saved choice is retained while unavailable.
 
 **Settings › Ignored** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
 
@@ -546,7 +552,7 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 | Topic titles | Generation | New thread, and on drift | Always, with no marker |
 | Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | Likely reply to one of them |
 | Local checks | Pure rules | On send, according to each preference | Concrete fixes or a long sentence found |
-| Grammar check | Decision, minimal span edits | Typing pause, at most 800 ms; ready results read on send | Clear grammar errors only |
+| Grammar check | Decision, minimal span edits | After a Juno send, one 700 ms request | Within one second, still on the visible topic; clear errors only |
 | Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
 | Settled, suggest resolve | Decision | Each new message | High score |
 | Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |

@@ -47,6 +47,7 @@ function minimal(edit: GrammarEdit): boolean {
 }
 
 function clean(output: Static<typeof GrammarCheckOutput>, input: GrammarCheckInput): Static<typeof GrammarCheckOutput> {
+  if ([...input.draft].length > 1000) return { edits: [] }
   const ranges = editableRanges(input.draft)
   let end = -1
   const edits = output.edits.toSorted((a, b) => a.start - b.start).filter((edit) => {
@@ -61,9 +62,13 @@ function clean(output: Static<typeof GrammarCheckOutput>, input: GrammarCheckInp
 }
 
 export const grammarCheck = defineStructuredTask<GrammarCheckInput, typeof GrammarCheckOutput>({
-  name: 'grammarCheck', version: 1, tier: 'decision', timeoutMillis: 800,
+  name: 'grammarCheck', version: 2, tier: 'decision', timeoutMillis: 700, maxAttempts: 1, maxTokens: 256,
   prompt, tool: { name: 'grammar', description: 'Report only clear grammar errors as minimal word edits.' },
   output: GrammarCheckOutput, clean,
-  render: ({ draft }) => draft,
+  render: ({ draft }) => {
+    const ranges = editableRanges(draft)
+    // Preserve UTF-16 offsets while withholding code, quotes, links and mentions.
+    return draft.split('').map((char, i) => char === '\n' || ranges.some(({ start, end }) => i >= start && i < end) ? char : ' ').join('')
+  },
   key: () => '',
 })

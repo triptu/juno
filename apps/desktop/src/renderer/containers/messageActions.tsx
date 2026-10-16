@@ -23,6 +23,7 @@ import { editMessage, registry, type MessageWindow } from '@juno/state'
 import { InlineEdit, type MessageActions } from '@juno/views'
 import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
+import { useSentSuggestion } from './topic/sentSuggestion'
 import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
@@ -40,6 +41,7 @@ export interface MessageActionsInput {
 }
 
 export interface MessageActionsOutput {
+  readonly suggestion: ReturnType<typeof useSentSuggestion>
   readonly actions: MessageActions
   readonly activeMessage: string | undefined
   readonly confirmingDelete: string | undefined
@@ -96,6 +98,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   'use no memo'
   const channel = detail.channel.id
   const { editing, setEditing, confirming, setConfirming, latest } = useEditState(detail, list)
+  const suggestion = useSentSuggestion(detail.id, list, setEditing, editing)
   const [picker, setPicker] = useState<Picker | undefined>(undefined)
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   useEffect(preloadPicker, [])
@@ -136,6 +139,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
 
   return {
     actions,
+    suggestion,
     ...rowHandlers(actions, rowMessage, latest, scrollRef, composer),
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,

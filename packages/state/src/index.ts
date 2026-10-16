@@ -226,3 +226,5 @@ export {
 } from './attachments'
 
 export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
+
+export { sentSuggestionAtom, dismissSentSuggestion } from './sentSuggestions'

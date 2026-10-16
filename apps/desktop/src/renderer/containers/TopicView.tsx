@@ -128,6 +128,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
     activeMessage: messageActions.activeMessage,
     confirmingDelete: messageActions.confirmingDelete,
     editing: messageActions.editing,
+    suggestion: messageActions.suggestion,
     onRowKey: messageActions.onRowKey,
     onToggleReaction: messageActions.onToggleReaction,
     onPersonMenu: personMenu,

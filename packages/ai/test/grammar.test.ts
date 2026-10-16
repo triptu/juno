@@ -8,6 +8,19 @@ describe('grammar validation', () => {
   it('accepts only the flagged words and keeps the surrounding lowercase text', () => {
     expect(check('i think its broken', [edit('its', "it's", 8)])).toEqual({ ok: true, value: { edits: [edit('its', "it's", 8)] } })
   })
+  it('skips above 1000 Unicode characters and masks protected input without moving offsets', () => {
+    const long = 'its broken ' + 'a'.repeat(990)
+    expect(check(long, [edit('its', "it's")])).toEqual({ ok: true, value: { edits: [] } })
+    const boundary = 'its broken ' + 'a'.repeat(989)
+    expect(check(boundary, [edit('its', "it's")])).toEqual({ ok: true, value: { edits: [edit('its', "it's")] } })
+    const draft = '> its broken\n`their is` https://example.com <@U123> its broken'
+    const masked = grammarCheck.render({ draft })
+    expect(masked.length).toBe(draft.length)
+    expect(masked).not.toContain('their')
+    expect(masked).not.toContain('https')
+    expect(masked).not.toContain('U123')
+    expect(masked.indexOf('its broken')).toBe(draft.lastIndexOf('its broken'))
+  })
   it('rejects malformed output', () => {
     expect(check('its broken', [{ from: 'its', to: "it's" }]).ok).toBe(false)
     expect(check('its broken', [edit('its', "it's", -1)]).ok).toBe(false)

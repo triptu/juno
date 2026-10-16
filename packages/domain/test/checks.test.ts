@@ -119,3 +119,7 @@ describe('clarity preferences', () => {
     expect(clarityCheck(text, { capitalI: false, longSentences: false })).toBeUndefined()
   })
 })
+
+it('keeps lowercase contractions when Capital i is off', () => {
+  expect(clarityCheck('im ready', { capitalI: false })?.fixed).toBe("i'm ready")
+})

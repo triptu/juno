@@ -45,7 +45,7 @@ export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPee
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
         </Surface>
       </Section>
-      <Section heading="Checks before sending" sub="Quick checks when you press Enter. Juno only suggests small fixes and never rewrites your message.">
+      <Section heading="Message checks" sub="Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <div {...stylex.props(styles.stack)}>
             {checks.map(({ key, enabled }) => <Checkbox key={key} label={checkLabels[key]} checked={enabled && !(key === 'grammar' && grammarUnavailable)} disabled={key === 'grammar' && grammarUnavailable !== undefined} onChange={(event) => onCheckChange(key, event.currentTarget.checked)} />)}

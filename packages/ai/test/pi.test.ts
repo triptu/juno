@@ -69,6 +69,13 @@ describe('PiAiProvider decisions', () => {
     expect(faux.state.callCount).toBe(1)
   })
 
+  it('never retries a grammar request with invalid output', async () => {
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('grammar', { prose: 'rewrite it' }))])
+    const decision = await Effect.runPromise(provider.decide(tasks.grammarCheck, { draft: 'its broken' }))
+    expect(noDecision(decision)).toEqual({ reason: 'invalid-output', attempts: 1 })
+    expect(faux.state.callCount).toBe(1)
+  })
+
   it('retries once on invalid tool output, then takes the valid answer', async () => {
     const { provider, faux } = scripted([
       fauxAssistantMessage(fauxToolCall('route', { replyTo: 'not-a-topic', confidence: 0.8 })),

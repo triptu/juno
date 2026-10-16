@@ -1,25 +1,10 @@
-/**
- * The checks on send (spec section 8, architecture 10).
- *
- * `messages.precheck` runs while typing pauses in a Main: it asks
- * `routeCheck` whether the draft replies to one of the channel's latest
- * open topics and keeps the answer in `ai_cache` under
- * `cacheKeyOf(routeCheck, input)`. The input covers the draft and the
- * topics' latest messages, so an answer is for exactly that draft in that
- * channel state. Nothing reads it live, so the write invalidates nothing.
- *
- * `messages.check` runs on Enter and never waits for a model: the
- * wrong-place finding is the stored answer for the draft as it is, if there
- * is one, and the clarity check (pure, `@juno/domain`) runs on every draft.
- * Local checks also run while AI assist is off. No answer yet, a low confidence, a
- * timeout or a spent budget find nothing, so the message just sends.
- */
+/** Wrong-place prechecks and post-send message suggestions (SPEC section 8). */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
 import { type ClarityFinding, type RouteFinding, type SendCheck } from '@juno/contract'
 import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import { grammarFor, askGrammar } from './grammar'
+import { askGrammar } from './grammar'
 import { aiAssistOn, decisionProviderAvailable } from '../ai'
 import type { EngineConfig } from '../config'
 import { channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userName, type JoinedRow, type UserRow } from '../topicRows'
@@ -174,35 +159,24 @@ const clarity = (text: string, options: ClarityPrefs): ClarityFinding | undefine
 export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '') return {}
+    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return {}
     return yield* Effect.gen(function* () {
       const options = yield* checkPrefs
       const ai = (yield* aiAssistOn) && (yield* decisionProviderAvailable)
-      const [route, grammar] = yield* Effect.all([
-        ai && options.wrongPlace && input.threadTs === undefined ? wrongPlace(input) : Effect.succeed(undefined),
-        ai && options.grammar ? grammarFor(input.text) : Effect.succeed([]),
-      ], { concurrency: 'unbounded' })
-      let fixed = input.text
-      for (const edit of grammar.toReversed()) fixed = fixed.slice(0, edit.start) + edit.to + fixed.slice(edit.start + edit.from.length)
-      const local = clarity(fixed, options)
-      const labels = [...new Set([...grammar.map((edit) => `${edit.from} → ${edit.to}`), ...(local?.fixes ?? [])])]
-      const found = labels.length === 0 ? local : { fixes: labels, fixed: local?.fixed ?? fixed, confidence: 0.9, ...(local?.note === undefined ? {} : { note: local.note }) }
-      return { ...(route === undefined ? {} : { route }), ...(found === undefined ? {} : { clarity: found }) }
+      const route = ai && options.wrongPlace && input.threadTs === undefined ? yield* wrongPlace(input) : undefined
+      return route === undefined ? {} : { route }
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
-/** Grammar and Main routing run together while typing pauses, so Enter finds ready answers. */
+/** Only Main routing runs while typing pauses. */
 export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '') return
+    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return
     yield* Effect.gen(function* () {
       if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return
       const options = yield* checkPrefs
-      yield* Effect.all([
-        options.wrongPlace && input.threadTs === undefined ? askRoute(input, budget) : Effect.void,
-        options.grammar ? askGrammar(input.text) : Effect.void,
-      ], { concurrency: 'unbounded' })
+      if (options.wrongPlace && input.threadTs === undefined) yield* askRoute(input, budget)
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
@@ -213,3 +187,24 @@ const checkPrefs = Effect.gen(function* () {
   const enabled = (key: string) => !disabled.has(`sendCheck.${key}`)
   return { wrongPlace: enabled('wrongPlace'), typos: enabled('typos'), capitalI: enabled('capitalI'), questionMarks: enabled('questionMarks'), longSentences: enabled('longSentences'), grammar: enabled('grammar') }
 })
+
+/** Runs only after a Juno send. Local fixes and grammar never hold Enter. */
+export const postcheckMessage = (text: string, clientMsgId: string): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig> =>
+  Effect.gen(function* () {
+    if ([...text].length > 1000 || text.trim() === '') return {}
+    const open = yield* (yield* Workspace).current
+    if (open === undefined) return {}
+    return yield* Effect.gen(function* () {
+      const options = yield* checkPrefs
+      const local = clarity(text, options)
+      const ai = options.grammar && (yield* aiAssistOn) && (yield* decisionProviderAvailable)
+      const grammar = (ai ? yield* askGrammar(text, clientMsgId) : []).filter((edit) => options.typos || edit.kind !== 'doubled')
+      // Run local rules on the grammar result so overlapping doubled-word fixes apply once.
+      let fixed = text
+      for (const edit of grammar.toReversed()) fixed = fixed.slice(0, edit.start) + edit.to + fixed.slice(edit.start + edit.from.length)
+      const found = grammar.length === 0 ? local : clarity(fixed, options)
+      const fixes = [...new Set([...grammar.map((edit) => `${edit.from} → ${edit.to}`), ...(found?.fixes ?? [])])]
+      const result = fixes.length === 0 ? found : { fixes, fixed: found?.fixed ?? fixed, confidence: 0.9, ...(found?.note === undefined ? {} : { note: found.note }) }
+      return result === undefined ? {} : { clarity: result }
+    }).pipe(Effect.provide(open.context), Effect.orDie)
+  })

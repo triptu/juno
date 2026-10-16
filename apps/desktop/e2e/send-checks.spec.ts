@@ -1,9 +1,3 @@
-// The checks on send (spec section 8) with the fake AI: the wrong-place bar
-// in a Main posts in the thread or sends to Main, the clarity bar fixes and
-// sends or sends as is, Esc and editing return to the draft, the audience
-// line in a public channel, Enter never waits for a slow model, and with AI
-// assist off only local checks run. The wrong-place question is asked while
-// typing pauses; a test waits for its answer in `ai_cache` before Enter.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
@@ -88,51 +82,41 @@ test('Send to Main sends it where it was typed', async ({ juno, fake, userData }
   await expect(topic.composer).toBeFocused()
 })
 
-test('the clarity bar lists minimal fixes; Fix and send sends the fixed text', async ({ juno, fake }) => {
+test('local fixes send first and Edit opens a draft without changing the sent message', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await topic.send(TYPOS)
-  await expect(topic.checkBar.bar).toContainText('3 fixes: recieve → receive, the the → the, add ?')
-  await topic.composer.press('Enter')
-  await topic.expectSent(FIXED)
-  expect(posts(fake).map((call) => call.args['text'])).toEqual([FIXED])
-})
-
-test('Send as is sends the text as typed', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
-  await juno.sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await topic.send(TYPOS)
-  await topic.checkBar.choose('Send as is')
-  await topic.expectSent(TYPOS)
+  await juno.topic.send(TYPOS)
+  await juno.topic.expectSent(TYPOS)
+  await expect(juno.topic.checkBar.bar).toHaveCount(0)
+  const suggestion = juno.win.locator('[data-send-suggestion]')
+  await expect(suggestion).toContainText('recieve → receive')
+  const row = suggestion.locator('..')
+  const before = await row.boundingBox()
+  await suggestion.getByRole('button', { name: 'Edit', exact: true }).click()
+  const editor = row.getByRole('textbox', { name: 'Edit message' })
+  await expect(editor).toHaveValue(FIXED)
   expect(posts(fake).map((call) => call.args['text'])).toEqual([TYPOS])
+  expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
+  await row.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
+  expect(before).not.toBeNull()
 })
 
-test('Esc returns to editing with the draft as it was, and an edit closes the bar too', async ({ juno, fake }) => {
+test('Esc dismisses a post-send suggestion without changing the message or shifting its row', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await topic.send(TYPOS)
-  await expect(topic.checkBar.bar).toBeVisible()
-  await topic.composer.press('Escape')
-  await expect(topic.checkBar.bar).toHaveCount(0)
-  await expect(topic.composer).toHaveValue(TYPOS)
-  await expect(topic.composer).toBeFocused()
-
-  await topic.composer.press('Enter')
-  await expect(topic.checkBar.bar).toBeVisible()
-  await topic.composer.press('End')
-  await topic.composer.pressSequentially('?')
-  await expect(topic.checkBar.bar).toHaveCount(0)
-  await expect(topic.composer).toHaveValue(`${TYPOS}?`)
-  expect(posts(fake)).toHaveLength(0)
+  await juno.topic.send(TYPOS)
+  await juno.topic.expectSent(TYPOS)
+  const suggestion = juno.win.locator('[data-send-suggestion]')
+  await expect(suggestion).toBeVisible()
+  const row = juno.topic.list.locator('[data-message-row]').filter({ hasText: TYPOS })
+  const before = await row.boundingBox()
+  await juno.topic.composer.press('Escape')
+  await expect(suggestion).toHaveCount(0)
+  expect(await row.boundingBox()).toEqual(before)
+  expect(posts(fake).map((call) => call.args['text'])).toEqual([TYPOS])
 })
 
 test('hiring and people details in a public channel show the amber line while typing', async ({ juno }) => {
@@ -215,8 +199,7 @@ test('with AI assist off, local checks still work and models stay off', async ({
     await topic.send(BILL_REPLY)
     await topic.expectSent(BILL_REPLY)
     await topic.send(TYPOS)
-    await expect(topic.checkBar.bar).toContainText('recieve → receive')
-    await topic.checkBar.choose('Send as is')
+    await expect(restarted.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
     await topic.expectSent(TYPOS)
     await expect(topic.checkBar.bar).toHaveCount(0)
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
@@ -248,18 +231,17 @@ test('New chat checks a channel draft and can post in the suggested thread', asy
   expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
 })
 
-test('New chat offers the same clarity fixes before sending', async ({ juno, fake }) => {
+test('New chat sends local mistakes unchanged and offers an edit on its topic', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.tabs.newTabButton.click()
   await juno.newChat.pickConversation('eng', 'eng')
   await juno.newChat.write(TYPOS)
   await juno.newChat.send()
-  await expect(juno.newChat.root.getByRole('button', { name: 'Fix and send' })).toBeVisible()
-  expect(posts(fake)).toHaveLength(0)
-  await juno.newChat.send()
+  await expect(juno.newChat.root).toHaveCount(0)
+  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
   await expect.poll(() => posts(fake).length).toBe(1)
-  expect(posts(fake)[0]!.args['text']).toBe(FIXED)
+  expect(posts(fake)[0]!.args['text']).toBe(TYPOS)
 })
 
 test('New chat warns about the audience of the chosen channel', async ({ juno }) => {
@@ -290,54 +272,78 @@ test('Capital i can be turned off in General and stays off after reopening Setti
   await juno.topic.send('i think so')
   await juno.topic.expectSent('i think so')
   await expect(juno.topic.checkBar.bar).toHaveCount(0)
+  await juno.win.waitForTimeout(1100)
+  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
   expect(posts(fake)[0]!.args['text']).toBe('i think so')
 })
 
-test('grammar fixes its broken and merges with local fixes in the same bar', async ({ juno, fake, userData }) => {
+test('grammar offers its broken as an inline edit after sending', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
-  for (const [draft, fixed] of [["its broken", "it's broken"], ["its broken and i recieve errors", "it's broken and I receive errors"]]) {
-    const since = Date.now()
-    await juno.topic.composer.fill(draft!)
-    await routeAnswered(userData, fake.teamId, since, 'grammarCheck')
-    await juno.topic.composer.press('Enter')
-    await expect(juno.topic.checkBar.bar).toContainText("its → it's")
-    await juno.topic.checkBar.choose('Fix and send')
-    await juno.topic.expectSent(fixed!)
-  }
+  await juno.topic.send('its broken')
+  await juno.topic.expectSent('its broken')
+  await expect(juno.topic.checkBar.bar).toHaveCount(0)
+  const suggestion = juno.win.locator('[data-send-suggestion]')
+  await expect(suggestion).toContainText("its → it's")
+  await suggestion.getByRole('button', { name: 'Edit', exact: true }).click()
+  await expect(juno.topic.list.getByRole('textbox', { name: 'Edit message' })).toHaveValue("it's broken")
+  expect(posts(fake)[0]!.args['text']).toBe('its broken')
+  await juno.topic.list.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
 })
 
-test('grammar over 800 ms is skipped and a repeated draft uses its cached timeout', async ({ juno, fake, slackApp, userData, running }) => {
+test('a slow grammar response never holds Enter or shows a late suggestion', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_200 })
   try {
     const restarted = new Juno(again.app, again.win)
     await restarted.sidebar.row(POSTGRES).open()
-    const since = Date.now()
-    await restarted.topic.composer.fill('its broken')
-    await routeAnswered(userData, fake.teamId, since, 'grammarCheck')
-    await restarted.topic.composer.press('Enter')
+    await restarted.topic.send('its broken')
     await expect(restarted.topic.composer).toHaveValue('', { timeout: 500 })
-    await expect(restarted.topic.checkBar.bar).toHaveCount(0)
     await restarted.topic.expectSent('its broken')
-    await restarted.topic.composer.fill('its broken')
-    await restarted.win.waitForTimeout(500)
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-    try {
-      const rows = db.prepare("SELECT created_at, output_json FROM ai_cache WHERE task = 'grammarCheck'").all()
-      expect(rows).toHaveLength(1)
-      expect(rows[0]!.output_json).toBe('{"edits":[]}')
-      expect(Number(rows[0]!.created_at)).toBeGreaterThanOrEqual(since)
-    } finally { db.close() }
-    await restarted.topic.composer.press('Enter')
-    await expect(restarted.topic.composer).toHaveValue('', { timeout: 500 })
+    await restarted.win.waitForTimeout(1500)
+    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
     await expect(restarted.topic.checkBar.bar).toHaveCount(0)
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+    try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'").get()).toEqual({ n: 1 }) }
+    finally { db.close() }
   } finally { await again.close() }
 })
 
+test('messages above 1000 characters do not run grammar or local fixes', async ({ juno, fake, userData }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(POSTGRES).open()
+  const text = 'its broken ' + 'a'.repeat(990)
+  expect(text.length).toBe(1001)
+  await juno.topic.send(text)
+  await juno.topic.expectSent(text)
+  await juno.win.waitForTimeout(1100)
+  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
+  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+  try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'").get()).toEqual({ n: 0 }) }
+  finally { db.close() }
+})
+
+test('leaving the topic drops a pending grammar result, including after returning', async ({ juno, fake, slackApp, userData, running }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 600 })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.sidebar.row(POSTGRES).open()
+    await restarted.topic.send('its broken')
+    await restarted.sidebar.row(RINA).open()
+    await restarted.win.waitForTimeout(1100)
+    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
+    await restarted.sidebar.row(POSTGRES).open()
+    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
+  } finally { await again.close() }
+})
 
 test('Wrong place and grammar can be turned off without disabling local checks', async ({ juno, fake, userData }) => {
   await juno.signIn()
@@ -353,7 +359,7 @@ test('Wrong place and grammar can be turned off without disabling local checks',
   await juno.topic.send('its broken')
   await juno.topic.expectSent('its broken')
   await juno.topic.send('i think so')
-  await expect(juno.topic.checkBar.bar).toContainText('i → I')
+  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
   try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task IN ('routeCheck', 'grammarCheck')").get()).toEqual({ n: 0 }) }
   finally { db.close() }

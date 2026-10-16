@@ -1,29 +1,23 @@
-import { AiProvider, cacheKeyOf, grammarCheck, validateOutput } from '@juno/ai'
-import { StoreReader, StoreWriter } from '@juno/store'
+import { AiProvider, grammarCheck } from '@juno/ai'
+import { StoreWriter } from '@juno/store'
 import { Clock, Effect } from 'effect'
 
-const keyOf = (draft: string) => cacheKeyOf(grammarCheck, { draft }).inputHash
+/** A persisted daily call cap includes failed requests and survives restarts. */
+const DAILY_CALLS = 500
 
-/** Timeouts are cached as empty findings too: another Enter never re-asks. */
-export const grammarFor = (draft: string) => Effect.gen(function* () {
-  const sql = yield* StoreReader
-  const key = keyOf(draft)
-  const rows = yield* sql<{ output_json: string }>`SELECT output_json FROM ai_cache WHERE task = 'grammarCheck' AND key = ${key} AND input_hash = ${key}`
-  if (rows[0] === undefined) return []
-  const checked = validateOutput(grammarCheck, { draft }, JSON.parse(rows[0].output_json))
-  return checked.ok ? checked.value.edits : []
-})
-
-/** Reserve the hash before starting, so concurrent pauses share one call. */
-export const askGrammar = (draft: string) => Effect.gen(function* () {
+export const askGrammar = (draft: string, clientMsgId: string) => Effect.gen(function* () {
+  if ([...draft].length > 1000 || grammarCheck.render({ draft }).trim() === '') return []
   const sql = yield* StoreWriter
-  const key = keyOf(draft)
-  const now = String(yield* Clock.currentTimeMillis)
+  const now = yield* Clock.currentTimeMillis
+  const dayStart = String(Math.floor(now / 86_400_000) * 86_400_000)
   const claimed = yield* sql<{ key: string }>`INSERT INTO ai_cache (task, key, input_hash, output_json, model, created_at)
-    VALUES ('grammarCheck', ${key}, ${key}, '{"edits":[]}', '', ${now}) ON CONFLICT (task, key) DO NOTHING RETURNING key`
-  if (claimed.length === 0) return
+    SELECT 'grammarCheck', ${clientMsgId}, ${clientMsgId}, '{"edits":[]}', '', ${String(now)}
+    WHERE (SELECT COUNT(*) FROM ai_cache WHERE task = 'grammarCheck' AND CAST(created_at AS INTEGER) >= CAST(${dayStart} AS INTEGER)) < ${DAILY_CALLS}
+    ON CONFLICT (task, key) DO NOTHING RETURNING key`
+  if (claimed.length === 0) return []
   const decision = yield* (yield* AiProvider).decide(grammarCheck, { draft })
   const output = decision._tag === 'Decided' ? decision.value : { edits: [] }
   yield* sql`UPDATE ai_cache SET output_json = ${JSON.stringify(output)}, model = ${decision.meta.model}, cost_usd = ${decision.meta.costUsd ?? null}
-    WHERE task = 'grammarCheck' AND key = ${key}`
+    WHERE task = 'grammarCheck' AND key = ${clientMsgId}`
+  return output.edits
 })

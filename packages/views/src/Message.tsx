@@ -63,6 +63,7 @@ export interface MessageProps {
   readonly active?: boolean
   readonly confirmingDelete?: boolean
   /** The inline edit field, in place of the body while the message is edited. */
+  readonly suggestion?: { readonly label: string; readonly onEdit: () => void } | undefined
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
@@ -150,6 +151,7 @@ export const Message = memo(function Message({
   active = false,
   confirmingDelete = false,
   editor,
+  suggestion,
   onOpenThread,
   onChannel,
   onLink,
@@ -204,6 +206,12 @@ export const Message = memo(function Message({
         message.mentionsMe && styles.rowMention,
       )}
     >
+      {suggestion !== undefined && editor === undefined ? (
+        <span data-send-suggestion="" {...stylex.props(styles.suggestion)}>
+          <Text variant="meta" tone="muted" truncate>{suggestion.label}</Text>
+          <TextButton onClick={suggestion.onEdit}>Edit</TextButton>
+        </span>
+      ) : null}
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
@@ -276,12 +284,28 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined && suggestion === undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
   )
 })
 
 const styles = stylex.create({
+  suggestion: {
+    position: 'absolute',
+    insetInlineEnd: spacing['--space-2'],
+    top: 0,
+    zIndex: z['--z-toolbar'],
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    maxWidth: '80%',
+    paddingInline: spacing['--space-2'],
+    paddingBlock: spacing['--space-1'],
+    backgroundColor: colors['--background'],
+    borderRadius: radii['--radius-sm'],
+    border: '1px solid',
+    borderColor: colors['--border-default'],
+  },
   row: {
     position: 'relative',
     display: 'flex',

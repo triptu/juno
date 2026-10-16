@@ -24,6 +24,8 @@ interface TaskBase<I> {
   readonly version: number
   readonly tier: Tier
   readonly timeoutMillis: number
+  readonly maxAttempts?: number
+  readonly maxTokens?: number
   /** The system prompt. */
   readonly prompt: string
   /** The user message: the input as plain text the model reads. */

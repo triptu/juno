@@ -90,7 +90,7 @@ export interface ClarityResult {
 
 type Segment = { readonly text: string; readonly protect: boolean }
 
-const PROTECTED = /(<[^>]+>|`+[^`\n]*(?:`+|$)|https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+|[@#][\w'-]+(?: [A-Z][\w'-]+)*|:[a-z0-9_+\-']+(?:::skin-tone-[2-6])?:)/g
+const PROTECTED = /(\[[^\]\n]*\]\([^)\n]*\)|<[^>]+>|`+[^`\n]*(?:`+|$)|https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+|[@#][\w'-]+(?: [A-Z][\w'-]+)*|:[a-z0-9_+\-']+(?:::skin-tone-[2-6])?:)/g
 
 /** Splits a line into editable text and spans the check must not touch. */
 function segments(line: string): Segment[] {
@@ -114,7 +114,7 @@ function fixEditable(text: string, fixes: ClarityFix[], prefs: ClarityPrefs): st
   let out = text.replace(/\b([A-Za-z']+)\b/g, (word) => {
     const to = prefs.typos === false ? undefined : TYPOS[word.toLowerCase()]
     if (to === undefined) return word
-    const replacement = matchCase(word, to)
+    const replacement = prefs.capitalI === false && word === word.toLowerCase() && to.startsWith('I') ? to.toLowerCase() : matchCase(word, to)
     if (replacement === word) return word
     fixes.push({ kind: 'typo', from: word, to: replacement, label: `${word} → ${replacement}` })
     return replacement

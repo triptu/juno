@@ -15,8 +15,12 @@ export function fakeGrammarCheck({ draft }: GrammarCheckInput): { edits: Grammar
     { pattern: /(?<=the )affect(?= was\b)/gi, to: 'effect', kind: 'confusion' },
     { pattern: /(?<=might )loose\b/gi, to: 'lose', kind: 'confusion' },
     { pattern: /\bcould of\b/gi, to: 'could have', kind: 'confusion' },
-    { pattern: /\bneed(?= send\b)/gi, to: 'need to', kind: 'missing' },
+    { pattern: /\bneed(?= (?:send|check)\b)/gi, to: 'need to', kind: 'missing' },
     { pattern: /\bthe the\b/gi, to: 'the', kind: 'doubled' },
+    { pattern: /(?<=they )has\b/gi, to: 'have', kind: 'agreement' },
+    { pattern: /(?<=she )have\b/gi, to: 'has', kind: 'agreement' },
+    { pattern: /(?<=we )was\b/gi, to: 'were', kind: 'agreement' },
+    { pattern: /(?<=he )go\b/gi, to: 'goes', kind: 'agreement' },
     { pattern: /(?<=they )is\b/gi, to: 'are', kind: 'agreement' },
   ]
   return { edits: rules.flatMap(({ pattern, to, kind }) => [...draft.matchAll(pattern)].map((match) => ({

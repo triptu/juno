@@ -88,6 +88,8 @@ export default defineFixtures(
     },
     // Your own message: the delete confirm in the toolbar's place, and the inline edit field in the body's.
     Own: {
+      'suggested-edit': one(ownMessage, { actions: noopActions, suggestion: { label: "its → it's", onEdit: noop } }),
+      'suggested-edit-narrow': one(ownMessage, { suggestion: { label: 'recieve → receive, the the → the, add ?', onEdit: noop } }, { width: 320 }),
       'confirm-delete': one(ownMessage, { startsGroup: true, actions: noopActions, confirmingDelete: true }),
       'confirm-delete-continuation': one(ownMessage, { actions: noopActions, confirmingDelete: true }),
       editing: one(ownMessage, { startsGroup: true, actions: noopActions, editor: <InlineEdit value={ownText} onChange={noop} onSave={noop} onCancel={noop} /> }),

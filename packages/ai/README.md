@@ -40,7 +40,8 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 
 | Task | Path | Timeout | Why |
 | --- | --- | --- | --- |
-| `routeCheck` | classifier | 1.5 s | On Enter, the user waits. Jev p95 is 0.9 s, plus about 0.3 s when the connection is cold; past the budget the draft posts to Main unchecked. A chat model here is slower than the budget. |
+| `routeCheck` | classifier | 1.5 s | Runs during typing pauses in Main; Enter reads only a ready result. |
+| `grammarCheck` | chat decision | 700 ms | One request after sending; show within one second on the same topic or discard. |
 | `urgencyGate` | classifier | 2 s | Per incoming message not settled by the owner's settings. A notification may be 2 s late; past that the message is decided as with AI assist off (DMs and mentions notify). Room for one retry. |
 | `settledScore` | classifier | 3 s | After 2 minutes idle; nobody waits. Room for one retry. |
 | `parseCommand` | chat decision | 4 s | ⌘K fallback after the grammar; search results show meanwhile. Luna p50 1.5 s, p95 2.3 s, the odd call near 3 s. |
@@ -111,4 +112,6 @@ What the numbers say:
 - Hard-code a model slug anywhere but `defaultModelPrefs` (and the bench's setup list).
 - Throw. A failure is a `NoDecision` or a `failed` event.
 
-`grammarCheck` uses the `decision` chat model (currently GPT-6 Luna): a classifier cannot return span edits. It has an 800 ms timeout, a structured edit schema, and a filter that rejects rewrites, case changes, punctuation changes, overlaps and protected spans. The send path reads ready cached results and merges them with local clarity fixes. `pnpm ai:eval grammarCheck` exercises invented lowercase and grammar cases with the fake; `JUNO_AI=live` uses an available key.
+`grammarCheck` uses the `decision` chat model (currently GPT-6 Luna, provisional pending the grammar benchmark): a classifier cannot return span edits. One attempt, at most 256 output tokens, 700 ms deadline. The structured edit schema rejects rewrites, case and punctuation changes, overlaps and protected spans. Code, quotes, links and mentions are masked before the request. Messages over 1,000 Unicode characters are skipped. The post-send overlay opens an unsaved inline edit draft; it never sends a correction automatically.
+
+`pnpm --filter @juno/ai grammar:bench --fake` checks the 40 labelled fixtures (20 clean, 20 with errors). `pnpm --filter @juno/ai grammar:bench` uses the engine's `OPENROUTER_API_KEY` environment variable for five rounds through OpenRouter, one warmup per model and one request at a time. It reports full-answer p50/p95, errors, exact-correction precision and recall, and known cost. See [the study](../../docs/research/grammar-post-send.md).

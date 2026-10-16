@@ -3,7 +3,7 @@ import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { Message, type MessageActions } from './Message'
+import { Message, type MessageActions, type MessageProps } from './Message'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -58,6 +58,7 @@ export interface MessageListProps {
   readonly activeMessage?: string | undefined
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
+  readonly suggestion?: { readonly ts: string; readonly value: MessageProps['suggestion'] } | undefined
   readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
   /**
    * A key on a selected row that the list does not use itself (it moves the
@@ -165,6 +166,7 @@ export function MessageList({
   activeMessage,
   confirmingDelete,
   editing,
+  suggestion,
   onRowKey,
   onOpenThread,
   onChannel,
@@ -230,6 +232,7 @@ export function MessageList({
                 actions={actions}
                 active={activeMessage === item.message.ts}
                 confirmingDelete={confirmingDelete === item.message.ts}
+                suggestion={suggestion?.ts === item.message.ts ? suggestion.value : undefined}
                 editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}
                 onChannel={onChannel}
