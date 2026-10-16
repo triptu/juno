@@ -309,14 +309,17 @@ module outboxProtocol {
   // On a queued or failed post nothing goes to Slack: an edit rewrites the
   // row's text, a reaction on a failed post is refused, and a delete removes
   // the row like Delete draft.
+  // A delete also ends a row still waiting on the post (a lookup found the
+  // post absent after an edit was queued on it).
   def localAction(k: int, kind: str): State =
     if (kind == "delete") { ...s, row: s.row.set(k, "gone"), due: s.due.exclude(Set(k)),
-      discarded: s.discarded.union(Set(k)) } else s
+      discarded: s.discarded.union(Set(k)),
+      act: if (actPending(k)) s.act.set(k, "dropped") else s.act, stale: s.stale.exclude(Set(k)) } else s
   // On a sending or unknown post the row depends on the post (depends_on);
   // on a stored message it carries the ts. A newer intent replaces a waiting
   // row; a row with a call out sends again after its answer.
   action queueAction(k: int, kind: str): bool = {
-    val local = Set("queued", "failed").contains(s.row.get(k)) and not(actPending(k))
+    val local = Set("queued", "failed").contains(s.row.get(k)) and (kind == "delete" or not(actPending(k)))
     val queued = { ...s, actKind: s.actKind.set(k, kind),
       act: s.act.set(k, if (actInFlight(k)) s.act.get(k) else "waiting"),
       stale: if (actInFlight(k)) s.stale.union(Set(k)) else s.stale }

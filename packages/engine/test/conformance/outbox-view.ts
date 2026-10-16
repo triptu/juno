@@ -74,12 +74,22 @@ const PENDING = new Set(['waiting', 'transit', 'accepted'])
 const held = (s: S, k: number) =>
   s.server.get(k)! + s.dup.get(k)! - s.deletes.get(k)! - ([...s.slack].some((c) => c.key === k && c.what === 'gone') ? 1 : 0)
 
-/** Whether the user's own delete of the draft's message reached Slack by `index`. The model counts it nowhere else. */
+/**
+ * Whether the user's own delete of the draft's message reached Slack by `index`. The model counts it nowhere
+ * else. A delete that replaced an edit whose call was out (`stale`) is not the call Slack accepted then.
+ */
 const userDeleted = (states: ReadonlyArray<TraceState>, index: number, k: number) =>
   states.slice(1, index + 1).some((state, i) => {
     const prev = sOf(states[i]!)
     const next = sOf(state)
-    return next.label === 'actAccept' && next.target === k && prev.actKind.get(k) === 'delete' && ![...prev.slack].some((c) => c.key === k && c.what === 'gone')
+    return (
+      next.label === 'actAccept' &&
+      next.target === k &&
+      prev.actKind.get(k) === 'delete' &&
+      !prev.stale.has(k) &&
+      // Once the copy is the message, the user's delete removes it.
+      (prev.kept.get(k) === 'copy' || ![...prev.slack].some((c) => c.key === k && c.what === 'gone'))
+    )
   })
 
 /**
@@ -119,7 +129,9 @@ export function expectedDraft(states: ReadonlyArray<TraceState>, index: number, 
     lookup,
     ...(waits ? { due: s.due.has(k) } : {}),
     slack: Math.max(0, held(s, k) - (userDeleted(states, index, k) ? 1 : 0)),
-    copy: s.copyRow.get(k)!,
+    // The copy that became the message goes with the user's delete, once its echo or answer is stored.
+    copy:
+      s.kept.get(k) === 'copy' && userDeleted(states, index, k) && (s.connected || s.act.get(k) === 'done') ? 'none' : s.copyRow.get(k)!,
     kept: s.kept.get(k)!,
     act: PENDING.has(act) ? `${act} ${s.actKind.get(k)}` : 'idle',
   }
