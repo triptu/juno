@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
@@ -24,7 +24,8 @@ export interface SettingsGeneralProps {
   readonly onPeekKeyChange: (key: PeekKeyName) => void
   readonly mirrorReads: boolean
   readonly onMirrorReadsChange: (enabled: boolean) => void
-  readonly catchUp: { readonly available: number; readonly pending: number }
+  /** Earlier reads still to send to Slack (`reads.catchUpStatus`); undefined until it arrives. */
+  readonly catchUp: { readonly available: number; readonly pending: number } | undefined
   readonly onCatchUp: () => void
   readonly classifier: boolean
   readonly onClassifierChange: (enabled: boolean) => void
@@ -56,12 +57,14 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
             onChange={(event) => onMirrorReadsChange(event.currentTarget.checked)}
             description="When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read." />
           <div {...stylex.props(styles.catchUp)} aria-live="polite">
-            {mirrorReads && catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
-              : mirrorReads && catchUp.available > 0 ? <Button variant="ghost" size="sm" tone="muted" onClick={onCatchUp}>Also mark what you already read in Juno</Button> : null}
+            {!mirrorReads || catchUp === undefined ? null
+              : catchUp.pending > 0 ? <Text variant="meta" tone="muted">Marking earlier reads in Slack · {catchUp.pending} remaining</Text>
+              : catchUp.available > 0 ? <Button variant="secondary" size="sm" onClick={onCatchUp}>Mark earlier reads in Slack</Button>
+              : <Text variant="meta" tone="muted">Earlier reads are in Slack</Text>}
           </div>
         </Surface>
       </Section>
-      <Section heading="AI assist" sub="Use a fast model for decisions. Off uses a small chat model for these decisions.">
+      <Section heading="AI assist" sub="A fast model decides which messages notify you, when a message may be in the wrong place and when a topic looks settled. Off, a slower chat model decides.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <Checkbox label="Use fast classifier" checked={classifier} onChange={(event) => onClassifierChange(event.currentTarget.checked)} />
         </Surface>
@@ -140,8 +143,10 @@ const styles = stylex.create({
   card: {
     paddingInline: spacing['--space-3-5'],
   },
+  // Starts on the switch label's text: past the 15px box and the Checkbox's 10px gap.
   catchUp: {
     minHeight: spacing['--space-8'],
+    paddingInlineStart: `calc(${sizes['--checkbox']} + ${spacing['--space-2-5']})`,
     display: 'flex',
     alignItems: 'center',
   },

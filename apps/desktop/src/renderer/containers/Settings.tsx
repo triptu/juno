@@ -77,7 +77,7 @@ function General() {
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
   return <SettingsGeneral quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
-    catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
+    catchUp={catchUp._tag === 'Success' ? catchUp.value : undefined}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 

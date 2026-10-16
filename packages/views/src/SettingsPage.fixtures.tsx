@@ -53,6 +53,7 @@ export default defineFixtures(
     },
     States: {
       'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
+      'read-catch-up-done': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
