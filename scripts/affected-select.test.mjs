@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { decodeMappings, formatMap, mergePartials, sourceAt } from './coverage-map.mjs'
-import { galleryComponents, mapProblem, MAX_MAP_AGE_DAYS, selectSpecs } from './affected-select.mjs'
+import { changedMembers, driverSpecs, galleryComponents, mapProblem, MAX_MAP_AGE_DAYS, selectSpecs } from './affected-select.mjs'
 
 const TOPIC = 'apps/desktop/e2e/topic.spec.ts'
 const SIDEBAR = 'apps/desktop/e2e/sidebar.spec.ts'
@@ -58,8 +58,13 @@ test('shared e2e support runs everything', () => {
   assert.deepEqual(select({ changed: ['packages/fake-slack/src/server.ts'] }), { all: 'packages/fake-slack/src/server.ts is shared e2e support' })
 })
 
-test('a bundled file whose functions never ran runs everything', () => {
-  assert.match(select({ changed: ['packages/contract/src/schema.ts'] }).all, /module-level code only/)
+test('a file with module-level code only picks the specs that ran the files importing it', () => {
+  const result = select({ changed: ['packages/contract/src/schema.ts'], imports: { 'packages/views/src/Topic.tsx': ['packages/contract/src/schema.ts'] } })
+  assert.deepEqual(picked(result), { [TOPIC]: ['packages/contract/src/schema.ts has module-level code only; packages/views/src/Topic.tsx imports it and ran here'] })
+})
+
+test('a file with module-level code only that nothing known imports runs everything', () => {
+  assert.match(select({ changed: ['packages/contract/src/schema.ts'] }).all, /module-level code only and nothing that imports it ran/)
 })
 
 test('an app file outside the bundles, such as a style sheet, runs everything', () => {
@@ -89,7 +94,7 @@ test('a new file picks the specs that ran the known files importing it, through 
 })
 
 test('a new file nothing known imports runs everything', () => {
-  assert.match(select({ changed: ['packages/views/src/Orphan.tsx'], added: ['packages/views/src/Orphan.tsx'] }).all, /nothing that imports it has coverage/)
+  assert.match(select({ changed: ['packages/views/src/Orphan.tsx'], added: ['packages/views/src/Orphan.tsx'] }).all, /is new and nothing that imports it ran/)
 })
 
 test('an importer edited since the map adds its specs, as it may call the file now', () => {
@@ -154,4 +159,68 @@ test('a gallery spec that reads every route, or names no component, walks every 
   assert.equal(galleryComponents("const routes = await readRoutes(page)\nawait open(page, 'Sidebar')", gallery), '*')
   assert.deepEqual(galleryComponents("const routes = (await readRoutes(page)).filter((route) => ['Composer'].includes(route.component))", gallery), ['Composer'])
   assert.equal(galleryComponents("await page.goto('/')", gallery), '*')
+})
+
+const DRIVER_TEXT = `import { type Page } from '@playwright/test'
+
+export async function press(win: Page): Promise<void> {
+  await win.mouse.down()
+}
+
+export class Palette {
+  constructor(private readonly win: Page) {}
+
+  /** The rows of one section. */
+  section(name: string) {
+    return this.win.getByRole('group', { name })
+  }
+
+  async pick(name: string) {
+    await press(this.win)
+  }
+}
+
+export class Sidebar {
+  section(name: string) {
+    return name
+  }
+}
+
+export class Juno {
+  get palette(): Palette {
+    return new Palette(this.win)
+  }
+}
+`
+const lineOf = (text) => DRIVER_TEXT.split('\n').findIndex((line) => line.includes(text)) + 1
+
+test('a driver change is placed in the class member or top-level function it falls in', () => {
+  assert.deepEqual([...changedMembers(DRIVER_TEXT, [lineOf('getByRole')])], ['Palette.section'])
+  assert.deepEqual([...changedMembers(DRIVER_TEXT, [lineOf('The rows of one section')])], ['Palette.section'])
+  assert.deepEqual([...changedMembers(DRIVER_TEXT, [lineOf('mouse.down')])], ['press'])
+  assert.deepEqual([...changedMembers(DRIVER_TEXT, [lineOf('constructor')])], ['Palette'])
+  assert.deepEqual([...changedMembers(DRIVER_TEXT, [lineOf("from '@playwright/test'")])], [])
+  assert.equal(changedMembers(DRIVER_TEXT, [lineOf('export class Palette')]), undefined)
+})
+
+test('a changed driver member reaches the specs that use it on its class, and through its callers', () => {
+  const specTexts = new Map([
+    ['palette.spec.ts', 'await juno.palette.section("Recent")'],
+    ['sidebar.spec.ts', 'await juno.sidebar.section("Channels")'],
+    ['pick.spec.ts', 'await juno.palette.pick("Home")'],
+    ['other.spec.ts', 'await juno.topic.send("hi")'],
+  ])
+  const reached = (lines) => driverSpecs({ changed: [{ text: DRIVER_TEXT, lines }], driverTexts: [DRIVER_TEXT], specTexts })
+  assert.deepEqual([...reached([lineOf('getByRole')]).keys()], ['palette.spec.ts'])
+  // press is used by Palette.pick, which pick.spec.ts calls.
+  assert.deepEqual([...reached([lineOf('mouse.down')]).keys()], ['pick.spec.ts'])
+  assert.equal(reached([lineOf('export class Palette')]), undefined)
+})
+
+test('a driver change runs only the specs it reaches, and one outside a member runs everything', () => {
+  const driverFile = 'apps/desktop/e2e/driver/juno.ts'
+  const base = { specs: [SIDEBAR, TOPIC], map, support: new Set([driverFile]), own: (spec) => new Set([spec]), app: new Set(), isNew: () => false, drift: new Set(), importers: () => [] }
+  const narrowed = selectSpecs({ ...base, changed: [driverFile], driver: () => new Map([[TOPIC, "it uses the driver's TopicPane.send, which changed or uses what changed"]]) })
+  assert.deepEqual(picked(narrowed), { [TOPIC]: ["it uses the driver's TopicPane.send, which changed or uses what changed"] })
+  assert.match(selectSpecs({ ...base, changed: [driverFile] }).all, /outside a named driver member/)
 })

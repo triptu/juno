@@ -6,6 +6,7 @@
 //   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
 //   pnpm affected --plan --files packages/ui/src/Chip.tsx   plan for those files
 //   pnpm affected --graph         pick desktop specs by the import graph, not the coverage map
+//   pnpm affected --plan --range a..b   plan for what changed between two commits
 //
 // The change is every file that differs from the merge base, committed or not,
 // plus new files. An import graph over apps/ and packages/ (relative imports,
@@ -39,7 +40,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
-import { galleryComponents, mapProblem, selectSpecs } from './affected-select.mjs'
+import { driverSpecs, galleryComponents, mapProblem, selectSpecs } from './affected-select.mjs'
 import { forwardSignals } from './remote/children.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -53,10 +54,14 @@ const git = (...args) => {
   return result.stdout.split('\n').filter(Boolean)
 }
 
-// --files a,b plans for those files instead of the working tree's changes.
+// --files a,b plans for those files instead of the working tree's changes;
+// --range a..b for what changed between two commits (to replay a past merge).
+const range = argv.includes('--range') ? argv[argv.indexOf('--range') + 1].split('..') : undefined
 const changed = argv.includes('--files')
   ? argv[argv.indexOf('--files') + 1].split(',')
-  : [...new Set([...git('diff', '--name-only', base), ...git('ls-files', '--others', '--exclude-standard')])].toSorted()
+  : range
+    ? git('diff', '--name-only', range[0], range[1])
+    : [...new Set([...git('diff', '--name-only', base), ...git('ls-files', '--others', '--exclude-standard')])].toSorted()
 const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'apps', 'packages').filter((file) => existsSync(join(root, file))))
 
 /** Files every suite depends on: a change to one runs everything. */
@@ -207,8 +212,31 @@ for (const file of [...files].filter((path) => path.startsWith('apps/desktop/src
 // The fake Slack's files the app also runs (the shared Slack schema) are left to the coverage map.
 for (const file of app) if (!/^(apps\/desktop\/e2e|packages\/fake-slack|packages\/agent-testing)\//.test(file) && !supportRoots.includes(file)) support.delete(file)
 const specItems = [...files]
-  .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|live\.spec/.test(file))
+  .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|panel-shots\.spec|live\.spec/.test(file))
   .map((file) => ({ suite: 'desktop', id: file, inputs: new Set([...app, ...support, ...closure(file)]) }))
+
+/** A changed file's text after the change, or undefined when it was deleted. */
+function textAtChange(file) {
+  if (range) {
+    const shown = spawnSync('git', ['show', `${range[1]}:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    return shown.status === 0 ? shown.stdout : undefined
+  }
+  return existsSync(join(root, file)) ? readFileSync(join(root, file), 'utf8') : undefined
+}
+
+/** The lines of a changed file that the change added or edited (where lines were only removed, the line before). */
+function changedLines(file) {
+  const tracked = range ?? (git('ls-files', '--', file).length > 0 ? [base] : undefined)
+  if (tracked === undefined) return (textAtChange(file) ?? '').split('\n').map((_, index) => index + 1)
+  const lines = []
+  for (const hunk of git('diff', '-U0', ...tracked, '--', file).filter((line) => line.startsWith('@@'))) {
+    const [, start, count] = /\+(\d+)(?:,(\d+))?/.exec(hunk).map(Number)
+    const length = Number.isNaN(count) ? 1 : count
+    if (length === 0) lines.push(Math.max(start, 1))
+    for (let line = start; line < start + length; line++) lines.push(line)
+  }
+  return lines
+}
 
 /** The coverage map's selection, or why it was not used. */
 function desktopSelection() {
@@ -221,7 +249,14 @@ function desktopSelection() {
   const existed = new Set(git('ls-tree', '-r', '--name-only', map.commit, '--', 'apps', 'packages'))
   const drift = new Set([...changed, ...git('diff', '--name-only', map.commit), ...git('ls-files', '--others', '--exclude-standard')])
   const own = (spec) => new Set([...closure(spec)].filter((file) => !app.has(file) && !support.has(file)))
-  return selectSpecs({ specs: specItems.map((item) => item.id), changed, map, support, own, app, isNew: (file) => !existed.has(file), drift, importers })
+  const specTexts = new Map(specItems.map((item) => [item.id, [...own(item.id)].map((file) => readFileSync(join(root, file), 'utf8')).join('\n')]))
+  const driverTexts = [...files].filter((file) => file.startsWith('apps/desktop/e2e/driver/')).map((file) => readFileSync(join(root, file), 'utf8'))
+  const driver = (changedDriver) => {
+    if (argv.includes('--files')) return undefined
+    const edits = changedDriver.map((file) => ({ text: textAtChange(file), lines: changedLines(file) }))
+    return edits.some((edit) => edit.text === undefined) ? undefined : driverSpecs({ changed: edits, driverTexts, specTexts })
+  }
+  return selectSpecs({ specs: specItems.map((item) => item.id), changed, map, support, own, app, isNew: (file) => !existed.has(file), drift, importers, driver })
 }
 const selection = desktopSelection()
 const specs = pending(selection.specs ? specItems.filter((item) => selection.specs.has(item.id)) : specItems)
