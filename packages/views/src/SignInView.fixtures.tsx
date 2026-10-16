@@ -38,6 +38,7 @@ export default defineFixtures(
       'slack-app-signed-out': fixture({
         mode: 'first-run',
         error: 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.',
+        onCopyDetails: noop,
         onSignIn: noop,
         onImport: noop,
       }),

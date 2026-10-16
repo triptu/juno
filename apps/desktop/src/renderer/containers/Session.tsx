@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { SignInFailed } from '@juno/contract'
-import { errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
+import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { SessionView, SignInView } from '@juno/views'
@@ -44,6 +44,7 @@ export function Session() {
   const failed = result === undefined || result.waiting ? undefined : errorOf(result)
   // A transport failure (the engine restarting) is retried by the state layer and not shown.
   const error = failed?._tag === 'SignInFailed' ? failureLine(failed) : undefined
+  const details = failed?._tag === 'SignInFailed' ? failed.details : undefined
 
   if (status._tag !== 'Success') return null
   const value = status.value
@@ -68,6 +69,7 @@ export function Session() {
       mode={mode}
       {...(value._tag === 'signingIn' ? { busy: value.method } : {})}
       {...(error === undefined ? {} : { error })}
+      {...(details === undefined ? {} : { onCopyDetails: () => copyText(details) })}
       onSignIn={() => {
         setLast('window')
         setUpAfter()

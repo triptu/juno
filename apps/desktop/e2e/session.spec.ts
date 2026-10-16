@@ -153,6 +153,12 @@ test('explains a Slack app that is not signed in', async ({ fake, userData }) =>
     await juno.importFromSlackApp({ skipSetUp: false })
     await juno.expectSignInError('Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.')
     await juno.expectSignedOut()
+    // "Copy details" gives a report of where the import stopped, with no cookie or token in it.
+    const details = await juno.copySignInDetails()
+    expect(details).toContain('Failed at: signed out: the cookie database has no d cookie')
+    expect(details).toContain('Keychain: not asked')
+    expect(details).not.toMatch(/xox|d=/)
+    expect(details).not.toContain(slackApp.credentials.cookie)
   } finally {
     await running.close()
   }

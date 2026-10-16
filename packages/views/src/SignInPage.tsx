@@ -10,6 +10,8 @@ export interface SignInPageProps {
   readonly body: string
   /** One line under the actions: what is happening (muted) or what went wrong. Its room is kept. */
   readonly status?: { readonly text: string; readonly tone: 'muted' | 'danger' }
+  /** A quiet control beside the status line, such as "Copy details". */
+  readonly statusAction?: ReactNode
   readonly children: ReactNode
   readonly 'data-set-up-juno'?: ''
 }
@@ -20,7 +22,7 @@ export interface SignInPageProps {
  * and a status line whose room is kept, so a message never moves the
  * buttons. `SignInView` and `SetUpJunoView` share it.
  */
-export function SignInPage({ titleId, title, body, status, children, ...data }: SignInPageProps) {
+export function SignInPage({ titleId, title, body, status, statusAction, children, ...data }: SignInPageProps) {
   return (
     <section {...stylex.props(styles.root)} aria-labelledby={titleId} {...data}>
       <div {...stylex.props(styles.text)}>
@@ -41,6 +43,7 @@ export function SignInPage({ titleId, title, body, status, children, ...data }: 
             {status.text}
           </Text>
         )}
+        {statusAction}
       </div>
     </section>
   )
@@ -68,6 +71,10 @@ const styles = stylex.create({
     marginBottom: spacing['--space-2'],
   },
   status: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: spacing['--space-2'],
     minHeight: spacing['--space-6'],
   },
 })

@@ -60,8 +60,8 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('agentPort', {}),
   /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */
   Schema.TaggedStruct('secrets', { secrets: Schema.NullOr(SessionSecrets) }),
-  /** A sign-in or import ended without a session. */
-  Schema.TaggedStruct('sessionFailed', { method: SignInMethod, kind: SignInFailureKind, message: Schema.String }),
+  /** A sign-in or import ended without a session. `details` is the import's report for "Copy details": no secrets, no values. */
+  Schema.TaggedStruct('sessionFailed', { method: SignInMethod, kind: SignInFailureKind, message: Schema.String, details: Schema.optionalKey(Schema.String) }),
   /** Main has cleared secrets and cookies after `signOut`. */
   Schema.TaggedStruct('signedOut', {}),
   /** The answer to `handshake`: what the socket upgrade needs (ADR 0007). */
