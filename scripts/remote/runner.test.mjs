@@ -204,7 +204,7 @@ console.log(fs.readFileSync(process.env.TEST_INSTANCES, 'utf8'));
   const invoke = (body) => spawnSync(process.execPath, ['--input-type=module', '-e', `
 import { list, invalidateInventory, acquire } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
 ${body}
-`], { env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_CALLS: counter, TEST_INSTANCES: source, TEST_REVISION: join(dir, 'juno-remote-pool', 'inventory-revision') }, encoding: 'utf8', timeout: 10_000 })
+`], { env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, JUNO_REMOTE_IDLE_MINUTES: '1', TEST_CALLS: counter, TEST_INSTANCES: source, TEST_REVISION: join(dir, 'juno-remote-pool', 'inventory-revision') }, encoding: 'utf8', timeout: 10_000 })
   try {
     assert.equal(invoke('console.log(JSON.stringify(list().instances))').stdout.trim(), '[]')
     assert.equal(invoke('console.log(JSON.stringify(list().instances))').stdout.trim(), '[]')
@@ -270,4 +270,99 @@ assert(!existsSync(pool + '/decide.lock'));
     })
     assert.equal(result.status, 0, result.stderr || result.error?.message)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+function writePoolNamespace(dir) {
+  writeFileSync(join(dir, 'nsc'), `#!/usr/bin/env node
+const fs = require('node:fs');
+const path = require('node:path');
+const dir = process.env.TEST_INSTANCES;
+if (process.argv[2] === 'list') {
+ fs.appendFileSync(process.env.TEST_CALLS, process.ppid + '\\n');
+ const instances = fs.readdirSync(dir).map(id => JSON.parse(fs.readFileSync(path.join(dir, id))));
+ console.log(JSON.stringify(instances.length ? instances : null));
+} else if (process.argv[2] === 'destroy') fs.rmSync(path.join(dir, process.argv[3]), { force: true });
+else process.exit(2);
+`)
+  chmodSync(join(dir, 'nsc'), 0o755)
+}
+
+test('daemon owns inventory, holds capacity for the queue head, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
+  const { spawn } = await import('node:child_process')
+  const { mkdirSync, readdirSync } = await import('node:fs')
+  const dir = mkdtempSync(join(tmpdir(), 'juno-pool-daemon-'))
+  const poolDir = join(dir, 'juno-remote-pool')
+  const instances = join(dir, 'instances')
+  mkdirSync(instances)
+  writePoolNamespace(dir)
+  const children = []
+  const env = { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: instances, TEST_CALLS: join(dir, 'lists'), JUNO_REMOTE_MAX_VCPU: '8', JUNO_REMOTE_IDLE_MINUTES: '0' }
+  const waitFor = async (predicate) => {
+    const deadline = Date.now() + 35_000
+    while (!predicate()) {
+      assert(Date.now() < deadline, `timed out; children: ${children.map((item) => item.output).join('\n')}`)
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 50))
+    }
+  }
+  const run = (name, cores, holdCreate = false) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', `
+import { existsSync, writeFileSync } from 'node:fs';
+import { acquire, destroy } from ${JSON.stringify(new URL('./pool.mjs', import.meta.url).href)};
+const job = await acquire('linux/amd64:${cores}x${cores * 2}', async (_, labels) => {
+ console.log('creating');
+ while (${holdCreate} && !existsSync(${JSON.stringify(join(dir, `finish-create-${name}`))})) await new Promise(resolve => setTimeout(resolve, 50));
+ writeFileSync(${JSON.stringify(join(instances, name))}, JSON.stringify({ cluster_id: '${name}', shape: { virtual_cpu: ${cores} }, labels: {...labels, 'juno-remote': '1'}, created_at: new Date().toISOString() }));
+ return '${name}';
+}, console.log);
+console.log('acquired');
+while (!existsSync(${JSON.stringify(join(dir, `release-${name}`))})) await new Promise(resolve => setTimeout(resolve, 50));
+if (!destroy(job.id)) throw new Error('destroy failed');
+`], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const item = { child, output: '', done: undefined }
+    child.stdout.on('data', (chunk) => { item.output += chunk })
+    child.stderr.on('data', (chunk) => { item.output += chunk })
+    item.done = new Promise((resolvePromise) => child.on('close', resolvePromise))
+    children.push(item)
+    return item
+  }
+  let daemon
+  try {
+    const blocker = run('blocker', 2, true)
+    await waitFor(() => blocker.output.includes('creating'))
+    daemon = Number(readFileSync(join(poolDir, 'watcher.pid'), 'utf8'))
+    const head = run('head', 8)
+    await waitFor(() => head.output.includes('waiting: 1st'))
+    const small = run('small', 2)
+    await waitFor(() => small.output.includes('waiting: 2nd'))
+    const abandoned = run('abandoned', 2)
+    await waitFor(() => abandoned.output.includes('waiting: 3rd'))
+    abandoned.child.kill('SIGKILL')
+    await abandoned.done
+    // At least one daemon tick sees six free cores and must leave them for head.
+    await waitFor(() => readFileSync(join(dir, 'lists'), 'utf8').trim().split('\n').length >= 3)
+    assert(!head.output.includes('acquired'))
+    assert(!small.output.includes('acquired'))
+    assert.deepEqual(new Set(readFileSync(join(dir, 'lists'), 'utf8').trim().split('\n')), new Set([String(daemon)]))
+    process.kill(daemon, 'SIGKILL')
+    await waitFor(() => head.output.includes('using direct admission') || small.output.includes('using direct admission'))
+    writeFileSync(join(dir, 'finish-create-blocker'), '')
+    await waitFor(() => blocker.output.includes('acquired'))
+    writeFileSync(join(dir, 'release-blocker'), '')
+    assert.equal(await blocker.done, 0, blocker.output)
+    await waitFor(() => head.output.includes('acquired'))
+    assert(!small.output.includes('acquired'), small.output)
+    writeFileSync(join(dir, 'release-head'), '')
+    assert.equal(await head.done, 0, head.output)
+    await waitFor(() => small.output.includes('acquired'))
+    writeFileSync(join(dir, 'release-small'), '')
+    assert.equal(await small.done, 0, small.output)
+    assert.deepEqual(readdirSync(instances), [])
+    assert.deepEqual(readdirSync(join(poolDir, 'queue')), [])
+    assert(!readdirSync(poolDir).some((name) => name.startsWith('pending-')))
+  } finally {
+    for (const { child } of children) if (child.exitCode === null) child.kill('SIGKILL')
+    if (daemon) { try { process.kill(daemon, 'SIGKILL') } catch { /* Already exited. */ } }
+    await Promise.all(children.map((item) => item.done))
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

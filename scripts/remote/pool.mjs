@@ -12,7 +12,7 @@ const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
 const idleMs = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? 1) * 60_000
 const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 1)
-const maxVcpu = Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24)
+const maxVcpu = Math.min(24, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24))
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
@@ -86,7 +86,9 @@ export function invalidateInventory() {
   rmSync(inventoryPath, { force: true })
 }
 
+let daemonInventory
 export function list() {
+  if (daemonInventory) return daemonInventory
   try {
     const cached = JSON.parse(readFileSync(inventoryPath, 'utf8'))
     const age = Date.now() - cached.completedAt
@@ -126,7 +128,7 @@ export function ensureReaper() {
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 8) return
+    if (alive(pid) && version >= 9) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
@@ -134,8 +136,9 @@ export function ensureReaper() {
       try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
     }
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: '1' } })
+    child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '8')
+    writeFileSync(versionFile, '9')
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -149,7 +152,7 @@ export function destroy(id) {
   const result = spawnSync('nsc', ['destroy', id, '--force'], { encoding: 'utf8', timeout: 30_000 })
   invalidateInventory()
   let gone = result.status === 0
-  if (!gone) {
+  if (!gone && !daemonAlive()) {
     try { gone = !list().instances.some((instance) => instance.cluster_id === id) } catch { /* Retain state when the workspace cannot be read. */ }
   }
   if (gone) forget(id)
@@ -209,9 +212,13 @@ async function provision(machine, pending, create) {
   invalidateInventory()
   try {
     const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
-    lock(id)
-    write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
-    rmSync(statePath(pending.id), { force: true })
+    // Admission must never observe neither the pending reservation nor its machine.
+    while (!takeLock('decide')) await sleep(100)
+    try {
+      lock(id)
+      write({ id, machine, created: Date.now(), lastUsed: Date.now(), images: [] })
+      rmSync(statePath(pending.id), { force: true })
+    } finally { unlock('decide') }
     return { id, warm: false, images: [] }
   } catch (error) {
     write({ ...pending, pid: undefined, failed: true })
@@ -220,70 +227,121 @@ async function provision(machine, pending, create) {
   } finally { invalidateInventory() }
 }
 
+const queueDir = join(dir, 'queue')
+mkdirSync(queueDir, { recursive: true })
+const requestPath = (id) => join(queueDir, id)
+function readRequest(id) {
+  try { return JSON.parse(readFileSync(requestPath(id), 'utf8')) } catch { return undefined }
+}
+function writeRequest(request) {
+  const temporary = `${requestPath(request.id)}.${process.pid}.tmp`
+  writeFileSync(temporary, JSON.stringify(request))
+  renameSync(temporary, requestPath(request.id))
+}
+function queue() {
+  return readdirSync(queueDir).filter((id) => !id.endsWith('.tmp')).map(readRequest).filter((request) => {
+    if (!request) return false
+    if (alive(request.pid)) return true
+    rmSync(requestPath(request.id), { force: true })
+    return false
+  }).toSorted((a, b) => a.order - b.order)
+}
+function daemonAlive() {
+  try {
+    return Number(readFileSync(join(dir, 'watcher.version'), 'utf8')) >= 9 && alive(Number(readFileSync(join(dir, 'watcher.pid'), 'utf8')))
+  } catch { return false }
+}
+
+// Called under decide by either the daemon or a surviving client. Reservations
+// name the request so a crash before publishing its answer cannot allocate twice.
+function admit(request, instances) {
+  const pendingId = `pending-${request.id}`
+  const existing = read(pendingId)
+  if (existing) return { pending: existing }
+  const all = machines()
+  const claimed = all.find((state) => state.requestId === request.id && lockOwner(state.id) === request.pid)
+  if (claimed) return { id: claimed.id, warm: true, images: claimed.images ?? [] }
+  for (const state of all) {
+    if (!request.fresh && state.machine === request.machine && takeLock(state.id)) {
+      const current = read(state.id)
+      if (current && !current.destroying && !current.kept && Date.now() - current.created < handOutMs) {
+        write({ ...current, requestId: request.id })
+        writeFileSync(join(lockPath(state.id), 'pid'), String(request.pid))
+        return { id: current.id, warm: true, images: current.images ?? [] }
+      }
+      unlock(state.id)
+    }
+  }
+  const usage = capacity(instances, all)
+  let used = usage.tracked + usage.untracked + pendingVcpu(instances, entries().filter((entry) => entry.pending))
+  const cap = Math.min(24, request.cap)
+  for (const state of all) {
+    if (used + vcpu(request.machine) <= cap) break
+    if (!state.kept && !state.destroying && takeLock(state.id) && destroy(state.id)) used -= vcpu(state.machine)
+  }
+  if (used + vcpu(request.machine) > cap) return
+  const pending = { id: pendingId, pending: true, token: request.id, pid: request.pid, created: Date.now(), machine: request.machine }
+  write(pending)
+  return { pending }
+}
+function dispatch(instances) {
+  for (const request of queue()) {
+    if (request.result || request.error) continue
+    const result = admit(request, instances)
+    if (!result) break
+    writeRequest({ ...request, result })
+  }
+}
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th')}`
+
 export async function acquire(machine, create, log, { fresh = false } = {}) {
   if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
   if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
   if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
   ensureReaper()
-  const started = Date.now()
-  let reported = false
   let createFailures = 0
-  let inventoryFailure
+  const started = Date.now()
   for (;;) {
-    let pending
-    if (!takeLock('decide')) { await sleep(500); continue }
+    while (!takeLock('decide')) await sleep(100)
+    const request = { id: randomUUID(), pid: process.pid, machine, fresh, cap: maxVcpu, created: started }
     try {
-      inventoryFailure = undefined
-      const instances = reconcile()
-      const all = machines()
-      for (const state of all) {
-        if (!fresh && state.machine === machine && takeLock(state.id)) {
-          const current = read(state.id)
-          if (current && !current.destroying && !current.kept && current.machine === machine && Date.now() - current.created < handOutMs) {
-            return { id: current.id, warm: true, images: current.images ?? [] }
-          }
-          unlock(state.id)
+      request.order = Math.max(Date.now(), ...queue().map((item) => item.order + 1))
+      writeRequest(request)
+    } finally { unlock('decide') }
+    let reportedAt = 0
+    let fallbackReported = false
+    try {
+      for (;;) {
+        if (!daemonAlive() && takeLock('decide')) {
+          try {
+            if (!fallbackReported) { log('pool daemon unavailable; using direct admission'); fallbackReported = true }
+            dispatch(reconcile())
+          } catch (error) {
+            if (!error.message.startsWith('nsc list failed:') || !transient(error)) throw error
+            log(`infrastructure: inventory unavailable, retrying (${error.message.split('\n')[0]})`)
+            await sleep(2000)
+          } finally { unlock('decide') }
         }
-      }
-      let usage = capacity(instances, all)
-      // Pending creates reserve capacity before leaving the short decision lock.
-      const reserved = pendingVcpu(instances, entries().filter((entry) => entry.pending))
-      let used = usage.tracked + usage.untracked + reserved
-      for (const state of all) {
-        if (used + vcpu(machine) <= maxVcpu) break
-        if (!state.kept && !state.destroying && takeLock(state.id) && destroy(state.id)) used -= vcpu(state.machine)
-      }
-      if (used + vcpu(machine) <= maxVcpu) {
-        const token = randomUUID()
-        pending = { id: `pending-${token}`, pending: true, token, pid: process.pid, created: Date.now(), machine }
-        write(pending)
-      }
-      if (!reported && Date.now() - started >= 60_000) {
-        usage = capacity(instances, machines())
-        log(`waiting for capacity (cap ${maxVcpu} vCPU): ${usage.tracked} tracked, ${usage.untracked} untracked vCPU in the workspace`)
-        reported = true
+        const current = readRequest(request.id)
+        if (current?.error) throw new Error(current.error)
+        if (current?.result) {
+          // The persisted reservation/lock is already owned by this client.
+          rmSync(requestPath(request.id), { force: true })
+          if (!current.result.pending) return current.result
+          return await provision(machine, current.result.pending, create)
+        }
+        if (Date.now() - reportedAt >= 10_000) {
+          const position = queue().filter((item) => !item.result && !item.error).findIndex((item) => item.id === request.id) + 1
+          if (position > 0) log(`waiting: ${ordinal(position)} in queue, ${vcpu(machine)} cores, ${Math.floor((Date.now() - started) / 1000)} s elapsed`)
+          reportedAt = Date.now()
+        }
+        await sleep(500)
       }
     } catch (error) {
-      if (!error.message.startsWith('nsc list failed:') || !transient(error)) throw error
-      inventoryFailure = error
-    } finally { unlock('decide') }
-    if (inventoryFailure) {
-      log(`infrastructure: inventory unavailable, retrying in 2 s (${inventoryFailure.message.split('\n')[0]})`)
-      await sleep(2000)
-      continue
-    }
-    if (pending) {
-      // Do not hold the pool-wide decision lock over provisioning or SSH.
-      // Failed attempts remain reserved until observed and destroyed, or the
-      // orphan grace expires. Late arrivals retain their attempt label.
-      try { return await provision(machine, pending, create) } catch (error) {
-        if (!transient(error) || ++createFailures > 2) throw error
-        log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
-        await sleep(createFailures * 2000)
-        continue
-      }
-    }
-    await sleep(10_000)
+      if (!transient(error) || ++createFailures > 2) throw error
+      log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
+      await sleep(createFailures * 2000)
+    } finally { rmSync(requestPath(request.id), { force: true }) }
   }
 }
 
@@ -311,13 +369,22 @@ export async function reap() {
   const started = Date.now()
   try {
     for (;;) {
-      await sleep(30_000)
+      await sleep(5000)
       if (!takeLock('decide')) continue
       try {
+        // One inventory read per tick, even when mutations invalidate the disk cache.
+        // Local machine records and pending attempts reserve newer allocations.
+        reapIdle()
+        daemonInventory = list()
         const instances = reconcile()
-        if (entries().length === 0 && Date.now() - started > 6 * 60_000 && !instances.some((instance) => instance.labels?.['juno-remote'] === '1' && (!instance.labels['juno-pool'] || instance.labels['juno-pool'] === owner))) return
-      } catch (error) { console.error(`remote: reconciliation failed: ${error.message}`) }
-      finally { unlock('decide') }
+        dispatch(instances)
+        if (queue().length === 0 && entries().length === 0 && Date.now() - started > 6 * 60_000 && !instances.some((instance) => instance.labels?.['juno-remote'] === '1' && (!instance.labels['juno-pool'] || instance.labels['juno-pool'] === owner))) return
+      } catch (error) {
+        console.error(`remote: reconciliation failed: ${error.message}`)
+        if (!transient(error)) for (const request of queue()) {
+          if (!request.result) writeRequest({ ...request, error: error.message })
+        }
+      } finally { daemonInventory = undefined; unlock('decide') }
     }
   } finally { unlock('watcher') }
 }
