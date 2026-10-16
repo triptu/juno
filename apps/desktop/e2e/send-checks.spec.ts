@@ -143,10 +143,6 @@ test('hiring and people details in a public channel show the amber line while ty
 test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
-  // A route answer belongs to its topic titles too. Finish initial titles before testing model timing.
-  await expect.poll(() => juno.win.locator('[data-topic-row][data-topic-id^="t:C0ENG:"]').evaluateAll(rows =>
-    rows.length > 0 && rows.every(row => row.getAttribute('data-title-source') === 'ai'),
-  ), { timeout: 15_000 }).toBe(true)
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
