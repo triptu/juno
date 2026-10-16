@@ -128,6 +128,10 @@ const bridge: JunoBridge = {
         ipcRenderer.off(Events.notificationOpen, forward)
       }
     },
+    test: () => ipcRenderer.invoke(Channels.notificationsTest),
+    permission: () => ipcRenderer.invoke(Channels.notificationsPermission),
+    requestPermission: () => ipcRenderer.invoke(Channels.notificationsRequestPermission),
+    openSettings: () => ipcRenderer.invoke(Channels.notificationsOpenSettings),
   },
 }
 

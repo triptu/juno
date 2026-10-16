@@ -64,6 +64,14 @@ export const Channels = {
   shellEditUndo: 'shell.editUndo',
   /** The topic the window shows, or null. Main adds whether the window is focused and tells the engine. */
   notificationsViewing: 'notifications.viewing',
+  /** Settings › Notifications' Send test notification: one notification through the notifier. */
+  notificationsTest: 'notifications.test',
+  /** Whether macOS lets Juno post notifications, as a `NotificationPermission`. */
+  notificationsPermission: 'notifications.permission',
+  /** Asks macOS for permission (the system prompt, once); answers as `notifications.permission`. */
+  notificationsRequestPermission: 'notifications.requestPermission',
+  /** Opens System Settings at Juno's notifications. */
+  notificationsOpenSettings: 'notifications.openSettings',
 } as const
 
 /** main -> preload messages sent with `webContents.postMessage`. */
@@ -296,5 +304,13 @@ export interface JunoBridge {
     readonly setViewing: (topicId: string | null) => Promise<unknown>
     /** Calls `listener` with the target of each clicked notification, undecoded. Returns the unsubscribe. */
     readonly onOpen: (listener: (target: unknown) => void) => () => void
+    /** Posts one test notification the way a message's is posted. */
+    readonly test: () => Promise<unknown>
+    /** Resolves with a `NotificationPermission`. */
+    readonly permission: () => Promise<unknown>
+    /** Shows the macOS prompt while permission is not determined; resolves with the `NotificationPermission` after. */
+    readonly requestPermission: () => Promise<unknown>
+    /** Opens System Settings at Juno's notifications. */
+    readonly openSettings: () => Promise<unknown>
   }
 }

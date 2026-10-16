@@ -4,7 +4,9 @@
  * The engine decides; main only shows. `notify` shows one notification,
  * once per id, and a click brings the window forward and hands the target
  * to the renderer, which opens the topic at the message. `badge` sets the
- * dock's `•` while any topic has an unread mention.
+ * dock's `•` while any topic has an unread mention. `test` shows Settings ›
+ * Notifications' test notification the same way; its click only brings
+ * Juno forward.
  *
  * The renderer says which topic it shows and whether its window has focus;
  * main passes that to the engine, which suppresses a notification for the
@@ -28,6 +30,8 @@ export interface NotifierDeps {
   readonly setBadge: (text: string) => void
   /** Brings the app window forward and hands it the target. */
   readonly open: (target: NotificationTarget) => void
+  /** Brings the app window forward, or opens it. */
+  readonly focus: () => void
   /** To the engine over parentPort. */
   readonly send: (message: MainToEngine) => void
   /** Privacy mode is on: the body, which quotes the message, is left out (SPEC section 5, Privacy mode). */
@@ -41,6 +45,9 @@ export const HIDDEN_BODY = 'Message hidden'
 const KEPT = 20
 
 export const DOCK_BADGE = '•'
+
+/** Settings › Notifications' test notification. Not a message, so privacy mode leaves it as it is. */
+export const TEST_NOTIFICATION = { title: 'Juno', body: 'Notifications from Juno look like this.' } as const
 
 export class Notifier {
   private readonly shown = new Map<string, ShownNotification>()
@@ -78,16 +85,28 @@ export class Notifier {
     this.deps.send({ _tag: 'wake' })
   }
 
+  /** Settings › Notifications' Send test notification: a new one each time, clicked to bring Juno forward. */
+  test(): void {
+    this.tests += 1
+    this.post(`test:${this.tests}`, TEST_NOTIFICATION, () => this.deps.focus())
+  }
+
+  private tests = 0
+
   private show(notification: OsNotification): void {
     if (this.shown.has(notification.id)) return
     const body = this.deps.privacy() ? HIDDEN_BODY : notification.body
-    const shown = this.deps.create({ title: notification.title, body })
+    this.post(notification.id, { title: notification.title, body }, () => this.deps.open(notification.target))
+  }
+
+  private post(id: string, options: { readonly title: string; readonly body: string }, onClick: () => void): void {
+    const shown = this.deps.create(options)
     shown.onClick(() => {
-      this.shown.delete(notification.id)
-      this.deps.open(notification.target)
+      this.shown.delete(id)
+      onClick()
     })
-    this.shown.set(notification.id, shown)
-    for (const id of [...this.shown.keys()].slice(0, Math.max(0, this.shown.size - KEPT))) this.shown.delete(id)
+    this.shown.set(id, shown)
+    for (const kept of [...this.shown.keys()].slice(0, Math.max(0, this.shown.size - KEPT))) this.shown.delete(kept)
     shown.show()
   }
 }

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
-import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
+import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createAgentSupervisor } from './agent'
@@ -16,6 +16,7 @@ import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { Notifier, type ShownNotification } from './notifier'
+import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
 import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
@@ -109,13 +110,18 @@ const supervisor = createSupervisor({
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
 let badgeForTests = ''
 
-/** A clicked notification: the app window comes forward, or opens, and the renderer opens the target. */
-function openTarget(target: NotificationTarget): void {
+/** A clicked notification: the app window comes forward, or opens. */
+function focusWindow(): BrowserWindow {
   const window = appWindow() ?? openWindow()
   if (window.isMinimized()) window.restore()
   window.show()
   window.focus()
-  window.webContents.send(Events.notificationOpen, target)
+  return window
+}
+
+/** A clicked message notification: the window comes forward and the renderer opens the target. */
+function openTarget(target: NotificationTarget): void {
+  focusWindow().webContents.send(Events.notificationOpen, target)
 }
 
 const notifier = new Notifier({
@@ -133,10 +139,36 @@ const notifier = new Notifier({
     if (!e2e) app.dock?.setBadge(text)
   },
   open: openTarget,
+  focus: () => void focusWindow(),
   send: (message) => supervisor.send(message),
   privacy: privacyOn,
 })
 supervisor.onReady(() => notifier.engineReady())
+
+/**
+ * Whether macOS lets Juno notify (notificationPermission.ts). Under JUNO_E2E a test sets it
+ * (`junoTest.notificationPermission`); a request then answers allowed, as if the user clicked Allow.
+ */
+let permissionForTests: NotificationPermission = 'allowed'
+let notificationSettingsOpenedForTests = 0
+const notificationPermission = e2e
+  ? {
+      preload: () => {},
+      read: () => Promise.resolve(permissionForTests),
+      request: () => {
+        if (permissionForTests === 'notDetermined') permissionForTests = 'allowed'
+        return Promise.resolve(permissionForTests)
+      },
+    }
+  : createNotificationPermission(loadPermissionBridge)
+
+/** System Settings at Juno's notifications; the Notifications pane if macOS refuses the entry's link. */
+async function openNotificationSettings(): Promise<void> {
+  if (e2e) return void (notificationSettingsOpenedForTests += 1)
+  // Packaged, macOS knows Juno by its bundle id; in development the app is Electron.
+  const [entry, pane] = settingsUrls(app.isPackaged ? 'app.juno.desktop' : 'com.github.Electron')
+  await shell.openExternal(entry).catch(() => shell.openExternal(pane))
+}
 
 // The backup's secrets in the keychain (memory under tests), WP21.
 const backupSecrets = appBackupSecrets(e2e)
@@ -193,6 +225,12 @@ app.whenReady().then(() => {
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     setViewing: (topicId) => notifier.setViewing(topicId),
+    notifications: {
+      test: () => notifier.test(),
+      permission: notificationPermission.read,
+      requestPermission: notificationPermission.request,
+      openSettings: openNotificationSettings,
+    },
     agent,
     providers,
     codex: codexHome(agent.agentDir, e2e),
@@ -239,6 +277,7 @@ function openWindow(): BrowserWindow {
     supervisor.send({ _tag: 'painted' })
     // After the first paint, so loading koffi never delays it. Only while the window is open.
     screenWatch.start()
+    notificationPermission.preload()
   })
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
   window.on('closed', () => screenWatch.stop())
@@ -295,6 +334,10 @@ if (e2e) {
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
+      notificationPermission: (permission: NotificationPermission) => {
+        permissionForTests = permission
+      },
+      notificationSettingsOpened: () => notificationSettingsOpenedForTests,
       wake: () => notifier.wake(),
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {
