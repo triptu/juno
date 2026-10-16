@@ -21,6 +21,7 @@ import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
+import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -85,6 +86,7 @@ export type PaletteIconName =
   | 'connections'
   | 'backup'
   | 'about'
+  | 'ai-activity'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -125,6 +127,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   connections: Plugs,
   backup: HardDrives,
   about: Info,
+  'ai-activity': Pulse,
 }
 
 export interface PaletteItem {
