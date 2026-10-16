@@ -86,6 +86,35 @@ export function mentionProps(marks: ComposerProps['marks'], mention: ComposerMen
 const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files')
 
 /**
+ * A paste or a drop with files is taken, and a text paste the owner takes;
+ * other text pastes and text drags stay the browser's.
+ */
+function transfers(onFiles: ComposerProps['onFiles'], onPasteText: ComposerProps['onPasteText']) {
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.files)
+    if (files.length === 0 || onFiles === undefined) {
+      const pasted = event.clipboardData.getData('text/plain')
+      if (files.length === 0 && pasted !== '' && onPasteText?.(pasted, event.currentTarget) === true) event.preventDefault()
+      return
+    }
+    event.preventDefault()
+    onFiles(files)
+  }
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (onFiles === undefined || !carriesFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length === 0 || onFiles === undefined) return
+    event.preventDefault()
+    onFiles(files)
+  }
+  return { onPaste, onDragOver, onDrop }
+}
+
+/**
  * The composer (inventory 7): a 752px field whose textarea grows to 194px,
  * and the round send button, dimmed while there is nothing to send. Enter
  * sends, Shift Enter adds a line. At one line it has the `ComposerSlot`'s
@@ -111,28 +140,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
     event.preventDefault()
     if (!sending) onSend()
   }
-  // A paste or a drop with files is taken, and a text paste the owner takes; other text pastes and text drags stay the browser's.
-  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.clipboardData.files)
-    if (files.length === 0 || onFiles === undefined) {
-      const pasted = event.clipboardData.getData('text/plain')
-      if (files.length === 0 && pasted !== '' && onPasteText?.(pasted, event.currentTarget) === true) event.preventDefault()
-      return
-    }
-    event.preventDefault()
-    onFiles(files)
-  }
-  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (onFiles === undefined || !carriesFiles(event)) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-  }
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    const files = Array.from(event.dataTransfer.files)
-    if (files.length === 0 || onFiles === undefined) return
-    event.preventDefault()
-    onFiles(files)
-  }
+  const { onPaste, onDragOver, onDrop } = transfers(onFiles, onPasteText)
   return (
     <div data-composer="" onDragOver={onFiles === undefined ? undefined : onDragOver} onDrop={onFiles === undefined ? undefined : onDrop} {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}

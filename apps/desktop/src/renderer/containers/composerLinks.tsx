@@ -35,7 +35,6 @@ export function useComposerLinks({ field, initialText, initial, onChange }: Comp
   const links = useRef<ReadonlyArray<LinkRange>>(initial)
   const [drawn, setDrawn] = useState(initial)
   const text = useRef(initialText)
-  const [editing, setEditing] = useState<{ readonly start: number; readonly end: number; readonly url: string } | undefined>(undefined)
 
   const keep = (next: ReadonlyArray<LinkRange>) => {
     links.current = next
@@ -82,6 +81,26 @@ export function useComposerLinks({ field, initialText, initial, onChange }: Comp
     openExternal(link.url)
   }
 
+  const popover = useLinkEditor(field, links, drawn, (range, url) => {
+    keep(setLink(links.current, range.start, range.end, url))
+    // The text is the same, the draft is not: it is saved with the new link.
+    onChange(text.current)
+  })
+
+  return { current: () => links.current, moved, reset, shown, onPasteText, onFieldClick, popover }
+}
+
+type Range = { readonly start: number; readonly end: number }
+
+/** ⌘K's link editor for the words selected in `field`, while it is open; `onApply` sets or removes their link. */
+function useLinkEditor(
+  field: RefObject<HTMLTextAreaElement | null>,
+  links: RefObject<ReadonlyArray<LinkRange>>,
+  drawn: ReadonlyArray<LinkRange>,
+  onApply: (range: Range, url: string | undefined) => void,
+): ComposerPopover | undefined {
+  const [editing, setEditing] = useState<{ readonly start: number; readonly end: number; readonly url: string } | undefined>(undefined)
+
   // ⌘K reaches this composer while its field has focus and words selected.
   const takeCommandK = useRef<() => boolean>(() => false)
   const commandK = () => {
@@ -108,33 +127,28 @@ export function useComposerLinks({ field, initialText, initial, onChange }: Comp
     element.focus()
     if (caret !== undefined) element.setSelectionRange(caret, caret)
   }
-  const apply = (range: { readonly start: number; readonly end: number }, url: string | undefined) => {
-    keep(setLink(links.current, range.start, range.end, url))
+  const apply = (range: Range, url: string | undefined) => {
+    onApply(range, url)
     close(range.end)
-    // The text is the same, the draft is not: it is saved with the new link.
-    onChange(text.current)
   }
 
-  const popover: ComposerPopover | undefined =
-    editing === undefined
-      ? undefined
-      : {
-          anchorAt: editing.start,
-          content: (
-            <LinkEditor
-              key={`${editing.start}-${editing.end}`}
-              url={editing.url}
-              onSave={(typed) => {
-                const url = pastedLink(typed)
-                if (url === undefined) return false
-                apply(editing, url)
-                return true
-              }}
-              {...(drawn.some((link) => link.start === editing.start && link.end === editing.end) ? { onRemove: () => apply(editing, undefined) } : {})}
-              onCancel={() => close(undefined)}
-            />
-          ),
-        }
-
-  return { current: () => links.current, moved, reset, shown, onPasteText, onFieldClick, popover }
+  return editing === undefined
+    ? undefined
+    : {
+        anchorAt: editing.start,
+        content: (
+          <LinkEditor
+            key={`${editing.start}-${editing.end}`}
+            url={editing.url}
+            onSave={(typed) => {
+              const url = pastedLink(typed)
+              if (url === undefined) return false
+              apply(editing, url)
+              return true
+            }}
+            {...(drawn.some((link) => link.start === editing.start && link.end === editing.end) ? { onRemove: () => apply(editing, undefined) } : {})}
+            onCancel={() => close(undefined)}
+          />
+        ),
+      }
 }
