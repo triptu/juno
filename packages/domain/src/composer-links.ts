@@ -11,7 +11,7 @@
  * element with that text.
  */
 import { findLinks, linkOf } from '@juno/richtext'
-import { decodeMentions, mentionTokens, type MentionPick } from './composer-mentions'
+import { decodeMentions, encodePick, mentionTokens, type MentionPick } from './composer-mentions'
 
 /** A link on the words from `start` up to `end`. */
 export interface LinkRange {
@@ -89,8 +89,9 @@ const unescapeWords = (words: string) => words.replace(/&lt;/g, '<').replace(/&g
 const encodeUrl = (url: string) => url.replace(/\|/g, '%7C').replace(/>/g, '%3E').replace(/\s/g, '%20')
 
 /**
- * The text as drafts store it and sends carry it: picked people and
- * channels as `<@U…|Maya>` and `<#C…|eng>`, linked words as `<url|words>`.
+ * The text as drafts store it and sends carry it: picked people, groups
+ * and channels as Slack encodes them (`encodePick`), linked words as
+ * `<url|words>`.
  * A mention inside linked words stays text.
  */
 export function encodeDraft(text: string, picks: ReadonlyArray<MentionPick>, links: ReadonlyArray<LinkRange>): string {
@@ -98,7 +99,7 @@ export function encodeDraft(text: string, picks: ReadonlyArray<MentionPick>, lin
   const mentions = mentionTokens(text, picks).filter((token) => !linked.some((link) => token.start < link.end && token.end > link.start))
   const spans = [
     ...linked.map((link) => ({ start: link.start, end: link.end, out: `<${encodeUrl(link.url)}|${escapeWords(text.slice(link.start, link.end))}>` })),
-    ...mentions.map((token) => ({ start: token.start, end: token.end, out: `<${token.pick.kind === 'person' ? '@' : '#'}${token.pick.id}|${token.pick.name.replace(/[>|]/g, '')}>` })),
+    ...mentions.map((token) => ({ start: token.start, end: token.end, out: encodePick(token.pick) })),
   ].toSorted((a, b) => a.start - b.start)
   let out = ''
   let last = 0

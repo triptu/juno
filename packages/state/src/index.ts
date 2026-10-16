@@ -107,7 +107,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { composerEmojiAtom, mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
+export { composerEmojiAtom, mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
   checkMessage,
   deleteMessage,

@@ -1,13 +1,16 @@
 /**
  * Composer text → what Slack accepts on send.
  *
- * The composer sends plain text with the people and channels its
- * suggestions picked already encoded as `<@U…|Maya>` and `<#C…|eng>`
+ * The composer sends plain text with the people, user groups and channels
+ * its suggestions picked already encoded as `<@U…|Maya>`,
+ * `<!subteam^S…|@design-team>` and `<#C…|eng>`
  * (`encodeMentions` in `@juno/domain`), "> " quote lines, and ":shortcode:"
  * emoji. An edit's text names them as "@Maya Chen" and "#eng" instead, with
  * `MentionTargets` saying who they are. This turns either into one
  * `rich_text` block (sections and quotes) and a mrkdwn `text` fallback with
- * `<@U…>` / `<#C…|name>` encodings.
+ * `<@U…>` / `<!subteam^S…>` / `<#C…|name>` encodings. A group goes as
+ * Slack's client sends it (research section 3, "User groups"): a
+ * `usergroup` element and the bare `<!subteam^S…>`.
  *
  * Links go the way Slack's client sends them (research section 5): a URL
  * typed with its scheme is `{ type: "link", url }` and `<url>`; an address
@@ -39,6 +42,7 @@ export interface OutgoingMessage {
 type Token =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'user'; readonly id: string; readonly name: string }
+  | { readonly kind: 'usergroup'; readonly id: string }
   | { readonly kind: 'channel'; readonly id: string; readonly name: string }
   | { readonly kind: 'broadcast'; readonly range: 'here' | 'channel' | 'everyone' }
   | { readonly kind: 'emoji'; readonly name: string }
@@ -51,11 +55,11 @@ function escapeRegExp(s: string): string {
 const EMOJI_RE = /:([a-z0-9_+\-']+(?:::skin-tone-[2-6])?):/g
 
 /**
- * A person or channel the composer picked, or a link it put on some words,
+ * A person, group or channel the composer picked, or a link it put on some words,
  * as it sends them. The name is what the field showed; a link's label is
  * escaped as in mrkdwn (`encodeLinks` in `@juno/domain`).
  */
-const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>|<((?:https?:\/\/|mailto:)[^|>\s]+)\|([^>]+)>/g
+const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>|<((?:https?:\/\/|mailto:)[^|>\s]+)\|([^>]+)>|<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g
 
 function tokenizeLine(line: string, targets: MentionTargets): Token[] {
   const out: Token[] = []
@@ -64,6 +68,7 @@ function tokenizeLine(line: string, targets: MentionTargets): Token[] {
     if (m.index > last) out.push(...tokenizeLinks(line.slice(last, m.index), targets))
     if (m[1] !== undefined) out.push({ kind: 'user', id: m[1], name: m[2] ?? m[1] })
     else if (m[3] !== undefined) out.push({ kind: 'channel', id: m[3], name: m[4] ?? m[3] })
+    else if (m[7] !== undefined) out.push({ kind: 'usergroup', id: m[7] })
     else out.push({ kind: 'link', url: m[5]!, text: unescapeMrkdwn(m[6]!) })
     last = m.index + m[0].length
   }
@@ -165,6 +170,8 @@ function toElement(token: Token): RichTextInline {
       return { type: 'text', text: token.text }
     case 'user':
       return { type: 'user', user_id: token.id }
+    case 'usergroup':
+      return { type: 'usergroup', usergroup_id: token.id }
     case 'channel':
       return { type: 'channel', channel_id: token.id }
     case 'broadcast':
@@ -194,6 +201,8 @@ function toMrkdwn(token: Token): string {
       return escapeText(token.text)
     case 'user':
       return `<@${token.id}>`
+    case 'usergroup':
+      return `<!subteam^${token.id}>`
     case 'channel':
       return `<#${token.id}|${token.name}>`
     case 'broadcast':

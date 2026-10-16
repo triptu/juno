@@ -5,9 +5,9 @@
  * `mentionStatements`, so the plan test can check each one reads them
  * through an index (performance 6).
  */
-import type { MentionChannel, MentionPerson } from '@juno/contract'
-import { defaultPersonColor, rankSuggestions } from '@juno/domain'
-import { ftsQuery, StoreReader } from '@juno/store'
+import { GROUP_SUGGESTION_LIMIT, type MentionChannel, type MentionGroup, type MentionPerson } from '@juno/contract'
+import { defaultPersonColor, rankSuggestions, type Me } from '@juno/domain'
+import { ftsQuery, StoreReader, syncState } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { parseIds } from '../topicRows'
 
@@ -134,6 +134,29 @@ export const queryPeople = Effect.fn('mentions.people')(function* (channel: stri
     if (!tierOf.has(user.id) && user.id !== selfId) people.push(personOf(user, 2, index))
   })
   return rankSuggestions(people, text)
+})
+
+/**
+ * The user groups matching `text` by handle or name, yours first (see
+ * `mentions.groups`). A workspace has tens of groups, not thousands, so
+ * every live one is read and ranked here.
+ */
+export const queryGroups = Effect.fn('mentions.groups')(function* (text: string) {
+  if (text.trim() === '') return []
+  const sql = yield* StoreReader
+  const mine = new Set<string>((yield* syncState.get<Me>('me'))?.usergroupIds ?? [])
+  const rows = yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE deleted = 0 ORDER BY handle`
+  const groups = rows.map(
+    (row, index): MentionGroup => ({
+      id: row.id,
+      handle: row.handle,
+      ...(row.name ? { name: row.name } : {}),
+      tier: mine.has(row.id) ? 0 : 1,
+      order: index,
+      names: [row.handle, ...(row.name ? [row.name] : [])],
+    }),
+  )
+  return rankSuggestions(groups, text, GROUP_SUGGESTION_LIMIT)
 })
 
 interface ChannelRow {

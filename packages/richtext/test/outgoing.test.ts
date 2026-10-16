@@ -58,6 +58,19 @@ describe('composer text to outgoing message', () => {
     expect(out.text).toBe('ask <@U0MAYA> in <#C0ENG|eng> about &lt;b&gt;')
   })
 
+  it('sends a picked user group as the official client does: a usergroup element and the bare subteam mention', () => {
+    const out = composeOutgoing('cc <!subteam^S0DESIGN|@design-team> today', {})
+    expect(out.blocks[0]?.elements[0]).toEqual({
+      type: 'rich_text_section',
+      elements: [
+        { type: 'text', text: 'cc ' },
+        { type: 'usergroup', usergroup_id: 'S0DESIGN' },
+        { type: 'text', text: ' today' },
+      ],
+    })
+    expect(out.text).toBe('cc <!subteam^S0DESIGN> today')
+  })
+
   it('matches a first name only when it is unambiguous', () => {
     expect(composeOutgoing('thanks @Leo', targets).blocks[0]?.elements[0]).toEqual({
       type: 'rich_text_section',

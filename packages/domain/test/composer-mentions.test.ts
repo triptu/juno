@@ -14,6 +14,7 @@ import {
 const maya: MentionPick = { kind: 'person', id: 'U0MAYA', name: 'Maya' }
 const mayaChen: MentionPick = { kind: 'person', id: 'U0MAYA2', name: 'Maya Chen' }
 const eng: MentionPick = { kind: 'channel', id: 'C0ENG', name: 'eng' }
+const design: MentionPick = { kind: 'group', id: 'S0DESIGN', name: 'design-team' }
 
 describe('the query being typed', () => {
   it('follows an @ or # at a word start, up to the caret', () => {
@@ -68,6 +69,14 @@ describe('drafts and sends', () => {
     expect(encoded).toBe('ask <@U0MAYA2|Maya Chen> in <#C0ENG|eng> about <b>')
     expect(decodeMentions(encoded)).toEqual({ text, picks: [mayaChen, eng] })
     expect(decodeMentions('plain')).toEqual({ text: 'plain', picks: [] })
+  })
+
+  it('a user group shows as its handle and goes as a subteam mention', () => {
+    const text = 'cc @design-team and @Maya'
+    expect(mentionTokens(text, [design, maya]).map((t) => text.slice(t.start, t.end))).toEqual(['@design-team', '@Maya'])
+    const encoded = encodeMentions(text, [design, maya])
+    expect(encoded).toBe('cc <!subteam^S0DESIGN|@design-team> and <@U0MAYA|Maya>')
+    expect(decodeMentions(encoded)).toEqual({ text, picks: [design, maya] })
   })
 })
 

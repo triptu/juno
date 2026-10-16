@@ -1,6 +1,6 @@
 /**
  * Handlers for the @ and # suggestions (`contract/src/routes/mentions.ts`).
- * Both follow the open workspace like New chat's pickers
+ * Each follows the open workspace like New chat's pickers
  * (`newchat/handlers.ts`) and never call Slack. They re-run when people or
  * conversations change; who posted lately is read again on the next query.
  */
@@ -9,7 +9,7 @@ import { StoreReader, type InvalidationKeys } from '@juno/store'
 import { Effect } from 'effect'
 import { serveWorkspaceValue } from '../protocol/live'
 import { Workspace } from '../workspace'
-import { queryChannels, queryPeople } from './query'
+import { queryChannels, queryGroups, queryPeople } from './query'
 
 const KEYS: InvalidationKeys = ['users', 'conversations', 'team']
 
@@ -23,6 +23,7 @@ export const MentionsHandlers = MentionsRoutes.toLayer(
         return yield* sql<{ name: string; url: string | null; alias_for: string | null }>`SELECT name, url, alias_for FROM emoji ORDER BY name`
       })),
       'mentions.people': ({ channel, threadTs, query }) => live('mentions.people', queryPeople(channel, threadTs, query)),
+      'mentions.groups': ({ query }) => serveWorkspaceValue(workspace.changes, 'mentions.groups', ['usergroups', 'team'], queryGroups(query)),
       'mentions.channels': ({ query }) => live('mentions.channels', queryChannels(query)),
     }
   }),

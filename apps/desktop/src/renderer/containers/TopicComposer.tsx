@@ -66,8 +66,8 @@ export function withQuote(draft: string, text: string): string {
  * and the pending row shows in the list at once; otherwise the check bar
  * shows inside the composer until a choice, Esc or an edit. While typing
  * pauses in a public channel, the audience line warns about hiring and
- * people details. Typing @ or # suggests people and channels
- * (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
+ * people details. Typing @ or # suggests people and user groups, or
+ * channels (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
  * The draft and the send carry the picked people and channels and the
  * linked words encoded as Slack does (`encodeDraft`), while the checks read
  * the text as shown. A file still staging goes with the send: the message
@@ -278,6 +278,7 @@ function LoadedComposer({
     onChange: change,
     field,
     place: { channel: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) },
+    groups: true,
   })
 
   // Links are drawn where no picked name is.

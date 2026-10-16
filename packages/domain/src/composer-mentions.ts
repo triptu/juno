@@ -2,18 +2,19 @@
  * @ and # in the composer (spec section 8, inventory 7.1). Pure rules the
  * renderer runs on each keystroke, reached through `@juno/contract`.
  *
- * The field holds plain text. A person or channel picked from the
- * suggestions shows as "@Maya" or "#eng", and the composer keeps the list
- * of what was picked. A token is a place in the text where a picked name
+ * The field holds plain text. A person, user group or channel picked from
+ * the suggestions shows as "@Maya", "@design-team" or "#eng", and the
+ * composer keeps the list of what was picked. A token is a place in the text where a picked name
  * still stands whole; typing inside one breaks it back into plain text.
  * Drafts and sends carry the text with each token encoded as Slack does,
- * `<@U…|Maya>` and `<#C…|eng>`, so a draft keeps its mentions through a
- * restart and `composeOutgoing` sends them by id.
+ * `<@U…|Maya>`, `<!subteam^S…|@design-team>` and `<#C…|eng>`, so a draft
+ * keeps its mentions through a restart and `composeOutgoing` sends them by
+ * id.
  */
 
-export type MentionKind = 'person' | 'channel'
+export type MentionKind = 'person' | 'group' | 'channel'
 
-/** A person or channel picked from the suggestions. `name` has no "@" or "#". */
+/** A person, user group or channel picked from the suggestions. `name` has no "@" or "#"; a group's is its handle. */
 export interface MentionPick {
   readonly kind: MentionKind
   readonly id: string
@@ -35,8 +36,8 @@ export interface MentionQuery {
   readonly text: string
 }
 
-/** "@Maya", "#eng": a pick as the field shows it. */
-export const mentionText = (pick: MentionPick): string => `${pick.kind === 'person' ? '@' : '#'}${pick.name}`
+/** "@Maya", "@design-team", "#eng": a pick as the field shows it. */
+export const mentionText = (pick: MentionPick): string => `${pick.kind === 'channel' ? '#' : '@'}${pick.name}`
 
 /** What may not come right before a trigger: it would be inside a word or an email. */
 const WORD_BEFORE = /[\p{L}\p{N}_@#.-]/u
@@ -117,27 +118,43 @@ export function picksIn(text: string, picks: ReadonlyArray<MentionPick>): Readon
 /** Slack's encoding has no escape for ">" or "|", so a name loses them. */
 const encodeName = (name: string) => name.replace(/[>|]/g, '')
 
-/** `text` with each token encoded as Slack does: `<@U…|Maya>`, `<#C…|eng>`. What drafts store and sends carry. */
+/** A pick encoded as Slack does: `<@U…|Maya>`, `<!subteam^S…|@design-team>`, `<#C…|eng>`. */
+export function encodePick({ kind, id, name }: MentionPick): string {
+  switch (kind) {
+    case 'person':
+      return `<@${id}|${encodeName(name)}>`
+    case 'group':
+      return `<!subteam^${id}|@${encodeName(name)}>`
+    case 'channel':
+      return `<#${id}|${encodeName(name)}>`
+  }
+}
+
+/** `text` with each token encoded as Slack does (`encodePick`). What drafts store and sends carry. */
 export function encodeMentions(text: string, picks: ReadonlyArray<MentionPick>): string {
   const tokens = mentionTokens(text, picks)
   if (tokens.length === 0) return text
   let out = ''
   let last = 0
   for (const token of tokens) {
-    const { kind, id, name } = token.pick
-    out += `${text.slice(last, token.start)}<${kind === 'person' ? '@' : '#'}${id}|${encodeName(name)}>`
+    out += `${text.slice(last, token.start)}${encodePick(token.pick)}`
     last = token.end
   }
   return out + text.slice(last)
 }
 
-const ENCODED = /<@([UW][A-Z0-9]+)\|([^>]*)>|<#([CG][A-Z0-9]+)\|([^>]*)>/g
+const ENCODED = /<@([UW][A-Z0-9]+)\|([^>]*)>|<#([CG][A-Z0-9]+)\|([^>]*)>|<!subteam\^([A-Z0-9]+)\|@?([^>]*)>/g
 
 /** The field's text and picks for an encoded draft (`encodeMentions`). */
 export function decodeMentions(encoded: string): { readonly text: string; readonly picks: ReadonlyArray<MentionPick> } {
   const picks = new Map<string, MentionPick>()
-  const text = encoded.replace(ENCODED, (_match, userId: string | undefined, userName: string | undefined, channelId: string | undefined, channelName: string | undefined) => {
-    const pick: MentionPick = userId !== undefined ? { kind: 'person', id: userId, name: userName ?? userId } : { kind: 'channel', id: channelId!, name: channelName ?? channelId! }
+  const text = encoded.replace(ENCODED, (_match, userId: string | undefined, userName: string | undefined, channelId: string | undefined, channelName: string | undefined, groupId: string | undefined, handle: string | undefined) => {
+    const pick: MentionPick =
+      userId !== undefined
+        ? { kind: 'person', id: userId, name: userName ?? userId }
+        : channelId !== undefined
+          ? { kind: 'channel', id: channelId, name: channelName ?? channelId }
+          : { kind: 'group', id: groupId!, name: handle || groupId! }
     picks.set(`${pick.kind}:${pick.id}:${pick.name}`, pick)
     return mentionText(pick)
   })

@@ -5,11 +5,12 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { mentionsChannels, mentionsEmoji, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
+import { mentionsChannels, mentionsEmoji, mentionsGroups, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
 import { registry } from './client'
 import { liveQuery } from './atoms'
 
 const peopleFamily = liveQuery(mentionsPeople)
+const groupsFamily = liveQuery(mentionsGroups)
 const channelsFamily = liveQuery(mentionsChannels)
 
 const closed = Atom.make(AsyncResult.initial<never, never>())
@@ -25,6 +26,9 @@ export const mentionPeopleAtom = (query: string | undefined, place: MentionPlace
   query === undefined
     ? closed
     : peopleFamily({ query, ...(place.channel === undefined ? {} : { channel: place.channel }), ...(place.threadTs === undefined ? {} : { threadTs: place.threadTs }) })
+
+/** The user groups matching `query` while the "@" list is open with something typed after the "@". */
+export const mentionGroupsAtom = (query: string | undefined) => (query === undefined || query.trim() === '' ? closed : groupsFamily({ query }))
 
 /** The channels matching `query` while the "#" list is open. */
 export const mentionChannelsAtom = (query: string | undefined) => (query === undefined ? closed : channelsFamily({ query }))

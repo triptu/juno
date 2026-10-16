@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import type { MentionChannel, MentionPerson } from '@juno/contract'
+import type { MentionChannel, MentionGroup, MentionPerson } from '@juno/contract'
 import { defineFixtures, fixture, scene, type TextareaMark } from '@juno/ui'
 import { AttachButton } from './AttachButton'
 import { AttachmentChips } from './AttachmentChips'
@@ -98,11 +98,16 @@ const channels: ReadonlyArray<MentionChannel> = [
   { id: 'C0PLAYBOOKS', name: 'playbooks', kind: 'public', tier: 1, order: 2, names: ['playbooks'] },
 ]
 
+const groups: ReadonlyArray<MentionGroup> = [
+  { id: 'S0MARKETING', handle: 'marketing', name: 'Marketing team', tier: 0, order: 0, names: ['marketing', 'Marketing team'] },
+  { id: 'S0MAINT', handle: 'maintainers', name: 'Repository maintainers', tier: 1, order: 1, names: ['maintainers', 'Repository maintainers'] },
+]
+
 const LIST = 'mentions'
 
-/** The composer with the @ or # list open over `value`, its trigger at `at`. */
-function MentionsOpen({ value, at, kind }: { readonly value: string; readonly at: number; readonly kind: 'person' | 'channel' }) {
-  const rows = kind === 'person' ? { kind, rows: people } : { kind, rows: channels }
+/** The composer with the @ or # list open over `value`, its trigger at `at`; with `withGroups`, user groups after the people. */
+function MentionsOpen({ value, at, kind, withGroups = false }: { readonly value: string; readonly at: number; readonly kind: 'person' | 'channel'; readonly withGroups?: boolean }) {
+  const rows = kind === 'person' ? { kind, rows: people, ...(withGroups ? { groups } : {}) } : { kind, rows: channels }
   const activeId = mentionRowId(LIST, rows.rows[0]!.id)
   return (
     <div {...stylex.props(styles.column)}>
@@ -110,7 +115,7 @@ function MentionsOpen({ value, at, kind }: { readonly value: string; readonly at
         {...base}
         value={value}
         placeholder="Reply"
-        marks={value.startsWith('Ask @Leo') ? [{ start: 4, end: 8, look: 'person', hue: 'midnight' }] : []}
+        marks={value.startsWith('Ask @Leo') ? [{ start: 4, end: 8, look: 'person', hue: 'midnight' }] : value.startsWith('cc @design-crew') ? [{ start: 3, end: 15, look: 'person', hue: 'jordy' }] : []}
         mention={{
           anchorAt: at,
           listId: LIST,
@@ -229,6 +234,7 @@ export default defineFixtures(
     Mentions: {
       chips: fixture({ ...base, value: 'Thanks @Maya for the notes, see #platform for the plan.', placeholder: 'Reply', marks: picked }),
       'people-open': scene(() => <MentionsOpen value="Ask @Leo and @ma" at={13} kind="person" />, { height: 300 }),
+      'people-and-groups-open': scene(() => <MentionsOpen value="cc @design-crew and @ma" at={20} kind="person" withGroups />, { height: 380 }),
       'channels-open': scene(() => <MentionsOpen value="#pla" at={0} kind="channel" />, { height: 260 }),
       // Far right in a wide field: the list stays inside the composer's width.
       'open-at-the-end': scene(() => <MentionsOpen value={`${'The numbers for the quarter are in and they look good. '.repeat(1)}cc @ma`} at={58} kind="person" />, {
