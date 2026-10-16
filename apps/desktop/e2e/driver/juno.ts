@@ -1441,6 +1441,18 @@ export class TopicPane {
     return lastMenu(this.win)
   }
 
+  /** The right island's Follow, on a thread you do not follow: it opens the Follow menu. */
+  get followButton() {
+    return this.header.getByRole('button', { name: 'Follow', exact: true })
+  }
+
+  /** Opens the Follow menu and picks a choice. */
+  async chooseInFollowMenu(item: 'notify-matters' | 'notify-every'): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.followButton.click()
+    return lastMenu(this.win)
+  }
+
   /** Opens the topic menu by right-clicking the title and picks `item`. */
   async chooseInTitleMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
     await chooseNextMenuItem(this.win, item)

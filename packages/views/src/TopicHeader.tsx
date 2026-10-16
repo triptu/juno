@@ -1,4 +1,5 @@
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
+import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -28,6 +29,12 @@ export interface TopicHeaderProps {
   readonly onPillMenu?: () => void
   /** Threads: Resolve or Reopen. Without it the button is not shown. */
   readonly onResolve?: () => void
+  /**
+   * A thread you do not follow (Notify me is Never, SPEC 5) shows Follow in
+   * Resolve's place: `onOpen` opens its menu at `at`, and `open` says the
+   * menu is showing. Without it such a thread shows Resolve.
+   */
+  readonly follow?: { readonly open: boolean; readonly onOpen: (at: MenuAnchor) => void }
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
@@ -62,21 +69,26 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * is the tint, the icon, the tooltip and the accessible name) and the
  * title, which opens the topic switcher, hung under the left island; a
  * right-click on it opens the topic's menu. Right: Resolve or Reopen (not
- * on Main), ⋯ (the topic's menu) and Juno. The islands line up with the
- * reading column, and under 480px Resolve shows as an icon. Rename turns
- * the title into a field in place.
+ * on Main), or Follow on a thread you do not follow, then ⋯ (the topic's
+ * menu) and Juno. Follow and Resolve keep the wider of their two widths,
+ * so following moves nothing. The islands line up with the reading column,
+ * and under 480px Follow and Resolve show as icons. Rename turns the title
+ * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, follow, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
   const pillName = `${channel.name}, ${kind.toLowerCase()}`
 
+  // Follow can turn into Resolve or Reopen, and back on ⌘Z or Never, so each reserves the other's label.
+  const canFollow = !main && follow !== undefined
+  const resolveLabel = detail.resolved ? 'Reopen' : 'Resolve'
   const resolve =
-    main || onResolve === undefined ? null : detail.resolved ? (
-      <IslandButton icon={ArrowCounterClockwise} label="Reopen" onClick={onResolve} />
-    ) : (
-      <IslandButton icon={CheckCircle} label="Resolve" onClick={onResolve} />
+    canFollow && !detail.subscribed ? (
+      <IslandButton icon={Bell} label="Follow" reserve={resolveLabel} popup="menu" expanded={follow.open} onClick={follow.onOpen} />
+    ) : main || onResolve === undefined ? null : (
+      <IslandButton icon={detail.resolved ? ArrowCounterClockwise : CheckCircle} label={resolveLabel} {...(canFollow ? { reserve: 'Follow' } : {})} onClick={onResolve} />
     )
   const junoButton = juno === undefined ? null : <JunoToggle pressed={juno.open} onToggle={juno.onToggle} />
 
