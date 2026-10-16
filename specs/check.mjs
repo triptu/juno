@@ -7,6 +7,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
+import { outboxPairs, outboxSchedules } from './outbox-checks.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -311,19 +312,7 @@ const regressions = [
   ['readstate', 'latePage', 'acceptedUnreadProtected', 'late-read-page'],
   ['readstate', 'pendingPage', 'acceptedUnreadProtected', 'pending-read-page'],
   ['readstate', 'pendingMark', 'quietAgreement', 'pending-read-event'],
-  ['outbox', 'blindRetry', 'atMostOnce', 'outbox-blind-retry'],
-  ['outbox', 'crashResend', 'atMostOnce', 'outbox-crash-resend'],
-  ['outbox', 'echoKeepsRow', 'noDoubleShow', 'outbox-echo-keeps-row'],
-  ['outbox', 'answerAfterEcho', 'noDoubleShow', 'outbox-answer-after-echo'],
-  ['outbox', 'actionBeforeStore', 'actionNeedsMessage', 'outbox-action-before-store'],
-  ['outbox', 'actionOnDiscarded', 'noActionOnDiscarded', 'outbox-action-on-discarded'],
-  ['outbox', 'offlineSend', 'sendsWaitOffline', 'outbox-offline-send'],
-  ['outbox', 'networkCopy', 'shownOnce', 'outbox-network-copy'],
-  ['outbox', 'sameText', 'keepsRealSends', 'outbox-same-text'],
-  ['outbox', 'keptDeleted', 'keepsRealSends', 'outbox-kept-deleted'],
-  ['outbox', 'copyReply', 'repliesKeepRoot', 'outbox-copy-reply'],
-  ['outbox', 'deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
-  ['outbox', 'uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
+  ...outboxPairs.map((pair) => ['outbox', ...pair]),
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
@@ -352,7 +341,7 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of ['answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']) {
+  for (const schedule of outboxSchedules) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
