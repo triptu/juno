@@ -74,7 +74,7 @@ export interface SidebarProps {
   /** After the traffic lights: Hide sidebar, Back and Forward (`TitlebarNav`). */
   readonly titlebarLeading?: ReactNode
   readonly account: SidebarAccount
-  /** Unread Juno messages: the soft grey count on the Juno item, never an accent badge. */
+  /** Unread Juno messages: the count on the Juno item, in the sidebar's counter colours. */
   readonly junoUnread?: number
   /** A background job is running: the Juno item's sparkle turns duotone. A run alone does not light it (SPEC 13.2). */
   readonly junoBusy?: boolean
@@ -227,7 +227,7 @@ export function Sidebar({
           onContextMenu={navMenu('juno')}
           trailing={
             junoUnread > 0 ? (
-              <Chip variant="filled" numeric title={`${junoUnread} unread from Juno`}>
+              <Chip variant="count" numeric title={`${junoUnread} unread from Juno`}>
                 {countLabel(junoUnread)}
               </Chip>
             ) : undefined

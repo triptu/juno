@@ -191,7 +191,7 @@ export const TopicRow = memo(function TopicRow({
             </span>
             <span {...stylex.props(styles.badgeSlot)}>
               {unread ? (
-                <Chip variant="strong" numeric title={unreadLabel}>
+                <Chip variant="count" numeric title={unreadLabel}>
                   {countLabel(row.unreadCount, row.unreadExact)}
                 </Chip>
               ) : null}
