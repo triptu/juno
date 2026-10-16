@@ -56,6 +56,10 @@ export interface StoredFile {
   mimetype: string
   /** Set by `files.completeUpload`. The name stands in until then. */
   title?: string
+  /** Slack has not made the thumbnails yet: the file object has no thumbnails and no size (`holdThumbnails`). */
+  thumbsHeld?: boolean
+  /** A video's poster frame, a PNG, served at `?thumb=video`. */
+  poster?: { readonly bytes: Buffer; readonly width: number; readonly height: number }
 }
 
 export interface PostInput {
@@ -70,6 +74,8 @@ export interface PostInput {
   readonly broadcast?: boolean
   readonly clientMsgId?: string
   readonly files?: ReadonlyArray<File>
+  /** The files the socket event carries instead of `files`: Slack's partial copies (`check_file_info`). */
+  readonly eventFiles?: ReadonlyArray<File>
   readonly at?: number
   readonly subtype?: string
   /** Fixture-only: skip events and read-state side effects. */
@@ -94,6 +100,8 @@ export class Workspace {
   readonly changedAt = new Map<string, number>()
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
+  /** Files uploaded while this is set start without thumbnails (`holdThumbnails`). */
+  holdThumbnails = false
   prefs: UserPrefs = {}
   /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
   selfUsergroups: Array<string> = []
@@ -446,7 +454,7 @@ export class Workspace {
       }
     }
 
-    this.emit({ ...message, type: 'message', channel: input.channel, event_ts: ts })
+    this.emit({ ...message, ...(input.eventFiles === undefined ? {} : { files: input.eventFiles }), type: 'message', channel: input.channel, event_ts: ts })
     if (followed !== undefined) this.emit({ type: 'thread_subscribed', subscription: this.subscriptionObject(followed), event_ts: this.eventTs() })
     if (root !== undefined) {
       const updated = this.withThreadFields({ ...this.find(input.channel, root.ts)!, channel: input.channel })

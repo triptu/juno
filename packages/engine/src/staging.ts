@@ -7,14 +7,15 @@
  * serve it as `juno://uploads/<name>` for the chip and the pending row.
  *
  * What the composer attached is remembered in memory until it is sent or
- * removed. Staged bytes that no pending post names are deleted a day after
- * they were written (`sweep`, when a workspace opens).
+ * removed. Staged bytes that no pending post names, and that no sent
+ * message still shows (`uploaded_files`), are deleted a day after they were
+ * written (`sweep`, when a workspace opens).
  */
 import { appendFile, mkdir, open as openFile, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Clock, Context, Effect, Layer, Stream } from 'effect'
 import { MAX_FILE_BYTES, NotSignedIn, Rejected, type StagedFile, type StageError } from '@juno/contract'
-import { pendingPosts, type PendingFile } from '@juno/sync'
+import { pendingPosts, uploadedNames, type PendingFile } from '@juno/sync'
 import { Workspace, type OpenWorkspace } from './workspace'
 import { imageSize } from './imageSize'
 
@@ -139,7 +140,9 @@ export class Staging extends Context.Service<
       const sweep = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const posts = yield* pendingPosts.pipe(Effect.provide(open.context))
-          const keep = new Set([...posts.flatMap((post) => post.files.map((file) => file.stagedName)), ...[...entries.values()].map((entry) => entry.file.stagedName)])
+          // A sent image's copy stays while its message shows it, until Slack's thumbnails arrive (`uploaded_files`).
+          const shown = yield* uploadedNames.pipe(Effect.provide(open.context))
+          const keep = new Set([...posts.flatMap((post) => post.files.map((file) => file.stagedName)), ...shown, ...[...entries.values()].map((entry) => entry.file.stagedName)])
           const now = yield* Clock.currentTimeMillis
           const names = yield* io(() => readdir(open.paths.uploads))
           for (const name of names) {

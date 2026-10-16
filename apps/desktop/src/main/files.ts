@@ -6,11 +6,18 @@
  *   main fetches the bytes on the Slack session, so the cookie never leaves
  *   the `persist:slack` partition, and only from Slack's file hosts (or the
  *   fake Slack under JUNO_E2E).
+ *   `juno://files/<file id>/video?url=…` streams a video for the viewer,
+ *   passing the player's `Range` on, so it can seek.
  * - `juno://uploads/<id>.<ext>`: an image the composer staged, from the
  *   engine's `uploads/` folder, for its chip and the pending row.
  * - `downloadFile`: Download, into ~/Downloads, then shown in Finder.
+ * - `openFile`: the viewer's Open, into a temporary folder, then opened in
+ *   the default app (Preview for images).
+ * - `copyImage`: the viewer's Copy image, from a `juno://files` or
+ *   `juno://uploads` url, onto the clipboard as an image.
  */
-import { app, session as electronSession, shell, type DownloadItem } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { app, clipboard, ClipboardItem, nativeImage, session as electronSession, shell, type DownloadItem } from 'electron'
 import { existsSync, mkdirSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { join, parse } from 'node:path'
@@ -38,22 +45,42 @@ function slackFileUrl(raw: string, extraOrigin: string | undefined): URL | undef
   return undefined
 }
 
-/** Serves one thumbnail. Anything but an image answers 404, so a Slack sign-in page never reaches an `<img>`. */
-export async function serveThumbnail(request: URL, extraOrigin: string | undefined): Promise<Response> {
+/**
+ * Serves one thumbnail. Anything but an image answers 404, so a Slack
+ * sign-in page never reaches an `<img>`. A `video` variant answers only a
+ * video, with `range` passed to Slack and its partial answer passed back.
+ */
+export async function serveThumbnail(request: URL, extraOrigin: string | undefined, range?: string | null): Promise<Response> {
   let url = thumbnailUrl(request, extraOrigin)
   if (url === undefined) return new Response('Not found', { status: 404 })
+  const video = request.host === 'files' && request.pathname.endsWith('/video')
   try {
     const session = electronSession.fromPartition(SLACK_PARTITION)
-    const signal = AbortSignal.timeout(15_000)
-    let response = await session.fetch(url.toString(), { credentials: 'include', redirect: 'manual', signal })
+    // A video plays for minutes; only its first answer has to come quickly.
+    const signal = video ? undefined : AbortSignal.timeout(15_000)
+    const headers = video && range ? { range } : undefined
+    const get = (target: URL) => session.fetch(target.toString(), { credentials: 'include', redirect: 'manual', ...(signal === undefined ? {} : { signal }), ...(headers === undefined ? {} : { headers }) })
+    let response = await get(url)
     for (let redirects = 0; response.status >= 300 && response.status < 400 && redirects < 3; redirects++) {
       const location = response.headers.get('location')
       await response.body?.cancel()
       url = location === null ? undefined : slackFileUrl(new URL(location, url).toString(), extraOrigin)
       if (url === undefined) return new Response('Not found', { status: 404 })
-      response = await session.fetch(url.toString(), { credentials: 'include', redirect: 'manual', signal })
+      response = await get(url)
     }
     const type = response.headers.get('content-type') ?? ''
+    if (video) {
+      if (!response.ok || !type.startsWith('video/')) {
+        await response.body?.cancel()
+        return new Response('Not found', { status: 404 })
+      }
+      const passed = new Headers({ 'content-type': type, 'accept-ranges': 'bytes' })
+      for (const name of ['content-length', 'content-range']) {
+        const value = response.headers.get(name)
+        if (value !== null) passed.set(name, value)
+      }
+      return new Response(response.body, { status: response.status, headers: passed })
+    }
     if (request.host === 'files' && request.pathname !== '/avatar') {
       if (!response.ok || !type.startsWith('image/')) {
         await response.body?.cancel()
@@ -125,10 +152,55 @@ export function freePath(folder: string, name: string, exists: (path: string) =>
  * shows it in Finder. Only Slack's file hosts, or the fake Slack in tests.
  */
 export function downloadFile(file: { readonly url: string; readonly name: string }, extraOrigin: string | undefined, e2e: boolean): Promise<DownloadResult> {
+  const folder = e2e ? join(app.getPath('userData'), 'Downloads') : app.getPath('downloads')
+  return saveFile(file, folder, extraOrigin, (path) => {
+    if (e2e) downloadsForTests.push(path)
+    else shell.showItemInFolder(path)
+  })
+}
+
+/** Under JUNO_E2E, files Open would have opened are recorded here instead. */
+export const openedForTests: string[] = []
+
+/**
+ * Open in the viewer: the Slack file saved under its name into a folder of
+ * its own in the temporary folder, then opened in the default app.
+ */
+export function openFile(file: { readonly url: string; readonly name: string }, extraOrigin: string | undefined, e2e: boolean): Promise<DownloadResult> {
+  const folder = join(app.getPath('temp'), 'Juno', randomUUID())
+  return saveFile(file, folder, extraOrigin, (path) => {
+    if (e2e) openedForTests.push(path)
+    else void shell.openPath(path)
+  })
+}
+
+/** Under JUNO_E2E, how many images Copy image put on the clipboard. */
+export const copiedForTests = { images: 0 }
+
+/** Copy image in the viewer: the bytes behind a `juno://files` or `juno://uploads` url, onto the clipboard. */
+export async function copyImage(src: string, extraOrigin: string | undefined, e2e: boolean): Promise<'copied' | 'failed'> {
+  let url: URL
+  try {
+    url = new URL(src)
+  } catch {
+    return 'failed'
+  }
+  if (url.protocol !== 'juno:') return 'failed'
+  const response = url.host === 'files' && url.pathname !== '/avatar' ? await serveThumbnail(url, extraOrigin) : url.host === 'uploads' ? await serveUpload(url, app.getPath('userData')) : undefined
+  if (response === undefined || !response.ok) return 'failed'
+  const image = nativeImage.createFromBuffer(Buffer.from(await response.arrayBuffer()))
+  if (image.isEmpty()) return 'failed'
+  // As PNG whatever it came as, which every app pastes.
+  await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' }) })])
+  if (e2e) copiedForTests.images++
+  return 'copied'
+}
+
+/** Saves a Slack file on the Slack session into `folder` under its name, then calls `saved` with its path. */
+function saveFile(file: { readonly url: string; readonly name: string }, folder: string, extraOrigin: string | undefined, saved: (path: string) => void): Promise<DownloadResult> {
   const url = slackFileUrl(file.url, extraOrigin)
   if (url === undefined) return Promise.resolve('failed')
   const session = electronSession.fromPartition(SLACK_PARTITION)
-  const folder = e2e ? join(app.getPath('userData'), 'Downloads') : app.getPath('downloads')
   mkdirSync(folder, { recursive: true })
   return new Promise((resolve) => {
     const onDownload = (_event: unknown, item: DownloadItem) => {
@@ -139,8 +211,7 @@ export function downloadFile(file: { readonly url: string; readonly name: string
       item.setSavePath(path)
       item.once('done', (_done, state) => {
         if (state !== 'completed') return resolve('failed')
-        if (e2e) downloadsForTests.push(path)
-        else shell.showItemInFolder(path)
+        saved(path)
         resolve('saved')
       })
     }

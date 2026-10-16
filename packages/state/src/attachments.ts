@@ -67,3 +67,21 @@ export async function downloadFile(file: { readonly url: string; readonly name: 
     return false
   }
 }
+
+/** Open in the viewer: main saves the file into a temporary folder and opens it in the default app. Resolves whether it opened. */
+export async function openFile(file: { readonly url: string; readonly name: string }): Promise<boolean> {
+  try {
+    return (await window.juno.shell.openFile(file)) === 'saved'
+  } catch {
+    return false
+  }
+}
+
+/** Copy image in the viewer: main puts the image behind `src` on the clipboard. Resolves whether it did. */
+export async function copyImage(src: string): Promise<boolean> {
+  try {
+    return (await window.juno.clipboard.writeImage(src)) === 'copied'
+  } catch {
+    return false
+  }
+}

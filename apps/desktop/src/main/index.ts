@@ -7,7 +7,7 @@ import { appBackupSecrets } from './backupSecrets'
 import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
-import { downloadFile, downloadsForTests } from './files'
+import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -224,6 +224,8 @@ app.whenReady().then(() => {
     updates,
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
+    openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
+    copyImage: (src) => copyImage(src, fakeSlackOrigin, e2e),
     setViewing: (topicId) => notifier.setViewing(topicId),
     notifications: {
       test: () => notifier.test(),
@@ -328,6 +330,8 @@ if (e2e) {
       slackLinks: slackLinksForTests,
       browserLinks: browserLinksForTests,
       downloads: downloadsForTests,
+      opened: openedForTests,
+      copiedImages: () => copiedForTests.images,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,

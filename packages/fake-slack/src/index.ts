@@ -10,6 +10,8 @@ import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
 import { FakeServer, type CallRecord, type GatedCall, type GateDecision, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
+import { fileObject, partialFileObject } from './files.ts'
+import { samplePng } from './samples.ts'
 
 export type { CallRecord, GatedCall, GateDecision, Session } from './server.ts'
 export type { Subscription } from './state.ts'
@@ -328,6 +330,87 @@ export class FakeSlack {
     this.server.failUploads(input.times ?? 1, input.after ?? 0)
   }
 
+  /**
+   * Files uploaded from now on, and media from `injectMedia`, come without
+   * thumbnails and without a size, on the message and from `files.info`, as
+   * live Slack's echo of a fresh upload does, until `releaseThumbnails`.
+   */
+  holdThumbnails(): void {
+    this.workspace.holdThumbnails = true
+  }
+
+  /**
+   * Slack has made the held thumbnails: stored messages and `files.info`
+   * carry them, and each file gets a `file_thumbnail_generated` frame, as
+   * live (`event: 'file_change'` sends that instead; `'none'` sends nothing).
+   * Files uploaded later have thumbnails at once.
+   */
+  releaseThumbnails(input: { event?: 'file_thumbnail_generated' | 'file_change' | 'none' } = {}): void {
+    const ws = this.workspace
+    ws.holdThumbnails = false
+    const released = [...ws.files.values()].filter((file) => file.thumbsHeld === true)
+    for (const file of released) file.thumbsHeld = false
+    const ids = new Set(released.map((file) => file.id))
+    for (const [channel, list] of ws.messages) {
+      const isPublic = ws.conversations.get(channel)?.kind === 'public'
+      list.forEach((message, index) => {
+        if (!message.files?.some((file) => file.id !== undefined && ids.has(file.id))) return
+        list[index] = { ...message, files: message.files.map((file) => (file.id !== undefined && ids.has(file.id) ? fileObject(this.server.url, ws.files.get(file.id)!, isPublic) : file)) }
+      })
+    }
+    if (input.event === 'none') return
+    for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, event_ts: ws.eventTs() })
+  }
+
+  /**
+   * A message from another user with images (PNGs) and videos of the sizes
+   * given, in order; a video gets a PNG poster of that size and bytes that
+   * are not a playable video. Without thumbnails or posters while
+   * `holdThumbnails` is on. With `partial`, the socket event carries each
+   * file as Slack's partial copy (`file_access: "check_file_info"`, little
+   * more than the id), while history and `files.info` have it whole. With
+   * `ago` (minutes), the message is that old.
+   */
+  injectMedia(input: {
+    channel: string
+    user?: string
+    text?: string
+    partial?: boolean
+    ago?: number
+    media: ReadonlyArray<{ name: string; width: number; height: number; kind?: 'image' | 'video' }>
+  }): Message {
+    const ws = this.workspace
+    const user = input.user ?? 'U0MAYA'
+    const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
+    const stored = input.media.map((each) => {
+      const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+      const picture = samplePng(each.width, each.height)
+      const video = each.kind === 'video'
+      const bytes = video ? Buffer.from('not a playable video') : picture
+      const file = {
+        id,
+        name: each.name,
+        length: bytes.length,
+        user,
+        created: ws.clock.now(),
+        bytes,
+        mimetype: video ? 'video/mp4' : 'image/png',
+        ...(video ? { poster: { bytes: picture, width: each.width, height: each.height } } : {}),
+        ...(ws.holdThumbnails ? { thumbsHeld: true } : {}),
+      }
+      ws.files.set(id, file)
+      return file
+    })
+    return ws.post({
+      channel: input.channel,
+      user,
+      ...(input.text === undefined ? {} : { text: input.text }),
+      files: stored.map((file) => fileObject(this.server.url, file, isPublic)),
+      ...(input.ago === undefined ? {} : { at: ws.clock.now() - input.ago * 60_000 }),
+      ...(input.partial === true ? { eventFiles: stored.map(partialFileObject) } : {}),
+    })
+  }
+
   /** Frames of these types wait for `releaseFrames`, so a test can deliver an event late or never. */
   holdFrames(input: { types: ReadonlyArray<string> }): void {
     this.server.holdFrames(input.types)
@@ -422,6 +505,9 @@ export class FakeSlack {
       delayFiles: (i) => this.delayFiles(i),
       setLatency: (i) => this.setLatency(i),
       failUploads: (i) => this.failUploads(i),
+      holdThumbnails: () => this.holdThumbnails(),
+      releaseThumbnails: (i) => this.releaseThumbnails(i),
+      injectMedia: (i) => this.injectMedia(i),
       releaseFrames: (i) => this.releaseFrames(i),
       heldFrames: () => this.heldFrames(),
       expireSession: () => this.expireSession(),

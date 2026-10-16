@@ -182,3 +182,52 @@ describe('seeded files', () => {
     expect(Number(download.headers.get('content-length'))).toBe(pdf?.size)
   })
 })
+
+describe('late and partial files', () => {
+  it('holdThumbnails sends an image without thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    fake.holdThumbnails()
+    const file = await upload('shot.png', samplePng(640, 400), 'image/png')
+    await client.ok('files.completeUpload', { files: [{ id: file }] })
+    await client.ok('files.share', { files: [file], channel: 'C0ENG', comment: 'Held', client_msg_id: 'uuid-held-1' })
+    const echo = await socket.next(postedWith('uuid-held-1'))
+    expect(echo.files?.[0]).toMatchObject({ id: file, mimetype: 'image/png' })
+    expect(echo.files?.[0]?.thumb_360).toBeUndefined()
+    expect(echo.files?.[0]?.original_w).toBeUndefined()
+    expect((await client.ok('files.info', { file })).file.thumb_360).toBeUndefined()
+
+    const other = fake.injectMedia({ channel: 'C0ENG', media: [{ name: 'board.png', width: 400, height: 300 }] })
+    expect(other.files?.[0]?.thumb_360).toBeUndefined()
+
+    fake.releaseThumbnails()
+    const generated = await socket.next(isType('file_thumbnail_generated'))
+    expect(generated).toMatchObject({ file_id: file })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360_w: 360, thumb_360_h: 225 })
+    const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 2 })
+    expect(history.messages.map((m) => m.files?.[0]?.original_w)).toEqual([400, 640])
+  })
+
+  it('injectMedia sends partial files on the socket, a video with its poster, and the whole files in history and files.info', async () => {
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    const posted = fake.injectMedia({
+      channel: 'C0ENG',
+      text: 'Partial on the socket',
+      partial: true,
+      media: [{ name: 'shot.png', width: 640, height: 400 }, { name: 'clip.mp4', width: 1280, height: 720, kind: 'video' }],
+    })
+    const echo = await socket.next((frame): frame is MessagePostedEvent => isMessagePosted(frame) && frame.ts === posted.ts)
+    expect(echo.files).toEqual([
+      expect.objectContaining({ file_access: 'check_file_info', mode: 'hosted' }),
+      expect.objectContaining({ file_access: 'check_file_info', mode: 'hosted' }),
+    ])
+    expect(echo.files?.[0]?.mimetype).toBeUndefined()
+    const [image, video] = posted.files!
+    expect(image).toMatchObject({ mimetype: 'image/png', original_w: 640, original_h: 400 })
+    expect(video).toMatchObject({ mimetype: 'video/mp4', thumb_video_w: 1280, thumb_video_h: 720 })
+    expect((await client.ok('files.info', { file: video!.id! })).file).toMatchObject({ thumb_video_w: 1280, mp4: video!.mp4 })
+    const poster = await fetch(video!.thumb_video!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
+    expect(poster.headers.get('content-type')).toBe('image/png')
+  })
+})

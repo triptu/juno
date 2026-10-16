@@ -471,7 +471,7 @@ export class FakeServer {
         response.end()
         return
       }
-      return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', response)
+      return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', url.searchParams.get('thumb') === 'video', response)
     }
     if (path.startsWith('/avatars/') && method === 'GET') {
       const cookie = parseCookies(request.headers.cookie)['d']
@@ -629,13 +629,17 @@ export class FakeServer {
     response.end('OK - ' + bytes.length)
   }
 
-  /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes. */
-  async #file(fileId: string, download: boolean, response: ServerResponse): Promise<void> {
+  /** Serves a file's bytes; `?download=1` asks the browser to save it. Thumb urls get the original bytes, and a video's `?thumb=video` its poster. */
+  async #file(fileId: string, download: boolean, poster: boolean, response: ServerResponse): Promise<void> {
     await this.#hold(this.#stalls, 'file:bytes', { fileId })
     await this.#hold(this.#holds, 'file:bytes', { fileId })
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
     const stored = this.workspace.files.get(fileId)
     if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })
+    if (poster && stored.poster !== undefined) {
+      response.writeHead(200, { 'content-type': 'image/png', 'content-length': stored.poster.bytes.length })
+      return void response.end(stored.poster.bytes)
+    }
     response.writeHead(200, {
       'content-type': stored.mimetype,
       'content-length': stored.bytes.length,

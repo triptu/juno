@@ -9,6 +9,7 @@ import type { Locator, Page } from '@playwright/test'
 import { samplePdf, samplePng } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { TopicPane } from './driver/juno'
+import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -87,6 +88,59 @@ test('a pasted image goes with the message and shows in it at its final size', a
   const posted = fake.messages('C0ENG').filter((m) => m.client_msg_id === shares[0]!.args['client_msg_id'])
   expect(posted.map((m) => m.files?.map((f) => f.name))).toEqual([['chart.png']])
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
+})
+
+// Live, Slack shares a fresh image before it has made thumbnails: the echo has no `thumb_*` and no size, and
+// `file_thumbnail_generated` follows (research section 3, "Files"). The sent image shows its staged copy at its
+// final size from the first frame, then Slack's thumbnail in the same box.
+test('a sent image Slack has no thumbnails for yet shows at once from the local copy, then takes Slack\'s in the same box', async ({ juno, win, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  fake.holdThumbnails()
+  await paste(topic.composer, [chart()])
+  await staged(topic, 1)
+  fake.holdNext({ method: 'files.share', before: true })
+  await topic.send('Before the thumbnails')
+  const row = topic.message('Before the thumbnails')
+  const image = row.locator('[data-thumbnail][title="chart.png"]')
+  await expect(image).toBeVisible()
+  expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+
+  await expectStableAnchor(win, '[data-message-row] [data-thumbnail][title="chart.png"]', async () => {
+    fake.release()
+    await topic.expectSent('Before the thumbnails')
+    // Stored without thumbnails: still the staged copy, still an image.
+    await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
+    await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
+    fake.releaseThumbnails()
+    await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
+    await expect.poll(() => image.locator('img[src^="juno://files/"]').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
+  })
+  expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+  expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
+})
+
+test('another person\'s image that arrives without thumbnails fills in after the refetch', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  fake.holdThumbnails()
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', media: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
+  const row = topic.message('Whiteboard from today')
+  await expect(row.getByRole('button', { name: 'Download whiteboard.png' })).toBeVisible()
+  // The first try finds no thumbnails yet; Slack makes them without an event, and a later try brings them.
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  fake.releaseThumbnails({ event: 'none' })
+  const image = row.getByRole('button', { name: 'Open whiteboard.png' })
+  await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
+  expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
 test('a file dropped on the topic is sent on its own as a file row with Download', async ({ juno, fake }) => {
@@ -278,4 +332,60 @@ test('a send check keeps the draft while a newly attached file is still being re
   await post.click()
   await expect(topic.composer).toHaveValue('')
   await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length).toBe(1)
+})
+
+// A message's images make a grid in the message; any of them opens the media viewer at it, with every one in a
+// filmstrip along the bottom. ← and → move and stop at the ends, the strip shows the one clicked, and Esc closes
+// with focus back on the tile that opened it.
+test('several images open in the viewer at the one clicked, and the keys and the filmstrip move through them', async ({ juno, win, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  const names = ['rack-front.png', 'rack-back.png', 'cable-map.png', 'patch-panel.png']
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Photos from the rack move', media: names.map((name, index) => ({ name, width: 800 + index * 100, height: 600 })) })
+  const row = topic.message('Photos from the rack move')
+  const grid = row.locator('[data-thumbnail-grid]')
+  await expect(grid).toHaveAttribute('data-count', '4')
+  await expect(grid.locator('[data-thumbnail]')).toHaveCount(4)
+  expect(await grid.boundingBox()).toMatchObject({ width: 360, height: 240 })
+
+  const third = row.getByRole('button', { name: 'Open cable-map.png' })
+  await third.click()
+  const viewer = win.getByRole('dialog')
+  await expect(viewer).toBeVisible()
+  const current = viewer.locator('[data-viewer-item]')
+  const strip = viewer.getByRole('group', { name: 'All pictures in this message' })
+  await expect(current).toHaveAttribute('data-viewer-item', '3')
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('cable-map.png')
+  // The header names the message's sender, as the message's own header does.
+  const sender = await row.locator('[data-person-name]').first().getAttribute('data-person-name')
+  expect(sender).toBeTruthy()
+  await expect(viewer.locator('[data-viewer-meta]')).toHaveText(new RegExp(`^${sender} · .+ · 3 of 4$`))
+  await expect(strip.getByRole('button')).toHaveCount(4)
+  await expect(strip.getByRole('button', { name: 'Show cable-map.png' })).toHaveAttribute('aria-current', 'true')
+
+  await win.keyboard.press('ArrowRight')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await expect(viewer.getByRole('button', { name: 'Next' })).toHaveAttribute('aria-disabled', 'true')
+  await win.keyboard.press('ArrowRight')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await win.keyboard.press('ArrowLeft')
+  await expect(current).toHaveAttribute('data-viewer-item', '3')
+
+  await strip.getByRole('button', { name: 'Show rack-front.png' }).click()
+  await expect(current).toHaveAttribute('data-viewer-item', '1')
+  await expect(strip.getByRole('button', { name: 'Show rack-front.png' })).toHaveAttribute('aria-current', 'true')
+  await expect(viewer.getByRole('button', { name: 'Previous' })).toHaveAttribute('aria-disabled', 'true')
+  await win.keyboard.press('End')
+  await expect(current).toHaveAttribute('data-viewer-item', '4')
+  await win.keyboard.press('Home')
+  await expect(current).toHaveAttribute('data-viewer-item', '1')
+  await expect.poll(() => current.locator('img[alt="rack-front.png"]').evaluate((image: HTMLImageElement) => image.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
+
+  await win.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+  await expect(third).toBeFocused()
 })

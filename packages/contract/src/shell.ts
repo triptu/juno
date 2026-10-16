@@ -187,6 +187,11 @@ export const ShellRoutes = {
     input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
     output: DownloadResult,
   },
+  [Channels.shellOpenFile]: {
+    input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
+    output: DownloadResult,
+  },
+  [Channels.clipboardWriteImage]: { input: Schema.Struct({ src: Schema.String.check(Schema.isMaxLength(8192)) }), output: Schema.Literals(['copied', 'failed']) },
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
   [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },

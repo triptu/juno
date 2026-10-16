@@ -22,6 +22,7 @@ import sentPostsOwnDelete from './202610171300_sent_posts_own_delete'
 import viewColors from './202610171400_view_colors'
 import aiCalls from './202610180900_ai_calls'
 import automatedReason from './202610180930_automated_reason'
+import uploadedFiles from './202610181000_uploaded_files'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -51,4 +52,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610171400_view_colors': viewColors,
   '202610180900_ai_calls': aiCalls,
   '202610180930_automated_reason': automatedReason,
+  '202610181000_uploaded_files': uploadedFiles,
 }

@@ -297,7 +297,7 @@ export const withFiles = window([
 export const pendingFile = window([{ ago: 10, from: people.priya, text: 'Staging after the fix:', files: [files.pending] }])
 
 /** A made-up download url: main fetches the real one on the Slack session. */
-const downloadUrl = (id: string) => `https://files.example.invalid/${id}/download`
+export const downloadUrl = (id: string) => `https://files.example.invalid/${id}/download`
 
 /** Files Slack holds: the cards get Download, the images open in the viewer at full size. */
 export const downloadable = {

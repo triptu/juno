@@ -87,8 +87,12 @@ export const colors = stylex.defineVars({
 
   // The dim behind the command palette.
   '--overlay': 'rgba(27, 28, 21, 0.16)',
-  // Behind the image viewer: the page, nearly opaque, so only the picture reads.
+  // Behind the media viewer: the page, nearly opaque, so only the picture reads.
   '--overlay-viewer': 'hsla(48, 50%, 98%, 0.94)',
+  // Over a picture: the "+N" on the last tile of a message's images, and a
+  // video's play badge. The same in both themes, since it sits on the picture.
+  '--media-scrim': 'rgba(20, 19, 16, 0.5)',
+  '--media-scrim-foreground': 'hsla(48, 20%, 98%, 1)',
 
   // Status. Warning and info are only ever mixed into tints, never used as
   // text on their own (2.1:1 and 3.9:1).
@@ -802,6 +806,12 @@ export const layout = stylex.defineVars({
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',
   '--thumb-max-height': '240px',
+  // A tile of a message's image grid: two rows and the gap fill --thumb-max-height.
+  '--thumb-tile-height': '117px',
+  // The media viewer's header bar, the same for every item.
+  '--viewer-bar-width': '560px',
+  // A picture in the media viewer's filmstrip, square.
+  '--filmstrip-thumb': '56px',
   '--search-field-width': '260px',
   // The All topics table (inventory 10): topic, where, status, messages,
   // updated. Under the minimum width (the columns' minimums, their gaps and
@@ -981,7 +991,7 @@ export const z = stylex.defineVars({
   '--z-picker': '10',
   '--z-menu': '20',
   '--z-palette': '30',
-  // The image viewer, over the whole window. Never open with the palette.
+  // The media viewer, over the whole window. Never open with the palette.
   '--z-viewer': '30',
   '--z-selection': '35',
   '--z-context': '40',

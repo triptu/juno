@@ -108,3 +108,46 @@ describe('mergeMessage', () => {
     expect(same.row).toBe(stored)
   })
 })
+
+describe('image thumbnails', () => {
+  const bare = { id: 'F0SHOT', name: 'shot.png', mimetype: 'image/png', mode: 'hosted' }
+  const made = { ...bare, original_w: 640, original_h: 400, thumb_360: 'https://files.example.test/360', thumb_360_w: 360, thumb_360_h: 225 }
+
+  it('a later copy without thumbnails keeps the stored ones', () => {
+    const stored = toMessageRow(C, message({ ts: ts(1), files: [made] }))
+    const echo = mergeMessage(stored, message({ ts: ts(1), files: [{ ...bare, title: 'Renamed' }] }), C, event(2))
+    expect(JSON.parse(echo.row.files_json!)).toEqual([{ ...made, title: 'Renamed' }])
+  })
+
+  it('thumbnails that arrive replace a stored copy without them', () => {
+    const stored = toMessageRow(C, message({ ts: ts(1), files: [bare] }))
+    const page2 = mergeMessage(stored, message({ ts: ts(1), files: [made] }), C, page(3))
+    expect(JSON.parse(page2.row.files_json!)).toEqual([made])
+  })
+})
+
+describe('partial files and videos', () => {
+  const full = { id: 'F0SHOT', name: 'shot.png', mimetype: 'image/png', mode: 'hosted', file_access: 'visible', original_w: 640, original_h: 400, thumb_360: 'https://files.example.test/360', thumb_360_w: 360, thumb_360_h: 225 }
+  const partial = { id: 'F0SHOT', mode: 'hosted', file_access: 'check_file_info', created: 1, timestamp: 1, user: 'U0MAYA' }
+
+  it('a partial copy on a later event keeps the complete stored file', () => {
+    const stored = toMessageRow(C, message({ ts: ts(1), files: [full] }))
+    const merged = mergeMessage(stored, message({ ts: ts(1), files: [partial] }), C, event(2))
+    expect(JSON.parse(merged.row.files_json!)).toEqual([full])
+  })
+
+  it('a complete copy replaces a stored partial one', () => {
+    const stored = toMessageRow(C, message({ ts: ts(1), files: [partial] }))
+    const merged = mergeMessage(stored, message({ ts: ts(1), files: [full] }), C, page(3))
+    expect(JSON.parse(merged.row.files_json!)).toEqual([full])
+  })
+
+  it("a video keeps its stored poster and playback url when a later copy has neither", () => {
+    const video = { id: 'F0VID', name: 'demo.mp4', mimetype: 'video/mp4', mode: 'hosted', thumb_video: 'https://files.example.test/poster', thumb_video_w: 1280, thumb_video_h: 720, mp4: 'https://files.example.test/demo.mp4' }
+    const { thumb_video: _t, thumb_video_w: _w, thumb_video_h: _h, mp4: _m, ...bare } = video
+    const stored = toMessageRow(C, message({ ts: ts(1), files: [video] }))
+    const merged = mergeMessage(stored, message({ ts: ts(1), files: [bare] }), C, event(2))
+    expect(JSON.parse(merged.row.files_json!)).toEqual([video])
+  })
+})
+

@@ -12,6 +12,9 @@
  * fetchers in `shared-boot-async` (modules `HExl` and `bw5L`), and its form
  * builder `getFormData` (`qVKj`). The client does not read the answers of
  * steps 3 and 4, so their fields are optional.
+ *
+ * `files.info` answers the file as Slack holds it now, with its thumbnails
+ * once Slack has made them.
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
@@ -57,4 +60,11 @@ export const FilesShareArgs = S.Struct({
 })
 export type FilesShareArgs = typeof FilesShareArgs.Type
 
-export const FilesShareFields = { files: opt(S.Array(File)) } as const
+/** Live, the answer is `{ ok, file_msg_ts }`; the files come back without thumbnails on the message echo (research section 3). */
+export const FilesShareFields = { files: opt(S.Array(File)), file_msg_ts: opt(Ts) } as const
+
+export const FilesInfoArgs = S.Struct({ file: S.String })
+export type FilesInfoArgs = typeof FilesInfoArgs.Type
+
+/** Also `comments` and `paging`, which Juno does not read. */
+export const FilesInfoFields = { file: File } as const

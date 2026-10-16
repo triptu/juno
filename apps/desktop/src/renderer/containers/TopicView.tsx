@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef } from 'react'
-import type { FileView, TopicDetail } from '@juno/contract'
+import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent } from '@juno/views'
+import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
 import { closeTabById, openTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
@@ -125,9 +125,9 @@ interface TopicProps {
 }
 
 /** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
-function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, onOpenImage: (file: FileView) => void) {
+function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, onOpenMedia: (viewing: MediaViewing) => void) {
   return {
-    onOpenImage,
+    onOpenMedia,
     onRetry: retry,
     onDiscard: discard,
     onMessageMenu: messageActions.onMessageMenu,

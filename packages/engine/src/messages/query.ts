@@ -41,7 +41,7 @@ import {
 } from '@juno/domain'
 import { emojiUnicode, messageBody, plainText, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
-import type { PendingFile } from '@juno/sync'
+import { imagesWithoutThumbs, type PendingFile } from '@juno/sync'
 import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
@@ -215,6 +215,13 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       }
     }
 
+    // The user's own images Slack has no thumbnails for yet show their staged copies (`uploaded_files`).
+    const local = new Map<string, LocalFile>()
+    const waiting = selfId === undefined ? [] : rows.flatMap((row) => (row.user_id === selfId && row.files_json !== null && !pending.has(row.ts) ? imagesWithoutThumbs(row.files_json) : []))
+    if (waiting.length > 0) {
+      for (const file of yield* sql<LocalFile>`SELECT file_id, staged_name, width, height FROM uploaded_files WHERE file_id IN ${sql.in(waiting)}`) local.set(file.file_id, file)
+    }
+
     // Senders, then bodies: parse with what the maps hold, read what they lacked, parse those again.
     const senders = new Set<string>()
     for (const row of rows) if (row.user_id !== null) senders.add(row.user_id)
@@ -307,6 +314,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         title?.ai_title,
         conversation?.name,
         pending.get(row.ts)?.state,
+        local.size === 0 ? '' : localKey(row, local),
         intent?.issue === undefined ? '' : `${intent.issue.state}:${intent.issue.on ? 1 : 0}:${intent.issue.name}`,
         ...own.flatMap((r) => [r.name, r.count, r.me, r.users.join(',')]),
       ].join('\u0001')
@@ -316,7 +324,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         view = held.row
       } else {
         const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation, lookups)
-        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, thread, cache, pending: pending.get(row.ts) })
+        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, thread, cache, pending: pending.get(row.ts), local })
       }
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
@@ -436,6 +444,7 @@ interface ShapeInput {
   readonly thread: ThreadLink | undefined
   readonly cache: MessageCache
   readonly pending: PendingRow | undefined
+  readonly local: ReadonlyMap<string, LocalFile>
 }
 
 function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): MessageView {
@@ -471,7 +480,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     root: input.isRoot,
     reactions: kind === 'message' ? reactions : [],
     ...(kind === 'message' && input.reactionIssue !== undefined ? { reactionIssue: input.reactionIssue } : {}),
-    files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row) : pendingFiles(input.pending),
+    files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row, input.local) : pendingFiles(input.pending),
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
@@ -650,6 +659,10 @@ interface SlackFile {
   readonly thumb_480?: string
   readonly thumb_720?: string
   readonly thumb_1024?: string
+  readonly thumb_video?: string
+  readonly thumb_video_w?: number
+  readonly thumb_video_h?: number
+  readonly mp4?: string
   readonly url_private?: string
   readonly url_private_download?: string
 }
@@ -670,18 +683,32 @@ function thumbOf(file: SlackFile): FileView['thumb'] {
   const w = file.original_w ?? file.thumb_360_w
   const h = file.original_h ?? file.thumb_360_h
   if (variant === undefined || url === undefined || w === undefined || h === undefined || w <= 0 || h <= 0) return undefined
-  const scale = Math.min(1, THUMB_BOX / Math.max(w, h))
+  return boxOf(`juno://files/${encodeURIComponent(file.id)}/${variant}?url=${encodeURIComponent(url)}`, w, h)
+}
+
+/**
+ * A video's poster frame and what the viewer plays: Slack's `mp4` when it
+ * made one, else the original. Without a poster and its size the video is a
+ * card.
+ */
+function videoOf(file: SlackFile): Pick<FileView, 'thumb' | 'video' | 'width' | 'height'> | undefined {
+  const w = file.thumb_video_w
+  const h = file.thumb_video_h
+  const play = file.mp4 ?? file.url_private
+  if (file.id === undefined || file.thumb_video === undefined || play === undefined || w === undefined || h === undefined || w <= 0 || h <= 0) return undefined
+  const id = encodeURIComponent(file.id)
   return {
-    src: `juno://files/${encodeURIComponent(file.id)}/${variant}?url=${encodeURIComponent(url)}`,
-    width: Math.max(1, Math.round(w * scale)),
-    height: Math.max(1, Math.round(h * scale)),
+    width: w,
+    height: h,
+    thumb: boxOf(`juno://files/${id}/poster?url=${encodeURIComponent(file.thumb_video)}`, w, h),
+    video: `juno://files/${id}/video?url=${encodeURIComponent(play)}`,
   }
 }
 
 /**
  * The files of a message Juno is sending, from their staged copies. An
- * image's box is worked out as `thumbOf` works out Slack's, from the same
- * pixel size, so the row does not move when the stored message replaces it.
+ * image's box comes from the same pixel size as Slack's (`boxOf`), so the
+ * row does not move when the stored message replaces it.
  */
 function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
   const files = parseJson<ReadonlyArray<PendingFile>>(row.file_ids_json) ?? []
@@ -689,7 +716,6 @@ function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
     const kind = fileKind(file.mimetype)
     const src = uploadsUrl(file.stagedName)
     const sized = kind === 'image' && file.width !== undefined && file.height !== undefined && !file.stagedName.endsWith('.bin')
-    const scale = sized ? Math.min(1, THUMB_BOX / Math.max(file.width!, file.height!)) : 1
     return {
       id: file.id,
       name: file.name,
@@ -700,7 +726,7 @@ function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
         ? {
             width: file.width!,
             height: file.height!,
-            thumb: { src, width: Math.max(1, Math.round(file.width! * scale)), height: Math.max(1, Math.round(file.height! * scale)) },
+            thumb: boxOf(src, file.width!, file.height!),
             full: src,
           }
         : {}),
@@ -717,7 +743,30 @@ function fileKind(mimetype: string | undefined): FileView['kind'] {
   return 'file'
 }
 
-function filesOf(row: WindowMessage): ReadonlyArray<FileView> {
+/** A sent image's staged copy, while Slack has no thumbnails for it (`uploaded_files`). */
+interface LocalFile {
+  readonly file_id: string
+  readonly staged_name: string
+  readonly width: number
+  readonly height: number
+}
+
+/** The staged copies a row shows, for its cache key. */
+function localKey(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): string {
+  if (row.files_json === null) return ''
+  return imagesWithoutThumbs(row.files_json).flatMap((id) => { const file = local.get(id); return file === undefined ? [] : [file.staged_name] }).join(',')
+}
+
+/**
+ * An image's box from its pixel size, the same for a staged copy and for
+ * Slack's thumbnail, so the row does not move when one replaces the other.
+ */
+function boxOf(src: string, width: number, height: number): NonNullable<FileView['thumb']> {
+  const scale = Math.min(1, THUMB_BOX / Math.max(width, height))
+  return { src, width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+}
+
+function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): ReadonlyArray<FileView> {
   const files = parseJson<ReadonlyArray<SlackFile>>(row.files_json)
   if (files === undefined) return []
   const out: Array<FileView> = []
@@ -728,12 +777,43 @@ function filesOf(row: WindowMessage): ReadonlyArray<FileView> {
       continue
     }
     const kind = fileKind(file.mimetype)
-    const thumb = kind === 'image' ? thumbOf(file) : undefined
+    const slack = kind === 'image' ? thumbOf(file) : undefined
+    const staged = kind === 'image' && slack === undefined ? local.get(file.id) : undefined
+    if (staged !== undefined) {
+      const src = uploadsUrl(staged.staged_name)
+      out.push({
+        id: file.id,
+        name: file.title || file.name || 'File',
+        kind,
+        ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
+        ...(file.size === undefined ? {} : { size: file.size }),
+        width: staged.width,
+        height: staged.height,
+        thumb: boxOf(src, staged.width, staged.height),
+        full: src,
+        ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
+      })
+      continue
+    }
+    if (kind === 'video') {
+      const poster = videoOf(file)
+      out.push({
+        id: file.id,
+        name: file.title || file.name || 'File',
+        kind,
+        ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
+        ...(file.size === undefined ? {} : { size: file.size }),
+        ...(poster === undefined ? {} : poster),
+        ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
+      })
+      continue
+    }
+    const thumb = slack
     // The viewer shows the original (Slack's `url_private`).
     const full = thumb === undefined ? undefined : file.url_private ?? file.thumb_1024
     out.push({
       id: file.id,
-      name: file.title || file.name || file.id,
+      name: file.title || file.name || 'File',
       kind,
       ...(file.mimetype === undefined ? {} : { mimetype: file.mimetype }),
       ...(file.size === undefined ? {} : { size: file.size }),

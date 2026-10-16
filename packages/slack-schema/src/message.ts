@@ -67,6 +67,12 @@ export const File = S.Struct({
   thumb_1024_w: opt(S.Number),
   thumb_1024_h: opt(S.Number),
   thumb_tiny: opt(S.String),
+  /** A video's poster frame (research section 3, "Files"). */
+  thumb_video: opt(S.String),
+  thumb_video_w: opt(S.Number),
+  thumb_video_h: opt(S.Number),
+  /** A video Slack transcoded for playback. */
+  mp4: opt(S.String),
   original_w: opt(S.Number),
   original_h: opt(S.Number),
 })

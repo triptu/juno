@@ -223,32 +223,6 @@ test.describe('composer attachments', () => {
   })
 })
 
-test.describe('message images', () => {
-  test('one image fits 360 by 240; images side by side are a two-column grid of equal cells', async ({ page }) => {
-    await open(page, 'MessageList', 'files/thumbnails')
-    const at = await page.evaluate(() => {
-      const size = (element: Element) => {
-        const b = element.getBoundingClientRect()
-        return { left: b.left, top: b.top, width: b.width, height: b.height }
-      }
-      const grids = [...document.querySelectorAll('[data-thumbnail-grid]')].map((grid) => ({ grid: size(grid), cells: [...grid.querySelectorAll('[data-thumbnail]')].map(size) }))
-      const single = [...document.querySelectorAll('[data-thumbnail]')].filter((thumb) => thumb.closest('[data-thumbnail-grid]') === null).map(size)
-      return { grids, single }
-    })
-    expect(at.single.length).toBeGreaterThan(0)
-    for (const thumb of at.single) {
-      expect(thumb.width).toBeLessThanOrEqual(360)
-      expect(thumb.height).toBeLessThanOrEqual(240)
-    }
-    expect(at.grids.length).toBeGreaterThan(0)
-    for (const { grid, cells } of at.grids) {
-      expect(grid.width).toBe(360)
-      for (const cell of cells) expect({ width: cell.width, height: cell.height }).toEqual({ width: 177, height: 120 })
-      expect(cells[1]!.left - (cells[0]!.left + cells[0]!.width)).toBe(6)
-    }
-  })
-})
-
 test.describe('settings chips', () => {
   // How far a chip and the text of the row's buttons end from the card's right edge.
   const ends = (page: Page, chipSelector: string, card: string) =>

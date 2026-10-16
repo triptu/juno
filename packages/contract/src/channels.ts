@@ -58,6 +58,10 @@ export const Channels = {
   shellOpenInSlack: 'shell.openInSlack',
   /** Saves a Slack file into ~/Downloads on the Slack session and shows it in Finder. */
   shellDownloadFile: 'shell.downloadFile',
+  /** Saves a Slack file into a temporary folder on the Slack session and opens it in the default app. */
+  shellOpenFile: 'shell.openFile',
+  /** Puts the image behind a `juno://files` or `juno://uploads` url on the clipboard. */
+  clipboardWriteImage: 'clipboard.writeImage',
   /** Puts text on the clipboard. */
   clipboardWriteText: 'clipboard.writeText',
   /** Undo in the focused text field (`webContents.undo()`), for ⌘Z while one has text. */
@@ -291,9 +295,13 @@ export interface JunoBridge {
     readonly editUndo: () => Promise<unknown>
     /** Only Slack file urls download; main answers `saved` or `failed`. */
     readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
+    /** Only Slack file urls open; main answers `saved` once the default app was asked to open it, or `failed`. */
+    readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>
+    /** Only `juno://files` and `juno://uploads` images; main answers `copied` or `failed`. */
+    readonly writeImage: (src: string) => Promise<unknown>
   }
   readonly menu: {
     /** Calls `listener` for each app-menu command. Returns the unsubscribe. */

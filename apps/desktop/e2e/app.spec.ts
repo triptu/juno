@@ -198,8 +198,8 @@ test('exposes only the bridge to the page', async ({ win }) => {
     launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
     sharing: ['get', 'set'],
     contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile'],
-    clipboard: ['writeText'],
+    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
+    clipboard: ['writeText', 'writeImage'],
     menu: ['onCommand'],
     notifications: ['setViewing', 'onOpen'],
   })

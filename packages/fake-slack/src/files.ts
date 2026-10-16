@@ -129,7 +129,8 @@ function thumbs(url: string, width: number, height: number): Partial<File> {
 export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false): File {
   const url = `${baseUrl}/files/${stored.id}/${encodeURIComponent(stored.name)}`
   const type = typeOf(stored.name, stored.mimetype)
-  const size = stored.bytes === undefined ? undefined : imageSize(stored.bytes)
+  // Live, a fresh upload's echo has no thumbnails and no size until Slack has made them.
+  const size = stored.bytes === undefined || stored.thumbsHeld === true ? undefined : imageSize(stored.bytes)
   const seconds = Math.floor(stored.created / 1000)
   return {
     id: stored.id,
@@ -149,5 +150,13 @@ export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false
     url_private_download: `${url}?download=1`,
     permalink: url,
     ...(size === undefined ? {} : { original_w: size.width, original_h: size.height, ...thumbs(url, size.width, size.height) }),
+    // A video: its poster and the url it plays from, as live (research section 10, "Videos"); not until Slack has made them.
+    ...(stored.poster === undefined || stored.thumbsHeld === true ? {} : { thumb_video: `${url}?thumb=video`, thumb_video_w: stored.poster.width, thumb_video_h: stored.poster.height, mp4: url }),
   }
+}
+
+/** Slack's partial copy of a file on a socket message: what `file_access: "check_file_info"` carries. */
+export function partialFileObject(stored: StoredFile): File {
+  const seconds = Math.floor(stored.created / 1000)
+  return { id: stored.id, mode: 'hosted', file_access: 'check_file_info', created: seconds, timestamp: seconds, user: stored.user }
 }

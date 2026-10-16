@@ -10,6 +10,9 @@
  * - Reaction state from a page applies only if the message's `last_event_ts`
  *   is older than the page's request start. Reaction events are applied by
  *   the caller and only bump `last_event_ts`.
+ * - A file only gets fuller: a copy of the message without its thumbnails,
+ *   poster or playback url keeps the stored ones, and a partial copy
+ *   (`check_file_info`) keeps the complete stored file (`files.ts`).
  * - A stub root (a reply arrived before its root) keeps the counters it
  *   learned and is filled in by whichever page brings the root.
  *
@@ -18,6 +21,7 @@
  */
 import { compareTs, maxTs, type Message } from '@juno/slack-schema'
 import type { Flag, MessageRow } from '@juno/store'
+import { keepFuller } from './files'
 
 /** Where an incoming message came from, for the reaction guard and `last_event_ts`. */
 export type MergeSource =
@@ -163,7 +167,7 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
     subtype: content.subtype ?? existing.subtype,
     text: content.text,
     blocks_json: content.blocks_json,
-    files_json: content.files_json,
+    files_json: keepFuller(existing.files_json, content.files_json),
     attachments_json: content.attachments_json,
     edited_ts: takeContent ? (incomingEdit ?? storedEdit) : storedEdit,
     deleted: 0,

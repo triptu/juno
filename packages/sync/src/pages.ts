@@ -6,15 +6,19 @@
  * here; the socket events have their own path in `events.ts` but use the
  * same merge.
  */
-import { compareTs, mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
+import { compareTs, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type Ts } from '@juno/domain'
 import { isReply, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
-import { Effect, Queue } from 'effect'
+import { Clock, Effect, Queue } from 'effect'
+import { filesToFetch } from './files'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeMessage, mergeRootCounters, stubRoot, type MergeSource } from './merge'
 import { reindexTopics, topicsOfMessages } from './reindex'
 import { referencedUserIds } from './users'
 import { applyRootSubscription, markRepliesComplete, observeRead, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
+
+/** Older files that arrive unfilled are asked about when their topic opens (`run/files.ts`), not as they are written: a page of old ones would ask about each. */
+const THUMBS_WAIT_MILLIS = 24 * 60 * 60_000
 
 /** Merges one message and returns the rows it produced (the message, and a stub root when needed). */
 export const mergeOne = (
@@ -31,6 +35,11 @@ export const mergeOne = (
       yield* writeMessage(merged.row)
       // Everyone the message shows gets a name as soon as possible; `nameUsers` skips the ones the store has.
       wantUsers(ctx, referencedUserIds([message]))
+      // A recent file Slack has not filled in yet: thumbnails, a poster, or a partial copy (`files.ts`).
+      const waiting = filesToFetch(merged.row.files_json)
+      if (waiting.length > 0 && tsToMillis(message.ts as Ts) > (yield* Clock.currentTimeMillis) - THUMBS_WAIT_MILLIS) {
+        for (const fileId of waiting) yield* Queue.offer(ctx.fileFetches, { kind: 'stored', fileId, channel, ts: message.ts })
+      }
     }
     if (merged.applyReactions) yield* replaceReactions(merged.row, message.reactions ?? [], ctx.me.userId)
     // A reaction event came before this message was stored; a page requested before it does not have it.
