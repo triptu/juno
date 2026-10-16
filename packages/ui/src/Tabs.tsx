@@ -4,6 +4,7 @@ import { useId, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, ty
 import { colors, layout, opacity, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
+import { tooltip } from './Tooltip'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
@@ -129,7 +130,7 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
         aria-keyshortcuts={shortcuts === '' ? undefined : shortcuts}
         data-pinned={pinned ? '' : undefined}
         data-unread={dot ? '' : undefined}
-        title={label}
+        {...tooltip(label)}
         onContextMenu={onContextMenu}
         onPointerDown={activate.onPointerDown}
         onClick={activate.onClick}

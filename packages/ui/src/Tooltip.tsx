@@ -105,8 +105,9 @@ function tooltipTimer(set: (shown: Shown | undefined) => void) {
 /** Feeds the document's pointer, focus, key and scroll events to `timer`. Returns the cleanup. */
 function listen(timer: ReturnType<typeof tooltipTimer>): () => void {
   const under = (target: EventTarget | null) => (target instanceof Element ? (target.closest<HTMLElement>(SELECTOR) ?? undefined) : undefined)
+  // Nothing shows while a button is held: a tab dragged along the strip passes over other tabs.
   const onPointerOver = (event: PointerEvent) => {
-    if (event.pointerType !== 'touch') timer.aim(under(event.target))
+    if (event.pointerType !== 'touch') timer.aim(event.buttons === 0 ? under(event.target) : undefined)
   }
   // Leaving the window: nothing is under the pointer.
   const onPointerOut = (event: PointerEvent) => {
@@ -171,7 +172,8 @@ function place(tip: HTMLElement, target: HTMLElement): void {
  * - Shows after 700ms of hover, or of keyboard focus. Once one has shown,
  *   a neighbour's shows at once for 600ms.
  * - Hides on mouse down (and stays hidden until the pointer leaves that
- *   control), on scroll, on Esc, on a drag and when the window loses focus.
+ *   control), on scroll, on Esc, on a drag (a held button shows none, so a
+ *   dragged tab passes its neighbours quietly) and when the window loses focus.
  * - Sits under the control, or over it when there is no room below, never
  *   on it, and moves in to stay inside the window. It is fixed in a
  *   portal, so it moves nothing.

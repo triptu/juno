@@ -1819,7 +1819,7 @@ export class TabStrip {
 
   /** Tab titles, left to right. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('title') ?? ''))
+    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
   }
 
   async expectCount(count: number): Promise<void> {
