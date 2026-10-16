@@ -327,7 +327,7 @@ On a cold visit, the greeting says "Syncing with Slack." and reserves space for 
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
   - **Moved a lot.** A followed topic with many new messages since you looked.
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
-  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases?", with "To Automated" on the line below, quiet Keep in All then raised Move, each with Undo. Right-clicking it opens the channel's menu.
+  - **Automated.** A channel neither the rules nor Juno could place (5, "Automated"): "Move #releases?", with "To Automated" and why on the line below ("To Automated · Apps wrote 18 of the last 30 messages", or Juno's reason when Juno judged it), quiet Keep in All then raised Move, each with Undo. Right-clicking it opens the channel's menu.
   - **Tidy up** (AI on). Topics that look settled, listed in the meta line, with Resolve all and Undo.
   Clicking a row opens its topic. Items are computed when Home appears and do not change under the pointer. With AI on, a row's title line may be rewritten to say what it is about; the meta line never changes.
 - **Ask Juno** opens the Juno chat. Anything else that used to be a suggestion card (a coding prompt from a discussion, reply ideas) is something you ask Juno for, here or in the Juno panel beside the topic.

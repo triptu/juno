@@ -1,7 +1,7 @@
 // The built-in Automated view (SPEC 5 "Automated", 12) against the fake
 // Slack and the fake AI: it fills on the first sync and keeps the bot
 // channels out of All; Home asks about a channel neither the rules nor Juno
-// could place, and Move and Keep in All stick, with Undo; the question's
+// could place, and says why; Move and Keep in All stick, with Undo; the question's
 // menu ignores a noisy channel; a channel taken out by hand is never moved
 // back; and a deleted view stays deleted.
 import type { FakeSlack } from '@juno/fake-slack'
@@ -83,7 +83,8 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
 
   await homeAsks(juno)
   await expect(home.title('automated')).toHaveText('Move #releases?')
-  await expect(home.meta('automated')).toHaveText('To Automated')
+  // The reason: Juno's, from the fake AI.
+  await expect(home.meta('automated')).toHaveText('To Automated · 3 of 6 messages from apps')
 
   await home.button('automated', 'Move').click()
   await juno.expectToast('Moved #releases to Automated')
@@ -93,10 +94,11 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await sidebar.selectView('Automated')
   await sidebar.row(RELEASES_MAIN).expectVisible()
 
-  // Undo puts the question back.
+  // Undo puts the question back, with its reason.
   await juno.undo()
   await sidebar.row(RELEASES_MAIN).expectAbsent()
   await homeAsks(juno)
+  await expect(home.meta('automated')).toHaveText('To Automated · 3 of 6 messages from apps')
 
   await home.button('automated', 'Keep in All').click()
   await juno.expectToast('Keeping #releases in All')

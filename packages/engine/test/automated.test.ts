@@ -86,7 +86,8 @@ describe('the Automated view', () => {
     const engine = await bootedEngine(engines, withReleases)
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
-    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases?', channel: { id: RELEASES, label: '#releases' }, fromApps: { apps: 3, of: 6 } })
+    // The reason is Juno's, from the fake AI.
+    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases?', channel: { id: RELEASES, label: '#releases' }, reason: '3 of 6 messages from apps' })
 
     const moved = valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'automated' }))
     expect(moved.undo).toEqual({ _tag: 'views.sortChannel', channel: RELEASES, to: 'ask' })
@@ -95,7 +96,8 @@ describe('the Automated view', () => {
 
     valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'ask' }))
     await viewsUntil(engine, (list) => !holds(list, RELEASES), 'the move undone')
-    await homeUntil(engine, (view) => view.items.some((item) => item.id === `automated:${RELEASES}`), 'asked again')
+    // Asked again with the same reason.
+    await homeUntil(engine, (view) => view.items.some((item) => item.id === `automated:${RELEASES}` && item.reason === question.reason), 'asked again')
 
     const kept = valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'kept' }))
     expect(kept.undo).toEqual({ _tag: 'views.sortChannel', channel: RELEASES, to: 'ask' })
