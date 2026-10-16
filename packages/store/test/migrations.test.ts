@@ -53,10 +53,17 @@ describe('migrations', () => {
       yield* sql`CREATE TABLE for_you_cards (id TEXT PRIMARY KEY)`
       yield* sql`INSERT INTO for_you_cards VALUES ('old-card')`
       yield* sql`INSERT INTO prefs (key, value_json) VALUES ('theme', '"dark"')`
-      // As on a database from before the drop: it and every later migration run again.
+      // Restore the old notification schema too: every later migration runs again.
+      yield* sql`ALTER TABLE notification_log ADD COLUMN summary_due_at TEXT`
+      yield* sql`CREATE INDEX notification_log_pending ON notification_log (summary_due_at) WHERE delivered_at IS NULL AND outcome = 'summary'`
+      yield* sql`INSERT INTO notification_log (at, channel, ts, outcome) VALUES ('2026-10-12T08:00:00Z', 'C1', '1.000001', 'summary')`
       yield* sql`DELETE FROM ${sql(MIGRATIONS_TABLE)} WHERE migration_id >= 202610160200`
       yield* Effect.provideService(migrate(userMigrations), SqlClient.SqlClient, sql)
       assert.notInclude(yield* tableNames('main'), 'for_you_cards')
+      const columns = yield* sql<{ name: string }>`PRAGMA table_info(notification_log)`
+      assert.notInclude(columns.map((column) => column.name), 'summary_due_at')
+      const held = yield* sql<{ outcome: string }>`SELECT outcome FROM notification_log WHERE channel = 'C1'`
+      assert.deepStrictEqual(held, [{ outcome: 'hold' }])
       const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'theme'`
       assert.strictEqual(rows[0]?.value_json, '"dark"')
     }).pipe(Effect.provide(freshStore)),

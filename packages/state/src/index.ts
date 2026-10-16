@@ -176,7 +176,6 @@ export {
   focusJunoComposer,
   junoAboutAtom,
   junoAvailableAtom,
-  junoChatTargetAtom,
   junoFocusAtom,
   junoPanelOpenAtom,
   junoPanelWidthAtom,
@@ -186,7 +185,6 @@ export {
   quoteInJuno,
   setJunoPanelOpen,
   setJunoPanelWidth,
-  showInJunoChat,
 } from './junoPanel'
 export {
   fillHome,

@@ -425,23 +425,6 @@ export const scheduled: ReadonlyArray<ChatItem> = [
   ...juno('m-70', 'Quiet night in #eng. One thing: the Postgres 16 plan got two more comments, both about the index rebuild window.', { origin: scheduleOrigin, at: NOW - 30 * MINUTE, unread: true, cards: [topicsCard('c-70')] }),
 ]
 
-/** The hours-start summary (SPEC 14): one message with a source per message, under the Summary label, after a quiet night. */
-export const summaryOrigin: Origin = { _tag: 'summary', at: NOW - 30 * MINUTE }
-const summarySource = (words: string, channelId: string, ts: string, place: string): JunoInline => ({ _tag: 'source', text: words, channelId, ts, place })
-export const summary: ReadonlyArray<ChatItem> = [
-  day(0),
-  { _tag: 'groupLabel', id: 'g-summary', origin: summaryOrigin, text: 'Summary' },
-  ...juno('m-75', [
-    text('3 messages need you:'),
-    text('\n'),
-    summarySource('Maya Chen', 'D0MAYA', '1760430000.000100', 'Maya Chen'),
-    text('\n'),
-    summarySource('Leo Park in #eng', 'C0ENG', '1760431000.000200', '#eng'),
-    text('\n'),
-    summarySource('Priya Shah in #hiring', 'C0HIRING', '1760432000.000300', '#hiring'),
-  ], { origin: summaryOrigin, at: NOW - 30 * MINUTE, unread: true }),
-]
-
 /** A proactive group from two jobs that reported together. */
 export const jobs: ReadonlyArray<ChatItem> = [
   day(0),

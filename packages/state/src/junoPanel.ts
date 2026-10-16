@@ -14,8 +14,6 @@
  *   until a message about the topic is sent from it (`catchUpDoneAtom`).
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
- * - `junoChatTargetAtom`: a Juno message the Juno tab should scroll to and
- *   flash once it shows, from the hours-start summary's notification.
  * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
  *   why popover's Tell Juno (SPEC 14). The panel beside that topic takes it
  *   as its selection quote.
@@ -89,15 +87,6 @@ export interface JunoFocusRequest {
 }
 
 export const junoFocusAtom = Atom.make<JunoFocusRequest>({ n: 0, where: 'tab' }).pipe(Atom.keepAlive)
-
-/** A Juno message for the Juno tab to show and flash; `n` counts requests. The tab clears it once taken. */
-export const junoChatTargetAtom = Atom.make<{ readonly n: number; readonly id: string } | undefined>(undefined).pipe(Atom.keepAlive)
-
-let chatTargets = 0
-
-export function showInJunoChat(registry: Registry, id: string): void {
-  registry.set(junoChatTargetAtom, { n: ++chatTargets, id })
-}
 
 /** A topic message to quote in the Juno panel's composer; `n` counts requests, so each is taken once. */
 export interface JunoQuoteRequest {

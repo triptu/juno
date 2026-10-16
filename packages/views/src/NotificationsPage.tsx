@@ -56,7 +56,7 @@ export function NotificationsPage(props: NotificationsPageProps) {
 
       <Section heading="Hours">
         <Surface kind="group">
-          <HoursRow which="notifications" title="Notifications" sub="When it starts, one notification sums up what needed you." hours={notificationHours} onChange={onHoursChange} />
+          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} />
           <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
