@@ -163,6 +163,8 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
   const openRouterApiKey = e2e ? undefined : process.env.OPENROUTER_API_KEY
   // An e2e run can make the fake AI slow, to watch a check give up at its timeout.
   const fakeAiDelayMillis = e2e ? Number(process.env.JUNO_FAKE_AI_DELAY_MS) : Number.NaN
+  // An e2e run can play the next build, which adds a cache migration.
+  const cacheMigrationProbe = e2e && process.env.JUNO_E2E_CACHE_MIGRATION === '1'
   return new EngineSupervisor(
     {
       userData: app.getPath('userData'),
@@ -172,6 +174,7 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
       ai,
       ...(openRouterApiKey ? { openRouterApiKey } : {}),
       ...(Number.isFinite(fakeAiDelayMillis) ? { fakeAiDelayMillis } : {}),
+      ...(cacheMigrationProbe ? { cacheMigrationProbe } : {}),
     },
     options.onMessage,
   )

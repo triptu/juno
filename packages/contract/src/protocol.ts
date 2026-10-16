@@ -30,6 +30,8 @@ export const EngineConfig = Schema.Struct({
   openRouterApiKey: Schema.optionalKey(Schema.String),
   /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */
   fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
+  /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
+  cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })
 export type EngineConfig = typeof EngineConfig.Type
 
