@@ -10,7 +10,7 @@ export { Composer, type ComposerMention, type ComposerPopover } from './Composer
 export { LinkEditor } from './LinkEditor'
 export { MentionSuggestions, mentionRowId, type EmojiSuggestion } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
-export { DestinationPickers, type PickerName } from './DestinationPickers'
+export { DestinationPickers, PlacePicker, type PickerName, type PlacePick } from './DestinationPickers'
 export { EmojiPicker } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaViewer'
