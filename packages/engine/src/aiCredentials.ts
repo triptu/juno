@@ -34,9 +34,15 @@ export class AiCredentials extends Context.Service<AiCredentials, {
   }))
 }
 
-/** What starts a new pass of a background AI job: a key change, or a new link to the agent's spend ledger. */
+/**
+ * What starts a new pass of a background AI job: a key change, a new link to
+ * the agent's spend ledger, or the ledger's word that it may have room again
+ * (the owner raised the cap), so a job stopped at the cap does not wait for its timer.
+ */
 export const aiWakes: Effect.Effect<Stream.Stream<string>, never, AiCredentials | AiSpend> = Effect.gen(function* () {
   const credentials = yield* AiCredentials
   const spend = yield* AiSpend
-  return Stream.zipLatest(credentials.revisions, spend.links).pipe(Stream.map(([revision, link]) => `${revision}.${link}`))
+  return Stream.zipLatest(Stream.zipLatest(credentials.revisions, spend.links), spend.rooms).pipe(
+    Stream.map(([[revision, link], room]) => `${revision}.${link}.${room}`),
+  )
 })

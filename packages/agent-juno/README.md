@@ -21,6 +21,7 @@ Juno as the agent's host. It runs inside the engine and serves the whole AgentHo
 | `host.notification.deliver` | `unsupported`: Juno has no OS notifier for the agent yet |
 | `host.spend.asks` | A stream: the engine's open spend asks (reserve an amount, or settle a reservation with its reported cost or unknown), then every change. Amounts are nanodollars on the agent ledger's `engine` path. No key and no model input |
 | `host.spend.answer` | The agent's answer to one ask: `reserved` or `blocked`, or `settled`; the host stops offering it |
+| `host.spend.room` | The agent's ledger may have room again: the cap went up, the owner allowed another dollar, or a release followed a refusal. The host wakes the engine's background AI jobs |
 
 ## Single-attempt sends
 

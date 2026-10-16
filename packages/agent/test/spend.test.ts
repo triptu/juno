@@ -146,3 +146,27 @@ it('stops the engine backlog at three quarters of the engine half, leaving the r
   expect(ledger.reserve('engine', 1, 'backlog-3', true).kind).toBe('blocked')
   invariant()
 })
+
+it('says it may have room again when the cap goes up, on a raise, and on a release after a refusal, and not otherwise', () => {
+  let rooms = 0
+  const stop = ledger.onRoom(() => { rooms++ })
+  ledger.setCap(dollars(1))
+  const held = ledger.reserve('engine', dollars(0.4))
+  if (held.kind !== 'reserved') throw new Error('expected a reservation')
+  // A release with no refusal before it, and a lower cap, change nothing for a waiting job.
+  const other = ledger.reserve('chat', dollars(0.1))
+  if (other.kind === 'reserved') ledger.settle(other.id, dollars(0.05))
+  ledger.setCap(dollars(0.5))
+  expect(rooms).toBe(0)
+  // The engine's half is used up: refused. Its release then makes room.
+  expect(ledger.reserve('engine', dollars(0.2)).kind).toBe('blocked')
+  ledger.settle(held.id, dollars(0.1))
+  expect(rooms).toBe(1)
+  ledger.setCap(dollars(3))
+  ledger.allowDollar('raise-room')
+  ledger.allowDollar('raise-room')
+  expect(rooms).toBe(3)
+  stop()
+  ledger.setCap(dollars(4))
+  expect(rooms).toBe(3)
+})

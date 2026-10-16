@@ -29,9 +29,31 @@ export interface SpendSnapshot {
 }
 export type Reservation = { readonly kind: 'reserved'; readonly id: string } | { readonly kind: 'blocked'; readonly reason: 'budget' }
 
+/**
+ * Who hears that the ledger may have room again, per database, so every
+ * ledger on one store shares it (Settings and the engine's answers each
+ * make their own). `blocked` is set when a reservation is refused: only then
+ * does a release matter.
+ */
+const rooms = new WeakMap<object, { blocked: boolean; readonly listeners: Set<() => void> }>()
+const roomOf = (db: object) => {
+  let room = rooms.get(db)
+  if (room === undefined) {
+    room = { blocked: false, listeners: new Set() }
+    rooms.set(db, room)
+  }
+  return room
+}
+
 /** All paths use the same SQLite write transaction; no check crosses an await. */
 export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) {
   const { db } = store
+  const room = roomOf(db)
+  /** The cap went up, a raise was made, or a release followed a refusal: whoever stopped at the cap may try again. */
+  const roomed = () => {
+    room.blocked = false
+    for (const listener of room.listeners) listener()
+  }
   const today = () => spendDay(store.now())
   const ensureDay = (day: string) => db.prepare('INSERT OR IGNORE INTO spend_days(day, cap) VALUES (?, ?)').run(day, money(cap()))
   const snapshot = (day = today()): SpendSnapshot => {
@@ -82,7 +104,10 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       if (as !== undefined && db.prepare('SELECT 1 FROM spend_reservations WHERE id = ?').get(as)) return { kind: 'reserved', id: as }
       const day = today()
       ensureDay(day)
-      if (!fits(day, path, amount, background)) return { kind: 'blocked', reason: 'budget' }
+      if (!fits(day, path, amount, background)) {
+        room.blocked = true
+        return { kind: 'blocked', reason: 'budget' }
+      }
       const id = as ?? uuidv7(store.now())
       db.prepare("INSERT INTO spend_reservations(id, day, path, amount, state) VALUES (?, ?, ?, ?, 'reserved')").run(id, day, path, amount)
       return { kind: 'reserved', id }
@@ -108,24 +133,43 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
      */
     settle: (id: string, actual: number | undefined): void => {
       if (actual !== undefined) money(actual)
+      const amount = room.blocked && actual !== undefined ? db.prepare("SELECT amount FROM spend_reservations WHERE id = ? AND state = 'reserved'").get(id)?.amount : undefined
       db.prepare(`UPDATE spend_reservations SET state = ?, actual = ? WHERE id = ? AND state = 'reserved'`)
         .run(actual === undefined ? 'unknown' : 'settled', actual ?? null, id)
+      if (amount !== undefined && actual !== undefined && Number(amount) > actual) roomed()
     },
     /** A trusted owner click, keyed by its durable operation id. Never expose this as a model tool. */
-    allowDollar: (clickId: string): void => transaction(db, () => {
-      const day = today()
-      ensureDay(day)
-      money(snapshot(day).cap + snapshot(day).raises + DOLLAR)
-      db.prepare('INSERT OR IGNORE INTO spend_raises(id, day, amount) VALUES (?, ?, ?)').run(clickId, day, DOLLAR)
-    }),
+    allowDollar: (clickId: string): void => {
+      const raised = transaction(db, () => {
+        const day = today()
+        ensureDay(day)
+        money(snapshot(day).cap + snapshot(day).raises + DOLLAR)
+        return db.prepare('INSERT OR IGNORE INTO spend_raises(id, day, amount) VALUES (?, ?, ?)').run(clickId, day, DOLLAR).changes > 0
+      })
+      if (raised) roomed()
+    },
     /** A lower cap blocks new reservations; existing reservations still settle. */
-    setCap: (amount: number): boolean => transaction(db, () => {
-      money(amount)
-      const day = today()
-      ensureDay(day)
-      db.prepare('UPDATE spend_days SET cap = ? WHERE day = ?').run(amount, day)
+    setCap: (amount: number): boolean => {
+      const raised = transaction(db, () => {
+        money(amount)
+        const day = today()
+        ensureDay(day)
+        const before = snapshot(day).cap
+        db.prepare('UPDATE spend_days SET cap = ? WHERE day = ?').run(amount, day)
+        return amount > before
+      })
+      if (raised) roomed()
       return true
-    }),
+    },
+    /**
+     * Calls `listener` when the ledger may have room again: a higher cap, a
+     * raise, or, after a refusal, a settlement that released part of its
+     * reservation. Returns the unsubscribe.
+     */
+    onRoom: (listener: () => void): (() => void) => {
+      room.listeners.add(listener)
+      return () => room.listeners.delete(listener)
+    },
     countCodex: (home: string): string => {
       const id = uuidv7(store.now())
       db.prepare('INSERT INTO codex_turns(id, day, home) VALUES (?, ?, ?)').run(id, today(), home)

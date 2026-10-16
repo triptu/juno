@@ -31,15 +31,19 @@ export class AiSpend extends Context.Service<AiSpend, {
   readonly admit: (upperUsd: number) => Effect.Effect<Admission>
   /** Counts agent links. A new link wakes the jobs that stopped for want of one. */
   readonly links: Stream.Stream<number>
+  /** Counts the agent's word that its ledger may have room again (a higher cap, a raise, a release after a refusal). Each wakes the jobs. */
+  readonly rooms: Stream.Stream<number>
   /** The AgentHost side: the open asks, now and on every change, and the agent's answers. */
   readonly host: {
     readonly asks: Stream.Stream<ReadonlyArray<HostSpendAsk>>
     readonly answer: (answer: Answer) => Effect.Effect<void>
+    readonly room: Effect.Effect<void>
   }
 }>()('juno/engine/AiSpend') {
   static readonly layer = Layer.effect(AiSpend, Effect.gen(function* () {
     const asks = yield* SubscriptionRef.make<ReadonlyArray<HostSpendAsk>>([])
     const links = yield* SubscriptionRef.make(0)
+    const rooms = yield* SubscriptionRef.make(0)
     const waiting = new Map<string, Deferred.Deferred<'reserved' | 'blocked'>>()
     let listeners = 0
 
@@ -83,6 +87,8 @@ export class AiSpend extends Context.Service<AiSpend, {
       if (waiter !== undefined) yield* Deferred.succeed(waiter, answer.result === 'reserved' ? 'reserved' : 'blocked')
     })
 
-    return AiSpend.of({ admit, links: SubscriptionRef.changes(links), host: { asks: hostAsks, answer } })
+    const room = SubscriptionRef.update(rooms, (n) => n + 1)
+
+    return AiSpend.of({ admit, links: SubscriptionRef.changes(links), rooms: SubscriptionRef.changes(rooms), host: { asks: hostAsks, answer, room } })
   }))
 }
