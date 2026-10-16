@@ -126,6 +126,12 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 
 *Figure 2. Right-click a row for the full set of actions.*
 
+### Read-dependent membership
+
+In Unread only, including within a view or channel scope, a topic already in the list stays in place while any tab shows it, even after it becomes read. It shows its actual read state: no unread count or bold title, and it stays selected when its tab is active. The same rule applies wherever sidebar membership depends on read state, including a thread shown only for an unread mention. Becoming unread again leaves it in place.
+
+The row leaves when the last tab showing it closes or navigates elsewhere. History entries do not count. Removing it does not reorder the rows above it. Changing filters starts a fresh list; an open topic that was never in that list is not added. Resolve and Ignore still remove topics.
+
 ### Row actions
 
 - **Hover** (or keyboard focus) shows an icon-only **Resolve** button (a check) at the right end of the meta line. The time stays in place, and the button's slot is always reserved, so nothing shifts. Its tooltip and accessible name say "Resolve" (with the topic title for screen readers). Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.

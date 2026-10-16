@@ -439,3 +439,36 @@ test('a row says its unread count and a mention in words, not only in tooltips',
   await expect(rina.root).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
   await expect(juno.sidebar.row(POSTGRES).root).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
 })
+
+test('Unread keeps read topics until no tab shows them', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+  await sidebar.toggleUnread()
+  const rina = sidebar.row(RINA)
+  const roadmap = sidebar.row(ROADMAP)
+  await rina.expectUnread(2)
+  const before = await sidebar.titles()
+  const anchor = `[data-topic-id="${await rina.root.getAttribute('data-topic-id')}"]`
+  await expectStableAnchor(win, anchor, async () => {
+    await rina.open()
+    await rina.expectRead()
+    await rina.expectSelected()
+  })
+  expect(await sidebar.titles()).toEqual(before)
+
+  await roadmap.open()
+  await roadmap.expectRead()
+  await roadmap.expectSelected()
+  await expect(rina.root).toHaveCount(0)
+
+  // Two tabs show the same read topic. Closing one must leave its row.
+  await roadmap.openInNewTab()
+  await tabs.expectCount(2)
+  await tabs.menu('close-tab')
+  await tabs.expectCount(1)
+  await roadmap.expectRead()
+  await roadmap.expectSelected()
+  await tabs.menu('close-tab')
+  await expect(roadmap.root).toHaveCount(0)
+})
