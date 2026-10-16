@@ -1,14 +1,15 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
 import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicHeader, type MenuAnchor } from '@juno/views'
+import { chunk } from '../chunks'
 import { toggleJunoPanel } from '../juno/actions'
 import { scopeToChannel, showChannelMenu } from '../placeMenus'
 import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from '../topicActions'
 
-const loadSwitcher = () => import('./Switcher')
-const Switcher = lazy(loadSwitcher)
+const switcher = chunk(() => import('./Switcher'))
+const Switcher = switcher.component((module) => module.default)
 
 /**
  * The topic's header: title, place pill, Resolve, the Juno toggle, the
@@ -32,9 +33,12 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
   // title opens the switcher with its rows in the first frame (performance 4.4).
   useEffect(() => {
     if (!drawnAll || readOnly) return undefined
-    void loadSwitcher()
+    const idle = requestIdleCallback(() => void switcher.load())
     const releases = [registry.mount(channelTopicsAtom(channel)), registry.mount(topicAtom(mainTopicOf(channel)))]
-    return () => releases.forEach((release) => release())
+    return () => {
+      cancelIdleCallback(idle)
+      releases.forEach((release) => release())
+    }
   }, [drawnAll, readOnly, channel])
 
   return (
@@ -47,7 +51,7 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
       {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
       {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
-      switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Suspense fallback={null}><Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /></Suspense> : null }}
+      switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
     />
   )
 }

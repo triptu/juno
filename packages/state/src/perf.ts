@@ -9,6 +9,8 @@
 
 export type PerfName =
   | 'juno.start'
+  /** New chat has painted with its composer focused. */
+  | 'juno.composer-ready'
   | 'juno.shell-paint'
   | 'juno.sidebar-rows'
   /** Mark: the sidebar's first snapshot has reached the renderer. */

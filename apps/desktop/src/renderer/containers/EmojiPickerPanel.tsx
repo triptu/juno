@@ -1,6 +1,6 @@
 /**
- * The emoji picker with the full catalog. Loaded on its own (`lazy` in
- * `messageActions.tsx`), so the catalog is not in the first bundle; the
+ * The emoji picker with the full catalog. Loaded on its own (`chunk` in
+ * `topic/messageOverlays.tsx`), so the catalog is not in the first bundle; the
  * chunk is fetched when a topic has painted, before the first open.
  */
 import { emojiCatalog } from '@juno/contract'

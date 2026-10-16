@@ -42,6 +42,9 @@ export interface JunoChatProps {
  *   A hidden tab sits in `<Activity>` with its effects gone, so it reads
  *   nothing and takes no focus until shown.
  * - Sends show at once (`chatItemsAtom` holds them as `sending`).
+ * - The empty state enters staggered in the tab only. The panel lands in
+ *   one frame with its contents, as a tab switch does: ⌘J opens and closes
+ *   it all day (performance 8.5).
  */
 export function JunoChat({ column, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
   const agent = useAgentState()
@@ -115,7 +118,7 @@ export function JunoChat({ column, header, contextOf, composerContext, onSent, o
         anchorRef={anchorRef}
         topEdgeRef={topEdgeRef}
         bottomEdgeRef={bottomEdgeRef}
-        enterEmpty={loaded && agent !== 'off'}
+        enterEmpty={column === 'page' && loaded && agent !== 'off'}
       />
     </JunoChatFrame>
     </>

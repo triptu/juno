@@ -8,8 +8,8 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 43,
-    "oversizedFunctions": 136
+    "oversizedFiles": 42,
+    "oversizedFunctions": 134
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -43,7 +43,6 @@
     "packages/richtext/test/rendering.test.ts",
     "packages/state/src/tabs.ts",
     "packages/sync/src/boot.ts",
-    "packages/sync/src/write.ts",
     "packages/tokens/src/themes.stylex.ts",
     "packages/tokens/src/tokens.stylex.ts",
     "packages/views/src/AllTopics.tsx",
@@ -171,8 +170,6 @@
     "packages/sync/src/events.ts:applyFrame/Effect.gen#1",
     "packages/sync/src/reindex.ts:reindexOne#1",
     "packages/sync/src/reindex.ts:reindexOne/Effect.gen#1",
-    "packages/sync/src/sync.ts:runSync#1",
-    "packages/sync/src/sync.ts:runSync/Effect.gen#1",
     "packages/sync/test/merge.test.ts:describe('mergeMessage')#1",
     "packages/testing/src/layoutShift.ts:measureLayoutShift#1",
     "packages/testing/src/layoutShift.ts:measureLayoutShift/page.evaluate#1",

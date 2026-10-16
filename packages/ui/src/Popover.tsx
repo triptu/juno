@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { layout, motion, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
@@ -93,9 +93,11 @@ export function Popover({
   // Set when Escape closes the panel with focus in it; the anchor takes focus once the panel is gone.
   const restoreFocus = useRef(false)
 
-  useLayoutEffect(() => {
-    if (open && panelRef.current !== null) clamp(panelRef.current)
-  }, [open])
+  // A deferred panel clamps when it mounts, including after its chunk finishes loading.
+  const placePanel = useCallback((panel: HTMLDivElement | null) => {
+    panelRef.current = panel
+    if (panel !== null) clamp(panel)
+  }, [])
 
   useLayoutEffect(() => {
     if (open || !restoreFocus.current) return
@@ -138,18 +140,20 @@ export function Popover({
     <div ref={rootRef} {...stylex.props(styles.root)}>
       {anchor}
       {open ? (
-        <div ref={panelRef} {...stylex.props(styles.panel, placements[placement], widths[width], layers[layer])}>
-          <Surface
-            kind="popover"
-            radius={radius}
-            padding={padding}
-            role={role}
-            aria-label={label}
-            sx={[styles.surface, origins[placement], maxHeights[maxHeight]]}
-          >
-            {children}
-          </Surface>
-        </div>
+        <Suspense fallback={<span data-chunk-pending="" hidden />}>
+          <div ref={placePanel} {...stylex.props(styles.panel, placements[placement], widths[width], layers[layer])}>
+            <Surface
+              kind="popover"
+              radius={radius}
+              padding={padding}
+              role={role}
+              aria-label={label}
+              sx={[styles.surface, origins[placement], maxHeights[maxHeight]]}
+            >
+              {children}
+            </Surface>
+          </div>
+        </Suspense>
       ) : null}
     </div>
   )

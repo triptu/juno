@@ -3,18 +3,20 @@
  * the emoji picker and the selection's Quote button. Its
  * hooks stay out of the React Compiler, as `useMessageActions` does.
  */
-import { lazy, Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { MessageView } from '@juno/contract'
 import { Floating, SelectionQuote } from '@juno/views'
+import { chunk } from '../chunks'
 import type { ComposerHandle } from '../messageActions'
 import { recentEmoji } from '../recentEmoji'
 import { focusRow, middleOf, type Picker } from './messageCommands'
 
-const EmojiPickerPanel = lazy(() => import('../EmojiPickerPanel'))
+const emojiPicker = chunk(() => import('../EmojiPickerPanel'))
+const EmojiPickerPanel = emojiPicker.component((module) => module.default)
 
 /** Fetch the picker's chunk once a topic has painted, so the first open does not wait for it. */
 let pickerLoaded = false
-const loadPicker = () => void import('../EmojiPickerPanel')
+const loadPicker = () => void emojiPicker.load()
 export function preloadPicker(): void {
   if (pickerLoaded) return
   pickerLoaded = true
@@ -114,11 +116,11 @@ export function floatingOf(
   }
 
   return picker !== undefined ? (
-    <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
-      <Suspense fallback={null}>
+    <Suspense fallback={null}>
+      <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
         <EmojiPickerPanel recent={recentEmoji()} onPick={pick} onClose={closePicker} />
-      </Suspense>
-    </Floating>
+      </Floating>
+    </Suspense>
   ) : selection !== undefined ? (
     <Floating x={selection.x} y={selection.y} placement="above-center" layer="selection">
       <SelectionQuote onQuote={quoteSelection} />

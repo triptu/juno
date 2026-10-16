@@ -19,21 +19,19 @@
  * limit that stopped it or after `bootRetryMillis`. A store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
  */
-import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type SocketEvent } from '@juno/slack'
 import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Clock, Deferred, Effect, FiberSet, Queue, Scope, Semaphore } from 'effect'
-import { Stream } from 'effect'
-import { bootState, catchUp, coldBoot, followPass, warmBoot, type BootState, type Phase } from './boot'
-import { syncEmoji } from './emoji'
-import { SyncConfig } from './config'
-import { reindexOptions, trackFetch, type RootFetch, type SyncContext } from './context'
-import { applyActed, applyFrame, applyOpened, applySent, type Acted } from './events'
-import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from './open'
-import { applyPage } from './pages'
-import { reindexTopics } from './reindex'
-import { nameUsers, wantUsers } from './users'
-import { clearPendingFollows, endEventCoverage, observeRead } from './write'
+import { Effect, FiberSet, Scope, Stream } from 'effect'
+import { applyOpened, applySent, type Acted } from './events'
+import type { FetchReport, OpenError } from './open'
+import { makeBootLoop } from './run/boot'
+import { makeTopicFetcher } from './run/fetcher'
+import { fetchRoots, lookUpReads } from './run/lookups'
+import { makeReconcile } from './run/reconcile'
+import { makeSyncRuntime } from './run/runtime'
+import { handleSocketEvent } from './run/socket'
+import { nameUsers } from './users'
+import { clearPendingFollows } from './write'
 
 /** `first`: the cold boot of an empty store, the first sync the user waits through. */
 export type SyncPhase =
@@ -85,297 +83,21 @@ export interface TopicFetcher {
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
 
-const isNotAuth = <E extends { readonly _tag: string }>(error: E): error is Exclude<E, SlackAuthRequired> => error._tag !== 'SlackAuthRequired'
-
 export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuthRequired, SyncServices | Scope.Scope> =>
   Effect.gen(function* () {
-    const config = yield* SyncConfig
-    const session = yield* SlackSession
-    const socket = yield* SlackSocket
-    const ctx: SyncContext = {
-      me: { userId: session.userId as SyncContext['me']['userId'] },
-      config,
-      rootFetches: yield* Queue.unbounded<RootFetch>(),
-      readLookups: yield* Queue.unbounded<string>(),
-      missingUsers: new Map(),
-      usersWanted: yield* Queue.sliding<void>(1),
-      usersOnBackground: false,
-      onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
-      unknownUsers: new Set(),
-      lateReactions: new Map(),
-      fetchesInFlight: new Set(),
-      metadata: new Set(),
-    }
-    const state = {
-      connected: false,
-      booted: false,
-      lastBoot: undefined as BootState | undefined,
-      lastFollowPass: undefined as number | undefined,
-      /** When the socket dropped, until a catch-up has rechecked the gap. */
-      droppedAt: undefined as number | undefined,
-    }
-    let bootRetry: Deferred.Deferred<void> | undefined
-    const work = yield* Semaphore.make(1)
-    const phase = options.onPhase
-    const cycle = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-      (options.onCycle?.('started') ?? Effect.void).pipe(
-        Effect.andThen(effect),
-        Effect.ensuring(options.onCycle?.('finished') ?? Effect.void),
-      )
-    const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
-    const refreshEmoji = syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
-    const reportBoot: Phase = phase
-    // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
-    const background = yield* FiberSet.make<void, SlackAuthRequired>()
-
-    /** Names the senders an open fetch found unknown, through `nameUsers`. */
-    const nameSenders = (report: FetchReport) => Effect.sync(() => wantUsers(ctx, report.unknownUsers))
-    const services = yield* Effect.context<SyncServices>()
-    const fetched = (fetch: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string): Effect.Effect<FetchReport, OpenError> => {
-      const run = (lane: FetchLane) => trackFetch(ctx, fetch(lane))
-      return run('interactive').pipe(
-        Effect.tap(nameSenders),
-        Effect.tapError((error) =>
-          error._tag === 'SlackRateLimited'
-            ? FiberSet.run(
-                background,
-                run('background').pipe(
-                  Effect.tap(nameSenders),
-                  Effect.asVoid,
-                  Effect.catchIf(isNotAuth, (retry) => Effect.logWarning(`sync: ${label} failed on the background lane`, { tag: retry._tag })),
-                ),
-              ).pipe(Effect.asVoid)
-            : Effect.void,
-        ),
-        Effect.provide(services),
-      )
-    }
-    const fetcher: TopicFetcher = {
-      open: (topicId) => fetched((lane) => fetchTopic(ctx, topicId, lane), 'open'),
-      older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
-      opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
-      sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
-      acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
-    }
+    const runtime = yield* makeSyncRuntime(options)
+    const { ctx, background, socket } = runtime
+    const fetcher = yield* makeTopicFetcher(runtime)
     if (options.onFetcher !== undefined) yield* options.onFetcher(fetcher)
-
-    /** After a reconnect or a sweep: what changed in the open topics while the socket was down. */
-    const refreshOpen = Effect.gen(function* () {
-      const open = options.openTopics === undefined ? [] : yield* options.openTopics
-      for (const topicId of open) {
-        yield* fetchTopic(ctx, topicId, 'interactive').pipe(
-          Effect.tap(nameSenders),
-          Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: open topic not refreshed', { tag: error._tag })),
-        )
-      }
-    })
 
     // No command is in flight before the sync runs; `follow` outbox rows are left over from a crash.
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
-
-    /**
-     * The pass over the followed threads of the window (`followPass`), when
-     * the last one (a boot counts) started more than `followPassMillis` ago.
-     * After the phase has settled: it runs on the background lane.
-     */
-    const followPassIfDue = Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis
-      if (state.lastFollowPass !== undefined && now - state.lastFollowPass < config.followPassMillis) return
-      yield* followPass(ctx)
-      state.lastFollowPass = now
-    }).pipe(
-      work.withPermit,
-      Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: follow pass failed', { tag: error._tag })),
-    )
-
-    /**
-     * A failed catch-up is tried again while the socket stays up: after the
-     * rate limit that stopped it, else after `bootRetryMillis`. At most one
-     * retry waits; a reconnect in between catches up anyway.
-     */
-    let retryWaiting = false
-    const retryCatchUp = (error: { readonly _tag: string; readonly retryAfterMillis?: number }) =>
-      Effect.suspend(() => {
-        if (retryWaiting) return Effect.void
-        retryWaiting = true
-        const delay = error._tag === 'SlackRateLimited' && error.retryAfterMillis !== undefined ? error.retryAfterMillis : config.bootRetryMillis
-        return FiberSet.run(
-          background,
-          Effect.sleep(delay).pipe(
-            Effect.andThen(
-              Effect.suspend(() => {
-                retryWaiting = false
-                return state.connected ? reconcile : Effect.void
-              }),
-            ),
-          ),
-        ).pipe(Effect.asVoid)
-      })
-
-    const openNow = options.openTopics ?? Effect.succeed([])
-
-    /**
-     * The catch-up after a reconnect or a sweep, under the work permit, then
-     * the follow pass if it is due. After a drop it rechecks the gap; a drop
-     * during it is rechecked by the next one, and a failure keeps the gap.
-     */
-    const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(Effect.gen(function* () {
-      const previous = state.lastBoot ?? (yield* bootState())
-      if (previous === undefined) return
-      const droppedAt = state.droppedAt
-      state.droppedAt = undefined
-      const recheck = droppedAt === undefined ? undefined : { since: droppedAt, first: yield* openNow }
-      yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshMetadata: droppedAt !== undefined, refreshThreads: true, ...(recheck === undefined ? {} : { recheck }) }).pipe(
-        Effect.tapError(() =>
-          Effect.sync(() => {
-            if (droppedAt !== undefined) state.droppedAt = Math.min(droppedAt, state.droppedAt ?? droppedAt)
-          }),
-        ),
-      )
-      state.lastBoot = yield* bootState()
-      yield* refreshOpen
-    }).pipe(
-      work.withPermit,
-      Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
-      Effect.andThen(settle),
-      Effect.catchIf(isNotAuth, (error) => settle().pipe(Effect.andThen(retryCatchUp(error)))),
-      Effect.andThen(followPassIfDue),
-    ))
-
-    const handle = (event: SocketEvent): Effect.Effect<void, never, SyncServices | Scope.Scope> => {
-      switch (event._tag) {
-        case 'Connected':
-          state.connected = true
-          return (options.onConnection?.(true) ?? Effect.void).pipe(
-            Effect.andThen(state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void),
-          )
-        case 'Disconnected':
-          state.connected = false
-          if (!state.booted) return options.onConnection?.(false) ?? Effect.void
-          return Clock.currentTimeMillis.pipe(
-            Effect.tap((now) => Effect.sync(() => { state.droppedAt ??= now })),
-            Effect.andThen(options.onConnection?.(false) ?? Effect.void),
-            Effect.andThen(transaction(endEventCoverage)),
-            Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
-            Effect.andThen(phase({ _tag: 'offline' })),
-          )
-        case 'Frame':
-          if (event.frame.type === 'force_reload') {
-            if (bootRetry !== undefined) return Deferred.succeed(bootRetry, undefined).pipe(Effect.asVoid)
-            return FiberSet.run(background, reboot).pipe(Effect.asVoid)
-          }
-          return applyFrame(ctx, event.frame).pipe(
-            Effect.catchCause((cause) => Effect.logError('sync: event not applied', { type: event.frame.type, cause })),
-          )
-      }
-    }
-
+    const reconcile = makeReconcile(runtime)
+    const { reboot, bootLoop } = makeBootLoop(runtime, reconcile)
+    const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 
-    const bootOnce = Effect.gen(function* () {
-      const startedAt = yield* Clock.currentTimeMillis
-      const previous = yield* bootState()
-      if (previous === undefined) yield* coldBoot(ctx, reportBoot)
-      else yield* warmBoot(ctx, previous, reportBoot, yield* openNow)
-      state.lastBoot = yield* bootState()
-      // Both boots read the followed threads over the window and check the ones left out: a follow pass.
-      state.lastFollowPass = startedAt
-      if (options.onBooted !== undefined) yield* options.onBooted
-    }).pipe(work.withPermit)
-
-    /** A `force_reload`: boot again from the current store. */
-    const reboot = cycle(bootOnce.pipe(
-      Effect.andThen(settle),
-      Effect.andThen(refreshEmoji),
-      Effect.andThen(followPassIfDue),
-      Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
-    ))
-
-    const initialize = cycle(Effect.gen(function* () {
-      while (true) {
-        const result = yield* Effect.result(bootOnce)
-        if (result._tag === 'Success') break
-        const error = result.failure
-        if (error._tag === 'SlackAuthRequired') return yield* error
-        yield* Effect.logWarning('sync: boot failed, retrying', { tag: error._tag })
-        const wake = yield* Deferred.make<void>()
-        bootRetry = wake
-        yield* phase({ _tag: 'offline' }).pipe(
-          Effect.andThen(Effect.raceFirst(Effect.sleep(config.bootRetryMillis), Deferred.await(wake))),
-          Effect.ensuring(Effect.sync(() => { bootRetry = undefined })),
-        )
-      }
-      state.booted = true
-      yield* settle()
-      yield* refreshEmoji
-      yield* followPassIfDue
-    }))
-
-    const bootLoop = Effect.gen(function* () {
-      yield* initialize
-      if (config.sweepIntervalMillis === 0) return yield* Effect.never
-      // The periodic discovery sweep while live.
-      while (true) {
-        yield* Effect.sleep(config.sweepIntervalMillis)
-        if (!state.connected) continue
-        yield* reconcile
-      }
-    })
-
-    const fetchRoots = Effect.gen(function* () {
-      const api = yield* SlackApi
-      while (true) {
-        const { channel, ts } = yield* Queue.take(ctx.rootFetches)
-        const fetchRoot = Effect.gen(function* () {
-          const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
-          const result = yield* Effect.result(
-            api.call('conversations.replies', { channel, ts: ts as Ts, oldest: ts, inclusive: true, limit: 1 }, { lane: 'background', reason: 'root' }),
-          )
-          if (result._tag === 'Failure') {
-            if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
-            return yield* Effect.logDebug('sync: root fetch failed', { tag: result.failure._tag })
-          }
-          // The root carries `subscribed` and `last_read`, so a thread older than the window is a row as soon as it is followed.
-          yield* applyPage(ctx, channel, result.success.messages, { kind: 'page', requestedAt }).pipe(
-            Effect.catchCause((cause) => Effect.logError('sync: root not applied', { cause })),
-          )
-        })
-        yield* trackFetch(ctx, fetchRoot)
-      }
-    })
-
-    /**
-     * Main's read pointer when Slack must settle it (specs/readstate.qnt):
-     * `conversations.info` carries `last_read`, and its answer is a page.
-     * A failure is dropped: the next counts call (a reconnect or the
-     * periodic catch-up) brings the pointer too.
-     */
-    const lookUpReads = Effect.gen(function* () {
-      const api = yield* SlackApi
-      while (true) {
-        const channel = yield* Queue.take(ctx.readLookups)
-        const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
-        const result = yield* Effect.result(api.call('conversations.info', { channel }, { lane: 'background', reason: 'conversation' }))
-        if (result._tag === 'Failure') {
-          if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
-          yield* Effect.logDebug('sync: read lookup failed', { tag: result.failure._tag })
-          continue
-        }
-        const lastRead = result.success.channel.last_read
-        if (lastRead === undefined) continue
-        yield* transaction(
-          Effect.gen(function* () {
-            const topic = mainTopicId(channel as ChannelId)
-            const outcome = yield* observeRead(topic, { kind: 'page', lastReadTs: lastRead, requestedAt })
-            if (outcome === 'applied') yield* reindexTopics([topic], reindexOptions(ctx))
-            // Something newer was observed while it was in flight and Slack still disagrees: ask again.
-            if (outcome === 'lookup') yield* Queue.offer(ctx.readLookups, channel)
-          }),
-        ).pipe(Effect.catchCause((cause) => Effect.logError('sync: read lookup not applied', { cause })))
-      }
-    })
-
-    yield* Effect.all([consumer, bootLoop, fetchRoots, lookUpReads, nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, fetchRoots(ctx), lookUpReads(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

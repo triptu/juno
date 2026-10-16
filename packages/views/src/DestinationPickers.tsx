@@ -7,14 +7,15 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { lazy, Suspense, useEffect, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, PickThread } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Icon, Popover, type PhosphorIcon } from '@juno/ui'
+import { chunk, Icon, Popover, type PhosphorIcon } from '@juno/ui'
 
-const loadLists = () => import('./DestinationLists')
-const ConversationList = lazy(() => loadLists().then(chunk => ({ default: chunk.ConversationList })))
-const ThreadList = lazy(() => loadLists().then(chunk => ({ default: chunk.ThreadList })))
+const lists = chunk(() => import('./DestinationLists'))
+const loadLists = lists.load
+const ConversationList = lists.component((module) => module.ConversationList)
+const ThreadList = lists.component((module) => module.ThreadList)
 
 export type PickerName = 'conversation' | 'thread'
 
@@ -79,7 +80,7 @@ export function DestinationPickers(props: DestinationPickersProps) {
           </PickerButton>
         }
       >
-        {open === 'conversation' ? <Suspense fallback={<span data-chunk-pending="" hidden />}><ConversationList {...props} /></Suspense> : null}
+        {open === 'conversation' ? <ConversationList {...props} /> : null}
       </Popover>
       <Popover
         open={open === 'thread'}
@@ -103,7 +104,7 @@ export function DestinationPickers(props: DestinationPickersProps) {
           </PickerButton>
         }
       >
-        {open === 'thread' ? <Suspense fallback={<span data-chunk-pending="" hidden />}><ThreadList {...props} /></Suspense> : null}
+        {open === 'thread' ? <ThreadList {...props} /> : null}
       </Popover>
     </div>
   )

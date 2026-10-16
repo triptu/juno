@@ -1,9 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { attachmentsAtom, clearAttachments, readyFiles, registry, removeAttachment, restoreAttachments, type Attachment } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AttachButton } from '@juno/views'
+import { chunk } from './chunks'
 
-const AttachmentChipsPanel = lazy(() => import('./AttachmentChipsPanel'))
+const chipsPanel = chunk(() => import('./AttachmentChipsPanel'))
+const AttachmentChipsPanel = chipsPanel.component((module) => module.default)
 
 /** Fetch the chips' and the staging's chunks once a composer has painted, so the first attach does not wait for them. */
 let preloaded = false
@@ -11,13 +13,14 @@ function preload(): void {
   if (preloaded) return
   preloaded = true
   window.requestIdleCallback(() => {
-    void import('./AttachmentChipsPanel')
+    void chipsPanel.load()
     void import('./staging')
   })
 }
 
-/** Adds files to the composer whose draft `key` owns: paste, drop and the attach button all end here. */
-export const attach = (key: string, files: ReadonlyArray<File>) => void import('./staging').then(({ stageFiles }) => stageFiles(key, files))
+/** Paste, drop and attach load the chips before staging publishes files, so the composer grows once. */
+export const attach = (key: string, files: ReadonlyArray<File>) =>
+  void Promise.all([chipsPanel.load(), import('./staging')]).then(([, { stageFiles }]) => stageFiles(key, files))
 
 /**
  * A composer's attachments (spec section 8): the attach button, the chips
@@ -30,12 +33,7 @@ export function useAttachments(key: string) {
   const onFiles = useCallback((list: ReadonlyArray<File>) => attach(key, list), [key])
   const leading = useMemo(() => <AttachButton onFiles={onFiles} />, [onFiles])
   const onRemove = useCallback((id: string) => removeAttachment(registry, key, id), [key])
-  const chips =
-    files.length === 0 ? undefined : (
-      <Suspense fallback={null}>
-        <AttachmentChipsPanel files={files} onRemove={onRemove} />
-      </Suspense>
-    )
+  const chips = files.length === 0 ? undefined : <AttachmentChipsPanel files={files} onRemove={onRemove} />
   return { files, onFiles, leading, chips }
 }
 

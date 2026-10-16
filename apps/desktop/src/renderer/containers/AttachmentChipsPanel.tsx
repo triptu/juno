@@ -1,5 +1,5 @@
 /**
- * The composer's file chips. Loaded on their own (`lazy` in
+ * The composer's file chips. Loaded on their own (`chunk` in
  * `attachments.tsx`), so they are not in the first bundle; the chunk is
  * fetched once a composer has painted, before the first file is attached.
  */

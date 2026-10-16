@@ -69,3 +69,4 @@ export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'
 
 export { UpdateSettings } from './UpdateSettings'
+export { chunk } from '@juno/ui'
