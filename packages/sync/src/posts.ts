@@ -19,7 +19,6 @@
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import { syncKeys } from './keys'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
@@ -88,9 +87,9 @@ const toPost = (row: PostRow): PendingPost => ({
 
 /** The topic a post shows in: its thread, or the channel's Main. */
 export const postTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): string =>
-  post.threadTs === undefined ? mainTopicId(post.channel as ChannelId) : threadTopicId(post.channel as ChannelId, post.threadTs as Ts)
+  post.threadTs === undefined ? mainTopicId(post.channel as ChannelId) : post.threadTs.startsWith('pending:') ? `p:${post.channel}:${post.threadTs.slice(8)}` : threadTopicId(post.channel as ChannelId, post.threadTs as Ts)
 
-const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) => Invalidation.use((i) => i.invalidate(syncKeys.messages(postTopic(post))))
+const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) => Invalidation.use((i) => i.invalidate({ messages: [postTopic(post), `channel:${post.channel}`] }))
 
 /** The pending post with this `client_msg_id`, if any. */
 export const readPost = (clientMsgId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter> =>
@@ -112,11 +111,16 @@ export const queuePost = (post: {
 }): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    let threadTs = post.threadTs
+    if (threadTs?.startsWith('pending:')) {
+      const root = (yield* sql<{ root_ts: string | null }>`SELECT root_ts FROM started_threads WHERE client_msg_id = ${threadTs.slice(8)} AND channel = ${post.channel}`)[0]
+      threadTs = root?.root_ts ?? threadTs
+    }
     const files = post.files === undefined || post.files.length === 0 ? null : JSON.stringify(post.files)
     yield* sql`INSERT INTO pending_messages (client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state, attempts, next_at)
-      VALUES (${post.clientMsgId}, ${post.channel}, ${post.threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${files}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
+      VALUES (${post.clientMsgId}, ${post.channel}, ${threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${files}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
       ON CONFLICT (client_msg_id) DO NOTHING`
-    yield* touch(post)
+    yield* touch({ channel: post.channel, threadTs })
   })
 
 /** Every post not yet in Slack, oldest first. */

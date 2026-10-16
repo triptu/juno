@@ -66,7 +66,7 @@ const styles = stylex.create({
     paddingInline: spacing['--space-3-5'],
     borderRadius: radii['--radius-bubble'],
     borderEndStartRadius: chat['--bubble-tail'],
-    backgroundColor: colors['--surface-hover'],
+    backgroundColor: chat['--juno-bubble-bg'],
     color: colors['--foreground-default'],
     userSelect: 'none',
   },

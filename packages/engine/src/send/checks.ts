@@ -90,7 +90,7 @@ const latestTopics = (channelId: string, now: number) =>
       for (const message of messages) if (message.user_id !== null) senders.add(message.user_id)
     }
     const users = new Map<string, UserRow>()
-    if (senders.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in([...senders])}`) users.set(user.id, user)
+    if (senders.size > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...senders])}`) users.set(user.id, user)
     return {
       channel: open[0] === undefined ? '' : channelLabel(open[0].topic.channel),
       topics: open.map(({ row, topic }) => ({

@@ -8,6 +8,7 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { liveValueRoute } from '../live'
+import { Person } from '../refs'
 
 /** What main hands the engine: the team record from `localConfig_v2` plus the token. The cookie stays in the Chromium session. */
 export const SessionSecrets = Schema.Struct({
@@ -75,6 +76,9 @@ export class SignInFailed extends Schema.TaggedError<SignInFailed>()('SignInFail
   message: Schema.String,
 }) {}
 
+/** The signed-in person from the users cache, updated with their profile. */
+export const sessionProfile = liveValueRoute('session.profile', { value: Schema.NullOr(Person) })
+
 /** The session state. Emits once at subscribe time, then on every change. */
 export const sessionStatus = liveValueRoute('session.status', { value: SessionStatus })
 
@@ -87,4 +91,4 @@ export const sessionImportFromSlackApp = Rpc.make('session.importFromSlackApp', 
 /** Forgets the session: secrets, cookies and the workspace cache. */
 export const sessionSignOut = Rpc.make('session.signOut', { success: Schema.Void })
 
-export const SessionRoutes = RpcGroup.make(sessionStatus, sessionSignIn, sessionImportFromSlackApp, sessionSignOut)
+export const SessionRoutes = RpcGroup.make(sessionProfile, sessionStatus, sessionSignIn, sessionImportFromSlackApp, sessionSignOut)

@@ -24,9 +24,11 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons; send-check bar; segmented control track |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
+| `--panel-surface` | `hsla(48, 22%, 95.5%, 1)` | #F6F5F1 | redesign | The Juno panel: a step below the page (1.05:1) and the field on it (1.05:1); muted text 4.7:1 |
+| `--panel-bubble` | `hsla(48, 40%, 99%, 1)` | #FDFDFB | redesign | Juno's bubble on the panel, lighter than the panel as the field is (1.07:1) |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
-| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, Juno nav count, pressed state |
+| `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | The topic switcher's unread count, pressed state |
 | `--border-subtle` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | List-style row rule, table row rule, card inner rules |
 | `--border-default` | `hsla(48, 30%, 91%, 1)` | #EFECE1 | css | Sidebar edge, tab strip edge, menu separators, card-style row border, reaction chips, option buttons |
 | `--border-strong` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Outline buttons (Resolve), Main tag, kbd, scrollbar thumb, @ tag ring |
@@ -56,6 +58,8 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--panel-surface` | #201E1B | 0.235 | 1.05:1 over the page, the field 1.07:1 over it | redesign |
+| `--panel-bubble` | #2D2B28 | 0.29 | 1.18:1 over the panel (the hover surface) | redesign |
 | `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
 | `--secondary-hover` | #383633 | 0.335 | | redesign |
 | `--secondary-active` | #403E3B | 0.365 | | redesign |
@@ -93,13 +97,29 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
 | `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
+| `--hl-count`, `--hl-count-fg` | The sidebar's counters (row unread counts, the Juno nav count): the accent at reduced brightness. Literal values per accent, below | #F7DED4 / #B3371B | #462E26 / #F8846D |
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
 | `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
 
 Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
-**What the accent does not touch.** Unread counts, the Juno nav count, the tab unread dot and the quiet "@" tag on rows stay the soft grey tags (SPEC: "unread counts are soft grey, not black badges"); the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the user's own @mention chip, the focus ring and text selection.
+**Sidebar counters** (decided 10-16, the owner: the grey count tags were almost invisible). The row unread counts and the Juno nav count take the accent at reduced brightness: `--hl-count` is the accent mixed into `--background-subtle` in OKLab (16% light, 24% dark, raised until the fill stands 1.2:1 from the sidebar in light and 1.45:1 in dark), and `--hl-count-fg` is the accent's own hue, darkened in light until it reaches at least 4.5:1 on that fill, and in dark dimmed toward the fill while it stays above 5:1. They are literal hex values, computed once (WCAG 2, sRGB):
+
+| Accent | Light fill | Light text | Light contrast | Dark fill | Dark text | Dark contrast |
+| --- | --- | --- | --- | --- | --- | --- |
+| Coral | #F7DED4 | #B3371B | 4.67:1 | #462E26 | #F8846D | 5.07:1 |
+| Ink | #D2D0CB | #1B180E | 11.53:1 | #41403B | #B9B6AB | 5.14:1 |
+| Marigold | #F9E1BD | #895A00 | 4.7:1 | #43361F | #DEA213 | 5.15:1 |
+| Teal | #D8E4DF | #006E69 | 4.7:1 | #253834 | #38B8B2 | 5.11:1 |
+| Midnight | #D5D4DE | #2E1F64 | 9.54:1 | #36333E | #AA9CE0 | 5.03:1 |
+| Emerald | #D5E1D8 | #00674F | 5.1:1 | #26392F | #44BA98 | 5.14:1 |
+| Claret | #E9D4D3 | #7F1734 | 7.17:1 | #432E2F | #ED889D | 5.16:1 |
+| Cyan | #D7E6EA | #006B8F | 4.69:1 | #28393E | #48B6DB | 5.14:1 |
+
+Ink stays neutral, as everywhere else. The quick filters show no counts, only the unread dot, so nothing else in the sidebar changes.
+
+**What the accent does not touch.** Counts outside the sidebar (the topic switcher), the tab unread dot and the quiet "@" tag on rows stay the soft grey tags; the "@" tag's background is `--hl-soft`, its text `--foreground-subtle`. Coral is for the primary button, the selected nav item, the sidebar's counters, the user's own @mention chip, the focus ring and text selection.
 
 **Values and measured contrast.** Measured in Chromium from the built gallery (WCAG 2, sRGB; `color-mix()` resolved by the browser). Targets: 4.5:1 for text on the fill, accent text on the page, on the selected nav and on the soft tint, and for body text on the selection; the focus ring is the accent text so it meets the same bar. The fill against the page is information only: Marigold in light is 1.94:1, so a marigold button is identified by its label, never by colour alone. The dark column was measured against the dark palette in 1.2.
 
@@ -412,7 +432,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--surface-default` with 1.5% of `--hl` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. 3% read as pink on paper in light; 1.5% is a tint you notice only beside the page.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--panel-surface` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. It carries no accent: a tint of `--hl` read as pink, yellow or purple depending on the accent, and the field and Juno's bubbles were the panel's own colour. `--juno-bubble-bg` is Juno's bubble and the status bubble (`--surface-hover`); the panel sets it to `--panel-bubble`.
 
 ### Illustrations and the mark
 
@@ -548,6 +568,5 @@ Other literal lengths and colours require tokens, or a trailing
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
 | `--topic-people-width` | 60px | Four overlapping participant avatars. |
 | `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
-| `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |
 | `--threads-button-width` | 128px | Threads button before and after its count arrives. |
 | `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

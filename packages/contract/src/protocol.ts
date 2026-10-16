@@ -37,14 +37,8 @@ export type EngineConfig = typeof EngineConfig.Type
 export const NotificationSource = Schema.Struct({ channelId: Schema.String, ts: Schema.String, topicId: Schema.String })
 export type NotificationSource = typeof NotificationSource.Type
 
-/**
- * What clicking a notification opens: a message, or the hours-start
- * summary. The summary opens the Juno chat at its message (`id`) once the
- * chat exists, and until then the first message it names (`first`).
- */
 export const NotificationTarget = Schema.Union([
   Schema.TaggedStruct('message', { source: NotificationSource }),
-  Schema.TaggedStruct('summary', { id: Schema.String, first: NotificationSource }),
 ])
 export type NotificationTarget = typeof NotificationTarget.Type
 

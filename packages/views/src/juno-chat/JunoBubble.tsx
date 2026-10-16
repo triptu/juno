@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
-import { colors, motion, spacing } from '@juno/tokens/tokens.stylex'
+import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
@@ -17,6 +17,8 @@ export interface JunoBubbleProps {
   readonly actions: ChatActions
   /** Fade in on mount: a bubble arrives whole. Pass false for a bubble drawn in a settled list. */
   readonly enter?: boolean
+  /** Laid out in full even off screen, never at the size estimate. */
+  readonly eager?: boolean
 }
 
 /**
@@ -26,7 +28,7 @@ export interface JunoBubbleProps {
  * flow; React and Reply wait beside it. The slot under a group's last
  * bubble is kept, as the owner's is, so the spacing matches.
  */
-export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter = true }: JunoBubbleProps) {
+export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter = true, eager = false }: JunoBubbleProps) {
   const end = isGroupEnd(item.group)
   const menu = actions.onContextMenu
   const target = { _tag: 'bubble', id: item.id } as const
@@ -38,7 +40,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
           <QuoteStub quote={replyTo} onOpen={() => actions.onQuote(replyTo.target)} />
         </div>
       ) : null}
-      <div {...stylex.props(rowStyles.row, rowStyles.contained)}>
+      <div {...stylex.props(rowStyles.row, rowStyles.contained, eager && rowStyles.eager)}>
         <div
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
@@ -106,7 +108,7 @@ const styles = stylex.create({
     animationFillMode: 'both',
   },
   bubble: {
-    backgroundColor: colors['--surface-hover'],
+    backgroundColor: chat['--juno-bubble-bg'],
     color: colors['--foreground-default'],
   },
   // Above the bubble, on its edge.

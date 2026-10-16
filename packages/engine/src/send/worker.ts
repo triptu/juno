@@ -267,12 +267,13 @@ export class PostWorker extends Context.Service<
           const held = new Set<string>()
           for (const row of yield* local(pendingPosts)) {
             if (row.state === 'failed' || held.has(row.channel)) continue
+            if (row.threadTs?.startsWith('pending:')) continue
             held.add(row.channel)
             if (row.nextAt > now) continue
             if (row.state === 'queued') yield* post(open, fetcher, row)
             else if (row.state === 'unknown') yield* lookUp(open, fetcher, row)
           }
-          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed')
+          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed' && !row.threadTs?.startsWith('pending:'))
           if (rest.length === 0) return undefined
           const after = yield* Clock.currentTimeMillis
           return Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - after)

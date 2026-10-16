@@ -22,7 +22,6 @@ import {
   quoteInJuno,
   registry,
   setJunoPanelOpen,
-  showInJunoChat,
   tabsAtom,
 } from '@juno/state'
 import { chatActions, junoPageActions } from '@juno/state/agent'
@@ -93,12 +92,6 @@ export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
 function aboutKey(): string {
   const active = registry.get(tabsAtom).active
   return topicTabActive() && active !== undefined ? active : JUNO_TAB_ABOUT
-}
-
-/** The hours-start summary's notification (SPEC 14): the Juno tab, at the summary's message, which flashes. */
-export function openJunoAt(messageId: string): void {
-  showInJunoChat(registry, messageId)
-  openJuno()
 }
 
 /** Tell Juno in the why popover (SPEC 14, inventory 15.4): the chat beside the topic, with the message quoted in its composer. */

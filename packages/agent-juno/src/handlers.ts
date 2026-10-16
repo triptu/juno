@@ -9,9 +9,8 @@
  *   options turn them on. The desktop enables them for approved cards;
  *   a disabled host refuses before recording an attempt.
  * - Resolve uses the local topic command and retains its Undo.
- * - OS notification delivery remains unsupported. The hours-start summary
- *   goes the other way: the host offers it and the agent appends it.
- * - Spend asks go the other way too: the engine's model calls offer
+ * - OS notification delivery remains unsupported.
+ * - Spend asks go the other way: the engine's model calls offer
  *   reservations and settlements, and the agent answers from its ledger.
  *
  * `host.hello` answers the one protocol the host serves; the agent refuses
@@ -84,8 +83,6 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.schedule.changes': () => host.schedule?.changes ?? Stream.empty,
         'host.presence': () => host.presence,
         'host.notification.deliver': () => unsupported('Juno cannot show notifications for the agent yet.'),
-        'host.notification.summaries': () => host.summaries?.pending ?? Stream.make([]),
-        'host.notification.summaryTaken': ({ id }) => host.summaries?.taken(id) ?? Effect.void,
         'host.spend.asks': () => host.spend?.asks ?? Stream.never,
         'host.spend.answer': (answer) => host.spend?.answer(answer) ?? Effect.void,
       })

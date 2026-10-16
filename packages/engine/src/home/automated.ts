@@ -121,7 +121,7 @@ const junoSample = (rows: ReadonlyArray<SampleRow>, selfId: string | undefined) 
     const sql = yield* StoreReader
     const ids = [...new Set(rows.flatMap((row) => (row.user_id === null ? [] : [row.user_id])))]
     const users = new Map<string, UserRow>()
-    if (ids.length > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(ids)}`) users.set(user.id, user)
+    if (ids.length > 0) for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(ids)}`) users.set(user.id, user)
     return rows
       .toReversed()
       .filter((row) => row.text.trim() !== '')

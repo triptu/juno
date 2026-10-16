@@ -34,6 +34,7 @@ import { mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } fro
 import type { SlackApiError } from '@juno/slack'
 import { Invalidation, liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import type { FetchReport } from '@juno/sync'
+import { pendingThread, resolveStartedThread } from '../startedThreads'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { SyncLink } from '../syncLink'
@@ -47,6 +48,8 @@ const encodeThread = Schema.encodeSync(Schema.toCodecJson(ThreadSummary))
 
 /** The window a topic id names, or `undefined` for anything else (groups come later). */
 const targetOf = (id: string): WindowTarget | undefined => {
+  const pending = pendingThread(id)
+  if (pending !== undefined) return { kind: 'thread', channel: pending.channel, threadTs: `pending:${pending.clientMsgId}` }
   const parsed = parseTopicId(id)
   if (parsed === undefined) return undefined
   return parsed.kind === 'thread' ? { kind: 'thread', channel: parsed.channel, threadTs: parsed.threadTs } : { kind: 'main', channel: parsed.channel }
@@ -113,7 +116,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: [payload.id], users: [], conversations: [], emoji: [], topic_overlay: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: [payload.id] }
+        const keys: InvalidationKeys = { messages: pendingThread(payload.id) === undefined ? [payload.id] : [`channel:${target.channel}`], users: [], conversations: [], emoji: [], topic_overlay: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation
@@ -122,7 +125,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
             Effect.sync(() => invalidation.subscribeUnsafe(['users', 'conversations', 'emoji'], () => forgetLookups(cache))),
             (cancel) => Effect.sync(cancel),
           )
-          return listMessages(target, range, cache)
+          return Effect.flatMap(resolveStartedThread(payload.id), id => listMessages(targetOf(id)!, range, cache))
         })
         return serveLiveList(runs(keys, setup), { encodeRow: encodeMessage, measure }).pipe(retryFirstRun('messages.list'), Stream.orDie)
       },
@@ -132,11 +135,11 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
         const keys: InvalidationKeys =
           target.kind === 'main'
             ? ['topics', 'conversations', 'thread_subs', 'users', 'prefs', 'team', 'ignored_channels', 'topic_overlay', 'topic_reads', 'topic_art']
-            : { topics: [payload.id], topic_overlay: [payload.id], topic_reads: [payload.id], conversations: [], thread_subs: [], users: [], prefs: [], team: [], messages: [payload.id], topic_art: [] }
-        const setup = Effect.succeed(Effect.flatMap(now, (at) => topicDetail(payload.id, target, at)))
+            : { topics: pendingThread(payload.id) === undefined ? [payload.id] : [], topic_overlay: pendingThread(payload.id) === undefined ? [payload.id] : [], topic_reads: pendingThread(payload.id) === undefined ? [payload.id] : [], conversations: [], thread_subs: [], users: [], prefs: [], team: [], messages: pendingThread(payload.id) === undefined ? [payload.id] : [`channel:${target.channel}`], topic_art: [] }
+        const setup = Effect.succeed(Effect.flatMap(now, at => Effect.flatMap(resolveStartedThread(payload.id), id => topicDetail(id, targetOf(id)!, at))))
         const served = serveLiveValue(runs(keys, setup), { measure }).pipe(retryFirstRun('topics.get'), Stream.orDie)
         // Shown for as long as the header is subscribed.
-        return Stream.unwrap(Effect.as(link.showing(payload.id), served))
+        return pendingThread(payload.id) === undefined ? Stream.unwrap(Effect.as(link.showing(payload.id), served)) : served
       },
       'channel.threads': (payload) => {
         const limit = Math.max(1, Math.min(THREADS_WINDOW_MAX, payload.range.limit))
@@ -147,6 +150,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
       'topics.open': (payload) =>
         Effect.gen(function* () {
           if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
+          if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const }
           const { outcome } = yield* fetch((fetcher) => fetcher.open(payload.id))
           return { outcome }
         }),
@@ -166,6 +170,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
       'messages.loadOlder': (payload) =>
         Effect.gen(function* () {
           if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
+          if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const, complete: true }
           const { outcome, report } = yield* fetch((fetcher) => fetcher.older(payload.id, payload.before))
           return { outcome, complete: report?.complete ?? false }
         }),

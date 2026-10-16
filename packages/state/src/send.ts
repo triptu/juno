@@ -30,10 +30,11 @@ import type { Registry } from './client'
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
  * Resolves with the `Exit`; on success, the topic.
  */
-export const sendMessage = (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>) =>
+export const sendMessage = (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>, startThread = false) =>
   runCommand(registry, messagesSend, {
     to,
     text,
+    startThread,
     clientMsgId: crypto.randomUUID(),
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),

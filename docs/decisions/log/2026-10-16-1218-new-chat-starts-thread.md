@@ -1,0 +1,1 @@
+- 10-16 12:18 · Tushar · A New chat send to Main in a channel or group DM opens its own locally followed thread immediately. Keep a durable outbox-to-thread identity so acknowledgement preserves the tab, history, draft and scroll; replies wait for the root's timestamp and use the normal send-once path. One-to-one DMs remain Main.

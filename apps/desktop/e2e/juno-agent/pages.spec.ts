@@ -28,7 +28,9 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await openPage(juno, 'Settings')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Rules', 'Pause']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Rules', 'Pause Juno']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  await expect(page.getByText('Use your ChatGPT plan instead of an API key.')).toBeVisible()
+  await expect(page.getByText('Coming soon')).toBeVisible()
   // Backup and This Mac are their own section.
   const sections = juno.win.getByRole('navigation', { name: 'Settings' })
   await sections.getByRole('button', { name: 'Backup & This Mac' }).click()
@@ -50,7 +52,7 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await page.getByLabel('Rule', { exact: true }).press('Enter')
   await page.getByRole('button', { name: 'Add a rule' }).click()
   await page.getByLabel('Rule', { exact: true }).nth(1).fill('Never post in #general without asking')
-  await page.getByLabel('Juno is paused').focus()
+  await page.getByLabel('Pause Juno').focus()
   await page.getByRole('button', { name: 'Remove rule' }).first().click()
   await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
   // What the agent kept: the page opened again shows only its served list.
@@ -59,7 +61,7 @@ test('Settings › Juno shows what is built, with the provider in use, and pause
   await expect.poll(() => ruleFields(juno)).toEqual(['Never post in #general without asking'])
 
   // Pause shows in the chat's header, and its Resume undoes it.
-  await page.getByLabel('Juno is paused').check()
+  await page.getByLabel('Pause Juno').check()
   // A page opens in the tab it was asked from; Back returns to the chat.
   await juno.nav.back()
   const chip = juno.win.locator('main [data-banner="paused"]')

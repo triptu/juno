@@ -34,6 +34,15 @@ export const colors = stylex.defineVars({
   // both themes (the selected segment of a segmented control).
   '--surface-raised': 'hsla(48, 30%, 98%, 1)',
 
+  // The Juno panel, a secondary surface like a macOS inspector: a step
+  // below the page in light (between the sidebar and the chips), a step
+  // above it in dark, so it separates without a border and the composer
+  // field and Juno's bubbles read on it. No accent in it.
+  '--panel-surface': 'hsla(48, 22%, 95.5%, 1)',
+  // Juno's bubble on the panel: lighter than the panel in light, as the
+  // field is; in dark the usual hover surface already is.
+  '--panel-bubble': 'hsla(48, 40%, 99%, 1)',
+
   // Secondary fills: secondary buttons, selected rows, chips, tiles.
   '--secondary-default': 'hsla(48, 30%, 92%, 1)',
   '--secondary-hover': 'hsla(48, 30%, 90%, 1)',
@@ -96,11 +105,14 @@ export const colors = stylex.defineVars({
  * - --hl-bubble: the owner's bubble in the Juno chat, a stronger tint than
  *   --hl-soft (16% light, 22% dark) with --foreground-default text
  * - --hl-nav: the selected nav item's fill, over the sidebar
+ * - --hl-count, --hl-count-fg: the sidebar's counters, the accent at reduced
+ *   brightness: a tint of it over the sidebar for the fill and a deeper
+ *   (light) or dimmer (dark) accent for the text, held to 4.5:1 on the fill
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
  *
- * Unread counts are never the accent; they stay the soft grey tag.
+ * Counts outside the sidebar (the topic switcher) stay the soft grey tag.
  */
 export const accent = stylex.defineVars({
   '--hl': '#CC4628',
@@ -109,6 +121,8 @@ export const accent = stylex.defineVars({
   '--hl-soft': `color-mix(in oklch, #CC4628 10%, ${colors['--background']})`,
   '--hl-bubble': `color-mix(in oklch, #CC4628 16%, ${colors['--background']})`,
   '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
+  '--hl-count': '#F7DED4',
+  '--hl-count-fg': '#B3371B',
   '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
   '--focus-ring': '#B4351F',
@@ -175,14 +189,15 @@ export const chat = stylex.defineVars({
   },
   // How far a reaction badge sits out over its bubble's top corner.
   '--reaction-offset': '10px',
-  // The Juno panel's material: the surface with a breath of the accent, so
-  // it reads as Juno's without colouring anything in it. Beside a topic it
-  // sits on the page colour alone, so it is drawn opaque and costs nothing
-  // to composite. Over the topic (a narrow window) it is the same fill, let
+  // The Juno panel's material (`--panel-surface`). Beside a topic it sits
+  // on the page colour alone, so it is drawn opaque and costs nothing to
+  // composite. Over the topic (a narrow window) it is the same fill, let
   // through and blurred like a macOS inspector; the header band fades the
   // list into the opaque fill.
-  '--panel-fill': `color-mix(in oklch, ${accent['--hl']} 1.5%, ${colors['--surface-default']})`,
-  '--panel-glass': `color-mix(in oklch, ${accent['--hl']} 1.5%, color-mix(in oklch, ${colors['--surface-default']} 80%, transparent))`,
+  '--panel-fill': colors['--panel-surface'],
+  '--panel-glass': `color-mix(in oklch, ${colors['--panel-surface']} 80%, transparent)`,
+  // Juno's bubble and the status bubble; the panel sets `--panel-bubble`.
+  '--juno-bubble-bg': colors['--surface-hover'],
   '--panel-backdrop': 'blur(24px) saturate(1.6)',
 })
 
@@ -805,7 +820,6 @@ export const sizes = stylex.defineVars({
   '--topic-time-width': '48px',
   '--topic-people-width': '60px',
   '--topic-tags-width': '76px',
-  '--message-sender-width': '128px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
   '--control-26': '26px',

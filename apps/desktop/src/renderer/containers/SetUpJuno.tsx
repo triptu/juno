@@ -4,7 +4,7 @@ import type { ProviderChange } from '@juno/contract'
 import { junoSetupPendingAtom, registry } from '@juno/state'
 import { agentProviderAtom, codexSetup, junoPageActions, junoSettingsAtom, setAgentProvider } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { SetUpJunoView, type ProviderDrafts, type SetUpChoice, type SetUpCodex } from '@juno/views'
+import { CODEX_ENABLED, SetUpJunoView, type ProviderDrafts, type SetUpChoice, type SetUpCodex } from '@juno/views'
 
 const actions = junoPageActions(registry)
 
@@ -37,7 +37,7 @@ function useModels(shown: SetUpChoice, saved: boolean) {
   const page = result._tag === 'Success' ? result.value : undefined
   if (!saved || page === undefined) return { models: undefined, typed: false, selected: undefined }
   const typed = shown === 'custom' && page.modelTyped === true
-  const models = page.chatModels.filter((model) => model.provider === providerOf(shown))
+  const models = page.chatModels.filter((model) => model.provider === providerOf(shown) && (CODEX_ENABLED || model.provider !== 'codex'))
   const listed = models.length === 0 ? undefined : models
   const pick = listed?.find((model) => model.selected) ?? listed?.find((model) => model.resolved !== undefined)
   return { models: listed, typed, selected: pick === undefined ? undefined : modelChoiceKey(pick) }
@@ -61,7 +61,7 @@ export function SetUpJuno() {
   useEffect(() => {
     void codexSetup().then(setCodex)
   }, [])
-  const shown: SetUpChoice = picked ?? provider?.active ?? (codex === 'signedIn' ? 'codex' : 'openRouter')
+  const shown: SetUpChoice = CODEX_ENABLED ? picked ?? provider?.active ?? (codex === 'signedIn' ? 'codex' : 'openRouter') : picked ?? (provider?.active === 'custom' ? 'custom' : 'openRouter')
   const saved = shown === 'codex' ? codex === 'signedIn' : provider?.active === shown
   const { models, typed, selected } = useModels(shown, saved)
   const model = chosenModel ?? (typed ? '' : selected)

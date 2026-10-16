@@ -2,8 +2,7 @@
  * Notifications and presence (spec section 14, inventory section 13).
  *
  * Order: ignored channel → Every message (channel or person) → Never →
- * outside notification hours (into the summary when hours start, if it
- * would have notified) → AI assist off (DMs and mentions) → Juno's judgement.
+ * outside notification hours (hold) → AI assist off (DMs and mentions) → Juno's judgement.
  * Every message wins over Never, so nothing important is silently lost.
  */
 import { channelLabel, isDm, type ChannelInfo } from './channel'
@@ -76,10 +75,9 @@ export interface Judgement {
 
 /**
  * - now: an OS notification right away.
- * - summary: no notification now; counted in the one notification when notification hours start.
  * - hold: no notification. The message is in Juno as always.
  */
-export type NotificationOutcome = 'now' | 'summary' | 'hold'
+export type NotificationOutcome = 'now' | 'hold'
 
 export interface NotificationDecision {
   readonly outcome: NotificationOutcome
@@ -257,7 +255,7 @@ export function decideWithCause(
   const later = (decision: NotificationDecision, cause: DecisionCause): CausedDecision =>
     inside || decision.outcome !== 'now'
       ? { decision, cause }
-      : { decision: { outcome: 'summary', reason: `Outside your notification hours. ${decision.reason}` }, cause: { kind: 'hours' } }
+      : { decision: { outcome: 'hold', reason: `Outside your notification hours. ${decision.reason}` }, cause: { kind: 'hours' } }
 
   if (!context.aiAssist) {
     const direct = isDm(channel.kind) || candidate.mentionsMe
@@ -271,20 +269,6 @@ export function decideWithCause(
 
   if (!judgement) return { needsJudgement: true }
   return later({ outcome: judgement.notify ? 'now' : 'hold', reason: `Juno: ${judgement.reason}` }, { kind: 'juno' })
-}
-
-/** The one notification when notification hours start, or nothing when no message was kept for it. */
-export function hoursStartSummary(
-  held: ReadonlyArray<{ readonly decision: NotificationDecision; readonly where: string }>,
-): { readonly title: string; readonly body: string } | undefined {
-  const kept = held.filter((item) => item.decision.outcome === 'summary')
-  if (kept.length === 0) return undefined
-  const places = [...new Set(kept.map((item) => item.where))]
-  const shown = places.slice(0, 3)
-  const rest = places.length - shown.length
-  const list = rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)}` : shown[0]
-  const title = kept.length === 1 ? '1 message needs you' : `${kept.length} messages need you`
-  return { title, body: `In ${list}` }
 }
 
 const calendarWeekdays: ReadonlyArray<Weekday> = [0, 1, 2, 3, 4, 5, 6]

@@ -64,6 +64,8 @@ export interface UserRow {
   readonly name: string | null
   readonly display_name: string | null
   readonly real_name: string | null
+  readonly avatar_small_url?: string | null
+  readonly avatar_large_url?: string | null
   readonly avatar_url: string | null
 }
 
@@ -74,8 +76,8 @@ export const userName = (_id: string, user: UserRow | null | undefined): string 
 export function personFrom(id: string, user: UserRow | null | undefined, known?: Person): Person {
   const name = userName(id, user)
   const avatarUrl = user?.avatar_url ? user.avatar_url : undefined
-  if (known !== undefined && known.name === name && known.avatarUrl === avatarUrl) return known
-  return { id, name, ...(avatarUrl === undefined ? {} : { avatarUrl }), color: defaultPersonColor(id) }
+  if (known !== undefined && known.name === name && known.avatarUrl === avatarUrl && known.avatarSmallUrl === (user?.avatar_small_url || undefined) && known.avatarLargeUrl === (user?.avatar_large_url || undefined)) return known
+  return { id, name, ...(user?.avatar_small_url ? { avatarSmallUrl: user.avatar_small_url } : {}), ...(user?.avatar_large_url ? { avatarLargeUrl: user.avatar_large_url } : {}), ...(avatarUrl === undefined ? {} : { avatarUrl }), color: defaultPersonColor(id) }
 }
 
 /** The JSON columns of an index row, parsed. */

@@ -1,0 +1,1 @@
+- 10-16 13:33 · juno-panel · What Juno sees is a chip inside the top of the panel's composer, on its text inset with 8px above and below, replacing the loose line above the field; a selection is a second chip.

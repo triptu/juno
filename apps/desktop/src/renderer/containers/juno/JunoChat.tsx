@@ -1,11 +1,11 @@
 import { useEmojiSuggestions } from '../emojiSuggestions'
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { chatCopy, type ChatPage, type Quote, type SendContext } from '@juno/agent-contract'
 import { junoDraftAtom, nowAtom, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useReactionPicker, useRemoval } from './chatActions'
-import { useBubbleMeasure, useChatPosition, useChatTarget, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
+import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 
 /** Times change at most at a day boundary; re-render for it this often. */
@@ -19,14 +19,12 @@ export interface JunoChatProps {
   readonly header: (banner: ChatPage['banner']) => ReactNode
   /** What the next message is about, read at send time (the panel's topic, an About chip). */
   readonly contextOf?: () => SendContext | undefined
-  /** Above the composer field: the panel's selection quote, About chip and Catch me up. */
+  /** In the composer field's top: the panel's context chips. */
   readonly composerContext?: ReactNode
   /** A message went out, with the context it carried. */
   readonly onSent?: (context: SendContext | undefined) => void
   /** Esc in the empty composer. */
   readonly onEscape?: () => void
-  /** For the panel's Catch me up: sends `text` as if typed. */
-  readonly sendRef?: RefObject<((text: string) => void) | null>
 }
 
 /**
@@ -38,6 +36,8 @@ export interface JunoChatProps {
  *   edge it moves by `OVERLAP` rows; rows stay in flow, so scroll anchoring
  *   keeps the rows in view still. A window that reaches the newest row
  *   follows it (`latest`).
+ * - The last screenful of rows is laid out in full (`eagerTail`), so the
+ *   bottom set before the first paint is the bottom that paints.
  * - At the bottom, a new row is scrolled into view before paint; scrolled
  *   up, the "New message" pill shows.
  * - A Juno bubble fully on screen for a second in the focused window is read.
@@ -48,7 +48,7 @@ export interface JunoChatProps {
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
  */
-export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, sendRef }: JunoChatProps) {
+export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape }: JunoChatProps) {
   const agent = useAgentState()
   const { page, pageRef, current, loaded, setWindow } = useChatWindow(column, agent)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -59,7 +59,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // The hooks run their effects in this order; keep it.
   const items = useChatItems(page, current)
-  const { pinnedRef, positioned, atBottom, setAtBottom, unseen } = useChatPosition(column, loaded, items, scrollRef, anchorRef)
+  const { pinnedRef, positioned, atBottom, setAtBottom, unseen, eagerTail } = useChatPosition(column, loaded, items, scrollRef, anchorRef)
   const { sentAtRef, newestBubbleId } = useBubbleMeasure(items)
   useStickToBottom(scrollRef, pinnedRef, positioned, items, page.moreBelow)
   useScrollRelease(scrollRef, pinnedRef, pageRef, setAtBottom)
@@ -71,10 +71,9 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const emojiSuggestions = useEmojiSuggestions({ text: draft, onChange: setDraft, field: inputRef })
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
   useFocusRequest(column, inputRef)
-  const { toBottom, send } = useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
+  const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
-  useChatTarget(column, positioned, items, scrollRef, pinnedRef, setWindow)
   const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval })
 
   return (
@@ -122,6 +121,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
         topEdgeRef={topEdgeRef}
         bottomEdgeRef={bottomEdgeRef}
         enterEmpty={column === 'page' && loaded && agent !== 'off'}
+        eagerTail={eagerTail}
       />
     </JunoChatFrame>
     </>

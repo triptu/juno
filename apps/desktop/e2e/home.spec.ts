@@ -33,9 +33,9 @@ test('During the first sync Home greets and says it is syncing, and the sidebar 
   await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
   await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
   await expect(syncing.getByText('All caught up.')).toHaveCount(0)
-  const progress = juno.sidebar.root.getByRole('status', { name: 'Sync status' })
-  await expect(progress).toHaveText(/^Syncing 0 of \d+$/)
-  await expect(juno.sidebar.root.getByRole('progressbar', { name: 'Sync progress' })).toBeVisible()
+  const progress = juno.sidebar.syncStatus
+  await expect(progress).toHaveText('Syncing with Slack')
+  await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^0 of \d+ conversations$/)
 
   // Once the history lands the first sync finishes: Home shows what waits and the line goes.
   slack.fake.release()
@@ -68,7 +68,7 @@ test('Home shows rows before the first sync ends', async ({ juno, slack, win }) 
     )
     .toBe(true)
   await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
-  await expect(juno.sidebar.root.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing \d+ of \d+$/)
+  await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
   const early = await juno.home.kinds()
 
   // The sync ends: the rows shown stay first, in their order, and the count line replaces the syncing one.

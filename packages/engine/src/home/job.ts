@@ -97,7 +97,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         for (const row of rows) userIdsOf(row, parseColumns(row), ids)
         const missing = [...ids].filter((id) => !users.has(id))
         if (missing.length === 0) return
-        for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(missing)}`) users.set(user.id, user)
+        for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`) users.set(user.id, user)
       })
     const nowIso = new Date(now).toISOString()
     const take = (rows: ReadonlyArray<HomeRow>, task: string) => {

@@ -4,32 +4,43 @@ import { openState, type Route } from './support'
 const open = (page: Page, component: string, id: string) =>
   openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
 
+/** The topic chip, the field and its text, measured. */
+const measure = (page: Page) =>
+  page.evaluate(() => {
+    const context = document.querySelector('[data-panel-context]')!
+    const field = context.closest('[data-composer-field]')!
+    const textarea = field.querySelector('textarea')!
+    const chip = context.querySelector<HTMLElement>('[data-panel-sees]')!
+    const label = chip.lastElementChild as HTMLElement
+    const f = field.getBoundingClientRect()
+    const c = chip.getBoundingClientRect()
+    const t = textarea.getBoundingClientRect()
+    const textTop = t.top + parseFloat(getComputedStyle(textarea).paddingTop)
+    return {
+      fieldText: t.left + parseFloat(getComputedStyle(textarea).paddingLeft),
+      chip: c.left,
+      above: c.top - (f.top + 1),
+      below: textTop - c.bottom,
+      chipRight: c.right,
+      fieldRight: f.right,
+      cut: label.scrollWidth > label.clientWidth,
+    }
+  })
+
 test.describe('Juno panel context', () => {
-  test('Catch me up sits on the field edge at the destination chip height; the context line starts at the field text', async ({ page }) => {
+  test('the topic chip sits in the field, on its text inset, with an even gap above and below', async ({ page }) => {
     await open(page, 'Workspace', 'page/juno-panel')
-    const at = await page.evaluate(() => {
-      const context = document.querySelector('[data-panel-context]')!
-      let scope: Element = context
-      while (!scope.querySelector('[data-composer-field]')) scope = scope.parentElement!
-      const field = scope.querySelector('[data-composer-field]')!
-      const textarea = field.querySelector('textarea')!
-      const chip = context.querySelector('[data-catch-me-up]')!
-      const line = context.querySelector('[data-panel-sees]')!
-      const c = chip.getBoundingClientRect()
-      const style = getComputedStyle(chip)
-      return {
-        field: field.getBoundingClientRect().left,
-        fieldText: textarea.getBoundingClientRect().left + parseFloat(getComputedStyle(textarea).paddingLeft),
-        chip: c.left, chipHeight: c.height,
-        chipStart: parseFloat(style.paddingLeft), chipEnd: parseFloat(style.paddingRight),
-        lineText: line.firstElementChild!.getBoundingClientRect().left,
-      }
-    })
-    expect(at.chip).toBe(at.field)
-    expect(at.chipHeight).toBe(28)
-    // The destination chip's 10px icon side; the text side is 12px with no chevron after it.
-    expect(at.chipStart).toBe(10)
-    expect(at.chipEnd).toBe(12)
-    expect(at.lineText).toBe(at.fieldText)
+    const at = await measure(page)
+    expect(at.chip).toBe(at.fieldText)
+    expect(at.above).toBe(8)
+    expect(at.below).toBe(8)
+  })
+
+  test('a long channel name cuts inside the chip, which stays inside the field', async ({ page }) => {
+    await open(page, 'Workspace', 'page/juno-panel-long-name')
+    const at = await measure(page)
+    expect(at.cut).toBe(true)
+    expect(at.chipRight).toBeLessThan(at.fieldRight)
+    expect(at.chip).toBe(at.fieldText)
   })
 })

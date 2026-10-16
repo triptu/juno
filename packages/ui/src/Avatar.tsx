@@ -43,6 +43,7 @@ export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', 
   // Keyed by src so a row that is reused for another person starts over.
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState<string | undefined>(undefined)
+  const imageSrc = src === undefined || src.startsWith('/') || src.startsWith('data:') || src.startsWith('juno:') ? src : `juno://files/avatar?url=${encodeURIComponent(src)}`
   const showImage = src !== undefined && failed !== src
   const shown = showImage && loaded === src
   return (
@@ -56,7 +57,7 @@ export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', 
       {label}
       {showImage ? (
         <img
-          src={src}
+          src={imageSrc}
           alt=""
           draggable={false}
           decoding="async"

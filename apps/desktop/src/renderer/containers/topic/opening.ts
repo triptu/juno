@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { readsMarkRead } from '@juno/contract'
-import { catchUpDoneAtom, dividerIndex, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
+import { dividerIndex, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
 import type { MessageListStatus } from '@juno/views'
 
 /** No "Loading messages" line before this (performance 4.4). */
@@ -40,11 +40,10 @@ export function useDivider(id: string, lastReadTs: string | undefined, list: Mes
   const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
-  // The Juno panel offers Catch me up while the topic opened at a "new" divider (SPEC 7); a new divider offers it again.
+  // A message sent from the Juno panel carries where the topic opened at a "new" divider (SPEC 7).
   useEffect(() => {
     if (readOnly || registry.get(openedAtNewAtom(id)) === dividerBefore) return
     registry.set(openedAtNewAtom(id), dividerBefore)
-    registry.set(catchUpDoneAtom(id), false)
   }, [id, readOnly, dividerBefore])
   return { readAtOpen: readAtOpen.lastReadTs, at, dividerBefore }
 }

@@ -76,6 +76,8 @@ export interface MessageCache {
   channels: Map<string, string | null>
   /** Custom emoji image urls, `null` for a name with no custom emoji. */
   emoji: Map<string, string | null>
+  /** Custom aliases with no image, to the name they end at (a standard emoji, or a missing one). */
+  emojiAliases: Map<string, string>
   /** Bumped whenever the lookup maps are dropped; a body parsed in an older epoch is parsed again. */
   epoch: number
   people: Map<string, Person>
@@ -89,6 +91,7 @@ export const makeMessageCache = (): MessageCache => ({
   users: new Map(),
   channels: new Map(),
   emoji: new Map(),
+  emojiAliases: new Map(),
   epoch: 0,
   people: new Map(),
   selfId: undefined,
@@ -100,6 +103,7 @@ export function forgetLookups(cache: MessageCache): void {
   cache.users = new Map()
   cache.channels = new Map()
   cache.emoji = new Map()
+  cache.emojiAliases = new Map()
   cache.epoch += 1
 }
 
@@ -151,7 +155,16 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const statement = pendingStatement(target)
       for (const row of yield* sql.unsafe<PendingRow>(statement.sql, statement.params)) pending.set(pendingRowId(row.client_msg_id), row)
     }
-    const withPending: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => pendingMessage(row, selfId))]
+    const ownRoots = new Map<string, string>()
+    const clients = [...stored.flatMap(row => row.client_msg_id === null ? [] : [row.client_msg_id]), ...[...pending.values()].map(row => row.client_msg_id)]
+    if (target.kind === 'main' && clients.length > 0) {
+      for (const root of yield* sql<{ client_msg_id: string; topic_id: string; root_ts: string | null }>`SELECT client_msg_id, topic_id, root_ts FROM started_threads
+        WHERE channel = ${target.channel} AND client_msg_id IN ${sql.in(clients)}`) {
+        ownRoots.set(root.root_ts ?? pendingRowId(root.client_msg_id), root.root_ts === null ? root.topic_id : `t:${target.channel}:${root.root_ts}`)
+      }
+    }
+    const threadId = (row: WindowMessage) => ownRoots.get(row.ts) ?? threadTopicId(target.channel as ChannelId, row.ts as Ts)
+    const withPending: ReadonlyArray<WindowMessage> = pending.size === 0 ? stored : [...stored, ...[...pending.values()].map((row) => ({ ...pendingMessage(row, selfId), ...(ownRoots.has(pendingRowId(row.client_msg_id)) ? { thread_ts: pendingRowId(row.client_msg_id) } : {}) }))]
     // A network copy of a post that shares files is hidden but not deleted (ADR 0014).
     const hiddenCopies = withPending.length === 0 ? [] : yield* sql.unsafe<{ ts: string }>(hiddenCopiesStatement(target.channel).sql, hiddenCopiesStatement(target.channel).params)
     const hidden = new Set(hiddenCopies.map((row) => row.ts))
@@ -183,7 +196,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const titles = new Map<string, { readonly manual_title: string | null; readonly ai_title: string | null }>()
     let conversation: ConversationInfo | undefined
     if (target.kind === 'main') {
-      const linked = rows.filter((row) => row.reply_count > 0 && row.thread_ts === row.ts).map((row) => threadTopicId(target.channel as ChannelId, row.ts as Ts))
+      const linked = rows.filter((row) => row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts))).map(threadId)
       if (linked.length > 0) {
         const statement = threadTitlesStatement(linked)
         for (const title of yield* sql.unsafe<{ topic_id: string; manual_title: string | null; ai_title: string | null }>(statement.sql, statement.params)) titles.set(title.topic_id, title)
@@ -214,6 +227,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         if (url === undefined) wanted.emoji.add(name)
         return url ?? undefined
       },
+      emojiAlias: (name: string) => cache.emojiAliases.get(name),
     }
     const parse = (row: WindowMessage): CachedBody => {
       const content: MessageContent = {
@@ -261,7 +275,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       previous = group
       const intent = intentOf(actions, row)
       const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions)
-      const topicId = target.kind === 'main' && row.reply_count > 0 && row.thread_ts === row.ts ? threadTopicId(target.channel as ChannelId, row.ts as Ts) : undefined
+      const topicId = target.kind === 'main' && row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts)) ? threadId(row) : undefined
       const title = topicId === undefined ? undefined : titles.get(topicId)
       const key = [
         row.version,
@@ -302,7 +316,7 @@ const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.users.set(id, null)
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
+    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
   })
 
 const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
@@ -342,6 +356,8 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
         url = cache.emoji.get(current) ?? null
       }
       cache.emoji.set(name, url)
+      // An alias of a standard emoji (`alias:thumbsup`) shows that emoji.
+      if (url === null) cache.emojiAliases.set(name, current)
     }
   })
 
@@ -389,8 +405,11 @@ interface ShapeInput {
 function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): MessageView {
   const kind = row.deleted === 1 ? 'deleted' : STUB(row) ? 'unloaded' : 'message'
   const reactions: Array<ReactionView> = input.reactions.map((reaction) => {
-    const unicode = emojiUnicode(reaction.name)
-    const url = unicode === undefined ? (input.cache.emoji.get(splitEmojiName(reaction.name).name) ?? undefined) : undefined
+    const standard = emojiUnicode(reaction.name)
+    const base = splitEmojiName(reaction.name).name
+    const url = standard === undefined ? (input.cache.emoji.get(base) ?? undefined) : undefined
+    const alias = standard === undefined && url === undefined ? input.cache.emojiAliases.get(base) : undefined
+    const unicode = standard ?? (alias === undefined ? undefined : emojiUnicode(alias))
     return {
       name: reaction.name,
       count: reaction.count,

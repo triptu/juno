@@ -21,7 +21,6 @@ type Removal = typeof MessageMenu.Type
 interface SendInput {
   readonly contextOf: (() => SendContext | undefined) | undefined
   readonly onSent: ((context: SendContext | undefined) => void) | undefined
-  readonly sendRef: RefObject<((text: string) => void) | null> | undefined
   readonly quote: Quote | undefined
   readonly setQuote: Dispatch<SetStateAction<Quote | undefined>>
   readonly sentAtRef: RefObject<{ readonly at: number; readonly newest: string | undefined } | undefined>
@@ -33,8 +32,8 @@ interface SendInput {
   readonly setWindow: Dispatch<SetStateAction<Window>>
 }
 
-/** Sending: the message goes out with its context and quote, and the list goes to the bottom. `sendRef` lets the panel's Catch me up send. */
-export function useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow }: SendInput) {
+/** Sending: the message goes out with its context and quote, and the list goes to the bottom. */
+export function useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow }: SendInput) {
   const toBottom = () => {
     pinnedRef.current = true
     setAtBottom(true)
@@ -53,17 +52,6 @@ export function useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentA
     toBottom()
     onSent?.(context)
   }
-  const sendRefCurrent = useRef(send)
-  useLayoutEffect(() => {
-    sendRefCurrent.current = send
-  })
-  useLayoutEffect(() => {
-    if (sendRef === undefined) return
-    sendRef.current = (text: string) => sendRefCurrent.current(text)
-    return () => {
-      sendRef.current = null
-    }
-  }, [sendRef])
   return { toBottom, send }
 }
 

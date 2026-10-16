@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostSpendAsk, HostSummary, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -84,11 +84,6 @@ export class JunoHost extends Context.Service<
 
     /** The current presence, then every change. */
     readonly presence: Stream.Stream<Presence>
-    /** Hours-start summaries the agent has not taken, now and on every change (SPEC 14). */
-    readonly summaries?: {
-      readonly pending: Stream.Stream<ReadonlyArray<HostSummary>>
-      readonly taken: (id: string) => Effect.Effect<void>
-    }
     /** The engine's model calls asking the agent's spend ledger (plan v3 §5.4): open asks now and on every change, and the answers. */
     readonly spend?: {
       readonly asks: Stream.Stream<ReadonlyArray<HostSpendAsk>>

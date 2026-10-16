@@ -16,14 +16,12 @@ import { waitFor, type RunningEngine } from './harness'
 
 function recorder() {
   const shown: Notification[] = []
-  const summaries: Array<Parameters<Notifier['summary']>[0]> = []
   let focused = false
   const notifier: Notifier = {
     show: (notification) => Effect.sync(() => { shown.push(notification) }),
-    summary: (summary) => Effect.sync(() => { summaries.push(summary); return `chat:${summary.id}` }),
     viewing: () => Effect.sync(() => focused),
   }
-  return { shown, summaries, notifier, focus: (value: boolean) => { focused = value } }
+  return { shown, notifier, focus: (value: boolean) => { focused = value } }
 }
 const settings: NotificationSettings = { ...defaultNotificationSettings, matters: "The release and hiring", notificationHours: { days: [1], from: 540, to: 1140 } }
 const monday = (hour: number) => new Date(2026, 9, 12, hour).getTime()
@@ -64,10 +62,10 @@ describe('notifications service', () => {
     yield* TestClock.adjust(2000)
     yield* Fiber.join(atClosing)
     expect(record.shown).toHaveLength(2)
-    expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'summary' }])
+    expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'hold' }])
   }).pipe(Effect.provide(Layer.merge(freshStore, Layer.succeed(AiProvider, { ...fakeProvider, decide: () => Effect.never }))), Effect.scoped))
 
-  effectIt.effect('delivers one hours-start summary and a missed start on relaunch, with source links and no second notification', () => Effect.gen(function* () {
+  effectIt.effect('keeps messages held at hours start and after a missed start on relaunch', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(8))
     yield* setSettings()
     const record = recorder()
@@ -79,18 +77,16 @@ describe('notifications service', () => {
     yield* TestClock.setTime(monday(9))
     yield* service.tick
     yield* service.tick
-    expect(record.shown).toHaveLength(1)
-    expect(record.shown[0]).toMatchObject({ title: '2 messages need you', target: { kind: 'summary' } })
-    expect(record.summaries[0]?.sources).toHaveLength(2)
+    expect(record.shown).toHaveLength(0)
     yield* TestClock.setTime(monday(20))
     yield* service.receive(candidate('3.000001'))
     // The app misses the whole next Monday window, not just its opening minute.
     yield* TestClock.setTime(monday(20) + 7 * 86400000)
     const relaunched = yield* makeNotifications(record.notifier, () => Effect.succeed(true))
     yield* relaunched.wake
-    expect(record.shown).toHaveLength(2)
+    expect(record.shown).toHaveLength(0)
     yield* relaunched.wake
-    expect(record.shown).toHaveLength(2)
+    expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
   effectIt.effect('re-runs stored judgements without calling the gate, and suppresses a focused topic', () => Effect.gen(function* () {
@@ -126,7 +122,7 @@ describe('notifications service', () => {
     expect(calls).toBe(1)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('uses the first source with AI off and sends presence switches through Slack', () => Effect.gen(function* () {
+  effectIt.effect('keeps messages held with AI off and sends presence switches through Slack', () => Effect.gen(function* () {
     const fake = yield* fakeSlack
     yield* Effect.gen(function* () {
       yield* TestClock.setTime(monday(8))
@@ -139,8 +135,7 @@ describe('notifications service', () => {
       yield* service.receive(candidate('1.000001'))
       yield* TestClock.setTime(monday(9))
       yield* service.tick
-      expect(record.summaries).toHaveLength(0)
-      expect(record.shown[0]?.target).toEqual({ kind: 'message', source: { channelId: 'C0ENG', ts: '1.000001', topicId: 'm:C0ENG' } })
+      expect(record.shown).toHaveLength(0)
       yield* service.observePresence('away')
       yield* service.tick
       expect(yield* service.currentPresence).toBe('away')

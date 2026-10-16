@@ -371,9 +371,14 @@ export class Sidebar {
     return (await lastMenu(this.win)).labels
   }
 
-  /** The status line under the filters, shown when the list may be behind Slack. */
+  /** The status card's title at the foot of the sidebar: the first sync, or why the list may be behind Slack. */
   get syncStatus() {
     return this.root.getByRole('status', { name: 'Sync status' })
+  }
+
+  /** The first sync's ring in the status card; its value text is "N of M conversations". */
+  get syncProgress() {
+    return this.root.getByRole('progressbar', { name: 'Sync progress' })
   }
 
   get restartButton() {
@@ -1436,6 +1441,18 @@ export class TopicPane {
     return lastMenu(this.win)
   }
 
+  /** The right island's Follow, on a thread you do not follow: it opens the Follow menu. */
+  get followButton() {
+    return this.header.getByRole('button', { name: 'Follow', exact: true })
+  }
+
+  /** Opens the Follow menu and picks a choice. */
+  async chooseInFollowMenu(item: 'notify-matters' | 'notify-every'): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    await chooseNextMenuItem(this.win, item)
+    await this.followButton.click()
+    return lastMenu(this.win)
+  }
+
   /** Opens the topic menu by right-clicking the title and picks `item`. */
   async chooseInTitleMenu(item: TopicMenuItem): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
     await chooseNextMenuItem(this.win, item)
@@ -1631,7 +1648,7 @@ export class TopicPane {
   /** At least one image thumbnail in view has its bytes, served by main from the Slack session. */
   async expectThumbnailsLoaded(): Promise<void> {
     await expect
-      .poll(() => this.list.locator('img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
+      .poll(() => this.list.locator('[data-thumbnail] img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
       .toBeGreaterThan(0)
   }
 

@@ -92,6 +92,8 @@ export interface IslandButtonProps {
   readonly icon: PhosphorIcon
   /** The visible text in a roomy header. */
   readonly label: string
+  /** A label this button can turn into (Follow and Resolve): the roomy label keeps the wider of the two widths, so the swap moves nothing. */
+  readonly reserve?: string
   /** What a narrow header shows beside the icon ("12" for Threads). Absent: the icon only. */
   readonly narrowLabel?: string
   /** The accessible name, when it differs from `label` ("Threads, 12"). It holds in the narrow form. */
@@ -99,31 +101,51 @@ export interface IslandButtonProps {
   /** A toggle or a popover's button is down. */
   readonly pressed?: boolean
   readonly expanded?: boolean
-  readonly onClick: () => void
+  /** It opens a menu (Follow). */
+  readonly popup?: 'menu'
+  /** `at` is under the right island, at the button's left edge, where a menu it opens goes. */
+  readonly onClick: (at: MenuAnchor) => void
 }
 
 /**
- * A text button in the right island: Resolve, Reopen, Threads. In a
+ * A text button in the right island: Follow, Resolve, Reopen, Threads. In a
  * narrow header it becomes a 28px icon button, or the icon and a short
  * label, by CSS alone; its accessible name never changes.
  */
-export function IslandButton({ reserveCount = false, icon, label, narrowLabel, name, pressed, expanded, onClick }: IslandButtonProps) {
+export function IslandButton({ reserveCount = false, icon, label, reserve, narrowLabel, name, pressed, expanded, popup, onClick }: IslandButtonProps) {
   return (
     <button
       type="button"
       aria-label={name ?? label}
       title={name ?? label}
+      aria-haspopup={popup}
       aria-expanded={expanded}
-      onClick={onClick}
+      onClick={(event) => onClick(underRightIsland(event.currentTarget))}
       {...stylex.props(styles.reset, styles.island, reserveCount && styles.countWidth, narrowLabel === undefined && styles.iconOnlyWhenNarrow, (pressed === true || expanded === true) && styles.islandDown)}
     >
       <span {...stylex.props(styles.islandIcon)}>
         <Icon icon={icon} size={14} />
       </span>
-      <span {...stylex.props(styles.roomy)}>{label}</span>
+      {reserve === undefined ? (
+        <span {...stylex.props(styles.roomy)}>{label}</span>
+      ) : (
+        <span {...stylex.props(styles.roomyStack)}>
+          <span {...stylex.props(styles.stacked)}>{label}</span>
+          <span aria-hidden="true" {...stylex.props(styles.stacked, styles.reserved)}>
+            {reserve}
+          </span>
+        </span>
+      )}
       {narrowLabel === undefined ? null : <span {...stylex.props(styles.narrow)}>{narrowLabel}</span>}
     </button>
   )
+}
+
+/** Under the right island, at `button`'s left edge: where ⋯ and Follow open their menus. */
+function underRightIsland(button: HTMLElement): MenuAnchor {
+  const box = button.getBoundingClientRect()
+  const island = (button.closest('[data-island]') ?? button).getBoundingClientRect()
+  return { x: box.left, y: island.bottom + MENU_GAP }
 }
 
 export interface MoreButtonProps {
@@ -146,11 +168,7 @@ export function MoreButton({ expanded, onOpen }: MoreButtonProps) {
       variant="island"
       aria-haspopup="menu"
       expanded={expanded}
-      onClick={(event) => {
-        const button = event.currentTarget.getBoundingClientRect()
-        const island = (event.currentTarget.closest('[data-island]') ?? event.currentTarget).getBoundingClientRect()
-        onOpen({ x: button.left, y: island.bottom + MENU_GAP })
-      }}
+      onClick={(event) => onOpen(underRightIsland(event.currentTarget))}
     />
   )
 }
@@ -275,5 +293,16 @@ const styles = stylex.create({
   },
   narrow: {
     display: { default: 'none', [NARROW]: 'inline' },
+  },
+  // Both labels in one cell: the cell is as wide as the wider, and only the shown one is painted.
+  roomyStack: {
+    display: { default: 'inline-grid', [NARROW]: 'none' },
+    justifyItems: 'center',
+  },
+  stacked: {
+    gridArea: '1 / 1',
+  },
+  reserved: {
+    visibility: 'hidden',
   },
 })

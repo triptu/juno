@@ -13,7 +13,7 @@ export default {
   },
   workspaces: {
     '.': {
-      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'knip.config.mjs'],
+      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
       // typecheck-bun resolves the pinned executable through bun/package.json.
       ignoreDependencies: ['bun'],
@@ -21,7 +21,7 @@ export default {
     // Knip reads every package.json exports map and discovers test/config entries
     // through its Vitest plugin. Package scripts also cover the AI eval entries.
     'packages/*': { project: ['**/*.{ts,tsx}'] },
-    'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'] },
+    'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.conformance.config.ts'] } },
     'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts'], project: ['**/*.{ts,tsx}'] },
     'docs/juno-agent/spikes': { entry: ['*.ts'], project: ['*.ts'] },
     'packages/tokens': {

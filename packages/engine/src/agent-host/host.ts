@@ -11,8 +11,6 @@
  * - `sent` asks Slack, not the store, for the reconcile lookup.
  * - Spend asks come from `AiSpend`: the engine's model calls reserve and
  *   settle in the agent's daily cap.
- * - The hours-start summaries come from the notification host, which
- *   holds them until the agent has appended them.
  * - Presence follows the engine phase, the AI assist pref, the clock against
  *   the notification and active hours the notifications engine reads
  *   (`@juno/notifications` settings), and the topic last shown.
@@ -28,7 +26,6 @@ import { recordSend, storedMe } from '@juno/sync'
 import { AiSpend } from '../aiSpend'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
-import { NotificationHost } from '../notificationRuntime'
 import { resolve, undoResolve } from './resolve'
 import { Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
@@ -99,7 +96,6 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const outbox = yield* Outbox
     const link = yield* SyncLink
     const phases = yield* PhaseSource
-    const notificationHost = yield* NotificationHost
     const spend = yield* AiSpend
 
     /** Runs a store read on the open workspace. A store failure is a bug, so it dies. */
@@ -225,7 +221,6 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       resolve: (dispatch) => resolve(dispatch).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,
-      ...(notificationHost.summaries === undefined ? {} : { summaries: notificationHost.summaries }),
       spend: spend.host,
       schedule: {
         hours: inStore(watchHours),

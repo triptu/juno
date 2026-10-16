@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   activateTab,
+  acknowledgeTopic,
   closeAllTabs,
   closeOtherTabs,
   closeTab,
@@ -380,4 +381,20 @@ describe('the divider', () => {
     expect(dividerIndex(order, '1.000001', mine)).toBe(3)
     expect(dividerIndex(order.slice(0, 3), '1.000001', mine)).toBe(-1)
   })
+})
+
+
+it('acknowledges a pending thread in place, including closed history and saved view identity', () => {
+  const pending = 'p:C1:client-1'
+  const acknowledged = 't:C1:100.000001'
+  const before = open(open(noTabs, 'm:C1'), pending)
+  const after = acknowledgeTopic(before, pending, acknowledged)
+  expect(after.active).toBe(before.active)
+  expect(after.tabs[0]?.id).toBe(before.tabs[0]?.id)
+  expect(after.tabs[0]?.history.index).toBe(before.tabs[0]?.history.index)
+  expect(after.tabs[0]?.history.entries).toEqual([topicPlace('m:C1'), { kind: 'topic', topicId: acknowledged, viewId: pending }])
+  expect(parseTabs(savedTabs(after)).tabs[0]?.history.entries).toEqual([{ kind: 'topic', topicId: acknowledged, viewId: pending }])
+  const closed = closeTab(before, before.active!)
+  const reopened = reopenClosedTab(acknowledgeTopic(closed, pending, acknowledged))
+  expect(reopened.tabs[0]?.history).toEqual(after.tabs[0]?.history)
 })

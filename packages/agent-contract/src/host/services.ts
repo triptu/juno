@@ -87,24 +87,7 @@ export const hostNotify = Rpc.make('host.notification.deliver', {
     deliver: Schema.Literals(['now', 'digest', 'silent']), open: Schema.optionalKey(OpenTarget) },
   success: Schema.Literals(['delivered', 'held', 'suppressed', 'alreadyDelivered']), error: AgentHostError,
 })
-/**
- * The hours-start summary (SPEC 14, plan v3 §19.1). The host lists what
- * would have notified outside notification hours; the agent appends it to
- * the chat as one `summary` message, with one source per message, and no
- * run. `place` is the channel as the owner sees it ("#eng", "Maya Chen"),
- * `sender` who wrote the message when the place does not say.
- */
-export const HostSummarySource = Schema.Struct({ channelId: HostChannelId, ts: HostMessageTs, place: Schema.String, sender: Schema.optionalKey(Schema.String) })
-export const HostSummary = Schema.Struct({
-  id: Schema.String, at: Schema.Number, title: Schema.String,
-  sources: Schema.Array(HostSummarySource).check(Schema.isMinLength(1)),
-})
-export type HostSummary = typeof HostSummary.Type
-/** The summaries the agent has not taken yet, now and on every change. The append is idempotent by id, so a repeat is harmless. */
-export const hostSummaries = Rpc.make('host.notification.summaries', { success: Schema.Array(HostSummary), stream: true })
-/** The agent appended the summary durably; the host stops offering it. */
-export const hostSummaryTaken = Rpc.make('host.notification.summaryTaken', { payload: { id: Schema.String }, success: Schema.Void })
-export const HostNotificationRpcs = RpcGroup.make(hostNotify, hostSummaries, hostSummaryTaken)
+export const HostNotificationRpcs = RpcGroup.make(hostNotify)
 
 /** Local sidebar settings. Icons are validated by the host against the app's icon set. */
 export const HostViewDraft = Schema.Struct({ name: Schema.String, icon: Schema.optionalKey(Schema.String),

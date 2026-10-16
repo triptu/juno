@@ -40,6 +40,10 @@ export const rowStyles = stylex.create({
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-bubble-estimate']}`,
   },
+  // The last screenful: laid out in full, so the bottom set before the first paint is where the list stays.
+  eager: {
+    contentVisibility: 'visible',
+  },
   time: {
     flexShrink: 0,
     alignSelf: 'center',
