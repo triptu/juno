@@ -1,6 +1,7 @@
 // Peek (spec section 5): hold ⌥ (or Space, set in Settings › General) over a
-// sidebar row to read the topic in a popover. A peek marks nothing read,
-// opens no tab and moves no focus; letting go or moving off the rows closes it.
+// sidebar row, or over a Main message that has a thread, to read the topic
+// in a popover. A peek marks nothing read, opens no tab and moves no focus;
+// letting go or moving off the rows closes it.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
@@ -9,6 +10,7 @@ test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
+const ENG_MAIN = '#eng'
 
 /**
  * A text field with focus. The composer is not built yet (M6), so a plain
@@ -113,4 +115,46 @@ test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text
 
   await rina.expectUnread(2)
   await slack.expectNoMarks()
+})
+
+test('holding ⌥ over a thread in a Main peeks at its replies without opening it', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { peek, tabs, topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  const link = topic.threadLink(/^6 replies: Draft plan/)
+  await expect(link.root).toBeVisible()
+  slack.resetCalls()
+
+  // Over the "6 replies" link: the thread shows at its message, and nothing on screen moves.
+  await expectNoLayoutShift(juno.win, async () => {
+    await link.peek()
+    await peek.expectShowing(POSTGRES)
+  })
+  await peek.expectMessage('Booked 2–4pm')
+  await topic.expectTitle('Main')
+  await tabs.expectCount(1)
+  // Beside the message, not over it, and only as tall as the thread.
+  const message = (await topic.message(POSTGRES).boundingBox())!
+  const box = (await peek.root.boundingBox())!
+  expect(box.y >= message.y + message.height - 1 || box.y + box.height <= message.y + 1).toBe(true)
+  expect(box.height).toBeLessThan((await juno.win.evaluate(() => window.innerHeight)) - 44)
+  await peek.release()
+  await peek.expectClosed()
+
+  // Over the message's own text too.
+  await topic.message(POSTGRES).getByText(POSTGRES, { exact: false }).first().hover()
+  await juno.win.keyboard.down('Alt')
+  await peek.expectShowing(POSTGRES)
+  // Off the message, onto one with no thread: it closes.
+  await topic.list.locator('[data-message-row]:not([data-thread])').last().hover()
+  await peek.expectClosed()
+  await peek.release()
+
+  await topic.expectTitle('Main')
+  await tabs.expectCount(1)
+  // The thread was not marked read.
+  await juno.win.waitForTimeout(1_000)
+  expect(slack.fake.calls.filter((call) => call.method === 'subscriptions.thread.mark')).toEqual([])
 })

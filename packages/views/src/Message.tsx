@@ -200,6 +200,7 @@ export const Message = memo(function Message({
       role="listitem"
       tabIndex={tabbable ? 0 : -1}
       data-message-row={message.ts}
+      data-thread={main ? message.thread?.id : undefined}
       data-pending={pending}
       data-popover-active={active ? '' : undefined}
       onFocus={focus}

@@ -2,20 +2,28 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isPeekKey, messageListAtom, peekKeyAtom, registry, topicAtom } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { PeekView, TopicArt } from '@juno/views'
+import { PeekView, TopicArt, type PeekPlacement } from '@juno/views'
 import { hasArt, TopicPreview } from './TopicView'
 
 const ROW = '[data-topic-row]'
 /** The sidebar's sections: the rows and the gaps and labels between them. Moving through them keeps a peek open. */
 const SECTION = '[data-topic-section]'
-/** The peek's message list, which the wheel over the rows scrolls. */
+/** A Main message that has a thread, with its "3 replies" link; `data-thread` is the thread's topic id. */
+const THREAD = '[data-message-row][data-thread]'
+const PEEK = '[data-peek]'
+/** The peek's message list, which the wheel over the rows (or the Main) scrolls. */
 const PEEK_SCROLLER = '[data-peek] [data-scroll]'
+/** A thread peek goes below its message unless less than this fits there and more fits above. */
+const ROOM_BELOW = 320
 
-/** A peek in progress: the topic, and when the input that asked for it happened. */
+/** A peek in progress: the topic, where it shows, and when the input that asked for it happened. */
 interface Peeking {
   readonly id: string
+  readonly placement: PeekPlacement
   readonly at: number
 }
+
+const SIDEBAR: PeekPlacement = { at: 'sidebar' }
 
 /** Space types a space in these, so it never peeks while one has focus. */
 function typingIn(element: Element | null): boolean {
@@ -24,23 +32,53 @@ function typingIn(element: Element | null): boolean {
 
 const rowOf = (target: EventTarget | null): HTMLElement | null => (target instanceof Element ? target.closest<HTMLElement>(ROW) : null)
 
+/** The Main message with a thread that `target` is in, outside the peek itself (a peek does not peek its own threads). */
+function threadOf(target: EventTarget | null): HTMLElement | null {
+  const message = target instanceof Element ? target.closest<HTMLElement>(THREAD) : null
+  return message === null || message.closest(PEEK) !== null ? null : message
+}
+
 /**
- * The row a peek key press is for: the row under the pointer, or, for ⌥,
- * the row that has keyboard focus. Space on a focused row opens it, as on
- * a button, so Space peeks only by pointer.
+ * Where a thread peek shows: below its message, its left edge at the
+ * message's, or above the message when the window has more room there and
+ * too little below. One layout read, when the peek starts or switches.
  */
-function rowToPeek(key: string): string | undefined {
-  const hovered = document.querySelector<HTMLElement>(`${ROW}:hover`)
-  if (hovered !== null) return hovered.dataset['topicId']
-  return key === 'Alt' ? rowOf(document.activeElement)?.dataset['topicId'] : undefined
+function placeAt(message: HTMLElement): PeekPlacement {
+  const box = message.getBoundingClientRect()
+  const below = window.innerHeight - box.bottom
+  const at = below >= ROOM_BELOW || below >= box.top ? 'below' : 'above'
+  const y = Math.round(at === 'below' ? box.bottom : box.top)
+  return { at, x: Math.round(box.left), y, room: at === 'below' ? window.innerHeight - y : y }
+}
+
+/** The peek for an element under the pointer or with focus: a sidebar row's topic, or a Main message's thread. */
+function peekOf(target: EventTarget | null, at: number): Peeking | undefined {
+  const id = rowOf(target)?.dataset['topicId']
+  if (id !== undefined) return { id, placement: SIDEBAR, at }
+  const message = threadOf(target)
+  const thread = message?.dataset['thread']
+  return message == null || thread === undefined ? undefined : { id: thread, placement: placeAt(message), at }
+}
+
+/**
+ * What a peek key press is for: the row or the Main message under the
+ * pointer, or, for ⌥, the one that has keyboard focus. Space on a focused
+ * row opens it, as on a button, so Space peeks only by pointer.
+ */
+function toPeek(key: string, at: number): Peeking | undefined {
+  const hovered = document.querySelector(`${ROW}:hover`) ?? Array.from(document.querySelectorAll(`${THREAD}:hover`)).find((message) => threadOf(message) !== null)
+  if (hovered !== undefined) return peekOf(hovered, at)
+  return key === 'Alt' ? peekOf(document.activeElement, at) : undefined
 }
 
 /**
  * Peek (spec section 5): while the peek key is held over a sidebar row, the
- * topic shows in a popover beside the sidebar. Moving to another row
- * switches it; releasing the key, moving off the rows, another key, a click
- * or leaving the window closes it. The wheel over the rows scrolls the
- * peek, not the sidebar.
+ * topic shows in a popover beside the sidebar; held over a Main message
+ * that has a thread, the thread shows below (or above) the message. Moving
+ * to another row or threaded message switches it; releasing the key,
+ * moving off them, another key, a click or leaving the window closes it.
+ * A thread peek stays open while the pointer is on it. The wheel over the
+ * rows (or the Main) scrolls the peek, not what is under the pointer.
  *
  * A peek is a read that never marks (`peekNeverMarks` in
  * `specs/readstate.qnt`): it runs no read command, opens no tab and moves
@@ -77,14 +115,14 @@ export const Peek = memo(function Peek() {
         return
       }
       if (event.repeat || !isPeekKey(peekKey, event.key, typingIn(document.activeElement))) return
-      const id = rowToPeek(event.key)
-      if (id === undefined) return
+      const next = toPeek(event.key, event.timeStamp)
+      if (next === undefined) return
       if (event.key === ' ') {
         event.preventDefault()
         event.stopPropagation()
       }
       held.current = event.key
-      setPeeking({ id, at: event.timeStamp })
+      setPeeking(next)
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === held.current) close()
@@ -100,24 +138,33 @@ export const Peek = memo(function Peek() {
   }, [peekKey])
 
   // While a peek is open: follow the pointer from row to row, and send the wheel to the peek.
-  const open = peeking !== undefined
+  const open = peeking === undefined ? undefined : peeking.placement.at === 'sidebar' ? 'sidebar' : 'thread'
   useEffect(() => {
-    if (!open) return
+    if (open === undefined) return
     const close = () => {
       held.current = undefined
       setPeeking(undefined)
     }
+    // Where the pointer may go without closing the peek: the sidebar's sections, or a thread peek itself.
+    const keeps = (target: Element) => target.closest(open === 'sidebar' ? SECTION : PEEK) !== null
     const onPointerOver = (event: PointerEvent) => {
-      const id = rowOf(event.target)?.dataset['topicId']
+      const target = event.target
+      if (!(target instanceof Element)) return close()
+      const row = rowOf(target)
+      const message = row === null ? threadOf(target) : null
+      const id = row?.dataset['topicId'] ?? message?.dataset['thread']
       if (id !== undefined) {
-        setPeeking((current) => (current?.id === id ? current : { id, at: event.timeStamp }))
-      } else if (!(event.target instanceof Element && event.target.closest(SECTION) !== null)) {
+        setPeeking((current) => (current?.id === id ? current : (peekOf(row ?? message, event.timeStamp) ?? current)))
+      } else if (!keeps(target)) {
         close()
       }
     }
     const onWheel = (event: WheelEvent) => {
       const scroller = document.querySelector<HTMLElement>(PEEK_SCROLLER)
-      if (scroller === null || !(event.target instanceof Element) || event.target.closest(SECTION) === null) return
+      if (scroller === null || !(event.target instanceof Element)) return
+      // Over the rows for a sidebar peek; anywhere off the peek for a thread peek, so the Main under it holds still.
+      const route = open === 'sidebar' ? event.target.closest(SECTION) !== null : event.target.closest(PEEK) === null
+      if (!route) return
       event.preventDefault()
       scroller.scrollBy({ top: event.deltaY, behavior: 'instant' })
     }
@@ -133,7 +180,7 @@ export const Peek = memo(function Peek() {
 
   const shown = useWhenReady(peeking)
   if (peeking === undefined || shown === undefined) return null
-  return <PeekTopic key={shown.id} id={shown.id} at={shown.at} />
+  return <PeekTopic key={shown.id} id={shown.id} at={shown.at} placement={shown.placement} />
 })
 
 /** The topic's header and first window are local (or it failed, or is unknown): a peek at it can paint. */
@@ -176,7 +223,7 @@ function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
  * read). `Peek` shows it only once the topic can paint, so its first frame
  * has the messages.
  */
-function PeekTopic({ id, at }: { readonly id: string; readonly at: number }) {
+function PeekTopic({ id, at, placement }: { readonly id: string; readonly at: number; readonly placement: PeekPlacement }) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   const shown = detail != null
@@ -191,8 +238,9 @@ function PeekTopic({ id, at }: { readonly id: string; readonly at: number }) {
       title={main ? detail.channel.label : detail.title}
       {...(main ? {} : { where: detail.channel.label })}
       {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
+      placement={placement}
     >
-      <TopicPreview id={id} underHeader={false} />
+      <TopicPreview id={id} peek />
     </PeekView>
   )
 }

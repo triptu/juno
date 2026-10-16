@@ -3,7 +3,7 @@ import type { FileView, TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent } from '@juno/views'
-import { closeTabById, openTopic } from './navigation'
+import { closeTabById, openTopic, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
@@ -98,11 +98,11 @@ function openThreadInNewTab(id: string): void {
  * and the same for peek (section 5). The list alone, with no header or
  * composer, in `readOnly` mode (see `TopicProps`).
  */
-export const TopicPreview = memo(function TopicPreview({ id, underHeader = true }: { readonly id: string; readonly underHeader?: boolean }) {
+export const TopicPreview = memo(function TopicPreview({ id, peek = false }: { readonly id: string; readonly peek?: boolean }) {
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   if (detail == null) return null
-  return <Topic key={id} id={id} view={id} detail={detail} readOnly underHeader={underHeader} />
+  return <Topic key={id} id={id} view={id} detail={detail} readOnly peek={peek} />
 })
 
 interface TopicProps {
@@ -120,8 +120,8 @@ interface TopicProps {
    * topic as a tab shows it, with its header and composer.
    */
   readonly readOnly?: boolean
-  /** The list runs under a floating header. Default true; peek has none. */
-  readonly underHeader?: boolean
+  /** In the peek popover: no floating header over the list, and the popover's tighter column. */
+  readonly peek?: boolean
 }
 
 /** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
@@ -147,7 +147,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
   }
 }
 
-function Topic({ id, view, detail, readOnly = false, underHeader = true }: TopicProps) {
+function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
@@ -192,10 +192,12 @@ function Topic({ id, view, detail, readOnly = false, underHeader = true }: Topic
       older={!showWindow || list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
       scrollRef={position.scrollRef}
-      underHeader={underHeader}
+      underHeader={!peek}
+      popover={peek}
       anchorRef={position.anchorRef}
       hueOf={hueOf}
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
+      onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
       onLink={openExternal}
       onDownload={downloadMessageFile}
