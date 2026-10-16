@@ -15,6 +15,7 @@ import { launchWriter, readLaunch, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
+import { slackKeychainReads } from './slackImport'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
 import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
@@ -338,6 +339,7 @@ if (e2e) {
         permissionForTests = permission
       },
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
+      slackKeychainReads,
       wake: () => notifier.wake(),
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {

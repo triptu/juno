@@ -10,7 +10,7 @@ test('starts signed out with the sign-in page', async ({ juno, win }) => {
   await juno.expectSignedOut()
   await expect(juno.signInButton).toBeVisible()
   await expect(juno.importButton).toBeVisible()
-  await expect(win.getByText('macOS will ask for access to the Slack keychain item.')).toBeVisible()
+  await expect(win.getByText('macOS will ask once for your Mac password so Juno can read Slack’s keychain item.')).toBeVisible()
   await expect(win.getByRole('status', { name: 'Engine status' })).toHaveCount(0)
 })
 
@@ -112,6 +112,8 @@ test('imports the Slack app’s session through the test seam', async ({ juno, f
   await juno.expectSignedOut()
   await juno.importFromSlackApp()
   await juno.expectSignedIn('Juno Fake')
+  // One keychain read, which is one macOS prompt outside tests.
+  expect(await juno.slackKeychainReads()).toBe(1)
   // The imported token and decrypted cookie are the fixture's, and they work.
   const authTest = fake.calls.find((call) => call.method === 'auth.test')
   expect(authTest?.ok).toBe(true)
@@ -164,13 +166,18 @@ test('explains a Slack app that is not signed in', async ({ fake, userData }) =>
   }
 })
 
-test('explains a keychain password that does not unlock the cookie', async ({ fake, slackApp, userData }) => {
+test('explains a keychain password that does not unlock the cookie, and does not ask for it again', async ({ fake, slackApp, userData }) => {
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: 'wrong' })
   try {
     const juno = new Juno(running.app, running.win)
     await juno.importFromSlackApp({ skipSetUp: false })
-    await juno.expectSignInError(/keychain item/)
+    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Sign in instead.')
     await juno.expectSignedOut()
+    // A second press reuses the password from the first: the keychain is read once.
+    await juno.importFromSlackApp({ skipSetUp: false })
+    await expect.poll(() => juno.copySignInDetails(), { timeout: 15_000 }).toContain('"Slack Safe Storage" found, allowed earlier in this run, did not unlock the cookie')
+    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Sign in instead.')
+    expect(await juno.slackKeychainReads()).toBe(1)
   } finally {
     await running.close()
   }

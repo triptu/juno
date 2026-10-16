@@ -13,6 +13,13 @@
  * that item is missing or does not unlock the cookie, the other items whose
  * account is Slack's are tried, found by their attributes, which macOS gives
  * without a prompt. Only an item that exists is ever read.
+ *
+ * Each read of Slack's item makes macOS ask, so an import asks at most once.
+ * A password macOS gave is kept in `known` (main keeps one map until Juno
+ * quits or signs out), so a second import in the same run does not ask
+ * again. When the one password asked for does not unlock the cookie and
+ * another item is left, the import stops and says so: the next press asks
+ * for that item. A refusal is not kept; pressing the button again asks again.
  */
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -40,6 +47,7 @@ export const NOT_INSTALLED = 'Slack isn’t installed on this Mac.'
 export const SIGNED_OUT = 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.'
 export const NO_KEYCHAIN = 'Juno could not read the Slack keychain item. Allow access when macOS asks, or sign in instead.'
 export const WRONG_KEYCHAIN = 'The Slack keychain item did not unlock the session cookie. Sign in instead.'
+export const NEXT_KEYCHAIN = 'That Slack keychain item did not unlock the session cookie. Use the Slack app’s session again to try the next one.'
 export const UNREADABLE = 'The Slack app’s data could not be read.'
 
 /** Account names Slack's keychain item may have: the app name, and the App Store bundle id. */
@@ -93,6 +101,8 @@ export interface ReadSlackAppOptions {
   readonly macosVersion: string
   /** The home folder, written as `~` in the report. */
   readonly home: string
+  /** Passwords macOS gave earlier in this run, by service. Read first, and added to. */
+  readonly known?: Map<string, string>
   readonly log?: (line: string) => void
 }
 
@@ -117,16 +127,35 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
   const chosen = { variant: data.variant, cookiesFile: data.cookiesFile }
 
   const services = data.variant === 'app-store' ? await appStoreServices(options.keychain, data.keychainService) : [data.keychainService]
+  const known = options.known ?? new Map<string, string>()
   let next = 0
+  let asked = false
+  let left = false
   const password = async (attempt: number): Promise<string | undefined> => {
     // A later attempt means the one before did not unlock the cookie.
     if (attempt > 0) markLast(keychain, false)
     while (next < services.length) {
-      const service = services[next++]!
+      const service = services[next]!
+      const remembered = known.get(service)
+      if (remembered !== undefined) {
+        next++
+        keychain.push({ service, found: true, allowed: true, remembered: true })
+        return remembered
+      }
       if (!(await options.keychain.exists(service))) {
+        next++
         keychain.push({ service, found: false })
         continue
       }
+      // One prompt per import: the next item waits for the next press.
+      if (asked) {
+        left = true
+        keychain.push({ service, found: true })
+        next = services.length
+        return undefined
+      }
+      next++
+      asked = true
       const value = await options.keychain.read(service)
       keychain.push({ service, found: true, allowed: value !== undefined })
       // The user said no: asking again for another item would be a second prompt they did not want.
@@ -134,6 +163,7 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
         next = services.length
         return undefined
       }
+      known.set(service, value)
       return value
     }
     return undefined
@@ -149,6 +179,7 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
   } catch (cause) {
     const step = stepOf(cause, keychain)
     const details = finish({ ...base, checked, chosen, step, ...(step === 'unreadable' ? { errorName: errorName(cause) } : {}) })
+    if (step === 'decrypt-failed' && left) return { ok: false, kind: 'keychain', message: NEXT_KEYCHAIN, details }
     return failure(step, details)
   } finally {
     await rm(copy, { recursive: true, force: true })

@@ -24,8 +24,10 @@ export type ImportStep =
 export interface KeychainAttempt {
   readonly service: string
   readonly found: boolean
-  /** Whether macOS gave the password. Undefined when the item was not found. */
+  /** Whether macOS gave the password. Undefined when the item was not found or not asked for. */
   readonly allowed?: boolean
+  /** The password macOS gave earlier in this run, used without asking again. */
+  readonly remembered?: boolean
   /** Whether the password decrypted the cookie. Undefined when it was not tried. */
   readonly unlocked?: boolean
 }
@@ -95,7 +97,8 @@ function checkLine(check: SlackAppCheck): string {
 
 function attemptLine(attempt: KeychainAttempt): string {
   if (!attempt.found) return `"${attempt.service}" not found`
-  if (attempt.allowed !== true) return `"${attempt.service}" found, access refused`
+  if (attempt.allowed === undefined) return `"${attempt.service}" found, left for the next try`
+  if (!attempt.allowed) return `"${attempt.service}" found, access refused`
   const unlocked = attempt.unlocked === undefined ? '' : attempt.unlocked ? ', unlocked the cookie' : ', did not unlock the cookie'
-  return `"${attempt.service}" found, access allowed${unlocked}`
+  return `"${attempt.service}" found, ${attempt.remembered === true ? 'allowed earlier in this run' : 'access allowed'}${unlocked}`
 }

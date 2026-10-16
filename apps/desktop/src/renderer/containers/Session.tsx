@@ -17,7 +17,8 @@ function failureLine(error: SignInFailed): string {
     case 'slack-signed-out':
       return 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.'
     case 'keychain':
-      return 'Juno could not read the Slack keychain item. Allow access when macOS asks, or sign in instead.'
+      // Main's line says which: refused, missing, did not unlock, or try the next item.
+      return error.message
     case 'rejected':
       return 'Slack did not accept the session. Sign in again.'
     case 'offline':
