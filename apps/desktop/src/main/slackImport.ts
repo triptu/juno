@@ -8,6 +8,10 @@
  * user), the versions for the failure report, and writing the `d` cookie
  * into the `persist:slack` session.
  *
+ * The passwords macOS gives are kept in memory until Juno quits or signs
+ * out, so pressing "Use the Slack app's session" again (after a failure, or
+ * a session Slack later expires) does not make macOS ask again.
+ *
  * Test seam: `JUNO_SLACK_APP_DIR` points at a fixture directory and
  * `JUNO_SLACK_SAFE_STORAGE_PASSWORD` stands in for the keychain, both read
  * only under `JUNO_E2E`. No value from either path is ever logged.
@@ -18,7 +22,7 @@ import type { SessionSecrets, SignInFailureKind } from '@juno/contract'
 import { KEYCHAIN_SERVICE, slackAppCandidates, type SlackAppCandidate, type SlackCookie } from '@juno/slack/import'
 import { securityRunner } from './keychain'
 import { SLACK_PARTITION } from './signInWindow'
-import { fixedKeychain, readSlackApp, securityKeychain, UNREADABLE } from './slackAppData'
+import { fixedKeychain, readSlackApp, securityKeychain, UNREADABLE, type SlackKeychain } from './slackAppData'
 
 export type ImportResult =
   | { readonly ok: true; readonly secrets: SessionSecrets }
@@ -36,15 +40,45 @@ export function defaultSlackCandidates(): ReadonlyArray<SlackAppCandidate> {
   return slackAppCandidates(app.getPath('home'))
 }
 
-/** The keychain prompt waits on the user, so `security` gets two minutes. */
-const SECURITY_TIMEOUT_MS = 120_000
+/**
+ * The keychain prompt waits on the user to find and type their password, so
+ * `security` gets five minutes. A shorter limit ends the read while the
+ * prompt is still up, and the next press asks again.
+ */
+const SECURITY_TIMEOUT_MS = 300_000
+
+/** Slack's keychain passwords macOS gave in this run, by service. Never written anywhere. */
+const known = new Map<string, string>()
+let keychainReads = 0
+
+/** Forgets the passwords, as signing out does. */
+export function forgetSlackKeychain(): void {
+  known.clear()
+}
+
+/** How many times this run asked the keychain for a Slack password, each a possible prompt. For tests. */
+export function slackKeychainReads(): number {
+  return keychainReads
+}
+
+/** Counts each read that reaches the keychain. */
+function counted(keychain: SlackKeychain): SlackKeychain {
+  return {
+    ...keychain,
+    read: (service) => {
+      keychainReads++
+      return keychain.read(service)
+    },
+  }
+}
 
 export async function importFromSlackApp(options: ImportOptions = {}): Promise<ImportResult> {
   const home = app.getPath('home')
   const seam = options.slackDir !== undefined
   const read = await readSlackApp({
     candidates: seam ? [{ variant: 'direct', dir: options.slackDir, keychainService: KEYCHAIN_SERVICE }] : defaultSlackCandidates(),
-    keychain: options.keychainPassword === undefined ? securityKeychain(securityRunner(SECURITY_TIMEOUT_MS)) : fixedKeychain(options.keychainPassword),
+    keychain: counted(options.keychainPassword === undefined ? securityKeychain(securityRunner(SECURITY_TIMEOUT_MS)) : fixedKeychain(options.keychainPassword)),
+    known,
     // Under the test seam the report names no real Slack.app.
     bundles: seam ? [] : ['/Applications/Slack.app', join(home, 'Applications', 'Slack.app')],
     junoVersion: app.getVersion(),

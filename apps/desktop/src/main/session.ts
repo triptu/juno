@@ -7,7 +7,8 @@
  * - `signIn` / `importFromSlackApp`: capture a session and answer with
  *   `secrets` or `sessionFailed`. The engine verifies it; only then does it
  *   send `storeSecrets`.
- * - `signOut`: delete `secrets.bin` and clear the `persist:slack` session.
+ * - `signOut`: delete `secrets.bin`, clear the `persist:slack` session and
+ *   forget the Slack keychain password an import read.
  * - `handshake`: the cookie header, origin, user agent and proxy for a
  *   socket URL (ADR 0007). `setCookies`: store `Set-Cookie` values from an
  *   upgrade response.
@@ -15,7 +16,7 @@
 import { BrowserWindow, session as electronSession } from 'electron'
 import type { EngineToMain, MainToEngine, SessionSecrets } from '@juno/contract'
 import type { SecretsStore } from './secrets'
-import { importFromSlackApp, type ImportOptions } from './slackImport'
+import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
 import { openSignInWindow, SLACK_PARTITION, type SignInWindowOptions } from './signInWindow'
 
 const SOCKET_ORIGIN = 'https://app.slack.com'
@@ -99,6 +100,7 @@ export class SessionHost {
 
   async #signOut(): Promise<void> {
     await this.#deps.secrets.delete()
+    forgetSlackKeychain()
     const slackSession = electronSession.fromPartition(SLACK_PARTITION)
     await slackSession.clearStorageData()
     await slackSession.clearCache()

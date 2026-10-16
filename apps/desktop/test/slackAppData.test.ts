@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { writeSlackAppFixture } from '@juno/fake-slack'
 import { slackAppCandidates } from '@juno/slack/import'
-import { NO_KEYCHAIN, NOT_INSTALLED, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'
+import { NEXT_KEYCHAIN, NO_KEYCHAIN, NOT_INSTALLED, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'
 import type { SecurityRunner } from '../src/main/keychain'
 
 const homes: Array<string> = []
@@ -40,9 +40,24 @@ function keychainWith(items: Record<string, string | null>, accounts: Record<str
   return { keychain, reads }
 }
 
-async function read(root: string, candidates: ReturnType<typeof slackAppCandidates>, keychain: SlackKeychain, bundles: ReadonlyArray<string> = []) {
+async function read(
+  root: string,
+  candidates: ReturnType<typeof slackAppCandidates>,
+  keychain: SlackKeychain,
+  bundles: ReadonlyArray<string> = [],
+  known?: Map<string, string>,
+) {
   const logs: Array<string> = []
-  const result = await readSlackApp({ candidates, keychain, bundles, junoVersion: '0.1.0', macosVersion: '15.6', home: root, log: (line) => logs.push(line) })
+  const result = await readSlackApp({
+    candidates,
+    keychain,
+    bundles,
+    junoVersion: '0.1.0',
+    macosVersion: '15.6',
+    home: root,
+    ...(known === undefined ? {} : { known }),
+    log: (line) => logs.push(line),
+  })
   return { result, logs }
 }
 
@@ -194,18 +209,26 @@ describe('readSlackApp: the keychain', () => {
     expect(report).toContain('Failed at: cookie decrypt failed: no keychain password unlocked the d cookie')
   })
 
-  it('tries the App Store build’s other Slack items and records the one that worked', async () => {
+  it('asks for one App Store item per import, and for the next one on the next press', async () => {
     const { root, candidates, appStore } = await home()
     await writeSlackAppFixture(appStore, { team, cookie: COOKIE, keychainPassword: PASSWORD })
     const { keychain, reads } = keychainWith(
       { 'Slack Safe Storage': 'wrong-password', 'Slack App Store Safe Storage': PASSWORD },
       { 'com.tinyspeck.slackmacgap': 'Slack App Store Safe Storage' },
     )
-    const outcome = await read(root, candidates, keychain)
-    expect(outcome.result).toMatchObject({ ok: true, cookie: { value: COOKIE } })
+    const known = new Map<string, string>()
+    const first = await read(root, candidates, keychain, [], known)
+    // One prompt, then the page says another item is left instead of asking again.
+    expect(first.result).toMatchObject({ ok: false, kind: 'keychain', message: NEXT_KEYCHAIN })
+    expect(reads).toEqual(['Slack Safe Storage'])
+    expect(reportOf(first)).toContain(
+      'Keychain: "Slack Safe Storage" found, access allowed, did not unlock the cookie; "Slack App Store Safe Storage" found, left for the next try',
+    )
+    const second = await read(root, candidates, keychain, [], known)
+    expect(second.result).toMatchObject({ ok: true, cookie: { value: COOKIE } })
     expect(reads).toEqual(['Slack Safe Storage', 'Slack App Store Safe Storage'])
-    expect(reportOf(outcome)).toContain(
-      'Keychain: "Slack Safe Storage" found, access allowed, did not unlock the cookie; "Slack App Store Safe Storage" found, access allowed, unlocked the cookie',
+    expect(reportOf(second)).toContain(
+      'Keychain: "Slack Safe Storage" found, allowed earlier in this run, did not unlock the cookie; "Slack App Store Safe Storage" found, access allowed, unlocked the cookie',
     )
   })
 
@@ -219,6 +242,44 @@ describe('readSlackApp: the keychain', () => {
     expect(reportOf(outcome)).toContain('Failed at: keychain denied: macOS did not give the password')
   })
 
+})
+
+describe('readSlackApp: one keychain prompt per run', () => {
+  it('reads the keychain once for a successful import, and not again on the next import', async () => {
+    const { root, candidates, direct } = await home()
+    await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
+    const { keychain, reads } = keychainWith({ 'Slack Safe Storage': PASSWORD })
+    const known = new Map<string, string>()
+    expect((await read(root, candidates, keychain, [], known)).result).toMatchObject({ ok: true })
+    expect(reads).toEqual(['Slack Safe Storage'])
+    // Slack expired the session, or auth.test could not reach Slack: the owner presses the button again.
+    const again = await read(root, candidates, keychain, [], known)
+    expect(again.result).toMatchObject({ ok: true, cookie: { value: COOKIE } })
+    expect(reads).toEqual(['Slack Safe Storage'])
+    expect(reportOf(again)).toContain('Keychain: "Slack Safe Storage" found, allowed earlier in this run, unlocked the cookie')
+  })
+
+  it('does not ask again for a password that did not unlock the cookie', async () => {
+    const { root, candidates, direct } = await home()
+    await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
+    const { keychain, reads } = keychainWith({ 'Slack Safe Storage': 'wrong-password' })
+    const known = new Map<string, string>()
+    await read(root, candidates, keychain, [], known)
+    const again = await read(root, candidates, keychain, [], known)
+    expect(again.result).toMatchObject({ ok: false, kind: 'keychain', message: WRONG_KEYCHAIN })
+    expect(reads).toEqual(['Slack Safe Storage'])
+  })
+
+  it('asks again after a refusal, because pressing the button again is asking again', async () => {
+    const { root, candidates, direct } = await home()
+    await writeSlackAppFixture(direct, { team, cookie: COOKIE, keychainPassword: PASSWORD })
+    const { keychain, reads } = keychainWith({ 'Slack Safe Storage': null })
+    const known = new Map<string, string>()
+    await read(root, candidates, keychain, [], known)
+    await read(root, candidates, keychain, [], known)
+    expect(reads).toEqual(['Slack Safe Storage', 'Slack Safe Storage'])
+    expect(known.size).toBe(0)
+  })
 })
 
 describe('securityKeychain', () => {

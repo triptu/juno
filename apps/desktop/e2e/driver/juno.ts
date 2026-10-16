@@ -794,6 +794,11 @@ export class Juno {
     if (options.skipSetUp !== false) await this.skipSetUp()
   }
 
+  /** How many times main asked the keychain for a Slack password; outside tests, each may be a macOS prompt. */
+  slackKeychainReads(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { slackKeychainReads: () => number } }).junoTest.slackKeychainReads())
+  }
+
   async signOut(): Promise<void> {
     await this.accountMenu.open()
     await this.accountMenu.signOutButton.click()

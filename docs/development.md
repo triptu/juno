@@ -314,9 +314,11 @@ Two ways in, both ending in a session the engine verifies with `auth.test`
   once it reaches `/client/<team>`; the cookie is already in the session.
 - **Use the Slack app's session** reads copies of the installed Slack app's
   `Local Storage/leveldb` and `Cookies`. macOS asks once for access to the
-  "Slack Safe Storage" keychain item (the `security` tool makes the request;
-  choose "Allow", not "Always allow", if you prefer to be asked each time).
-  The copies are deleted afterwards and the password is never stored.
+  "Slack Safe Storage" keychain item (the `security` tool makes the request,
+  so the prompt names `security`, not Juno). "Allow" is enough: main keeps the
+  password in memory until Juno quits or signs out, so pressing the button
+  again in the same run does not ask again. The copies are deleted afterwards
+  and the password is never written anywhere.
 
 Secrets go to `<userData>/secrets.bin`, encrypted with `safeStorage`. Under
 `JUNO_E2E=1` the file is plain JSON and the three test seams are read from the
@@ -361,6 +363,50 @@ copy a shape into the recorded fixtures by hand and run `node scripts/check-fixt
 `users/info` about every person the newest conversations reference and reads one page of each
 users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".
+
+### Keychain prompts
+
+Goal: at most one macOS prompt on a first run. Every keychain access from
+launch through the first sign-in and sync, in order:
+
+1. **`providers.load()` at launch** reads `juno-openrouter-key` and
+   `juno-custom-provider-key` with `security find-generic-password -w`. No
+   prompt: on a first run the items do not exist, and once they do, `security`
+   created them, so it is on their access list. This does not depend on Juno's
+   signature.
+2. **`requestSecrets` at engine start** reads `secrets.bin`. On a first run
+   there is no file, so `safeStorage` is not called.
+3. **The `persist:slack` cookie store** is encrypted (the cookie encryption
+   fuse is on) with "Juno Safe Storage", the same item `safeStorage` uses.
+   Chromium creates it the first time it needs it. Creating an item never
+   prompts, and the app that created it reads it without a prompt.
+4. **Use the Slack app's session**: `security find-generic-password` without
+   `-w` checks which Slack items exist (attributes only, no prompt), then one
+   `-w` read of Slack's item. **This is the one prompt**: Slack created the
+   item, so macOS always asks before another program reads it. For the App
+   Store build, when that password does not unlock the cookie and another
+   Slack item exists, the import stops and says "Use the Slack app's session
+   again to try the next one" rather than asking a second time in one press.
+   A password macOS gave is reused, without a read, by later imports in the
+   same run; a refusal is not, so pressing the button again asks again.
+5. **The import writes the `d` cookie** into `persist:slack`, and after
+   `auth.test` main writes `secrets.bin` with `safeStorage.encryptString`.
+   Both use "Juno Safe Storage" from step 3, so no prompt.
+6. **Sign in to Slack** (the window) reads no Slack item; its cookies go
+   through step 3's item.
+7. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
+   read only when the agent asks, after a provider is set up. Like step 1,
+   `security` created them, so there is no prompt.
+
+**Signing caveat.** macOS ties "Juno Safe Storage" to the code signature of
+the app that created it. A build without Developer ID signing has an ad-hoc
+signature, which is a hash of that exact build, so after each update macOS
+may see a different app and ask once for "Juno Safe Storage" at launch (choose
+"Always Allow" for Juno's own item, or it asks again next launch). A
+Developer ID signature is matched by team and bundle id, so updates keep
+access and these prompts stop. The Slack item prompt in step 4 is for
+`security`, not Juno, so signing does not change it; it appears once per run
+that imports.
 
 ## The live sync dry run
 
@@ -830,6 +876,8 @@ On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
 flipping fuses. This uses no certificate or credentials and does not grant
 Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 "unsigned" here means without Developer ID signing or notarization.
+Without Developer ID signing, each update makes macOS ask once for the
+"Juno Safe Storage" keychain item ("Keychain prompts" above).
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
