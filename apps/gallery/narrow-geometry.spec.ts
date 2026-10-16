@@ -14,6 +14,7 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('AllTopics', 'size/where-hidden'), false],
   [route('AllTopics', 'size/narrow'), false],
   [route('AllTopics', 'filters/narrow'), false],
+  [route('Home', 'items/minimum-window'), false],
   [route('CommandPalette', 'states/minimum-window'), false],
 ]
 
