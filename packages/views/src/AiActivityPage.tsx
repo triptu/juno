@@ -178,7 +178,8 @@ interface CallProps {
 function Call({ call, now, open, divider, onToggle, onCopyDetails }: CallProps) {
   const subject = call.subject.name || (call.subject.kind === 'chat' ? 'Juno chat' : '')
   return (
-    <div role="listitem" data-ai-call={call.outcome} data-ai-call-feature={call.feature}>
+    // The row opens its details under it when clicked: growth the owner asked for.
+    <div role="listitem" data-ai-call={call.outcome} data-ai-call-feature={call.feature} data-expands-in-place="">
       <ListRow
         divider={divider && !open}
         onSelect={onToggle}
