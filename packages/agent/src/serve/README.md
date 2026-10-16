@@ -66,6 +66,38 @@ Set `JUNO_CHAT_BENCH_REPORT` to save the JSON results. Set `JUNO_CHAT_PROFILE` t
 existing directory to capture one profiling pair instead of five timing pairs;
 profiled timings are not comparison results.
 
+## Results, 2026-10-17
+
+Namespace Linux, 8 vCPU / 16 GB (the standard shape), cached runs only. On 10-17
+the event p95 had risen to 30.2 to 46.7 ms per run on 8x16 (median 38.9 of 50,
+append and read-mark p95 37 to 51 ms), and one run on batch-28 read 50.199 ms.
+An A/B on 8x16 found no single commit: `db08b6d2` (before the rich text merge)
+gave 19.8 to 30.1 ms, `3cf179f0` (after it) 20.3 to 23.3 ms and main `9c1744fc`
+24.1 to 35.4 ms, on the same code that gave about 12 ms on 2x4 machines on 10-16.
+The rich text merge already parsed a bubble once per spans array; joining its
+text on every rebuild was about 4% of the profile.
+
+The p95 is an append or read mark: 40 of the 100 events walk all 5,000 rows.
+That walk built a key string per row for each memo, the reaction lookup, the
+group position and the row index; spread each run's archive rows into a memo
+input; stringified each row's reactions; and read the day of every entry. It
+now keys rows by their own ids, keeps unchanged runs' rows and reactions as the
+same arrays so memos compare them by identity, records a memo key's last pass
+instead of adding it to a set, checks each entry against the current day's
+range, and makes a bubble's text once with its blocks.
+
+`pnpm flake packages/agent/test/serve/chat-cache.bench.test.ts --repeat 10
+--machines 1`, 50 single-run p95s:
+
+- Event through encoded window, p95: **10.5 to 21.2 ms, median 14.3**
+  (before: 30.2 to 46.7, median 38.9).
+- Append/read-mark event, p95: 11.7 to 23.9 ms, median 17.0 (before: 37 to 51).
+- In-place update query, p95: 0.1 to 0.3 ms.
+- Retained projection heap: 13.8 MiB, unchanged.
+
+The chat-bubble time map is still read again after each append; reading only
+new rows would be wrong after a rolled-back transaction.
+
 ## Results, 2026-10-15
 
 Namespace Linux, 4 vCPU / 8 GB, Node 26.11.1, after merging main through
