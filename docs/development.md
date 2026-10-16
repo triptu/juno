@@ -587,16 +587,17 @@ Since 10-16, Juno merges first and tests in full afterwards. Many agents work at
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**The CI keeper.** One agent owns main's health. It runs the full suites on main (one machine per suite) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green.
+**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green.
+
+**One machine per run** (landed 10-16): `pnpm affected` and `pnpm verify:main` run their remote suites as one plan on one 8x16 machine, build the desktop app once, and do not shard the desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Work in progress** (this section changes as each lands):
-- One machine per run: a suite runs on one machine and builds the app once, instead of four desktop shards that each build it. Shards stay for the scheduled full run only.
 - Test selection by coverage: the full run records which source files each e2e spec and gallery component exercises, and `pnpm affected` runs only the specs whose recorded files changed.
 - A faster suite: slow, redundant or misplaced tests are merged, moved to faster layers or removed.
 
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
+`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan on one Namespace machine (`pnpm remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
 An import graph over `apps/` and `packages/` decides what each change reaches: relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
@@ -620,18 +621,19 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the standard shape, 8x16 (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
+- **Plans.** `pnpm remote test:plan <step> + <step> ...` runs several root scripts on one machine (`scripts/plan.mjs`); `KEY=VALUE` words before a step's script set its environment, for example `pnpm remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop`. The app suites (`test:desktop`, `test:gallery`, `test:e2e`) run one after another, each with the whole machine's workers. Unit tests and spec checks run one after another beside them under `nice`, so the app suites keep their timing; `JUNO_PLAN_SERIAL=1` runs every step in turn. Inside the container `scripts/build-cached.mjs` reuses a build made earlier in the run, so the desktop app is built once. Each line of output starts with `[<script>]`, and a line `plan: step <i> <script> exited with <code> after <s> s` gives each step's result; `pnpm affected` and `pnpm verify:main` read those lines.
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
 - **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
-- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. The head request holds available cores until it can start; later small jobs cannot fill those gaps. Job end times are unknown, so the pool does not let jobs pass a blocked head, including warm-machine requests. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The cap stays at most 24 vCPU; a lower `JUNO_REMOTE_MAX_VCPU` is honored.
+- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 8) idle minutes (the cost is in "Current cost controls"), every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
+- **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. With one shape, a free machine or 8 free cores fit any request. A request that does not fit (an explicit larger `--machine`) does not hold free cores: later requests that fit may start, until it has waited `JUNO_REMOTE_HOLD_SECONDS` (default 120). After that it holds the cores it needs, so a stream of small jobs cannot starve it. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The cap stays at most 24 vCPU; a lower `JUNO_REMOTE_MAX_VCPU` is honored.
 - **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. The first acquisition starts a shared daemon (an upgrade of the reaper watcher). It owns inventory and admission, polling once five seconds after the previous reconciliation finishes; slow calls never overlap. Clients publish requests in the pool’s `queue/` directory and read their answers without calling Namespace. The daemon exits after six minutes when there are no requests or machines to reconcile. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. During each daemon tick, reconciliation and admission share one snapshot. Newer machine records and pending creates still reserve capacity. If the daemon dies or cannot start, clients use the same durable queue and decision lock in direct mode, sharing successful inventory for up to five seconds and invalidating it before and after creates and destroys. A reservation identifies its request, so recovering an unanswered request cannot allocate it twice. Failed destroys remain recorded for the daemon to verify on its next poll. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two retries with two- and four-second backoffs. Known partial instances are destroyed first. Ambiguous attempts retain their reservation and attempt label for up to five minutes so reconciliation can destroy late arrivals. Authentication and configuration errors still fail. Exhausted infrastructure failures use exit 255 and `infraFailure` in the log summary.
-- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 24 vCPU since 10-16, to hold cost down; the Team plan allows 64). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
+- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 24 vCPU since 10-16, to hold cost down; the Team plan allows 64). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room. Namespace's image builders (`nsc.purpose=builder`) are not counted: they stay up idle after an image build and are not ours to release, and on 10-16 two of them (32 vCPU) stopped every run for over 15 minutes while 31 requests waited.
 - **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1.44 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
-- **Timings** (2026-10-15, 16x32). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
+- **Timings** (2026-10-15, 16x32, before the standard shape; the one-machine numbers are in "Machine shapes"). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
 
   | Script | Local (Mac) | Remote, new machine | Remote, warm machine | Script only | CPU busy |
   | --- | --- | --- | --- | --- | --- |
@@ -644,21 +646,34 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
   | `test:desktop` | 2.9 min plus the build | 261 s | 124 s | 25 s | 31% |
 
   The slowest Apalache check (about 50 to 70 s with the server start) is the floor of a spec check, so `--shards 2` saves about 20 s and more shards save nothing; it is not the default.
-- **Shards.** `pnpm remote --shards n <script>` runs the script on n machines at once with `JUNO_SHARD=i/n`; `specs:check` keeps its share of the jobs (dealt by expected cost, typechecks on every shard).
+- **Shards.** Opt-in only. `pnpm remote --shards n <script>` runs the script on n machines at once with `JUNO_SHARD=i/n`; for `test:desktop` each machine runs its Playwright shard and the parent merges the blob reports into `.remote/shards-*/html`; `specs:check` keeps its share of the jobs (dealt by expected cost, typechecks on every shard).
 - **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
 - **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
 
 ## Current cost controls
 
-The defaults are 24 vCPU in the workspace, one idle machine per shape and one
-idle minute. `JUNO_REMOTE_MAX_VCPU=0` refuses Namespace runs before an image build.
+The defaults are 24 vCPU in the workspace, two idle machines per shape and eight
+idle minutes (since 10-16; before, one machine and one minute). `JUNO_REMOTE_MAX_VCPU=0` refuses Namespace runs before an image build.
 A request larger than the cap fails instead of waiting forever.
 `JUNO_REMOTE_IDLE_MINUTES=0` destroys a machine immediately on release.
 These settings never reclaim a machine with a live owner. Releases record their
 own idle window. The pool upgrades the old background reaper so its five-minute
 policy does not survive a code update; it verifies the reaper command before
 sending it a signal.
+
+The idle policy trades idle vCPU-minutes for warm starts. A new 8x16 machine
+costs about 20 s to create and 37 to 145 s to pull the image (logs from 10-16),
+that is 8 to 22 vCPU-minutes and one to two and a half minutes of wall time per
+run; a warm one starts in about 4 s. Two idle 8x16 machines for eight minutes
+cost at most 2 x 8 vCPU x 8 min = 128 vCPU-minutes (about $0.13) after the last
+run of a busy spell. The bound per hour is 2 x 8 x 60 = 960 vCPU-minutes (about
+$0.96 an hour) if both machines sat idle the whole hour, which needs runs that
+arrive less than eight minutes apart and never use them. In practice a machine
+is idle only between runs, at most 64 vCPU-minutes per run. Before, one idle
+machine per shape for one minute cost at most 14 vCPU-minutes per spell, but
+most runs paid for a new machine. Idle machines count against the cap, and a
+run that needs room destroys idle machines of another shape first.
 
 `pnpm remote:usage [--days 7]` reads `.remote/*/run.log` in all registered worktrees.
 It reports counts, failures, cores, CPU busy, median script/startup/wall time,
@@ -680,11 +695,10 @@ measurements. Cache misses still pull from the registry. The image is unchanged,
 new builder. The pool records pending creates as reserved cores and releases its
 decision lock before provisioning, allowing independent creates within the cap.
 
-`pnpm remote test:desktop` splits Playwright across four 4x8 machines. Each shard uses three workers and
-returns a blob report and the parent merges them into `.remote/shards-*/html`.
-A failed shard or missing report fails the parent. `--shards n` changes the split;
-`JUNO_REMOTE_DESKTOP_SHARDS=1` or an explicit `--machine` runs one machine.
-`test:e2e` runs four 4x8 desktop shards and an 8x16 gallery through their separate remote shapes, within the 24-vCPU cap. The internal `JUNO_REMOTE_SHARDED` marker only prevents recursive sharding; it is not an opt-in switch.
+`pnpm remote test:desktop` runs on one machine and builds the app once. `--shards n`
+splits it across n machines; each returns a blob report and the parent merges them
+into `.remote/shards-*/html`, and a failed shard or missing report fails the parent.
+`test:e2e` runs the desktop e2e and then the gallery on one machine.
 `pnpm flake` keeps its repetition semantics instead of splitting its selected tests.
 
 Namespace stays the default. An optional SSH backend is enabled only by
@@ -731,20 +745,33 @@ Causes found so far (2026-10-15):
 
 ## Machine shapes
 
-`pnpm remote` picks a cost-conscious shape for each script (`remoteShapes` in `scripts/remote.mjs`). Measured on 2026-10-15 with TypeScript 7; "script" is the time the script itself took, without the minute or so a new machine needs to start and pull the image:
+Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Three 8x16 machines fit the 24 vCPU cap, so three plans run at once; 16x32 would fit one. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.
 
-| Script | Shape | Script time | Why not smaller or bigger |
-| --- | --- | --- | --- |
-| `lint`, `test:agent*` | 2x4 | | small and short; a bigger machine costs more than it saves |
-| `test` | 2x4 | 262 s in the current full suite; 156 s on 4x8 | uses less script compute in this pilot but takes longer; see the measurements below |
-| `test:gallery`, some components | 4x8 | a few components take under a minute | |
-| `test:gallery`, every component | 8x16, including `pnpm affected` | 132–146 s at 78–87% busy; 215 s at 73% on 4x8 | four cores miss three minutes; selected components still use 4x8 |
-| `test:desktop` | four 4x8 machines, 3 workers each | 83 / 187 / 112 / 82 s; 37–66% busy; 30.9 script core-min total | reports merge after all shards; explicit `--machine` disables the split |
-| `test:e2e` | desktop shards plus gallery shape | depends on both suites | each suite uses its own shape |
-| `specs:traces` | 8x16, eight jobs | 132 s at 97% busy; 333 s at 98% on 4x8 | four cores miss three minutes; no Apalache in trace-only runs |
-| `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) | CPU-bound at 90%; with the cache a run takes seconds on any shape |
+A typical UI change, before and after (`packages/views/src/Composer.tsx`: the gallery for six components and the whole desktop e2e, 380 tests), measured on 10-16 and 10-17 while other agents' runs were queued:
 
-Workers follow the core count (`scripts/remote/run.sh`): vitest at least four workers, two unit packages at a time, with the agent timing project run afterwards on 2-core machines, Electron one per two cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four, except trace-only runs use one job per core without Apalache. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
+| | Before: five 4x8 machines (four desktop shards, the gallery) | After: one 8x16 machine, one plan |
+| --- | --- | --- |
+| vCPU asked for | 20 (two runs at once need 40, above the cap) | 8 (three runs fit) |
+| Queue wait | 52 to 230 s per job | 278 s, behind other agents' 4x8 jobs |
+| Start-up | 4 s warm, 85 s on a new machine | 41 s on a new machine (37 s image pull), about 4 s warm |
+| Script | shards 95 / 107 / 178 / 204 s, gallery 102 s; each shard builds the app | 369 s: gallery 103 s, then desktop 266 s with one build (about 20 s) |
+| CPU busy | 37 to 70% per machine | 61% on average, 83% at the median |
+| Wall time | 381 s | 687 s with the wait; about 410 s without it, about 375 s warm |
+| Machine time | 60 vCPU-minutes | about 56 vCPU-minutes |
+
+On an idle pool one run is slower than five machines at once (about 375 s warm against about 210 s), but it asks for 8 vCPU instead of 20, builds once, and fits beside two other runs, where before a second run waited for the first. Two runs at once were not measured before merging; measure them on main. Running the gallery beside the desktop e2e on the same machine took 317 s but failed three tests (one gallery cursor test, two desktop timing tests) at 95% median CPU, so the app suites run one after another.
+
+Earlier measurements, with a shape per script (2026-10-15, TypeScript 7; "script" excludes start-up):
+
+| Script | Shape then | Script time |
+| --- | --- | --- |
+| `test` | 2x4 | 262 s in the full suite; 156 s on 4x8 |
+| `test:gallery`, every component | 8x16 | 132–146 s at 78–87% busy; 215 s at 73% on 4x8 |
+| `test:desktop` | four 4x8 machines, 3 workers each | 83 / 187 / 112 / 82 s; 37–66% busy; 30.9 script core-min total |
+| `specs:traces` | 8x16, eight jobs | 132 s at 97% busy; 333 s at 98% on 4x8 |
+| `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) |
+
+Workers follow the core count (`scripts/remote/run.sh`): vitest at least four workers, two unit packages at a time, with the agent timing project run afterwards on 2-core machines, Electron one per two cores, one per core from eight cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four, except trace-only runs use one job per core without Apalache. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
 
 Earlier full-suite pilots on the same prebuilt image (15 October 2026):
 
@@ -918,4 +945,4 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 
 ## Scheduled full run
 
-`pnpm verify:main` runs every suite against `main` (`--ref <ref>` for another): it checks the ref out into a temporary detached worktree, so nothing local is sent, and runs `test`, `specs:check` with no cache (every Quint run), `test:gallery` and `test:desktop` through `pnpm remote` at the same time. It writes a summary to `.juno-status/verify-main.md` and `.json` (each suite's result, time, log and the failing tests it names) and the full logs to `.juno-status/verify-main/<run>/`, and exits 1 if a suite failed. `--with-mac` also runs the e2e tests tagged `@mac` on this Mac, which takes a heavy-job slot. `perf` and `test:feel` are not part of it. The first run (2026-10-15) passed in 170 s of wall time: `test` 170 s, `specs:check` 146 s, `test:gallery` 74 s, `test:desktop` 114 s.
+`pnpm verify:main` runs every suite against `main` (`--ref <ref>` for another): it checks the ref out into a temporary detached worktree, so nothing local is sent, and runs `test`, `specs:check` with no cache (every Quint run), `test:gallery` and `test:desktop` as one plan on one 8x16 machine (`pnpm remote test:plan`): the gallery and then the desktop e2e, with the unit tests and spec checks beside them under `nice`. It writes a summary to `.juno-status/verify-main.md` and `.json` (each suite's result, time, log and the failing tests it names) and each suite's lines to `.juno-status/verify-main/<run>/<suite>.log`, and exits 1 if a suite failed. `--with-mac` also runs the e2e tests tagged `@mac` on this Mac, which takes a heavy-job slot. `perf` and `test:feel` are not part of it. The first run (2026-10-15, four machines at once) passed in 170 s of wall time: `test` 170 s, `specs:check` 146 s, `test:gallery` 74 s, `test:desktop` 114 s. On one machine expect about the gallery's and the desktop e2e's times added up (about six minutes from the numbers in "Machine shapes"); it has not been measured yet.
