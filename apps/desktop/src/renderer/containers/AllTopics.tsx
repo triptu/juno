@@ -1,5 +1,5 @@
 import { memo, useCallback, useDeferredValue, useEffect, useState } from 'react'
-import { ALL_TOPICS_WINDOW, type AllTopicsChip, type AllTopicsFilter, type AllTopicsSort, type KindFilter } from '@juno/contract'
+import { ALL_TOPICS_WINDOW, type AllTopicsChip, type AllTopicsFilter, type AllTopicsSort, type KindFilter, type PickConversation, type PickConversations } from '@juno/contract'
 import {
   allTopicsFilterAtom,
   allTopicsLayoutAtom,
@@ -8,14 +8,16 @@ import {
   allTopicsSummaryAtom,
   defaultAllTopicsFilter,
   nowAtom,
+  pickConversationsAtom,
   registry,
   tableRenamingAtom,
   type AllTopicsLayout,
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { AllTopics as AllTopicsView, AllTopicsPlaceholderRow, AllTopicsRow, relativeTime, type ActivateEvent } from '@juno/views'
+import { AllTopics as AllTopicsView, AllTopicsPlaceholderRow, AllTopicsRow, PlacePicker, relativeTime, type ActivateEvent, type PlacePick } from '@juno/views'
 import { openTopic, takeAllTopicsOpenStart, warmTopic } from './navigation'
+import { useHeld } from './pickerRows'
 import { cancelRename, renameTopic, showTableRowMenu } from './topicActions'
 
 /**
@@ -75,6 +77,54 @@ function onScope(scope: string | undefined): void {
   setFilter(scope === undefined ? rest : { ...rest, scope })
 }
 
+/** The picker's sections, keeping only the places the list can narrow to: conversations of the kind that have topics. */
+function narrowTo(sections: PickConversations, places: ReadonlySet<string>): PickConversations {
+  const keep = (rows: ReadonlyArray<PickConversation>) => rows.filter((row) => row.channelId !== undefined && places.has(row.channelId))
+  return { recent: keep(sections.recent), people: keep(sections.people), channels: keep(sections.channels) }
+}
+
+/**
+ * The place filter: New chat's searchable conversation list (spec section
+ * 10's word search), narrowed to the places that have topics of the kind,
+ * with Anywhere first. Its rows are a live query only while it is open.
+ */
+const Place = memo(function Place() {
+  const scope = useAtomValue(allTopicsFilterAtom, (filter) => filter.scope)
+  const places = useAtomValue(allTopicsSummaryAtom, (summary) => summary.places)
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  // The last pick, so the button keeps its label while the places reload under a new filter.
+  const [picked, setPicked] = useState<PlacePick | undefined>(undefined)
+  const list = useAtomValue(pickConversationsAtom(open ? query : undefined))
+  const held = useHeld(list._tag === 'Success' ? list.value : undefined, open)
+  const ref = scope === undefined ? undefined : places.find((entry) => entry.id === scope)
+  const place: PlacePick | undefined = ref === undefined ? (picked?.id === scope ? picked : undefined) : { id: ref.id, name: ref.name, kind: ref.kind, tint: ref.tint }
+
+  const onOpen = (next: boolean) => {
+    setQuery('')
+    setOpen(next)
+  }
+  const onPick = (conversation: PickConversation | undefined) => {
+    onOpen(false)
+    const id = conversation?.channelId
+    setPicked(conversation === undefined || id === undefined ? undefined : { id, name: conversation.name, kind: conversation.kind, tint: conversation.tint })
+    onScope(id)
+  }
+
+  return (
+    <PlacePicker
+      place={place}
+      open={open}
+      onOpen={onOpen}
+      query={query}
+      onQuery={setQuery}
+      conversations={held.value === undefined ? undefined : narrowTo(held.value, new Set(places.map((entry) => entry.id)))}
+      loading={held.loading}
+      onPick={onPick}
+    />
+  )
+})
+
 /** A new kind drops a place of the other kind. */
 function onKind(kind: KindFilter): void {
   const filter = registry.get(allTopicsFilterAtom)
@@ -106,7 +156,7 @@ function onVisibleRange(start: number, end: number): void {
 
 /**
  * The All topics page (spec section 11): every topic Juno knows, with the
- * status chips, the kind, place and sort selects and a text filter. The
+ * status tabs, the kind, the place picker, the sort and a text filter. The
  * table draws a virtual list of the whole list and the engine sends one
  * window of it (`allTopicsListAtom`); scrolling moves the window. Text
  * filtering is deferred, so typing is never blocked by the list.
@@ -152,10 +202,9 @@ export default function AllTopicsPage() {
       onQueryChange={setText}
       filter={filter}
       counts={summary.counts}
-      places={summary.places}
+      place={<Place />}
       onStatus={onStatus}
       onKind={onKind}
-      onScope={onScope}
       onSort={onSort}
       ready={layout.ready}
       total={layout.total}

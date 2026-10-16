@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
@@ -27,6 +28,7 @@ const placeLabel = (conversation: PickConversation): string =>
 const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`)
 
 const MAIN_ID = 'pick-main'
+const ANYWHERE_ID = 'pick-anywhere'
 const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
 
 /**
@@ -63,7 +65,16 @@ function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (i
   return [chosen !== undefined && ids.includes(chosen) ? chosen : ids[0], setChosen]
 }
 
-export function ConversationList({ query, onQuery, conversations, loading = false, onPickConversation, onOpen }: DestinationPickersProps) {
+export interface ConversationListProps extends Pick<DestinationPickersProps, 'query' | 'onQuery' | 'conversations' | 'onPickConversation'> {
+  readonly loading?: boolean | undefined
+  readonly onClose: () => void
+  /** An Anywhere row first, which clears a place filter (All topics). It shows while the query is empty or starts "anywhere". */
+  readonly onAnywhere?: () => void
+  /** With `onAnywhere`: the picked place's channel id, drawn as the current row; none is Anywhere. */
+  readonly selected?: string | undefined
+}
+
+export function ConversationList({ query, onQuery, conversations, loading = false, onPickConversation, onClose, onAnywhere, selected }: ConversationListProps) {
   const sections: ReadonlyArray<readonly [string, ReadonlyArray<PickConversation>]> =
     conversations === undefined
       ? []
@@ -73,19 +84,33 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
           ['Channels', conversations.channels],
         ]
   const rows = sections.flatMap(([, items]) => items)
-  const ids = rows.map((row) => rowId('conversation', row.key))
+  const showAnywhere = onAnywhere !== undefined && 'anywhere'.startsWith(query.trim().toLowerCase())
+  const ids = [...(showAnywhere ? [ANYWHERE_ID] : []), ...rows.map((row) => rowId('conversation', row.key))]
   const [activeId, setActive] = useActive(ids)
   const pick = (id: string) => {
-    const row = rows[ids.indexOf(id)]
+    if (id === ANYWHERE_ID) return onAnywhere?.()
+    const row = rows[ids.indexOf(id) - (showAnywhere ? 1 : 0)]
     if (row !== undefined) onPickConversation(row)
   }
-  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose })
   const search = usePendingEnter(loading || conversations === undefined, ids, pick, keys, onQuery)
   return (
     <>
       <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search people and channels" onKeyDown={search.onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Conversations" {...(activeId === undefined ? {} : { activeId })}>
+          {showAnywhere ? (
+            <OptionRow
+              id={ANYWHERE_ID}
+              size={36}
+              active={activeId === ANYWHERE_ID}
+              selected={selected === undefined}
+              leading={<Icon icon={Globe} size={15} />}
+              label="Anywhere"
+              onSelect={onAnywhere}
+              onActivate={() => setActive(ANYWHERE_ID)}
+            />
+          ) : null}
           {sections.map(([title, items]) =>
             items.length === 0 ? null : (
               <div key={title} role="group" aria-label={title}>
@@ -98,6 +123,7 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
                       id={id}
                       size={36}
                       active={id === activeId}
+                      selected={onAnywhere !== undefined && row.channelId !== undefined && row.channelId === selected}
                       leading={<ConversationMark conversation={row} />}
                       label={<Highlighted text={row.name} ranges={row.highlight} />}
                       sub={conversationSub(row)}
@@ -109,7 +135,7 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
               </div>
             ),
           )}
-          {conversations !== undefined && rows.length === 0 ? <PickerNoMatch /> : null}
+          {conversations !== undefined && ids.length === 0 ? <PickerNoMatch /> : null}
         </OptionList>
       </div>
     </>

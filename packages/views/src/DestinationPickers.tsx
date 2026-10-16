@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { At } from '@phosphor-icons/react/dist/icons/At'
+import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
@@ -7,7 +8,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useEffect, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, PickThread } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
 import { chunk, Icon, Popover, type PhosphorIcon } from '@juno/ui'
@@ -82,7 +83,7 @@ export function DestinationPickers(props: DestinationPickersProps) {
           </PickerButton>
         }
       >
-        {open === 'conversation' ? <ConversationList {...props} /> : null}
+        {open === 'conversation' ? <ConversationList {...props} onClose={() => onOpen(undefined)} /> : null}
       </Popover>
       <Popover
         open={open === 'thread'}
@@ -112,7 +113,80 @@ export function DestinationPickers(props: DestinationPickersProps) {
   )
 }
 
+/** The place a list is narrowed to, as its button shows it. */
+export interface PlacePick {
+  readonly id: string
+  readonly name: string
+  readonly kind: ConversationKind
+  readonly tint: PickConversation['tint']
+}
+
+export interface PlacePickerProps {
+  /** Undefined is Anywhere. */
+  readonly place: PlacePick | undefined
+  readonly open: boolean
+  readonly onOpen: (open: boolean) => void
+  readonly query: string
+  readonly onQuery: (query: string) => void
+  /** The list's sections, already narrowed to the places that apply; undefined while they load. */
+  readonly conversations: PickConversations | undefined
+  readonly loading?: boolean
+  /** A conversation, or Anywhere with `undefined`. */
+  readonly onPick: (conversation: PickConversation | undefined) => void
+}
+
+/**
+ * A place filter (All topics, spec section 11): New chat's conversation
+ * button and searchable list, opening below the button, with Anywhere as
+ * the list's first row. The button takes the place's tint once one is
+ * picked.
+ */
+export function PlacePicker({ place, open, onOpen, query, onQuery, conversations, loading, onPick }: PlacePickerProps) {
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadLists(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
+  const button = useRef<HTMLButtonElement>(null)
+  const label = place?.name ?? 'Anywhere'
+  // A pick puts focus back on the button, as Esc does.
+  const pick = (conversation: PickConversation | undefined) => {
+    onPick(conversation)
+    button.current?.focus()
+  }
+  return (
+    <Popover
+      open={open}
+      onClose={() => onOpen(false)}
+      placement="bottom-start"
+      width="picker"
+      maxHeight="none"
+      layer="picker"
+      padding="none"
+      label="Pick a place"
+      anchor={
+        <PickerButton ref={button} label={`Where: ${label}`} icon={place === undefined ? Globe : kindIcons[place.kind]} tint={place?.tint} muted={place === undefined} wide expanded={open} onOpen={() => onOpen(!open)}>
+          {label}
+        </PickerButton>
+      }
+    >
+      {open ? (
+        <ConversationList
+          query={query}
+          onQuery={onQuery}
+          conversations={conversations}
+          loading={loading}
+          onPickConversation={pick}
+          onClose={() => onOpen(false)}
+          onAnywhere={() => pick(undefined)}
+          selected={place?.id}
+        />
+      ) : null}
+    </Popover>
+  )
+}
+
 interface PickerButtonProps {
+  readonly ref?: Ref<HTMLButtonElement>
   readonly label: string
   readonly icon: PhosphorIcon
   /** A picked conversation's context tint. */
@@ -126,7 +200,7 @@ interface PickerButtonProps {
   readonly children: ReactNode
 }
 
-function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
   const subtle = muted ?? tint === undefined
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'ArrowDown' || expanded) return
@@ -135,6 +209,7 @@ function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen
   }
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
       aria-haspopup="dialog"

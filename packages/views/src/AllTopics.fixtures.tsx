@@ -1,7 +1,9 @@
 import { defineFixtures, scene } from '@juno/ui'
 import { PrivacyOn } from './fixtures/privacy'
-import type { AllTopicsCounts, ChannelRef, TopicRow } from '@juno/contract'
+import type { AllTopicsCounts, PickConversations, TopicRow } from '@juno/contract'
 import { AllTopics, AllTopicsPlaceholderRow, AllTopicsRow, type AllTopicsFilterState, type AllTopicsProps } from './AllTopics'
+import { PlacePicker, type PlacePick, type PlacePickerProps } from './DestinationPickers'
+import { conversations } from './fixtures/newChat'
 import { channels, NOW, rows } from './fixtures/topics'
 import { relativeTime } from './time'
 
@@ -27,10 +29,27 @@ const counts = (list: ReadonlyArray<TopicRow>): AllTopicsCounts => {
   return out
 }
 
-const places: ReadonlyArray<ChannelRef> = Object.values(channels).map((entry: TopicRow['channel']) => {
-  const { partner, ...channel } = entry
-  return partner === undefined ? channel : { ...channel, partnerId: partner.id }
-})
+const eng: PlacePick = { id: channels.eng.id, name: channels.eng.name, kind: channels.eng.kind, tint: channels.eng.tint }
+
+/** The open list with "ma" typed: the DM, the group DM and a channel, by the word search. */
+const maQuery: PickConversations = {
+  recent: [],
+  people: [
+    { ...conversations.maya, highlight: [[0, 2]] },
+    { ...conversations.group, highlight: [[0, 2]] },
+  ],
+  channels: [{ key: 'C0MARKETING', name: 'marketing', kind: 'public', tint: 'public', channelId: 'C0MARKETING', empty: false, highlight: [[0, 2]] }],
+}
+
+const recent: PickConversations = {
+  recent: [conversations.eng, conversations.maya, conversations.hiring, conversations.group, conversations.billing],
+  people: [],
+  channels: [],
+}
+
+const placePicker = (overrides: Partial<PlacePickerProps> = {}) => (
+  <PlacePicker place={undefined} open={false} onOpen={noop} query="" onQuery={noop} conversations={undefined} onPick={noop} {...overrides} />
+)
 
 const renderRows =
   (list: ReadonlyArray<TopicRow>, loaded: (index: number) => boolean = () => true) =>
@@ -48,10 +67,9 @@ const props = (overrides: Partial<AllTopicsProps> & { readonly list?: ReadonlyAr
     onQueryChange: noop,
     filter,
     counts: counts(table),
-    places,
+    place: placePicker(),
     onStatus: noop,
     onKind: noop,
-    onScope: noop,
     onSort: noop,
     ready: true,
     total: list.length,
@@ -85,7 +103,19 @@ export default defineFixtures(
           <AllTopics {...props()} />
         </PrivacyOn>
       ), { width: 1000, height: 640, padded: false }),
-      'narrowed-to-a-channel': page({ list: [rows.postgres], filter: { status: 'all', kind: 'channels', scope: channels.eng.id, sort: 'messages' } }),
+      'narrowed-to-a-channel': page({ list: [rows.postgres], filter: { status: 'all', kind: 'channels', scope: channels.eng.id, sort: 'messages' }, place: placePicker({ place: eng }) }),
+    },
+    Filters: {
+      // Anywhere, every kind, most recent.
+      default: page(),
+      // A channel picked: the button takes its tint.
+      'place-picked': page({ list: [rows.postgres], filter: { status: 'all', kind: 'all', scope: channels.eng.id, sort: 'recent' }, place: placePicker({ place: eng }) }),
+      // The picker open with nothing typed: Anywhere first, then recent places.
+      'picker-open': page({ place: placePicker({ open: true, conversations: recent }) }),
+      // The picker open with "ma" typed: a DM, a group DM and a channel.
+      'picker-query': page({ place: placePicker({ open: true, query: 'ma', conversations: maQuery }) }),
+      // A narrow window: the controls wrap under the tabs, nothing overlaps.
+      narrow: page({ place: placePicker({ place: eng }) }, { width: 560, height: 480 }),
     },
     Size: {
       // The topic column keeps its minimum width and the table scrolls sideways.

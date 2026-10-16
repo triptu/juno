@@ -55,7 +55,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await juno.topic.expectTitle(/We have 142 flags/)
 })
 
-test('each filter narrows the list: status chips, kind, place, sort and text', async ({ juno }) => {
+test('each filter narrows the list: status chips, kind, sort and text', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { allTopics } = juno
@@ -82,11 +82,7 @@ test('each filter narrows the list: status chips, kind, place, sort and text', a
   await allTopics.row(OFFSITE).expectAbsent()
   await allTopics.row(POSTGRES).expectVisible()
 
-  // Place: one channel.
-  await allTopics.filterPlace('#design-review')
-  await allTopics.row(DESIGN).expectVisible()
-  await allTopics.row(POSTGRES).expectAbsent()
-  await allTopics.filterPlace('Anywhere')
+  // Place: the next test.
 
   // Sort: most messages puts the six-reply Postgres thread above the two-reply quiet one.
   await allTopics.sort('Most messages')
@@ -108,6 +104,50 @@ test('each filter narrows the list: status chips, kind, place, sort and text', a
   await expect(allTopics.search).toHaveValue('')
   await allTopics.row(POSTGRES).expectVisible()
   await allTopics.row(QUIET).expectVisible()
+})
+
+test('the place picker searches conversations by word, and a pick narrows the list', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { allTopics } = juno
+  await allTopics.open()
+
+  // A channel by a word inside its name.
+  await allTopics.filterPlace('review', 'design-review')
+  await allTopics.row(DESIGN).expectVisible()
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.filterPlace('', 'Anywhere')
+  await allTopics.row(POSTGRES).expectVisible()
+
+  await allTopics.filterKind('Channels')
+  // With Channels on, the picker offers no DMs.
+  await allTopics.placeButton.click()
+  await allTopics.placeSearch.fill('maya')
+  await expect(allTopics.placeOption('Maya')).toHaveCount(0)
+  await allTopics.placeSearch.press('Escape')
+  await expect(allTopics.placeSearch).toBeHidden()
+  await expect(allTopics.placeButton).toBeFocused()
+
+  // Every kind: a group DM by its people's names in any order, picked with the arrows and Enter.
+  await allTopics.filterKind('All')
+  await allTopics.placeButton.click()
+  await allTopics.placeSearch.fill('leo maya')
+  await expect(allTopics.placeOption('Maya')).toHaveCount(0)
+  await allTopics.placeSearch.press('ArrowDown')
+  await allTopics.placeSearch.press('ArrowUp')
+  await allTopics.placeSearch.press('Enter')
+  await expect(allTopics.placeSearch).toBeHidden()
+  await expect(allTopics.placeButton).toHaveAccessibleName(/^Where: .*Leo/)
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.row(OFFSITE).expectAbsent()
+  expect(await allTopics.titles()).toHaveLength(1)
+
+  // A DM by the person's name: the list narrows to that DM's topics.
+  await allTopics.filterPlace('maya', 'Maya')
+  await allTopics.row(OFFSITE).expectVisible()
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.filterPlace('any', 'Anywhere')
+  await allTopics.row(POSTGRES).expectVisible()
 })
 
 test('the row menu works from All topics, each action with its undo', async ({ juno, slack }) => {

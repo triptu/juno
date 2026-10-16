@@ -1186,12 +1186,12 @@ export class AllTopicsPane {
   }
 
   chip(name: AllTopicsChipName): Locator {
-    return this.win.getByRole('group', { name: 'Status' }).getByRole('button', { name: new RegExp(`^${name} \\d+$`) })
+    return this.win.getByRole('radiogroup', { name: 'Status' }).getByRole('radio', { name: new RegExp(`^${name} \\d+$`) })
   }
 
   async filterStatus(name: AllTopicsChipName): Promise<void> {
     await this.chip(name).click()
-    await expect(this.chip(name)).toHaveAttribute('aria-pressed', 'true')
+    await expect(this.chip(name)).toHaveAttribute('aria-checked', 'true')
   }
 
   /** The count after a chip's label. */
@@ -1199,13 +1199,34 @@ export class AllTopicsPane {
     await expect(this.chip(name)).toHaveText(`${name}${count}`)
   }
 
-  async filterKind(label: 'Channels and DMs' | 'Channels' | 'DMs'): Promise<void> {
-    await this.win.getByRole('combobox', { name: 'Kind' }).selectOption({ label })
+  async filterKind(label: 'All' | 'Channels' | 'DMs'): Promise<void> {
+    const segment = this.win.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: label, exact: true })
+    await segment.click()
+    await expect(segment).toHaveAttribute('aria-checked', 'true')
   }
 
-  /** The place select: "Anywhere", "#eng", "Maya Chen". */
-  async filterPlace(label: string): Promise<void> {
-    await this.win.getByRole('combobox', { name: 'Where' }).selectOption({ label })
+  /** The place picker's button: "Where: Anywhere", "Where: design-review". */
+  get placeButton(): Locator {
+    return this.win.getByRole('button', { name: /^Where: / })
+  }
+
+  /** The place picker's search field, while its list is open. */
+  get placeSearch(): Locator {
+    return this.win.getByRole('dialog', { name: 'Pick a place' }).getByRole('textbox')
+  }
+
+  /** The open list's row whose name starts with `name`. */
+  placeOption(name: string): Locator {
+    return this.win.getByRole('dialog', { name: 'Pick a place' }).getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  /** Opens the place picker, types `query`, and picks the row whose name starts with the word `name` ("Anywhere" clears the place). */
+  async filterPlace(query: string, name: string): Promise<void> {
+    await this.placeButton.click()
+    await this.placeSearch.fill(query)
+    await this.placeOption(name).click()
+    await expect(this.placeSearch).toBeHidden()
+    await expect(this.placeButton).toHaveAccessibleName(new RegExp(`^Where: ${escapeRegExp(name)}(\\s|$)`))
   }
 
   async sort(label: 'Most recent' | 'Oldest first' | 'Most messages'): Promise<void> {

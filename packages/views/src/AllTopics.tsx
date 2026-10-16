@@ -18,6 +18,7 @@ import {
   Icon,
   PageHeader,
   pointerMoved,
+  Segmented,
   Select,
   Text,
   TextField,
@@ -48,20 +49,17 @@ const STATUS: Record<TopicRow['status'], { readonly label: string; readonly vari
   unsubscribed: { label: 'Unfollowed', variant: 'quiet' },
 }
 
-const KIND_OPTIONS = [
-  { value: 'all', label: 'Channels and DMs' },
+const KIND_OPTIONS: ReadonlyArray<{ readonly value: KindFilter; readonly label: string }> = [
+  { value: 'all', label: 'All' },
   { value: 'channels', label: 'Channels' },
   { value: 'dms', label: 'DMs' },
-] as const
+]
 
 const SORT_OPTIONS = [
   { value: 'recent', label: 'Most recent' },
   { value: 'oldest', label: 'Oldest first' },
   { value: 'messages', label: 'Most messages' },
 ] as const
-
-/** The place select's value for "Anywhere". Conversation ids never take it. */
-const ANYWHERE = ''
 
 export interface AllTopicsRowProps {
   readonly row: TopicRow
@@ -212,12 +210,10 @@ export interface AllTopicsProps {
   readonly onQueryChange: (text: string) => void
   readonly filter: AllTopicsFilterState
   readonly counts: AllTopicsCounts
-  /** The conversations the place select lists, channels then DMs. */
-  readonly places: ReadonlyArray<ChannelRef>
+  /** The place filter: a `PlacePicker`, wired by the owner. */
+  readonly place: ReactNode
   readonly onStatus: (status: AllTopicsChip) => void
   readonly onKind: (kind: KindFilter) => void
-  /** `undefined` is Anywhere. */
-  readonly onScope: (scope: string | undefined) => void
   readonly onSort: (sort: AllTopicsSort) => void
   /** False until the first rows have arrived: the table draws nothing yet. */
   readonly ready: boolean
@@ -236,8 +232,8 @@ export interface AllTopicsProps {
 
 /**
  * The All topics page (spec section 11, inventory 10): the title and text
- * filter, the status chips with their counts and the three selects, then
- * the table. The table is a virtual list (performance 3.5): it lays out
+ * filter; the status tabs with their counts, the kind, the place and the
+ * sort; then the table. The table is a virtual list (performance 3.5): it lays out
  * `total` rows of a fixed height and draws only those near the viewport,
  * asking the owner for each one. ↑ and ↓ move between rows.
  */
@@ -246,10 +242,9 @@ export function AllTopics({
   onQueryChange,
   filter,
   counts,
-  places,
+  place,
   onStatus,
   onKind,
-  onScope,
   onSort,
   ready,
   total,
@@ -278,36 +273,17 @@ export function AllTopics({
             />
           }
         />
-        <div {...stylex.props(styles.filters)}>
-          {/* Chips switch on mouse down, like the sidebar's filters (performance 4.1). */}
-          <div role="group" aria-label="Status" {...stylex.props(styles.chips)}>
-            {CHIPS.map((chip) => (
-              <Button
-                key={chip.id}
-                variant="filter"
-                pressed={filter.status === chip.id}
-                aria-label={`${chip.label} ${counts[chip.id]}`}
-                {...activateHandlers<HTMLButtonElement>(() => onStatus(chip.id))}
-              >
-                {chip.label}
-                <Text variant="ui" tone="subtle" weight="regular" numeric sx={styles.count}>
-                  {counts[chip.id]}
-                </Text>
-              </Button>
-            ))}
-          </div>
-          <div {...stylex.props(styles.selects)}>
-            <Select size={30} label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={(event) => onKind(event.currentTarget.value as KindFilter)} />
-            <span {...stylex.props(styles.place)}>
-              <Select
-                size={30}
-                label="Where"
-                value={filter.scope ?? ANYWHERE}
-                options={[{ value: ANYWHERE, label: 'Anywhere' }, ...places.map((place) => ({ value: place.id, label: place.label }))]}
-                onChange={(event) => onScope(event.currentTarget.value === ANYWHERE ? undefined : event.currentTarget.value)}
-              />
-            </span>
-            <Select size={30} label="Sort" value={filter.sort} options={SORT_OPTIONS} onChange={(event) => onSort(event.currentTarget.value as AllTopicsSort)} />
+        <div data-all-topics-filters="" {...stylex.props(styles.filters)}>
+          <Segmented
+            label="Status"
+            value={filter.status}
+            options={CHIPS.map((chip) => ({ value: chip.id, label: chip.label, count: counts[chip.id] }))}
+            onChange={onStatus}
+          />
+          <div {...stylex.props(styles.controls)}>
+            <Segmented label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={onKind} />
+            {place}
+            <Select size={28} label="Sort" value={filter.sort} options={SORT_OPTIONS} onChange={(event) => onSort(event.currentTarget.value as AllTopicsSort)} />
           </div>
         </div>
       </div>
@@ -440,6 +416,7 @@ const styles = stylex.create({
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
   },
+  // The status tabs, then the other controls at the end; on a narrow window the controls wrap under the tabs, then onto more lines.
   filters: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -447,27 +424,15 @@ const styles = stylex.create({
     justifyContent: 'space-between',
     gap: spacing['--space-2'],
   },
-  chips: {
+  controls: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: spacing['--space-0-5'],
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    minWidth: 0,
   },
   time: { width: sizes['--topic-time-width'] },
   messageCount: { width: sizes['--control-40'] },
-  count: {
-    display: 'inline-block',
-    width: sizes['--control-40'],
-    marginInlineStart: spacing['--space-1-5'],
-  },
-  place: {
-    display: 'grid',
-    width: layout['--all-topics-place-width'],
-  },
-  selects: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: spacing['--space-1-5'],
-  },
   scroller: {
     position: 'relative',
     flexGrow: 1,

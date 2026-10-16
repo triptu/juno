@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent } from 'react'
 import { colors, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { activateHandlers } from './internal/activate'
 import { interactive } from './internal/interactive'
-import { variants as typeVariants } from './internal/type'
+import { numeric, variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
 // Segment side padding. A one-off between the 8px and 10px spacing steps.
@@ -11,6 +12,8 @@ const SEGMENT_PADDING_INLINE = '9px'
 export interface SegmentedOption<T extends string> {
   readonly value: T
   readonly label: string
+  /** A count after the label, in muted tabular numbers ("Open 15"). */
+  readonly count?: number
 }
 
 export interface SegmentedProps<T extends string> {
@@ -22,8 +25,9 @@ export interface SegmentedProps<T extends string> {
 }
 
 /**
- * A small radio group drawn as a track with one raised segment. Arrow keys
- * move the selection.
+ * A small radio group drawn as a track with one raised segment. Each
+ * segment is as wide as its label, with even gaps. A segment switches on
+ * mouse down, like tabs (performance 4.1); arrow keys move the selection.
  */
 export function Segmented<T extends string>({ options, value, onChange, label, disabled = false }: SegmentedProps<T>) {
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -53,7 +57,8 @@ export function Segmented<T extends string>({ options, value, onChange, label, d
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
-            onClick={() => onChange(option.value)}
+            aria-label={option.count === undefined ? undefined : `${option.label} ${option.count}`}
+            {...activateHandlers<HTMLButtonElement>(() => onChange(option.value), { disabled })}
             {...stylex.props(
               interactive.reset,
               interactive.feedback,
@@ -65,6 +70,7 @@ export function Segmented<T extends string>({ options, value, onChange, label, d
             )}
           >
             {option.label}
+            {option.count === undefined ? null : <span {...stylex.props(styles.count, numeric.tabular)}>{option.count}</span>}
           </button>
         )
       })}
@@ -96,6 +102,11 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
       ':disabled': colors['--foreground-muted'],
     },
+  },
+  count: {
+    marginInlineStart: spacing['--space-1-5'],
+    fontWeight: weights['--weight-regular'],
+    color: colors['--foreground-muted'],
   },
   selected: {
     color: colors['--foreground-default'],
