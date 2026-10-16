@@ -237,6 +237,8 @@ export {
   openFile,
   copyImage,
   readyFiles,
+  sendableFiles,
+  whenStarted,
   removeAttachment,
   restoreAttachments,
   uploadProgressAtom,

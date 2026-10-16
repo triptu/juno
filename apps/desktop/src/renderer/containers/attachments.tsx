@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { attachmentsAtom, clearAttachments, readyFiles, registry, removeAttachment, restoreAttachments, type Attachment } from '@juno/state'
+import { attachmentsAtom, clearAttachments, readyFiles, registry, removeAttachment, restoreAttachments, sendableFiles, whenStarted, type Attachment } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AttachButton } from '@juno/views'
 import { chunk } from './chunks'
@@ -40,13 +40,19 @@ export function useAttachments(key: string, { tabbable = true }: { readonly tabb
 
 /**
  * The staged files a send takes, which leave the composer: `undefined`
- * while one is still staging, so Enter waits for it. `restore` puts them
- * back after a send that queued nothing.
+ * while one is still staging, so Enter waits for it. With `staging`, files
+ * still staging go too, and the post waits for them in the engine (the
+ * topic composer, spec section 8); `started` resolves once the engine
+ * knows each of them, and the send goes after it. `restore` puts them back
+ * after a send that queued nothing.
  */
-export function takeAttachments(key: string): { readonly ids: ReadonlyArray<string>; readonly restore: () => void } | undefined {
-  const ids = readyFiles(registry, key)
+export function takeAttachments(
+  key: string,
+  { staging = false }: { readonly staging?: boolean } = {},
+): { readonly ids: ReadonlyArray<string>; readonly started: Promise<unknown>; readonly restore: () => void } | undefined {
+  const ids = staging ? sendableFiles(registry, key) : readyFiles(registry, key)
   if (ids === undefined) return undefined
   const taken: ReadonlyArray<Attachment> = registry.get(attachmentsAtom(key))
   clearAttachments(registry, key)
-  return { ids, restore: () => restoreAttachments(registry, key, taken) }
+  return { ids, started: whenStarted(ids), restore: () => restoreAttachments(registry, key, taken) }
 }

@@ -49,7 +49,9 @@ export type StageError = typeof StageError.Type
  * One chunk of a file at `offset`. Chunks come in order, starting at 0.
  * With `last` the file is complete and the answer is its `StagedFile`;
  * before that the answer is `null`. `Rejected` `file_too_large` above
- * `MAX_FILE_BYTES`, `bad_chunk` for a chunk out of order.
+ * `MAX_FILE_BYTES`, `bad_chunk` for a chunk out of order. `size` is the
+ * whole file's, sent with the first chunk, so a message sent before the
+ * last chunk shows it.
  */
 export const filesStage = Rpc.make('files.stage', {
   payload: {
@@ -57,6 +59,7 @@ export const filesStage = Rpc.make('files.stage', {
     name: Schema.String,
     mimetype: Schema.String,
     offset: Schema.Number,
+    size: Schema.optionalKey(Schema.Number),
     bytes: Schema.Uint8Array,
     last: Schema.Boolean,
   },
@@ -64,7 +67,11 @@ export const filesStage = Rpc.make('files.stage', {
   error: StageError,
 })
 
-/** A chip was removed before sending: its staged bytes are deleted. Unknown ids are ignored. */
+/**
+ * A chip was removed before sending: its staged bytes are deleted. Unknown
+ * ids are ignored. For a file a send took while it was still staging, it
+ * says the rest of the bytes will not come, and the post fails.
+ */
 export const filesUnstage = Rpc.make('files.unstage', { payload: { id: Schema.String }, success: Schema.Void })
 
 /** Upload progress of each message being sent with files, by `clientMsgId`, from 0 to 1. A message absent here is not uploading. */

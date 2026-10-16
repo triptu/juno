@@ -46,14 +46,37 @@ export function readyFiles(registry: Registry, key: string): ReadonlyArray<strin
   return files.filter((each) => each.state === 'ready').map((each) => each.id)
 }
 
+/**
+ * The files of a composer a send takes when it does not wait for staging
+ * (the topic composer, spec section 8): the staged ones and the ones still
+ * staging, which the engine takes as they are. Failed chips are left out.
+ */
+export function sendableFiles(registry: Registry, key: string): ReadonlyArray<string> {
+  return registry.get(attachmentsAtom(key)).flatMap((each) => (each.state === 'failed' ? [] : [each.id]))
+}
+
+/**
+ * The files being staged now, each with its first chunk's answer: a send
+ * names a file only once the engine knows it.
+ */
+export const firstChunks = new Map<string, Promise<unknown>>()
+
+/** Resolves once the engine knows every file of `ids` that is staging. */
+export const whenStarted = (ids: ReadonlyArray<string>): Promise<unknown> => Promise.all(ids.map((id) => firstChunks.get(id)))
+
 /** Empties a composer's chips after a send; the post owns the staged files now. */
 export function clearAttachments(registry: Registry, key: string): void {
   registry.set(attachmentsAtom(key), [])
 }
 
-/** Puts chips back, after a send that queued nothing. */
+/**
+ * Puts chips back, after a send that queued nothing. A chip taken while
+ * staging whose staging has ended since cannot be sent any more: it comes
+ * back failed.
+ */
 export function restoreAttachments(registry: Registry, key: string, files: ReadonlyArray<Attachment>): void {
-  update(registry, key, (current) => [...files, ...current.filter((each) => !files.some((file) => file.id === each.id))])
+  const back = files.map((file) => (file.state === 'staging' && !firstChunks.has(file.id) ? { ...file, state: 'failed' as const } : file))
+  update(registry, key, (current) => [...back, ...current.filter((each) => !files.some((file) => file.id === each.id))])
 }
 
 /** How far each post being sent with files has got, by `clientMsgId`. */

@@ -41,6 +41,7 @@ export {
   discardPost,
   failPost,
   failUpload,
+  fileStaged,
   fileUploaded,
   flushPosts,
   pendingPosts,

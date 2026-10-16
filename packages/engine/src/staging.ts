@@ -7,13 +7,18 @@
  * serve it as `juno://uploads/<name>` for the chip and the pending row.
  *
  * What the composer attached is remembered in memory until it is sent or
- * removed. Staged bytes that no pending post names, and that no sent
+ * removed. A send may take a file that is still staging (Enter before the
+ * last chunk, spec section 8): its post names it at once, marked `staging`,
+ * and the rest of its chunks still come here. The post worker asks
+ * `status` before it uploads, and waits for `settled` while the file is
+ * being written; the composer's `files.unstage` for such a file means the
+ * rest will not come, and the post fails. Staged bytes that no pending post names, and that no sent
  * message still shows (`uploaded_files`), are deleted a day after they were
  * written (`sweep`, when a workspace opens).
  */
 import { appendFile, mkdir, open as openFile, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { Clock, Context, Effect, Layer, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, PubSub, Stream } from 'effect'
 import { MAX_FILE_BYTES, NotSignedIn, Rejected, type StagedFile, type StageError } from '@juno/contract'
 import { pendingPosts, uploadedNames, type PendingFile } from '@juno/sync'
 import { Workspace, type OpenWorkspace } from './workspace'
@@ -33,17 +38,28 @@ export interface StageChunk {
   readonly name: string
   readonly mimetype: string
   readonly offset: number
+  /** The whole file's bytes, with the first chunk. */
+  readonly size?: number | undefined
   readonly bytes: Uint8Array
   readonly last: boolean
 }
 
 interface Entry {
-  readonly file: PendingFile
+  file: PendingFile
   readonly path: string
   /** Bytes written so far. */
   written: number
   done: boolean
+  /** A send took it while it was staging, and the rest of its bytes will not come. */
+  failed: boolean
 }
+
+/** How far a file a post took while it was staging has got. `unknown` after a restart, which loses the rest of its bytes. */
+export type StagingStatus =
+  | { readonly _tag: 'writing' }
+  | { readonly _tag: 'ready'; readonly file: PendingFile }
+  | { readonly _tag: 'failed' }
+  | { readonly _tag: 'unknown' }
 
 export class Staging extends Context.Service<
   Staging,
@@ -51,8 +67,16 @@ export class Staging extends Context.Service<
     /** Writes one chunk. The last answers the file as its chip shows it. */
     readonly stage: (chunk: StageChunk) => Effect.Effect<StagedFile | null, StageError>
     readonly unstage: (id: string) => Effect.Effect<void>
-    /** The staged files `ids` name, in order, for a post. `file_not_found` for one that is missing or incomplete. */
+    /**
+     * The staged files `ids` name, in order, for a post. A file still
+     * staging is taken as it is, marked `staging`. `file_not_found` for one
+     * that is missing.
+     */
     readonly take: (ids: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<PendingFile>, Rejected>
+    /** How far a file a post took while it was staging has got. A ready file is forgotten once asked about; a failed one at `release`. */
+    readonly status: (id: string) => Effect.Effect<StagingStatus>
+    /** A file a post took while it was staging finished, or will not. */
+    readonly settled: Stream.Stream<void>
     /** A staged file's bytes, for the upload. */
     readonly read: (open: OpenWorkspace, file: PendingFile) => Effect.Effect<Uint8Array, Rejected>
     /** Deletes a post's staged bytes once Slack has the message, or the post was discarded. */
@@ -64,21 +88,29 @@ export class Staging extends Context.Service<
     Effect.gen(function* () {
       const workspace = yield* Workspace
       const entries = new Map<string, Entry>()
+      // Files a post took while they were staging, until the worker has the complete file or the post is discarded.
+      const claimed = new Map<string, Entry>()
+      const settles = yield* PubSub.unbounded<void>()
+      const settle = Effect.asVoid(PubSub.publish(settles, undefined))
 
       const stage = (chunk: StageChunk): Effect.Effect<StagedFile | null, StageError> =>
         Effect.gen(function* () {
           const open = yield* workspace.current
           if (open === undefined) return yield* new NotSignedIn()
           if (!ID.test(chunk.id)) return yield* new Rejected({ code: 'bad_chunk' })
+          const taken = claimed.get(chunk.id)
+          if (taken !== undefined) return yield* stageClaimed(taken, chunk)
           let entry = entries.get(chunk.id)
-          if (chunk.offset === 0) {
+          // The composer names a file with an empty first chunk before it reads any bytes; the bytes start at 0 again.
+          if (chunk.offset === 0 && (entry === undefined || entry.written > 0 || entry.done)) {
             const extension = IMAGE_EXTENSIONS[chunk.mimetype] ?? 'bin'
             const stagedName = `${chunk.id}.${extension}`
             entry = {
-              file: { id: chunk.id, stagedName, name: chunk.name, mimetype: chunk.mimetype, size: 0 },
+              file: { id: chunk.id, stagedName, name: chunk.name, mimetype: chunk.mimetype, size: chunk.size ?? 0 },
               path: path.join(open.paths.uploads, stagedName),
               written: 0,
               done: false,
+              failed: false,
             }
             entries.set(chunk.id, entry)
           }
@@ -93,22 +125,62 @@ export class Staging extends Context.Service<
           yield* io(() => (chunk.offset === 0 ? mkdir(path.dirname(target.path), { recursive: true }).then(() => writeFile(target.path, chunk.bytes)) : appendFile(target.path, chunk.bytes))).pipe(Effect.orDie)
           entry.written += chunk.bytes.byteLength
           if (!chunk.last) return null
-          entry.done = true
-          const header = yield* io(() => readHead(target.path)).pipe(Effect.orDie)
-          const size = IMAGE_EXTENSIONS[entry.file.mimetype] === undefined ? undefined : imageSize(header)
-          const file: PendingFile = { ...entry.file, size: entry.written, ...(size === undefined ? {} : { width: size.width, height: size.height }) }
-          entries.set(chunk.id, { ...entry, file })
-          return {
-            id: file.id,
-            name: file.name,
-            mimetype: file.mimetype,
-            size: file.size,
-            ...(size === undefined ? {} : { width: size.width, height: size.height, preview: uploadsUrl(file.stagedName) }),
+          const file = yield* finish(entry)
+          // A send took it while this chunk was being written: its post waits for it.
+          if (claimed.get(chunk.id) === entry) yield* settle
+          return stagedOf(file)
+        })
+
+      /** A chunk of a file a post took while it was staging. A refused chunk fails the post; the last makes it ready. */
+      const stageClaimed = (entry: Entry, chunk: StageChunk): Effect.Effect<StagedFile | null, StageError> =>
+        Effect.gen(function* () {
+          if (entry.done || entry.failed) return yield* new Rejected({ code: 'bad_chunk' })
+          if (entry.written !== chunk.offset || entry.written + chunk.bytes.byteLength > MAX_FILE_BYTES) {
+            entry.failed = true
+            yield* settle
+            return yield* new Rejected({ code: entry.written === chunk.offset ? 'file_too_large' : 'bad_chunk' })
           }
+          yield* io(() => appendFile(entry.path, chunk.bytes)).pipe(Effect.orDie)
+          entry.written += chunk.bytes.byteLength
+          if (!chunk.last) return null
+          const file = yield* finish(entry)
+          yield* settle
+          return stagedOf(file)
+        })
+
+      /** The last chunk is written: the file's size, and an image's pixel size from its header. */
+      const finish = (entry: Entry) =>
+        Effect.gen(function* () {
+          entry.done = true
+          const header = yield* io(() => readHead(entry.path)).pipe(Effect.orDie)
+          const size = IMAGE_EXTENSIONS[entry.file.mimetype] === undefined ? undefined : imageSize(header)
+          const { staging: _, ...rest } = entry.file
+          entry.file = { ...rest, size: entry.written, ...(size === undefined ? {} : { width: size.width, height: size.height }) }
+          return entry.file
+        })
+
+      const status = (id: string): Effect.Effect<StagingStatus> =>
+        Effect.sync(() => {
+          const entry = claimed.get(id)
+          if (entry === undefined) return { _tag: 'unknown' } as const
+          if (entry.failed) return { _tag: 'failed' } as const
+          if (!entry.done) return { _tag: 'writing' } as const
+          // The worker keeps the complete file on the post now.
+          claimed.delete(id)
+          return { _tag: 'ready', file: entry.file } as const
         })
 
       const unstage = (id: string) =>
         Effect.gen(function* () {
+          const taken = claimed.get(id)
+          // A post owns it: only a file still staging changes, to failed.
+          if (taken !== undefined) {
+            if (!taken.done && !taken.failed) {
+              taken.failed = true
+              yield* settle
+            }
+            return
+          }
           const entry = entries.get(id)
           if (entry === undefined) return
           entries.delete(id)
@@ -120,11 +192,15 @@ export class Staging extends Context.Service<
           const files: Array<PendingFile> = []
           for (const id of ids) {
             const entry = entries.get(id)
-            if (entry === undefined || !entry.done) return yield* new Rejected({ code: 'file_not_found' })
-            files.push(entry.file)
+            if (entry === undefined) return yield* new Rejected({ code: 'file_not_found' })
+            files.push(entry.done ? entry.file : { ...entry.file, staging: true })
           }
           // The post owns them now; removing a chip later must not delete them.
-          for (const id of ids) entries.delete(id)
+          for (const id of ids) {
+            const entry = entries.get(id)
+            entries.delete(id)
+            if (entry !== undefined && !entry.done) claimed.set(id, entry)
+          }
           return files
         })
 
@@ -134,7 +210,15 @@ export class Staging extends Context.Service<
         )
 
       const release = (open: OpenWorkspace, files: ReadonlyArray<PendingFile>) =>
-        Effect.forEach(files, (file) => removeFile(path.join(open.paths.uploads, file.stagedName)), { discard: true })
+        Effect.forEach(
+          files,
+          (file) =>
+            Effect.suspend(() => {
+              claimed.delete(file.id)
+              return removeFile(path.join(open.paths.uploads, file.stagedName))
+            }),
+          { discard: true },
+        )
 
       /** Deletes staged bytes older than a day that no pending post and no chip names. */
       const sweep = (open: OpenWorkspace) =>
@@ -157,18 +241,27 @@ export class Staging extends Context.Service<
         Stream.runForEach(workspace.changes, (open) =>
           Effect.gen(function* () {
             entries.clear()
+            claimed.clear()
             if (open !== undefined) yield* sweep(open)
           }),
         ),
       )
 
-      return Staging.of({ stage, unstage, take, read, release })
+      return Staging.of({ stage, unstage, take, status, settled: Stream.fromPubSub(settles), read, release })
     }),
   )
 }
 
 /** The url main serves a staged image at (`apps/desktop/src/main/files.ts`). */
 export const uploadsUrl = (stagedName: string): string => `juno://uploads/${stagedName}`
+
+const stagedOf = (file: PendingFile): StagedFile => ({
+  id: file.id,
+  name: file.name,
+  mimetype: file.mimetype,
+  size: file.size,
+  ...(file.width === undefined || file.height === undefined ? {} : { width: file.width, height: file.height, preview: uploadsUrl(file.stagedName) }),
+})
 
 const io = <A>(run: () => Promise<A>) => Effect.tryPromise({ try: run, catch: (cause) => cause })
 
