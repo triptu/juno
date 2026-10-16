@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { encodeMentions, type PickConversation, type PickThread } from '@juno/contract'
 import {
   newChatAtom,
@@ -62,7 +62,8 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   // The files stay with the draft through every change of destination (spec section 9).
   const files = useAttachments(tabId, { tabbable: false })
 
-  useEffect(() => {
+  // Before the first paint, so keys typed right after ⌘N reach the field.
+  useLayoutEffect(() => {
     inputRef.current?.focus()
     afterPaint(() => {
       if (inputRef.current === document.activeElement) mark('juno.composer-ready')

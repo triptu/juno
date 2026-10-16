@@ -318,16 +318,37 @@ test('⌘T twice gives two New chat tabs with their own drafts, and both survive
   }
 })
 
-test('a New chat sent to a topic open in another tab stays in its own tab', async ({ juno, fake }) => {
+test('a New chat sent to Main becomes the new thread; to a thread or DM another tab shows, it stays in its own tab', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  // Main: the tab becomes the thread rooted at the sent message (SPEC 9, After the first send).
   await juno.sidebar.row('#eng').open()
   await juno.tabs.menu('new-tab')
   await juno.newChat.write('Sent from a second tab')
   await juno.newChat.pickConversation('eng', 'eng')
   await juno.newChat.send()
   await juno.topic.expectMessage('Sent from a second tab')
-  await expect(juno.tabs.tab('eng')).toHaveCount(2)
-  await juno.tabs.expectActiveAt('eng', 1)
+  await juno.tabs.expectActive('Sent from a second tab')
+  await expect(juno.tabs.tab('eng')).toHaveCount(1)
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent from a second tab')).toHaveLength(1)
+
+  // An existing thread another tab shows: this tab becomes it too (Other destinations).
+  await juno.sidebar.row(POSTGRES).openInNewTab()
+  await juno.tabs.menu('new-tab')
+  await juno.newChat.write('Reply from a New chat')
+  await juno.newChat.pickThread('draft plan', POSTGRES)
+  await juno.newChat.send()
+  await juno.topic.expectMessage('Reply from a New chat')
+  await expect(juno.tabs.tab(POSTGRES)).toHaveCount(2)
+  await juno.tabs.expectActiveAt(POSTGRES, 1)
+
+  // A DM another tab shows: this tab becomes its Main.
+  await juno.sidebar.row('Maya', { exact: true }).openInNewTab()
+  await juno.tabs.menu('new-tab')
+  await juno.newChat.write('DM from a New chat')
+  await juno.newChat.pickConversation('maya', 'Maya')
+  await juno.newChat.send()
+  await juno.topic.expectMessage('DM from a New chat')
+  await expect(juno.tabs.tab('Maya')).toHaveCount(2)
+  await juno.tabs.expectActiveAt('Maya', 1)
 })

@@ -315,6 +315,9 @@ function keepsNewChat(tabs: Tabs): boolean {
  * (spec section 9), every time. Each New chat tab keeps its own draft.
  */
 export function openNewChat(): void {
+  // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘N must not land in
+  // the field the old tab had focused.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
 }
 
