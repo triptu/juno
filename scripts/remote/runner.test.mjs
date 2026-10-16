@@ -289,7 +289,7 @@ else process.exit(2);
 
 async function poolHarness(extraEnv = {}) {
   const { spawn } = await import('node:child_process')
-  const { mkdirSync, readdirSync } = await import('node:fs')
+  const { mkdirSync } = await import('node:fs')
   const dir = mkdtempSync(join(tmpdir(), 'juno-pool-daemon-'))
   const poolDir = join(dir, 'juno-remote-pool')
   const instances = join(dir, 'instances')

@@ -12,10 +12,8 @@ const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
 // Warm machines between runs: docs/development.md, "Current cost controls".
 const defaultIdleMinutes = 8
-export const idleMinutes = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? defaultIdleMinutes)
-const idleMs = idleMinutes * 60_000
-const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2)
-const holdMs = Number(process.env.JUNO_REMOTE_HOLD_SECONDS ?? 120) * 1000
+export const idleMinutes = Number(process.env.JUNO_REMOTE_IDLE_MINUTES ?? defaultIdleMinutes), idleMs = idleMinutes * 60_000
+const idlePerShape = Number(process.env.JUNO_REMOTE_IDLE_PER_SHAPE ?? 2), holdMs = Number(process.env.JUNO_REMOTE_HOLD_SECONDS ?? 120) * 1000
 const maxVcpu = Math.min(24, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 24))
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
@@ -288,9 +286,8 @@ function admit(request, instances) {
   write(pending)
   return { pending }
 }
-// A request that does not fit leaves free cores to later requests that fit,
-// until it has waited JUNO_REMOTE_HOLD_SECONDS (default 120); then it holds
-// them so it is not starved.
+// A request that does not fit leaves free cores to later ones until it has
+// waited JUNO_REMOTE_HOLD_SECONDS (default 120); then it holds them.
 function dispatch(instances) {
   const blocked = []
   for (const request of queue()) {
