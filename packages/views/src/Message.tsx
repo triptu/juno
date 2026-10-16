@@ -12,7 +12,7 @@ import { MessageBody } from './MessageBody'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
-import { fullTime } from './time'
+import { clockTime, fullTime } from './time'
 
 /**
  * What the hover toolbar and the delete confirm do, for every row of a list.
@@ -227,7 +227,7 @@ export const Message = memo(function Message({
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
         ) : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.gutterTime}>
-            {time}
+            {clockTime(message.at)}
           </Text>
         )}
       </span>
