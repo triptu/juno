@@ -17,7 +17,7 @@ Privacy mode (SPEC section 5) hides message text so it cannot be read over a sha
 ## Consequences
 
 - The call is private. A macOS update could remove it; the result is that automatic hiding stops, not a crash. Check it with a real Zoom or Meet share once per macOS release.
-- The signal says that something captures, not who. A screenshot tool, a screen recorder or an always-on screen-context app counts too. On the owner's Mac the signal was already true before any test capture (research doc, "Probe on 10-16"). So the footer says "Message text hidden while sharing" and Show turns it off until the next share starts.
+- The signal says that something captures, not who. A screenshot tool, a screen recorder or an always-on screen-context app counts too. On the owner's Mac the signal was already true before any test capture (research doc, "Probe on 10-16"). So only a change from false to true seen while Juno runs counts, a signal true since launch for more than 2 minutes makes Settings say detection is not available, the footer says "Message text hidden while sharing", and Show turns it off until the next share starts.
 - About 1.3 MB more in the app, all unpacked from the asar: the arm64 `.node` (1.2 MB) and koffi's JS (84 KB), measured in the packaged build on 10-16.
 
 ## Alternatives
