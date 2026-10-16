@@ -20,7 +20,7 @@ interface Frame {
 }
 
 /**
- * Reads, before every paint, whether the newest `row` that contains `text` exists, is fully inside the scroller
+ * Reads, after every paint, whether the newest `row` that contains `text` exists, is fully inside the scroller
  * `scroller`, and how far the scroller is from its end. The returned function stops and answers the frames from
  * the first that has the row.
  */
@@ -41,9 +41,10 @@ async function watchArrival(page: Page, scroller: string, row: string, text: str
             distance: list.scrollHeight - list.scrollTop - list.clientHeight,
           })
         }
-        if (state.on) requestAnimationFrame(tick)
+        // After the frame is painted: a resize observer runs after animation frame callbacks, before paint.
+        if (state.on) requestAnimationFrame(() => setTimeout(tick, 0))
       }
-      requestAnimationFrame(tick)
+      requestAnimationFrame(() => setTimeout(tick, 0))
     },
     { scroller, row, text },
   )
