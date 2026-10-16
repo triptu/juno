@@ -26,6 +26,12 @@ export interface FixtureFrame {
    * from the keyboard, so the focus ring and `:focus-within` styles show.
    */
   readonly focus?: string
+  /**
+   * Before the screenshot, press the first element matching `from` and move
+   * the pointer `by` px sideways, holding the button, so a drag shows
+   * mid-way. Reduced motion is turned off for the shot.
+   */
+  readonly drag?: { readonly from: string; readonly by: number }
 }
 
 export interface Fixture<P> {
