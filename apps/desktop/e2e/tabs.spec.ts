@@ -98,7 +98,7 @@ test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
   await tabs.expectActive(ROADMAP)
 })
 
-test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, app }) => {
+test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -107,18 +107,28 @@ test('⌘W held down closes a tab per press, even when the tabs it lands on were
   for (const title of topics.slice(1)) await sidebar.row(title).openInNewTab()
   await tabs.menu('tab-1')
   await tabs.expectActive(POSTGRES)
-  // Past the idle time, the tabs that are not mounted have let go of their topics, so showing one waits for the engine.
-  await juno.win.waitForTimeout(31_000)
-
-  // Three presses in one go, as the key repeats.
-  await app.evaluate(({ Menu, BrowserWindow }) => {
-    const close = Menu.getApplicationMenu()!.getMenuItemById('close-tab')!
-    for (let press = 0; press < 3; press++) close.click(undefined, BrowserWindow.getAllWindows()[0])
-  })
-  await tabs.expectCount(topics.length - 3)
+  // Let the save reach the engine.
   await juno.win.waitForTimeout(500)
-  await tabs.expectCount(topics.length - 3)
-  expect(await tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
+  await running.close()
+
+  // After a relaunch only the active tab has its topic loaded, so showing any other one waits for the engine.
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await restarted.tabs.expectCount(topics.length)
+    await restarted.tabs.expectActive(POSTGRES)
+    // Three presses in one go, as the key repeats.
+    await again.app.evaluate(({ Menu, BrowserWindow }) => {
+      const close = Menu.getApplicationMenu()!.getMenuItemById('close-tab')!
+      for (let press = 0; press < 3; press++) close.click(undefined, BrowserWindow.getAllWindows()[0])
+    })
+    await restarted.tabs.expectCount(topics.length - 3)
+    await restarted.win.waitForTimeout(500)
+    await restarted.tabs.expectCount(topics.length - 3)
+    expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
+  } finally {
+    await again.close()
+  }
 })
 
 test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp }) => {

@@ -5,8 +5,6 @@ import type { Juno } from '../driver/juno'
 import { openChat, ready } from './agent'
 import { expect, JunoChatPane, test } from './chat'
 
-test.describe.configure({ timeout: 180_000 })
-
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /** Read the saved settings: a select's DOM value changes before its RPC commits. */
@@ -32,7 +30,7 @@ async function everyDay(juno: Juno, saved: ReadSettings): Promise<void> {
   }
 }
 
-/** The UI offers half hours; the hours-boundary test needs a start at the next minute. */
+/** Set one edge of the notification hours and check it saved. */
 async function setHours(juno: Juno, saved: ReadSettings, edge: 'from' | 'to', minutes: number): Promise<void> {
   const select = juno.notifications.root.getByRole('combobox', { name: `Notifications ${edge}` })
   await select.evaluate((element, value) => {
@@ -55,21 +53,26 @@ async function coverNow(juno: Juno, saved: ReadSettings): Promise<void> {
   await setHours(juno, saved, 'to', (middle + 6 * 60) % 1440)
 }
 
+/** A twelve-hour window that starts six hours from now, so now is outside it. */
+async function excludeNow(juno: Juno, saved: ReadSettings): Promise<void> {
+  await everyDay(juno, saved)
+  const middle = Math.floor(minutesNow() / 30) * 30
+  await setHours(juno, saved, 'from', (middle + 6 * 60) % 1440)
+  await setHours(juno, saved, 'to', (middle + 18 * 60) % 1440)
+}
+
 const minutesNow = () => {
   const now = new Date()
   return now.getHours() * 60 + now.getMinutes()
 }
 
+// A held message is judged at the time it arrived, so hours that start later never release it.
+// The minute-by-minute boundary is covered with the test clock in packages/engine/test/notifications.test.ts.
 test('starting notification hours keeps held messages quiet while a new urgent message notifies', async ({ juno, slack, model, userData, fake }) => {
   await ready(juno)
   await juno.openNotifications()
   const saved = () => savedSettings(userData, fake.teamId)
-  await everyDay(juno, saved)
-  // Leave enough time to record the held message before the next minute begins.
-  if (new Date().getSeconds() > 30) await juno.win.waitForTimeout((61 - new Date().getSeconds()) * 1000)
-  const start = (minutesNow() + 1) % 1440
-  await setHours(juno, saved, 'to', (Math.floor(start / 30) * 30 + 120) % 1440)
-  await setHours(juno, saved, 'from', start)
+  await excludeNow(juno, saved)
   const held = 'Can you approve the release now?'
   slack.as('Maya').dm(held)
   await expect.poll(() => {
@@ -81,11 +84,8 @@ test('starting notification hours keeps held messages quiet while a new urgent m
     }
   }).toMatchObject({ outcome: 'hold', reason: expect.stringContaining('Outside your notification hours.') })
   expect(await juno.osNotifications()).toHaveLength(0)
+  await coverNow(juno, saved)
   await juno.blurWindow()
-  // Cross the boundary and allow a full engine minute tick to pass.
-  await expect.poll(minutesNow, { timeout: 70_000, intervals: [1_000] }).toBe(start)
-  await juno.win.waitForTimeout(61_000)
-  expect(await juno.osNotifications()).toHaveLength(0)
 
   const urgent = 'Can you approve the release today?'
   slack.as('Maya').dm(urgent)
