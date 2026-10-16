@@ -42,7 +42,6 @@ it('updates the engine provider on host key changes and cancels calls using the 
   }
 })
 
-
 it('reads the latest key for every live provider call', async () => {
   const host = memoryHost()
   const provider = vi.spyOn(PiAiProvider, 'layer').mockImplementation(config => Layer.succeed(AiProvider, {

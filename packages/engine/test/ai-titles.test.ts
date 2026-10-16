@@ -34,7 +34,7 @@ it('titles recent sidebar threads after sync without opening them and respects t
   const id = `t:C0ENG:${root.ts}`
   await engine.rowsUntil(rows => rows.some(row => row.id === id), 'new sidebar thread')
   await new Promise(resolve => setTimeout(resolve, 3_000))
-  const rows = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
-  expect(rows.find(row => row.id === id)?.titleSource).toBe('fallback')
+  const after = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
+  expect(after.find(row => row.id === id)?.titleSource).toBe('fallback')
   expect(calls()).toBe(before)
 })
