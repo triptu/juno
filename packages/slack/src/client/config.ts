@@ -14,7 +14,7 @@ import { Context, Layer } from 'effect'
  * `totalMillis` is a ceiling over all of them. A 429 doubles one method's
  * interval from its own base.
  */
-export interface BackgroundPacing {
+interface BackgroundPacing {
   /** Least time between any two background starts: the ceiling over every method. */
   readonly totalMillis: number
   /** Least time between two starts of a method `methods` does not list. */
@@ -38,7 +38,7 @@ export interface BackgroundPacing {
  *   (the follow pass, lookups, emoji, a reconnect's metadata).
  * - all methods together: 120 a minute.
  */
-export const defaultBackgroundPacing: BackgroundPacing = {
+const defaultBackgroundPacing: BackgroundPacing = {
   totalMillis: 500,
   methodMillis: 3_000,
   methods: {
