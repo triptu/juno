@@ -3,7 +3,7 @@
 // the session expiring under the app.
 import { readFile, access, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, test, writeSlackApp } from './fixtures'
 import { Juno } from './driver/juno'
 
 test('starts signed out with the sign-in page', async ({ juno, win }) => {
@@ -119,12 +119,39 @@ test('imports the Slack app’s session through the test seam', async ({ juno, f
   expect(slackApp.credentials.userId).toBe(fake.selfId)
 })
 
-test('explains a Slack app that is not signed in', async ({ fake, userData }) => {
+test('imports a Slack app whose cookie store is at Network/Cookies', async ({ fake, userData }) => {
+  const dir = join(userData, 'slack-network-cookies')
+  const slackApp = await writeSlackApp(fake, dir, { cookiesFile: 'Network/Cookies' })
+  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const juno = new Juno(running.app, running.win)
+    await juno.importFromSlackApp()
+    await juno.expectSignedIn('Juno Fake')
+    expect(fake.calls.find((call) => call.method === 'auth.test')?.ok).toBe(true)
+  } finally {
+    await running.close()
+  }
+})
+
+test('explains a Mac without Slack', async ({ fake, userData }) => {
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: join(userData, 'no-such-dir'), keychainPassword: 'x' })
   try {
     const juno = new Juno(running.app, running.win)
     await juno.importFromSlackApp({ skipSetUp: false })
-    await juno.expectSignInError('No signed-in Slack app was found on this Mac.')
+    await juno.expectSignInError('Slack isn’t installed on this Mac.')
+    await juno.expectSignedOut()
+  } finally {
+    await running.close()
+  }
+})
+
+test('explains a Slack app that is not signed in', async ({ fake, userData }) => {
+  const slackApp = await writeSlackApp(fake, join(userData, 'slack-signed-out'), { signedOut: true })
+  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const juno = new Juno(running.app, running.win)
+    await juno.importFromSlackApp({ skipSetUp: false })
+    await juno.expectSignInError('Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.')
     await juno.expectSignedOut()
   } finally {
     await running.close()

@@ -13,7 +13,9 @@ function failureLine(error: SignInFailed): string {
     case 'no-token':
       return 'Slack signed in, but Juno could not read the session. Try again.'
     case 'no-slack-app':
-      return 'No signed-in Slack app was found on this Mac.'
+      return 'Slack isn’t installed on this Mac.'
+    case 'slack-signed-out':
+      return 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.'
     case 'keychain':
       return 'Juno could not read the Slack keychain item. Allow access when macOS asks, or sign in instead.'
     case 'rejected':

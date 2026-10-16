@@ -31,7 +31,13 @@ export default defineFixtures(
       }),
       'slack-app-missing': fixture({
         mode: 'first-run',
-        error: 'No signed-in Slack app was found on this Mac.',
+        error: 'Slack isn’t installed on this Mac.',
+        onSignIn: noop,
+        onImport: noop,
+      }),
+      'slack-app-signed-out': fixture({
+        mode: 'first-run',
+        error: 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.',
         onSignIn: noop,
         onImport: noop,
       }),

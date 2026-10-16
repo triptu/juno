@@ -60,6 +60,8 @@ export const SignInFailureKind = Schema.Literals([
   'no-token',
   /** No Slack app data on this Mac. */
   'no-slack-app',
+  /** The Slack app is installed but holds no signed-in workspace. */
+  'slack-signed-out',
   /** The keychain password could not be read or did not decrypt the cookie. */
   'keychain',
   /** The token and cookie were found but Slack rejected them. */
