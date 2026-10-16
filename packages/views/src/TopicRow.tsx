@@ -14,7 +14,6 @@ import {
   activateHandlers,
   Avatar,
   AvatarStack,
-  channelIcons,
   Chip,
   Icon,
   IconButton,
@@ -25,7 +24,7 @@ import {
   type AvatarStackPerson,
   type PhosphorIcon,
 } from '@juno/ui'
-import { channelIconFor, countLabel, groupInitials, hueFor, initials } from './look'
+import { countLabel, groupInitials, hueFor, initials } from './look'
 import { RenameField } from './RenameField'
 
 export interface TopicRowProps {
@@ -64,10 +63,12 @@ const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
 
 /**
- * One sidebar row, chat style: the channel icon or the person's photo, then
+ * One sidebar row, chat style: the topic's art or the person's photo, then
  * the title and time, a one-line "Sender: text" preview with the @ and count
- * tags, and the meta line with the channel, the people, the Main and
- * Reopened tags, a Main row's new-thread count and the Resolve check. The
+ * tags, and the meta line: the place with its Main and Reopened tags and a
+ * Main row's new-thread count, the people talking in the unread messages,
+ * and the Resolve check. Text takes three levels: the title, the preview
+ * one step down, and the meta line and time a step below that. The
  * check sits in a slot that is always reserved and shows on hover or
  * keyboard focus, so nothing ever moves. The row activates on mouse down;
  * Resolve on click.
@@ -154,6 +155,7 @@ export const TopicRow = memo(function TopicRow({
               truncate
               dir="auto"
               id={titleId}
+              data-row-part="title"
               tooltipWhenTruncated
               sx={styles.title}
             >
@@ -165,14 +167,14 @@ export const TopicRow = memo(function TopicRow({
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
             </span>
           ) : null}
-          <Text variant="meta" tone={unread ? 'subtle' : 'muted'} numeric sx={styles.time}>
+          <Text variant="meta" tone="muted" numeric data-row-part="time" sx={styles.time}>
             {time}
           </Text>
         </span>
         <span {...stylex.props(styles.line2)}>
           {/* The message sets the direction; the sender is isolated so a Latin
               name before Arabic text, or the reverse, keeps its own order. */}
-          <Text variant="preview" tone={unread ? 'subtle' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" sx={styles.preview}>
+          <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
             {row.preview.text.length === 0 ? (
               row.preview.sender
             ) : (
@@ -198,40 +200,36 @@ export const TopicRow = memo(function TopicRow({
             </span>
           </span>
         </span>
-        <span {...stylex.props(styles.line3, main && styles.line3Main)}>
+        <span {...stylex.props(styles.line3)}>
           <span {...stylex.props(styles.where)}>
-            {row.channel.kind === 'private' ? (
-              <span {...stylex.props(styles.lock)} title={PRIVATE_TITLE}>
-                <Icon icon={Lock} size={13} label={PRIVATE_TITLE} />
+            <span {...stylex.props(styles.place)}>
+              <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
+                <Icon icon={whereIcon(row)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
               </span>
-            ) : (
-              <Icon icon={whereIcon(row)} size={13} />
-            )}
-            <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated>
-              {row.channel.name}
-            </Text>
-          </span>
-          <span {...stylex.props(styles.people)}>
-            {people.length > 0 ? <AvatarStack people={people} surface={selected ? 'surface' : 'subtle'} /> : null}
-          </span>
-          <span {...stylex.props(styles.tags)}>
+              <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated data-row-part="place">
+                {row.channel.name}
+              </Text>
+            </span>
             {main ? <Chip variant="outline">Main</Chip> : null}
             {reopened ? (
               <Chip variant="filled" title={REOPENED_TITLE}>
                 Reopened
               </Chip>
             ) : null}
-          </span>
-          {main ? <span {...stylex.props(styles.threads)} title={threads > 0 ? threadsLabel : undefined}>
             {threads > 0 ? (
-              <>
+              <span {...stylex.props(styles.threads)} title={threadsLabel}>
                 <Icon icon={ChatsCircle} size={13} />
                 <Text variant="meta" tone="muted" numeric>
                   {threads}
                 </Text>
-              </>
+              </span>
             ) : null}
-          </span> : null}
+          </span>
+          <span {...stylex.props(styles.people)}>
+            {people.length > 0 ? (
+              <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
+            ) : null}
+          </span>
           <span {...stylex.props(styles.actionSlot)}>
             {row.canResolveOnHover && !renaming ? (
               <IconButton
@@ -298,17 +296,21 @@ function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string 
   return parts.length === 0 ? undefined : `${parts.join(', ')}.`
 }
 
-/** Line three's leading icon: the channel's own icon, or a person for DMs. A private channel shows the lock instead. */
+/**
+ * Line three's leading glyph says what kind of place it is, nothing more: #
+ * for a public channel, a lock for a private one, a person for a DM and two
+ * for a group DM. A channel's own icon is for its art, not this line.
+ */
 function whereIcon(row: TopicRowModel): PhosphorIcon {
   switch (row.channel.kind) {
     case 'im':
       return User
     case 'mpim':
       return Users
-    default: {
-      const name = channelIconFor(row.channel.icon)
-      return name === undefined ? Hash : channelIcons[name]
-    }
+    case 'private':
+      return Lock
+    default:
+      return Hash
   }
 }
 
@@ -354,14 +356,15 @@ const styles = stylex.create({
       ':has(:focus-visible)': '1',
     },
   },
-  // Muted text fails contrast on the secondary fill (tokens.md 1.7); the
-  // selected row points it at the subtle value, as ListRow does.
+  // Light muted text fails contrast on the secondary fill (tokens.md 1.7);
+  // the selected row points it at the value made for a fill, which keeps it
+  // a step below the preview in both themes.
   selected: {
     backgroundColor: {
       default: colors['--secondary-default'],
       ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
-    '--foreground-muted': colors['--foreground-subtle'],
+    '--foreground-muted': colors['--foreground-muted-on-fill'],
   },
   tile: {
     display: 'inline-flex',
@@ -433,8 +436,12 @@ const styles = stylex.create({
     width: sizes['--control-28'],
     flexShrink: 0,
   },
+  // A fixed slot at the end of the line, before Resolve: the stack ends on
+  // the same edge in every row and the place never moves when it changes.
   people: {
     display: 'inline-flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     width: sizes['--topic-people-width'],
     overflow: 'hidden',
   },
@@ -445,37 +452,34 @@ const styles = stylex.create({
     flexShrink: 0,
     paddingTop: spacing['--space-pixel'],
   },
+  // The place and its tags on the left, the people in a fixed slot on the
+  // right, then Resolve. The tags follow the name, so they never float.
   line3: {
     display: 'grid',
-    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--topic-tags-width']} ${sizes['--control-22']}`,
+    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--control-22']}`,
     alignItems: 'center',
-    gap: spacing['--space-1'],
+    gap: spacing['--space-2'],
     minWidth: 0,
     marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
   },
-  line3Main: {
-    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--control-36']} ${sizes['--control-32']} ${sizes['--control-22']}`,
-  },
   where: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    minWidth: 0,
+  },
+  glyph: {
+    display: 'inline-flex',
+    flexShrink: 0,
+  },
+  // The glyph and the name; the name gives way first, the tags keep their size.
+  place: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
-    minWidth: 0,
     flexShrink: 1,
-  },
-  // The private context pill's colour (tokens.md 1.4), so a lock reads the
-  // same here as on the topic header.
-  lock: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    color: tints['--tint-private-fg'],
-  },
-  tags: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing['--space-1-5'],
-    flexShrink: 0,
+    minWidth: 0,
   },
   threads: {
     display: 'inline-flex',

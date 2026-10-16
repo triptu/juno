@@ -104,6 +104,28 @@ export default defineFixtures(
       press: state(rows.postgres, {}, { press: ROW }),
       'hover-resolved': state(rows.notes, {}, { hover: ROW }),
     },
+    // The three text levels across every kind of row, read and unread, with
+    // one selected and one past four people: the shot for contrast in light,
+    // dark and each accent, and the rows the gallery contrast test measures.
+    Hierarchy: {
+      'mixed-list': scene(() => (
+        <div style={column}>
+          {[rows.alertsMain, rows.postgres, rows.lowerBound, rows.hiring, rows.vendors, rows.mayaMain, rows.offsite, rows.lunch, rows.roadmap].map((row) => (
+            <TopicRow key={row.id} {...one(row, { selected: row === rows.postgres })} />
+          ))}
+        </div>
+      )),
+      'mixed-list-hover': scene(
+        () => (
+          <div style={column}>
+            {[rows.postgres, rows.roadmap, rows.hiring].map((row) => (
+              <TopicRow key={row.id} {...one(row)} />
+            ))}
+          </div>
+        ),
+        { hover: `${ROW}:nth-of-type(2)` },
+      ),
+    },
     Overview: {
       'all-states': scene(() => (
         <div style={column}>
