@@ -189,6 +189,8 @@ describe('cold boot', () => {
       // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear on.
       'edge:users/info': 7,
       'edge:emojis/list': 1,
+      // User group handles, once per boot.
+      'api:usergroups.list': 1,
     })
     const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
     expect(new Set(asked).size).toBe(asked.length)
@@ -310,6 +312,8 @@ describe('warm boot', () => {
       'api:auth.test': 1,
       'api:api.getFlannelHttpUrl': 1,
       'edge:emojis/list': 1,
+      // User group handles, once per boot.
+      'api:usergroups.list': 1,
       'api:client.getWebSocketURL': 1,
       'api:client.userBoot': 1,
       'api:client.counts': 1,
