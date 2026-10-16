@@ -109,6 +109,16 @@ export function Popover({
     if (!open) return
     // An owner that stayed open after Escape is not closing; forget it.
     restoreFocus.current = false
+    // An owner whose content closes on Escape itself (an option list's search) does so before the key
+    // bubbles to `onKey`, so mark where focus was on the way down; the mark lasts for this key only.
+    const onEscapeDown = (event: KeyboardEvent) => {
+      const panel = panelRef.current
+      if (event.key !== 'Escape' || panel === null || !panel.contains(document.activeElement)) return
+      restoreFocus.current = true
+      setTimeout(() => {
+        restoreFocus.current = false
+      })
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
@@ -126,10 +136,12 @@ export function Popover({
       const root = rootRef.current
       if (root && event.target instanceof Node && !root.contains(event.target)) onClose()
     }
+    document.addEventListener('keydown', onEscapeDown, true)
     document.addEventListener('keydown', onKey)
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('focusin', onFocusIn)
     return () => {
+      document.removeEventListener('keydown', onEscapeDown, true)
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('focusin', onFocusIn)
