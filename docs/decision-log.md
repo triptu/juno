@@ -13,6 +13,7 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 - 10-16 21:00 · orchestrator · Growth the user asks for, such as Show more on a card, is exempt from the layout-shift guard (`data-expands-in-place`). Everything that moves on its own still fails the guard.
 - 10-16 20:40 · orchestrator · Set up Juno loads on demand to keep the startup bundle under 1000 KB.
 - 10-16 20:00 · orchestrator · Local desktop tests rebuild first when sources changed (Playwright global setup with build-cached), after a stale build made a fixed bug look live.
+- 10-16 19:40 · reactions-live · A reaction Slack refuses (`message_not_found` included, which counted as done before) stays as a failed row: the chip shows what Slack has, the message offers Retry and Dismiss, and one unsent after 30 s says "Reaction not sent yet."
 - 10-16 19:30 · orchestrator · A post the network sends twice is reconciled by its client message id: the copy is hidden and deleted through the outbox; a copy with replies stays (ADR 0014).
 - 10-16 18:30 · orchestrator · Background Slack calls stay at 40 per minute per method, below the published 50, because the session token is shared with the official client.
 - 10-16 17:00 · cache-keep · Lint checks migration order for cache.db and user.db (`scripts/check-migration-order.mjs`): an id that main does not have must be above main's largest id, because the Migrator skips ids at or below the newest it has recorded and existing installs would never run it. Ids must be unique.
