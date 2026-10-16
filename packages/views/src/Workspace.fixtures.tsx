@@ -183,13 +183,13 @@ export default defineFixtures(
     },
     // Each tab's icon: the topic's art, the DM person's photo, the page's glyph. Inactive ones dim with their title.
     'Tab icons': {
-      mixed: workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440, height: 200 }),
-      'mixed-hover': workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440, height: 200, hover: '[data-tab]:nth-of-type(3) [role="tab"]' }),
-      'pinned-mixed': workspace({ tabs: [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.maya, tabs.home], activeId: tabs.maya.id }, postgresPage, { width: 1200, height: 200 }),
+      mixed: workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440 }),
+      'mixed-hover': workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440, hover: '[data-tab]:nth-of-type(3) [role="tab"]' }),
+      'pinned-mixed': workspace({ tabs: [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.maya, tabs.home], activeId: tabs.maya.id }, postgresPage, { width: 1200 }),
     },
     // Dragging a tab: it follows the pointer and the tabs it passed slide aside.
     Reorder: {
-      'mid-drag': scene<WorkspaceProps>(() => <Reorderable />, { width: 1440, height: 200, drag: { from: '[data-tab]:nth-of-type(5) [role="tab"]', by: -300 } }),
+      'mid-drag': scene<WorkspaceProps>(() => <Reorderable />, { width: 1440, drag: { from: '[data-tab]:nth-of-type(5) [role="tab"]', by: -300 } }),
     },
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(2) [role="tab"]' }),
