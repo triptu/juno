@@ -21,7 +21,7 @@ const placeholders: Record<PaletteTab, string> = {
 }
 
 export interface PaletteSection {
-  /** "Frequent", "Conversations", "Commands", "Recent", "Results", "Juno", or the open topic's name over its commands. */
+  /** "Frequent", "Conversations", "Pages", "Settings", "Commands", "Recent", "Results", "Juno", or the open topic's name over its commands. */
   readonly heading: string
   /** Unique among the sections; the heading by default. */
   readonly key?: string

@@ -2,9 +2,10 @@
  * ⌘K (spec section 10, inventory 9, performance 5.3), in two tabs.
  *
  * Conversations, the default: DMs, group DMs and channels from
- * `paletteConversationsAtom`, by use with an empty query; the commands
- * that match the text (`paletteCommands.ts`), or all of them after a
- * leading ">", with the open topic's own commands first under its name.
+ * `paletteConversationsAtom`, by use with an empty query; the pages,
+ * Settings sections and commands that match the text
+ * (`paletteCommands.ts`), or all of them after a leading ">", with the
+ * open topic's own commands first under its name.
  *
  * Messages: the message search. Local results come from `searchAtom`;
  * after a pause in typing, Slack's search is asked for and its matches are
@@ -49,7 +50,7 @@ import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSec
 import { junoCommands, openJunoTab } from './juno/actions'
 import { openNewChatTo, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette } from './paletteActions'
-import { globalCommands, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
+import { commandGroups, globalCommands, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { scopeToChannel, showChannelMenu, type MenuChannel } from './placeMenus'
 
@@ -182,10 +183,21 @@ const conversationRow = (pick: PickConversation): Row => {
   }
 }
 
-const commandRunRow = (command: CommandRow): Row => ({ ...command, run: () => command.run() })
-
-/** Commands shown beside conversations when the text is not a ">" listing. */
+/** Commands shown in each group beside conversations when the text is not a ">" listing, unless the text names their family. */
 const COMMANDS_WITH_TEXT = 4
+
+/** The global commands that match `text`, under Pages, Settings and Commands. */
+function globalSections(rows: ReadonlyArray<CommandRow>, text: string, max?: number): ReadonlyArray<PaletteSection & { readonly items: ReadonlyArray<CommandRow> }> {
+  return commandGroups.map(({ group, heading }) => ({
+    key: `commands-${group}`,
+    heading,
+    items: matchCommands(
+      rows.filter((candidate) => candidate.group === group),
+      text,
+      max,
+    ),
+  }))
+}
 
 const commandIcon: Record<PaletteCommand['kind'], PaletteIconName> = { 'send-dm': 'send', post: 'send', 'open-dm': 'open-dm', ask: 'ask', resolve: 'resolve' }
 
@@ -258,26 +270,26 @@ export function OpenPalette() {
   if (conversationsTab) {
     const topic = commands.topic
     if (listingNow !== undefined) {
-      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, listingNow).map(commandRunRow)
-      const globalRows = matchCommands(commands.global, listingNow).map(commandRunRow)
-      sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]), { heading: 'Commands', items: globalRows }]
-      rows = [...topicRows, ...globalRows]
+      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, listingNow)
+      const global = globalSections(commands.global, listingNow)
+      sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]), ...global]
+      rows = [...topicRows, ...global.flatMap((section) => section.items)]
     } else if (shownText === '') {
       const found = (conversations.local?.value ?? []).map(conversationRow)
       sections = [{ heading: 'Frequent', items: found }]
       rows = found
     } else {
-      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, shownText).slice(0, COMMANDS_WITH_TEXT).map(commandRunRow)
+      const topicRows = topic === undefined ? [] : matchCommands(topic.rows, shownText, COMMANDS_WITH_TEXT)
       const found = (conversations.local?.value ?? []).map(conversationRow)
-      const globalRows = matchCommands(commands.global, shownText).slice(0, COMMANDS_WITH_TEXT).map(commandRunRow)
+      const global = globalSections(commands.global, shownText, COMMANDS_WITH_TEXT)
       const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
       sections = [
         ...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]),
         { heading: 'Conversations', items: found },
-        { heading: 'Commands', items: globalRows },
+        ...global,
         { heading: 'Juno', items: juno },
       ]
-      rows = [...topicRows, ...found, ...globalRows, ...juno]
+      rows = [...topicRows, ...found, ...global.flatMap((section) => section.items), ...juno]
     }
   } else {
     const results = messages.local?.value ?? []
