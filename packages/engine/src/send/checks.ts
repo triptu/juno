@@ -1,7 +1,7 @@
 /** Wrong-place prechecks and post-send message suggestions (SPEC section 8). */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
 import { sendCheckDefaults, type ClarityFinding, type RouteFinding, type SendCheck, type SendCheckPref } from '@juno/contract'
-import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
+import { channelLabel, clarityCheck, resolveTitle, sendChecksApply, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { GrammarChecks } from './grammar'
@@ -160,7 +160,7 @@ const clarity = (text: string, options: ClarityPrefs): ClarityFinding | undefine
 export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return {}
+    if (open === undefined || !sendChecksApply(input.text)) return {}
     return yield* Effect.gen(function* () {
       const options = yield* checkPrefs
       const ai = (yield* aiAssistOn) && (yield* decisionProviderAvailable)
@@ -177,7 +177,7 @@ export const precheckMessage = (input: CheckInput & { readonly message?: string 
   Effect.gen(function* () {
     const slot = slotOf(input)
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return yield* grammar.stop(slot)
+    if (open === undefined || !sendChecksApply(input.text)) return yield* grammar.stop(slot)
     yield* Effect.gen(function* () {
       if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return yield* grammar.stop(slot)
       const options = yield* checkPrefs
@@ -204,7 +204,7 @@ const checkPrefs = Effect.gen(function* () {
  */
 export const postcheckMessage = (text: string, grammarChecks: GrammarChecks, waitMillis: number): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
-    if ([...text].length > 1000 || text.trim() === '') return {}
+    if (!sendChecksApply(text)) return {}
     const open = yield* (yield* Workspace).current
     if (open === undefined) return {}
     return yield* Effect.gen(function* () {

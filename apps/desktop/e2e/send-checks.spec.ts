@@ -131,13 +131,7 @@ test('hiring and people details in a public channel show the amber line while ty
   // It goes as soon as the draft stops matching.
   await topic.composer.fill('The release goes out Friday')
   await expect(topic.audienceWarning).toHaveCount(0)
-
-  // #hiring is private: the same words are fine there.
-  await juno.sidebar.row(RINA).open()
-  await topic.expectTitle(RINA)
-  await topic.composer.fill('The offer for the new backend hire goes out Friday')
-  await juno.win.waitForTimeout(800)
-  await expect(topic.audienceWarning).toHaveCount(0)
+  // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and New chat below.
 })
 
 test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, slackApp, userData, running }) => {
@@ -261,15 +255,10 @@ test('New chat warns about the audience of the chosen channel', async ({ juno })
 })
 
 
-test('lowercase i is never flagged unless Capital i is turned on in General', async ({ juno, fake }) => {
+// Lowercase i left alone by default is a clarity rule (packages/domain/test/checks.test.ts).
+test('Capital i, turned on in General, flags lowercase i', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.send('i think so')
-  await juno.topic.expectSent('i think so')
-  await juno.win.waitForTimeout(1100)
-  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
-
   await juno.openSettings('General')
   const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
   await expect(capital).not.toBeChecked()
@@ -282,7 +271,7 @@ test('lowercase i is never flagged unless Capital i is turned on in General', as
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.send('i think so too')
   await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
-  expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so', 'i think so too'])
+  expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so too'])
 })
 
 test('grammar offers its broken as an inline edit after sending', async ({ juno, fake }) => {
@@ -319,21 +308,6 @@ test('a slow grammar response never holds Enter or shows a late suggestion', asy
     try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'").get()).toEqual({ n: 1 }) }
     finally { db.close() }
   } finally { await again.close() }
-})
-
-test('messages above 1000 characters do not run grammar or local fixes', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  const text = 'its broken ' + 'a'.repeat(990)
-  expect(text.length).toBe(1001)
-  await juno.topic.send(text)
-  await juno.topic.expectSent(text)
-  await juno.win.waitForTimeout(1100)
-  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-  try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'").get()).toEqual({ n: 0 }) }
-  finally { db.close() }
 })
 
 test('leaving the topic drops a pending grammar result, including after returning', async ({ juno, fake, slackApp, userData, running }) => {

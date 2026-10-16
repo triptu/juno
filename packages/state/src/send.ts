@@ -22,6 +22,7 @@ import {
   messagesReact,
   messagesRetry,
   messagesSend,
+  sendChecksApply,
   type MessageRef,
   type SendCheck,
   type SendTarget,
@@ -42,7 +43,7 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })
-  if (exit._tag === 'Success' && [...text].length <= 1000 && text.trim() !== '') {
+  if (exit._tag === 'Success' && sendChecksApply(text)) {
     const receive = watchSentMessage(registry, { clientMsgId, topicId: exit.value.topicId, original: text, sentAt })
     void runCommand(registry, messagesPostcheck, { clientMsgId }).then((checked) => receive(checked._tag === 'Success' ? checked.value.clarity : undefined))
   }
@@ -74,7 +75,7 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
  * Grammar suggestions still show only after sending.
  */
 export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string, message?: string): void {
-  if ([...text].length > 1000) return stopPrecheck(registry, channelId, threadTs)
+  if (!sendChecksApply(text)) return stopPrecheck(registry, channelId, threadTs)
   void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }), ...(message === undefined || message === text ? {} : { message }) })
 }
 

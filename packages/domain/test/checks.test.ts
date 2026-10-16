@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { audienceCheck, clarityCheck } from '../src/index'
+import { audienceCheck, clarityCheck, sendChecksApply } from '../src/index'
 import { eng, hiring, maya } from './fixtures'
 
 describe('clarity check', () => {
@@ -127,4 +127,15 @@ describe('clarity preferences', () => {
 
 it('keeps lowercase contractions when Capital i is off', () => {
   expect(clarityCheck('im ready', { capitalI: false })?.fixed).toBe("i'm ready")
+})
+
+describe('which messages the checks on send read', () => {
+  it('skips empty messages and those above 1000 Unicode characters', () => {
+    expect(sendChecksApply('its broken')).toBe(true)
+    expect(sendChecksApply('  \n ')).toBe(false)
+    expect(sendChecksApply('its broken ' + 'a'.repeat(989))).toBe(true)
+    expect(sendChecksApply('its broken ' + 'a'.repeat(990))).toBe(false)
+    // Characters, not UTF-16 units: 1000 emoji are still read.
+    expect(sendChecksApply('😄'.repeat(1000))).toBe(true)
+  })
 })
