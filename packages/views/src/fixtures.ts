@@ -30,6 +30,7 @@ import SettingsPage from './SettingsPage.fixtures'
 import NewTabSetting from './NewTabSetting.fixtures'
 import TopicSwitcher from './TopicSwitcher.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
+import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import Reactions from './Reactions.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
@@ -115,6 +116,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewTabSetting,
   TopicSwitcher,
   PeekKeySetting,
+  QuickReactionsSetting,
   PeekView,
   OwnerBubble,
   SettingsPage,
