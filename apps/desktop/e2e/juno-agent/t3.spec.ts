@@ -53,7 +53,8 @@ const test = chat.extend<{ readonly t3: FakeT3; readonly model: FakeOpenRouter; 
   },
 })
 
-// The watcher reads the session every 10 s, so a change in T3 Code shows within one poll.
+// The watcher sees a run end through t3_thread_wait and an answer as soon as Juno sends it; any other
+// change shows within its slowest read, 10 s. POLL leaves room for a busy machine.
 const POLL = 25_000
 
 test.describe.configure({ timeout: 150_000 })
