@@ -166,8 +166,8 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       if (classifierSlug !== undefined) {
         const { model, priced } = resolveClassifier(models, classifierSlug)
         if (!config.apiKey) return noKey(model.id, started)
-        const upper = upperUsd(model.cost, priced, JSON.stringify(task.classify!.ask(input)), DECISION_MAX_TOKENS)
-        return yield* admitted(config, model.id, priced, upper,
+        const bounds = attemptBounds(model.cost, priced, JSON.stringify(task.classify!.ask(input)), DECISION_MAX_TOKENS)
+        return yield* admitted(config, model.id, priced, bounds,
           run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: classifyAttempt(task, input, model, config.apiKey) }))
       }
       const { model, priced } = resolveModel(models, modelFor(task.tier, config))
@@ -186,7 +186,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
         },
       }
-      return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
+      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
         run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
@@ -211,7 +211,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
         },
       }
-      return yield* admitted(config, model.id, priced, upperUsd(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
+      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
         run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, started, attempt: chatAttempt(request, config.apiKey) }))
     })
 
@@ -224,13 +224,26 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
  * and both outputs at the cap. Rounded up by the ledger.
  */
 export function upperUsd(cost: ModelCost, priced: boolean, input: string, maxTokens: number): number {
-  if (!priced) return UNPRICED_RESERVATION_USD
+  return attemptBounds(cost, priced, input, maxTokens).total
+}
+
+/** The most each attempt of a call can cost, and both together (`upperUsd`). */
+export interface AttemptBounds {
+  readonly first: number
+  readonly total: number
+}
+
+export function attemptBounds(cost: ModelCost, priced: boolean, input: string, maxTokens: number): AttemptBounds {
+  if (!priced) return { first: UNPRICED_RESERVATION_USD, total: UNPRICED_RESERVATION_USD }
   const rates = [cost, ...(cost.tiers ?? [])]
   const inputRate = Math.max(...rates.flatMap((rate) => [rate.input, rate.cacheRead, rate.cacheWrite]))
   const outputRate = Math.max(...rates.map((rate) => rate.output))
   const first = new TextEncoder().encode(input).length + 2 * FRAMING_TOKENS
   const retry = first + 4 * maxTokens + RETRY_MESSAGE_BYTES + 2 * FRAMING_TOKENS
-  return ((first + retry) * inputRate + 2 * maxTokens * outputRate) / 1_000_000
+  return {
+    first: (first * inputRate + maxTokens * outputRate) / 1_000_000,
+    total: ((first + retry) * inputRate + 2 * maxTokens * outputRate) / 1_000_000,
+  }
 }
 
 /** A 401, 403 or 429 comes before any output, so nothing was billed for that attempt. */
@@ -239,23 +252,30 @@ function refusedBeforeOutput(detail: string | undefined): boolean {
   return /^(401|403|429)\b/.test(detail) || /\((401|403|429)\):/.test(detail) || /rate.?limit/i.test(detail)
 }
 
-/** What to settle: the reported cost when it is known, else `undefined`, which keeps the reservation. */
-function settledUsd<A>(decision: Decision<A>, priced: boolean): number | undefined {
+/**
+ * What to settle: the reported cost when it is known. A call that ended in
+ * its first attempt without a report (a timeout, a lost request) never sent
+ * the retry, so it settles at the first attempt's bound, which is at least
+ * what it can have been billed. Otherwise `undefined`, which keeps the
+ * whole reservation.
+ */
+export function settledUsd<A>(decision: Decision<A>, priced: boolean, bounds: AttemptBounds): number | undefined {
   if (!priced) return undefined
   if (decision._tag === 'Decided' || decision.reason === 'invalid-output') return decision.meta.costUsd
   if (decision.reason === 'provider-error' && refusedBeforeOutput(decision.detail)) return decision.meta.costUsd ?? 0
+  if ((decision.reason === 'timeout' || decision.reason === 'provider-error') && decision.meta.attempts === 1) return bounds.first
   return undefined
 }
 
 /** Reserves the call's upper cost when the config has a cap, and settles it however the call ends. */
-function admitted<A>(config: AiConfig, modelId: string, priced: boolean, upper: number, call: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
+function admitted<A>(config: AiConfig, modelId: string, priced: boolean, bounds: AttemptBounds, call: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
   const admit = config.admit
   if (admit === undefined) return call
   return Effect.gen(function* () {
     const started = Date.now()
-    const admission = yield* admit(upper)
+    const admission = yield* admit(bounds.total)
     if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', detail: admission.reason ?? 'cap', meta: { model: modelId, latencyMillis: Date.now() - started, attempts: 0 } } as Decision<A>
-    return yield* call.pipe(Effect.onExit((exit) => admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced) : undefined)))
+    return yield* call.pipe(Effect.onExit((exit) => admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced, bounds) : undefined)))
   })
 }
 

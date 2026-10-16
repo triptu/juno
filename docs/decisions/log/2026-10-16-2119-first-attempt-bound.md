@@ -1,0 +1,1 @@
+- 10-16 21:19 · ai-audit · Engine AI spend: a call that times out or is lost in its first attempt settles at that attempt's bound rather than keeping the reservation for both attempts, since the retry was never sent; a topic art timeout now holds about $0.02 of the day's cap instead of $0.05.
