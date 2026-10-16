@@ -6,6 +6,7 @@ export { unescapeMrkdwn } from './from-mrkdwn'
 export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, type MessageContent } from './body'
 
 export { composeOutgoing } from './outgoing'
+export { findLinks, linkOf } from './links'
 export type { MentionTargets } from './outgoing'
 export {
   customEmojiLookup,

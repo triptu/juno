@@ -149,7 +149,7 @@ export function editUndo(): void {
   window.juno.shell.editUndo().catch(() => {})
 }
 
-/** Opens an http or https link in the browser. */
+/** Opens an http, https or mailto link outside the app (main refuses any other). */
 export function openExternal(url: string): void {
   window.juno.shell.openExternal(url).catch(() => {})
 }

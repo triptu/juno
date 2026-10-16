@@ -7,7 +7,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { downloadFile, downloadsForTests } from './files'
-import { contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
@@ -227,6 +227,7 @@ if (e2e) {
       contextMenu: contextMenuForTests,
       folder: folderForTests,
       slackLinks: slackLinksForTests,
+      browserLinks: browserLinksForTests,
       downloads: downloadsForTests,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,

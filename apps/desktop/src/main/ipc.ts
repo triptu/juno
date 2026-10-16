@@ -77,6 +77,8 @@ export const folderForTests: { next: string | null | undefined } = { next: undef
 
 /** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
 export const slackLinksForTests: string[] = []
+/** Under JUNO_E2E, links for the browser are recorded here instead of opening it. */
+export const browserLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 
 export interface IpcDeps {
@@ -216,7 +218,9 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   )
 
   handle(Channels.shellOpenExternal, ({ url }) => {
-    if (isWebUrl(url) || isT3ThreadUrl(url)) void shell.openExternal(url)
+    if (!isWebUrl(url) && !isT3ThreadUrl(url)) return
+    if (e2e) browserLinksForTests.push(url)
+    else void shell.openExternal(url)
   })
 
   // Built here from ids, so the renderer can never open an arbitrary slack:// link.
@@ -243,11 +247,11 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   })
 }
 
-/** Links from messages open in the browser only when they are http or https. */
+/** Links from messages open outside only when they are http, https or mailto. */
 function isWebUrl(url: string): boolean {
   try {
     const protocol = new URL(url).protocol
-    return protocol === 'https:' || protocol === 'http:'
+    return protocol === 'https:' || protocol === 'http:' || protocol === 'mailto:'
   } catch {
     return false
   }

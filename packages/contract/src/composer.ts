@@ -1,10 +1,17 @@
 /**
- * The composer's @ and # rules (spec section 8): `@juno/domain` rules the
+ * The composer's @ and # rules and its links (spec section 8): `@juno/domain` rules the
  * renderer runs on each keystroke, reached here because the renderer does
  * not import domain (as with `audience.ts`).
  */
 export {
-  decodeMentions,
+  decodeDraft,
+  encodeDraft,
+  linkAt,
+  moveLinks,
+  pastedLink,
+  setLink,
+  shownLinks,
+  type LinkRange,
   defaultPersonColor,
   encodeMentions,
   insertMention,

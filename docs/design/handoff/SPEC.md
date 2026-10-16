@@ -233,6 +233,7 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 - **Sending.** Enter sends at once: the message shows in the topic straight away and goes to Slack in the background, never twice. If Slack refuses it, it stays where it is with "Not sent.", Retry and Delete draft. Sends wait out a lost connection and go when it is back.
 - **Drafts.** Each topic keeps its own draft, through tab switches and restarts.
 - **Mentions.** Typing @ suggests people and # suggests channels, with arrow keys and Enter or Tab to pick.
+- **Links.** URLs, addresses and bare domains like example.com are links as typed, in the composer and in the sent message, as Slack links them. Pasting a URL over selected words makes those words a link, as in Slack, Notion and Notes; ⌘Z gives the plain paste back. ⌘K with words selected edits their link, and ⌘-click opens it. In messages a link shows its label, the URL shows on hover, and a click opens it in the default browser, never inside Juno.
 - **Audience check.** When what you type reads like hiring or people details and the channel is public, a quiet amber line warns you as you type.
 
 - **Emoji suggestions.** In every composer and the inline edit field, `:` at a word start followed by at least two characters opens local emoji matches, ranked by recent use, then common emoji (your quick reactions in their order, then 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌), then prefix, then substring, so `:thumbs` offers 👍 first. Rows show the glyph or workspace image and `:shortcode:`. ↑ and ↓ move; Enter or Tab inserts; Esc closes and keeps the text. An exact closing `:` converts a standard shortcode to Unicode. Workspace emoji insert `:name:` for Slack.
@@ -637,7 +638,7 @@ Use the Littlebird design system's tokens.
 
 | Keys | Action |
 | --- | --- |
-| ⌘K | Search and commands. Inside it, Tab or ⌘1 and ⌘2 switch between Conversations and Messages (section 10) |
+| ⌘K | Search and commands. Inside it, Tab or ⌘1 and ⌘2 switch between Conversations and Messages (section 10). With words selected in a composer, edit their link (section 8) |
 | ⌘, | Settings (section 14) |
 | ⌘N | New chat in a new tab (section 9) |
 | ⌘T | New tab: a New chat, or Home if Settings › General says so (section 6) |

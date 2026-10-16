@@ -380,6 +380,12 @@ Typing `@` or `#` at a word start opens a popover above the composer: `bottom: c
 
 The shared mention suggestion list also shows local emoji matches: glyph or workspace image, then `:shortcode:`. It uses the same 32px rows, caret anchor, keyboard selection and light and dark tokens. Topic replies, Main, New chat, Juno and the inline edit field (7.5) share this interaction (SPEC §8). Matches rank by recent use, then the common emoji 👍 ✅ 👀 🙏 🎉 ❤️ 😂 🔥 💯 🙌, then prefix, then substring.
 
+### 7.1a Links
+
+[built links] In every topic composer. A URL, email address or bare domain ("example.com") typed or pasted into the field is drawn as a link (accent text, the message link's underline, no change of width; `Textarea marks` look `link`) and sent as one. A URL pasted over selected words on one line links those words and keeps their text; the paste goes in as typing would and the words go back over it, so ⌘Z first gives the plain paste. Typing inside linked words keeps them linked; typing at either end does not; replacing all of them removes the link. ⌘-click on a link in the field opens it in the browser. ⌘K with words selected opens the link editor (`LinkEditor`) instead of the palette: a popover above the field box, 340 wide, z 5, its left edge under the first selected character (CSS anchor positioning, as the suggestions), with a 30px "Link" field (placeholder "Paste or type a link"), Remove (ghost, only for words that have a link) and Save (primary), 6 apart. The field is focused with its text selected; Enter saves, Esc or focus leaving closes it and gives focus back to the composer. Text that is not a link marks the field invalid and keeps the editor open. The draft and the send carry linked words as `<url|words>`. New chat links typed URLs only.
+
+In messages a link shows its label, with the URL as its tooltip, and a click opens it in the default browser (http, https and mailto only). It is the one place the pointer cursor is allowed.
+
 ### 7.2 Audience warning
 
 While typing in a **public** channel, if the draft matches hiring/people terms (offer, salary, comp, candidate, layoffs, performance review, headcount, fired, onsite), a line appears at the top of the box: margin `8 8 0`, padding 6 10, radius 6, bg warning-14% over surface, text warning-45% over fg, 12px, `sparkles` 13: "This reads like hiring or people detail. eng is a public channel." Disappears as soon as the draft stops matching. Not a block.

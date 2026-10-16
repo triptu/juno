@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
-import type { ClipboardEvent, DragEvent, KeyboardEvent, ReactNode, Ref, SyntheticEvent } from 'react'
+import type { ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent, ReactNode, Ref, SyntheticEvent } from 'react'
 import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
 
@@ -15,6 +15,13 @@ export interface ComposerMention {
   readonly list: ReactNode
   /** The field lost focus: the list closes. */
   readonly onDismiss: () => void
+}
+
+/** A panel over the field other than the suggestions: the link editor. */
+export interface ComposerPopover {
+  /** The offset of the first selected character: the panel lines up under it. */
+  readonly anchorAt: number
+  readonly content: ReactNode
 }
 
 export interface ComposerProps {
@@ -56,21 +63,56 @@ export interface ComposerProps {
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
   /** The caret moved without the text changing: a click or an arrow key. */
   readonly onCaret?: (caret: number) => void
+  /** A paste with text and no files; true when the owner took it (a URL over selected words). */
+  readonly onPasteText?: (text: string, field: HTMLTextAreaElement) => boolean
+  /** A click in the field, after the caret moved to it: ⌘-click opens a link. */
+  readonly onFieldClick?: (event: MouseEvent<HTMLTextAreaElement>) => void
+  /** The link editor, while it is open. */
+  readonly popover?: ComposerPopover
 }
 
 /** The field's side of the @ and # suggestions: chips, the caret, the list's anchor and its ARIA wiring. */
-export function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret']) {
+export function mentionProps(marks: ComposerProps['marks'], mention: ComposerMention | undefined, onCaret: ComposerProps['onCaret'], popover?: ComposerPopover) {
   return {
     ...(onCaret === undefined ? {} : { onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) => onCaret(event.currentTarget.selectionStart) }),
     ...(marks === undefined ? {} : { marks, 'aria-autocomplete': 'list' as const }),
     ...(mention === undefined
-      ? {}
+      ? popover === undefined ? {} : { anchorAt: popover.anchorAt }
       : { anchorAt: mention.anchorAt, onBlur: mention.onDismiss, 'aria-controls': mention.listId, 'aria-activedescendant': mention.activeId, 'aria-expanded': mention.list !== null && mention.list !== undefined }),
   }
 }
 
 /** A drag that carries files from Finder, not text or a link. */
 const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files')
+
+/**
+ * A paste or a drop with files is taken, and a text paste the owner takes;
+ * other text pastes and text drags stay the browser's.
+ */
+function transfers(onFiles: ComposerProps['onFiles'], onPasteText: ComposerProps['onPasteText']) {
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.files)
+    if (files.length === 0 || onFiles === undefined) {
+      const pasted = event.clipboardData.getData('text/plain')
+      if (files.length === 0 && pasted !== '' && onPasteText?.(pasted, event.currentTarget) === true) event.preventDefault()
+      return
+    }
+    event.preventDefault()
+    onFiles(files)
+  }
+  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (onFiles === undefined || !carriesFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length === 0 || onFiles === undefined) return
+    event.preventDefault()
+    onFiles(files)
+  }
+  return { onPaste, onDragOver, onDrop }
+}
 
 /**
  * The composer (inventory 7): a 752px field whose textarea grows to 194px,
@@ -80,7 +122,7 @@ const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types
  * as in the Juno composer; `leading` is where the attach button goes.
  * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, mention, onFieldKey, onCaret }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, mention, onFieldKey, onCaret, onPasteText, onFieldClick, popover }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (onFieldKey?.(event) === true) return
@@ -98,24 +140,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
     event.preventDefault()
     if (!sending) onSend()
   }
-  // Only a paste or a drop with files is taken; text pastes and text drags stay the browser's.
-  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.clipboardData.files)
-    if (files.length === 0 || onFiles === undefined) return
-    event.preventDefault()
-    onFiles(files)
-  }
-  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (onFiles === undefined || !carriesFiles(event)) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-  }
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    const files = Array.from(event.dataTransfer.files)
-    if (files.length === 0 || onFiles === undefined) return
-    event.preventDefault()
-    onFiles(files)
-  }
+  const { onPaste, onDragOver, onDrop } = transfers(onFiles, onPasteText)
   return (
     <div data-composer="" onDragOver={onFiles === undefined ? undefined : onDragOver} onDrop={onFiles === undefined ? undefined : onDrop} {...stylex.props(styles.outer)}>
       {above !== undefined ? <div {...stylex.props(styles.above)}>{above}</div> : null}
@@ -133,8 +158,9 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
             value={value}
             onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
-            {...mentionProps(marks, mention, onCaret)}
-            onPaste={onFiles === undefined ? undefined : onPaste}
+            {...mentionProps(marks, mention, onCaret, popover)}
+            onPaste={onFiles === undefined && onPasteText === undefined ? undefined : onPaste}
+            onClick={onFieldClick}
             dir="auto"
           />
           <span {...stylex.props(styles.send)}>
@@ -155,6 +181,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
         </div>
       </Surface>
       {mention?.list}
+      {popover?.content}
     </div>
   )
 }

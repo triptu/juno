@@ -697,6 +697,11 @@ export class Juno {
     return this.app.evaluate(({ clipboard }) => clipboard.readText())
   }
 
+  /** The links a click sent to the browser, oldest first. */
+  browserLinks(): Promise<string[]> {
+    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { browserLinks: string[] } }).junoTest.browserLinks])
+  }
+
   /** The `slack://` links Open in Slack opened, oldest first. */
   slackLinks(): Promise<string[]> {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
@@ -1374,6 +1379,17 @@ export class TopicPane {
   /** The picked people and channels drawn as chips in the composer's field. */
   get composerChips(): Locator {
     return this.root.locator('[data-composer] [data-mark]')
+  }
+
+  /** The links drawn in the composer's field: typed URLs and linked words. */
+  get composerLinks(): Locator {
+    return this.root.locator('[data-composer] [data-mark="link"]')
+  }
+
+  /** The link editor ⌘K opens on words selected in the composer. */
+  get linkEditor() {
+    const root = this.root.locator('[data-link-editor]')
+    return { root, url: root.getByRole('textbox', { name: 'Link' }), remove: root.getByRole('button', { name: 'Remove' }) }
   }
 
   /** The composer's box, which must not move as rows come and go. */
