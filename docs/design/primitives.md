@@ -110,7 +110,7 @@ Typography. `variant` maps to the five variables of a type role in tokens: `sect
 
 ## 10. Popover and OptionList
 
-`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-end` | `top-start` | `top-end`), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. Appears with opacity and a 0.98 → 1 scale from the anchor corner over `--duration-appear`; closing is instant (the panel unmounts).
+`Popover`: renders `anchor` in place and, when `open`, a `popover` Surface next to it. `placement` (`bottom-start` | `bottom-center` | `bottom-end` | `top-start` | `top-end`; `bottom-center` centres the panel under the anchor, as the avatar menu does), `width` (`menu` 236, `account` 248, `browse` 300, `mention` 280, `anchor`), `maxHeight` (`popover` 400, `picker` 300), `layer` (`mention` | `picker` | `menu` | `context`), `role`, `label`. Closes on Esc, outside pointer-down and focus leaving (`closeOnBlur`). Scroll is contained. Appears with opacity and a 0.98 → 1 scale from the anchor corner over `--duration-appear`; closing is instant (the panel unmounts).
 
 Menus are not a separate primitive: an in-app menu (the account menu) is an `OptionList` with `role="menu"` inside a `Popover`; its rows become `menuitem`s. In a `listbox`, rows are `option`s and `aria-selected` is the real selection only (the keyboard highlight is `aria-activedescendant`). Real context menus are native.
 

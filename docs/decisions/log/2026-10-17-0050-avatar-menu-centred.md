@@ -1,0 +1,1 @@
+- 10-17 00:50 · ui-fixes-1017 · The avatar menu opens centred under the avatar (Popover placement bottom-center), not hung off its right edge to the left.

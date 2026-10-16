@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, type ReactNo
 import { layout, motion, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
-export type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+export type PopoverPlacement = 'bottom-start' | 'bottom-center' | 'bottom-end' | 'top-start' | 'top-end'
 export type PopoverLayer = 'mention' | 'picker' | 'menu' | 'context'
 export type PopoverWidth = 'menu' | 'account' | 'browse' | 'mention' | 'picker' | 'anchor'
 
@@ -46,7 +46,7 @@ function clipOf(node: HTMLElement): HTMLElement | undefined {
  * run past an edge, and narrows it when the pane is narrower than the
  * panel. One read of the two boxes, then one write, before the first paint.
  */
-function clamp(panel: HTMLElement): void {
+function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   const clip = clipOf(panel)
   const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth }
   const box = panel.getBoundingClientRect()
@@ -55,8 +55,9 @@ function clamp(panel: HTMLElement): void {
   const width = Math.min(box.width, room)
   const left = Math.max(bounds.left + gap, Math.min(box.left, bounds.right - gap - width))
   if (width < box.width) panel.style.maxWidth = `${width}px`
-  // A right-anchored panel that is narrowed keeps its right edge; account for that before shifting.
-  const narrowedLeft = width < box.width && getComputedStyle(panel).right !== 'auto' ? box.right - width : box.left
+  // A narrowed panel keeps its right edge when right-anchored and its centre when centred; account for that before shifting.
+  const narrowedLeft =
+    width === box.width ? box.left : placement === 'bottom-center' ? box.left + (box.width - width) / 2 : getComputedStyle(panel).right !== 'auto' ? box.right - width : box.left
   const shift = left - narrowedLeft
   if (shift !== 0) panel.style.translate = `${shift}px 0`
 }
@@ -95,10 +96,13 @@ export function Popover({
   const restoreFocus = useRef(false)
 
   // A deferred panel clamps when it mounts, including after its chunk finishes loading.
-  const placePanel = useCallback((panel: HTMLDivElement | null) => {
-    panelRef.current = panel
-    if (panel !== null) clamp(panel)
-  }, [])
+  const placePanel = useCallback(
+    (panel: HTMLDivElement | null) => {
+      panelRef.current = panel
+      if (panel !== null) clamp(panel, placement)
+    },
+    [placement],
+  )
 
   useLayoutEffect(() => {
     if (open || !restoreFocus.current) return
@@ -204,6 +208,8 @@ const styles = stylex.create({
 
 const placements = stylex.create({
   'bottom-start': { top: `calc(100% + ${spacing['--space-1']})`, left: 0 },
+  // Centred under the anchor. The clamp's sideways shift is `translate`, which adds to this transform.
+  'bottom-center': { top: `calc(100% + ${spacing['--space-1']})`, left: '50%', transform: 'translateX(-50%)' },
   'bottom-end': { top: `calc(100% + ${spacing['--space-1']})`, right: 0 },
   'top-start': { bottom: `calc(100% + ${spacing['--space-1-5']})`, left: 0 },
   'top-end': { bottom: `calc(100% + ${spacing['--space-1-5']})`, right: 0 },
@@ -212,6 +218,7 @@ const placements = stylex.create({
 // The scale grows out of the corner that touches the anchor.
 const origins = stylex.create({
   'bottom-start': { transformOrigin: 'top left' },
+  'bottom-center': { transformOrigin: 'top center' },
   'bottom-end': { transformOrigin: 'top right' },
   'top-start': { transformOrigin: 'bottom left' },
   'top-end': { transformOrigin: 'bottom right' },

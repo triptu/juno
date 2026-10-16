@@ -59,7 +59,7 @@ The header has no status line: the nav starts right under the 44px bar. Sync pro
 
 Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press scale .96. Each has a tooltip (primitives 14a): "Search ⌘K" and "New chat ⌘N" with the keys as keycaps, "Account and settings".
 
-**Avatar menu** (popover, 248px wide, anchored top 36px right 0, z 20, padding 6, radius 13, `--pop-shadow`):
+**Avatar menu** (popover, 248px wide, centred under the avatar 4px below it, moved in from the window's edge when it would run past (decided 10-17; it hung off the avatar's right edge and opened to its left), z 20, padding 6, radius 13, `--pop-shadow`):
 
 - Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface `--surface-raised`: `--presence-active` green when active, hollow `--foreground-muted` ring when away) + "Tushar" 13/600 + "Active" or "Away until 9am" 12 muted (`untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch); padding `8 8 10`.
 - Separator 1px `--border-default`, margin `2 6 4`.

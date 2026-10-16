@@ -198,7 +198,7 @@ export function Sidebar({
                 open={accountMenuOpen}
                 onClose={() => onAccountMenu(false)}
                 width="browse"
-                placement="bottom-end"
+                placement="bottom-center"
                 role="dialog"
                 label="Account"
                 anchor={
