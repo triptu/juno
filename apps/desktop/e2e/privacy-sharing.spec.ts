@@ -56,6 +56,8 @@ test('a capture running at launch hides nothing, and true then false then true h
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, screenShared: true })
   try {
     const second = new Juno(again.app, again.win)
+    // The relaunched app starts its engine and catches up before the rows show.
+    await second.waitForSync()
     const rina = second.sidebar.row(RINA)
     await rina.expectVisible()
     await second.privacy.startSharing()
