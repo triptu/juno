@@ -24,6 +24,8 @@ export interface JunoTestHooks {
   readonly notifications: () => Array<{ readonly title: string; readonly body: string }>
   readonly clickNotification: (index?: number) => void
   readonly dockBadge: () => string
+  /** How many times Open Notification Settings opened System Settings. */
+  readonly notificationSettingsOpened: () => number
   /** As if the Mac woke from sleep. */
   readonly wake: () => void
 }
