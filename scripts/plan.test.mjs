@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { lanes, parsePlan } from './plan.mjs'
+import { lanes, parsePlan, sideBySide } from './plan.mjs'
 
 test('a plan splits on + and reads KEY=VALUE before each script', () => {
   const steps = parsePlan(['test', '--passWithNoTests', 'a.test.ts', '+', 'GALLERY_SHIFT_ONLY=Chip,Tab', 'test:gallery', '+', 'test:desktop', 'e2e/topic.spec.ts', 'X=1'])
@@ -18,4 +18,12 @@ test('app suites share one lane and the other suites run beside them', () => {
   assert.deepEqual(lanes(steps, false).map((lane) => lane.map((step) => step.script)), [['test:gallery', 'test:desktop'], ['test', 'specs:check']])
   assert.deepEqual(lanes(steps, true).map((lane) => lane.map((step) => step.script)), [['test', 'specs:check', 'test:gallery', 'test:desktop']])
   assert.equal(lanes(parsePlan(['test']), false).length, 1)
+})
+
+test('lanes side by side share an 8-core machine without queueing on it', () => {
+  assert.deepEqual(sideBySide(8), {
+    app: { JUNO_E2E_WORKERS: '5', GALLERY_WORKERS: '8' },
+    rest: { JUNO_VITEST_WORKERS: '4', JUNO_TEST_PACKAGE_JOBS: '1', SPECS_JOBS: '2', SPECS_APALACHE: '1' },
+  })
+  assert.equal(sideBySide(2).app.JUNO_E2E_WORKERS, '2')
 })
