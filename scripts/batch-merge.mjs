@@ -147,7 +147,7 @@ function cleanup() {
 
 function main() {
   if (argv.includes('--help')) {
-    console.log('node scripts/batch-merge.mjs [--dry-run | --push] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push]\nDry run merges and regenerates locally, but only plans affected checks and cannot push.')
+    console.log('node scripts/batch-merge.mjs [--dry-run | --push] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push]\nChecks are typecheck, lint and the unit tests. Dry run merges and regenerates locally, runs no checks and cannot push.')
     return
   }
   if (push && dryRun) throw new Error('--dry-run cannot be combined with --push')
@@ -184,11 +184,17 @@ function main() {
     regenerate()
     checkMessages()
     const checkedHead = git(state.worktree, 'rev-parse', 'HEAD')
-    run('pnpm', ['affected', '--base', state.base, ...(state.dryRun ? ['--plan'] : [])])
+    // Merge first, test in full afterwards (docs/development.md, "Testing"): a batch gates on
+    // typecheck, lint and the unit tests; the CI keeper runs the full suites on main.
+    if (!state.dryRun) {
+      run('pnpm', ['typecheck'])
+      run('pnpm', ['lint'])
+      run('pnpm', ['remote', 'test'])
+    }
     clean()
     if (git(state.worktree, 'rev-parse', 'HEAD') !== checkedHead) throw new Error('HEAD changed during checks; continue to check again')
     if (push) publish(checkedHead)
-    else console.log(`${state.dryRun ? 'Dry run finished (checks only planned)' : 'Checks passed; nothing pushed'}. Worktree retained: ${state.worktree}\nLog: ${logPath}`)
+    else console.log(`${state.dryRun ? 'Dry run finished (no checks run)' : 'Checks passed; nothing pushed'}. Worktree retained: ${state.worktree}\nLog: ${logPath}`)
   } finally {
     closeSync(fd)
     unlinkSync(lock)

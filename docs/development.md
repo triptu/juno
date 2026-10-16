@@ -99,8 +99,9 @@ Generated-file conflicts use a temporary copy of the batch's version. After all
 merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
 decision log, runs `pnpm health:baseline`, and commits generated changes. Review
 the baseline diff: regeneration records the merged tree's current health,
-including any increases. Then it runs one `pnpm affected --base <base-commit>`
-against the pinned `origin/main` commit. A failed command retains the worktree;
+including any increases. Then it runs `pnpm typecheck`, `pnpm lint` and
+`pnpm remote test` (the unit tests on one machine); the full suites run on main
+afterwards (see "Testing"). A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
@@ -110,7 +111,7 @@ push removes the worktree; the batch branch and logs remain. Continuing a checke
 batch reruns checks before publishing.
 
 `--dry-run branch-one branch-two` performs local merges, installation and
-regeneration, but only prints the affected plan. Dry-run batches cannot push.
+regeneration, but runs no checks. Dry-run batches cannot push.
 Remove a discarded worktree with `git worktree remove <path>`, then delete its
 batch branch with `git branch -D batch-N`. If a process was killed, remove its
 `.juno-status/batches/active.lock` only after confirming it has stopped.
