@@ -4,7 +4,7 @@ import { expect, test } from './feel'
 import { count, edgeKey, header, paneRegions, sidebarReorder, topicProbes } from './pane'
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 
 test('open a topic at its divider, then another at its bottom', async ({ juno, feel }) => {
   await juno.signIn()

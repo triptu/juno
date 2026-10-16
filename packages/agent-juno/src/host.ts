@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -84,6 +84,11 @@ export class JunoHost extends Context.Service<
 
     /** The current presence, then every change. */
     readonly presence: Stream.Stream<Presence>
+    /** The engine's model calls asking the agent's spend ledger (plan v3 §5.4): open asks now and on every change, and the answers. */
+    readonly spend?: {
+      readonly asks: Stream.Stream<ReadonlyArray<HostSpendAsk>>
+      readonly answer: (answer: { readonly id: string; readonly ask: 'reserve' | 'settle'; readonly result: 'reserved' | 'blocked' | 'settled' }) => Effect.Effect<void>
+    }
     readonly schedule?: {
       readonly check: (conversation: typeof WatchConversation.Type, refresh: boolean) => Effect.Effect<typeof WatchSnapshot.Type, AgentHostError>
       readonly hours: Effect.Effect<typeof WatchHours.Type, AgentHostError>

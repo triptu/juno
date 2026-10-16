@@ -15,6 +15,7 @@ export interface ProviderDrafts {
 export interface ProviderSectionProps {
   /** Main's provider state: which is active, and what is set up. */
   readonly state: ProviderState
+  readonly engineKeyMissing?: boolean
   /** Whose fields show: the active provider, or the one the owner picked to set up. */
   readonly shown: ProviderKind
   readonly drafts: ProviderDrafts
@@ -39,7 +40,7 @@ export interface ProviderSectionProps {
  * key, or one OpenAI-compatible endpoint with a base URL and an optional
  * key. One is active at a time; saving one makes it active.
  */
-export function ProviderSection({ state, shown, drafts, error, rejected = false, focusFirst = false, onShow, onDraft, onSave, onRemove }: ProviderSectionProps) {
+export function ProviderSection({ state, shown, drafts, error, engineKeyMissing = false, rejected = false, focusFirst = false, onShow, onDraft, onSave, onRemove }: ProviderSectionProps) {
   const copy = chatCopy.providers
   const openRouter = shown === 'openRouter'
   const first = useRef<HTMLInputElement>(null)
@@ -144,6 +145,7 @@ export function ProviderSection({ state, shown, drafts, error, rejected = false,
           </Text>
         </ListRow>
       </Surface>
+      {engineKeyMissing ? <Text variant="meta" tone="muted">Topic art and AI titles need an OpenRouter key.</Text> : null}
     </Section>
   )
 }

@@ -11,6 +11,7 @@ import { Slack } from './driver/slack'
 /** What main exposes on `globalThis.junoTest` under JUNO_E2E. */
 export interface JunoTestHooks {
   readonly enginePid: () => number | undefined
+  readonly aiCalls: () => Record<string, number>
   readonly engineState: () => string
   /** Makes the supervisor give up on the engine, as after too many crashes. */
   readonly failEngine: () => void
@@ -63,6 +64,8 @@ export interface LaunchOptions {
   readonly backupIntervalMs?: number
   /** How long the engine's fake AI takes to answer; past a task's timeout it gives no answer. */
   readonly fakeAiDelayMillis?: number
+  /** The fake AI answers only once Settings has an OpenRouter key, as the live provider does. */
+  readonly fakeAiRequiresKey?: boolean
   /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
   readonly codemode?: boolean
 }
@@ -79,6 +82,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
+  delete env.JUNO_E2E_OPENROUTER_KEY
+  env.JUNO_FAKE_AI_REQUIRES_KEY = options.fakeAiRequiresKey === true ? '1' : '0'
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword

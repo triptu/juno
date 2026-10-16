@@ -133,6 +133,7 @@ export const TopicRow = memo(function TopicRow({
       aria-describedby={state === undefined ? previewId : `${stateId} ${previewId}`}
       data-topic-row=""
       data-topic-id={row.id}
+      data-title-source={row.titleSource}
       onPointerEnter={onPrefetch === undefined ? undefined : onPointerEnter}
       onFocus={onFocus}
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}

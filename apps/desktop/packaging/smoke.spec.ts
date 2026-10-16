@@ -34,7 +34,9 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   const env: NodeJS.ProcessEnv = { ...process.env, JUNO_E2E: '1', JUNO_USER_DATA: userData, JUNO_FAKE_SLACK_URL: fake.url,
     JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin,
     // The agent runs one script at start and writes the result: the QuickJS worker and binary load from the asar.
-    JUNO_AGENT_CODEMODE: '1' }
+    JUNO_AGENT_CODEMODE: '1',
+    // The engine's fake AI answers only with the OpenRouter key main hands it and inside the agent's cap, as the live one does.
+    JUNO_FAKE_AI_REQUIRES_KEY: '1' }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.NODE_OPTIONS
   try {
@@ -78,6 +80,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
             timings.push(painted - started)
           }
           await expect.poll(() => page.evaluate(() => window.juno.agent.requestPort())).toEqual('sent')
+          // The engine got the saved key from main: a sidebar thread has an AI title without being opened.
+          await expect(page.locator('[data-topic-row][data-title-source="ai"]').first()).toBeVisible({ timeout: 30_000 })
           await page.screenshot({ path: 'test-results/packaged-sidebar.png' })
         } finally {
           await browser.close()

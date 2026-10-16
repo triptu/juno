@@ -14,7 +14,7 @@ const test = base.extend({
   },
 })
 
-const THREAD = 'Review the rollout checklist 1.'
+const THREAD = 'Review the rollout checklist 1'
 /** The list runs under the 68 px header band; the divider opens 80 px below it (inventory 5). */
 const DIVIDER_OFFSET = 148
 /** Images answer this late, well after the rows paint. */

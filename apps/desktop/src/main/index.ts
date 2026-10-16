@@ -54,9 +54,14 @@ const fakeSlackUrl = e2e ? process.env.JUNO_FAKE_SLACK_URL : undefined
 const slackAppDir = e2e ? process.env.JUNO_SLACK_APP_DIR : undefined
 const keychainPassword = e2e ? process.env.JUNO_SLACK_SAFE_STORAGE_PASSWORD : undefined
 
+const aiCallsForTests: Record<string, number> = {}
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
+    if (message._tag === 'aiCall') {
+      if (e2e) aiCallsForTests[message.task] = (aiCallsForTests[message.task] ?? 0) + 1
+      return
+    }
     if (!notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
   },
 })
@@ -115,8 +120,9 @@ const providers = new ProviderStore(
   app.getPath('userData'),
   e2e ? { openRouter: memoryKeychain(), custom: memoryKeychain() } : { openRouter: macKeychain(OPENROUTER_ITEM), custom: macKeychain(CUSTOM_ITEM) },
   // Under JUNO_E2E only the test seam: a test launches with a key, never the developer's.
-  e2e ? process.env.JUNO_E2E_OPENROUTER_KEY : process.env.OPENROUTER_API_KEY,
-  (state, provider) => {
+  e2e ? process.env.JUNO_E2E_OPENROUTER_KEY : app.isPackaged ? undefined : process.env.OPENROUTER_API_KEY,
+  (state, provider, engineKey) => {
+    supervisor.setAiKey(engineKey)
     agent.setProvider(provider)
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(Events.agentProviderChanged, state)
@@ -215,6 +221,7 @@ if (e2e) {
   Object.assign(globalThis, {
     junoTest: {
       enginePid: () => supervisor.pid,
+      aiCalls: () => ({ ...aiCallsForTests }),
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,

@@ -7,7 +7,7 @@ import { Juno } from './driver/juno'
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite.'
+const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 

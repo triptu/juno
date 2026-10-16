@@ -4,6 +4,7 @@ import { bindViewHost } from './view-tools/host'
  * in the agent utility process; tests call it from Node.
  *
  * It reaches the host and checks the protocol, follows `host.presence`,
+ * answers the engine's spend asks from the ledger (`spend/engine.ts`),
  * then, given `turns`, opens the turn engine on the agent directory with
  * the Slack reads and the card actions bound to the host (`host/reads.ts`,
  * `actions/host.ts`): the owner lock,
@@ -35,6 +36,9 @@ import type { RendererTransport } from './serve/runner'
 import { rendererServer } from './serve/server'
 import { CHAT_MIGRATIONS } from './serve/schema'
 import { createJunoSettings } from './settings/settings'
+import { capOf } from './settings/store'
+import { createSpend } from './spend'
+import { answerEngineSpend } from './spend/engine'
 import type { UpdateNeeded } from './runtime/core'
 
 export interface AgentHandle {
@@ -117,6 +121,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
             Effect.forkScoped, Scope.provide(scope),
           )
+          yield* answerEngineSpend(createSpend(engine.store, () => capOf(engine.store))).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
           // A click waits while no Slack account is known; each presence lets it look again.
           yield* bound.presenceChanges.pipe(
             Stream.runForEach(() => Effect.sync(() => { engine.networkChanged(); engine.actions.kick() })),

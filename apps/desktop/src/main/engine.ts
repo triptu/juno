@@ -29,6 +29,7 @@ export class EngineSupervisor {
   private readonly pendingPorts = new Map<WebContents, MessagePortMain>()
   private readonly exits: Array<number> = []
   private readonly readyListeners = new Set<() => void>()
+  private aiKey: string | null = null
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
 
@@ -37,6 +38,11 @@ export class EngineSupervisor {
     /** Every message from the engine other than `ready`. */
     private readonly onMessage: (message: EngineToMain) => void = () => {},
   ) {}
+
+  setAiKey(key: string | null): void {
+    this.aiKey = key
+    this.send({ _tag: 'aiKey', key })
+  }
 
   get currentState(): SupervisorState {
     return this.state
@@ -66,6 +72,7 @@ export class EngineSupervisor {
       }
       if (message._tag === 'ready') {
         this.state = 'ready'
+        this.send({ _tag: 'aiKey', key: this.aiKey })
         this.attempt = 0
         for (const port of this.pendingPorts.values()) this.send({ _tag: 'port' }, [port])
         this.pendingPorts.clear()
@@ -156,11 +163,8 @@ export class EngineSupervisor {
 
 export function createSupervisor(options: { readonly fakeSlackUrl?: string; readonly onMessage?: (message: EngineToMain) => void } = {}): EngineSupervisor {
   const e2e = process.env.JUNO_E2E === '1'
-  // Tests and `JUNO_AI=fake` get the deterministic provider. The OpenRouter key
-  // comes from the environment for now (ADR 0006: the key stays in memory);
-  // without it every AI task answers "no decision" and the app runs as before.
+  // ProviderStore sends the shared key after loading and on every change.
   const ai = e2e || process.env.JUNO_AI === 'fake' ? 'fake' : 'live'
-  const openRouterApiKey = e2e ? undefined : process.env.OPENROUTER_API_KEY
   // An e2e run can make the fake AI slow, to watch a check give up at its timeout.
   const fakeAiDelayMillis = e2e ? Number(process.env.JUNO_FAKE_AI_DELAY_MS) : Number.NaN
   return new EngineSupervisor(
@@ -170,7 +174,7 @@ export function createSupervisor(options: { readonly fakeSlackUrl?: string; read
       dev: !app.isPackaged,
       ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
       ai,
-      ...(openRouterApiKey ? { openRouterApiKey } : {}),
+      ...(e2e && process.env.JUNO_FAKE_AI_REQUIRES_KEY === '1' ? { fakeAiRequiresKey: true } : {}),
       ...(Number.isFinite(fakeAiDelayMillis) ? { fakeAiDelayMillis } : {}),
     },
     options.onMessage,
