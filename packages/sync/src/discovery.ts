@@ -21,16 +21,21 @@
  *
  * Live research confirms `is:thread` and the extra thread metadata. Roots
  * outside the returned pages still need their existing lookup.
+ *
+ * The same pages serve the cold boot's preview search (`searchPreviews`):
+ * `after:<date>` without `is:thread`, which live also returns plain
+ * messages (research section 10, "Search with an `xoxc` session").
  */
 import { millisToTs, type Ts } from '@juno/domain'
-import { SlackApi, type SlackApiError } from '@juno/slack'
+import { SlackApi, SlackEdge, type SlackApiError } from '@juno/slack'
 import { isReply, searchMatchChannelId, searchMatches, type CountEntry, type FlatSearchMatch, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { SyncContext } from './context'
 import { applyPage } from './pages'
+import { nameFirst } from './users'
 
-type Services = SlackApi | StoreWriter | Invalidation
+type Services = SlackApi | SlackEdge | StoreWriter | Invalidation
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -45,22 +50,25 @@ const threadTsOf = (match: FlatSearchMatch): Ts | undefined => {
   return value === undefined ? undefined : (value as Ts)
 }
 
+/** A match as a partial message, in the thread `threadTs` names. */
+const toMessage = (match: FlatSearchMatch, threadTs: Ts | undefined): Message => ({
+  type: 'message',
+  ts: match.ts,
+  ...(match.user === undefined ? {} : { user: match.user }),
+  ...(match.text === undefined ? {} : { text: match.text }),
+  ...(match.blocks === undefined ? {} : { blocks: match.blocks }),
+  ...(match.attachments === undefined ? {} : { attachments: match.attachments }),
+  ...(match.files === undefined ? {} : { files: match.files }),
+  ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
+  ...(match.reply_count === undefined ? {} : { reply_count: match.reply_count }),
+  ...(match.latest_reply === undefined ? {} : { latest_reply: match.latest_reply }),
+})
+
 /** A match as a message, or `undefined` when it says nothing about a thread. */
 const matchToMessage = (match: FlatSearchMatch): Message | undefined => {
   const threadTs = threadTsOf(match)
   if (threadTs === undefined && (match.reply_count ?? 0) === 0) return undefined
-  return {
-    type: 'message',
-    ts: match.ts,
-    ...(match.user === undefined ? {} : { user: match.user }),
-    ...(match.text === undefined ? {} : { text: match.text }),
-    ...(match.blocks === undefined ? {} : { blocks: match.blocks }),
-    ...(match.attachments === undefined ? {} : { attachments: match.attachments }),
-    ...(match.files === undefined ? {} : { files: match.files }),
-    ...(threadTs === undefined ? {} : { thread_ts: threadTs }),
-    ...(match.reply_count === undefined ? {} : { reply_count: match.reply_count }),
-    ...(match.latest_reply === undefined ? {} : { latest_reply: match.latest_reply }),
-  }
+  return toMessage(match, threadTs)
 }
 
 export interface DiscoverOptions {
@@ -68,20 +76,36 @@ export interface DiscoverOptions {
   readonly seedReadBefore?: string
 }
 
-/** Thread activity since `sinceMillis`, by search. */
-const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
+interface SearchPass {
+  readonly query: string
+  readonly pages: number
+  readonly sinceMillis: number
+  readonly reason: string
+  /** A match as a message to store, or `undefined` to drop it. */
+  readonly toMessage: (match: FlatSearchMatch) => Message | undefined
+  /** Fetch the people the page names before storing it, so the rows it makes show names, not "Someone". */
+  readonly nameFirst?: boolean
+  /** After naming, what to store of each conversation's matches. */
+  readonly select?: (channel: string, messages: ReadonlyArray<Message>) => Effect.Effect<ReadonlyArray<Message>, SqlError, StoreWriter>
+}
+
+/**
+ * Newest-first search pages from member conversations, each applied as a
+ * partial page, until a page reaches `sinceMillis`, the last page, or
+ * `pages`. On the background lane, which paces search on its own clock.
+ */
+const searchPages = (ctx: SyncContext, pass: SearchPass, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const sql = yield* StoreWriter
     const members = new Set((yield* sql<{ id: string }>`SELECT id FROM conversations WHERE is_member = 1`).map((r) => r.id))
-    const sinceTs = `${Math.floor(sinceMillis / 1000)}.000000`
-    const query = `is:thread after:${afterDate(sinceMillis)}`
-    for (let page = 1; page <= ctx.config.searchMaxPages; page++) {
+    const sinceTs = `${Math.floor(pass.sinceMillis / 1000)}.000000`
+    for (let page = 1; page <= pass.pages; page++) {
       const requestedAt = yield* Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))
       const answer = yield* api.call(
         'search.modules.messages',
-        { module: 'messages', query, count: ctx.config.searchPageCount, page, no_user_profile: 1, extra_message_data: 1, sort: 'timestamp', sort_dir: 'desc' },
-        { lane: 'background', reason: 'discovery' },
+        { module: 'messages', query: pass.query, count: ctx.config.searchPageCount, page, no_user_profile: 1, extra_message_data: 1, sort: 'timestamp', sort_dir: 'desc' },
+        { lane: 'background', reason: pass.reason },
       )
       const matches = searchMatches(answer)
       const byChannel = new Map<string, Array<Message>>()
@@ -90,7 +114,7 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
         if (match.ts < sinceTs) reachedSince = true
         const channel = searchMatchChannelId(match)
         if (!members.has(channel)) continue
-        const message = matchToMessage(match)
+        const message = pass.toMessage(match)
         if (message === undefined) continue
         let list = byChannel.get(channel)
         if (list === undefined) {
@@ -99,7 +123,10 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
         }
         list.push(message)
       }
-      for (const [channel, messages] of byChannel) {
+      if (pass.nameFirst === true) yield* nameFirst(ctx, [...byChannel.values()].flat(), 'background')
+      for (const [channel, matched] of byChannel) {
+        const messages = pass.select === undefined ? matched : [...(yield* pass.select(channel, matched))]
+        if (messages.length === 0) continue
         // Search is newest first. Store roots before replies on this page, so
         // their counters prevent a redundant stub/root lookup for each reply.
         messages.sort((a, b) => Number(isReply(a)) - Number(isReply(b)))
@@ -112,6 +139,64 @@ const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: Discov
       yield* Effect.yieldNow
     }
   })
+
+/** Thread activity since `sinceMillis`, by search. */
+const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
+  searchPages(ctx, { query: `is:thread after:${afterDate(sinceMillis)}`, pages: ctx.config.searchMaxPages, sinceMillis, reason: 'discovery', toMessage: matchToMessage }, options)
+
+/**
+ * A match that Main shows, as a message: a plain message or a thread root
+ * by a person. Replies are left to discovery, which would fetch every
+ * unknown root; bot posts are left to history, since a match carries no
+ * bot fields and the row would have no sender.
+ */
+const matchToMainMessage = (match: FlatSearchMatch, sinceTs: string): Message | undefined => {
+  if (match.user === undefined || match.ts < sinceTs) return undefined
+  const threadTs = threadTsOf(match)
+  return threadTs === undefined || threadTs === match.ts ? toMessage(match, threadTs) : undefined
+}
+
+/**
+ * What a preview may store: nothing for a conversation whose history has
+ * landed (its rows already show it), and only posts by people the store
+ * knows. A bot's match carries no bot fields, so its channel would show as
+ * a person's until history sorts it into Automated.
+ */
+const previewsToStore = (channel: string, messages: ReadonlyArray<Message>): Effect.Effect<ReadonlyArray<Message>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    if ((yield* sql<{ n: number }>`SELECT count(*) AS n FROM synced_ranges WHERE channel = ${channel}`)[0]?.n) return []
+    const ids = [...new Set(messages.flatMap((m) => (m.user === undefined ? [] : [m.user])))]
+    if (ids.length === 0) return []
+    const people = new Set((yield* sql<{ id: string }>`SELECT id FROM users WHERE is_bot = 0 AND id IN ${sql.in(ids)}`).map((r) => r.id))
+    return messages.filter((m) => m.user !== undefined && people.has(m.user))
+  })
+
+/**
+ * The cold boot's preview search: the newest messages of the workspace
+ * since `sinceMillis`, at most `SyncConfig.previewSearchPages` pages, so the
+ * most active channels and DMs show a preview seconds after the quick
+ * start instead of when their history page lands. Each match is partial:
+ * the history page that follows replaces it with the full message. A match
+ * older than `sinceMillis` (`after:` names the day before) is dropped, so no
+ * conversation outside the window gets a row.
+ */
+export const searchPreviews = (ctx: SyncContext, sinceMillis: number, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> => {
+  const sinceTs = `${Math.floor(sinceMillis / 1000)}.000000`
+  return searchPages(
+    ctx,
+    {
+      query: `after:${afterDate(sinceMillis)}`,
+      pages: ctx.config.previewSearchPages,
+      sinceMillis,
+      reason: 'previews',
+      toMessage: (match) => matchToMainMessage(match, sinceTs),
+      nameFirst: true,
+      select: previewsToStore,
+    },
+    options,
+  )
+}
 
 /** The fallback: replies since the stored ones for every root whose `latest_reply` moved. */
 const discoverByReplies = (ctx: SyncContext, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>

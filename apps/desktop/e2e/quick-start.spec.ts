@@ -11,6 +11,8 @@ import { expect, launchApp, test, writeSlackApp } from './fixtures'
 
 /** performance.md, "First sync": sign-in to usable sidebar rows on the large seed. */
 const QUICK_START_BUDGET_MS = 5_000
+/** The preview search runs right after the quick start; its second page waits for search's pacing (10 a minute). */
+const PREVIEW_BUDGET_MS = 10_000
 const LATENCY_MS = 300
 
 const large = test.extend({
@@ -58,4 +60,30 @@ large('first sign-in shows threads, channels and DMs within the budget, then fil
 
   // The sync is still reading, and the rows follow it with no reload: previews arrive as history lands.
   await expect.poll(withPreview, { timeout: 120_000 }).toBeGreaterThan(previewsAtStart)
+})
+
+large('the busiest channels show a preview seconds after sign-in, before their history is read', async ({ juno, fake }) => {
+  test.setTimeout(120_000)
+  // History waits: any channel preview now comes from the preview search after the quick start.
+  fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })
+  await juno.signIn({ skipSetUp: false })
+  await juno.skipSetUp()
+  const { sidebar } = juno
+  await expect(sidebar.rows.first()).toBeVisible({ timeout: QUICK_START_BUDGET_MS })
+  const quickStart = Date.now()
+
+  // A channel's Main row with a "Sender: text" preview.
+  const channelPreviews = () =>
+    sidebar.rows.evaluateAll((rows) =>
+      rows.filter((row) => {
+        const titleId = row.getAttribute('aria-labelledby')
+        const title = (titleId === null ? null : document.getElementById(titleId)?.textContent) ?? ''
+        return title.startsWith('#') && (row.textContent ?? '').slice(title.length).includes(': ')
+      }).length,
+    )
+  await expect.poll(channelPreviews, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(5)
+  test.info().annotations.push({ type: 'previews', description: `${Date.now() - quickStart} ms from rows to channel previews` })
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.kind === 'api')).toHaveLength(0)
+  expect(fake.heldCount({ method: 'conversations.history' })).toBe(1)
+  fake.release({ method: 'conversations.history' })
 })

@@ -8,7 +8,9 @@
  * a provisional Main row), the people of the DMs, and the first page of
  * followed threads from `subscriptions.thread.getView`, all on the
  * interactive lane. Then the quick-start marker (`QUICK_START_KEY`): the
- * sidebar shows rows from here on. The other `getView` pages (10 per page
+ * sidebar shows rows from here on. One or two newest-first searches of the
+ * window (`searchPreviews`), beside everything after, then give the busiest
+ * conversations a preview within seconds. The other `getView` pages (10 per page
  * live, back to the quiet window) then run beside one history page per
  * active conversation (`historyOrder`: DMs, mentions, unread followed
  * threads and the user's own channels first, then newest first; background lane, skipping
@@ -31,10 +33,10 @@ import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Clock, Effect, Queue } from 'effect'
+import { Clock, Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { activeConversations, historyOrder, loadCounts } from './counts'
-import { discoverSince } from './discovery'
+import { discoverSince, searchPreviews } from './discovery'
 import { readMetadata, storeMetadata } from './metadata'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
@@ -417,8 +419,16 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     // Names before rows: the people of every DM and group DM, on the interactive lane.
     yield* fillUsers(ctx, 'interactive')
     // The quick start ends with the first page of followed threads; the other pages run beside history.
-    const quickStart = Effect.flatMap(Clock.currentTimeMillis, (at) => transaction(setSyncState(QUICK_START_KEY, { at })))
+    const quickStarted = yield* Deferred.make<void>()
+    const quickStart = Effect.flatMap(Clock.currentTimeMillis, (at) => transaction(setSyncState(QUICK_START_KEY, { at }))).pipe(
+      Effect.andThen(Deferred.succeed(quickStarted, undefined)),
+      Effect.asVoid,
+    )
     const threads = loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive', afterFirstPage: quickStart })
+    // Once rows show, the newest messages of the workspace give the busiest channels a preview before their history lands.
+    const previews = Deferred.await(quickStarted).pipe(
+      Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: bootTs })) : Effect.void),
+    )
     const history = Effect.gen(function* () {
       yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
       let done = 0
@@ -433,14 +443,19 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
         yield* Effect.yieldNow
       }
     })
-    yield* Effect.all([threads, history], { concurrency: 2, discard: true })
-    yield* fillUsers(ctx)
-    // Independent methods, so they run side by side: previews read replies, discovery searches.
-    // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-    const [, discovered] = yield* Effect.all([
-      loadThreadPreviews(ctx, bootTs),
-      discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })),
-    ], { concurrency: 2 })
+    const rest = Effect.gen(function* () {
+      yield* Effect.all([threads, history], { concurrency: 2, discard: true })
+      yield* fillUsers(ctx)
+      // Independent methods, so they run side by side: previews read replies, discovery searches.
+      // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
+      const [, found] = yield* Effect.all([
+        loadThreadPreviews(ctx, bootTs),
+        discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })),
+      ], { concurrency: 2 })
+      return found
+    })
+    // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
+    const [discovered] = yield* Effect.all([rest, previews], { concurrency: 2 })
     yield* fillUsers(ctx)
     const state: BootState = {
       quietDays,
