@@ -897,6 +897,18 @@ A typical UI change, before and after (`packages/views/src/Composer.tsx`: the ga
 
 On an idle pool one run is slower than five machines at once (about 375 s warm against about 210 s), but it asks for 8 vCPU instead of 20, builds once, and fits beside two other runs, where before a second run waited for the first. Two runs at once were not measured before merging; measure them on main. Running the gallery beside the desktop e2e on the same machine took 317 s but failed three tests (one gallery cursor test, two desktop timing tests) at 95% median CPU, so the app suites run one after another.
 
+**Lanes side by side** (10-17). A plan runs the app suites in one lane and the unit tests and spec checks in another, at the same time (`scripts/plan.mjs`). With each suite's own worker count the machine was far past full: busy time stops at 100%, so the remote run now also prints the runnable tasks per core and the kernel's CPU pressure (the share of time some task waited for a core), with a 30 s timeline. Since then the plan gives each lane a smaller share (`sideBySide`): 5 desktop workers and 8 gallery workers on 8 cores, and beside them vitest with 4 workers and one package at a time, and spec checks with 2 jobs and one Apalache. A step's own `KEY=VALUE` words still win; a suite run alone keeps its own counts. The full `verify:main` plan on one 8x16, one commit:
+
+| Workers | Script | Busy, average | Runnable per core, median | CPU pressure, median | Failed |
+| --- | --- | --- | --- | --- | --- |
+| Each suite's own (desktop 8, gallery 24) | 534 s | 92% | 4 to 7 | about 85% | 2 layout-shift tests |
+| Desktop 6, the rest unchanged | 560 s | 93% | 3 to 7 | about 80% | the codex removal test |
+| Desktop 6, gallery 12, the other lane smaller | 540 s | 82% | 2.2 | 58% | the chat-cache benchmark |
+| Every suite one after another, desktop 6 | 625 s | 72% | 1.4 | 30% | none |
+| Desktop 5, gallery 8, the other lane smaller (the default) | 564 s | 79% | 1.6 | 42% | none |
+
+Alone, the gallery at 3 workers per core still ran 5.5 runnable tasks per core; the desktop suite at 6 workers ran 2 to 3. Most failures reported from plan runs on 10-17 were waits that a loaded core made late (layout-shift probes, 1 s polls, the conformance replay's settle time, the chat benchmark).
+
 Earlier measurements, with a shape per script (2026-10-15, TypeScript 7; "script" excludes start-up):
 
 | Script | Shape then | Script time |
