@@ -1092,8 +1092,10 @@ export class AllTopicsRow {
     for (;;) {
       await settle(table)
       if ((await this.root.count()) > 0) {
-        await this.root.scrollIntoViewIfNeeded()
-        return true
+        // A filter that is still applying can take the row away between the count and the scroll: then look again.
+        if (await this.root.scrollIntoViewIfNeeded({ timeout: 2_000 }).then(() => true, () => false)) return true
+        if ((await this.root.count()) > 0) throw new Error(`All topics row "${this.title}" is drawn but never stable`)
+        continue
       }
       if (!(await pageDown(table))) return false
     }
