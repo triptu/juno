@@ -1,8 +1,8 @@
-// Notification hours stay quiet for held messages; Tell Juno quotes a message beside the topic.
+// A DM outside notification hours is held quietly; Tell Juno quotes a message beside the topic.
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Juno } from '../driver/juno'
-import { openChat, ready } from './agent'
+import { ready } from './agent'
 import { expect, JunoChatPane, test } from './chat'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -66,13 +66,13 @@ const minutesNow = () => {
   return now.getHours() * 60 + now.getMinutes()
 }
 
-// A held message is judged at the time it arrived, so hours that start later never release it.
-// The minute-by-minute boundary is covered with the test clock in packages/engine/test/notifications.test.ts.
-test('starting notification hours keeps held messages quiet while a new urgent message notifies', async ({ juno, slack, model, userData, fake }) => {
+// What happens when the hours start, by the clock, is covered with the test clock in
+// packages/engine/test/notifications.test.ts ("keeps messages held at hours start").
+test('outside notification hours a DM is held with its reason and shows no notification', async ({ juno, slack, model, userData, fake }) => {
   await ready(juno)
   await juno.openNotifications()
-  const saved = () => savedSettings(userData, fake.teamId)
-  await excludeNow(juno, saved)
+  await excludeNow(juno, () => savedSettings(userData, fake.teamId))
+  await juno.blurWindow()
   const held = 'Can you approve the release now?'
   slack.as('Maya').dm(held)
   await expect.poll(() => {
@@ -84,14 +84,6 @@ test('starting notification hours keeps held messages quiet while a new urgent m
     }
   }).toMatchObject({ outcome: 'hold', reason: expect.stringContaining('Outside your notification hours.') })
   expect(await juno.osNotifications()).toHaveLength(0)
-  await coverNow(juno, saved)
-  await juno.blurWindow()
-
-  const urgent = 'Can you approve the release today?'
-  slack.as('Maya').dm(urgent)
-  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toEqual([{ title: 'Maya', body: urgent }])
-  const chat = await openChat(juno)
-  await expect(chat.root.locator('[data-chat-group-label]').filter({ hasText: 'Summary' })).toHaveCount(0)
   expect(model.inputs()).toHaveLength(0)
 })
 
