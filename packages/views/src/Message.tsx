@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
-import type { FileView, MessageView, Person } from '@juno/contract'
+import type { FileView, MessageView, Person, QuickReaction } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -20,6 +20,8 @@ import { fullTime } from './time'
  * memoized (performance 5.1).
  */
 export interface MessageActions {
+  /** The toolbar's one-click reactions, in order; the default three when absent. */
+  readonly quickReactions?: ReadonlyArray<QuickReaction>
   readonly onReact: (message: MessageView, name: string) => void
   /** Opens the emoji picker at `at`. */
   readonly onMoreReactions: (message: MessageView, at: MenuAnchor) => void
@@ -90,6 +92,17 @@ const HOVER = '@media (hover: hover)'
 // toolbar rises above the row's top edge, over the end of the row before, as
 // Slack's does, so it never covers the name or the time.
 const NARROW_ROW = '@container message (width < 464px)'
+
+// Each quick reaction past three makes the toolbar one 28px button and its
+// 2px gap wider, so the header's reserve grows by that much and the row
+// counts as narrow 30px sooner: its toolbar rises above the row rather than
+// cover the name or the time.
+const EXTRA_REACTION = `(${sizes['--control-28']} + ${spacing['--space-0-5']})`
+const NARROW_ROW_4 = '@container message (width < 494px)'
+const NARROW_ROW_5 = '@container message (width < 524px)'
+const NARROW_ROW_6 = '@container message (width < 554px)'
+const NARROW_ROW_7 = '@container message (width < 584px)'
+const RAISED = `var(--row-toolbar-top, calc(-1 * ${layout['--toolbar-height']}))`
 
 /**
  * Where a narrow row's toolbar goes, decided once as the row is pointed at or
@@ -168,6 +181,8 @@ export const Message = memo(function Message({
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
   }
+  // 0 with three reactions or fewer, else the variant for how many more.
+  const extra = Math.max(0, Math.min(4, (actions?.quickReactions?.length ?? 3) - 3))
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const { pending, clientMsgId } = message
   // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to act on.
@@ -177,6 +192,7 @@ export const Message = memo(function Message({
         main={main}
         hasThread={message.thread !== undefined}
         tabIndex={tabbable ? 0 : -1}
+        {...(actions.quickReactions === undefined ? {} : { reactions: actions.quickReactions })}
         onReact={(reaction) => actions.onReact(message, reaction)}
         onMoreReactions={(at) => actions.onMoreReactions(message, at)}
         onQuote={() => actions.onQuote(message)}
@@ -216,7 +232,7 @@ export const Message = memo(function Message({
       </span>
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
-          <span data-message-header="" {...stylex.props(styles.header, actions !== undefined && styles.headerWithToolbar)}>
+          <span data-message-header="" {...stylex.props(styles.header, actions !== undefined && headerReserve[extra])}>
             <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
               {name}
             </Text>
@@ -271,7 +287,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar, toolbarTop[extra])}>{toolbar}</span> : null}
     </div>
   )
 })
@@ -409,6 +425,18 @@ const styles = stylex.create({
       [NARROW_ROW]: 0,
     },
   },
+  headerWithToolbar4: {
+    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + ${EXTRA_REACTION})`, [NARROW_ROW_4]: 0 },
+  },
+  headerWithToolbar5: {
+    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 2 * ${EXTRA_REACTION})`, [NARROW_ROW_5]: 0 },
+  },
+  headerWithToolbar6: {
+    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 3 * ${EXTRA_REACTION})`, [NARROW_ROW_6]: 0 },
+  },
+  headerWithToolbar7: {
+    paddingInlineEnd: { default: `calc(${layout['--toolbar-reserve']} + 4 * ${EXTRA_REACTION})`, [NARROW_ROW_7]: 0 },
+  },
   // The time follows the name at the header's gap, as in Slack.
   name: {
     flexShrink: 1,
@@ -452,10 +480,22 @@ const styles = stylex.create({
     top: {
       default: spacing['--space-0-5'],
       // Raised, unless placeToolbar found the row too near the list's top.
-      [NARROW_ROW]: `var(--row-toolbar-top, calc(-1 * ${layout['--toolbar-height']}))`,
+      [NARROW_ROW]: RAISED,
     },
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
   },
 })
+
+// The toolbar with four to seven quick reactions rises sooner (EXTRA_REACTION).
+const raisedFrom = stylex.create({
+  4: { top: { default: spacing['--space-0-5'], [NARROW_ROW_4]: RAISED } },
+  5: { top: { default: spacing['--space-0-5'], [NARROW_ROW_5]: RAISED } },
+  6: { top: { default: spacing['--space-0-5'], [NARROW_ROW_6]: RAISED } },
+  7: { top: { default: spacing['--space-0-5'], [NARROW_ROW_7]: RAISED } },
+})
+
+/** By quick reactions past three. */
+const headerReserve = [styles.headerWithToolbar, styles.headerWithToolbar4, styles.headerWithToolbar5, styles.headerWithToolbar6, styles.headerWithToolbar7]
+const toolbarTop = [null, raisedFrom[4], raisedFrom[5], raisedFrom[6], raisedFrom[7]]

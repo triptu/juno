@@ -26,6 +26,7 @@ import {
 } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
+import { sevenQuickReactions } from './fixtures/quickReactions'
 import { InlineEdit } from './InlineEdit'
 import { MessageList, type MessageListItem, type MessageListProps } from './MessageList'
 
@@ -36,6 +37,9 @@ const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onChannel' | 'onLin
 const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => fixture<MessageListProps>({ ...base, ...props }, frame)
 
 const ROW = '[data-message-row]'
+
+/** The toolbar with the most quick reactions it holds. */
+const sevenActions = { ...noopActions, quickReactions: sevenQuickReactions }
 
 /**
  * A send settles: the pending row is replaced by the message Slack stored,
@@ -184,6 +188,8 @@ export default defineFixtures(
       'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
       'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-toolbar-main': state({ items: mainStream, main: true, actions: noopActions }, { hover: `${ROW}:nth-of-type(5)` }),
+      // Seven quick reactions: the header keeps room for all of them.
+      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { hover: `${ROW}:nth-of-type(5)` }),
       'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: `${ROW}:first-of-type` }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
@@ -195,6 +201,10 @@ export default defineFixtures(
       'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
       'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:first-of-type` }),
       'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: `${ROW}:first-of-type` }),
+      // Seven quick reactions: the raised toolbar shows as many as fit, then More reactions.
+      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
+      // A pane between narrow and wide: with seven, the toolbar rises above the row rather than cover the name.
+      'hover-toolbar-seven-mid': state({ items: mainStream, main: true, actions: sevenActions }, { width: 560, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
     },
   },
   { width: 816, height: 600, padded: false },

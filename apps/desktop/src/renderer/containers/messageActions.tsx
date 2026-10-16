@@ -2,7 +2,7 @@
  * What a topic's messages do (SPEC section 7: the hover toolbar, More,
  * Keyboard, Quoting and reactions), wired to the engine.
  *
- * - The toolbar: the three quick reactions, the emoji picker, Quote, Reply
+ * - The toolbar: the quick reactions (Settings › Appearance), the emoji picker, Quote, Reply
  *   in thread (Main) and More, the message menu.
  * - Your own messages: Edit turns the body into a field in place; Delete
  *   asks once in the toolbar's place (ADR 0010). Neither has an undo.
@@ -17,9 +17,10 @@
  * list shows it from the engine's next window. The edit field stays until
  * that window has the new text, so the old text never flashes back.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { editMessage, registry, type MessageWindow } from '@juno/state'
+import { editMessage, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
 import { InlineEdit, type InlineEditProps, type MessageActions } from '@juno/views'
 import { useEmojiSuggestions } from './emojiSuggestions'
 import { landedTs, refOf } from './messageRows'
@@ -101,7 +102,10 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   useEffect(preloadPicker, [])
 
-  const actions = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage })
+  const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage })
+  // The rows re-render only when the quick reactions change.
+  const quick = useAtomValue(quickReactionsAtom)
+  const actions = useMemo(() => ({ ...commands, quickReactions: quick }), [commands, quick])
   const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)
@@ -141,7 +145,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
-    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer),
+    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, quick),
   }
 }
 
