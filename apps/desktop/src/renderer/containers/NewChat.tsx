@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { encodeMentions, type PickConversation, type PickThread } from '@juno/contract'
 import {
   newChatAtom,
+  setNewChat,
   frequentConversationsAtom,
   nowAtom,
   pickConversation,
@@ -15,7 +16,7 @@ import {
   type NewChat as NewChatState,
 } from '@juno/state'
 import { afterPaint, mark } from '@juno/state/perf'
-import { useAtom, useAtomValue } from '@juno/state/react'
+import { useAtomValue } from '@juno/state/react'
 import { Composer, DestinationPickers, NewChat as NewChatView, startOfConversation, type PickerName } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useMentions } from './mentions'
@@ -50,7 +51,8 @@ export interface NewChatTabProps {
  * the composer takes focus.
  */
 export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
-  const [chat, setChat] = useAtom(newChatAtom(tabId))
+  const chat = useAtomValue(newChatAtom(tabId))
+  const setChat = (next: NewChatState) => setNewChat(registry, tabId, next)
   const [open, setOpen] = useState<PickerName | undefined>(undefined)
   const [query, setQuery] = useState('')
   const [sending, setSending] = useState(false)

@@ -32,11 +32,11 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
+import { PickConversation, PickThread, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
-import { newChatAtom, newChatTitle } from './newChat'
+import { newChatAtom, newChatTitle, untouched, type NewChat } from './newChat'
 import { newTabPageAtom, type NewTabPage } from './newTabPage'
 import { signedInAtom } from './session'
 
@@ -389,7 +389,10 @@ function placeOf(saved: typeof PlaceJson.Type): Place {
  * topic's. Tabs saved with the old `stealth` flag still read back; the flag
  * is dropped.
  */
-const TabJson = Schema.Union([Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean) }), Schema.Struct({ id: Schema.String })])
+const TabJson = Schema.Union([
+  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), newChat: Schema.optionalKey(Schema.Unknown) }),
+  Schema.Struct({ id: Schema.String }),
+])
 const TabsJson = Schema.Struct({
   tabs: Schema.Array(TabJson),
   active: Schema.NullOr(Schema.String),
@@ -419,16 +422,79 @@ export function parseTabs(value: unknown): Tabs {
   })
 }
 
-/** What `TABS_PREF` holds: each tab with the place it shows, and whether its Juno panel is open. */
-export function savedTabs(tabs: Tabs): unknown {
+/** A New chat's draft and destination as a tab saves them. One that no longer reads is dropped, not the tab. */
+const NewChatJson = Schema.Struct({
+  draft: Schema.String,
+  mentions: Schema.Array(Schema.Struct({ kind: Schema.Literals(['person', 'channel']), id: Schema.String, name: Schema.String })),
+  conversation: Schema.optionalKey(PickConversation),
+  thread: Schema.optionalKey(PickThread),
+})
+const decodeNewChat = Schema.decodeUnknownOption(NewChatJson)
+
+/** The New chats saved with the tabs, by tab id. */
+function parseNewChats(value: unknown): ReadonlyMap<string, NewChat> {
+  const chats = new Map<string, NewChat>()
+  Option.map(decodeTabs(value), (saved) => {
+    for (const tab of saved.tabs) {
+      if (!('place' in tab) || tab.newChat === undefined) continue
+      Option.map(decodeNewChat(tab.newChat), (chat) => chats.set(tab.id, { draft: chat.draft, mentions: chat.mentions, conversation: chat.conversation, thread: chat.thread }))
+    }
+  })
+  return chats
+}
+
+/** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, and a New chat's draft and destination. */
+export function savedTabs(tabs: Tabs, chatOf: (tabId: string) => NewChat | undefined = () => undefined): unknown {
   return {
-    tabs: tabs.tabs.map((tab) => ({ id: tab.id, pinned: tab.pinned, place: currentPlace(tab), ...(tab.junoPanel === true ? { junoPanel: true } : {}) })),
+    tabs: tabs.tabs.map((tab) => {
+      const place = currentPlace(tab)
+      const chat = place.kind === 'newChat' ? chatOf(tab.id) : undefined
+      return {
+        id: tab.id,
+        pinned: tab.pinned,
+        place,
+        ...(tab.junoPanel === true ? { junoPanel: true } : {}),
+        ...(chat === undefined || untouched(chat) ? {} : { newChat: savedNewChat(chat) }),
+      }
+    }),
     active: tabs.active ?? null,
     recent: tabs.recent,
   }
 }
 
+const savedNewChat = (chat: NewChat) => ({
+  draft: chat.draft,
+  mentions: chat.mentions,
+  ...(chat.conversation === undefined ? {} : { conversation: chat.conversation }),
+  ...(chat.thread === undefined ? {} : { thread: chat.thread }),
+})
+
 const savedTabsAtom = liveQuery(prefsGet)({ key: TABS_PREF })
+
+const savedNewChatsAtom = Atom.make((get): ReadonlyMap<string, NewChat> => {
+  const saved = get(savedTabsAtom)
+  return AsyncResult.isSuccess(saved) ? parseNewChats(saved.value) : new Map()
+})
+
+/** The draft and destination a New chat tab was saved with, read back after a restart. */
+export const savedNewChatAtom = Atom.family((tabId: string) => Atom.make((get) => get(savedNewChatsAtom).get(tabId)))
+
+/** The tabs as `TABS_PREF` saves them, with each New chat's draft and destination. */
+function saveTabs(registry: Registry, tabs: Tabs): void {
+  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(tabs, (id) => registry.get(newChatAtom(id))) })
+}
+
+let chatSave: ReturnType<typeof setTimeout> | undefined
+
+/** Sets a New chat tab's draft and destination, and saves them with the tabs once typing pauses. */
+export function setNewChat(registry: Registry, tabId: string, chat: NewChat): void {
+  registry.set(newChatAtom(tabId), chat)
+  clearTimeout(chatSave)
+  chatSave = setTimeout(() => {
+    chatSave = undefined
+    saveTabs(registry, registry.get(tabsAtom))
+  }, 300)
+}
 
 /** Tabs changed in this run of the app, per workspace. Until the first change, the saved ones show. */
 const changedTabsAtom = Atom.family((_teamId: string) => Atom.make<Tabs | undefined>(undefined).pipe(Atom.keepAlive))
@@ -452,7 +518,7 @@ export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Ta
   const next = changed === current ? current : ensureTab(changed, newTabPlace(registry.get(newTabPageAtom)))
   if (next === current) return current
   registry.set(changedTabsAtom(teamId), next)
-  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(next) })
+  saveTabs(registry, next)
   return next
 }
 

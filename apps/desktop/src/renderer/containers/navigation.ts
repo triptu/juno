@@ -50,6 +50,7 @@ import {
   messageWindowSpecAtom,
   mountedTabs,
   newChatAtom,
+  setNewChat,
   newChatPlace,
   newTabPageAtom,
   emptyNewChat,
@@ -346,7 +347,7 @@ export function openNewChatTo(conversation: PickConversation): void {
   show((tabs) => {
     const blank = tabs.tabs.find((tab) => currentPlace(tab).kind === 'newChat' && untouched(registry.get(newChatAtom(tab.id))))
     const next = blank === undefined ? openHere(tabs, newChatPlace, { newTab: true }) : activateTab(tabs, blank.id)
-    if (next.active !== undefined) registry.set(newChatAtom(next.active), pickConversation(emptyNewChat, conversation))
+    if (next.active !== undefined) setNewChat(registry, next.active, pickConversation(emptyNewChat, conversation))
     return next
   }, undefined)
 }
@@ -504,7 +505,7 @@ export function openAllTopics(options: OpenOptions = {}): void {
 export function settleSentChat(tabId: string, topicId: string): void {
   show(
     (tabs) => {
-      registry.set(newChatAtom(tabId), emptyNewChat)
+      setNewChat(registry, tabId, emptyNewChat)
       return settleNewChat(tabs, tabId, topicId)
     },
     { id: topicId, fresh: true, name: 'juno.topic-open' },
