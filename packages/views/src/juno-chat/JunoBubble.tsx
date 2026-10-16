@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
-import { colors, motion, spacing } from '@juno/tokens/tokens.stylex'
+import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
@@ -108,7 +108,7 @@ const styles = stylex.create({
     animationFillMode: 'both',
   },
   bubble: {
-    backgroundColor: colors['--surface-hover'],
+    backgroundColor: chat['--juno-bubble-bg'],
     color: colors['--foreground-default'],
   },
   // Above the bubble, on its edge.

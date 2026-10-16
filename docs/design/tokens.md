@@ -24,6 +24,8 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons; send-check bar; segmented control track |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
+| `--panel-surface` | `hsla(48, 22%, 95.5%, 1)` | #F6F5F1 | redesign | The Juno panel: a step below the page (1.05:1) and the field on it (1.05:1); muted text 4.7:1 |
+| `--panel-bubble` | `hsla(48, 40%, 99%, 1)` | #FDFDFB | redesign | Juno's bubble on the panel, lighter than the panel as the field is (1.07:1) |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
 | `--secondary-hover` | `hsla(48, 30%, 90%, 1)` | #EDEADE | css | Secondary button hover |
 | `--secondary-active` | `hsla(48, 30%, 88%, 1)` | #EAE6D7 | css | Unread count tag, Juno nav count, pressed state |
@@ -56,6 +58,8 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--panel-surface` | #201E1B | 0.235 | 1.05:1 over the page, the field 1.07:1 over it | redesign |
+| `--panel-bubble` | #2D2B28 | 0.29 | 1.18:1 over the panel (the hover surface) | redesign |
 | `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
 | `--secondary-hover` | #383633 | 0.335 | | redesign |
 | `--secondary-active` | #403E3B | 0.365 | | redesign |
@@ -412,7 +416,7 @@ Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at
 
 ### Juno chat
 
-The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--surface-default` with 1.5% of `--hl` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. 3% read as pink on paper in light; 1.5% is a tint you notice only beside the page.
+The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-fg` are the owner bubble's fill and text, set to option B (`--hl-bubble` / `--foreground-default`); the other options are listed beside the group, and switching is a change to those two lines. `--bubble-max-width` 76% (`--bubble-max-width-panel` 85% in the Juno panel), `--bubble-tail` 4px (the last bubble of a group), `--card-max-width` 560px. The status bubble: `--status-dot` 6px, `--status-min-width` 52px, `--status-loop` 1200ms, `--status-pulse-scale` 1.35 (1 under reduced motion), `--status-dot-opacity` 1 (0.6 under reduced motion). `--reaction-offset` 10px is how far a reaction badge sits out over its bubble's top corner. The Juno panel's material: `--panel-fill` is `--panel-surface` (opaque; beside a topic it sits on the page colour alone, so nothing behind it moves and it costs nothing to composite), `--panel-glass` the same at 80% for when it covers the topic, with `--panel-backdrop` `blur(24px) saturate(1.6)`. It carries no accent: a tint of `--hl` read as pink, yellow or purple depending on the accent, and the field and Juno's bubbles were the panel's own colour. `--juno-bubble-bg` is Juno's bubble and the status bubble (`--surface-hover`); the panel sets it to `--panel-bubble`.
 
 ### Illustrations and the mark
 
