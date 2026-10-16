@@ -24,10 +24,11 @@
  *   with backoff, also after a restart.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
- * posts (`@juno/sync` `sent.ts`), which wakes this worker. Just before
- * that delete goes out, holding the send lane so no other write comes
- * between, one transaction checks again that it loses nothing
- * (`checkCopyDelete`) and cancels it otherwise. After the socket
+ * posts (`@juno/sync` `sent.ts`), which wakes this worker. Before that
+ * delete waits for the send lane, and again just before it goes out,
+ * holding the lane so no other write comes between, one transaction
+ * checks that it loses nothing (`checkCopyDelete`) and cancels it
+ * otherwise. After the socket
  * comes back, a copy's delete waits for the catch-up, at most
  * `COPY_CATCH_UP_MILLIS`; the check then also needs the copy's own topic
  * rechecked since the reconnect, so a delete of the kept message made
@@ -142,11 +143,13 @@ export class ActionWorker extends Context.Service<
             yield* local(transaction(dropAction(action)))
             return false
           }
-          // A copy's delete is checked once more on the send lane, so a change made while it waited for the lane is seen.
+          // A copy's delete is checked before it waits for the send lane, so a copy to keep is kept at once,
+          // and again holding the lane, so a change made while it waited is seen.
           const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
             if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
           })
+          if (action.kind === 'delete' && (yield* Effect.result(check))._tag === 'Failure') return false
           const selfId = (yield* local(storedMe))?.userId ?? ''
           const result = yield* Effect.result(callFor(action, place.ts, selfId, check))
           const now = yield* Clock.currentTimeMillis
