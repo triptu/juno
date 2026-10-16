@@ -82,11 +82,41 @@ test('each filter narrows the list: status chips, kind, place, sort and text', a
   await allTopics.row(OFFSITE).expectAbsent()
   await allTopics.row(POSTGRES).expectVisible()
 
-  // Place: one channel.
-  await allTopics.filterPlace('#design-review')
+  // Place: one channel, found by a word inside its name in the searchable picker.
+  await allTopics.filterPlace('review', 'design-review')
   await allTopics.row(DESIGN).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
-  await allTopics.filterPlace('Anywhere')
+  await allTopics.filterPlace('', 'Anywhere')
+  await allTopics.row(POSTGRES).expectVisible()
+
+  // With Channels on, the picker offers no DMs.
+  await allTopics.placeButton.click()
+  await allTopics.placeSearch.fill('maya')
+  await expect(allTopics.placeOption('Maya Chen')).toHaveCount(0)
+  await allTopics.placeSearch.press('Escape')
+  await expect(allTopics.placeSearch).toBeHidden()
+  await expect(allTopics.placeButton).toBeFocused()
+
+  // Every kind: a group DM by its people's names in any order, picked with the arrows and Enter.
+  await allTopics.filterKind('All')
+  await allTopics.placeButton.click()
+  await allTopics.placeSearch.fill('leo maya')
+  await expect(allTopics.placeOption('Maya Chen')).toHaveCount(0)
+  await allTopics.placeSearch.press('ArrowDown')
+  await allTopics.placeSearch.press('ArrowUp')
+  await allTopics.placeSearch.press('Enter')
+  await expect(allTopics.placeSearch).toBeHidden()
+  await expect(allTopics.placeButton).toHaveAccessibleName(/^Where: .*Leo/)
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.row(OFFSITE).expectAbsent()
+  expect(await allTopics.titles()).toHaveLength(1)
+
+  // A DM by the person's name: the list narrows to that DM's topics.
+  await allTopics.filterPlace('maya', 'Maya Chen')
+  await allTopics.row(OFFSITE).expectVisible()
+  await allTopics.row(POSTGRES).expectAbsent()
+  await allTopics.filterPlace('any', 'Anywhere')
+  await allTopics.row(POSTGRES).expectVisible()
 
   // Sort: most messages puts the six-reply Postgres thread above the two-reply quiet one.
   await allTopics.sort('Most messages')
