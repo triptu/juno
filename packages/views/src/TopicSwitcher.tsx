@@ -87,7 +87,8 @@ export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, que
   return (
     <div data-topic-switcher="">
       <PickerSearch query={query} onQuery={onQuery} placeholder="Search this channel" onKeyDown={onKeyDown} activeId={activeId} />
-      <div {...stylex.props(styles.scroll)}>
+      {/* Not a Tab stop: the rows are driven from the search field, so Chromium's own stop on a scroller would lead nowhere. */}
+      <div tabIndex={-1} {...stylex.props(styles.scroll)}>
         <OptionList label="Topics in this channel" {...(activeId === undefined ? {} : { activeId })}>
           {main ? <MainRow mainId={mainId} unread={mainUnread} active={rowId(mainId) === activeId} current={mainId === currentId} onOpen={onOpen} onActivate={setChosen} /> : null}
           {open.map(row)}
