@@ -140,8 +140,12 @@ export class ProviderStore {
         break
       }
     }
-    await this.#save()
-    this.#notify()
+    // The keychain already changed: the engine and the agent follow it even if the file write fails.
+    try {
+      await this.#save()
+    } finally {
+      this.#notify()
+    }
     return result
   }
 

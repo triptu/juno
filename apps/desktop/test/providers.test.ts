@@ -134,7 +134,6 @@ it('the keychain gets a key on stdin, never in argv, and nothing about it is log
   for (const spy of logged) expect(spy).not.toHaveBeenCalled()
 })
 
-
 it('shares the keychain OpenRouter key with the engine independently of the chat provider', async () => {
   const keychains = { openRouter: memoryKeychain('fake-router-key'), custom: memoryKeychain() }
   const { store, engineKeys } = await setup({ keychains })
@@ -145,4 +144,13 @@ it('shares the keychain OpenRouter key with the engine independently of the chat
   expect(engineKeys.at(-1)).toBe('fake-replacement-key')
   await store.set({ _tag: 'openRouter', key: null })
   expect(engineKeys.at(-1)).toBeNull()
+})
+
+it('a removed key leaves the engine even when the provider file cannot be written', async () => {
+  const keychains = { openRouter: memoryKeychain('fake-router-key'), custom: memoryKeychain() }
+  const { store, engineKeys } = await setup({ dir: join(tmpdir(), 'juno-providers-missing', 'nowhere'), keychains })
+  expect(engineKeys).toEqual(['fake-router-key'])
+  await expect(store.set({ _tag: 'openRouter', key: null })).rejects.toThrow()
+  expect(engineKeys.at(-1)).toBeNull()
+  expect(await keychains.openRouter.read()).toBeUndefined()
 })
