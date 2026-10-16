@@ -13,6 +13,7 @@ import {
   workspacePathsFromDir,
 } from '../src/index'
 import { freshStore, tempWorkspaceDir } from './helpers'
+import dropForYouCards from '../src/migrations/user/202610160200_drop_for_you_cards'
 
 const tableNames = (schema: 'main' | 'cache') =>
   Effect.gen(function* () {
@@ -53,9 +54,7 @@ describe('migrations', () => {
       yield* sql`CREATE TABLE for_you_cards (id TEXT PRIMARY KEY)`
       yield* sql`INSERT INTO for_you_cards VALUES ('old-card')`
       yield* sql`INSERT INTO prefs (key, value_json) VALUES ('theme', '"dark"')`
-      // As on a database from before the drop: it and every later migration run again.
-      yield* sql`DELETE FROM ${sql(MIGRATIONS_TABLE)} WHERE migration_id >= 202610160200`
-      yield* Effect.provideService(migrate(userMigrations), SqlClient.SqlClient, sql)
+      yield* Effect.provideService(dropForYouCards, SqlClient.SqlClient, sql)
       assert.notInclude(yield* tableNames('main'), 'for_you_cards')
       const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'theme'`
       assert.strictEqual(rows[0]?.value_json, '"dark"')
