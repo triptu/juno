@@ -139,6 +139,13 @@ export type PrivacyState = typeof PrivacyState.Type
 export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, detection: Schema.Literals(['available', 'missing', 'alwaysOn']) })
 export type SharingSetting = typeof SharingSetting.Type
 
+/**
+ * Whether macOS lets Juno post notifications (Settings › Notifications). `unknown` when main
+ * could not ask: the page then offers Open Notification Settings anyway.
+ */
+export const NotificationPermission = Schema.Literals(['allowed', 'denied', 'notDetermined', 'unknown'])
+export type NotificationPermission = typeof NotificationPermission.Type
+
 /** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */
 export const DownloadResult = Schema.Literals(['saved', 'failed'])
 export type DownloadResult = typeof DownloadResult.Type
@@ -183,6 +190,10 @@ export const ShellRoutes = {
   [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
   [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },
+  [Channels.notificationsTest]: { input: Schema.Void, output: Schema.Void },
+  [Channels.notificationsPermission]: { input: Schema.Void, output: NotificationPermission },
+  [Channels.notificationsRequestPermission]: { input: Schema.Void, output: NotificationPermission },
+  [Channels.notificationsOpenSettings]: { input: Schema.Void, output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

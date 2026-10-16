@@ -34,7 +34,7 @@ flowchart LR
   renderer <-->|ipcRenderer.invoke: menus, window, clipboard, files| main
 ```
 
-- The **shell** (main) owns what needs Electron APIs: windows, the application menu and context menus, notifications, the dock badge, the screen watch that turns privacy mode on while the screen is shared (`main/screenWatch.ts`, ADR 0015), `safeStorage`, the `persist:slack` session that holds the Slack cookie, the sign-in window, the import from the installed Slack app, the `juno://` scheme, file dialogs and downloads. No business logic.
+- The **shell** (main) owns what needs Electron APIs: windows, the application menu and context menus, notifications, the dock badge, the screen watch that turns privacy mode on while the screen is shared (`main/screenWatch.ts`, ADR 0015), macOS's notification permission (`main/notificationPermission.ts`, through koffi as in ADR 0015), `safeStorage`, the `persist:slack` session that holds the Slack cookie, the sign-in window, the import from the installed Slack app, the `juno://` scheme, file dialogs and downloads. No business logic.
 - The **engine** (a `utilityProcess` forked with `partition: 'persist:slack'`) owns all business logic and I/O. It is a plain Node program built from Effect services, so it also runs outside Electron for tests.
 - The **renderer** is UI only. It subscribes to live queries and sends commands over one MessagePort. It never sees a token, a cookie or an API key.
 

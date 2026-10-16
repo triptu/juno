@@ -3,8 +3,10 @@
  * thread or person, the OS notification and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
  * Notifications and Ignored sections of Settings, and Set yourself
- * away or active. Main records OS notifications instead of
- * showing them (`junoTest.notifications`).
+ * away or active, and the test notification and macOS permission line.
+ * Main records OS notifications instead of showing them
+ * (`junoTest.notifications`) and fakes macOS's permission
+ * (`junoTest.notificationPermission`).
  */
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -137,6 +139,40 @@ test('Settings › Notifications saves hours and what matters, and Appearance ch
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('compact')
   await juno.settings.show('Notifications')
   await expect(page.matters).toHaveValue('The launch and hiring.')
+})
+
+test('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openNotifications()
+  const page = juno.notifications
+  const line = page.root.getByRole('status', { name: 'Notification permission' })
+  const test = { title: 'Juno', body: 'Notifications from Juno look like this.' }
+
+  // Allowed: no line, and the button posts one notification the way a message's is posted.
+  await expect(page.root.getByRole('button', { name: 'Send test notification' })).toBeVisible()
+  await expect(line).toHaveCount(0)
+  await page.root.getByRole('button', { name: 'Send test notification' }).click()
+  await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === test.title && shown.body === test.body)).toHaveLength(1)
+
+  // Denied: the line and Open Notification Settings, read again when the window regains focus.
+  await juno.setNotificationPermission('denied')
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(line).toContainText("macOS is not showing Juno's notifications.")
+  await line.getByRole('button', { name: 'Open Notification Settings' }).click()
+  await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
+
+  // Turned on in System Settings: back in Juno, the line goes.
+  await juno.setNotificationPermission('allowed')
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(line).toHaveCount(0)
+
+  // Not asked yet: the action asks macOS instead, and the line goes once allowed.
+  await juno.setNotificationPermission('notDetermined')
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await line.getByRole('button', { name: 'Allow notifications' }).click()
+  await expect(line).toHaveCount(0)
+  expect(await juno.notificationSettingsOpened()).toBe(1)
 })
 
 test('Set yourself away and active from the avatar menu sets Slack presence', async ({ juno, slack }) => {

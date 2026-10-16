@@ -1,7 +1,7 @@
 import { isT3ThreadUrl } from '@juno/agent-contract'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
 import type { CodexHome } from './codex'
@@ -100,11 +100,18 @@ export interface IpcDeps {
   readonly sharing: { readonly get: () => SharingSetting; readonly set: (hide: boolean) => SharingSetting }
   /** The topic the window shows, or null while it shows none or is not focused. */
   readonly setViewing: (topicId: string | null) => void
+  /** Settings › Notifications: the test notification, macOS's permission and its settings (notificationPermission.ts). */
+  readonly notifications: {
+    readonly test: () => void
+    readonly permission: () => Promise<NotificationPermission>
+    readonly requestPermission: () => Promise<NotificationPermission>
+    readonly openSettings: () => Promise<void>
+  }
   /** Download (files.ts), with the hosts it may fetch from already bound. */
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, sharing, setViewing, downloadFile }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -179,6 +186,11 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.launchSetSidebar, (sidebar) => {
     setSidebar(sidebar)
   })
+
+  handle(Channels.notificationsTest, () => notifications.test())
+  handle(Channels.notificationsPermission, () => notifications.permission())
+  handle(Channels.notificationsRequestPermission, () => notifications.requestPermission())
+  handle(Channels.notificationsOpenSettings, () => notifications.openSettings())
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

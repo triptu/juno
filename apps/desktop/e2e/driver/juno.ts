@@ -879,6 +879,16 @@ export class Juno {
     await this.app.evaluate((_electron, at) => (globalThis as unknown as { junoTest: { clickNotification: (i: number) => void } }).junoTest.clickNotification(at), index)
   }
 
+  /** What macOS says about Juno's notifications from now on (main's seam); `allowed` at launch. */
+  async setNotificationPermission(permission: 'allowed' | 'denied' | 'notDetermined' | 'unknown'): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { notificationPermission: (p: string) => void } }).junoTest.notificationPermission(value), permission)
+  }
+
+  /** How many times Open Notification Settings opened System Settings. */
+  notificationSettingsOpened(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notificationSettingsOpened: () => number } }).junoTest.notificationSettingsOpened())
+  }
+
   /** The dock's badge text: "•" with unread mentions, else empty. */
   dockBadge(): Promise<string> {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())

@@ -28,6 +28,10 @@ export const notificationsBase: NotificationsPageProps = {
   onHoursChange: noop,
   onMattersSave: noop,
   onRemove: noop,
+  permission: 'allowed',
+  onSendTest: noop,
+  onOpenSettings: noop,
+  onAllow: noop,
 }
 
 export default defineFixtures(
@@ -37,6 +41,11 @@ export default defineFixtures(
       default: fixture(notificationsBase),
       'show-why': fixture({ ...notificationsBase, showWhy: true }),
       'same-hours': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
+    },
+    Permission: {
+      denied: fixture({ ...notificationsBase, permission: 'denied' }),
+      'not-determined': fixture({ ...notificationsBase, permission: 'notDetermined' }),
+      unknown: fixture({ ...notificationsBase, permission: 'unknown' }),
     },
     Empty: {
       'nothing-set': fixture({ ...notificationsBase, matters: '', every: [], never: [], interrupted: 0, held: 0, today: [] }),

@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Density, ResolvedTheme, Theme } from '@juno/contract'
@@ -199,4 +199,30 @@ export function onNotificationOpen(listener: (target: NotificationTarget) => voi
     const target = decodeTarget(raw)
     if (target._tag === 'Some') listener(target.value)
   })
+}
+
+/** Posts Settings › Notifications' test notification, the way a message's is posted. */
+export function sendTestNotification(): void {
+  window.juno.notifications.test().catch(() => {})
+}
+
+const decodePermission = Schema.decodeUnknownOption(NotificationPermission)
+const permissionOf = (raw: unknown): NotificationPermission => {
+  const decoded = decodePermission(raw)
+  return decoded._tag === 'Some' ? decoded.value : 'unknown'
+}
+
+/** Whether macOS lets Juno notify; `unknown` if main could not tell. */
+export async function getNotificationPermission(): Promise<NotificationPermission> {
+  return permissionOf(await window.juno.notifications.permission().catch(() => undefined))
+}
+
+/** Shows the macOS prompt while permission is not determined; resolves with the permission after. */
+export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  return permissionOf(await window.juno.notifications.requestPermission().catch(() => undefined))
+}
+
+/** Opens System Settings at Juno's notifications. */
+export function openNotificationSettings(): void {
+  window.juno.notifications.openSettings().catch(() => {})
 }

@@ -10,7 +10,7 @@ Privacy mode (SPEC section 5) hides message text so it cannot be read over a sha
 
 - Add [koffi](https://koffi.dev) 3.3.3, a Node-API FFI module, as a runtime dependency of `@juno/desktop`. Main loads it lazily, after the app window's first paint, and calls `bool SLSIsScreenWatcherPresent()`, falling back to the `CGS` name. If koffi does not load or neither name resolves, the screen watch turns itself off for the rest of the run and Settings says it is not available. Hiding by hand keeps working.
 - Poll every 2 s while the app window is open. The window server's change notifications (1502 and 1503) would call back into JavaScript from another thread; polling avoids that, and one call every 2 s costs nothing measurable.
-- koffi is imported only from `screenWatch.ts` (`scripts/check-deps.mjs`, the `thirdParty` list).
+- koffi is imported only from `screenWatch.ts` and, since 10-16, `notificationPermission.ts`, which reads macOS's notification permission for Settings › Notifications (`scripts/check-deps.mjs`, the `thirdParty` list).
 - Packaging: koffi's binary comes from its `@koromix/koffi-<platform>` optional dependency, so its install script, which only checks the binary or rebuilds it with CMake, is denied in `pnpm-workspace.yaml`. Node-API means no rebuild per Electron version. `electron-builder.yml` already unpacks `**/*.node` and `**/koffi/**` from the asar; it now also leaves out koffi's C++ sources and docs. The packaged smoke test checks that the symbol resolves in the packaged, signed app.
 - Under `JUNO_E2E` a seam replaces the probe (`junoTest.screenShared`), so e2e tests never call the window server and run on Linux.
 
