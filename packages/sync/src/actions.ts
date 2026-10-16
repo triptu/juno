@@ -11,7 +11,8 @@
  * still pending is handled by its state (`posts.ts`):
  *
  * - `queued` or `failed`: Slack has not got it, so nothing is sent. An edit
- *   rewrites the pending row; a delete removes it. A failed post takes no
+ *   rewrites the pending row and drops an edit row left from while the post
+ *   was out; a delete removes it. A failed post takes no
  *   reaction.
  * - `sending` or `unknown`: Slack may have it. The row carries
  *   `depends_on = client_msg_id` and no ts; the worker finds the ts once
@@ -209,6 +210,9 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
       const sql = yield* StoreWriter
       yield* sql`UPDATE pending_messages SET text = ${input.text}, blocks_json = ${input.blocksJson} WHERE client_msg_id = ${target.post.clientMsgId}`
+      // An edit queued while the post was out (it came back: a 429, or a lookup that did not find it) holds older
+      // text, and Slack does not have the post: the post now carries the newest text, so the row goes.
+      yield* deleteActions(actions.filter((action) => action.kind === 'edit'))
       yield* touch([postTopic(target.post)])
       return undefined
     }
