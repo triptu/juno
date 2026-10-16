@@ -33,6 +33,7 @@ import {
   closeAllTabs,
   closeOtherTabs,
   closeTab,
+  moveTab,
   closeTabsToRight,
   copyText,
   currentPlace,
@@ -587,6 +588,11 @@ function changeTabs(change: (tabs: Tabs) => Tabs): void {
 
 export function closeTabById(tabId: string): void {
   changeTabs((tabs) => closeTab(tabs, tabId))
+}
+
+/** A tab dragged, or moved with ⌃⇧← and ⌃⇧→, to `index` in the strip. */
+export function moveTabTo(tabId: string, index: number): void {
+  changeTabs((tabs) => moveTab(tabs, tabId, index))
 }
 
 /** ⌘W: closes whichever tab is active once the changes before it apply. */

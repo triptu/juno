@@ -1,0 +1,1 @@
+- 10-16 17:29 · tab-drag-icons · Tabs reorder by dragging (4px threshold, transforms only, order committed on drop) and by ⌃⇧← and ⌃⇧→ on the focused tab, with ⌃⇧Page Up and Page Down as in Firefox; Safari and Chrome have no Mac key for it. A tab stays in its pinned or unpinned group.

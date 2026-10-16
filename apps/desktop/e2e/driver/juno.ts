@@ -1792,9 +1792,34 @@ export class TabStrip {
     return pointAt(this.win, this.tab(title))
   }
 
+  /**
+   * Drags the tab titled `title` with the real mouse until its left edge is
+   * over the left edge of the tab titled `onto`, in small steps, then drops it.
+   */
+  async drag(title: string, onto: string): Promise<void> {
+    const from = await this.tab(title).boundingBox()
+    const to = await this.tab(onto).boundingBox()
+    if (!from || !to) throw new Error(`No tab "${title}" or "${onto}"`)
+    const y = from.y + from.height / 2
+    await this.win.mouse.move(from.x + 24, y)
+    await this.win.mouse.down()
+    await this.win.mouse.move(to.x + 24, y, { steps: 20 })
+    await this.win.mouse.up()
+  }
+
+  /** What a screen reader last heard about a tab's move. */
+  get announcement(): Locator {
+    return this.win.locator('[data-tab-announce]')
+  }
+
+  /** The art or photo in a tab's icon slot. */
+  tile(title: string): Locator {
+    return this.tab(title).locator('[data-topic-art], img')
+  }
+
   /** Tab titles, left to right. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('title') ?? ''))
+    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
   }
 
   async expectCount(count: number): Promise<void> {

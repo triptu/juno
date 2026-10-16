@@ -1,50 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
-import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { House } from '@phosphor-icons/react/dist/icons/House'
-import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
-import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
-import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
-import { JUNO_PANEL_WIDTH, menuKeys } from '@juno/contract/channels'
+import { useLayoutEffect, useRef, type PointerEvent, type ReactNode } from 'react'
+import { JUNO_PANEL_WIDTH } from '@juno/contract/channels'
 import { chat, colors, layout, radii, shadows, spacing, z } from '@juno/tokens/tokens.stylex'
-import { EmptyState, IconButton, Tab, TabStrip, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
+import { EmptyState } from '@juno/ui'
+import { WorkspaceStrip, type WorkspaceStripProps } from './WorkspaceStrip'
 
-/** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'settings'
+export type { WorkspaceTab, WorkspaceTabIcon } from './WorkspaceStrip'
 
-export interface WorkspaceTab {
-  readonly id: string
-  /** The topic title, the channel name for Main (no "#"), or the page name. */
-  readonly title: string
-  readonly icon: WorkspaceTabIcon
-  /** The topic's art, drawn in the 15px icon slot instead of the icon. */
-  readonly art?: ReactNode
-  /** Pinned: first in the strip, icon only, no close button. */
-  readonly pinned?: boolean
-  /** The topic has unread messages: the soft grey dot, on inactive tabs only. */
-  readonly unread?: boolean
-}
-
-export interface WorkspaceProps {
-  /** Default none: the strip is empty and the page shows the empty state. */
-  readonly tabs?: ReadonlyArray<WorkspaceTab>
-  readonly activeId?: string
-  /** Fires on mouse down; `event.metaKey` asks for a new tab. */
-  readonly onSelectTab?: (id: string, event: ActivateEvent) => void
-  readonly onCloseTab?: (id: string) => void
-  /** The "+" button: a new tab, with a New chat or Home (Settings › General). */
-  readonly onNewTab?: () => void
-  /** The "+" button's name, after what a new tab opens. Default "New chat". */
-  readonly newTabLabel?: string
-  /** Right-click on a tab: the tab menu. */
-  readonly onTabContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
-  /** Before the tabs while the sidebar is hidden: Show sidebar, Back and Forward. */
-  readonly leading?: ReactNode
+export interface WorkspaceProps extends WorkspaceStripProps {
   /** The open pages, the hidden ones included. Nothing here shows the empty state. */
   readonly children?: ReactNode
   /** Shows the empty state over hidden pages: no tab is open, or the active tab has no page yet. */
@@ -65,74 +28,14 @@ export interface WorkspaceProps {
   readonly onSideResetWidth?: () => void
 }
 
-const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
-  hash: Hash,
-  lock: Lock,
-  user: User,
-  users: Users,
-  'new-chat': NotePencil,
-  home: House,
-  'all-topics': ListBullets,
-  juno: Sparkle,
-  settings: Gear,
-}
-
 // --juno-panel-min-width + --juno-panel-topic-min + two --juno-panel-inset: under this the page would be too narrow to read beside the panel.
 const COVER = '@container workspace-body (width < 856px)'
 
-const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }
-
-/** The tab the arrow keys select from `index`: Left and Right wrap, Home and End go to the ends. */
-function stepIndex(key: string, index: number, count: number): number | undefined {
-  switch (key) {
-    case 'ArrowLeft':
-      return index <= 0 ? count - 1 : index - 1
-    case 'ArrowRight':
-      return index < 0 || index >= count - 1 ? 0 : index + 1
-    case 'Home':
-      return 0
-    case 'End':
-      return count - 1
-    default:
-      return undefined
-  }
-}
-
-/**
- * The right pane: the tab strip (a window drag region) over the page.
- * Tabs carry the kind icon or the topic's art in a fixed slot, the title,
- * the unread dot and a close button; pinned tabs come first as icons. "+"
- * sits right after the last tab and opens a new tab. While the sidebar is hidden, `leading`
- * holds its controls. The strip is an APG tablist: the active tab is the one Tab stop, the arrow
- * keys select its neighbours, Delete closes it.
- */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onTabContextMenu, leading, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (onSelectTab === undefined || !(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
-    const next = stepIndex(event.key, tabs.findIndex((tab) => tab.id === activeId), tabs.length)
-    const target = next === undefined ? undefined : tabs[next]
-    if (target === undefined) return
-    event.preventDefault()
-    onSelectTab(target.id, keyboard)
-  }
+/** The right pane: the tab strip (a window drag region, `WorkspaceStrip`) over the page. */
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <TabStrip onKeyDown={onKeyDown} leading={leading} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
-        {tabs.map((tab) => (
-          <Tab
-            key={tab.id}
-            icon={icons[tab.icon]}
-            leading={tab.art}
-            label={tab.title}
-            active={tab.id === activeId}
-            pinned={tab.pinned === true}
-            unread={tab.unread === true}
-            onSelect={onSelectTab === undefined ? undefined : (event) => onSelectTab(tab.id, event)}
-            onClose={onCloseTab === undefined || tab.pinned === true ? undefined : () => onCloseTab(tab.id)}
-            onContextMenu={onTabContextMenu === undefined ? undefined : (event) => onTabContextMenu(tab.id, event)}
-          />
-        ))}
-      </TabStrip>
+      <WorkspaceStrip tabs={tabs} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onNewTab={onNewTab} newTabLabel={newTabLabel} onMoveTab={onMoveTab} onTabContextMenu={onTabContextMenu} leading={leading} />
       <div {...stylex.props(styles.body)}>
         <main {...stylex.props(styles.page)}>
           {children}

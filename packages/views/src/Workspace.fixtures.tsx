@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { ComposerSlot } from './ComposerSlot'
 import { details, main, mainDividerBefore, thread } from './fixtures/messages'
-import { NOW } from './fixtures/topics'
+import { art, NOW, people } from './fixtures/topics'
 import { MessageList } from './MessageList'
 import { TopicHeader } from './TopicHeader'
 import { TitlebarNav } from './TitlebarNav'
@@ -17,21 +18,30 @@ import { Workspace, type WorkspaceProps, type WorkspaceTab } from './Workspace'
 
 const noop = () => {}
 
+const mayaTile = { kind: 'person', ...people.maya, src: people.maya.avatarUrl } as const
+
 const tabs = {
-  eng: { id: 'C0ENG:main', title: 'eng', icon: 'hash' } satisfies WorkspaceTab,
-  postgres: { id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', icon: 'hash' } satisfies WorkspaceTab,
-  density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash' } satisfies WorkspaceTab,
-  hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock' } satisfies WorkspaceTab,
-  maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user' } satisfies WorkspaceTab,
-  pinnedEng: { id: 'tab-pinned-eng', title: 'eng', icon: 'hash', pinned: true } satisfies WorkspaceTab,
-  pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true } satisfies WorkspaceTab,
-  densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true } satisfies WorkspaceTab,
+  eng: { id: 'C0ENG:main', title: 'eng', icon: 'hash', tile: { kind: 'art', topicId: 'm:C0ENG', recipe: art.bell } } satisfies WorkspaceTab,
+  postgres: { id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', icon: 'hash', tile: { kind: 'art', topicId: 't:C0ENG:1760000000.000100', recipe: art.database } } satisfies WorkspaceTab,
+  density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash', tile: { kind: 'art', topicId: 't:C0DESIGNREV:1759900000.000900', recipe: art.people } } satisfies WorkspaceTab,
+  // Its art is not drawn yet: the placeholder shape.
+  hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock', tile: { kind: 'art', topicId: 't:C0HIRING:1760000000.000300' } } satisfies WorkspaceTab,
+  maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user', tile: mayaTile } satisfies WorkspaceTab,
+  // A person with no photo: initials.
+  dev: { id: 'D0DEV:main', title: 'Dev Patel', icon: 'user', tile: { kind: 'person', ...people.dev } } satisfies WorkspaceTab,
+  group: { id: 'G0MAYALEO:main', title: 'Maya, Leo', icon: 'users' } satisfies WorkspaceTab,
+  pinnedEng: { id: 'tab-pinned-eng', title: 'eng', icon: 'hash', pinned: true, tile: { kind: 'art', topicId: 'm:C0ENG', recipe: art.bell } } satisfies WorkspaceTab,
+  pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true, tile: mayaTile } satisfies WorkspaceTab,
+  densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true, tile: { kind: 'art', topicId: 't:C0DESIGNREV:1759900000.000900', recipe: art.people } } satisfies WorkspaceTab,
   newChat: { id: 'tab-new-chat', title: 'New chat', icon: 'new-chat' } satisfies WorkspaceTab,
   // A New chat with a destination picked keeps its icon and takes the destination's name.
   newChatPicked: { id: 'tab-new-chat', title: 'Postgres 16 cutover window', icon: 'new-chat' } satisfies WorkspaceTab,
   home: { id: 'tab-home', title: 'Home', icon: 'home' } satisfies WorkspaceTab,
   juno: { id: 'tab-juno', title: 'Juno', icon: 'juno' } satisfies WorkspaceTab,
 } as const
+
+/** Topic art, a placeholder, DM photos, initials, a group DM and pages side by side. */
+const mixedTabs = [tabs.home, tabs.postgres, tabs.maya, tabs.hiring, tabs.dev, tabs.group, tabs.newChat]
 
 const browserTabs = [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.densityUnread, tabs.hiring]
 const sidebarControls = <TitlebarNav sidebarHidden canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
@@ -43,7 +53,7 @@ const thirtySeven: ReadonlyArray<WorkspaceTab> = Array.from({ length: 37 }, (_, 
 })
 const lastTab = thirtySeven[thirtySeven.length - 1]?.id
 
-const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onTabContextMenu: noop }
+const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.density], activeId: tabs.postgres.id, onSelectTab: noop, onCloseTab: noop, onNewTab: noop, onMoveTab: noop, onTabContextMenu: noop }
 
 const postgresPage = (
   <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
@@ -98,6 +108,21 @@ const junoPage = (
     <JunoChatList items={panelItems} banner={{ _tag: 'none' }} moreAbove={false} moreBelow={false} now={NOW} actions={noopActions} onSuggest={noop} enterEmpty={false} />
   </JunoChatFrame>
 )
+
+/** The strip with a drop that moves the tab. The tab being dragged is active, as a press in the app makes it; a press here selects nothing, so pressing moves nothing. */
+function Reorderable() {
+  const [order, setOrder] = useState<ReadonlyArray<WorkspaceTab>>(mixedTabs)
+  const move = (id: string, index: number) =>
+    setOrder((current) => {
+      const tab = current.find((other) => other.id === id)
+      return tab === undefined ? current : current.filter((other) => other !== tab).toSpliced(index, 0, tab)
+    })
+  return (
+    <Workspace {...base} tabs={order} activeId={tabs.dev.id} onMoveTab={move}>
+      {postgresPage}
+    </Workspace>
+  )
+}
 
 const workspace = (props: Partial<WorkspaceProps> = {}, page?: React.ReactNode, frame?: FixtureFrame) =>
   scene<WorkspaceProps>(
@@ -155,6 +180,16 @@ export default defineFixtures(
       'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
       'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),
+    },
+    // Each tab's icon: the topic's art, the DM person's photo, the page's glyph. Inactive ones dim with their title.
+    'Tab icons': {
+      mixed: workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440 }),
+      'mixed-hover': workspace({ tabs: mixedTabs, activeId: tabs.postgres.id }, postgresPage, { width: 1440, hover: '[data-tab]:nth-of-type(3) [role="tab"]' }),
+      'pinned-mixed': workspace({ tabs: [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.maya, tabs.home], activeId: tabs.maya.id }, postgresPage, { width: 1200 }),
+    },
+    // Dragging a tab: it follows the pointer and the tabs it passed slide aside.
+    Reorder: {
+      'mid-drag': scene<WorkspaceProps>(() => <Reorderable />, { width: 1440, drag: { from: '[data-tab]:nth-of-type(5) [role="tab"]', by: -300 } }),
     },
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(2) [role="tab"]' }),

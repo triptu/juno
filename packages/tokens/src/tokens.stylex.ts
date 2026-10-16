@@ -670,7 +670,7 @@ export const text = stylex.defineVars({
  * Three ideas: instant for what you do constantly, a quick ease-out for
  * presses and toggles, and a small spring for the few moments that deserve
  * it (a reaction landing, a toggle filling, a resolve check). Entrances are
- * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate.
+ * 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate, except a tab being dragged, whose neighbours slide aside over --duration-fast.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.
@@ -888,6 +888,7 @@ export const sizes = stylex.defineVars({
   '--avatar-24': '24px',
   '--avatar-20': '20px',
   '--avatar-18': '18px',
+  '--avatar-16': '16px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
 
@@ -898,6 +899,7 @@ export const sizes = stylex.defineVars({
   '--initials-24': '9.5px',
   '--initials-20': '9px',
   '--initials-18': '8.5px',
+  '--initials-16': '7px',
 
   // Phosphor glyphs are filled paths; weight comes from the variant, so
   // there is no stroke token.
