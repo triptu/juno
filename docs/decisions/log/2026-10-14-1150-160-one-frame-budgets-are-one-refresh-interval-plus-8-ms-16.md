@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · One-frame budgets are one refresh interval plus 8 ms (16.3 ms at 120 Hz, 24.7 ms at 60 Hz). performance.md section 1 states it.

@@ -1,0 +1,1 @@
+- 10-12 ~18:55 · Tushar · Sidebar shows every thread with recent activity plus each channel's Main. Resolve is local and marks read. No undo for sends; edit and delete own messages instead. Full file upload in v1.

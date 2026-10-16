@@ -1,0 +1,1 @@
+- 10-13 10:35 · Tushar · Look: Figtree UI font, Coral accent, rounder shapes (options C1 + D1). Accent colour becomes a user preference. The dark theme needs a redesign; light is good.

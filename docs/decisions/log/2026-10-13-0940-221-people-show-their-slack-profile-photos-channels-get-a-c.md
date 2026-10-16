@@ -1,0 +1,1 @@
+- 10-13 09:40 · Tushar · People show their Slack profile photos. Channels get a client-only icon and colour, auto-assigned and changeable.

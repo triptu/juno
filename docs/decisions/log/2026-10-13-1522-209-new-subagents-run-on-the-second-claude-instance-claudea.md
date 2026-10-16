@@ -1,0 +1,1 @@
+- 10-13 15:22 · Tushar · New subagents run on the second Claude instance (claudeAgent_2airclaude) via delegate_task; the orchestrator stays here. The two agents stopped by this instance's Fable limit continue there from their worktrees.

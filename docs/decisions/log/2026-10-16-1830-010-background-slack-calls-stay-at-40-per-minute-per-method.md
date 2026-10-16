@@ -1,0 +1,1 @@
+- 10-16 18:30 · orchestrator · Background Slack calls stay at 40 per minute per method, below the published 50, because the session token is shared with the official client.

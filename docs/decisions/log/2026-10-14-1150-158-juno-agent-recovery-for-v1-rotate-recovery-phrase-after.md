@@ -1,0 +1,1 @@
+- 10-14 11:50 · Tushar · Juno Agent recovery for v1: "Rotate recovery phrase after removals" stays off by default, and a restore while the old Mac is still on is an accepted limit (the restore sheet says so).

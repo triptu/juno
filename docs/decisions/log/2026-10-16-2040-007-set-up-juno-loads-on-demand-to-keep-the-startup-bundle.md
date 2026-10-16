@@ -1,0 +1,1 @@
+- 10-16 20:40 · orchestrator · Set up Juno loads on demand to keep the startup bundle under 1000 KB.

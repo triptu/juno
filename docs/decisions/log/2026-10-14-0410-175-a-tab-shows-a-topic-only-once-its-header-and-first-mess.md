@@ -1,0 +1,1 @@
+- 10-14 04:10 · Orchestrator · A tab shows a topic only once its header and first message window are local (at most 150 ms, then it shows anyway with the list loading), so the old tab stays on screen instead of a blank page. Switching back to an unmounted tab waits the same way.

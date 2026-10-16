@@ -1,0 +1,1 @@
+- 10-15 17:20 · orchestrator · Merged: a Slack force_reload during the boot-retry wait now boots at once (one boot at a time, backoff and auth handling unchanged); a test-clock regression test fails on the old code. No Quint spec models boot retries.

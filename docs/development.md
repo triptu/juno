@@ -22,6 +22,8 @@ Run these from the repo root.
 | `pnpm install` | Installs everything. Electron downloads its binary in a postinstall. |
 | `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
 | `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
+| `pnpm typecheck:bun` | Checks pending Bun-compatible projects locally through the typecheck queue. `pnpm affected` also schedules any TypeScript fallback. |
+| `pnpm typecheck:parity` | Compares Bun and TypeScript diagnostics across all projects without result caches. |
 | `pnpm typecheck` | Typechecks every tsc project (each package's configs and `scripts/tsconfig.json`), skipping the ones whose inputs passed before; see "Typecheck". |
 | `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet. |
 | `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
@@ -53,6 +55,63 @@ The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/
 Before calling work done: `pnpm affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
+
+## Decision log
+
+Add one file per decision under `docs/decisions/log/`, named
+`YYYY-MM-DD-HHMM-slug.md` using local IST time and a distinct descriptive slug.
+Keep the existing one-line format, for example:
+
+```md
+- 10-17 00:55 · orchestrator · Record decisions in separate fragments to avoid merge conflicts.
+```
+
+Run `node scripts/decision-log.mjs` and commit both the fragment and generated
+`docs/decision-log.md`. Never edit the generated log by hand. Lint checks that it
+matches the fragments. The builder sorts newest first, then by filename for ties;
+`~` in a reconstructed entry's time stays in its text. The status page reads the
+built file. Historical fragments use a numeric prefix in the slug to preserve
+their original order when timestamps match.
+
+## Batch merges
+
+Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories.
+
+Fetch `origin/main`, then run from the repository root:
+
+```sh
+node scripts/batch-merge.mjs branch-one branch-two
+node scripts/batch-merge.mjs --continue batch-1
+node scripts/batch-merge.mjs --continue batch-1 --push
+```
+
+The script creates `batch-N` from the current `origin/main` in
+`.claude/worktrees/batch-N`, pins the input branch tips, and merges them in order.
+At a source conflict it prints the branch and files. Resolve and `git add` them
+in that worktree, then use `--continue batch-N` from the original worktree. You
+can also commit the resolution yourself. An aborted merge must be redone before
+continuing. Progress and command output stay in `.juno-status/batches/` in the
+original worktree; read `batch-N.log` while checks run.
+
+Generated-file conflicts use a temporary copy of the batch's version. After all
+merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
+decision log, runs `pnpm health:baseline`, and commits generated changes. Review
+the baseline diff: regeneration records the merged tree's current health,
+including any increases. Then it runs one `pnpm affected --base <base-commit>`
+against the pinned `origin/main` commit. A failed command retains the worktree;
+fix the cause, commit source fixes, and continue to rerun checks.
+
+Nothing pushes without `--push`. Publishing checks commit messages for attribution
+lines, requires clean files and the checked commit, and uses a normal push to
+`origin/main`. If main advanced, start a new batch after fetching. A successful
+push removes the worktree; the batch branch and logs remain. Continuing a checked
+batch reruns checks before publishing.
+
+`--dry-run branch-one branch-two` performs local merges, installation and
+regeneration, but only prints the affected plan. Dry-run batches cannot push.
+Remove a discarded worktree with `git worktree remove <path>`, then delete its
+batch branch with `git branch -D batch-N`. If a process was killed, remove its
+`.juno-status/batches/active.lock` only after confirming it has stopped.
 
 ## Codebase health
 
@@ -502,7 +561,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
+The repo uses TypeScript 7.0.2, the native compiler (`tsc` from the `typescript` package hands over to a platform binary). TypeScript 7 offers no JS API like `ts.createSourceFile`; `scripts/health-size.mjs`, and `scripts/check-tokens.mjs` import `typescript-5` (an alias for 5.9.3, a root devDependency, used by these checks). The local Bun planner also uses that alias to read inherited compiler options. No other tool loads TypeScript: Vite, electron-vite and vitest transpile with esbuild, StyleX, the React Compiler and Playwright with Babel, oxlint and knip parse natively, and Quint does not use it. No tsconfig loads a language-service plugin.
 
 Packages ship TypeScript source, so each package's `tsc -p` also checks the source of every workspace package it depends on, and 29 projects repeat much of the same work. `pnpm typecheck` (`scripts/typecheck.mjs`) runs the same projects with the same tsconfigs, so the rules are unchanged, but:
 
@@ -526,9 +585,21 @@ Earlier timings, all with TypeScript 5.9.3 (2026-10-15):
 
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
+## Local Bun checks
+
+Bun 1.4.3 is an exact root devDependency installed by pnpm, including its approved postinstall. `pnpm exec bun` uses this binary on Darwin ARM64 and Linux x64. The global Bun install is not used. The remote image installs the same pin and checks its version during the build.
+
+`pnpm affected` runs `pnpm typecheck:bun` before starting the other steps. It gets the project list and input hashes from `scripts/typecheck.mjs --projects-json`, writes a temporary solution config referencing the pending projects, and runs `bun check -b --no-pretty --all`. Errors use `file(line,column): error TS…` locations that VS Code can open. A type error stops the run before remote suites start. The local check uses the machine-wide typecheck queue.
+
+Passing Bun results live in a separate `juno-cache/typecheck-bun` directory. Their keys include the existing project input hash, the pinned Bun version and both checker scripts. Generated `.tsbuildinfo` files are excluded from project inputs. Bun itself has no incremental build cache. Its results never populate the TypeScript cache. `--no-cache` bypasses result caches.
+
+The planner reads effective compiler options, including inherited options and project references. Plugins, emit requirements, declaration options, composite builds or config parse errors send that project to remote `pnpm typecheck --projects <JSON config list>`, which uses `tsc -b` for the selected configs. A passing TypeScript cache key skips that fallback. All 29 current configs support Bun. `--local` also runs fallback TypeScript locally.
+
+`pnpm typecheck`, scheduled main verification and `batch-merge.mjs` keep the existing authoritative TypeScript checks. `pnpm typecheck:parity` runs Bun and `tsc -b --force` against one solution containing all projects. It compares unique diagnostic locations, codes and full messages, ignoring duplicates and timing summaries. Matching errors count as parity; different errors or a tool failure fail the command. Parity bypasses result caches and refuses unsupported configs rather than reporting a partial comparison.
+
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those, each suite on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
+`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, each test suite runs on its own Namespace machine at the same time (`--local` runs them one after another through the local root scripts; `--plan` only prints the plan; `--files a,b` plans for given files). The change is every file that differs from the merge base with `main`, committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
 An import graph over `apps/` and `packages/` decides what each change reaches: relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
@@ -541,7 +612,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 | `apps/gallery/` (except `shots.spec.ts`), `packages/tokens/`, `packages/testing/` | `pnpm test:gallery` for every component |
 | A file the desktop app or the e2e support reaches (`apps/desktop/src`, `e2e/fixtures.ts`, `e2e/driver/`, the Playwright config) | `pnpm test:desktop` in full |
 | Only e2e spec files | `pnpm test:desktop <those files>` |
-| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck` remotely, when a project's key has not passed; it checks only those projects |
+| Any `.ts`, `.tsx` or config a tsc project reads | `pnpm typecheck:bun` locally for pending projects, with remote TypeScript fallback for unsupported configs |
 | Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
@@ -554,10 +625,11 @@ An import graph over `apps/` and `packages/` decides what each change reaches: r
 `pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the shape that script needs (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. Today that is one test, the sidebar width surviving a relaunch.
 
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
-- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached reaper destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. A reaper starts before acquisition and reconciles the workspace every 30 seconds, as does each acquisition. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. Processes share successful inventory for up to five seconds, invalidated before and after creates and destroys; newer machine records still reserve capacity. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two retries with two- and four-second backoffs. Known partial instances are destroyed first. Ambiguous attempts retain their reservation and attempt label for up to five minutes so reconciliation can destroy late arrivals. Authentication and configuration errors still fail. Exhausted infrastructure failures use exit 255 and `infraFailure` in the log summary.
+- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 1) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 1) idle minutes, every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
+- **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. The head request holds available cores until it can start; later small jobs cannot fill those gaps. Job end times are unknown, so the pool does not let jobs pass a blocked head, including warm-machine requests. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The cap stays at most 24 vCPU; a lower `JUNO_REMOTE_MAX_VCPU` is honored.
+- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. The first acquisition starts a shared daemon (an upgrade of the reaper watcher). It owns inventory and admission, polling once five seconds after the previous reconciliation finishes; slow calls never overlap. Clients publish requests in the pool’s `queue/` directory and read their answers without calling Namespace. The daemon exits after six minutes when there are no requests or machines to reconcile. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. During each daemon tick, reconciliation and admission share one snapshot. Newer machine records and pending creates still reserve capacity. If the daemon dies or cannot start, clients use the same durable queue and decision lock in direct mode, sharing successful inventory for up to five seconds and invalidating it before and after creates and destroys. A reservation identifies its request, so recovering an unanswered request cannot allocate it twice. Failed destroys remain recorded for the daemon to verify on its next poll. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two retries with two- and four-second backoffs. Known partial instances are destroyed first. Ambiguous attempts retain their reservation and attempt label for up to five minutes so reconciliation can destroy late arrivals. Authentication and configuration errors still fail. Exhausted infrastructure failures use exit 255 and `infraFailure` in the log summary.
 - **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 24 vCPU since 10-16, to hold cost down; the Team plan allows 64). A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room.
 - **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The cap bounds the spend at about $1.44 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
 - **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.

@@ -1,0 +1,1 @@
+- 10-15 14:50 · orchestrator · Merged the WP19 scheduler core: persisted occurrences, reply watches, schedule tools and card executors, the Scheduled page data and `agent.schedule.watchReply` (156 agent tests pass). Not yet wired end to end; a follow-up connects router startup, the reply checks and nudge-card expiry.

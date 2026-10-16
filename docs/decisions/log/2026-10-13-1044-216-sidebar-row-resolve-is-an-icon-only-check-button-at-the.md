@@ -1,0 +1,1 @@
+- 10-13 10:44 · Tushar · Sidebar row Resolve is an icon-only check button at the right of the meta line, in a reserved slot. The time stays. No layout shift on hover.

@@ -1,0 +1,1 @@
+- 10-13 23:40 · Tushar · Row footer: no message icon or count, and no "Messages outside threads" label on Main rows. Main rows may show a thread icon with the number of threads started since Main was last read (hidden when zero). DMs have threads too; each is its own topic.

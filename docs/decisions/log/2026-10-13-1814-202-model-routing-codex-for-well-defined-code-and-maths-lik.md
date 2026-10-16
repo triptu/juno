@@ -1,0 +1,1 @@
+- 10-13 18:14 · Tushar · Model routing: Codex for well-defined code and maths-like work (it starts the Quint specs), never UI or tests coupled to implementation; Fable for design; Opus for correctness work and reviews. When limits hit, wait for resets rather than giving design to Codex.

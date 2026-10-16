@@ -1,0 +1,1 @@
+- 10-12 ~19:00 · Orchestrator · Not Enterprise Grid (checked the local Slack config), so Grid support can wait.

@@ -1,0 +1,1 @@
+- 10-12 ~19:30 · Tushar · E2E tests use a typed, plain-language driver in Playwright, not Maestro or Gherkin.

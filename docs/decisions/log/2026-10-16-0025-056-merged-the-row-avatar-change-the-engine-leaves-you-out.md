@@ -1,0 +1,1 @@
+- 10-16 00:25 · orchestrator · Merged the row avatar change: the engine leaves you out of every participant stack, and DM and group DM rows show none. Only the sidebar row draws a stack. Follow-up: the stored cap of 4 participants should not count you.

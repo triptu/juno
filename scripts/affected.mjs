@@ -1,6 +1,6 @@
 // Works out which tests a change can affect, and runs only those.
 //
-//   pnpm affected                 plan and run against main, on Namespace (pnpm remote)
+//   pnpm affected                 local Bun check, then affected suites on Namespace
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
 //   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
@@ -158,12 +158,13 @@ function closure(start) {
 const touches = (reached) => changed.some((file) => reached.has(file))
 const plan = []
 
-// Typecheck: the tsc projects whose inputs have not passed before
-// (scripts/typecheck.mjs keeps that cache and skips the rest when it runs).
-const typecheckPending = !flag('--no-cache')
-  ? JSON.parse(spawnSync(process.execPath, [join(root, 'scripts/typecheck.mjs'), '--pending'], { cwd: root, encoding: 'utf8' }).stdout || '[]')
-  : ['every project']
-if (typecheckPending.length > 0) plan.push({ script: 'typecheck', args: flag('--no-cache') ? ['--no-cache'] : [], items: [], why: `${typecheckPending.length} tsc project(s): ${typecheckPending.slice(0, 4).join(', ')}${typecheckPending.length > 4 ? ', ...' : ''}` })
+// Bun has its own cache; its successes never skip the authoritative tsc run.
+const typecheckArgs = flag('--no-cache') ? ['--no-cache'] : []
+const listed = spawnSync(process.execPath, [join(root, 'scripts/typecheck-bun.mjs'), '--pending', ...typecheckArgs], { cwd: root, encoding: 'utf8' })
+if (listed.status !== 0) throw new Error(listed.stderr || 'Could not plan local typecheck')
+const typecheckPending = JSON.parse(listed.stdout)
+if (typecheckPending.bun.length > 0) plan.push({ script: 'typecheck:bun', args: typecheckArgs, items: [], local: true, why: `${typecheckPending.bun.length} project(s), Bun on this Mac` })
+if (typecheckPending.tsc.length > 0) plan.push({ script: 'typecheck', args: [...typecheckArgs, '--projects', JSON.stringify(typecheckPending.tsc.map((project) => project.config))], items: [], why: `TypeScript fallback: ${typecheckPending.tsc.map((project) => `${project.label} (${project.reason})`).join(', ')}` })
 // The whole lint takes about 3 s, less than a remote machine's overhead, so it runs here.
 if (changed.some((file) => !file.endsWith('.md'))) plan.push({ script: 'lint', args: [], items: [], local: true, why: 'the whole lint, on this Mac (about 3 s)' })
 
@@ -308,8 +309,13 @@ const run = (step) =>
     }
     child.on('close', (code) => resolvePromise({ step, code: code ?? 1 }))
   })
-const results = localAll ? [] : await Promise.all(plan.map(run))
-if (localAll) for (const step of plan) results.push(await run(step))
+// Fail on local type errors before paying for remote machines.
+const localTypecheck = plan.find((step) => step.script === 'typecheck:bun')
+const results = localTypecheck ? [await run(localTypecheck)] : []
+if (results.some(({ code }) => code !== 0)) process.exit(1)
+const remaining = plan.filter((step) => step !== localTypecheck)
+if (localAll) for (const step of remaining) results.push(await run(step))
+else results.push(...await Promise.all(remaining.map(run)))
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')

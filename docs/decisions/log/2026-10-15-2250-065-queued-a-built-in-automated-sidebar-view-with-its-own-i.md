@@ -1,0 +1,1 @@
+- 10-15 22:50 · Tushar · Queued: a built-in "Automated" sidebar view with its own icon, on by default. Juno classifies bot and alert channels into it; ambiguous ones are asked about on Home. Automated and noisy channels stay out of All. Channels he never wants to see are ignored or unfollowed as today; important-but-noisy ones live in a view checked now and then.

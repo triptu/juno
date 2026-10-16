@@ -1,0 +1,1 @@
+- 10-13 21:42 · Tushar · Topic art: constrained-vocabulary drawing on Gemini 3.8 Flash. Everything is a topic, so channel Main rows also get AI art (no separate generative channel marks). Next round: explain the vocabulary, compare more creative freedom, try no container (current tile is too rounded), and mute the colours, especially in dark mode.

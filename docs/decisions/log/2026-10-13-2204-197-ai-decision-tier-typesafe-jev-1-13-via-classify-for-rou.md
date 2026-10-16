@@ -1,0 +1,1 @@
+- 10-13 22:04 · Orchestrator · AI decision tier: TypeSafe `jev-1.13` via `classify` for route check, settled and the notification gate (516 ms p50, 100% on examples, about $0.03 per 1k); `openai/gpt-6-luna` for grouping and ⌘K parsing; Sonnet 5.5 for generation. Tool choice forced on decisions, auto on generation. Final live eval 32/33.

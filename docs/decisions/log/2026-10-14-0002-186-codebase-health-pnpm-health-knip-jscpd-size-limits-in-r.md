@@ -1,0 +1,1 @@
+- 10-14 00:02 · Orchestrator · Codebase health: `pnpm health` (knip, jscpd, size limits) in report-only mode first, blocking once clean; a maintenance and simplification pass at every milestone boundary plus a light weekly sweep; health numbers on the status page.

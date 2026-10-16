@@ -46,7 +46,7 @@ function filesUnder(dir) {
       const child = path ? `${path}/${entry.name}` : entry.name
       if (entry.isDirectory()) {
         if (!skip.has(entry.name)) walk(child)
-      } else if (entry.isFile()) found.push(child)
+      } else if (entry.isFile() && !entry.name.endsWith('.tsbuildinfo')) found.push(child)
     }
   }
   walk(dir)
@@ -119,7 +119,15 @@ for (const project of projects) {
 }
 
 const started = Date.now()
-const pending = projects.filter((project) => !(useCache && existsSync(join(cacheDir, project.key))))
+// Expose this exact inventory and its input keys to the local Bun checker.
+if (process.argv.includes('--projects-json')) {
+  console.log(JSON.stringify(projects.map(({ label, cwd, config, key }) => ({ label, cwd, config, key, tscPassed: existsSync(join(cacheDir, key)) }))))
+  process.exit(0)
+}
+const selectedAt = process.argv.indexOf('--projects')
+const selected = selectedAt < 0 ? undefined : JSON.parse(process.argv[selectedAt + 1])
+if (selected && selected.some((path) => !projects.some((project) => `${project.cwd}/${project.config}` === path))) throw new Error('Unknown typecheck project')
+const pending = projects.filter((project) => (!selected || selected.includes(`${project.cwd}/${project.config}`)) && !(useCache && existsSync(join(cacheDir, project.key))))
 // --pending prints the projects that would run, as JSON, for pnpm affected.
 if (process.argv.includes('--pending')) {
   console.log(JSON.stringify(pending.map((project) => project.label)))
@@ -132,7 +140,9 @@ function check(project) {
   return new Promise((resolvePromise) => {
     const buildInfo = join(root, project.cwd, 'node_modules/.cache/tsc', `${project.config.replace(/\W/g, '_')}.tsbuildinfo`)
     mkdirSync(dirname(buildInfo), { recursive: true })
-    const args = [tsc, '-p', project.config, '--incremental', '--tsBuildInfoFile', buildInfo]
+    const args = selected
+      ? [tsc, '-b', project.config, '--pretty', 'false']
+      : [tsc, '-p', project.config, '--incremental', '--tsBuildInfoFile', buildInfo]
     const command = process.env.JUNO_HEAVY_SLOTS === '1' ? [process.execPath, args] : [process.execPath, [join(root, 'scripts/heavy.mjs'), '--queue', 'typecheck', process.execPath, ...args]]
     const begun = Date.now()
     const child = spawn(command[0], command[1], { cwd: join(root, project.cwd), stdio: ['ignore', 'pipe', 'pipe'] })

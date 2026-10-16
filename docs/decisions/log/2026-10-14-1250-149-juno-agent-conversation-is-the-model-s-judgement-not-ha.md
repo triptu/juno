@@ -1,0 +1,1 @@
+- 10-14 12:50 · Tushar · Juno Agent conversation is the model's judgement, not hard-coded rules. No limits on bubble length or count, no fixed pacing or milestone rules. Hard rules stay only for safety (one click per outward action, no automatic repeat, spend cap, untrusted content, memory trust) and perf budgets. SPEC 13 and plan-v3 get a simplification pass.

@@ -1,0 +1,1 @@
+- 10-14 13:20 · Tushar · The New message page, its sidebar icon and "Track replies as a topic" are removed. To post, open a conversation's Main from the sidebar or search and type there. Tracking replies as a topic can't be done reliably and was scope creep. The tab strip's "+" becomes New tab: it opens search once ⌘K exists (M9), All topics until then.

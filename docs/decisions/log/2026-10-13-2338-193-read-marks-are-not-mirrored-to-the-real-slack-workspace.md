@@ -1,0 +1,1 @@
+- 10-13 23:38 · Tushar · Read marks are not mirrored to the real Slack workspace until turned on in a setting.

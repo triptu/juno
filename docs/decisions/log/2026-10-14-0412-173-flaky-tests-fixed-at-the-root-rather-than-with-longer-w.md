@@ -1,0 +1,1 @@
+- 10-14 04:12 · Orchestrator · Flaky tests fixed at the root rather than with longer waits: sync reports when a cycle (including its follow pass) finishes, the outbox reports when background recoveries finish, engine tests turn off the periodic sweep, and the e2e driver waits for the window close before acting. 20 of 20 runs passed under load for every former flake.

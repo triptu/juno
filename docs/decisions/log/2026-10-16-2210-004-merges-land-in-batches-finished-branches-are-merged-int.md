@@ -1,0 +1,1 @@
+- 10-16 22:10 · orchestrator · Merges land in batches: finished branches are merged into a local batch branch, conflicts resolved there, one full `pnpm affected` runs, and main moves only when it is green. Why: under the 24 vCPU cap one run per branch took 30+ minutes and most died on Namespace timeouts.

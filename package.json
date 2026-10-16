@@ -12,7 +12,9 @@
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
     "typecheck": "node scripts/typecheck.mjs",
-    "lint": "oxlint . && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
+    "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive node scripts/typecheck-bun.mjs --parity",
+    "typecheck:bun": "node scripts/heavy.mjs --queue typecheck node scripts/typecheck-bun.mjs",
+    "lint": "oxlint . && node scripts/decision-log.mjs --check && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
     "health:knip": "knip --config knip.config.mjs --no-exit-code",
@@ -49,7 +51,8 @@
     "test:remote-pool": "node scripts/heavy.mjs node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs",
     "test:package": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
-    "test:health": "node scripts/heavy.mjs node --test scripts/health.test.mjs"
+    "test:health": "node scripts/heavy.mjs node --test scripts/health.test.mjs",
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",
@@ -60,6 +63,7 @@
     "@juno/store": "workspace:*",
     "@juno/sync": "workspace:*",
     "@types/node": "24.19.2",
+    "bun": "1.4.3",
     "effect": "4.0.3",
     "jscpd": "5.4.1",
     "knip": "6.41.0",
