@@ -131,7 +131,7 @@ test('⋯ opens the topic menu under the right island, as a right-click on the t
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
 })
 
-test('an unfollowed thread opened from Main shows Follow in Resolve’s place; When it matters follows it, and ⌘Z undoes it', async ({ juno, slack }) => {
+test('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
@@ -141,23 +141,19 @@ test('an unfollowed thread opened from Main shows Follow in Resolve’s place; W
   const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
   const checkout = juno.sidebar.row(CHECKOUT)
   await expect(juno.topic.followButton).toBeVisible()
-  await expect(juno.topic.followButton).toHaveAttribute('aria-haspopup', 'menu')
+  await expect(juno.topic.followButton).not.toHaveAttribute('aria-haspopup')
   await expect(resolve).toHaveCount(0)
   await checkout.expectAbsent()
   const follow = (await juno.topic.followButton.boundingBox())!
   const title = (await juno.topic.titleButton.boundingBox())!
 
-  // Two choices, When it matters first with its hint, at Follow's left edge 6px under the right island.
-  const menu = await juno.topic.chooseInFollowMenu('notify-matters')
-  expect(menu.labels).toEqual(['When it matters · Juno decides when to notify you', 'Every message'])
-  const island = (await header.locator('[data-island="right"]').boundingBox())!
-  expect(Math.round(menu.at!.x)).toBe(Math.round(follow.x))
-  expect(Math.round(menu.at!.y - (island.y + island.height))).toBe(6)
+  // One click follows it, with no menu: When it matters, as Notify me sets it.
+  const { menuOpened } = await juno.topic.follow()
+  expect(menuOpened).toBe(false)
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
   await juno.expectToast('When it matters')
   await checkout.expectVisible()
   await expect(resolve).toBeVisible()
-  await expect(juno.topic.followButton).toHaveCount(0)
   // Resolve took Follow's place at Follow's width; the title did not move.
   const swapped = (await resolve.boundingBox())!
   expect(Math.round(swapped.x)).toBe(Math.round(follow.x))
@@ -170,6 +166,25 @@ test('an unfollowed thread opened from Main shows Follow in Resolve’s place; W
   await checkout.expectAbsent()
   await expect(juno.topic.followButton).toBeVisible()
   await expect(resolve).toHaveCount(0)
+})
+
+test('after Follow, Notify me in ⋯ shows When it matters and changes it', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.threadLink(/checkout\.spec failed/).open()
+  await juno.topic.expectTitle(CHECKOUT)
+  expect((await juno.topic.follow()).menuOpened).toBe(false)
+  await juno.expectToast('When it matters')
+
+  // ⋯ › Notify me has When it matters checked; Every message replaces it, and the thread stays followed.
+  const every = await juno.topic.chooseInMenu('notify-every')
+  expect(every.labels).toContain('> When it matters ✓')
+  await juno.expectToast('Every message')
+  const after = await juno.topic.chooseInMenu('copy-link')
+  expect(after.labels).toContain('> Every message ✓')
+  await juno.sidebar.row(CHECKOUT).expectVisible()
+  await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
 })
 
 test('Main’s Notify me is its channel’s, and the header is reached pill, title, ⋯, Juno', async ({ juno, win }) => {

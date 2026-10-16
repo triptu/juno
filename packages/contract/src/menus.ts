@@ -6,7 +6,6 @@
 export {
   channelMenuItems,
   dropViewOrder,
-  followMenuItems,
   isViewMenuAction,
   moveViewOrder,
   notifyChoice,

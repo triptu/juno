@@ -4,7 +4,6 @@
  * unfollows it; each change shows a toast with Undo.
  */
 import {
-  followMenuItems,
   notificationsSetLevel,
   notifyChoice,
   notifyChoiceLabel,
@@ -73,13 +72,13 @@ export async function showPersonMenu(person: { readonly id: string; readonly nam
 }
 
 /**
- * The header's Follow menu on a thread you do not follow (SPEC 5 and 7):
- * When it matters or Every message, set as Notify me sets them, so the
- * thread follows in Slack, joins the sidebar, and ⌘Z undoes it.
+ * The header's Follow on a thread you do not follow (SPEC 5 and 7): it
+ * follows at once with When it matters, set as Notify me sets it, so the
+ * thread follows in Slack, joins the sidebar, and ⌘Z undoes it. Notify me
+ * in ⋯ changes the level afterwards.
  */
-export async function showFollowMenu(thread: { readonly id: string; readonly title: string }, at: ContextMenuAt): Promise<void> {
-  const chosen = (await popupContextMenu(nativeMenu(followMenuItems()), at)) as NotifyAction | undefined
-  if (chosen !== undefined) setNotifyLevel({ kind: 'thread', id: thread.id }, notifyChoiceOf(chosen), thread.title)
+export function followThread(thread: { readonly id: string; readonly title: string }): void {
+  setNotifyLevel({ kind: 'thread', id: thread.id }, 'matters', thread.title)
 }
 
 /** Opens the why popover for a message, under where its menu opened. */

@@ -31,10 +31,10 @@ export interface TopicHeaderProps {
   readonly onResolve?: () => void
   /**
    * A thread you do not follow (Notify me is Never, SPEC 5) shows Follow in
-   * Resolve's place: `onOpen` opens its menu at `at`, and `open` says the
-   * menu is showing. Without it such a thread shows Resolve.
+   * Resolve's place, and a click follows it with When it matters. Without
+   * it such a thread shows Resolve.
    */
-  readonly follow?: { readonly open: boolean; readonly onOpen: (at: MenuAnchor) => void }
+  readonly onFollow?: () => void
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
@@ -75,18 +75,18 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * and under 480px Follow and Resolve show as icons. Rename turns the title
  * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, follow, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
   const pillName = `${channel.name}, ${kind.toLowerCase()}`
 
   // Follow can turn into Resolve or Reopen, and back on ⌘Z or Never, so each reserves the other's label.
-  const canFollow = !main && follow !== undefined
+  const canFollow = !main && onFollow !== undefined
   const resolveLabel = detail.resolved ? 'Reopen' : 'Resolve'
   const resolve =
     canFollow && !detail.subscribed ? (
-      <IslandButton icon={Bell} label="Follow" reserve={resolveLabel} popup="menu" expanded={follow.open} onClick={follow.onOpen} />
+      <IslandButton icon={Bell} label="Follow" reserve={resolveLabel} onClick={() => onFollow()} />
     ) : main || onResolve === undefined ? null : (
       <IslandButton icon={detail.resolved ? ArrowCounterClockwise : CheckCircle} label={resolveLabel} {...(canFollow ? { reserve: 'Follow' } : {})} onClick={onResolve} />
     )

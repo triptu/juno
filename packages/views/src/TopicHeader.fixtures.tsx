@@ -7,11 +7,11 @@ import { TopicSwitcher } from './TopicSwitcher'
 const noop = () => {}
 
 // The app always gives the title its switcher, so the title is the switcher's button here too, closed.
-const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'follow' | 'juno' | 'switcher'> = {
+const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'onFollow' | 'juno' | 'switcher'> = {
   onMenu: noop,
   onPill: noop,
   onResolve: noop,
-  follow: { open: false, onOpen: noop },
+  onFollow: noop,
   juno: { open: false, onToggle: noop },
   switcher: { open: false, onOpen: noop, content: null },
 }
@@ -62,11 +62,10 @@ export default defineFixtures(
       'resolved-no-juno': fixture<TopicHeaderProps>({ detail: { ...details.postgres, resolved: true, status: 'resolved' }, onMenu: noop, onPill: noop, onResolve: noop }),
       'resolved-336': state({ detail: { ...details.hiring, resolved: true, status: 'resolved' } }, narrow),
     },
-    // A thread you do not follow shows Follow in Resolve's place; its menu is native, so only the open button shows.
+    // A thread you do not follow shows Follow in Resolve's place; a click follows it, with no menu.
     // Follow keeps Resolve's width, so following moves nothing.
     Follow: {
       follow: state({ detail: unfollowed(details.postgres) }),
-      'follow-open': state({ detail: unfollowed(details.postgres), follow: { open: true, onOpen: noop } }),
       followed: state({ detail: details.postgres }),
       'follow-resolved': state({ detail: { ...unfollowed(details.postgres), resolved: true } }),
       'follow-long': state({ detail: unfollowed(details.long) }),
