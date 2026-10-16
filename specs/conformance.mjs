@@ -31,6 +31,7 @@ const unmapped = {
   actionOnDiscarded: 'not in Juno\'s order: Juno puts the edit into the refused row at once, before the discard',
   crashResend: 'the crash leaves the socket up; the engine\'s restart also reads history, so it stores the post with no lookup',
   reconnectPage: 'depends on timing: the catch-up stores the post before the lookup\'s 2 s are up',
+  reactionOnGone: 'reactions: the harness replays every change as an edit',
   actionRetry: 'a difference: after a lost answer the client sends the old text again before the worker sends the new one',
 }
 // Broken schedules whose bug the projection cannot see.
