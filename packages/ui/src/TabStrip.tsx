@@ -2,7 +2,11 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { revealFocus } from './internal/revealFocus'
-import { TabDrag } from './internal/tabDrag'
+import type { TabDrag } from './internal/tabDrag'
+
+// The drag code is not needed to paint the strip, so it loads after startup (performance 1, the bundle budget): when the strip is idle, or on the first press.
+let tabDragModule: Promise<typeof import('./internal/tabDrag')> | undefined
+const loadTabDrag = () => (tabDragModule ??= import('./internal/tabDrag'))
 
 export interface TabStripProps {
   readonly label?: string
@@ -54,16 +58,42 @@ export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, onMove,
     move.current = onMove
     drag.current?.settled()
   })
+  // Makes the strip's drag once its code has loaded. Returns it, or undefined once the strip has stopped dragging.
+  const ensure = useRef<() => Promise<TabDrag | undefined>>(async () => undefined)
   useEffect(() => {
-    if (!movable || scroller.current === null) return
-    const current = new TabDrag(scroller.current, { onMove: (from, to) => move.current?.(from, to) })
-    drag.current = current
+    const element = scroller.current
+    if (!movable || element === null) return
+    let stopped = false
+    ensure.current = async () => {
+      const { TabDrag } = await loadTabDrag()
+      if (stopped) return undefined
+      drag.current ??= new TabDrag(element, { onMove: (from, to) => move.current?.(from, to) })
+      return drag.current
+    }
+    const idle = requestIdleCallback(() => void ensure.current(), { timeout: 5_000 })
     return () => {
-      current.dispose()
+      stopped = true
+      cancelIdleCallback(idle)
+      drag.current?.dispose()
       drag.current = undefined
     }
   }, [movable])
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => drag.current?.pointerDown(event.nativeEvent)
+  // A press before the code has loaded still drags: the press is passed on once it has.
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const press = event.nativeEvent
+    if (drag.current !== undefined) {
+      drag.current.pointerDown(press)
+      return
+    }
+    // A press released while the code loads was a click, not a drag.
+    let released = false
+    const release = () => (released = true)
+    window.addEventListener('pointerup', release, { once: true, capture: true })
+    void ensure.current().then((ready) => {
+      window.removeEventListener('pointerup', release, { capture: true })
+      if (!released) ready?.pointerDown(press)
+    })
+  }
   return (
     <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
