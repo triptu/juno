@@ -15,9 +15,8 @@ function close(): void {
 }
 
 /**
- * The tour (SPEC 4) over the app: by itself after a first sign-in, unless
- * the workspace has seen it, and whenever Help, ⌘K or Settings › About
- * asks for it. While it shows it holds the app menu, so ⌘[ and ⌘] (Back
+ * The tour (SPEC 4) over the app: by itself once per workspace, when the
+ * sidebar has rows, and whenever Help, ⌘K or Settings › About asks for it. While it shows it holds the app menu, so ⌘[ and ⌘] (Back
  * and Forward) move its steps and no other shortcut reaches the window
  * under it.
  */

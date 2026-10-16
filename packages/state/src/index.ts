@@ -17,7 +17,7 @@ export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
-export { closeTour, showTour, tourAfterSignIn, tourOpenAtom, tourStepAtom } from './tour'
+export { closeTour, showTour, tourOpenAtom, tourStepAtom } from './tour'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {

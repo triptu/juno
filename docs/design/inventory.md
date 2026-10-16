@@ -60,7 +60,7 @@ Conventions that apply everywhere (SPEC §16):
   | 4 | Make it yours | Views group the channels and DMs you choose. Bot and alert channels go to Automated, so they stay out of All. | Automated: bots and alerts · Make a view · Settings: theme, density, notifications (⌘,) |
   | 5 | Juno helps, you decide | Juno is the assistant. Ask it to catch you up or find what someone said. It sends nothing until you click. | Open Juno here, or press ⌘J in a topic · Nothing goes out until you click Send |
 
-- **Opened by**: a first sign-in (after Set up Juno), Help › Show the Tour, ⌘K "Show the tour" (Commands, `compass` icon), Settings › About › Show the tour. Seen: the workspace preference `tourSeen`.
+- **Opened by**: itself, once per workspace without `tourSeen`, as soon as the sidebar has rows (after a first sign-in and Set up Juno, or on the first launch of an install from before the tour); Help › Show the Tour, ⌘K "Show the tour" (Commands, `compass` icon), Settings › About › Show the tour. Seen: the workspace preference `tourSeen`.
 
 ## 2. Sidebar
 

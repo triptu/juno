@@ -76,6 +76,8 @@ export interface LaunchOptions {
   readonly cacheMigration?: boolean
   /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
   readonly paced?: boolean
+  /** The tour opens by itself, as outside tests (`JUNO_E2E_TOUR`). Without it, only Help, ⌘K and Settings › About open it. */
+  readonly tour?: boolean
 }
 
 let launches = 0
@@ -122,6 +124,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.screenShared === true) env.JUNO_E2E_SCREEN_SHARED = '1'
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
   if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
+  if (options.tour === true) env.JUNO_E2E_TOUR = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
   const coverage = coverageDir()
   if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage

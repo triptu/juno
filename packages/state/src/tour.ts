@@ -1,22 +1,26 @@
 /**
  * The tour (SPEC 4): a few steps that show a Slack user how Juno is laid
- * out. It opens by itself over the app after a first sign-in made in this
- * run (after "Set up Juno" when that shows), unless the workspace has seen
- * it, and otherwise only when the owner asks for it: Help › Show the Tour,
- * ⌘K "Show the tour" or Settings › About. A relaunch, or signing in again
- * after Slack expired the session, never opens it.
+ * out. It opens by itself over the app once per workspace: when the
+ * workspace has not seen it and the sidebar has rows, so after a first
+ * sign-in it waits for the first sync's rows, and on an install from
+ * before the tour it opens on the first launch. Otherwise it opens only
+ * when the owner asks: Help › Show the Tour, ⌘K "Show the tour" or
+ * Settings › About.
  *
  * Seen is one workspace preference, `tourSeen`, written when the tour
  * closes by any way (Skip tour, Esc, Done). Preferences live in the
  * workspace's user.db, which signing out keeps, so signing out and in
  * again does not bring the tour back.
  */
+import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { prefsGet, prefsSet } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { signedInAtom } from './session'
+import { tourOpensItself } from './shell'
+import { sidebarListAtom } from './sidebar'
 
 export const TOUR_SEEN_PREF = 'tourSeen'
 
@@ -33,39 +37,26 @@ interface TourRequest {
 
 const tourRequestAtom = Atom.make<TourRequest>({ teamId: undefined, request: 'auto' }).pipe(Atom.keepAlive)
 
-/**
- * A first sign-in started in this run (the sign-in page, not "Slack signed
- * you out"): the tour may open by itself once it succeeds. Not kept across
- * a relaunch.
- */
-const tourAfterSignInAtom = Atom.make(false).pipe(Atom.keepAlive)
-
 /** The step on screen. Starts at the first each time the tour opens. */
 export const tourStepAtom = Atom.make(0).pipe(Atom.keepAlive)
 
 /**
  * Whether the tour shows. While the preference loads it does not, so a
- * workspace that has seen it never shows it for a frame.
+ * workspace that has seen it never shows it for a frame. By itself it
+ * waits for the sidebar's first rows, so it never opens over a first sync
+ * that has nothing to show yet, and once open it stays until it is closed.
  */
 export const tourOpenAtom = Atom.make((get): boolean => {
   const teamId = get(signedInAtom)?.teamId
   if (teamId === undefined) return false
   const { teamId: forTeam, request } = get(tourRequestAtom)
   if (forTeam === teamId && request !== 'auto') return request === 'open'
-  if (!get(tourAfterSignInAtom)) return false
+  if (!tourOpensItself) return false
   const saved = get(savedTourSeenAtom)
-  return AsyncResult.isSuccess(saved) && saved.value !== true
+  if (!AsyncResult.isSuccess(saved) || saved.value === true) return false
+  if (Option.getOrUndefined(get.self<boolean>()) === true) return true
+  return get(sidebarListAtom).order.length > 0
 })
-
-/**
- * A sign-in is starting. From the sign-in page (`firstRun`) the tour may
- * open once it succeeds, and the workspace's preference decides, not what
- * an earlier session in this run did.
- */
-export function tourAfterSignIn(registry: Registry, firstRun: boolean): void {
-  registry.set(tourAfterSignInAtom, firstRun)
-  if (firstRun) registry.set(tourRequestAtom, { teamId: undefined, request: 'auto' })
-}
 
 /** Opens the tour at its first step, seen or not. */
 export function showTour(registry: Registry): void {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { SignInFailed } from '@juno/contract'
-import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand, tourAfterSignIn } from '@juno/state'
+import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { SessionView, SignInView } from '@juno/views'
@@ -63,11 +63,8 @@ export function Session() {
   }
 
   const mode = value._tag === 'authRequired' ? 'expired' : 'first-run'
-  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10), then the tour (SPEC 4).
-  const setUpAfter = () => {
-    registry.set(junoSetupPendingAtom, mode === 'first-run' && noProvider)
-    tourAfterSignIn(registry, mode === 'first-run')
-  }
+  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10).
+  const setUpAfter = () => registry.set(junoSetupPendingAtom, mode === 'first-run' && noProvider)
   return (
     <SignInView
       mode={mode}

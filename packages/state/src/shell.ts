@@ -83,6 +83,9 @@ export const densityAtom = Atom.make<Density>(savedDensity())
  * Privacy mode (SPEC section 5): message text is blurred, for screen sharing.
  * Starts as saved (`?privacy=on`, or `sharing`), so a relaunch mid-share never shows text.
  */
+/** The tour opens by itself (SPEC 4, "The tour"); main turns that off for tests that do not ask for it. */
+export const tourOpensItself = launchParam('tour') !== 'manual'
+
 export const privacyAtom = Atom.make<boolean>(launchParam('privacy') === 'on' || launchParam('privacy') === 'sharing')
 
 /** Privacy mode is on because main saw the screen being shared, and the user has not touched it since. */

@@ -1,19 +1,35 @@
-// The tour (SPEC 4): after the first sign-in the tour opens over the
-// app, once. It moves with the keys, the dots and the app menu's Back and
-// Forward without moving anything on screen, Esc skips it, a relaunch does
-// not bring it back, and ⌘K, Help and Settings › About open it again.
+// The tour (SPEC 4): it opens by itself over the app once per workspace,
+// when the sidebar has rows: after a first sign-in, once the first sync has
+// rows, and on an install from before the tour, on its next launch. It
+// moves with the keys, the dots and the app menu's Back and Forward without
+// moving anything on screen, Esc skips it, it does not come back after a
+// relaunch, and ⌘K, Help and Settings › About open it again.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { Juno } from './driver/juno'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, test, type RunningApp } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
 const STEPS = ['Topics, not channels', 'Why a DM can show up twice', 'Getting around', 'Make it yours', 'Juno helps, you decide'] as const
 
-test('shows once after the first sign-in, steps without moving, and can be skipped', async ({ juno, running, fake, slackApp, userData }) => {
-  const { tour, tabs } = juno
-  await juno.signIn({ skipSetUp: false })
-  await juno.skipSetUp()
+/** Apps that open the tour by itself, as outside tests. */
+const opensItself = test.extend({
+  running: async ({ fake, slackApp, userData }, use) => {
+    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
+    await use(running)
+    await running.close()
+  },
+})
+
+opensItself('opens once after the first sign-in, when the sidebar has rows, steps without moving, and can be skipped', async ({ juno, running, fake, slackApp, userData }) => {
+  const { tour, tabs, sidebar } = juno
+  // The first sync has nothing to show yet: no tour over an empty list.
+  fake.holdNext({ method: 'client.userBoot', before: true })
+  await juno.signIn()
+  await sidebar.expectEmpty('Getting your topics')
+  await tour.expectClosed()
+  fake.release({ method: 'client.userBoot' })
+  await sidebar.expectRows()
 
   await tour.expectOpen()
   await tour.expectStep(STEPS[0])
@@ -48,22 +64,41 @@ test('shows once after the first sign-in, steps without moving, and can be skipp
   await tour.back.click()
   await tour.expectStep(STEPS[3])
 
-  // Esc skips; focus goes back to the window.
+  // Esc skips it.
   await juno.win.keyboard.press('Escape')
   await tour.expectClosed()
   await juno.waitForSync()
 
   // A relaunch does not bring it back.
   await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  await expectNoTourAfterLaunch(await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true }))
+})
+
+test('an install from before the tour shows it once, on its next launch', async ({ juno, running, fake, slackApp, userData }) => {
+  // This app does not open the tour by itself: the workspace never sees it, as on a build from before the tour.
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.tour.expectClosed()
+  await running.close()
+
+  // The update: the first launch opens it over the app once the sidebar has rows.
+  const updated = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
   try {
-    const relaunched = new Juno(again.app, again.win)
-    await relaunched.expectSignedIn('Juno Fake')
-    await relaunched.waitForSync()
-    await relaunched.tour.expectClosed()
+    const after = new Juno(updated.app, updated.win)
+    await after.sidebar.expectRows()
+    await after.tour.expectOpen()
+    await after.tour.expectStep(STEPS[0])
+    await after.tour.next.click()
+    await after.tour.expectStep(STEPS[1])
+    await after.tour.root.getByRole('button', { name: 'Skip tour' }).click()
+    await after.tour.expectClosed()
+    await after.expectSignedIn('Juno Fake')
   } finally {
-    await again.close()
+    await updated.close()
   }
+
+  // And never again.
+  await expectNoTourAfterLaunch(await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true }))
 })
 
 test('opens again from ⌘K, Help and Settings › About, and Done closes it', async ({ juno }) => {
@@ -100,3 +135,15 @@ test('opens again from ⌘K, Help and Settings › About, and Done closes it', a
   await tour.expectOpen()
   await tour.expectStep(STEPS[0])
 })
+
+/** Launches the app on a workspace that has seen the tour: signed in, synced, and no tour. */
+async function expectNoTourAfterLaunch(app: RunningApp): Promise<void> {
+  try {
+    const juno = new Juno(app.app, app.win)
+    await juno.expectSignedIn('Juno Fake')
+    await juno.waitForSync()
+    await juno.tour.expectClosed()
+  } finally {
+    await app.close()
+  }
+}
