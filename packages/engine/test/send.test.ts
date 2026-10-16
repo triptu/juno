@@ -312,6 +312,8 @@ describe('send', () => {
     valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'Queued behind it', 'm:C0PRODUCT'))
     engine.fake.goOnline()
     const first = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the first post at Slack')
+    // The post goes as soon as the socket is back, before the catch-up ends: wait for it, so `offline` below is the new drop.
+    await engine.phase('live', 30_000)
     engine.fake.goOffline()
     await engine.phase('offline')
     engine.fake.decide(first.id, 'run')
