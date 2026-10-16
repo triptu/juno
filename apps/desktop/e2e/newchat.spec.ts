@@ -56,7 +56,8 @@ test('write first, then pick a destination and send: the tab becomes the topic, 
     await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
     fake.release()
     await topic.expectSent('Cutover moves to Thursday night')
-  })
+    // The sidebar sorts by latest activity (SPEC 5), so the send moves #eng's Main up; only those moves are skipped.
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   await expect(topic.composer).toHaveValue('An unfinished reply')
   expect(await newChat.field.boundingBox()).toEqual(before)
   await topic.send('second')
