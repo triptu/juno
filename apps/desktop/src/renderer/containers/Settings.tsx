@@ -77,7 +77,7 @@ function General() {
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
   const [sharing, setSharing] = useSharingSetting()
-  return <SettingsGeneral hideWhileSharing={sharing.hide} sharingAvailable={sharing.available} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
+  return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
@@ -87,7 +87,7 @@ function General() {
  * main answers, as it is by default; the switch moves on the click and takes main's answer after.
  */
 function useSharingSetting(): readonly [SharingSetting, (hide: boolean) => void] {
-  const [setting, setSetting] = useState<SharingSetting>({ hide: true, available: true })
+  const [setting, setSetting] = useState<SharingSetting>({ hide: true, detection: 'available' })
   useEffect(() => {
     let active = true
     void getSharingSetting().then((value) => { if (active && value !== undefined) setSetting(value) })

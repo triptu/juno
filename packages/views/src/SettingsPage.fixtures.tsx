@@ -42,7 +42,7 @@ export default defineFixtures(
   SettingsPage,
   {
     Sections: {
-      general: at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingAvailable onHideWhileSharingChange={noop} />),
+      general: at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} />),
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
@@ -52,9 +52,11 @@ export default defineFixtures(
       about: at('about', about),
     },
     States: {
-      'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingAvailable onHideWhileSharingChange={noop} />),
-      'sharing-unavailable': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingAvailable={false} onHideWhileSharingChange={noop} />),
-      'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingAvailable onHideWhileSharingChange={noop} />),
+      'read-catch-up-running': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 12 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} />),
+      'sharing-unavailable': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingDetection="missing" onHideWhileSharingChange={noop} />),
+      // Another app records the screen all the time, so Juno cannot tell when a share starts.
+      'sharing-always-on': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingDetection="alwaysOn" onHideWhileSharingChange={noop} />),
+      'read-mirroring-off': at('general', <SettingsGeneral quietDays={7} onQuietDaysChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} newTabPage="newChat" onNewTabPageChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} />),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),

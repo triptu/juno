@@ -48,26 +48,40 @@ function updateLaunch(patch: Partial<Launch>): void {
 }
 
 /**
- * Privacy mode changes here (SPEC section 5): from the renderer when the user
- * toggles it (`bySharing` false), or from the screen watch when sharing
- * starts or ends, which also tells the app window.
+ * The screen watch turned privacy mode on and the user has not touched it since. Kept in memory
+ * only: on launch the mode is what the user left it as (`launch.privacy`).
  */
-function setPrivacy(privacy: boolean, bySharing: boolean, fromSharing: boolean): void {
-  updateLaunch({ privacy, privacyBySharing: bySharing })
+let privacyBySharing = false
+
+/** Privacy mode now: the user's choice, or on because sharing started. */
+const privacyOn = () => launch.privacy === true || privacyBySharing
+
+/** The user toggled privacy mode: it is theirs now, saved for the next launch. */
+function setUserPrivacy(privacy: boolean): void {
+  privacyBySharing = false
+  updateLaunch({ privacy })
   setMenuPrivacy(privacy)
-  if (!fromSharing) return
-  const state: PrivacyState = { privacy, sharing: bySharing }
+}
+
+/** Sharing started or ended (screenWatch.ts): the mode changes without being saved, and the app window is told. */
+function setSharingPrivacy(bySharing: boolean): void {
+  privacyBySharing = bySharing
+  setMenuPrivacy(privacyOn())
+  const state: PrivacyState = { privacy: privacyOn(), sharing: bySharing }
   appWindow()?.webContents.send(Events.privacyChanged, state)
 }
 
 /** Under JUNO_E2E a test says whether the screen is shared (`junoTest.screenShared`); the real probe never runs. */
-let sharedForTests = false
+let sharedForTests = e2e && process.env.JUNO_E2E_SCREEN_SHARED === '1'
+/** And moves the screen watch's clock on (`junoTest.screenWatchElapse`), to reach the always-on limit. */
+let screenClockForTests = 0
 
 const screenWatch = createScreenWatch({
   load: e2e ? () => Promise.resolve<ScreenProbe>(() => sharedForTests) : () => loadScreenProbe().then((loaded) => loaded?.probe),
   enabled: () => launch.hideWhileSharing !== false,
-  privacy: () => ({ on: launch.privacy === true, bySharing: launch.privacyBySharing === true }),
-  setPrivacy: (privacy, bySharing) => setPrivacy(privacy, bySharing, true),
+  privacy: () => ({ on: privacyOn(), bySharing: privacyBySharing }),
+  setPrivacy: (_privacy, bySharing) => setSharingPrivacy(bySharing),
+  now: () => Date.now() + screenClockForTests,
 })
 
 const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }))
@@ -115,7 +129,7 @@ const notifier = new Notifier({
   },
   open: openTarget,
   send: (message) => supervisor.send(message),
-  privacy: () => launch.privacy === true,
+  privacy: privacyOn,
 })
 supervisor.onReady(() => notifier.engineReady())
 
@@ -181,16 +195,16 @@ app.whenReady().then(() => {
     setAccent: (accent) => updateLaunch({ accent }),
     setDensity: (density) => updateLaunch({ density }),
     // The user's own choice: sharing no longer owns the mode, so it stays as they set it.
-    setPrivacy: (privacy) => setPrivacy(privacy, false, false),
+    setPrivacy: setUserPrivacy,
     setSidebar: (sidebar) => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
     },
     sharing: {
-      get: () => ({ hide: launch.hideWhileSharing !== false, available: screenWatch.available() }),
+      get: () => ({ hide: launch.hideWhileSharing !== false, detection: screenWatch.detection() }),
       set: (hide) => {
         updateLaunch({ hideWhileSharing: hide })
-        return { hide, available: screenWatch.available() }
+        return { hide, detection: screenWatch.detection() }
       },
     },
   })
@@ -214,7 +228,7 @@ app.whenReady().then(() => {
 })
 
 function openWindow(): BrowserWindow {
-  const window = createMainWindow(() => launch)
+  const window = createMainWindow(() => ({ ...launch, privacy: privacyOn(), privacySharing: privacyBySharing }))
   window.once('ready-to-show', () => {
     supervisor.send({ _tag: 'painted' })
     // After the first paint, so loading koffi never delays it. Only while the window is open.
@@ -278,6 +292,9 @@ if (e2e) {
       screenShared: (shared: boolean) => {
         sharedForTests = shared
         return screenWatch.poll()
+      },
+      screenWatchElapse: (ms: number) => {
+        screenClockForTests += ms
       },
     },
   })

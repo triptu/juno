@@ -67,15 +67,21 @@ export function appWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => mainWindows.has(window) && !window.isDestroyed())
 }
 
+/**
+ * What the page starts with: the saved launch values, with privacy mode as it is now. The screen
+ * watch may have turned it on (`privacySharing`), which is not saved, so only a reload sees it.
+ */
+export type PageLaunch = Launch & { readonly privacySharing?: boolean }
+
 /** Each app window's way to read the current launch values, for a reload. */
-const launchOf = new WeakMap<BaseWindow, () => Launch>()
+const launchOf = new WeakMap<BaseWindow, () => PageLaunch>()
 
 /**
  * `launch` reads the current launch values: the page takes its first state
  * (theme, privacy, sidebar) from its URL, so a reload builds the URL again
  * rather than loading the one the window opened with.
  */
-export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
+export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow {
   const launch = currentLaunch()
   const window = createWindow({
     title: 'Juno',
@@ -106,7 +112,7 @@ export function createMainWindow(currentLaunch: () => Launch): BrowserWindow {
 }
 
 /** The app page for `launch`. electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server. */
-function appPageUrl(launch: Launch): string {
+function appPageUrl(launch: PageLaunch): string {
   const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
   return pageUrl(devUrl || APP_URL, launch)
 }
@@ -321,13 +327,13 @@ function setAppMenu(state: MenuState, rebuild = false): void {
  * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
  * accent, density and privacy mode, and the saved sidebar.
  */
-function pageUrl(base: string, launch: Launch): string {
+function pageUrl(base: string, launch: PageLaunch): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
   // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
-  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacyBySharing === true ? 'sharing' : 'on')
+  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
   return url.toString()

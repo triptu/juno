@@ -132,8 +132,11 @@ export type UpdateState = typeof UpdateState.Type
 export const PrivacyState = Schema.Struct({ privacy: Schema.Boolean, sharing: Schema.Boolean })
 export type PrivacyState = typeof PrivacyState.Type
 
-/** "Hide message text while sharing the screen": `available` is false where Juno cannot tell (the call is missing). */
-export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, available: Schema.Boolean })
+/**
+ * "Hide message text while sharing the screen", and whether Juno can tell: `missing` where the
+ * call is not there, `alwaysOn` while another app captures the screen all the time.
+ */
+export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, detection: Schema.Literals(['available', 'missing', 'alwaysOn']) })
 export type SharingSetting = typeof SharingSetting.Type
 
 /** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */

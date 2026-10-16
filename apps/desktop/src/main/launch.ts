@@ -20,11 +20,9 @@ export const Launch = Schema.Struct({
   // Optional so a launch.json written before accents existed still decodes.
   accent: Schema.optionalKey(AccentSchema),
   density: Schema.optionalKey(DensitySchema),
-  // Privacy mode (SPEC section 5): message text blurred for screen sharing. It stays on across a relaunch.
+  // Privacy mode (SPEC section 5) as the user left it: message text blurred for screen sharing. It stays on
+  // across a relaunch. A mode the screen watch turned on is not saved.
   privacy: Schema.optionalKey(Schema.Boolean),
-  // Privacy mode was turned on because the screen is being shared, and the user has not touched it
-  // since, so it turns off again when sharing ends, even after a relaunch (screenWatch.ts).
-  privacyBySharing: Schema.optionalKey(Schema.Boolean),
   // Settings › General, "Hide message text while sharing the screen". On when absent.
   hideWhileSharing: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
