@@ -1,20 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { expect, hooks, launchApp, tempUserData, test } from '../fixtures'
 
-// Main forks the agent utility process, brokers a port between it and the
-// engine, and the agent's host.hello reaches the engine's AgentHost server.
-test('the agent process reaches its host over the brokered port', async () => {
-  const userData = await tempUserData()
-  const { app, close } = await launchApp(userData, { agent: true })
-  try {
-    await expect.poll(() => hooks(app, 'agentState'), { timeout: 15_000 }).toBe('ready')
-    expect(await hooks(app, 'agentHost')).toBe('juno')
-  } finally {
-    await close()
-    await rm(userData, { recursive: true, force: true })
-  }
-})
-
 // A crashed agent is forked again and gets a new port to the engine (ADR 0012).
 test('the agent process restarts after a crash and reaches its host again', async () => {
   const userData = await tempUserData()
