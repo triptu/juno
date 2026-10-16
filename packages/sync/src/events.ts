@@ -192,6 +192,10 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(upsertUsers([frame.user]))
       case 'pref_change':
         return yield* transaction(setPref(frame.name, frame.value))
+      case 'file_change':
+      case 'file_thumbnail_generated':
+        // Carries no sizes: `files.info` brings the thumbnails with them (`run/files.ts`).
+        return yield* Queue.offer(ctx.fileFetches, { kind: 'event', fileId: frame.file_id })
       default:
         return
     }

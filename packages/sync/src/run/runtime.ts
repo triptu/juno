@@ -4,7 +4,7 @@ import { SlackAuthRequired, SlackSession, SlackSocket } from '@juno/slack'
 import { Deferred, Effect, FiberSet, Queue, Semaphore } from 'effect'
 import type { BootState, Phase } from '../boot'
 import { SyncConfig } from '../config'
-import type { RootFetch, SyncContext } from '../context'
+import type { FileFetch, RootFetch, SyncContext } from '../context'
 import { syncEmoji } from '../emoji'
 
 import type { RunSyncOptions } from '../sync'
@@ -22,6 +22,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     config: { ...config, quietDays },
     rootFetches: yield* Queue.unbounded<RootFetch>(),
     readLookups: yield* Queue.unbounded<string>(),
+    fileFetches: yield* Queue.unbounded<FileFetch>(),
     missingUsers: new Map(),
     usersWanted: yield* Queue.sliding<void>(1),
     usersOnBackground: false,
