@@ -63,8 +63,8 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   await postgres.expectRead()
   await postgres.expectPreview('Dev: Booked 2–4pm. Will post results here.')
   await postgres.expectChannel('eng')
-  // The participant stack names everyone but you (the fake's display names are first names).
-  await expect(postgres.root.getByRole('img', { name: 'Dev, Leo', exact: true })).toBeVisible()
+  // Read, so no people: the stack names only who is talking in unread messages.
+  await expect(postgres.root.getByRole('img', { name: /Dev|Leo/ })).toHaveCount(0)
 
   // A thread with an unread mention: semibold title, the @ tag, then the count.
   const rina = sidebar.row(RINA)
@@ -99,6 +99,25 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // Both groups have unread topics, so both dots show.
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', true)
+})
+
+test('the stack shows who wrote the unread replies, and nobody once the topic is read', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const postgres = juno.sidebar.row(POSTGRES)
+  await postgres.expectRead()
+
+  slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
+  slack.as('Maya').replyIn(POSTGRES, 'Rollback steps are in the doc')
+  await postgres.expectUnread(2)
+  // Most recent first; the fake's display names are first names.
+  const stack = postgres.root.getByRole('img', { name: 'Maya, Leo', exact: true })
+  await expect(stack).toBeVisible()
+
+  await postgres.open()
+  await postgres.expectRead()
+  await expect(stack).toHaveCount(0)
+  await expect(postgres.root.getByRole('img', { name: /Maya|Leo/ })).toHaveCount(0)
 })
 
 test('rows in a DM or a group DM show no participant stack', async ({ juno }) => {
