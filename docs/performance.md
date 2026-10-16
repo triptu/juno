@@ -278,7 +278,7 @@ Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `a
 
 The scroll gate pools the frame work of two ordinary sweeps before taking the p95. Each ordinary sweep is followed by the same sweep with two background worker threads busy; the pooled held-clock p95 is printed beside the ordinary one and never substitutes for the gate. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. Every sweep checks for visible placeholders, long animation frames and dropped frames; the ordinary sweeps decide the gate.
 
-The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile.
+The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile.
 
 Status: the fixture and the engine benchmark exist; the Playwright harness does not. `scripts/check-bundle-size.mjs` runs in `pnpm build`, the marks live in `@juno/state/perf`, `largeSeed()` in `@juno/fake-slack` is the fixture below (generated in about 5 s, never checked in), and `packages/engine/test/bench` boots the engine on it and reports the sidebar query time alone and inside the engine, the snapshot and delta sizes, the encode, clone and decode times and the inject-to-row time, with the load average (`JUNO_BENCH=1`). On Apple silicon the first run after an idle gap is about twice as slow as the same run on a busy CPU (power management), so `meta.queryMs` after an injected event is higher than the isolated time even on a quiet machine. First numbers are in `docs/architecture.md` section 16, M3. The rest of this section is the plan.
 
@@ -473,6 +473,89 @@ placeholder between topic and Home. The inspected Home filmstrip still shows
 the specified staggered entrance; the check is about data readiness, not making
 that animation instantaneous. The log is `.juno-status/perf-4b/feel-final.log`,
 and the filmstrips are under `apps/desktop/feel-report/`.
+
+### 8.4 Main after the 10-16 merges (10-17)
+
+Two full `pnpm perf` runs on the shared M2 (8 GB, 60 Hz display, so a
+one-frame budget is 24.7 ms), with no other heavy job holding the lock.
+The first is main at `ae0f0f06`; the second adds the stale caret fix
+(`a015ea5c`). Load was 2 to 5 in both. All values are ms, p95 unless
+marked; ordinary / held-clock for scrolls.
+
+| Metric | Main | With the fix | Budget |
+| --- | --- | --- | --- |
+| Topic open, uncached | 47.6 | 51.2; 43.4 on a rerun | 50 |
+| Topic open, cached | 17.6 | 17.9 | 50 |
+| Topic open, prefetched | 20.4 | 19.3 | 24.7 |
+| Tab switch, mounted | 19.5 | 18.0 | 24.7 |
+| Tab switch, unmounted with restore | 17.2 | 16.7 | 50 |
+| Peek open | 19.6 | 21.2 | 24.7 |
+| Home open, including idle | 79.8 | 41.3 | 50 |
+| Filter change | 25.5 | 29.9 | 50 |
+| ⌘K open / keystroke to rows | 14.8 / 34.3 | 17.7 / 37.3 | 50 / 100 |
+| Send / send in Main | 35.7 / 33.5 | 48.8 / 34.7 | 50 |
+| Live update, sidebar / open thread | 18.5 / 30.5 | 20.1 / 27.9 | 50 |
+| Juno panel open | 18.8 (max 320.3) | 19.0 (max 323.7) | 24.7 |
+| Chat send to your bubble | 23.4 | 23.6 | 24.7 |
+| New chat open | 17.6 | 17.7 | 24.7 |
+| All topics open | 27.1 | 25.8 | 50 |
+| Warm start to shell / rows, median | 394.0 / 457.6 | 370.1 / 454.5 | 400 / 500 |
+| Sidebar drag, work per frame | 10.2 | 6.7 | 8.3 |
+| Sidebar scroll | 11.9 / 5.0 | 13.1 / 5.2 | 8.3 ordinary |
+| All topics scroll | 22.1 / 13.3 | 18.2 / 5.9 | 8.3 ordinary |
+| Message scroll | 8.4 / 3.2 | 9.6 / 2.5 | 8.3 ordinary |
+| Chat scroll | 9.4 / 3.8 | 11.1 / 3.6 | 8.3 ordinary |
+
+Keystroke presentation stayed within one refresh interval of the same
+run's bare input in every surface, except the composer in the second run
+(54.1 against 54.0); a rerun passed at 50.1 against 54.6. The initial JS
+bundle is 996.6 KB of its 1,000 KB budget.
+
+The first run passed 17 of 23 scenarios, the second 17 of 23, with the
+keystroke and uncached misses passing on the rerun. What still fails is
+the four ordinary scroll gates, as on 10-15, where held-clock readings
+pass. Sidebar scroll in the second run also recorded one long animation
+frame, which fails its zero rule; its cause is not attributed.
+
+- **Topic opens and the tab switch were load, not a regression.** Under
+  load 6 to 10 on 10-16 the uncached open read 156 to 198 ms, the
+  prefetched open 39 to 110 ms and the mounted tab switch 29 to 38 ms. On
+  a quieter Mac they pass. The no-shift branch's own runs show the same
+  uncached tail on its base commit, before it held message paint. The
+  hold cannot lengthen the measure: `juno.topic-open` ends on the first
+  frame with the header in place, whether or not the body waits for
+  coverage.
+- **Stale caret (fixed).** All topics scroll went from 7 to 13 ms
+  held-clock with the merge of `tabs-model-1`; a bisect over the merges
+  and then the branch found `9261e202` ("never leave no tab"). That
+  commit is not slow itself. Launch now opens a New chat with its
+  composer focused, and a text field leaves Blink's caret behind when
+  focus moves off it; once the field is removed, the caret sits where
+  the field was. Chromium makes that caret canonical before every frame
+  (`WidgetBase::UpdateSelectionBounds`), walking back through the DOM to
+  an editable position: 4 to 6 ms a frame past the sidebar's rows. The
+  10-15 commit is just as slow when the composer is focused first. Script
+  cannot see the caret (`getSelection().type` is `None`). The renderer
+  now clears it on the frame after focus leaves a text field for
+  something that is not one, unless the user has selected text
+  (`containers/caret.ts`). Heavy frames in the All topics sweep fell
+  from about 330 to 200, and the sidebar drag and Home open passed. The
+  same caret appears after any removed field (the palette, a popover's
+  search), so it was not only a test artefact. The cause was named by
+  tracing with `JUNO_TRACE_EXTRA` categories (section 7.3).
+- **Ordinary scroll gates.** The ordinary readings move by 3 to 8 ms
+  between runs of one commit; the bisect's good commits read 8.2 to 17 ms
+  for All topics with held-clock readings of 5.9 to 7.6 ms. Held-clock
+  was the reliable signal for this regression. These gates still fail
+  and are not fixed here.
+
+`pnpm test:feel` passed all 14 tests. The filmstrips for opening a topic
+at its divider, both tab switches, the Juno panel, Home after idle and
+the palette show each landing in one frame and holding still. The
+panel's empty-state text fades in over about 350 ms after the panel
+lands. There is no feel scenario for Home during the first sync; it is
+covered by `layout-shift.spec.ts` only. Logs are under
+`.juno-status/perf-1017/`.
 
 ### Engine speed measurements (2026-10-15)
 
