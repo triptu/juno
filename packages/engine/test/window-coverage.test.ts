@@ -61,3 +61,15 @@ it('marks a thread window covered when the replies page changes only coverage', 
   expect(version()).toEqual(before)
   await until((window) => window.meta.windowCovered === true, 'thread covered by unchanged replies page')
 })
+
+it('does not mark a thread window covered by replies a search match stored, until the open brings them in full', async () => {
+  const engine = await bootedEngine(engines)
+  await quiet(engine)
+  // The discovery search stored this reply without its reactions (`messages.partial`).
+  const reply = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('We keep the old primary warm'))!
+  const id = `t:C0ENG:${reply.thread_ts}`
+  const until = watchList(engine, id)
+  await until((window) => window.rows.has(reply.ts) && window.meta.windowCovered === false, 'the search match, not covering the window')
+  expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
+  await until((window) => window.meta.windowCovered === true && window.rows.get(reply.ts)?.reactions.length === 1, 'the reply in full, with its reaction')
+})
