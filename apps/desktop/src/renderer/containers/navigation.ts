@@ -291,6 +291,22 @@ export function openTopic(id: string, options: OpenOptions = {}): void {
   openTopicFresh(id, options, undefined, undefined)
 }
 
+/**
+ * ⌘-click on Start thread or Open thread (SPEC 6 and 7): the topic in a new
+ * tab after the current one, which stays active with its scroll and focus.
+ * The new tab gets a fresh open's window once the topic is local, so it
+ * opens at the divider or the bottom when it is chosen.
+ */
+export function openTopicInBackground(id: string): void {
+  queue = queue.then(() => {
+    const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
+    const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true }))
+    const tab = next.tabs.find((each) => !before.has(each.id))
+    if (tab === undefined) return
+    void whenReady(id, true).then(() => registry.set(messageWindowSpecAtom(topicView(id, tab.id)), registry.get(messageWindowSpecAtom(id))))
+  })
+}
+
 function openTopicFresh(id: string, options: OpenOptions, target: string | undefined, snapshot: ScrollSnapshot | undefined): void {
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {

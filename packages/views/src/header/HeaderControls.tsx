@@ -102,8 +102,6 @@ export interface IslandButtonProps {
   /** A toggle or a popover's button is down. */
   readonly pressed?: boolean
   readonly expanded?: boolean
-  /** It opens a menu (Follow). */
-  readonly popup?: 'menu'
   /** `at` is under the right island, at the button's left edge, where a menu it opens goes. */
   readonly onClick: (at: MenuAnchor) => void
 }
@@ -113,13 +111,12 @@ export interface IslandButtonProps {
  * narrow header it becomes a 28px icon button, or the icon and a short
  * label, by CSS alone; its accessible name never changes.
  */
-export function IslandButton({ reserveCount = false, icon, label, reserve, narrowLabel, name, pressed, expanded, popup, onClick }: IslandButtonProps) {
+export function IslandButton({ reserveCount = false, icon, label, reserve, narrowLabel, name, pressed, expanded, onClick }: IslandButtonProps) {
   return (
     <button
       type="button"
       aria-label={name ?? label}
       {...tooltip(name ?? label)}
-      aria-haspopup={popup}
       aria-expanded={expanded}
       onClick={(event) => onClick(underRightIsland(event.currentTarget))}
       {...stylex.props(styles.reset, styles.island, reserveCount && styles.countWidth, narrowLabel === undefined && styles.iconOnlyWhenNarrow, (pressed === true || expanded === true) && styles.islandDown)}
@@ -142,7 +139,7 @@ export function IslandButton({ reserveCount = false, icon, label, reserve, narro
   )
 }
 
-/** Under the right island, at `button`'s left edge: where ⋯ and Follow open their menus. */
+/** Under the right island, at `button`'s left edge: where ⋯ opens its menu. */
 function underRightIsland(button: HTMLElement): MenuAnchor {
   const box = button.getBoundingClientRect()
   const island = (button.closest('[data-island]') ?? button).getBoundingClientRect()

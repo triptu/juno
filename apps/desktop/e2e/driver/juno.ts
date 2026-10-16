@@ -1515,16 +1515,26 @@ export class TopicPane {
     return lastMenu(this.win)
   }
 
-  /** The right island's Follow, on a thread you do not follow: it opens the Follow menu. */
+  /** The right island's Follow, on a thread you do not follow: a click follows it. */
   get followButton() {
     return this.header.getByRole('button', { name: 'Follow', exact: true })
   }
 
-  /** Opens the Follow menu and picks a choice. */
-  async chooseInFollowMenu(item: 'notify-matters' | 'notify-every'): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
-    await chooseNextMenuItem(this.win, item)
+  /** Clicks Follow and waits for it to give way. Answers whether a native menu opened on the way (none should). */
+  async follow(): Promise<{ readonly menuOpened: boolean }> {
+    const app = appOf.get(this.win)
+    if (app === undefined) throw new Error('follow needs the app; use the Juno driver')
+    // A menu that opens takes the armed choice; with none, it is still armed afterwards.
+    await chooseNextMenuItem(this.win, 'no-menu-expected')
     await this.followButton.click()
-    return lastMenu(this.win)
+    await expect(this.followButton).toHaveCount(0, { timeout: 10_000 })
+    const menuOpened = await app.evaluate(() => {
+      const menu = (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu
+      const taken = menu.next !== 'no-menu-expected'
+      menu.next = undefined
+      return taken
+    })
+    return { menuOpened }
   }
 
   /** Opens the topic menu by right-clicking the title and picks `item`. */

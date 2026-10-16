@@ -131,18 +131,6 @@ function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<Notify
   return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
 }
 
-/**
- * The header's Follow menu on a thread you do not follow (SPEC 5 and 7):
- * the two Notify me choices that follow it, When it matters (the default)
- * first, with a line under it saying what it means.
- */
-export function followMenuItems(): ReadonlyArray<MenuItem<NotifyAction>> {
-  return [
-    { type: 'item', id: 'notify-matters', label: notifyLabels.matters, sublabel: 'Juno decides when to notify you' },
-    { type: 'item', id: 'notify-every', label: notifyLabels.every },
-  ]
-}
-
 /** How a toast names a choice: "#design-review: Never". */
 export function notifyChoiceLabel(choice: NotifyChoice): string {
   return notifyLabels[choice]
