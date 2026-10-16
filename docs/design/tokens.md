@@ -42,6 +42,9 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--accent-foreground-muted` | `hsla(48, 20%, 70%, 1)` | #BDB8A3 | css | |
 | `--selection-background` | `hsla(200, 50%, 80%, 1)` | #B3D4E6 | css | `::selection`; prototype also uses it for the focus ring (see 1.7) |
 | `--input-border` | `hsla(48, 14%, 82%, 1)` | #D8D5CB | proto | Composer, text fields, selects, search fields, send-card textarea |
+| `--tab-strip` | `hsla(48, 26%, 94%, 1)` | #F4F2EC | redesign 10-16 | The tab strip and inactive tabs. 1.08:1 under the active tab, so tabs read apart (inventory 4) |
+| `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
+| `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
 | `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the image viewer: the page at 94%, so only the picture reads |
 
 ### 1.2 Base palette, dark
@@ -64,6 +67,9 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--border-strong` | #3C3A37 | 0.35 | 1.37:1 on a card | redesign |
 | `--border-strongest` | #4C4A47 | 0.41 | 1.99:1 on the page | redesign |
 | `--input-border` | #464541 | 0.39 | 1.62:1 on the composer | redesign |
+| `--tab-strip` | #0D0C0A | 0.15 | 1.12:1 under the active tab | redesign 10-16 |
+| `--tab-hover` | #151411 | 0.19 | 1.06:1 over the strip, 1.05:1 under the page; label 10.6:1 | redesign 10-16 |
+| `--tab-divider` | #3A3835 | 0.37 | 1.67:1 on the strip | redesign 10-16 |
 | `--foreground-default` | #EEEBE2 | 0.94 | 14.7:1 on the page | redesign |
 | `--foreground-subtle` | #C6C4BE | 0.82 | 10.1:1 page, 7.7:1 `--secondary-default`, 6.1:1 `--secondary-active`, 7.0:1 popovers | redesign |
 | `--foreground-muted` | #A09E9A | 0.70 | 6.6:1 page, 6.9:1 sidebar, 5.8:1 cards, 5.3:1 hover, 5.0:1 `--secondary-default`, 4.6:1 popovers | redesign |
@@ -344,6 +350,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--tab-height` | 35px, bottom margin -1px so the active tab merges with the page |
 | `--tab-width` | flex 0 1 230px; `--tab-min-width` 120px (the prototype's 72 fit only the icon and the close button). The strip scrolls sideways once the tabs reach the floor. `--tab-pinned-width` 40px (icon only) |
 | `--tab-unread-dot` | 6px round, `--foreground-muted` |
+| `--tab-divider-height` | 16px, the divider between two inactive tabs, centred on the tab's height |
 | `--header-island-top` | 8px from the top of the topic area (or Juno tab, or panel) to the header islands |
 | `--header-island-height` | 36px: a 28px control plus 3px padding and the 1px transparent border |
 | `--header-band` | 68px: the band behind the islands, solid `--background` to `--header-band-solid` 44px (the islands' bottom), then fading to transparent. Also the list's `scroll-padding-top` and the scrollbar track's top margin |
@@ -449,6 +456,7 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
+| `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
 | `--panel-shadow` | `0 0 0 1px oklch(0 0 0 / .05), 0 1px 2px 0 oklch(0 0 0 / .04), 0 8px 24px -6px oklch(0 0 0 / .08), 0 24px 56px -12px oklch(0 0 0 / .12)` | `inset 0 0 0 1px oklch(1 0 0 / .06), 0 0 0 1px oklch(0 0 0 / .5), 0 1px 2px 0 oklch(0 0 0 / .3), 0 8px 24px -6px oklch(0 0 0 / .4), 0 24px 56px -12px oklch(0 0 0 / .5)` | 10-16 | The Juno panel floating over the page: a hairline ring, a contact shadow, two wide soft ones; in dark a faint light inner edge |
 
 Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.

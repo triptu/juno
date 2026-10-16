@@ -26,6 +26,20 @@ function ThirtySeven() {
   )
 }
 
+/** `count` tabs over a page, the one at `active` selected. */
+function Row({ count, active }: { readonly count: number; readonly active: number }) {
+  return (
+    <div {...stylex.props(styles.window)}>
+      <TabStrip trailing={newTab}>
+        {Array.from({ length: count }, (_, index) => (
+          <Tab key={index} icon={index % 4 === 1 ? Lock : Hash} label={titles[index % titles.length] ?? ''} active={index === active} onClose={() => {}} />
+        ))}
+      </TabStrip>
+      <div {...stylex.props(styles.page)} />
+    </div>
+  )
+}
+
 /** A strip over a page body, so the active tab is seen merging with the page. */
 function StripWithPage() {
   return (
@@ -97,12 +111,20 @@ export default defineFixtures(
       ),
     },
     'With page': {
+      // The owner's case (10-16): the active tab first, two inactive ones after it.
+      'one-tab': scene(() => <Row count={1} active={0} />, { height: 100 }),
+      'three-first-active': scene(() => <Row count={3} active={0} />, { width: 960, height: 100 }),
+      'three-middle-active': scene(() => <Row count={3} active={1} />, { width: 960, height: 100 }),
+      'twelve': scene(() => <Row count={12} active={5} />, { width: 1200, height: 100 }),
+      'twelve-narrow': scene(() => <Row count={12} active={5} />, { width: 520, height: 100 }),
       'with-page': scene(() => <StripWithPage />, { height: 160 }),
       'with-page-narrow': scene(() => <StripWithPage />, { width: 480, height: 160 }),
       'with-page-wide': scene(() => <StripWithPage />, { width: 1400, height: 160 }),
     },
     Interaction: {
       hover: scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(1) [role="tab"]' }),
+      // Hovering the middle of three inactive tabs: its fill shows and both its dividers go.
+      'hover-between-inactive': scene(() => <Row count={4} active={0} />, { width: 960, height: 100, hover: '[data-tab]:nth-of-type(3) [role="tab"]' }),
       'close-hover': scene(() => <StripWithPage />, { height: 160, hover: '[data-tab]:nth-of-type(2) button' }),
       'pinned-hover': scene(
         () => (
