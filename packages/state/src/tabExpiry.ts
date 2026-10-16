@@ -32,10 +32,10 @@ export function setTabExpiry(registry: Registry, expiry: TabExpiry): void {
   void runCommand(registry, prefsSet, { key: TAB_EXPIRY_PREF, value: expiry })
 }
 
-/** A live value once it has arrived, or undefined if it failed. */
+/** A live value's first value, or undefined if it failed. Not `suspendOnWaiting`: a live query stays waiting while it streams. */
 async function settled<A>(registry: Registry, atom: Atom.Atom<AsyncResult.AsyncResult<A, unknown>>): Promise<A | undefined> {
   const unmount = registry.mount(atom)
-  const exit = await Effect.runPromiseExit(AtomRegistry.getResult(registry, atom, { suspendOnWaiting: true })).finally(unmount)
+  const exit = await Effect.runPromiseExit(AtomRegistry.getResult(registry, atom)).finally(unmount)
   return Exit.isSuccess(exit) ? exit.value : undefined
 }
 
