@@ -157,3 +157,51 @@ test('Configure: a New or Changed mark is a tag after the tool’s name, on the 
   expect(rows).toHaveLength(2)
   for (const row of rows) expect(row).toEqual({ height: 56, after: true, middle: 0 })
 })
+
+test('a DM’s Main row is two lines and shorter, with even padding; every other row is three lines', async ({ page }) => {
+  await open(page, 'TopicRow', 'sidebar/mixed-rows')
+  const rows = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>('[data-topic-row]')].map((row) => {
+      const box = row.getBoundingClientRect()
+      const body = row.children[1]!
+      const lines = [...body.children].map((line) => line.getBoundingClientRect())
+      const style = getComputedStyle(row)
+      return {
+        lines: Number(row.dataset.rowLines),
+        drawn: lines.length,
+        height: box.height,
+        // The lines fill the content box exactly: the fixed height is their sum.
+        fill: Math.round((lines.at(-1)!.bottom - box.top - parseFloat(style.paddingTop)) * 100) / 100,
+        content: box.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+        place: row.querySelector('[data-row-part="place"]') !== null,
+        main: [...row.querySelectorAll('span')].some((span) => span.children.length === 0 && span.textContent === 'Main'),
+      }
+    }),
+  )
+  expect(rows.map((row) => row.lines)).toEqual([2, 2, 2, 3, 3, 3, 3])
+  for (const row of rows) {
+    expect(row.drawn).toBe(row.lines)
+    expect(row.height).toBe(row.lines === 2 ? 64 : 88)
+    expect(row.fill).toBeGreaterThan(row.content - 1)
+    expect(row.fill).toBeLessThanOrEqual(row.content)
+    expect(row.place).toBe(row.lines === 3)
+  }
+  expect(rows.slice(0, 3).some((row) => row.main)).toBe(false)
+})
+
+test('the people follow the place and its tags at the line’s 8px gap and show whole', async ({ page }) => {
+  await open(page, 'TopicRow', 'sidebar/mixed-rows')
+  const stacks = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-row-part="people"]')].map((people) => {
+      const box = people.getBoundingClientRect()
+      const before = people.previousElementSibling!.getBoundingClientRect()
+      const line = people.parentElement!.getBoundingClientRect()
+      const place = people.closest('[data-topic-row]')!.querySelector<HTMLElement>('[data-row-part="place"]')!
+      return { gap: Math.round((box.left - before.right) * 100) / 100, inside: box.right <= line.right + 0.5, whole: people.scrollWidth <= Math.ceil(box.width), placeCut: place.scrollWidth > place.clientWidth }
+    }),
+  )
+  expect(stacks.length).toBe(3)
+  for (const stack of stacks) expect(stack).toMatchObject({ gap: 8, inside: true, whole: true })
+  // The long private channel name gives way before the stack does.
+  expect(stacks.some((stack) => stack.placeCut)).toBe(true)
+})

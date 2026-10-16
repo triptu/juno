@@ -386,6 +386,7 @@ export const rowsById: ReadonlyMap<string, TopicRow> = new Map(Object.values(row
 export const pinnedIds: ReadonlyArray<string> = [rows.offsite.id, rows.notes.id]
 export const recentIds: ReadonlyArray<string> = [
   rows.alertsMain.id,
+  rows.mayaMain.id,
   rows.postgres.id,
   rows.hiring.id,
   rows.roadmap.id,

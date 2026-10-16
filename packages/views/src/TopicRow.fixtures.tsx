@@ -1,5 +1,5 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
-import { art, newThreadsById, NOW, rows } from './fixtures/topics'
+import { art, channels, newThreadsById, NOW, people, rows } from './fixtures/topics'
 import { relativeTime } from './time'
 import { TopicRow, type TopicRowProps } from './TopicRow'
 
@@ -30,6 +30,21 @@ const state = (row: TopicRowProps['row'], extra: Partial<TopicRowProps> = {}, fr
 
 const ROW = '[data-topic-row]'
 
+/** A DM's Main whose latest message is yours: the preview keeps "You:". */
+const devMain: TopicRowProps['row'] = { ...rows.mayaMain, id: 'm:D0DEV', title: 'Dev Patel', channel: channels.dev, preview: { sender: 'You', text: 'its good' } }
+
+/** A thread with unread people in a channel whose name is too long for the line: the name gives way, the stack shows whole. */
+const vendorsPeople: TopicRowProps['row'] = {
+  ...rows.vendors,
+  id: 'C0VENDORS:1759990000.001500',
+  title: 'Renewal terms for the analytics vendor',
+  preview: { sender: 'Sam', text: 'They came back at 12% over last year. Pushing for flat.' },
+  participants: [people.sam, people.elena, people.maya],
+  unreadCount: 2,
+  tags: ['reopened'],
+  art: art.coins,
+}
+
 export default defineFixtures(
   TopicRow,
   {
@@ -48,6 +63,7 @@ export default defineFixtures(
       placeholder: state({ ...rows.postgres, art: undefined }),
       'dm-thread-art': state(rows.offsite),
       'dm-main-photo': state(rows.mayaMain),
+      'dm-main-yours': state(devMain),
       'main-art': state(rows.alertsMain),
       'main-placeholder': state({ ...rows.alertsMain, art: undefined }),
       'placeholder-quiet': state(rows.notes),
@@ -124,6 +140,28 @@ export default defineFixtures(
           </div>
         ),
         { hover: `${ROW}:nth-of-type(2)` },
+      ),
+    },
+    // The two row heights side by side: a DM's Main and a group DM's Main in
+    // two lines, a DM thread and channel rows in three, with the people
+    // after the place and tags.
+    Sidebar: {
+      'mixed-rows': scene(() => (
+        <div style={column}>
+          {[rows.mayaMain, devMain, rows.lunch, rows.offsite, rows.lowerBound, vendorsPeople, rows.roadmap].map((row) => (
+            <TopicRow key={row.id} {...one(row, { newThreads: newThreadsById.get(row.id) })} />
+          ))}
+        </div>
+      )),
+      'mixed-rows-hover': scene(
+        () => (
+          <div style={column}>
+            {[rows.mayaMain, rows.lowerBound, vendorsPeople].map((row) => (
+              <TopicRow key={row.id} {...one(row)} />
+            ))}
+          </div>
+        ),
+        { hover: ROW },
       ),
     },
     Overview: {

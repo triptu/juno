@@ -135,6 +135,28 @@ test('rows in a DM or a group DM show no participant stack', async ({ juno }) =>
   }
 })
 
+test('a DM’s Main row is the name and the message: no Main tag, no place line, no repeated name', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, win } = juno
+  await sidebar.filter('DMs')
+
+  const row = win.locator('[data-topic-id="m:D0MAYA"]')
+  fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'yep' })
+  const preview = row.locator('[data-row-part="preview"]')
+  // From the other person: the message alone, since the title names them.
+  await expect(preview).toHaveText('yep')
+  await expect(row.locator('[data-row-part="title"]')).toHaveText(/^Maya/)
+  await expect(row).toHaveAttribute('data-row-lines', '2')
+  await expect(row.locator('[data-row-part="place"]')).toHaveCount(0)
+  await expect(row.getByText('Main', { exact: true })).toHaveCount(0)
+  await expect(row.getByText(/Maya/)).toHaveCount(1)
+
+  // Your own message keeps "You:".
+  fake.injectMessage({ channel: 'D0MAYA', user: fake.selfId, text: 'its good' })
+  await expect(preview).toHaveText('You: its good')
+})
+
 test('the quick filters narrow the list and the Unread toggle hides read rows', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
