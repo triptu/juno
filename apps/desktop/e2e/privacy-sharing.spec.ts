@@ -1,14 +1,18 @@
 /**
- * Privacy mode turns on by itself while the screen is shared (SPEC section 5,
- * docs/research/screen-share-detection.md). Main's screen watch is replaced
- * by a seam under JUNO_E2E, so the test says when sharing starts and stops.
+ * Privacy mode turns on by itself when a share starts while Juno runs (SPEC
+ * section 5, docs/research/screen-share-detection.md). Main's screen watch is
+ * replaced by a seam under JUNO_E2E, so the test says when the screen is
+ * captured. The first reading is a baseline: a capture already running at
+ * launch hides nothing.
  */
-import { expect, test } from './fixtures'
+import { expect, launchApp, test } from './fixtures'
+import { Juno } from './driver/juno'
 
 const RINA = 'Rina finished the onsite.'
 const SWITCH = 'Hide message text while sharing the screen'
+const ALWAYS_ON = "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text."
 
-test('sharing the screen hides message text and says why, and stopping shows it again', async ({ juno }) => {
+test('a share that starts while Juno runs hides message text and says why, and stopping shows it again', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, privacy } = juno
@@ -39,6 +43,63 @@ test('sharing the screen hides message text and says why, and stopping shows it 
   await expect(privacy.footer).toBeVisible()
   await privacy.stopSharing()
   await expect(privacy.footer).toHaveCount(0)
+})
+
+test('a capture running at launch hides nothing, and true then false then true hides the text', async ({ juno, running, userData, fake, slackApp }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  // Sharing turned the mode on when Juno quit; the next launch has it as the user left it, off.
+  await juno.privacy.startSharing()
+  await expect(juno.privacy.footer).toBeVisible()
+  await running.close()
+
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, screenShared: true })
+  try {
+    const second = new Juno(again.app, again.win)
+    const rina = second.sidebar.row(RINA)
+    await rina.expectVisible()
+    await second.privacy.startSharing()
+    await expect(second.privacy.footer).toHaveCount(0)
+    await second.privacy.expectBlurred(rina.preview, false)
+    expect(await second.privacy.menuLabel()).toBe('Hide Message Text')
+
+    await second.privacy.stopSharing()
+    await second.privacy.startSharing()
+    await second.privacy.expectBlurred(rina.preview)
+    expect(await second.privacy.footerText()).toBe('Message text hidden while sharing')
+  } finally {
+    await again.close()
+  }
+})
+
+test('a capture that never stops says detection is not available, until it stops', async ({ running, userData, fake, slackApp }) => {
+  await running.close()
+  const always = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, screenShared: true })
+  try {
+    const juno = new Juno(always.app, always.win)
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.openSettings('General')
+    await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
+
+    // True since launch for more than two minutes.
+    await juno.privacy.elapse(2 * 60_000 + 1_000)
+    await juno.settings.show('Appearance')
+    await juno.settings.show('General')
+    await expect(juno.settings.root.getByText(ALWAYS_ON)).toBeVisible()
+    await expect(juno.settings.root.getByRole('switch', { name: SWITCH })).toBeChecked()
+    await expect(juno.privacy.footer).toHaveCount(0)
+
+    // The capture stops: detection is available again, and the next share hides the text.
+    await juno.privacy.stopSharing()
+    await juno.settings.show('Appearance')
+    await juno.settings.show('General')
+    await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
+    await juno.privacy.startSharing()
+    await expect(juno.privacy.footer).toBeVisible()
+  } finally {
+    await always.close()
+  }
 })
 
 test('a mode turned on by hand stays on after sharing stops, and the setting turns hiding off', async ({ juno }) => {

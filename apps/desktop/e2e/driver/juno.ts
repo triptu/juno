@@ -2119,6 +2119,11 @@ export class PrivacyMode {
     await this.screenShared(false)
   }
 
+  /** Moves the screen watch's clock on, as if the signal had stayed as it is for that long. */
+  async elapse(ms: number): Promise<void> {
+    await this.app.evaluate((_electron, by) => (globalThis as unknown as { junoTest: { screenWatchElapse: (ms: number) => void } }).junoTest.screenWatchElapse(by), ms)
+  }
+
   private async screenShared(shared: boolean): Promise<void> {
     await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
   }
