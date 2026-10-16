@@ -60,12 +60,18 @@ function mergeRows(standard: ReadonlyArray<EmojiSuggestion>, custom: ReadonlyArr
   return [...rows, ...custom.slice(at)]
 }
 
+/** Common emoji, ranked after recent use and before name order, so `:thumbs` offers 👍 before 👎 (SPEC 8). */
+const COMMON = ['👍', '✅', '👀', '🙏', '🎉', '❤️', '😂', '🔥', '💯', '🙌'].map((glyph) => glyph.replaceAll('\uFE0F', ''))
+const commonRank = (row: EmojiSuggestion) => COMMON.indexOf(row.insert.replaceAll('\uFE0F', ''))
+
 function matching(rows: ReadonlyArray<EmojiSuggestion>, query: string) {
   const recent = recentEmoji()
   const matches = rows.filter((row) => row.name.includes(query))
   const frequent = recent.flatMap((name) => matches.find((row) => row.name === name) ?? [])
   const rest = matches.filter((row) => !recent.includes(row.name))
-  return [...frequent, ...rest.filter((row) => row.name.startsWith(query)), ...rest.filter((row) => !row.name.startsWith(query))].slice(0, 8)
+  const common = rest.filter((row) => commonRank(row) >= 0).toSorted((a, b) => commonRank(a) - commonRank(b))
+  const others = rest.filter((row) => commonRank(row) < 0)
+  return [...frequent, ...common, ...others.filter((row) => row.name.startsWith(query)), ...others.filter((row) => !row.name.startsWith(query))].slice(0, 8)
 }
 
 /** Local colon suggestions share the mention list's anchor, rows, and keyboard handling. */
