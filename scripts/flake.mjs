@@ -49,8 +49,7 @@ if (!suite || !(options.repeat >= 1) || !(options.machines >= 1 && options.machi
 
 const each = Math.ceil(options.repeat / options.machines)
 const vitest = suite.script === 'test'
-// The gallery script ends in `--project behaviour`, which takes every word after it,
-// so an option has to come before the spec paths.
+// The gallery script ends in `--project=behaviour`, so spec paths may follow it.
 const runner = vitest
   ? ['--passWithNoTests', '--retry=0', `--repeats=${each - 1}`, ...options.specs.map((spec) => spec.split('/').slice(2).join('/'))]
   : ['--retries=0', ...options.specs.map((spec) => spec.slice(suite.dir.length)), `--repeat-each=${each}`, '--trace=retain-on-failure', '--reporter=line']
