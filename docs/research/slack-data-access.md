@@ -582,3 +582,21 @@ Why the first real session showed user ids instead of names. `JUNO_LIVE=1 pnpm p
 | Messages whose `text` holds `&amp;`, `&lt;` or `&gt;` | 7 of 310 |
 
 So the edge answers every id the sync asks about, Slack Connect users included, and the names were missing because of when and what Juno asked. The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.
+
+#### 9. Profile photos (2026-10-16)
+
+Why users showed initials instead of photos. Same `--only users` run as section 8, which now also prints how photos are spelled. Counts and host names only.
+
+| Source | Users | `image_24` to `image_512` | `image_original` | `avatar_hash` | `is_custom_image` |
+| --- | --- | --- | --- | --- | --- |
+| Edge `users/info` | 57 | none | 42 | 57 | `true` on 42, absent on 15 (never `false`) |
+| Edge `users/list` | 100 | none | 43 | 100 | `true` on 43, absent on 57 |
+| `client.userBoot` `self` | 1 | none | 1 | 1 | `true` |
+| `users.list` (web) | 200 | all 200 | 149 | 200 | `true` on 149, absent on 51 |
+
+- On `users.list`, `image_72` is on `avatars.slack-edge.com` for custom photos (149), on `secure.gravatar.com` with a `d=` default on `a.slack-edge.com` for default photos (50), and on `a.slack-edge.com` once.
+- The edge profile carries no photo url at all, only `avatar_hash` (and `image_original`, a custom photo's full-size upload). The official client builds the url from the hash: `<team.avatar_base_url><team_id>-<user id>-<avatar_hash>-<size>`. `client.userBoot` `team.avatar_base_url` is `https://ca.slack-edge.com/`.
+- One GET of that url at size 72, for one user with a custom photo and one without, answered 200 with `image/jpeg` and `image/png`, with or without the `d` cookie, and no redirect. Default photos have a hash too.
+- All 57 users had a `team_id` starting with `T`. Whether Enterprise Grid users need the enterprise id in the url is not known.
+
+So the sync stored no photo for anyone: `toUserRow` read only `image_48`, `image_72` and `image_192`, which the edge never sends. It now builds the url from the hash when those are missing (`packages/sync/src/write/users.ts`), and the fake answers the edge calls without them.

@@ -38,6 +38,8 @@ export interface SyncContext {
   readonly onSelfPresence: (presence: 'active' | 'away') => Effect.Effect<void>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
+  /** Stored users without a photo already asked for again in this session (`fillUsers`), so each is asked once. */
+  readonly photoless: Set<string>
   /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */
   readonly fetchesInFlight: Set<{ readonly at: number }>
 }

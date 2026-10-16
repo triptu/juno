@@ -27,6 +27,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     usersOnBackground: false,
     onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
     unknownUsers: new Set(),
+    photoless: new Set(),
     lateReactions: new Map(),
     fetchesInFlight: new Set(),
     metadata: new Set(),
