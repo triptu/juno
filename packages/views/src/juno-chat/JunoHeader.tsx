@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
 import { menuKeys } from '@juno/contract/channels'
 import type { ReactNode } from 'react'
@@ -40,6 +41,7 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
   return (
     <HeaderIslands
       column={column}
+      give="right"
       data={{ 'data-juno-header': '' }}
       left={
         <Popover
@@ -96,28 +98,53 @@ export function JunoPanelActions({ onOpenInTab, onClose }: { readonly onOpenInTa
   )
 }
 
-/** One chip at a time, by the precedence the container applied. Its title is the full line. */
+/**
+ * One chip at a time, by the precedence the container applied. Its title is
+ * the full line. In a narrow header the chip shrinks: the line takes the
+ * ellipsis, and its action (Resume, Review) stays whole.
+ */
 function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Exclude<Banner, { _tag: 'none' }>; readonly onResume: () => void; readonly onOpenPage: (page: JunoPage) => void }) {
   const copy = chatCopy.banner
   const text = copy[banner._tag]
+  const action =
+    banner._tag === 'paused' ? (
+      <TextButton tone="muted" onClick={onResume}>
+        {copy.paused.resume}
+      </TextButton>
+    ) : banner._tag === 'recovery' ? (
+      <TextButton tone="muted" onClick={() => onOpenPage('review')}>
+        {copy.recovery.review}
+      </TextButton>
+    ) : null
   return (
-    <Chip key={banner._tag} variant="filled" size={28} title={text.line} data-banner={banner._tag}>
-      {text.chip}
-      {banner._tag === 'paused' ? (
-        <>
-          {' · '}
-          <TextButton tone="muted" onClick={onResume}>
-            {copy.paused.resume}
-          </TextButton>
-        </>
-      ) : banner._tag === 'recovery' ? (
-        <>
-          {' · '}
-          <TextButton tone="muted" onClick={() => onOpenPage('review')}>
-            {copy.recovery.review}
-          </TextButton>
-        </>
-      ) : null}
+    <Chip key={banner._tag} variant="filled" size={28} title={text.line} data-banner={banner._tag} shrink>
+      <span {...stylex.props(styles.chipLine)}>
+        <span {...stylex.props(styles.chipText)}>{text.chip}</span>
+        {action === null ? null : (
+          <span {...stylex.props(styles.chipAction)}>
+            {' · '}
+            {action}
+          </span>
+        )}
+      </span>
     </Chip>
   )
 }
+
+const styles = stylex.create({
+  chipLine: {
+    display: 'flex',
+    alignItems: 'baseline',
+    minWidth: 0,
+  },
+  chipText: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    minWidth: 0,
+  },
+  // Spaced as before the split: " · Review", kept whole.
+  chipAction: {
+    flexShrink: 0,
+    whiteSpace: 'pre',
+  },
+})

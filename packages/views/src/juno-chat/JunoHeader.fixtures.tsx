@@ -66,6 +66,9 @@ export default defineFixtures(
       recovery: header({ _tag: 'recovery', pending: 2 }),
       'update-needed': header({ _tag: 'updateNeeded' }),
       'other-device': header({ _tag: 'otherDevice', deviceName: 'Tushar’s MacBook Air' }),
+      // The Juno tab at the minimum window (336 beside the sidebar): the chip's line shortens, "Juno" and Review stay whole.
+      'recovery-minimum-window': header({ _tag: 'recovery', pending: 2 }, {}, { ...frame, width: 336 }),
+      'paused-minimum-window': header({ _tag: 'paused' }, {}, { ...frame, width: 336 }),
     },
     Menu: {
       open: header({ _tag: 'none' }, { menuOpen: true }, { ...frame, height: 320 }),

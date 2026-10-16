@@ -1,0 +1,1 @@
+- 10-17 04:20 · narrow-fixes · In the Juno header the banner chip gives way, not the title: its line takes the ellipsis and its action (Resume, Review) stays whole.
