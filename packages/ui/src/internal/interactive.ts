@@ -56,6 +56,7 @@ export const interactive = stylex.create({
     },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
   },
   // A tighter ring for controls that sit flush against others (tabs,

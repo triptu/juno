@@ -11,6 +11,9 @@
  * - A thread: the root and its replies, `thread_ts` equal to the root, through
  *   `messages_thread (channel, thread_ts, ts)`.
  *
+ * A root without replies has no \`thread_ts\` yet, so the thread scope misses
+ * it; \`rootStatement\` reads it by primary key.
+ *
  * Both hide what Slack hides: a deleted reply, and a deleted Main message
  * without replies. A deleted root with replies keeps its place.
  */
@@ -78,6 +81,11 @@ export function windowStatements(target: WindowTarget, range: { readonly anchor?
     { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts < ? ORDER BY ts DESC LIMIT ?`, params: [...where.params, range.anchor, before + 1] },
     { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.sql} AND ts >= ? ORDER BY ts ASC LIMIT ?`, params: [...where.params, range.anchor, range.limit] },
   ]
+}
+
+/** A thread's root while it has no \`thread_ts\` (no reply yet), by primary key. */
+export function rootStatement(target: Extract<WindowTarget, { kind: 'thread' }>): Statement {
+  return { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE channel = ? AND ts = ? AND thread_ts IS NULL AND deleted = 0`, params: [target.channel, target.threadTs] }
 }
 
 /** The topic's pending messages (architecture 5.7), oldest first, through `pending_messages_channel (channel, thread_ts)`. */

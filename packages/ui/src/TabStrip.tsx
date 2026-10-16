@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
 import { TabDrag } from './internal/tabDrag'
 
 export interface TabStripProps {
@@ -35,7 +36,9 @@ export interface TabStripProps {
  * a horizontal scroller with no visible scrollbar, as wide as the tabs need
  * and no wider, so `trailing` follows the last tab and the rest of the
  * strip is free to drag the window by. The active tab scrolls itself into
- * view when it changes, like browser tabs.
+ * view when it changes, like browser tabs, and a tab that takes keyboard
+ * focus scrolls into view whole. Tabs draw the inset ring, so the strip
+ * needs no room around them.
  *
  * With `onMove`, a tab drags along the strip to a new place, as in Safari
  * (`internal/tabDrag.ts`): transforms only, written once a frame, and no tab
@@ -64,7 +67,7 @@ export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, onMove,
   return (
     <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <div ref={scroller} role="tablist" aria-label={label} onKeyDown={onKeyDown} onPointerDown={movable ? onPointerDown : undefined} {...stylex.props(styles.scroller)}>
+      <div ref={scroller} role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} onPointerDown={movable ? onPointerDown : undefined} {...stylex.props(styles.scroller)}>
         {children}
       </div>
       {trailing ? (

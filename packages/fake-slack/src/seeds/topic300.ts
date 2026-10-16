@@ -18,7 +18,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
     const users = [SELF_ID, 'U0PERFLEO', 'U0PERFMAYA']
     for (const [index, id] of users.entries()) {
       const name = ['Tushar', 'Leo Park', 'Maya Chen'][index] ?? id
-      workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
+      workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, avatar_hash: `fake${id.toLowerCase()}`, image_72: `${avatarBase}/${id}.svg` } })
     }
     for (const id of [TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL]) {
       workspace.addConversation({ id, name: id === TOPIC300_MAIN_CHANNEL ? 'perf-main' : 'perf-thread', kind: 'public', members: new Set(users), created: now, topic: '', purpose: '', isOpen: true, archived: false })

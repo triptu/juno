@@ -7,7 +7,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
 - Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
 - Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, `duotone` only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations).
-- Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`.
+- Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`. It must show whole: a box that clips (overflow other than visible, or paint containment) gives the controls at its edge `ringRoom` (`--focus-ring-room` of padding taken back by a negative margin; a fixed size adds the room), and a scroller passes `revealFocus` as its `onFocus` so a control half under its edge scrolls in whole when it takes keyboard focus (`PillRow`, `TabStrip`, `ScrollArea` and `Page` do). Items that fill a scroller edge to edge take the inset ring instead. A scroller that is not a Tab stop of its own (its rows are driven from a field) sets `tabIndex={-1}`, since Chromium makes a scroller with no focusable children a Tab stop.
 - Icon-only controls require an accessible name (`label`).
 - Sizes, colours, radii and durations come from tokens; no literal values in components.
 - `user-select: none` by default; text-bearing primitives (Text `selectable`, TextField, Textarea, CodeBlock) opt in.

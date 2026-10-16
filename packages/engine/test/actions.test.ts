@@ -1,67 +1,15 @@
-// Edits, deletes and reactions through the outbox (M6b; architecture 5.7,
+// Edits and deletes through the outbox (M6b; architecture 5.7,
 // specs/outbox.qnt): the change shows at once, Slack's answer and the socket
 // event reconcile it in either order, a message still being sent is waited
-// for (`depends_on`), and a refusal puts back what Slack has.
-import { afterEach, describe, expect, it } from 'vitest'
-import type { MessageRef, MessageView } from '@juno/contract'
-import { deleteMessage, editMessage, messagesAtom, reactToMessage, sendMessage, type ListWindow } from '@juno/state'
-import { waitFor, WAIT_MS, type RunningEngine } from './harness'
-import { apiCalls, bootedEngine, errorOf, quiet, readDb, restart, valueOf } from './scenario'
+// for (`depends_on`), and a refusal puts back what Slack has. Reactions are
+// in `reactions.test.ts`.
+import { describe, expect, it } from 'vitest'
+import { deleteMessage, editMessage, sendMessage } from '@juno/state'
+import { waitFor, WAIT_MS } from './harness'
+import { apiCalls, errorOf, quiet, readDb, valueOf } from './scenario'
+import { actionRows, booted, eng, inSlack, MAIN, refOf, restarted, rowWith, sent, stopEnginesAfterEach, watch } from './actionScenario'
 
-const engines: Array<RunningEngine> = []
-const unmounts: Array<() => void> = []
-afterEach(async () => {
-  for (const unmount of unmounts.splice(0)) unmount()
-  for (const engine of engines.splice(0).toReversed()) await engine.stop()
-})
-
-const MAIN = 'm:C0ENG'
-const eng = { kind: 'channel', channelId: 'C0ENG' } as const
-
-const booted = async () => {
-  const engine = await bootedEngine(engines)
-  await quiet(engine)
-  engine.fake.resetCalls()
-  return engine
-}
-
-type Rows = ReadonlyArray<MessageView>
-
-/** The topic's message window, mounted, read until `predicate` holds. */
-function watch(engine: RunningEngine, topicId: string) {
-  const atom = messagesAtom(topicId)
-  unmounts.push(engine.registry.mount(atom))
-  const current = (): ListWindow<MessageView> | undefined => {
-    const result = engine.registry.get(atom)
-    return result._tag === 'Success' && result.value.meta.seq > 0 ? result.value : undefined
-  }
-  return (predicate: (rows: Rows) => boolean, label: string) =>
-    waitFor(() => {
-      const window = current()
-      const rows = window?.order.map((id) => window.rows.get(id)!)
-      return rows !== undefined && predicate(rows) ? rows : undefined
-    }, WAIT_MS, label)
-}
-
-const textOf = (row: MessageView) =>
-  row.body.blocks
-    .flatMap((block) => ('children' in block ? block.children : []))
-    .map((inline) => ('text' in inline ? inline.text : ''))
-    .join('')
-
-const rowWith = (rows: Rows, text: string) => rows.find((row) => textOf(row) === text)
-const refOf = (row: MessageView): MessageRef => ({ channelId: 'C0ENG', ts: row.ts, ...(row.clientMsgId === undefined ? {} : { clientMsgId: row.clientMsgId }) })
-
-/** Sends `text` to #eng's Main and waits until Slack's message is stored. */
-async function sent(engine: RunningEngine, text: string, rows: ReturnType<typeof watch>): Promise<MessageView> {
-  valueOf(await sendMessage(engine.registry, eng, text, MAIN))
-  const list = await rows((list) => rowWith(list, text)?.pending === undefined && rowWith(list, text) !== undefined, `"${text}" stored`)
-  return rowWith(list, text)!
-}
-
-const inSlack = (engine: RunningEngine, ts: string) => engine.fake.messages('C0ENG').find((m) => m.ts === ts)
-const actionRows = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.prepare(`SELECT kind FROM outbox WHERE kind IN ('edit', 'delete', 'react')`).all() as Array<{ kind: string }>)
-const chip = (row: MessageView | undefined, name: string) => row?.reactions.find((reaction) => reaction.name === name)
+stopEnginesAfterEach()
 
 describe('edit', () => {
   it('shows the new text at once; the answer and then the echo leave it as it is', async () => {
@@ -172,6 +120,30 @@ describe('edit', () => {
     expect(actionRows(engine)).toHaveLength(0)
   })
 
+  // A post back in the queue (a 429 here; a lookup that finds it missing ends the same) is not in Slack, so a
+  // newer edit goes into the post itself. An edit row queued while it was out must not put the older text back.
+  it('keeps the newest text when a post comes back to the queue between two edits', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    await rows((list) => list.length > 0, 'the window')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    valueOf(await sendMessage(engine.registry, eng, 'Draft one', MAIN))
+    const call = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the post at Slack')
+    const pending = rowWith(await rows((list) => rowWith(list, 'Draft one')?.pending === 'sending', 'sending'), 'Draft one')!
+    valueOf(await editMessage(engine.registry, refOf(pending), 'Edit while sending'))
+    await waitFor(() => (actionRows(engine).length === 1 ? true : undefined), WAIT_MS, 'the edit row waiting on the post')
+    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 2 })
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the 429')).id, 'answer')
+    const state = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(pending.clientMsgId!) as { state: string } | undefined)?.state)
+    await waitFor(() => (state() === 'queued' ? true : undefined), WAIT_MS, 'the post back in the queue')
+    valueOf(await editMessage(engine.registry, { channelId: 'C0ENG', ts: `pending:${pending.clientMsgId}`, clientMsgId: pending.clientMsgId! }, 'Edit while queued'))
+    engine.fake.gate(undefined)
+    await waitFor(() => (state() === undefined && actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the post and its edits settled')
+    await quiet(engine)
+    expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)?.text).toBe('Edit while queued')
+    await rows((list) => rowWith(list, 'Edit while queued')?.pending === undefined && rowWith(list, 'Edit while queued') !== undefined, 'the newest text shown')
+  })
+
   it('refuses to edit someone else’s message', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
@@ -188,8 +160,7 @@ describe('edit', () => {
     first.fake.forceError({ method: 'chat.update', error: 'internal_error', times: 1000 })
     valueOf(await editMessage(first.registry, refOf(message), 'After a restart'))
     await waitFor(() => (apiCalls(first, 'chat.update').length > 0 ? true : undefined), WAIT_MS, 'a try')
-    for (const unmount of unmounts.splice(0)) unmount()
-    const engine = await restart(engines, first, (fake) => fake.clearError({ method: 'chat.update' }))
+    const engine = await restarted(first, (fake) => fake.clearError({ method: 'chat.update' }))
     await watch(engine, MAIN)((list) => rowWith(list, 'After a restart')?.edited === true, 'the edit after the restart')
     await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
     expect(inSlack(engine, message.ts)?.text).toBe('After a restart')
@@ -247,104 +218,12 @@ describe('delete', () => {
   })
 })
 
-describe('reactions', () => {
-  it('shows the user’s reaction at once, counted with another user’s that lands meanwhile', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Ready for review', rows)
-    engine.fake.holdNext({ method: 'reactions.add', before: true })
-    valueOf(await reactToMessage(engine.registry, refOf(message), 'eyes', true))
-    await rows((list) => chip(rowWith(list, 'Ready for review'), 'eyes')?.me === true, 'mine shown')
-    engine.fake.addReaction({ channel: 'C0ENG', ts: message.ts, name: 'eyes', user: 'U0MAYA' })
-    await rows((list) => chip(rowWith(list, 'Ready for review'), 'eyes')?.count === 2, 'both counted')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    await quiet(engine)
-    const after = await rows((list) => chip(rowWith(list, 'Ready for review'), 'eyes')?.count === 2, 'still two')
-    expect(chip(rowWith(after, 'Ready for review'), 'eyes')?.me).toBe(true)
-    expect(inSlack(engine, message.ts)?.reactions?.find((r) => r.name === 'eyes')?.count).toBe(2)
-  })
 
-  it('cancels an add and a remove made before the worker sends, and makes at most two calls for quick toggles', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Toggle me', rows)
-    engine.fake.holdNext({ method: 'reactions.add', before: true })
-    valueOf(await reactToMessage(engine.registry, refOf(message), '+1', true))
-    await waitFor(() => (engine.fake.heldCount({ method: 'reactions.add' }) === 1 ? true : undefined), WAIT_MS, 'the add out')
-    // While the add is out: off, on, off. The row keeps the last intent.
-    valueOf(await reactToMessage(engine.registry, refOf(message), '+1', false))
-    valueOf(await reactToMessage(engine.registry, refOf(message), '+1', true))
-    valueOf(await reactToMessage(engine.registry, refOf(message), '+1', false))
-    await rows((list) => chip(rowWith(list, 'Toggle me'), '+1') === undefined, 'shown off')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    await quiet(engine)
-    expect(apiCalls(engine, 'reactions.add').length + apiCalls(engine, 'reactions.remove').length).toBe(2)
-    expect(inSlack(engine, message.ts)?.reactions).toBeUndefined()
-    await rows((list) => chip(rowWith(list, 'Toggle me'), '+1') === undefined, 'still off')
-  })
-
-  it('makes no call for an add taken back before it is sent', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Second thoughts', rows)
-    // An earlier change in the channel holds the reaction back until it settles.
-    engine.fake.holdNext({ method: 'chat.update', before: true })
-    valueOf(await editMessage(engine.registry, refOf(message), 'Second thoughts, edited'))
-    await waitFor(() => (engine.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the edit out')
-    valueOf(await reactToMessage(engine.registry, refOf(message), 'tada', true))
-    await rows((list) => chip(rowWith(list, 'Second thoughts, edited'), 'tada')?.me === true, 'shown on')
-    valueOf(await reactToMessage(engine.registry, refOf(message), 'tada', false))
-    await rows((list) => chip(rowWith(list, 'Second thoughts, edited'), 'tada') === undefined, 'shown off')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the rows ended')
-    expect(apiCalls(engine, 'reactions.add')).toHaveLength(0)
-    expect(apiCalls(engine, 'reactions.remove')).toHaveLength(0)
-  })
-
-  it('removes the user’s reaction from a chip others share, which stays', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Shared chip', rows)
-    engine.fake.addReaction({ channel: 'C0ENG', ts: message.ts, name: 'white_check_mark', user: 'U0MAYA' })
-    valueOf(await reactToMessage(engine.registry, refOf(message), 'white_check_mark', true))
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'added')
-    await rows((list) => chip(rowWith(list, 'Shared chip'), 'white_check_mark')?.count === 2, 'two')
-    engine.fake.holdFrames({ types: ['reaction_removed'] })
-    valueOf(await reactToMessage(engine.registry, refOf(message), 'white_check_mark', false))
-    const shown = await rows((list) => chip(rowWith(list, 'Shared chip'), 'white_check_mark')?.count === 1, 'one, at once')
-    expect(chip(rowWith(shown, 'Shared chip'), 'white_check_mark')?.me).toBe(false)
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'removed')
-    engine.fake.releaseFrames()
-    await quiet(engine)
-    await rows((list) => chip(rowWith(list, 'Shared chip'), 'white_check_mark')?.count === 1, 'still one')
-  })
-
-  it('reacts to a post still being sent once Slack has it', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    await rows((list) => list.length > 0, 'the window')
-    engine.fake.holdNext({ method: 'chat.postMessage', before: true })
-    valueOf(await sendMessage(engine.registry, eng, 'Fresh off the press', MAIN))
-    const pending = rowWith(await rows((list) => rowWith(list, 'Fresh off the press')?.pending === 'sending', 'sending'), 'Fresh off the press')!
-    valueOf(await reactToMessage(engine.registry, refOf(pending), 'rocket', true))
-    await rows((list) => chip(rowWith(list, 'Fresh off the press'), 'rocket')?.me === true, 'shown on the pending row')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the reaction sent')
-    const posted = engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)!
-    expect(posted.reactions?.find((r) => r.name === 'rocket')?.users).toEqual([posted.user])
-    expect(apiCalls(engine, 'reactions.add')[0]!.args['timestamp']).toBe(posted.ts)
-    await rows((list) => chip(rowWith(list, 'Fresh off the press'), 'rocket')?.count === 1, 'one chip, stored')
-  })
-})
-
-// Found by the conformance replay (test/conformance). `outbox` ids are SQLite rowids, which are reused:
-// a delete that replaces an edit whose call is out can take the edit's id, and the edit's answer
-// (`actionDone`, which reads the row by id) then ends the delete as if it were the edit.
-// `it.fails` until that is fixed; then make it `it`.
+// Found by the conformance replay (test/conformance). `outbox` ids were SQLite rowids, which are reused:
+// a delete that replaced an edit whose call was out took the edit's id, and the edit's answer
+// (`actionDone`, which reads the row by id) ended the delete as if it were the edit. Ids are now never reused.
 describe('actions: a delete while an edit is out', () => {
-  it.fails('deletes the message once the edit has answered (fails: the delete is lost)', async () => {
+  it('deletes the message once the edit has answered', async () => {
     const engine = await booted()
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')

@@ -1,0 +1,1 @@
+- 10-16 17:00 · cache-keep · Lint checks migration order for cache.db and user.db (`scripts/check-migration-order.mjs`): an id that main does not have must be above main's largest id, because the Migrator skips ids at or below the newest it has recorded and existing installs would never run it. Ids must be unique.

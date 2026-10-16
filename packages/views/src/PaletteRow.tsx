@@ -6,6 +6,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/icons/ArrowSquareOut'
+import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
@@ -16,13 +17,19 @@ import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
+import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { House } from '@phosphor-icons/react/dist/icons/House'
+import { Info } from '@phosphor-icons/react/dist/icons/Info'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
+import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
+import { Palette } from '@phosphor-icons/react/dist/icons/Palette'
 import { PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
+import { Plugs } from '@phosphor-icons/react/dist/icons/Plugs'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { PushPinSlash } from '@phosphor-icons/react/dist/icons/PushPinSlash'
@@ -69,6 +76,14 @@ export type PaletteIconName =
   | 'open-in-slack'
   | 'rename'
   | 'start-thread'
+  | 'home'
+  | 'all-topics'
+  | 'appearance'
+  | 'notifications'
+  | 'ignored'
+  | 'connections'
+  | 'backup'
+  | 'about'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -101,6 +116,14 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'open-in-slack': ArrowSquareOut,
   rename: PencilSimple,
   'start-thread': ChatsCircle,
+  home: House,
+  'all-topics': ListBullets,
+  appearance: Palette,
+  notifications: Bell,
+  ignored: EyeSlash,
+  connections: Plugs,
+  backup: HardDrives,
+  about: Info,
 }
 
 export interface PaletteItem {

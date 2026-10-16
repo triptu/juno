@@ -12,13 +12,13 @@ Compose `SlackClient.layer` and provide the three seams the host owns:
 
 Then use the services:
 
-- `SlackApi`: Web API calls, decoded with `@juno/slack-schema`, including `presence.set({ presence: 'auto' | 'away' })`.
+- `SlackApi`: Web API calls, decoded with `@juno/slack-schema`. A call's `beforeSend` runs holding its lane's permit just before each exchange and can stop the call with its own error. Includes `presence.set({ presence: 'auto' | 'away' })`.
 - `SlackEdge`: the edge API (`users/info` and similar).
 - `RequestQueue`: request lanes, per-method rate limits and `Retry-After`.
 - `SlackSocket`: the event socket with reconnect, as a stream of `SocketEvent`.
 - `SlackConfig` / `slackConfigLayer`: timers and limits, with defaults.
 
-`@juno/slack/import` is a separate entry: `readSlackAppSession({ dir, keychainPassword })` reads a team record and the `d` cookie out of a copy of the installed Slack app's data (a leveldb scan for `localConfig_v2`, Chromium cookie decryption). Plain file reading, no network; main and the live smoke use it.
+`@juno/slack/import` is a separate entry: `locateSlackAppData(slackAppCandidates(home))` finds the installed Slack app's data (direct download or Mac App Store, `Network/Cookies` or `Cookies`) and `copySlackAppData` copies it; `readSlackAppSession({ dir, keychainPassword })` reads a team record and the `d` cookie out of a copy of the installed Slack app's data (a leveldb scan for `localConfig_v2`, Chromium cookie decryption). Plain file reading, no network; main and the live smoke use it.
 
 Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfterMillis`), `SlackRejected`, `SlackTransportError`, `SlackDecodeError`. The engine maps them to `@juno/contract` errors; this package does not import the contract.
 

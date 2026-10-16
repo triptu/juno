@@ -41,8 +41,9 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
 export async function openState(page: Page, route: Route, theme: Theme = 'light'): Promise<void> {
   await page.goto(stateUrl(route, theme))
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
-  // Wait for code, not data: loading and pending-image fixtures intentionally never settle.
-  await expect(page.locator('[data-chunk-pending]')).toHaveCount(0)
+  // Wait for code, not data: loading and pending-image fixtures intentionally never settle. Some chunks start in an idle
+  // callback with a 5 s deadline (New chat's Frequent rows), so on a busy machine the load begins only then.
+  await expect(page.locator('[data-chunk-pending]')).toHaveCount(0, { timeout: 15_000 })
   await page.evaluate(() => document.fonts.ready)
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
   // Let entrances (toasts, popovers) finish; an endless animation does not hold this up.

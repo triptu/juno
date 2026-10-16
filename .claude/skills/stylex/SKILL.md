@@ -41,6 +41,12 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    `outlineStyle: { default: 'none', ':focus-visible': 'solid' }`. Never style plain `:focus`.
    Use the `--focus-ring` colour (and `--focus-ring-width`/`-offset`). `--selection-background` is
    the pale text-selection colour and fails contrast for a ring (`tokens.md` 1.8).
+   The ring must never be cut off. Inside a box that clips (a scroller, `contain: paint` or
+   `content`), give the box `ringRoom.inline`, `.block` or `.all` from `@juno/ui` (padding of
+   `--focus-ring-room` taken back by a negative margin), pass `revealFocus` as a scroller's
+   `onFocus`, or use the inset ring for items that fill the scroller edge to edge. A hand-written
+   outset ring also sets `scrollMargin: sizes['--focus-ring-room']`. `apps/gallery/focus-ring.spec.ts`
+   tabs through the main surfaces and fails on a cut ring.
 6. **Press scale** 0.96 (`--press-scale` when present): `transform: { default: 'none', ':active': 'scale(0.96)', ':disabled': 'none' }`
    and `pointerEvents: { default: 'auto', ':disabled': 'none' }`. Disabled controls never scale.
 7. **Motion**: at most `motion['--duration-fast']` (150ms) for hover and press feedback. Set

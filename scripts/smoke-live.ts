@@ -26,7 +26,7 @@
  * The session cache is a generic password named `juno-dev-slack-session`
  * (see `live-common.ts`); `sync-live-dry-run.ts` reuses it.
  */
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,7 +44,7 @@ import {
   type HttpResponse,
   type SlackSessionShape,
 } from '@juno/slack'
-import { COOKIES_FILE, LOCAL_STORAGE_DIR, readSlackAppSession } from '@juno/slack/import'
+import { copySlackAppData, locateSlackAppData, readSlackAppSession, slackAppCandidates } from '@juno/slack/import'
 import { decodeIssues, forgetCachedSession, redact, readCachedSession, SESSION_SERVICE, security, storeCachedSession, type CachedSession } from './live-common.ts'
 
 const READ_ONLY_METHODS = [
@@ -119,13 +119,15 @@ async function liveTarget(): Promise<Target> {
 
 /** The Slack app's session, read the way the desktop app does it. macOS asks once for the keychain item. */
 async function importFromSlackApp(): Promise<CachedSession> {
-  const slackDir = join(homedir(), 'Library', 'Application Support', 'Slack')
+  const location = await locateSlackAppData(slackAppCandidates(homedir()))
+  if (!location.found) throw new Error(`no usable Slack app data (${location.reason})`)
+  const { data } = location
+  console.log(`smoke-live: using ${data.variant} Slack data, cookies at ${data.cookiesFile}`)
   const copy = await mkdtemp(join(tmpdir(), 'juno-smoke-'))
   try {
-    await cp(join(slackDir, LOCAL_STORAGE_DIR), join(copy, LOCAL_STORAGE_DIR), { recursive: true })
-    await cp(join(slackDir, COOKIES_FILE), join(copy, COOKIES_FILE))
-    console.log('smoke-live: reading the "Slack Safe Storage" keychain item (macOS will ask)')
-    const answer = await security(['find-generic-password', '-w', '-s', 'Slack Safe Storage'])
+    await copySlackAppData(data, copy)
+    console.log(`smoke-live: reading the "${data.keychainService}" keychain item (macOS will ask)`)
+    const answer = await security(['find-generic-password', '-w', '-s', data.keychainService])
     if (answer.code !== 0) throw new Error('keychain access was declined or the item is missing')
     const keychainPassword = answer.stdout.replace(/\n$/, '')
     const { team, cookie } = await readSlackAppSession({ dir: copy, keychainPassword, ...(teamId === undefined ? {} : { teamId }) })

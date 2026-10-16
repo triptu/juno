@@ -8,4 +8,13 @@ export const prefsGet = liveValueRoute('prefs.get', { payload: { key: Schema.Str
 export const prefsSet = Rpc.make('prefs.set', {
   payload: { key: Schema.String, value: Schema.Json }, success: Schema.Void, error: NotSignedIn,
 })
-export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet)
+/** Whether the engine has a decision provider. No key material crosses the port. */
+export const aiAvailable = liveValueRoute('ai.available', { payload: {}, value: Schema.Boolean })
+export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable)
+
+export const sendCheckPrefKeys = ['wrongPlace', 'typos', 'capitalI', 'questionMarks', 'longSentences', 'grammar'] as const
+export type SendCheckPref = typeof sendCheckPrefKeys[number]
+/** A check with no saved choice. Capital i is off so lowercase style is never flagged unless asked for. */
+export const sendCheckDefaults: Readonly<Record<SendCheckPref, boolean>> = {
+  wrongPlace: true, typos: true, capitalI: false, questionMarks: true, longSentences: true, grammar: true,
+}

@@ -25,17 +25,20 @@ export interface Keychain {
 /** Runs `security` with `args`, writing `stdin` if given. Resolves with its exit code and stdout. */
 export type SecurityRunner = (args: ReadonlyArray<string>, stdin?: string) => Promise<{ readonly code: number; readonly stdout: string }>
 
-const runSecurity: SecurityRunner = (args, stdin) =>
-  new Promise((resolve) => {
-    // stderr is dropped: `security -i` may echo the command line it failed on.
-    const child = spawn('/usr/bin/security', [...args], { stdio: ['pipe', 'pipe', 'ignore'], timeout: 30_000 })
-    let stdout = ''
-    child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => (stdout += chunk))
-    child.on('error', () => resolve({ code: 1, stdout: '' }))
-    child.on('close', (code) => resolve({ code: code ?? 1, stdout }))
-    child.stdin.end(stdin ?? '')
-  })
+/** The real `security`. A call that may wait on a macOS prompt needs a longer `timeoutMs`. */
+export const securityRunner =
+  (timeoutMs = 30_000): SecurityRunner =>
+  (args, stdin) =>
+    new Promise((resolve) => {
+      // stderr is dropped: `security -i` may echo the command line it failed on.
+      const child = spawn('/usr/bin/security', [...args], { stdio: ['pipe', 'pipe', 'ignore'], timeout: timeoutMs })
+      let stdout = ''
+      child.stdout.setEncoding('utf8')
+      child.stdout.on('data', (chunk: string) => (stdout += chunk))
+      child.on('error', () => resolve({ code: 1, stdout: '' }))
+      child.on('close', (code) => resolve({ code: code ?? 1, stdout }))
+      child.stdin.end(stdin ?? '')
+    })
 
 export interface KeychainItem {
   readonly service: string
@@ -45,7 +48,7 @@ export const OPENROUTER_ITEM: KeychainItem = { service: 'juno-openrouter-key', a
 export const CUSTOM_ITEM: KeychainItem = { service: 'juno-custom-provider-key', account: 'custom' }
 
 /** A generic password in the login keychain. The item's names and the value must hold no spaces or quotes (see `KEY_PATTERN`). */
-export function macKeychain({ service, account }: KeychainItem, run: SecurityRunner = runSecurity): Keychain {
+export function macKeychain({ service, account }: KeychainItem, run: SecurityRunner = securityRunner()): Keychain {
   return {
     read: async () => {
       const answer = await run(['find-generic-password', '-w', '-s', service, '-a', account])

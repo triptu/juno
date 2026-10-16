@@ -3,7 +3,7 @@ import * as path from 'node:path'
 
 /**
  * The files of one workspace directory. `<userData>/workspaces/<workspaceId>/`
- * holds `cache.db` (the disposable Slack mirror), `user.db` (durable Juno
+ * holds `cache.db` (the Slack mirror), `user.db` (durable Juno
  * data) and `uploads/` (staged files waiting in the outbox).
  */
 export interface WorkspacePaths {

@@ -68,6 +68,10 @@ export interface LaunchOptions {
   readonly fakeAiRequiresKey?: boolean
   /** The `agent.codemode` flag (`JUNO_AGENT_CODEMODE`): the agent may run read-only scripts. */
   readonly codemode?: boolean
+  /** Play the next build: the engine opens the cache with one more migration (`JUNO_E2E_CACHE_MIGRATION`). */
+  readonly cacheMigration?: boolean
+  /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
+  readonly paced?: boolean
 }
 
 /**
@@ -94,6 +98,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
+  if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
+  if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
 
   // Launch the package directory (like `electron .`), not the script, so
@@ -125,12 +131,17 @@ export interface SlackAppFixture {
 
 export const KEYCHAIN_PASSWORD = 'fixture-keychain-password'
 
-export async function writeSlackApp(fake: FakeSlack, dir: string): Promise<SlackAppFixture> {
+export async function writeSlackApp(
+  fake: FakeSlack,
+  dir: string,
+  options: Pick<Parameters<typeof writeSlackAppFixture>[1], 'cookiesFile' | 'signedOut'> = {},
+): Promise<SlackAppFixture> {
   const credentials = fake.signIn()
   await writeSlackAppFixture(dir, {
     team: { id: fake.teamId, name: 'Juno Fake', domain: 'juno-fake', url: `${fake.url}/`, token: credentials.token, userId: credentials.userId },
     cookie: credentials.cookie,
     keychainPassword: KEYCHAIN_PASSWORD,
+    ...options,
   })
   return { dir, keychainPassword: KEYCHAIN_PASSWORD, credentials }
 }

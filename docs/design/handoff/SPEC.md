@@ -59,7 +59,7 @@ Titles resolve in this order. A title you set by renaming (stored in Juno only) 
 
 ### Sign-in
 
-- **The sign-in page.** With no session the window is one page: "Hi, I'm Juno", **Sign in to Slack** (Slack's own sign-in, in a window) and **Use the Slack app's session** (reads the signed-in Slack app; macOS asks for its keychain item). One line under them says what is happening or what went wrong. A session Slack no longer accepts shows "Slack signed you out" with the same two actions.
+- **The sign-in page.** With no session the window is one page: "Hi, I'm Juno", **Sign in to Slack** (Slack's own sign-in, in a window) and **Use the Slack app's session** (reads the signed-in Slack app; macOS asks for its keychain item). One line under them says what is happening or what went wrong. When the import fails, a quiet **Copy details** under that line copies a short report of what Juno checked and where it stopped, with no secrets in it. A session Slack no longer accepts shows "Slack signed you out" with the same two actions.
 - **Set up Juno.** After the first sign-in, when no model provider is set up, the same page shows "Set up Juno" before the app. It offers **OpenRouter** (an API key), **OpenAI-compatible** (a base URL and an optional key) and **Codex** when it is installed on this Mac (Sign in to Codex opens the browser and signs in to Juno's own Codex home, not yours). Once one is set up, a Model row offers its chat models, Sonnet by default. **Continue** saves the key, then finishes with the chosen model; **Skip for now** opens the app with nothing set up. Keys go to the keychain, as in Settings › Juno (13.10). After Skip, AI assist stays on, and the Juno tab and panel say "Juno needs a model" with Add a provider (13.7). The step shows once; Settings › Juno is where the model changes later. Slack syncs in the background while it shows.
 
 ## 5. Sidebar
@@ -198,6 +198,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
   - Quote.
   - In Main threads, Start thread or Open thread.
   - More: Edit, Delete and Tell me if nobody replies (13.6) on your own messages, Copy Slack link and Open in Slack. Right-clicking a message opens the same menu.
+- **Reaction failures.** A reaction shows at once and goes to Slack in the background. If Slack refuses it, the chip goes back to what Slack has and the message says "Reaction not added." (or "Reaction not removed.") with Retry and Dismiss. Juno never tries it again on its own. If a reaction has not reached Slack after 30 seconds, the message says "Reaction not sent yet." until it goes.
 - **Open actions.** A message keeps its active background and toolbar while its reaction picker or More menu is open.
 - **Keyboard.** ↑ in an empty composer selects the newest message; ↑ and ↓ move the selection, and Esc returns to the composer. On your own selected message, E edits it inline and Delete or Backspace deletes it after one inline confirm (Enter confirms, Esc cancels).
 - **Quoting** follows Slack. Quoting inserts "> " lines into your reply. Selecting any part of a message shows a floating Quote button that quotes only the selection.
@@ -239,10 +240,19 @@ Juno can sit beside any topic, so you can talk about what you are looking at wit
 
 ### Checks on send
 
-Pressing Enter runs fast checks before anything goes out. If they find nothing, the message just sends. If they flag something, a compact bar appears inside the composer. Enter takes the first option and Esc returns to editing.
+Only **Wrong place** can stop a send. In Main, typing pauses compare the draft with the last 3–4 open topics. Enter reads a ready answer only. A confident match offers “Looks like a reply to *Staging bill doubled since August*”, with **Post in thread** or **Send to Main**. No ready answer means send. This check stays before sending because it chooses where the message goes. The audience warning remains a non-blocking typing hint.
 
-1. **Wrong place.** In a Main thread, your message is compared against the last 3–4 topics in that channel. If it looks like a reply to one, you get "Looks like a reply to *Staging bill doubled since August*", with Post in thread or Send to Main.
-2. **Clarity.** Catches typos, doubled words, a lowercase "i", a missing question mark and very long sentences. Offers Fix and send or Send as is. Fixes are minimal corrections, never rewrites.
+All text fixes run **after sending**, only for messages sent from Juno. Enter never waits for grammar. Messages above 1,000 Unicode characters are skipped entirely. Code blocks, inline code, quotes, links, emails and mentions are excluded from checks and masked from the model input.
+
+- **Typos and doubled words:** the local typo table and accidental repeated words. Turning it off also suppresses doubled-word findings from grammar.
+- **Capital i:** standalone lowercase “i” to “I”. Off by default, so lowercase style is never flagged unless the user turns it on; grammar never flags lowercase style.
+- **Question marks:** add a missing “?” to a clear question.
+- **Long sentences:** note a sentence over 40 words, without rewriting it.
+- **Grammar (uses AI):** clear it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, missing or doubled words, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Validated minimal word edits cannot change surrounding prose.
+
+Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. The local pass and one grammar request start after the send is accepted; no typing-pause grammar requests or retries. Grammar has a 700 ms request deadline, leaving room for delivery and paint within the one-second display window. Calls count against a persisted 500-call daily limit, including failed requests, and record known cost in AI spend.
+
+A finding appears only within one second of sending and while the user is still on that topic with the app visible. Leaving the topic, late answers or missing rows drop it silently, without a badge, queue or later popup. The quiet overlay on the sent message shows the small fix, such as “its → it's”, and one action: **Edit**. It reserves no space and never moves other messages. Edit opens the existing inline editor with the fixes as an unsaved draft; only the user's Save changes the message. Esc dismisses the suggestion. Ignoring it dismisses it after eight seconds. A changed message cannot receive an old suggestion.
 
 ![Send-time routing check](screenshots/05-ui.png)
 
@@ -279,8 +289,10 @@ A conversation where you write first and choose where it goes, with frequent des
 
 - **Two tabs.** A small segmented control at the top of the palette switches between **Conversations** and **Messages**. Each open starts on Conversations. Tab and Shift Tab, or ⌘1 and ⌘2, switch tabs; the text stays, and focus stays in the field.
 - **Conversations.** DMs, group DMs and channels. With an empty query it lists the ones you use most ("Frequent"): your own messages and your topic visits from the last 30 days, each counted as `0.5 ^ (age_in_days / 7)` (the ranking of New chat's Frequent, section 9), then the rest by latest activity, DMs first. Typing filters by name or, for a group DM, by member, ranked the same way, names that start with the text first among the unused ones. DMs show the person's avatar, channels # or a lock, group DMs the group icon. Enter opens the conversation's Main in the current tab, or a New chat to a person you have never messaged; ⌘Enter opens it in a new tab.
-- **Commands.** In Conversations, the commands that match the text show beside the conversations, at most four of each group; a leading ">" lists them all and nothing else, and filters them by what follows.
-  - Global: Theme (Light, Dark, Match system), each accent, New tab, New chat, Settings by section, Hide or Show message text, and Set yourself away or active. The current theme and accent say "Current".
+- **Commands.** In Conversations, the pages, Settings sections and commands that match the text show beside the conversations, under Pages, Settings and Commands, at most four of each group. Text that names a whole group (settings, preferences, theme, accent, juno, pages) shows every row of it. Labels that start with the text come first, and a group whose top row is one moves ahead of the others. With an empty query only the conversations show. A leading ">" lists all of them and nothing else, and filters them by what follows.
+  - Pages: Home, All topics, Juno, New chat, Scheduled, What Juno remembers, Memory of this chat (while the Juno chat is open in the tab or its panel), Activity and Settings. Enter opens the page in the current tab, or focuses a tab that shows it, as the sidebar does (section 6); ⌘Enter opens it in a new tab. New chat always opens a new tab, and Settings opens as ⌘, does.
+  - Settings: one row for each section ("Settings: Notifications"), which opens Settings there. Juno's Connections is the Connections section.
+  - Global: Theme (Light, Dark, Match system), each accent, New tab, Hide or Show message text, and Set yourself away or active. The current theme and accent say "Current".
   - For the topic in the active tab, grouped under its name at the top: Resolve or Reopen, Pin or Unpin, Mark as unread or as read, Open or Close Juno panel (when Juno is on), Copy Slack link, Open in Slack, Rename thread (threads only), and Start thread when a message was selected in a Main as the palette opened, which opens that message's thread.
 - **Messages.** The message search: topic titles, message text, channels and people. With an empty query it shows recent topics.
   - **DMs.** A person's result reads "Message Maya Chen" and opens your Main with them, or a New chat addressed to them when you have never messaged (section 9).
@@ -527,13 +539,15 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); Close tabs not viewed in: Never, 1 day (the default), 3 days or 7 days (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
+- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); Close tabs not viewed in: Never, 1 day (the default), 3 days or 7 days (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); Message checks (below); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 
 The read switch says: “When you read something in Juno, Slack shows it as read too, on all your devices. Peeking never marks anything read.” When enabled and earlier Juno read pointers are ahead of known Slack pointers, offer “Also mark what you already read in Juno” once. Catch-up uses background pacing and a reserved progress line. Existing installs that never chose the preference catch up automatically once with the new default. Peek, stealth and the focused-bottom read rule stay unchanged.
 
 ⌘,, the avatar menu's Settings and Juno › Settings… in the app menu open it at General. The avatar menu's Notifications opens it at Notifications. The Juno menu's Settings, and Add a provider when Juno needs a model, open it at Juno, with the key field focused while no provider is set up. Picking a section shows it in the same tab and adds nothing to Back.
+
+**Settings › General › Message checks** has the lead line "Wrong place checks before sending. Other checks suggest small fixes after you send. You review and save every edit." It holds six switches, each saved separately: Wrong place, Typos and doubled words, Capital i, Question marks, Long sentences, and Grammar (uses AI). All default on except Capital i, which is off so lowercase style is never flagged. Wrong place applies in Main and requires AI assist. Grammar is available only with AI assist and an OpenRouter key; otherwise it is disabled with "Turn on AI assist to check grammar." or "Add an OpenRouter key to check grammar." Its saved choice is retained while unavailable.
 
 **Settings › Ignored** holds the **ignore list** for noisy channels such as alerts and deploys. Ignored channels are hidden from topics, search and All topics, and never notify. Nothing changes in Slack. You can also ignore a channel from any context menu, with undo.
 
@@ -557,7 +571,8 @@ Split the AI work into two kinds. **Decisions** are fast, cheap and structured: 
 | --- | --- | --- | --- |
 | Topic titles | Generation | New thread, and on drift | Always, with no marker |
 | Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | Likely reply to one of them |
-| Clarity check | Decision plus minimal fixes | On send | Concrete fixes found |
+| Local checks | Pure rules | On send, according to each preference | Concrete fixes or a long sentence found |
+| Grammar check | Decision, minimal span edits | After a Juno send, one 700 ms request | Within one second, still on the visible topic; clear errors only |
 | Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
 | Settled, suggest resolve | Decision | Each new message | High score |
 | Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |

@@ -38,6 +38,11 @@ const decodeTeam = S.decodeUnknownSync(LocalConfigTeam)
  * else the last active team, else the first ordered one. Teams whose record
  * has no usable token are skipped.
  */
+/** How many team records `localConfig_v2` holds, with a token or not. */
+export function teamCount(json: string): number {
+  return Object.keys(decodeConfig(JSON.parse(json)).teams).length
+}
+
 export function pickTeam(json: string, teamId?: string): LocalConfigTeam | undefined {
   const config = decodeConfig(JSON.parse(json))
   const teams = new Map<string, LocalConfigTeam>()

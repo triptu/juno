@@ -31,26 +31,19 @@
 //   drafts whose own pending row came first).
 //
 // Differences the replay found are kept out of the schedules, so the
-// random traces check the rest; each has a directed engine test
-// (README, "Conformance", "Differences found"):
+// random traces check the rest (README, "Conformance", "Differences
+// found"):
 //
-// - A delete queued while an edit of the same message is out is lost: its
-//   row can take the edit's id, and the edit's answer ends it. No delete
-//   replaces a change in flight here.
-// - The user's delete of a message whose copy's delete waits brings the
-//   copy back: the check before that delete finds the kept message
-//   deleted and makes the copy the message. No user delete comes while a
-//   copy Juno does not show is in Slack.
 // - A reply to a copy Juno has not stored, made while the socket is down,
 //   reaches the store with the copy itself, before the catch-up's recheck
 //   finds the kept message deleted, so the copy is kept for the reply and
 //   does not become the message. Replies to an unseen copy come only while
 //   the socket is up here.
 //
-// - The post worker checks the socket once per pass, not per row: after a
-//   lookup or post that outlasts a drop, it still claims the next queued
-//   post. No drop comes while the post worker is busy and another post
-//   waits.
+// A copy's delete whose try already waits for the send lane is checked
+// again only when the lane frees, so the engine keeps the copy then; the
+// model keeps it at its next step. The kept message is not deleted
+// elsewhere while a copy is hidden and a call holds the lane.
 //
 // The model's pending edit or delete follows `kept` to the copy when the
 // kept message is deleted elsewhere; the engine's targets the message the
@@ -101,9 +94,10 @@ module outbox_conformance {
   // The post worker's next row: due rows go in send order.
   def postDue(j: int): bool = (s.row.get(j) == "queued" and s.due.contains(j)) or (s.row.get(j) == "unknown" and s.due.contains(j) and not(hasLookup(j)))
   def postTurn(k: int): bool = drafts.forall(j => j == k or firstSent != j or not(postDue(j)))
-  // A message the user sees: a pending post, or a stored message not deleted elsewhere.
-  def shown(k: int): bool = not(s.stored.contains(k)) or not(s.seen.contains({ key: k, what: "gone" })) or s.kept.get(k) == "copy" or
-    Set("kept", "shown").contains(s.copyRow.get(k))
+  // A message the user sees: a pending post, or a stored message not deleted elsewhere. Once the
+  // first is deleted elsewhere, a copy kept beside it (for a reply) is shown, but the model's action
+  // would still target the deleted first; the user acts only once the copy became the message.
+  def shown(k: int): bool = not(s.stored.contains(k)) or not(s.seen.contains({ key: k, what: "gone" })) or s.kept.get(k) == "copy"
   // The copy's delete row waits behind the user's earlier row, or the other way round.
   def copyHeld(k: int): bool = actPending(k) and actFirst.contains(k)
   def actHeld(k: int): bool = s.copyRow.get(k) == "hidden" and not(actFirst.contains(k))
@@ -141,9 +135,8 @@ module outbox_conformance {
   action auxAll(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str, first: int, r: Set[int]): bool = all {
     by' = step, lane' = l, actFirst' = a, copyFrame' = c, closed' = d, freed' = f, firstSent' = first, retrying' = r
   }
-  // No drop while the post worker is busy and another post waits (the per-pass socket check).
-  // Nor while a call waits for the lane: whether it left its worker before the drop is not observable.
-  val dropSafe = lane.length() <= 1 and (postWorkerFree or drafts.forall(j => not(Set("queued", "unknown").contains(s.row.get(j))) or posting(j) or hasLookup(j)))
+  // No drop while a call waits for the lane: whether it left its worker before the drop is not observable.
+  val dropSafe = lane.length() <= 1
   action aux(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str): bool = auxAll(step, l, a, c, d, f, firstSent, retrying)
   action juno(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, freed)
   action timed(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, "")
@@ -195,8 +188,7 @@ module outbox_conformance {
     val atAct = atSlack(actCall(k))
     any {
       all { open, send(k), auxAll("world", lane, actFirst, copyFrame, closed, "", if (firstSent == 0) k else firstSent, retrying) }, all { open, retry(k), same }, all { open, discard(k), same },
-      all { open, shown(k), not(kind == "delete" and actInFlight(k) and s.actKind.get(k) == "change"),
-        not(kind == "delete" and copyInSlack(k) and s.copyRow.get(k) != "kept"), queueAction(k, kind), world(lane, first, copyFrame, closed) },
+      all { open, shown(k), queueAction(k, kind), world(lane, first, copyFrame, closed) },
       all { atPost, accept(k, withEcho), same }, all { atPost, refuse(k, later), same }, all { atPost, drop(k), same },
       all { Set("accepted", "refused", "later").contains(s.request.get(k)), lost(k), ended("post", without(postCall(k)), actFirst) },
       all { answer(k), ended("post", without(postCall(k)), actFirst) },
@@ -205,12 +197,14 @@ module outbox_conformance {
       all { s.events.contains(k), echo(k), same },
       all { copyFrame.contains(k), observeCopy(k), world(lane, actFirst, copyFrame.exclude(Set(k)), closed) },
       all { actionWorkerFree, lane.length() == 0, not(copyHeld(k)), deleteCopy(k), same },
-      all { not(actPending(k)), remoteChange(k, "gone"), same }, all { s.connected or not(copyUnseen(k)), remoteChange(k, "reply"), same },
+      all { not(actPending(k)), not(s.copyRow.get(k) == "hidden" and lane.length() > 0), remoteChange(k, "gone"), same }, all { s.connected or not(copyUnseen(k)), remoteChange(k, "reply"), same },
       all { atAct, actAccept(k), same },
       all { actAnswer(k), ended("act", without(actCall(k)), if (s.stale.contains(k)) actFirst else actFirst.exclude(Set(k))) },
       // A lost answer to an edit that changed meanwhile: the client sends the old text again first (README).
+      // A delete that replaced the edit is a new row with no backoff, so it goes at once.
       all { atAct, s.act.get(k) == "transit" or not(s.stale.contains(k)), actFail(k),
-        auxAll("world", without(actCall(k)), actFirst, copyFrame, closed, "act", firstSent, retrying.union(Set(k))) },
+        auxAll("world", without(actCall(k)), actFirst, copyFrame, closed, "act", firstSent,
+          if (s.stale.contains(k) and s.actKind.get(k) == "delete") retrying else retrying.union(Set(k))) },
       all { atAct, actRefuse(k), ended("act", without(actCall(k)), actFirst.exclude(Set(k))) },
       { nondet f = s.fetches.filter(f => f.kind == "lookup").oneOf(); all { finishFetch(f), same } },
       all { rare == 0, dropSafe, disconnect, world(lane, actFirst, Set(), closed) },

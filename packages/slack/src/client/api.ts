@@ -24,6 +24,10 @@
  * connection failures back off exponentially with jitter. Fatal auth errors,
  * other `ok:false` errors and decode failures are never retried. A call with
  * `singleAttempt` is never retried at all.
+ *
+ * `beforeSend` runs holding the lane's permit before each exchange, so a
+ * check against local state and the request it allows are adjacent on the
+ * lane. Its failure ends the call with its own error.
  */
 import { Clock, Context, Effect, Layer, Result, Schema as S } from 'effect'
 import { Methods, type MethodArgs, type MethodName, type MethodOk } from '@juno/slack-schema'
@@ -44,7 +48,7 @@ import { RequestQueue, type Lane } from './queue.ts'
 import { apiBaseFromWorkspace, SlackSession, slackRoute } from './session.ts'
 import { HttpTransport, type HttpResponse } from './transport.ts'
 
-export interface CallOptions {
+export interface CallOptions<E = never> {
   /** Default `interactive`. */
   readonly lane?: Lane
   /** Sent as `_x_reason`, like the official client's `fetch-client-data`. Short, no user data. */
@@ -55,6 +59,14 @@ export interface CallOptions {
    * timeout or 5xx then fails at once and the caller treats it as unknown.
    */
   readonly singleAttempt?: boolean
+  /**
+   * Runs holding the lane's permit, just before each exchange, so no other
+   * call on the lane comes between it and the request. A failure sends
+   * nothing and ends the call with that error. For a write that must be
+   * checked against the store right before it leaves (a copy's delete,
+   * ADR 0014).
+   */
+  readonly beforeSend?: Effect.Effect<void, E>
 }
 
 /** A file's bytes as `upload` sends them. */
@@ -65,7 +77,7 @@ export interface UploadBody {
 }
 
 export interface SlackApiShape {
-  call<M extends MethodName>(method: M, args: MethodArgs<M>, options?: CallOptions): Effect.Effect<MethodOk<M>, SlackApiError>
+  call<M extends MethodName, E = never>(method: M, args: MethodArgs<M>, options?: CallOptions<E>): Effect.Effect<MethodOk<M>, SlackApiError | E>
   /**
    * Posts a file's bytes to the `upload_url` that `files.getUploadURL`
    * gave, as the official client does: `multipart/form-data` with one
@@ -109,12 +121,24 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
           return yield* decodeResponse(method, response, Methods[method].response, config)
         })
 
-      const call = <M extends MethodName>(method: M, args: MethodArgs<M>, options: CallOptions = {}) =>
+      const call = <M extends MethodName, E = never>(method: M, args: MethodArgs<M>, options: CallOptions<E> = {}) =>
         Effect.gen(function* () {
           const lane = options.lane ?? 'interactive'
           const fields = encodeFields(method, args, session.token, options.reason)
           const attempts = options.singleAttempt === true ? { ...config, maxAttempts: 1 } : config
-          return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt))
+          const before = options.beforeSend
+          if (before === undefined) return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt))
+          // A failed check ends the retries as a refusal would, and the caller gets the check's own error.
+          let stopped: { readonly error: E } | undefined
+          const checked = (attempt: number) =>
+            Effect.flatMap(Effect.result(before), (result) => {
+              if (Result.isSuccess(result)) return once(method, fields, attempt)
+              stopped = { error: result.failure }
+              return Effect.fail(new SlackRejected({ method, error: 'not_sent' }))
+            })
+          return yield* withRetries(queue, attempts, lane, method, checked).pipe(
+            Effect.catch((error): Effect.Effect<never, SlackApiError | E> => Effect.fail(stopped === undefined ? error : stopped.error)),
+          )
         }).pipe(Effect.withSpan('SlackApi.call', { attributes: { method, lane: options.lane ?? 'interactive' } }))
 
       const upload = (url: string, file: UploadBody) =>

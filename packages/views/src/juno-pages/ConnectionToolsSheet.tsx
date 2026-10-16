@@ -3,7 +3,7 @@ import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { chatCopy, type ConnectionId, type ConnectionRow, type DiscoveredTool, type ReviewRule, type T3Address } from '@juno/agent-contract'
 import { colors, layout, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, Chip, Select, Surface, Text, TextField } from '@juno/ui'
+import { Button, Checkbox, Chip, revealFocus, ringRoom, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './cell'
 import { T3AddressRow } from './ConnectionsPage'
 
@@ -95,7 +95,7 @@ export function ConnectionToolsSheet({ row, error, onTool, onRule, onT3Address, 
               {copy.autoReview}
             </Text>
           </div>
-          <div {...stylex.props(styles.body)}>
+          <div onFocus={revealFocus} {...stylex.props(styles.body, ringRoom.inline)}>
             {tools.map((tool) => (
               <Tool key={tool.name} tool={tool} t3={t3} options={options} onTool={(change) => onTool(tool.name, change)} />
             ))}

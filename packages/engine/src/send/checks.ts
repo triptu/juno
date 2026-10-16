@@ -1,25 +1,13 @@
-/**
- * The checks on send (spec section 8, architecture 10).
- *
- * `messages.precheck` runs while typing pauses in a Main: it asks
- * `routeCheck` whether the draft replies to one of the channel's latest
- * open topics and keeps the answer in `ai_cache` under
- * `cacheKeyOf(routeCheck, input)`. The input covers the draft and the
- * topics' latest messages, so an answer is for exactly that draft in that
- * channel state. Nothing reads it live, so the write invalidates nothing.
- *
- * `messages.check` runs on Enter and never waits for a model: the
- * wrong-place finding is the stored answer for the draft as it is, if there
- * is one, and the clarity check (pure, `@juno/domain`) runs on every draft.
- * Nothing runs while AI assist is off. No answer yet, a low confidence, a
- * timeout or a spent budget find nothing, so the message just sends.
- */
+/** Wrong-place prechecks and post-send message suggestions (SPEC section 8). */
 import { AiProvider, cacheKeyOf, routeCheck, type AiMessage, type RouteCheckInput } from '@juno/ai'
-import type { ClarityFinding, RouteFinding, SendCheck } from '@juno/contract'
-import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts } from '@juno/domain'
+import { sendCheckDefaults, type ClarityFinding, type RouteFinding, type SendCheck, type SendCheckPref } from '@juno/contract'
+import { channelLabel, clarityCheck, resolveTitle, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import { aiAssistOn } from '../ai'
+import { askGrammar } from './grammar'
+import { aiAssistOn, decisionProviderAvailable } from '../ai'
+import type { AiCredentials } from '../aiCredentials'
+import type { EngineConfig } from '../config'
 import { channelInfoOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userName, type JoinedRow, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 import { unescapeMrkdwn } from '@juno/richtext'
@@ -162,31 +150,65 @@ const wrongPlace = (input: CheckInput): Effect.Effect<RouteFinding | undefined, 
     return { topicId: threadTopicId(input.channelId as ChannelId, topic.rootTs as Ts), threadTs: topic.rootTs, title: topic.title, confidence: answer.confidence }
   })
 
-const clarity = (text: string): ClarityFinding | undefined => {
-  const found = clarityCheck(text)
+const clarity = (text: string, options: ClarityPrefs): ClarityFinding | undefined => {
+  const found = clarityCheck(text, options)
   if (found === undefined) return undefined
   return { fixes: found.fixes.map((fix) => fix.label), fixed: found.fixed, confidence: found.confidence, ...(found.note === undefined ? {} : { note: found.note }) }
 }
 
 /** The checks on Enter for one draft. Empty when there is nothing to say. Reads the store only. */
-export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace> =>
+export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never, Workspace | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '') return {}
+    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return {}
     return yield* Effect.gen(function* () {
-      if (!(yield* aiAssistOn)) return {}
-      const route = input.threadTs === undefined ? yield* wrongPlace(input) : undefined
-      const found = clarity(input.text)
-      return { ...(route === undefined ? {} : { route }), ...(found === undefined ? {} : { clarity: found }) }
+      const options = yield* checkPrefs
+      const ai = (yield* aiAssistOn) && (yield* decisionProviderAvailable)
+      const route = ai && options.wrongPlace && input.threadTs === undefined ? yield* wrongPlace(input) : undefined
+      return route === undefined ? {} : { route }
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
-/** The wrong-place question for a Main draft while typing pauses, so Enter finds the answer stored. */
-export const precheckMessage = (input: { readonly channelId: string; readonly text: string }, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider> =>
+/** Only Main routing runs while typing pauses. */
+export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     const open = yield* (yield* Workspace).current
-    if (open === undefined || input.text.trim() === '') return
+    if (open === undefined || input.text.trim() === '' || [...input.text].length > 1000) return
     yield* Effect.gen(function* () {
-      if (yield* aiAssistOn) yield* askRoute(input, budget)
+      if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return
+      const options = yield* checkPrefs
+      if (options.wrongPlace && input.threadTs === undefined) yield* askRoute(input, budget)
+    }).pipe(Effect.provide(open.context), Effect.orDie)
+  })
+
+const checkPrefs = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const rows = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key LIKE 'sendCheck.%'`
+  const saved = new Map(rows.map((row) => [row.key, row.value_json]))
+  const enabled = (key: SendCheckPref) => {
+    const value = saved.get(`sendCheck.${key}`)
+    return value === 'true' ? true : value === 'false' ? false : sendCheckDefaults[key]
+  }
+  return { wrongPlace: enabled('wrongPlace'), typos: enabled('typos'), capitalI: enabled('capitalI'), questionMarks: enabled('questionMarks'), longSentences: enabled('longSentences'), grammar: enabled('grammar') }
+})
+
+/** Runs only after a Juno send. Local fixes and grammar never hold Enter. */
+export const postcheckMessage = (text: string, clientMsgId: string): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
+  Effect.gen(function* () {
+    if ([...text].length > 1000 || text.trim() === '') return {}
+    const open = yield* (yield* Workspace).current
+    if (open === undefined) return {}
+    return yield* Effect.gen(function* () {
+      const options = yield* checkPrefs
+      const local = clarity(text, options)
+      const ai = options.grammar && (yield* aiAssistOn) && (yield* decisionProviderAvailable)
+      const grammar = (ai ? yield* askGrammar(text, clientMsgId) : []).filter((edit) => options.typos || edit.kind !== 'doubled')
+      // Run local rules on the grammar result so overlapping doubled-word fixes apply once.
+      let fixed = text
+      for (const edit of grammar.toReversed()) fixed = fixed.slice(0, edit.start) + edit.to + fixed.slice(edit.start + edit.from.length)
+      const found = grammar.length === 0 ? local : clarity(fixed, options)
+      const fixes = [...new Set([...grammar.map((edit) => `${edit.from} → ${edit.to}`), ...(found?.fixes ?? [])])]
+      const result = fixes.length === 0 ? found : { fixes, fixed: found?.fixed ?? fixed, confidence: 0.9, ...(found?.note === undefined ? {} : { note: found.note }) }
+      return result === undefined ? {} : { clarity: result }
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })

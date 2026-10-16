@@ -4,8 +4,9 @@
  * function runs inside the caller's writer transaction.
  *
  * `sortClearCases` is the rules' pass the sync runs at the end of each boot
- * (`onBooted`), before it reports live, so a clear bot channel is already
- * out of All when the first sync finishes. The job then asks Juno and the
+ * (`onBooted`), before it reports live, and for each conversation as the
+ * first sync stores its history (`onHistory`), so a clear bot channel
+ * leaves All soon after its first messages show. The job then asks Juno and the
  * user about the ambiguous ones.
  *
  * `automated_channels` holds one row per conversation whose place is
@@ -181,12 +182,19 @@ export const selfIdOf = Effect.gen(function* () {
 export const write = <A>(effect: Effect.Effect<A, SqlError, StoreWriter>) =>
   transaction(Effect.tap(effect, () => invalidate([...keys.sidebarViews, ...keys.automatedChannels])))
 
-/** The rules alone: clear cases go into the view. Ambiguous ones wait for the job. */
-export const sortClearCases: Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> = Effect.gen(function* () {
+/**
+ * The rules alone: clear cases go into the view. Ambiguous ones wait for the
+ * job. With `channel`, only that conversation: the first sync sorts each one
+ * as its history lands, while the sidebar already shows rows. Rules only
+ * ever move a conversation in, and a later look with more names known can
+ * only see more apps, so an early look never keeps one out wrongly.
+ */
+export const sortClearCases = (channel?: string): Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> => Effect.gen(function* () {
   if ((yield* automatedViewState) === 'deleted') return
   const now = yield* Clock.currentTimeMillis
   const selfId = yield* selfIdOf
   for (const row of yield* candidates(now)) {
+    if (channel !== undefined && row.id !== channel) continue
     const { verdict } = yield* classify(row, selfId)
     if (verdict === 'automated') yield* write(moveToAutomated(row.id, 'rules', now))
   }

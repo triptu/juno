@@ -1,6 +1,7 @@
 // ⌘K (spec section 10): open it with the shortcut and the Search button,
 // the two tabs, a conversation from Conversations, the commands (global
-// and the open topic's), and in Messages: recent topics on an empty query, a topic by its title, a message by its
+// and the open topic's; the pages and Settings sections are in
+// `palette-pages.spec.ts`), and in Messages: recent topics on an empty query, a topic by its title, a message by its
 // text (landing on it), a channel's Main and "show its topics" (also from
 // its menu), a person's DM and a New chat to someone never messaged, a
 // command, Slack's search for what the cache lacks, and all of it from the
@@ -93,7 +94,7 @@ test('">" lists the commands, and ">theme" then Dark switches the theme', async 
   await palette.open()
   await palette.type('>')
   await expect(palette.section('Commands').getByRole('option', { name: /New tab/ })).toBeVisible()
-  await expect(palette.section('Commands').getByRole('option', { name: /Settings: Appearance/ })).toBeVisible()
+  await expect(palette.section('Settings').getByRole('option', { name: /Settings: Appearance/ })).toBeVisible()
   await palette.type('theme')
   await expect(palette.section('Commands').getByRole('option')).toHaveCount(3)
   await palette.choose('Theme: Dark')
