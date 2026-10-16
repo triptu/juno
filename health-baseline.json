@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 5,
     "oversizedFiles": 42,
-    "oversizedFunctions": 134
+    "oversizedFunctions": 133
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -75,7 +75,6 @@
     "apps/desktop/src/renderer/containers/Sidebar.tsx:Sidebar#1",
     "apps/desktop/src/renderer/containers/TopicComposer.tsx:LoadedComposer#1",
     "apps/desktop/src/renderer/containers/juno/BackupSettings.tsx:useBackupSettings#1",
-    "apps/desktop/test/slackAppData.test.ts:describe('readSlackApp')#1",
     "apps/gallery/behaviour.spec.ts:test.describe('state switcher')#1",
     "apps/gallery/shift.spec.ts:test.describe('Juno chat')#1",
     "apps/gallery/src/ComponentPage.tsx:ComponentPage#1",
