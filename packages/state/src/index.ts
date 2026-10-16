@@ -17,6 +17,7 @@ export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
+export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
   currentRowAtom,
   focusedTopicAtom,
