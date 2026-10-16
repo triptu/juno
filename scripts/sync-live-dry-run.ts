@@ -28,6 +28,7 @@
  *   --fake        run against an in-process fake Slack instead (no keychain, no JUNO_LIVE)
  *   --large       with --fake, use the large seed
  *   --paced       with --fake, retain production request pacing
+ *   --latency N   with --fake, every Web API and edge call waits N ms (live calls took 257 to 446 ms)
  *   --seconds N   time limit for boot and discovery (default 900)
  *   --until-quiet after `live`, keep running until no call has been made for 30 s
  *                 (the background follow pass), within the same time limit
@@ -259,7 +260,8 @@ async function liveTarget(): Promise<Target | undefined> {
 }
 
 async function fakeTarget(): Promise<Target> {
-  const fake = await startFakeSlack(process.argv.includes('--large') ? { seed: largeSeed() } : {})
+  const latencyMillis = Number(flag('--latency') ?? 0)
+  const fake = await startFakeSlack({ ...(process.argv.includes('--large') ? { seed: largeSeed() } : {}), latencyMillis })
   const c = fake.credentials()
   return {
     cached: { session: { teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token }, cookie: `d=${c.cookie}` },
@@ -308,6 +310,29 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
         if (phase._tag === 'live') Deferred.doneUnsafe(booted, Effect.succeed('live' as const))
       })
 
+    // The sidebar as the renderer sees it, sampled every 100 ms: when rows first exist, and when it would show them (`windowCovered`).
+    const sidebar: { rows?: number; shown?: number; main?: number } = {}
+    const watcher = yield* Effect.forkChild(
+      Effect.gen(function* () {
+        while (true) {
+          const window = yield* listTopics({ kind: 'all', unreadOnly: false }, { now: Date.now(), limit: SIDEBAR_WINDOW })
+          const at = performance.now() - startedAt
+          if (window.rows.length > 0 && sidebar.rows === undefined) {
+            sidebar.rows = at
+            console.log(`  ${ms(at)}: first sidebar rows (${window.rows.length})`)
+          }
+          if (window.rows.length > 0 && window.windowCovered !== false && sidebar.shown === undefined) {
+            sidebar.shown = at
+            console.log(`  ${ms(at)}: sidebar usable, rows shown (${window.rows.length})`)
+          }
+          if (window.rows.some((row) => row.kind === 'main') && sidebar.main === undefined) {
+            sidebar.main = at
+            console.log(`  ${ms(at)}: first channel or DM row`)
+          }
+          yield* Effect.sleep(100)
+        }
+      }).pipe(Effect.catchCause(() => Effect.void)),
+    )
     const scope = yield* Scope.make()
     const sync = yield* Effect.forkChild(
       runSync({ onPhase }).pipe(
@@ -321,10 +346,11 @@ async function run(target: Target, workspaceDir: string): Promise<number> {
     if (untilQuiet && outcome._tag === 'Some') {
       const deadline = startedAt + seconds * 1000
       while (performance.now() < deadline && performance.now() - lastCallAt < 30_000) yield* Effect.sleep(1_000)
-      console.log(`sync-live: ${performance.now() - lastCallAt >= 30_000 ? 'quiet' : 'time limit reached'} after ${ms(performance.now() - startedAt)}`)
+      console.log(`sync-live: ${performance.now() - lastCallAt >= 30_000 ? 'quiet' : 'time limit reached'} after ${ms(performance.now() - startedAt)}; the last call ended at ${ms(lastCallAt - startedAt)}`)
     }
     // A little time for root fetches and users already in flight, then stop everything before reading the store.
     yield* Effect.sleep(2_000)
+    yield* Fiber.interrupt(watcher)
     yield* Scope.close(scope, Exit.void)
     yield* Fiber.interrupt(sync)
     yield* report(bootTime, phases)
