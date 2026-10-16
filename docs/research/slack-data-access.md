@@ -33,6 +33,12 @@ Observed
 - Local storage of credentials on this machine:
   - `~/Library/Application Support/Slack/Local Storage/leveldb/*.ldb|*.log`, origin `https://app.slack.com`, key `localConfig_v2`. Value is a JSON string. Read/written by `shared` module `xLyU` (`getLocalConfig`, `createLocalConfigFacade`).
   - `~/Library/Application Support/Slack/Cookies` (SQLite, table `cookies`). Slack cookies present on host `.slack.com`: `b`, `d` (Secure, HttpOnly, SameSite=Lax, ~1 year expiry, `encrypted_value` ~291 bytes), `lc`, `ssb_instance_id`, `tz`, `ui`, `utm`. `value` is empty; everything is in `encrypted_value`.
+  - Where the data lives depends on the install (read from Slack 4.52.178's `main.bundle.cjs`, file names only):
+    - Direct download from slack.com: `~/Library/Application Support/Slack`. Not sandboxed (its entitlements have no `com.apple.security.app-sandbox`). This Mac has this install.
+    - Mac App Store build (`process.mas`): the sandbox container, `~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack`. Both builds have the bundle id `com.tinyspeck.slackmacgap`, hence the container name. The direct build's main process migrates from this path on first launch: when the container has `Cookies` and the direct profile has no `storage` and no `Local Storage`, it copies `Cookies`, `storage/slack-*` and every `Local Storage` entry across.
+    - The cookie store is `Network/Cookies` on newer Chromium and `Cookies` on older. Slack's own helper returns `<userData>/Network/Cookies` when it exists, else `<userData>/Cookies`, and its diagnostics check the two in that order. Either may have a `-journal` file beside it. On this Mac (Electron in Slack 4.52.178) it is still `Cookies` plus `Cookies-journal`.
+    - The App Store build also keeps an `auth-cookie-backup` file in its `userData` (section "Cookie hardening" in `slack-desktop-shell.md`); Juno does not read it.
+  - Keychain item: generic password, service "Slack Safe Storage", account "Slack", in the login keychain (metadata checked on the direct install). Electron names it after the app name, which is "Slack" in both builds, and Slack's App Store to direct migration copies the cookie file across unchanged, which only works if both builds use the same key. So the App Store build is expected to use the same item; this is not yet checked on an App Store install. Juno falls back to the other items with Slack's account names on an App Store install and records in its import report which item unlocked the cookie, so the first App Store report settles this.
   - IndexedDB `https_app.slack.com_0.indexeddb.leveldb` holds a `reduxPersistence` database (persisted redux stores: channels, members, messages, prefs, etc.). Local Storage also holds `persist-v1::<TEAM_ID>::<USER_ID>::<storeKey>` entries (drafts, expandables, accessibility).
 
 localConfig_v2 shape (observed keys; other keys inferred from `_z(teamId, key)` reads):
@@ -68,6 +74,7 @@ Observed live
 Unknown
 
 - Token lifetime and whether `xoxc-` rotates; the client has an `auth.test` fetcher and a "refetch credentials" path (`handleTeamAuthentication` in `shared`) but the refresh mechanism itself lives in the desktop shell/sign-in flow, outside these bundles.
+- Whether the App Store build's "Slack Safe Storage" item is readable with `security find-generic-password` from another app (it should be, since Chromium uses the legacy login keychain API, but no App Store install was available to check).
 - Whether `fp` (fingerprint) is validated server-side. It is a 2-character hash from FingerprintJS components; the client always sends it.
 
 ## 2. Boot sequence
@@ -202,6 +209,7 @@ Users, channels, emoji, usergroups via the Edge ("Flannel") API (`shared`, metho
 - Response: `{ ok, results: Object[] | Record, failed_ids?, pending_ids?, invalid_ids?, member_channels?, mpims?, disconnected_ids?, can_interact?, next_marker? }`. Paging is by `marker = next_marker`.
 - Web API fallbacks: `users.info` (default args `canonical_avatars`, `name_tagging`), `users.list`, `usergroups.search`, `subteams.info` `{ usergroups: ids, include_users: false, include_count: true, include_disabled: true }`, `emoji.adminList`/`emoji.getInfo`.
 - `emoji.list` is not called by this client; custom emoji come from `emojis/list` on the edge API.
+- **User groups, observed live 2026-10-16** (`pnpm probe:live -- --only usergroups`, key census and counts only). `client.userBoot.subteams` had only `self` (the ids of the user's own groups), never `all`, so handles must come from elsewhere. `usergroups.list` with `include_disabled=true` answers `{ ok, usergroups }` with no paging cursor; every group carries `id, team_id, name, handle, description, is_usergroup, is_subteam, is_external, is_org_level, is_section, is_visible, is_idp_group, is_membership_locked, is_editing_restricted, auto_provision, auto_type (null), prefs (object), channel_count, user_count, date_create, date_update, date_delete, created_by, updated_by, deleted_by (null), enterprise_subteam_id`. `date_delete` is a number on every group, `0` for a live one. No `users` list unless `include_users` is set. `handle` has no leading "@". Every `subteams.self` id was in the list. In 15 recent history pages, every group mention in `text` was the bare `<!subteam^S…>` with no `|@handle` label, and each such message also had a rich text `usergroup` element with only `type` and `usergroup_id`. So a client cannot name a group from the message alone. Unknown: the shape of `subteam_*` socket events (none was seen); Juno reads `subteam_created`/`subteam_updated` as carrying `subteam` (a full group, as Slack's public Events API documents), `subteam_members_changed` as `subteam_id` with `added_users`/`removed_users`, and `subteam_self_added`/`subteam_self_removed` as `subteam_id`.
 - **`emojis/list` results, observed live 2026-10-16** (`pnpm probe:live -- --only emoji`, key census only): `name`, `value`, `updated`, and on some `collection_id`. `value` is the image URL, `alias:<name>` for an alias, or an object of per-vendor URLs (`apple`, `google`). Aliases also carry `alias` (the target name) and `is_alias: true`; an alias can name a standard emoji, not only a custom one. There is no `url` or `alias_for` field: Juno read those until 2026-10-16, so every custom emoji was stored without an image and showed as `:name:`. Unknown: what other `value` object keys exist.
 
 Search (`shared`, `createThunkSearchModules` area: `` `search.modules.${module}` ``)
@@ -312,7 +320,8 @@ Observed (`shared`, `N8wa` rich text enum; mention regexes; `client-boot` send t
 - Outgoing messages are sent as `blocks` (JSON string) of one `rich_text` block (or `markdown_text` when the markdown composer is on). Minimal text: `[{ type:"rich_text", elements:[{ type:"rich_text_section", elements:[{ type:"text", text }] }] }]`.
 - Rich text element types: `rich_text_section`, `rich_text_header`, `rich_text_divider`, `rich_text_quote`, `rich_text_preformatted`, `rich_text_list` (`style: bullet|ordered|check|checked|unchecked`, `indent`), inline `text` (with `style: {bold, italic, strike, code}`), `user {user_id}`, `usergroup {usergroup_id}`, `channel {channel_id}`, `broadcast {range: here|channel|everyone}`, `emoji {name, unicode?}`, `link {url, text?}`, `date`, `color`, `workflowtoken`, `file`, `canvas`, `message_mention`, `workflow_mention`, `list_record`, `truncation`, `unknown`.
 - Quotes: a `rich_text_quote` element wraps a section; in the mrkdwn `text` field it is `&gt; ` at line start. There is no reply/quote object.
-- mrkdwn `text` encodings the client parses: `<@U…>` user, `<#C…|name>` channel, `<!subteam^S…|@handle>` usergroup, `<!here>`, `<!channel>`, `<!everyone>`, `<!date^…>`, `<url|label>`, `<!sf:…>` (Salesforce). Regexes: `/<!channel\b/`, `/<!here\b/`, `/<!everyone\b/`, `/<!group\b/`, `` `<!subteam^${id}|@${handle}>` ``.
+- mrkdwn `text` encodings the client parses: `<@U…>` user, `<#C…|name>` channel, `<!subteam^S…|@handle>` usergroup (live messages carry the bare `<!subteam^S…>`, section 3), `<!here>`, `<!channel>`, `<!everyone>`, `<!date^…>`, `<url|label>`, `<!sf:…>` (Salesforce). Regexes: `/<!channel\b/`, `/<!here\b/`, `/<!everyone\b/`, `/<!group\b/`, `` `<!subteam^${id}|@${handle}>` ``.
+- **Links, observed live 2026-10-16** (`pnpm probe:live -- --only links`: the self-DM and the 10 most recently active conversations, one history page each, 256 messages with a `client_msg_id`, counts only). Slack's clients send every URL as a `link` element: no `text` element held anything URL-like. 44 link elements in 34 messages. Keys: `type`, `url` always; `text` on 30; `truncated` (15), `is_slack_url` (4), `from_llm` (4) and `unsafe` (1) sometimes. A URL with no `text` (14) is written `<url>` in the message `text`; one with `text` is `<url|text>`, the text being a label (10), the URL itself (8) or the URL without its scheme (12: 11 `https://`, 1 `http://`). Slack does not link `text` elements itself, so a client that sends a URL in one gets plain text back in `blocks`. Juno sends what the clients send: a typed URL as `{ type: "link", url }` and `<url>`; a bare domain or address as `{ type: "link", url: "http://example.com", text: "example.com" }` and `<http://example.com|example.com>` (`mailto:` for an address); linked words as `{ type: "link", url, text }` and `<url|words>`. Unknown: what `truncated` means and which client sets it; whether today's client adds `http://` or `https://` to a bare domain typed into it (the one older domain-only sample has `http://`, as Slack's mrkdwn auto-linking does).
 - Incoming messages carry both `text` (mrkdwn, HTML-escaped `&lt; &gt; &amp;`) and `blocks`; the client renders `blocks` when present (`shouldRenderBlocksInsteadOfText`) and falls back to parsing `text`.
 - Thread fields on messages: `thread_ts`, `reply_count`, `reply_users`, `latest_reply`, `subscribed`, `last_read`, `unread_count` (root), `parent_user_id` (reply), `subtype: "thread_broadcast"` for "also send to channel" replies.
 - Edits: `edited: { user, ts }`; deletions arrive as `message_deleted` with `deleted_ts`.
@@ -346,11 +355,11 @@ Inferred
 
 The published [history](https://docs.slack.dev/reference/methods/conversations.history/) and [replies](https://docs.slack.dev/reference/methods/conversations.replies/) methods have Tier 3 limits (50+ per minute) for Marketplace and internal customer-built apps. Those pages also document a separate 1/minute policy for affected commercially distributed non-Marketplace apps. Neither policy establishes the limit of the internal `xoxc` session Juno uses. The live runs above only establish that 40/minute caused no 429.
 
-Juno spaces all background starts 1,500 ms apart in total (40/minute), and retains a separate 1,500 ms minimum for each method. The 298-call live run measured about 40/minute across all methods, not per method. This is evidence for a conservative background budget, not a guarantee for the internal session token shared with the official client.
+Juno spaces background starts per method (2026-10-16, `SlackConfig.lanes.backgroundPacing`): `conversations.history` and `conversations.replies` 1,500 ms apart (40/minute), `search.modules.messages` 6,000 ms (10/minute), edge `users/info` and every other method 3,000 ms (20/minute), and any two background starts at least 500 ms apart (120/minute in total). Slack's tiers are per method, so independent methods now run side by side. Until then all background starts shared one 1,500 ms clock (40/minute in total); the 298-call live run measured about 40/minute across all methods. No method now starts more often than it could then, and each stays below the published tier of the public method of the same name (history and replies Tier 3, 50+; `search.messages` Tier 2, 20+), leaving room for the official client on the same token. This is evidence for a conservative budget, not a guarantee for the internal session token. Unknown: whether Slack also counts all methods of one token together; the 120/minute ceiling bounds that case.
 
 Interactive reads use a separate token bucket: capacity 20, refill one token every 500 ms (2/second). Reconnect refetches beyond that allowance queue; waits release lane permits and recheck the method pause before dispatch. The send lane remains one in flight. The interactive budget is a local policy for normal use and bounded bursts, not a measured Slack allowance. The fake can inject method or global 429s but does not enforce a measured throughput limit.
 
-A 429 retains Retry-After and doubles that method's background interval once per active pause window, capped at 60 s. Every 429 resets its quiet timer. After five minutes without another 429 the interval halves, then halves every further five quiet minutes down to 1,500 ms. Existing start deadlines are retained. Interactive calls fail fast only for a method pause longer than five seconds, not because their token bucket is empty. Test overrides can disable background spacing and interactive refill waits independently.
+A 429 retains Retry-After and doubles that method's background interval once per active pause window, capped at 60 s. Every 429 resets its quiet timer. After five minutes without another 429 the interval halves, then halves every further five quiet minutes down to that method's base. Existing start deadlines are retained. Interactive calls fail fast only for a method pause longer than five seconds, not because their token bucket is empty. Test overrides can disable background spacing and interactive refill waits independently.
 
 `subscriptions.thread.getView` cannot be paged in parallel from the known API: `current_ts` is the last preceding page's `latest_reply`, not an offset or an independently obtainable cursor. Guessing timestamps risks gaps when activity is uneven or moves between requests. The existing sequential pass remains; increasing `limit` does not remove its 10-row cap.
 
@@ -582,3 +591,44 @@ Why the first real session showed user ids instead of names. `JUNO_LIVE=1 pnpm p
 | Messages whose `text` holds `&amp;`, `&lt;` or `&gt;` | 7 of 310 |
 
 So the edge answers every id the sync asks about, Slack Connect users included, and the names were missing because of when and what Juno asked. The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.
+
+### Live reactions (2026-10-16)
+
+`JUNO_LIVE=1 pnpm react:live` (`scripts/react-live.ts`) runs the whole engine on the cached session in a temporary directory. The transport refuses every write except reactions and posts in the self-DM and deletes of the posts the run made. It reacts through the real path: `messages.react`, the `outbox` row, `ActionWorker`. Shapes and codes only:
+
+| Call | Target | Name | Slack's answer | `reactions.get` after |
+| --- | --- | --- | --- | --- |
+| `reactions.add {channel, timestamp, name}` (form fields `_x_mode, channel, timestamp, name`) | message from history | `+1` | `ok` | mine |
+| same | same | `+1::skin-tone-2` | `ok` | mine |
+| same | same | custom (bare name, from `emoji.list`, 306 custom) | `ok` | mine |
+| same | same | a name no emoji has | `invalid_name` | absent |
+| `reactions.remove`, the three above | same | | `ok` each | none left |
+| `reactions.add` while Juno's post was still sending (row waited on `depends_on`) | own new post | `+1` | `ok`, sent with Slack's ts | mine |
+| add and remove | own post, then a thread reply to it | `eyes`, `+1` | `ok` each | as asked |
+| `reactions.add` at a ts no message has | self-DM | `+1` | `message_not_found` | |
+
+Every row ended within 0.3 to 2.5 s of the command. The two test posts were deleted through Juno (`chat.delete`, `ok`); nothing was left over.
+
+Then, read-only, `reactions.get {channel, timestamp}` for up to six stored messages of each kind in a fresh boot's store (4,769 messages; by conversation kind, membership, root, reply or plain, subtype, own or others'): 47 kinds, every answer `ok`. So Slack finds every stored message by the pair a reaction names, thread broadcasts, bot, huddle and join messages included.
+
+And `emoji.list {include_categories: true}` lists 1,859 standard names in 9 categories. Of the picker's 1,867 emoji (emoji-datasource 16), 16 have no name in that list, mostly person variants (`bearded_person`, `shrug`, `face_palm`); whether Slack refuses them is Unknown.
+
+What this means for Juno: the call Juno makes is right. Slack answers `message_not_found` to a reaction on a message it does not have, and the worker counted that answer as "already done" for reactions as for deletes, so it stored a reaction Slack never took and the chip stayed. It now treats that answer as a refusal for reactions.
+
+#### 9. Profile photos (2026-10-16)
+
+Why users showed initials instead of photos. Same `--only users` run as section 8, which now also prints how photos are spelled. Counts and host names only.
+
+| Source | Users | `image_24` to `image_512` | `image_original` | `avatar_hash` | `is_custom_image` |
+| --- | --- | --- | --- | --- | --- |
+| Edge `users/info` | 57 | none | 42 | 57 | `true` on 42, absent on 15 (never `false`) |
+| Edge `users/list` | 100 | none | 43 | 100 | `true` on 43, absent on 57 |
+| `client.userBoot` `self` | 1 | none | 1 | 1 | `true` |
+| `users.list` (web) | 200 | all 200 | 149 | 200 | `true` on 149, absent on 51 |
+
+- On `users.list`, `image_72` is on `avatars.slack-edge.com` for custom photos (149), on `secure.gravatar.com` with a `d=` default on `a.slack-edge.com` for default photos (50), and on `a.slack-edge.com` once.
+- The edge profile carries no photo url at all, only `avatar_hash` (and `image_original`, a custom photo's full-size upload). The official client builds the url from the hash: `<team.avatar_base_url><team_id>-<user id>-<avatar_hash>-<size>`. `client.userBoot` `team.avatar_base_url` is `https://ca.slack-edge.com/`.
+- One GET of that url at size 72, for one user with a custom photo and one without, answered 200 with `image/jpeg` and `image/png`, with or without the `d` cookie, and no redirect. Default photos have a hash too.
+- All 57 users had a `team_id` starting with `T`. Whether Enterprise Grid users need the enterprise id in the url is not known.
+
+So the sync stored no photo for anyone: `toUserRow` read only `image_48`, `image_72` and `image_192`, which the edge never sends. It now builds the url from the hash when those are missing (`packages/sync/src/write/users.ts`), and the fake answers the edge calls without them.

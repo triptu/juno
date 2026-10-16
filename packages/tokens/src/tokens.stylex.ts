@@ -170,6 +170,24 @@ export const accentSwatches = stylex.defineVars({
 })
 
 /**
+ * An icon drawn in an accent's colour (a sidebar view's icon): each
+ * accent's text colour, which holds 4.5:1 on the page and 3:1 or more on
+ * the secondary fill of a selected pill, in both themes. The dark values
+ * are in themes.stylex.ts. `--icon-tint-neutral` is the plain muted icon.
+ */
+export const iconTints = stylex.defineVars({
+  '--icon-tint-neutral': colors['--foreground-muted'],
+  '--icon-tint-coral': '#B4351F',
+  '--icon-tint-ink': 'hsla(48, 30%, 8%, 1)',
+  '--icon-tint-marigold': '#7F5200',
+  '--icon-tint-teal': '#096762',
+  '--icon-tint-midnight': '#2E1F64',
+  '--icon-tint-emerald': '#00674F',
+  '--icon-tint-claret': '#7F1734',
+  '--icon-tint-cyan': '#006A8A',
+})
+
+/**
  * The Juno chat (SPEC section 13, inventory section 12). The owner bubble's
  * colour is still the owner's choice between options A to D
  * (docs/design/juno-chat/README.md): this is option B, the accent tint.
@@ -717,6 +735,8 @@ export const motion = stylex.defineVars({
 /** Layout. Fixed widths and heights of the shell. */
 export const layout = stylex.defineVars({
   '--chat-empty-width': '520px',
+  // A tooltip wraps past this; most are one short line.
+  '--tooltip-max-width': '280px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '280px',
@@ -763,14 +783,11 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
-  // The message hover toolbar: its height, and the width a message header
-  // keeps free at its end so the name and time never run under it. The Main
-  // toolbar is 223px (seven 28px buttons, 2px gaps, a 5px rule, 4px padding)
-  // plus a 20px gap.
+  // The message hover toolbar's height. It straddles the row's top edge, so
+  // a header keeps no room for it.
   '--toolbar-height': '36px',
-  '--toolbar-reserve': '243px',
   // How far a message row may paint outside its box: the toolbar's height
-  // and its shadow, for the toolbar raised above a narrow row. A length, not
+  // and its shadow, for the toolbar above (or flipped below) the row. A length, not
   // a calc(): Chromium ignores calc() in overflow-clip-margin.
   '--toolbar-clip-margin': '44px',
   // Image thumbnails in a message: never wider or taller than this, scaled
@@ -799,6 +816,8 @@ export const layout = stylex.defineVars({
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',
+  // Who reacted (the reaction chip's card): narrow enough for one short name, no wider than a menu.
+  '--reactors-min-width': '160px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
@@ -911,6 +930,10 @@ export const sizes = stylex.defineVars({
   '--tab-divider-height': '16px',
   '--focus-ring-width': '2px',
   '--focus-ring-offset': '2px',
+  // How far an outset ring reaches past its element: the width plus the
+  // offset. A box that clips (a scroller, paint containment) keeps this much
+  // room around its controls (ringRoom in @juno/ui).
+  '--focus-ring-room': 'calc(var(--focus-ring-width) + var(--focus-ring-offset))',
   // Privacy mode: how far message text is blurred (tokens/global.css, [data-sensitive]).
   '--privacy-blur': '6px',
 })
@@ -953,6 +976,8 @@ export const z = stylex.defineVars({
   '--z-selection': '35',
   '--z-context': '40',
   '--z-toast': '45',
+  // A tooltip names what is under the pointer, so it sits over everything.
+  '--z-tooltip': '50',
 })
 
 export const opacity = stylex.defineVars({

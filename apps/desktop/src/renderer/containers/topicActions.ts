@@ -9,7 +9,6 @@ import { junoNavAtom, watchReply } from '@juno/state/agent'
  * in a text field that has text, and otherwise Juno's last action.
  */
 import {
-  artRedraw,
   channelsIgnore,
   isViewMenuAction,
   notifyChoiceOf,
@@ -40,6 +39,7 @@ import {
   messageLink,
   openInSlack,
   popupContextMenu,
+  redrawTopic,
   registry,
   renamingAtom,
   runAction,
@@ -50,6 +50,7 @@ import {
   threadRootTs,
   topicAtom,
   undoLast,
+  type RedrawProblem,
   type RenameTarget,
   type ToastContent,
 } from '@juno/state'
@@ -95,10 +96,22 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
+/** Why Redraw made nothing, said plainly. */
+const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
+  off: 'AI assist is off',
+  budget: 'Today’s AI spend cap is reached',
+  'no-key': 'Add an OpenRouter key in Settings › Juno',
+  'no-agent': 'Juno’s agent did not answer the spend check',
+  timeout: 'The model took too long',
+  provider: 'The model service returned an error',
+  invalid: 'The model’s drawing could not be used',
+  other: 'Something went wrong',
+}
+
 /** Redraw: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
 async function redrawArt(topic: ActionTopic): Promise<void> {
-  const done = await runAction(registry, artRedraw, { id: topic.id }, said('Redrawn', topic))
-  if (!done) showToast(registry, said('Could not redraw', topic))
+  const problem = await redrawTopic(registry, topic.id, said('Redrawn', topic))
+  if (problem !== undefined) showToast(registry, { text: `Could not redraw · ${REDRAW_PROBLEMS[problem]}` })
 }
 
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */

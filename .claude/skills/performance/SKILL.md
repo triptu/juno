@@ -40,7 +40,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 10. The list container subscribes to `order` only; each row subscribes to its own `Atom.family` member. Rows and messages are `React.memo` with primitive or `rev`-stable props and id-taking callbacks created once. Time is a leaf component reading `nowAtom`; rows pass `ts`.
 11. Deltas are applied into a `Map` by id; unchanged `rev` keeps object identity; decode only the `upsert` rows. Derived object atoms use `Atom.withEquality`.
 12. ⌘K uses `useDeferredValue` on the query with no debounce for local search; only the AI parse is debounced.
-13. No layout reads (`getBoundingClientRect`, `offsetHeight`, `scrollTop`) in render or next to writes; batch reads in one `requestAnimationFrame` before writes. ResizeObserver callbacks record, never write.
+13. No layout reads (`getBoundingClientRect`, `offsetHeight`, `scrollTop`) in render or next to writes; batch reads in one `requestAnimationFrame` before writes. ResizeObserver callbacks record, never write; the one exception is a message list's observer on its own scroller, which puts the held bottom back on a resize.
 
 **Engine and IPC**
 
@@ -69,7 +69,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 ## Delayed data
 
-Run `pnpm remote test:desktop layout-shift.spec.ts` for renderer changes that affect opening or loading. `pnpm affected` includes this ordinary desktop spec. Its frame-by-frame screen anchor check requires exactly 0 px movement, alongside Layout Shift entries excluding recent input. Hold fake Slack methods and release them in the measured action; assert both the held request and the final UI so a no-op cannot pass. Prove additions with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. See docs/development.md, "Delayed-load layout checks".
+Run `pnpm remote test:desktop layout-shift.spec.ts` for renderer changes that affect opening or loading. The CI keeper's full runs include it. Its frame-by-frame screen anchor check requires exactly 0 px movement, alongside Layout Shift entries excluding recent input. Hold fake Slack methods and release them in the measured action; assert both the held request and the final UI so a no-op cannot pass. Prove additions with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. See docs/development.md, "Delayed-load layout checks".
 
 Partial message windows do not establish the open position. The header and composer paint within the existing uncached-open budget while the body waits for history coverage. Keep eager rows around the divider after the first paint. Message reaction and Main thread-link slots reserve their height before metadata arrives; sender and Threads counter widths are fixed. Sidebar rows keep no slot for the participant stack, the @ or the unread count: they take their own width at the preview line's end and cut the preview shorter, never moving anything else (owner rule: no blank space for content that might arrive); on an empty cache, its first list waits for cold sync membership and Automated classification. Cached sidebar rows paint immediately. All topics holds its first cold rows until sync completes and reserves count and place-select widths and a scrollbar gutter before data arrives.
 

@@ -1,4 +1,5 @@
 import avatarSizes from './202610171000_avatar_sizes'
+import usergroups from './202610171200_usergroups'
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import integrationSearch from './202610160300_integration_search'
@@ -13,16 +14,24 @@ import threadSubsCommanded from './202610140900_thread_subs_commanded'
 import mainWindow from './202610141000_main_window'
 
 /**
- * Schema version of `cache.db`, stored in `PRAGMA user_version`. A cache file
- * with a different version is deleted and recreated when the store opens, and
- * the engine re-syncs. Bump it with every change to the cache migrations; the
- * mirror is disposable, so its migrations only ever run on an empty file and
- * never transform data (ADR 0008). A stored column that only changes meaning
- * needs no bump: `@juno/sync` `INDEX_VERSION` re-indexes it from local messages.
+ * Reset epoch of `cache.db`, stored in `PRAGMA user_version`. A cache file
+ * with another epoch is deleted and recreated when the store opens, and the
+ * engine syncs everything from Slack again. Schema changes do not touch it:
+ * they are migrations that run on the existing file and keep its rows.
+ * Change it only for a change that cannot be migrated, together with a
+ * decision fragment that says "cache reset epoch N" and why
+ * (`scripts/check-cache-epoch.mjs`, ADR 0008).
+ * A stored column that only changes meaning needs no migration: `@juno/sync`
+ * `INDEX_VERSION` re-indexes it from local messages.
  */
-export const CACHE_SCHEMA_VERSION = 10
+export const CACHE_RESET_EPOCH = 10
 
-/** Migrations for `cache.db`, keyed `<timestamp>_<name>`. */
+/**
+ * Migrations for `cache.db`, keyed `<timestamp>_<name>`. They run on a
+ * populated cache, so each one keeps existing rows (store README, "Cache
+ * migrations"). A new id must be later than every id here: the Migrator
+ * skips ids at or below the newest one it has recorded.
+ */
 export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>> = {
   '202610121200_initial': initial,
   '202610131000_topic_indexes': topicIndexes,
@@ -35,4 +44,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610160310_frequent_sends': frequentSends,
   '202610170910_rechecked_topics': recheckedTopics,
   '202610171000_avatar_sizes': avatarSizes,
+  '202610171200_usergroups': usergroups,
 }

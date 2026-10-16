@@ -19,7 +19,7 @@ export const answerEngineSpend = (spend: SpendLedger): Effect.Effect<never, neve
         spend.settle(ask.id, ask.actual ?? undefined)
         return client['host.spend.answer']({ id: ask.id, ask: 'settle', result: 'settled' })
       }
-      const reservation = spend.reserve('engine', ask.amount, ask.id)
+      const reservation = spend.reserve('engine', ask.amount, ask.id, ask.background === true)
       return client['host.spend.answer']({ id: ask.id, ask: 'reserve', result: reservation.kind === 'reserved' ? 'reserved' : 'blocked' })
     }, { discard: true })),
   )

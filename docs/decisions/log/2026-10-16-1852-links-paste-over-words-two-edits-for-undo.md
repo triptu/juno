@@ -1,0 +1,1 @@
+- 10-16 18:52 · links · A URL pasted over selected words is two native edits, the URL and then the words over it, so ⌘Z first gives the plain paste; the composer keeps linked words as ranges moved with each edit, and drafts store them as `<url|words>`.

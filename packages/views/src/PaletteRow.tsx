@@ -6,6 +6,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/icons/ArrowSquareOut'
+import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
@@ -16,13 +17,20 @@ import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
+import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { House } from '@phosphor-icons/react/dist/icons/House'
+import { Info } from '@phosphor-icons/react/dist/icons/Info'
+import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
+import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
+import { Palette } from '@phosphor-icons/react/dist/icons/Palette'
 import { PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
+import { Plugs } from '@phosphor-icons/react/dist/icons/Plugs'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { PushPinSlash } from '@phosphor-icons/react/dist/icons/PushPinSlash'
@@ -34,6 +42,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { Person } from '@juno/contract'
 import { accentSwatches, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Chip, Icon, Kbd, OptionRow, Text, type AccentName, type PhosphorIcon } from '@juno/ui'
+import { Highlighted, type TextRanges } from './Highlighted'
 import { hueFor, initials } from './look'
 import { relativeTime } from './time'
 
@@ -69,6 +78,15 @@ export type PaletteIconName =
   | 'open-in-slack'
   | 'rename'
   | 'start-thread'
+  | 'home'
+  | 'all-topics'
+  | 'appearance'
+  | 'notifications'
+  | 'ignored'
+  | 'connections'
+  | 'backup'
+  | 'about'
+  | 'ai-activity'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -101,12 +119,23 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'open-in-slack': ArrowSquareOut,
   rename: PencilSimple,
   'start-thread': ChatsCircle,
+  home: House,
+  'all-topics': ListBullets,
+  appearance: Palette,
+  notifications: Bell,
+  ignored: EyeSlash,
+  connections: Plugs,
+  backup: HardDrives,
+  about: Info,
+  'ai-activity': Pulse,
 }
 
 export interface PaletteItem {
   readonly id: string
   readonly icon: PaletteIconName
   readonly label: string
+  /** The parts of `label` the text matched, to show in semibold. */
+  readonly labelHighlight?: TextRanges
   /** The plain part of the sub line: "#eng", "Public channel · Main". */
   readonly sub?: string
   /** Epoch milliseconds, shown after `sub` as "4m". */
@@ -160,7 +189,7 @@ export function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: 
           ) : null}
         </>
       }
-      label={item.icon === 'public' && item.label.startsWith('#') ? item.label.slice(1) : item.label}
+      label={item.icon === 'public' && item.label.startsWith('#') ? item.label.slice(1) : <Highlighted text={item.label} ranges={item.labelHighlight} />}
       {...(sub === undefined ? {} : { sub, subPlacement: compact ? ('end' as const) : ('below' as const) })}
       trailing={
         // A command keeps its hint's place in flow, hidden while another row is active.

@@ -24,6 +24,9 @@ export interface AiCallMeta {
   /** USD from the provider's price table. Absent when the model is not in it. */
   readonly costUsd?: number
   readonly attempts: number
+  /** Tokens across the attempts, as the provider reported them. Absent when it reported none. */
+  readonly inputTokens?: number
+  readonly outputTokens?: number
 }
 
 export type Decision<A> =

@@ -1,0 +1,1 @@
+- 10-16 18:16 · thread-root · A thread's window reads its root by key while the root has no reply and no `thread_ts`, so a just-started thread shows its root at once instead of an empty state.

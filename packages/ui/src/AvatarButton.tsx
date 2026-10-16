@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
 import { Avatar, type HueName } from './Avatar'
 import { interactive } from './internal/interactive'
+import { tooltip } from './Tooltip'
 
 export interface AvatarButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
   /** Required accessible name, for example "Account and settings". */
@@ -32,6 +33,7 @@ export function AvatarButton({ label, initials, hue = 'rose', src, open = false,
       aria-label={label}
       aria-haspopup="menu"
       aria-expanded={open}
+      {...tooltip(label)}
       {...rest}
       {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.button, open && styles.open)}
     >

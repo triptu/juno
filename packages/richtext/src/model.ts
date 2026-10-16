@@ -20,7 +20,8 @@ export type Inline =
   | { readonly kind: 'link'; readonly url: string; readonly text: string; readonly style?: InlineStyle }
   | { readonly kind: 'user'; readonly id: string; readonly name: string; readonly isMe: boolean }
   | { readonly kind: 'channel'; readonly id: string; readonly name: string }
-  | { readonly kind: 'usergroup'; readonly id: string; readonly handle: string }
+  /** A user group. `name` is the group's full name, for a tooltip; `isMine` when the user belongs to it. */
+  | { readonly kind: 'usergroup'; readonly id: string; readonly handle: string; readonly name?: string; readonly isMine: boolean }
   | { readonly kind: 'broadcast'; readonly range: BroadcastRange }
   | { readonly kind: 'emoji'; readonly name: string; readonly unicode?: string; readonly url?: string }
   | { readonly kind: 'date'; readonly timestamp: number; readonly format: string; readonly fallback: string; readonly url?: string }
@@ -61,7 +62,8 @@ export interface MessageBody {
 
 /**
  * How ids become names. Every function is optional; a missing lookup falls
- * back to the raw id or shortcode so nothing ever renders blank.
+ * back to a label from the text, a placeholder, or the shortcode, so
+ * nothing ever renders blank.
  */
 export interface Lookups {
   /** The signed-in user's id. Sets `isMe` on user mentions. */
@@ -70,12 +72,19 @@ export interface Lookups {
   readonly user?: (id: string) => string | undefined
   /** Channel name for a channel id, without "#". */
   readonly channel?: (id: string) => string | undefined
-  /** Handle for a usergroup id, without "@". */
-  readonly usergroup?: (id: string) => string | undefined
+  /** Handle (without "@") and full name for a usergroup id. */
+  readonly usergroup?: (id: string) => UsergroupName | undefined
+  /** The user groups the signed-in user belongs to. Sets `isMine` on usergroup mentions. */
+  readonly myUsergroups?: ReadonlyArray<string>
   /** Image url for a custom emoji name. */
   readonly emoji?: (name: string) => string | undefined
   /** The standard emoji a custom alias names, for an alias with no image of its own. */
   readonly emojiAlias?: (name: string) => string | undefined
+}
+
+export interface UsergroupName {
+  readonly handle: string
+  readonly name?: string
 }
 
 /** All inline runs of a body in reading order, including list items. */

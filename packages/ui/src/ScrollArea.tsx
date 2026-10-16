@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ElementType, HTMLAttributes, ReactNode, Ref } from 'react'
+import type { ElementType, FocusEvent, HTMLAttributes, ReactNode, Ref } from 'react'
 import { colors, layout } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
 import type { LayoutStyles } from './internal/sx'
 
 export type ScrollAreaScrollbar = 'always' | 'hover'
@@ -42,9 +43,10 @@ const HOVER = '@media (hover: hover)'
  * end never scrolls the page behind. The scrollbar keeps its 10px gutter
  * (`--scrollbar-size`, global.css) in both modes; `hover` changes only the
  * thumb's colour, so showing or hiding it never moves the content. Keyboard
- * and trackpad scrolling are the browser's own.
+ * and trackpad scrolling are the browser's own. Keyboard focus inside it
+ * scrolls into view whole, ring included.
  */
-export function ScrollArea({ scrollbar = 'always', underHeader = false, evenInset = false, as, sx, children, ...rest }: ScrollAreaProps) {
+export function ScrollArea({ scrollbar = 'always', underHeader = false, evenInset = false, as, sx, onFocus, children, ...rest }: ScrollAreaProps) {
   const Tag = as ?? 'div'
   return (
     <Tag
@@ -53,6 +55,10 @@ export function ScrollArea({ scrollbar = 'always', underHeader = false, evenInse
       // pseudo-element rule here would lose to its unlayered one.
       data-under-header={underHeader ? '' : undefined}
       {...rest}
+      onFocus={(event: FocusEvent<HTMLElement>) => {
+        revealFocus(event)
+        onFocus?.(event)
+      }}
       {...stylex.props(styles.area, scrollbar === 'hover' && styles.hoverScrollbar, underHeader && styles.underHeader, evenInset && styles.evenInset, sx)}
     >
       {children}

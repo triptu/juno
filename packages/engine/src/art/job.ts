@@ -22,7 +22,7 @@ import { liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@j
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn } from '../ai'
 import { AiCredentials, aiWakes } from '../aiCredentials'
-import { AiSpend } from '../aiSpend'
+import { AiBackground, AiSpend } from '../aiSpend'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { ART_SELECT, drawTopic, type ArtOutcome } from './draw'
 import type { JoinedRow } from '../topicRows'
@@ -123,14 +123,17 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
       chosen,
       (row) =>
         Effect.gen(function* () {
-          const outcome: ArtOutcome = yield* drawTopic(row, pass.selfId, { source: 'ai' })
+          // A topic with no activity in the last day is backlog: it gives way to new threads in the spend cap.
+          const outcome: ArtOutcome = yield* drawTopic(row, pass.selfId, { source: 'ai' }).pipe(
+            Effect.provideService(AiBackground, Number(row.last_activity_ts ?? 0) * 1000 < now - DAY),
+          )
           if (outcome === 'ok' || outcome === 'unsure' || outcome === 'failed') {
             memory.deferred.delete(row.topic_id)
             return
           }
           const at = yield* Clock.currentTimeMillis
           // No key, or the daily cap: nothing was sent, and nothing can succeed until a key or a link to the ledger wakes the job.
-          if (outcome === 'missing-key' || outcome === 'budget') {
+          if (outcome === 'missing-key' || outcome === 'budget' || outcome === 'no-agent') {
             memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
             return
           }

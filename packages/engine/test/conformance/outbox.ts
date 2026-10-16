@@ -28,10 +28,10 @@ import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from
 import { bootedEngine, quiet, readDb } from '../scenario'
 import type { Trace, TraceState } from './itf'
 import {
-  CHANNEL,
   DRAFTS,
   RESEND,
   TEXT,
+  channelsOf,
   copyInSlack,
   draftOf,
   draftOfChannel,
@@ -145,7 +145,7 @@ const messageRef = (world: World, k: Draft) => {
   const store = readStore(world, k)
   const live = storedMessages(world, k).filter((m) => m.deleted === 0)
   const ts = live.find((m) => m.ts === store.sentTs)?.ts ?? live[0]?.ts ?? `pending:${world.ids[k]}`
-  return { channelId: CHANNEL[k], ts, clientMsgId: world.ids[k] }
+  return { channelId: world.channel[k], ts, clientMsgId: world.ids[k] }
 }
 
 /** One step the harness drives, with the model's states on either side of it. */
@@ -209,10 +209,10 @@ function queueAction(world: World, { prev, next, k, state }: Step) {
 function remoteChange(world: World, { prev, next, k }: Step) {
   const { fake } = world.engine
   const change = [...next.slack].find((c) => c.key === k && ![...prev.slack].some((p) => p.key === c.key && p.what === c.what))!
-  if (change.what === 'gone') return fake.deleteMessage({ channel: CHANNEL[k], ts: world.first.get(k)! })
+  if (change.what === 'gone') return fake.deleteMessage({ channel: world.channel[k], ts: world.first.get(k)! })
   const copy = copyInSlack(world, k)
   if (copy === undefined) throw new Error(`draft ${k} has no copy in Slack`)
-  fake.injectMessage({ channel: CHANNEL[k], user: 'U0MAYA', text: 'A reply to the copy', threadTs: copy })
+  fake.injectMessage({ channel: world.channel[k], user: 'U0MAYA', text: 'A reply to the copy', threadTs: copy })
 }
 
 async function accept(world: World, { next, k }: Step) {
@@ -246,9 +246,16 @@ function release(world: World, ts: string | undefined, what: string) {
 
 const answerPost = (outcome: 'answer' | 'lose'): Drive => async (world, { k }) => world.engine.fake.decide((await postCall(world, k, 'answer')).id, outcome)
 
+/** `messages.send` in the draft's channel: a New chat thread root when a reply names it, or that reply, by the root's `client_msg_id`. */
+const sendDraft = (world: World, k: Draft, threadTs?: string) => {
+  const to = { kind: 'channel', channelId: world.channel[k], ...(threadTs === undefined ? {} : { threadTs }) } as const
+  return command(runCommand(world.engine.registry, messagesSend, { to, text: TEXT, clientMsgId: world.ids[k], ...(world.roots.has(k) ? { startThread: true } : {}) }), 'send')
+}
+
 /** How the harness drives each step of the world, by the model's action. */
 const drive: Readonly<Record<string, Drive>> = {
-  send: (world, { k }) => command(runCommand(world.engine.registry, messagesSend, { to: { kind: 'channel', channelId: CHANNEL[k] }, text: TEXT, clientMsgId: world.ids[k] }), 'send'),
+  send: (world, { k }) => sendDraft(world, k),
+  sendReply: (world, { next, k }) => sendDraft(world, k, `pending:${world.ids[next.parent!.get(k) as Draft]}`),
   accept,
   refuse: async (world, { next, k }) =>
     decideBefore(world, await postCall(world, k, 'before'), next.request.get(k) === 'later' ? { error: 'ratelimited', status: 429, retryAfter: 1 } : { error: 'restricted_action' }, `the post of draft ${k}`),
@@ -335,6 +342,7 @@ export const outboxSpec: Spec<World, View> = {
       engine: await bootedEngine([], options),
       options,
       ids: { 1: crypto.randomUUID(), 2: crypto.randomUUID() },
+      ...channelsOf(trace),
       first: new Map(),
       post: new Map(),
       copy: new Map(),

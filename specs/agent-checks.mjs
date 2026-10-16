@@ -62,6 +62,7 @@ export const actionCases = [
   ['ruleDuringReview', 'reviewGated'],
   ['scriptWrite', 'scriptNeverAuthorizes'],
   ['engineBudget', 'capHard'],
+  ['engineBackground', 'capHard'],
 ]
 
 export const recoveryCases = [

@@ -69,14 +69,17 @@ export const changeReaction = (message: ReactionTarget, name: string, user: stri
     const sql = yield* StoreWriter
     const { channel, ts } = message
     yield* invalidate(syncKeys.messagesOf(message))
-    const rows = yield* sql<{ user_ids_json: string | null }>`SELECT user_ids_json FROM reactions WHERE channel = ${channel} AND ts = ${ts} AND name = ${name}`
+    const rows = yield* sql<{ count: number; user_ids_json: string | null }>`SELECT count, user_ids_json FROM reactions WHERE channel = ${channel} AND ts = ${ts} AND name = ${name}`
     const current = rows[0] === undefined ? [] : (JSON.parse(rows[0].user_ids_json ?? '[]') as Array<string>)
     const users = added ? (current.includes(user) ? current : [...current, user]) : current.filter((u) => u !== user)
-    if (users.length === 0) {
+    // Slack may list fewer users than its count, so the count moves by one and never below the users known.
+    const before = rows[0]?.count ?? 0
+    const count = Math.max(users.length, users.length === current.length ? before : added ? before + 1 : before - 1)
+    if (count === 0) {
       yield* sql`DELETE FROM reactions WHERE channel = ${channel} AND ts = ${ts} AND name = ${name}`
     } else {
       yield* sql`INSERT INTO reactions (channel, ts, name, count, user_ids_json, me)
-        VALUES (${channel}, ${ts}, ${name}, ${users.length}, ${JSON.stringify(users)}, ${users.includes(selfId) ? 1 : 0})
+        VALUES (${channel}, ${ts}, ${name}, ${count}, ${JSON.stringify(users)}, ${users.includes(selfId) ? 1 : 0})
         ON CONFLICT (channel, ts, name) DO UPDATE SET count = excluded.count, user_ids_json = excluded.user_ids_json, me = excluded.me`
     }
   })

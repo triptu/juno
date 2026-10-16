@@ -225,7 +225,7 @@ test('the empty state offers to clear the filters, and shows at once when it was
   await sidebar.row(POSTGRES).expectVisible()
 })
 
-test('during the first sync the list says Juno is getting the topics, not that it is quiet', async ({ juno, fake }) => {
+test('during the first sync the list says Juno is getting the topics, then shows rows before history lands', async ({ juno, fake }) => {
   // Hold the first boot call, so nothing has arrived when the window opens.
   fake.holdNext({ method: 'client.userBoot', before: true })
   fake.holdNext({ method: 'conversations.history', before: true })
@@ -246,12 +246,19 @@ test('during the first sync the list says Juno is getting the topics, not that i
   expect(listBox).not.toBeNull()
   expect(cardBox).not.toBeNull()
   expect(cardBox!.y).toBeGreaterThan(listBox!.y + listBox!.height)
+  fake.release({ method: 'client.userBoot' })
+  await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
+  await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
+  // The quick start is done: rows show while history is still held, and the card stays until the sync ends.
+  await sidebar.expectRows()
+  await expect(sidebar.syncStatus).toHaveText('Syncing with Slack')
+  // Rows take their places while history lands; the discovery search after it waits, so the sync cannot end yet.
+  fake.holdNext({ method: 'search.modules.messages', before: true })
+  fake.release({ method: 'conversations.history' })
+  await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
+  // The card goes when the sync ends; nothing above the list moves.
   await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
-    fake.release({ method: 'client.userBoot' })
-    await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
-    await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
-    await sidebar.expectEmpty('Getting your topics')
-    fake.release({ method: 'conversations.history' })
+    fake.release({ method: 'search.modules.messages' })
     await juno.waitForSync()
     await sidebar.row(POSTGRES).expectVisible()
   })
@@ -288,7 +295,7 @@ test('hovering a row shows Resolve in its reserved slot without moving anything'
   await expect(slot).toHaveCSS('opacity', '0')
   await expectNoLayoutShift(win, () => postgres.hover(), { root: 'aside' })
   await expect(slot).toHaveCSS('opacity', '1')
-  await expect(postgres.resolveButton).toHaveAttribute('title', 'Resolve')
+  await expect(postgres.resolveButton).toHaveAttribute('data-tooltip', 'Resolve')
   await expect(postgres.resolveButton).toHaveAccessibleName(`Resolve ${POSTGRES}`)
 
   // Leaving hides it again.

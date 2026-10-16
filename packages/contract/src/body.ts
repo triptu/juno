@@ -30,7 +30,7 @@ export const BodyInline = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('link'), url: Schema.String, text: Schema.String, style: Schema.optionalKey(BodyInlineStyle) }),
   Schema.Struct({ kind: Schema.Literal('user'), id: Schema.String, name: Schema.String, isMe: Schema.Boolean }),
   Schema.Struct({ kind: Schema.Literal('channel'), id: Schema.String, name: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal('usergroup'), id: Schema.String, handle: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('usergroup'), id: Schema.String, handle: Schema.String, name: Schema.optionalKey(Schema.String), isMine: Schema.Boolean }),
   Schema.Struct({ kind: Schema.Literal('broadcast'), range: BroadcastRange }),
   Schema.Struct({
     kind: Schema.Literal('emoji'),

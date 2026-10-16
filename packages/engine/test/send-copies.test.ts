@@ -161,11 +161,11 @@ describe('send: a copy whose delete waits across a reconnect', () => {
   })
 })
 
-// Found by the conformance replay (test/conformance): the check before a copy's delete runs before the
-// call waits for the send lane, which runs one write at a time. A change made while it waits is not seen,
-// and Slack ends with no copy of the post. `it.fails` until that is fixed; then make it `it`.
+// Found by the conformance replay (test/conformance): the check before a copy's delete ran before the
+// call waited for the send lane, which runs one write at a time. A change made during that wait was not
+// seen, and Slack ended with no copy of the post. The check now runs holding the lane.
 describe('send: a copy whose delete waits for the send lane', () => {
-  it.fails('keeps the copy when the user deletes the kept message while the delete waits behind a slow post (fails: both go)', async () => {
+  it('keeps the copy when the user deletes the kept message while the delete waits behind a slow post', async () => {
     const engine = await booted()
     engine.main.network.resend = true
     const rows = watch(engine, MAIN)
@@ -198,9 +198,9 @@ describe('send: a copy whose delete waits for the send lane', () => {
 })
 
 // Found by the conformance replay (test/conformance): the check that keeps a copy whose kept message was
-// deleted cannot tell the user's own delete from one made on another device. `it.fails` until fixed.
+// deleted could not tell the user's own delete from one made on another device. `sent_posts` now records it.
 describe('send: the user deletes a message before Juno has seen its copy', () => {
-  it.fails('deletes the copy too, and does not show it as the message (fails: the copy comes back)', async () => {
+  it('deletes the copy too, and does not show it as the message', async () => {
     const engine = await booted()
     engine.main.network.resend = true
     const rows = watch(engine, MAIN)

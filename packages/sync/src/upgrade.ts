@@ -12,9 +12,10 @@ export const INDEX_VERSION_KEY = 'index-version'
  * The meaning of `topic_index` rows. Bump it when a stored column changes
  * meaning; the next start re-indexes every stored topic from local messages
  * instead of throwing the cache away. 2: `participants_json` holds the
- * senders of the latest unread messages.
+ * senders of the latest unread messages. 3: a preview names user groups
+ * ("@handle" or "@group", never the id).
  */
-export const INDEX_VERSION = 2
+export const INDEX_VERSION = 3
 
 /** Rows per transaction, so the writer is never held long (performance rule 15). */
 const BATCH = 200
@@ -33,7 +34,7 @@ export const upgradeIndex = (ctx: SyncContext): Effect.Effect<number, SqlError, 
     // The user groups from the last boot, so mentions of a group the user is in still count.
     const me = (yield* storedMe) ?? ctx.me
     for (let i = 0; i < ids.length; i += BATCH) {
-      yield* transaction(reindexTopics(ids.slice(i, i + BATCH), { me }))
+      yield* transaction(reindexTopics(ids.slice(i, i + BATCH), { me, onMissingUsergroup: (topicId) => ctx.usergroupTopics.add(topicId) }))
       yield* Effect.yieldNow
     }
     yield* setSyncState(INDEX_VERSION_KEY, INDEX_VERSION)

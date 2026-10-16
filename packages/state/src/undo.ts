@@ -78,13 +78,23 @@ export async function runAction<R extends Rpc.Any>(
   payload: Rpc.PayloadConstructor<R>,
   toast: ToastContent,
 ): Promise<boolean> {
+  return Exit.isSuccess(await runActionExit(registry, route, payload, toast))
+}
+
+/** `runAction`, resolving with the command's exit, so a caller can say why it failed. */
+export async function runActionExit<R extends Rpc.Any>(
+  registry: Registry,
+  route: R,
+  payload: Rpc.PayloadConstructor<R>,
+  toast: ToastContent,
+): Promise<Exit.Exit<unknown, unknown>> {
   const exit = await runCommand(registry, route, payload)
-  if (Exit.isFailure(exit)) return false
+  if (Exit.isFailure(exit)) return exit
   const undo = (exit.value as CommandResult).undo
-  if (undo === undefined) return true
+  if (undo === undefined) return exit
   registry.set(undoStackAtom, [...registry.get(undoStackAtom), undo].slice(-UNDO_LIMIT))
   showToast(registry, toast, true)
-  return true
+  return exit
 }
 
 /** Replays the newest undo and hides the toast. Resolves with false when there was nothing to undo. */

@@ -69,6 +69,13 @@ describe('PiAiProvider decisions', () => {
     expect(faux.state.callCount).toBe(1)
   })
 
+  it('never retries a grammar request with invalid output', async () => {
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('grammar', { prose: 'rewrite it' }))])
+    const decision = await Effect.runPromise(provider.decide(tasks.grammarCheck, { draft: 'its broken' }))
+    expect(noDecision(decision)).toEqual({ reason: 'invalid-output', attempts: 1 })
+    expect(faux.state.callCount).toBe(1)
+  })
+
   it('retries once on invalid tool output, then takes the valid answer', async () => {
     const { provider, faux } = scripted([
       fauxAssistantMessage(fauxToolCall('route', { replyTo: 'not-a-topic', confidence: 0.8 })),
@@ -134,13 +141,20 @@ describe('PiAiProvider decisions', () => {
     expect(settled).toHaveLength(1)
   })
 
-  it('keeps the whole reservation when the cost is unknown: a timeout', async () => {
+  it('settles a timeout in the first attempt at that attempt\'s bound: the retry was never sent', async () => {
+    const asked: number[] = []
     const settled: Array<number | undefined> = []
-    const admit = () => Effect.succeed({ _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) })
+    const admit = (upper: number) => Effect.sync(() => {
+      asked.push(upper)
+      return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
+    })
     const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
     const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
     expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
-    expect(settled).toEqual([undefined])
+    // Settled as known, not kept whole: at most the first attempt, under half the reservation.
+    expect(settled).toHaveLength(1)
+    expect(settled[0]).toBeTypeOf('number')
+    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
   })
 
   it('uses the tier model from the config, and reports a cost only for a priced model', async () => {

@@ -7,6 +7,7 @@ import { afterPaint, mark, measure, observeFrames } from '@juno/state/perf'
 import { RegistryContext } from '@juno/state/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { TooltipLayer } from '@juno/views'
 import { App } from './App'
 import { clearCaretsLeftBehind } from './containers/caret'
 
@@ -77,6 +78,7 @@ function renderShell(): void {
     <StrictMode>
       <RegistryContext.Provider value={registry}>
         <App />
+        <TooltipLayer />
       </RegistryContext.Provider>
     </StrictMode>,
   )

@@ -1,0 +1,1 @@
+- 10-16 18:51 · links · A `text` element holding a URL, address or listed domain renders as a link (not in code), so messages Juno sent before links, and bots that send URLs as text, show links too.

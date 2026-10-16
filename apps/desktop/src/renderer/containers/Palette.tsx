@@ -8,16 +8,17 @@ import { Suspense, useEffect } from 'react'
 import { onMenuCommand, paletteOpenAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { chunk } from './chunks'
+import { editLinkInComposer } from './composerLinks'
 import { togglePalette } from './paletteActions'
 
 const palette = chunk(() => import('./PaletteContent'))
 const loadPalette = palette.load
 const OpenPalette = palette.component((module) => module.OpenPalette)
 
-/** ⌘K toggles it. */
+/** ⌘K toggles it, except with words selected in a composer, where it edits their link. */
 export function Palette() {
   const open = useAtomValue(paletteOpenAtom)
-  useEffect(() => onMenuCommand((command) => command === 'palette.toggle' && togglePalette()), [])
+  useEffect(() => onMenuCommand((command) => command === 'palette.toggle' && !editLinkInComposer() && togglePalette()), [])
   useEffect(() => {
     const idle = requestIdleCallback(() => void loadPalette(), { timeout: 5_000 })
     return () => cancelIdleCallback(idle)

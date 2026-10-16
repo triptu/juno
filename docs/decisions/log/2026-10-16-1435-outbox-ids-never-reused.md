@@ -1,0 +1,1 @@
+- 10-16 14:35 · orchestrator · `outbox` ids are never reused (`AUTOINCREMENT`), so the answer to an edit can only end the edit's own row, never a delete that replaced it while the call was out.

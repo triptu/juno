@@ -3,7 +3,7 @@ import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { Message, type MessageActions } from './Message'
+import { Message, type MessageActions, type MessageProps } from './Message'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -11,6 +11,8 @@ import { messageTime } from './time'
 export interface MessageListItem {
   readonly message: MessageView
   readonly sender: Person | undefined
+  /** The people who reacted, by id, for the chips' card of who reacted. */
+  readonly reactors?: ReadonlyMap<string, Person>
 }
 
 /**
@@ -58,6 +60,7 @@ export interface MessageListProps {
   readonly activeMessage?: string | undefined
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
+  readonly suggestion?: { readonly ts: string; readonly value: MessageProps['suggestion'] } | undefined
   readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
   /**
    * A key on a selected row that the list does not use itself (it moves the
@@ -69,6 +72,8 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
+  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** Retry on a failed send. */
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
@@ -165,11 +170,13 @@ export function MessageList({
   activeMessage,
   confirmingDelete,
   editing,
+  suggestion,
   onRowKey,
   onOpenThread,
   onChannel,
   onLink,
   onToggleReaction,
+  onSetReaction,
   onRetry,
   onDiscard,
   onOpenImage,
@@ -219,6 +226,7 @@ export function MessageList({
               <Message
                 message={item.message}
                 sender={item.sender}
+                {...(item.reactors === undefined ? {} : { reactors: item.reactors })}
                 time={messageTime(item.message.at, now)}
                 now={now}
                 main={main}
@@ -230,11 +238,13 @@ export function MessageList({
                 actions={actions}
                 active={activeMessage === item.message.ts}
                 confirmingDelete={confirmingDelete === item.message.ts}
+                suggestion={suggestion?.ts === item.message.ts ? suggestion.value : undefined}
                 editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}
                 onChannel={onChannel}
                 onLink={onLink}
                 onToggleReaction={onToggleReaction}
+                onSetReaction={onSetReaction}
                 onRetry={onRetry}
                 onDiscard={onDiscard}
                 onOpenImage={onOpenImage}

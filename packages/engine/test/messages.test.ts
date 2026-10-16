@@ -293,7 +293,7 @@ describe('live messages', () => {
     engine.fake.addReaction({ channel: 'C0ENG', ts: third!, name: 'eyes', user: 'U0SAM' })
     after = await list.until((window) => window.rows.get(third!)?.reactions.some((r) => r.name === 'eyes') === true, 'the reaction')
     expect(changedRows(before, after)).toEqual([third])
-    expect(after.rows.get(third!)!.reactions.find((r) => r.name === 'eyes')).toEqual({ name: 'eyes', count: 1, me: false, unicode: '👀' })
+    expect(after.rows.get(third!)!.reactions.find((r) => r.name === 'eyes')).toEqual({ name: 'eyes', count: 1, me: false, unicode: '👀', users: ['U0SAM'] })
 
     before = after
     engine.fake.deleteMessage({ channel: 'C0ENG', ts: rootTs })

@@ -3,7 +3,7 @@
 The two SQLite databases of one workspace and how to read and write them. See `docs/architecture.md` sections 4.1 to 4.3 and ADR 0008.
 
 - FTS indexes: `messages_fts`, `topic_titles_fts` (root text), `channels_fts` and `people_fts` in cache.db, and `overlay_titles_fts` (manual and AI titles) in user.db. Triggers keep them in the same transaction as their source rows.
-- `cache.db`: the Slack mirror. Disposable; deleted and rebuilt when `CACHE_SCHEMA_VERSION` changes or SQLite cannot open or migrate the existing cache. Recovery keeps `user.db`, including preferences and the outbox.
+- `cache.db`: the Slack mirror. Updates keep it: new migrations run on the existing file. It is deleted and rebuilt only when `CACHE_RESET_EPOCH` changes or SQLite cannot open or migrate the existing cache. Recovery keeps `user.db`, including preferences and the outbox.
 - `user.db`: Juno's own state (overlay, reads, outbox, prefs). Durable; migrations are incremental and never edited once shipped.
 
 The unused `topic_overlay.tracked` column remains from the initial migration. Reply tracking was removed on 10-14; no code reads or writes this column, and shipped migrations stay unchanged.
@@ -17,7 +17,20 @@ The unused `topic_overlay.tracked` column remains from the initial migration. Re
 - `SqlClient` (type) and `SqlError`, re-exported so callers do not import `effect/sql`.
 - Row types (`MessageRow`, `TopicIndexRow`, ...) and the migrations lists.
 
-To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. For `cache.db`, also bump `CACHE_SCHEMA_VERSION`.
+`usergroups` in cache.db holds the workspace's user groups (`id`, `handle`, `name`, `deleted`), so a group mention shows its handle.
+
+To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. Its id must be later than every shipped id in that folder: the Migrator skips ids at or below the newest one it has recorded. `scripts/check-migration-order.mjs` (run by `pnpm lint`) checks both folders against `origin/main` (or `main`): an id main does not have must be above main's largest, and no id may repeat. It names the id to renumber and the smallest safe one. Without git it checks only that ids are unique.
+
+### Cache migrations
+
+`cache.db` migrations run on a populated cache, the same way as `user.db`'s, so an update does not sync everything from Slack again (ADR 0008, note of 10-16). Each one:
+
+- Is additive where it can be: a new table, a new column with a default, a new index. It keeps every existing row.
+- Refills data derived from what is stored, locally. An FTS table or index fills from its source rows inside the migration (`202610140100_search`). Work too long for startup, such as `reindexAll` over every topic in `@juno/sync`, runs once in the background after the boot, never in the migration, and makes no Slack calls.
+- Leaves data that only Slack has to be fetched lazily: the sync asks for the items that need it, on the background lane. It never blocks the first paint and never starts a cold boot.
+- Runs once: the Migrator records it in the same transaction, so a crash leaves the migration either applied and recorded or not applied at all.
+
+A change that cannot be migrated changes `CACHE_RESET_EPOCH` in `src/migrations/cache/index.ts`. That deletes every user's cache and syncs everything again, so it needs a decision fragment that says "cache reset epoch N" and why; `scripts/check-cache-epoch.mjs` (run by `pnpm lint`) fails without one. Tests can open a store with the migrations of a later build through `Store.layer(paths, { cacheMigrations })`; the desktop e2e test of an update uses `cacheMigrationsWithProbe`.
 
 The topic view's Main window reads the partial index `messages_main (channel, ts)` over roots and broadcast replies; a query uses it only when its WHERE clause repeats the index's condition. Invalidation keys in the record form may give a table an empty id list (`{ messages: [topicId], users: [] }`), which subscribes to the whole table.
 

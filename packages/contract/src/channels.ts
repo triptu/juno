@@ -46,6 +46,10 @@ export const Channels = {
   launchSetPrivacy: 'launch.setPrivacy',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
   launchSetSidebar: 'launch.setSidebar',
+  /** "Hide message text while sharing the screen": whether it is on, and whether this Mac can tell. */
+  sharingGet: 'sharing.get',
+  /** Turns "Hide message text while sharing the screen" on or off; answers as `sharing.get`. */
+  sharingSet: 'sharing.set',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
@@ -75,6 +79,8 @@ export const Events = {
   notificationOpen: 'notification.open',
   /** The agent's provider state changed, with the new `ProviderState`. */
   agentProviderChanged: 'agent.providerChanged',
+  /** Main turned privacy mode on or off because sharing started or ended, with a `PrivacyState`. */
+  privacyChanged: 'privacy.changed',
 } as const
 
 /**
@@ -101,6 +107,53 @@ export type MenuCommand =
   | 'palette.toggle'
   | 'edit.undo'
   | 'settings.open'
+
+/**
+ * The app menu's shortcuts, in Electron's accelerator form. Main registers
+ * them; the renderer shows them in tooltips and hints through
+ * `shortcutKeys`, so a key changes in one place.
+ */
+export const menuShortcuts = {
+  'chat.new': 'CommandOrControl+N',
+  'tab.new': 'CommandOrControl+T',
+  'tab.reopen': 'CommandOrControl+Shift+T',
+  'tab.close': 'CommandOrControl+W',
+  'tab.previous': 'CommandOrControl+Shift+[',
+  'tab.next': 'CommandOrControl+Shift+]',
+  'history.back': 'CommandOrControl+[',
+  'history.forward': 'CommandOrControl+]',
+  'sidebar.toggle': 'Control+Command+S',
+  'privacy.toggle': 'Control+Command+H',
+  'juno.toggle': 'CommandOrControl+J',
+  'palette.toggle': 'CommandOrControl+K',
+  'edit.undo': 'CommandOrControl+Z',
+  'settings.open': 'CommandOrControl+,',
+} as const satisfies Partial<Record<MenuCommand, string>>
+
+const keyGlyphs: Record<string, string> = {
+  CommandOrControl: '⌘',
+  Command: '⌘',
+  Control: '⌃',
+  Alt: '⌥',
+  Option: '⌥',
+  Shift: '⇧',
+  Plus: '+',
+}
+// macOS writes the modifiers in this order, whatever order the accelerator uses.
+const modifierOrder = ['⌃', '⌥', '⇧', '⌘']
+
+/** An accelerator as the Mac writes it: "Control+Command+S" is "⌃⌘S". */
+export function shortcutKeys(accelerator: string): string {
+  const parts = accelerator.split('+').map((part) => keyGlyphs[part] ?? part)
+  const key = parts.at(-1) ?? ''
+  const modifiers = parts.slice(0, -1).toSorted((a, b) => modifierOrder.indexOf(a) - modifierOrder.indexOf(b))
+  return [...modifiers, key].join('')
+}
+
+/** The keys of an app-menu command, as the Mac writes them ("⌘["). */
+export function menuKeys(command: keyof typeof menuShortcuts): string {
+  return shortcutKeys(menuShortcuts[command])
+}
 
 /** One item of a context menu the renderer asks for, or a separator. */
 export type ContextMenuLeaf =
@@ -209,6 +262,14 @@ export interface JunoBridge {
     readonly setDensity: (density: Density) => Promise<unknown>
     readonly setPrivacy: (privacy: boolean) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
+    /** Calls `listener` with each `PrivacyState` main sets because sharing started or ended, undecoded. Returns the unsubscribe. */
+    readonly onPrivacy: (listener: (state: unknown) => void) => () => void
+  }
+  readonly sharing: {
+    /** Resolves with a `SharingSetting`. */
+    readonly get: () => Promise<unknown>
+    /** Turns hiding while sharing on or off; resolves with the `SharingSetting` after. */
+    readonly set: (hide: boolean) => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

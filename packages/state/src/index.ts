@@ -17,6 +17,7 @@ export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { newTabPageAtom, setNewTabPage } from './newTabPage'
+export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
   currentRowAtom,
   focusedTopicAtom,
@@ -145,12 +146,16 @@ export {
   openInSlack,
   persistAccent,
   persistDensity,
+  getSharingSetting,
+  onSharingPrivacy,
   persistPrivacy,
   persistSidebar,
   persistTheme,
   popupContextMenu,
   privacyAtom,
+  privacySharingAtom,
   resolvedThemeAtom,
+  setSharingSetting,
   setViewing,
   sidebarLayoutAtom,
   themeAtom,
@@ -160,7 +165,8 @@ export {
   type Theme,
 } from './shell'
 export type { PortLike } from './transport'
-export { redrawTopic } from './art'
+export { redrawTopic, type RedrawProblem } from './art'
+export { aiActivityAtom } from './aiActivity'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
@@ -228,3 +234,7 @@ export {
   uploadProgressAtom,
   type Attachment,
 } from './attachments'
+
+export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
+
+export { sentSuggestionAtom, dismissSentSuggestion } from './sentSuggestions'

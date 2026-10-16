@@ -107,7 +107,13 @@ export const startNotifications = Effect.gen(function* () {
         if (row.name !== null) names.set(row.id, row.name)
       }
     }
-    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id) })
+    // And the groups, by handle.
+    const groupIds = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<!subteam\^([A-Z0-9]+)|"usergroup_id":"([A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+    const groups = new Map<string, { readonly handle: string }>()
+    if (groupIds.size > 0) {
+      for (const row of yield* sql<{ id: string; handle: string }>`SELECT id, handle FROM usergroups WHERE id IN ${sql.in([...groupIds])}`) groups.set(row.id, { handle: row.handle })
+    }
+    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id), usergroup: (id) => groups.get(id) })
     const mentionsMe = messageMentionsMe(body, me)
     const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
       COALESCE(u.display_name, u.real_name, u.name) AS person_name,

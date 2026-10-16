@@ -50,8 +50,29 @@ export const ReactionView = Schema.Struct({
   unicode: Schema.optionalKey(Schema.String),
   /** The image, for custom emoji. A reaction with neither shows `:name:`. */
   url: Schema.optionalKey(Schema.String),
+  /**
+   * Who reacted, as user ids in the window's `refs.people`: you first when
+   * `me`, then the others in Slack's order, at most ten. Slack may list fewer
+   * than `count`; the rest are "and N others".
+   */
+  users: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type ReactionView = typeof ReactionView.Type
+
+/**
+ * The user's own reaction change that Slack has not taken (architecture
+ * 5.7). `failed`: Slack refused it; the chip shows what Slack has, and the
+ * message offers Retry and Dismiss. `waiting`: it has not gone out for a
+ * while (no connection, or its message is still being sent); the chip
+ * shows the change.
+ */
+export const ReactionIssue = Schema.Struct({
+  name: Schema.String,
+  /** The change asked for: add (`true`) or remove. */
+  on: Schema.Boolean,
+  state: Schema.Literals(['failed', 'waiting']),
+})
+export type ReactionIssue = typeof ReactionIssue.Type
 
 /**
  * A thumbnail the view can show at once with `aspect-ratio: width / height`
@@ -157,6 +178,8 @@ export const MessageView = Schema.Struct({
   /** The thread's root, the first row of a thread. */
   root: Schema.Boolean,
   reactions: Schema.Array(ReactionView),
+  /** The newest of the user's reaction changes Slack has not taken, when there is one. */
+  reactionIssue: Schema.optionalKey(ReactionIssue),
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),

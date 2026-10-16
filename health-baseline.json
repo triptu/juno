@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 5,
     "oversizedFiles": 42,
-    "oversizedFunctions": 134
+    "oversizedFunctions": 133
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -127,7 +127,6 @@
     "packages/engine/src/topics/query.ts:shapeRows#1",
     "packages/engine/src/topics/query.ts:shapeRows/Effect.gen#1",
     "packages/engine/test/actions.test.ts:describe('edit')#1",
-    "packages/engine/test/actions.test.ts:describe('reactions')#1",
     "packages/engine/test/agent-host.test.ts:describe('the AgentHost port')#1",
     "packages/engine/test/art.test.ts:describe('topic art')#1",
     "packages/engine/test/bench/messages-large.test.ts:describe.skipIf()('messages.list on the large seed')#1",

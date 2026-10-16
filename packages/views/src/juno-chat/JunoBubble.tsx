@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem, JunoInline } from '@juno/agent-contract'
 import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
-import { Text } from '@juno/ui'
+import { ringRoom, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
@@ -40,7 +40,8 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
           <QuoteStub quote={replyTo} onOpen={() => actions.onQuote(replyTo.target)} />
         </div>
       ) : null}
-      <div {...stylex.props(rowStyles.row, rowStyles.contained, eager && rowStyles.eager)}>
+      {/* Paint containment clips at the row's edge, and React and Reply end it: room for their rings. */}
+      <div {...stylex.props(rowStyles.row, rowStyles.contained, ringRoom.inline, eager && rowStyles.eager)}>
         <div
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}

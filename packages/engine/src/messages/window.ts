@@ -11,6 +11,9 @@
  * - A thread: the root and its replies, `thread_ts` equal to the root, through
  *   `messages_thread (channel, thread_ts, ts)`.
  *
+ * A root without replies has no \`thread_ts\` yet, so the thread scope misses
+ * it; \`rootStatement\` reads it by primary key.
+ *
  * Both hide what Slack hides: a deleted reply, and a deleted Main message
  * without replies. A deleted root with replies keeps its place.
  */
@@ -80,6 +83,11 @@ export function windowStatements(target: WindowTarget, range: { readonly anchor?
   ]
 }
 
+/** A thread's root while it has no \`thread_ts\` (no reply yet), by primary key. */
+export function rootStatement(target: Extract<WindowTarget, { kind: 'thread' }>): Statement {
+  return { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE channel = ? AND ts = ? AND thread_ts IS NULL AND deleted = 0`, params: [target.channel, target.threadTs] }
+}
+
 /** The topic's pending messages (architecture 5.7), oldest first, through `pending_messages_channel (channel, thread_ts)`. */
 export function pendingStatement(target: WindowTarget): Statement {
   const columns = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, created_at, state'
@@ -103,7 +111,7 @@ export function hiddenCopiesStatement(channel: string): Statement {
 /** Reactions of the window's messages, by primary key. */
 export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): Statement {
   return {
-    sql: `SELECT ts, name, count, me FROM reactions WHERE channel = ? AND ts IN (${ts.map(() => '?').join(', ')}) ORDER BY ts, rowid`,
+    sql: `SELECT ts, name, count, me, user_ids_json FROM reactions WHERE channel = ? AND ts IN (${ts.map(() => '?').join(', ')}) ORDER BY ts, rowid`,
     params: [channel, ...ts],
   }
 }

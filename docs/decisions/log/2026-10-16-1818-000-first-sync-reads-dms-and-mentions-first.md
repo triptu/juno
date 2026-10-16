@@ -1,0 +1,1 @@
+- 10-16 18:18 · Tushar · First sync history order: DMs and group DMs first, then conversations with an unread mention, then unread followed threads, then the channels where the user's own messages are stored, then the rest by recency. Order only; every conversation is still read once.

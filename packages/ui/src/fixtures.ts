@@ -42,6 +42,7 @@ import Text from './Text.fixtures'
 import Textarea from './Textarea.fixtures'
 import TextField from './TextField.fixtures'
 import Toast from './Toast.fixtures'
+import Tooltip from './Tooltip.fixtures'
 import TopicArt from './TopicArt.fixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,6 +85,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Textarea,
   TextField,
   Toast,
+  Tooltip,
   TopicArt,
 }
 
