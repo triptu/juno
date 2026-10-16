@@ -6,6 +6,8 @@ These specs describe the protocols and their limits. They do not certify the app
 
 ## Follow rules and assumptions
 
+- A New chat root is locally followed before it has replies. `authoredRoot` models this exception to storage agreement: a page reporting false does not clear it before replies, unless the user explicitly changed follow state. `authoredRootStep` checks a zero-reply root against a later page. Replies return it to ordinary Slack follow handling.
+
 - Values are `1` (followed), `0` (unfollowed), and `-1` (Unknown: no row). Unknown remains distinct from false. A root with `subscribed: false` does not create a row for an unknown thread; a root without the field changes nothing. A failed first Subscribe that finds false forgets its temporary row. Socket events with an explicit flag can create a row.
 - `eventClock` supplies Slack event stamps and server-write order. `clock` supplies Juno request and observation times. No rule compares the two. Events apply when their stamp is at least `updatedEvent`; pages apply only when requested strictly after `observedAt`. A command stamps `observedAt` when it starts and again when its call ends (`acknowledge` or `reject`), but does not advance `updatedEvent`. An undated event queues a root lookup instead of writing a flag. A row a command wrote is `commanded`: an event stamp cannot be ordered against the command, so an event that contradicts such a row queues a root lookup instead of applying.
 - Each thread has at most one pending command. Its intent stays visible. Eligible events and pages while pending only set `noted`; they do not advance either watermark. A success removes the pending row and, if noted, queues a fresh root lookup. The lookup can finish after other observations. Overlapping commands during that refresh, crashes and persistence are outside the model.
@@ -50,6 +52,8 @@ The follow drain covers three pending calls and their refreshes, eight events, t
 - `seal` stops input and failures. Queued work completes.
 
 ## Outbox rules and assumptions
+
+- A New chat thread keeps its root's outbox identity while pending or failed. `sendReply` queues a dependent post; `claim` waits until `writeMessage` has acknowledged its parent. `repliesWaitForRoot` checks that no dependent post reaches Slack early. `pendingRootStep` covers an echo before the response; `failedRootStep` covers retrying a refused root. Tab and draft identity are covered by application tests.
 
 - `send` creates one durable `queued` row per draft, keyed by `client_msg_id`. Each ID is new and belongs to Juno. The model tracks row states `queued`, `sending`, `unknown`, `failed` and `gone`. Gone means no pending row. Slack stores a count per ID; the local mirror stores a set. The model gives Slack no deduplication guard. Each `accept` increases the count, so a repeated post is observable.
 - `resend` is the network, not Juno: Chromium sends a request again by itself when a reused connection closes before any answer (ADR 0014). It applies to an accepted post whose answer has not come back, and Slack runs it again (`dup`). `held(k)` is what Slack holds: Juno's accepted submissions, plus network copies, minus deleted copies. **Assumption:** at most one network copy per post (Chromium's limit is about two; one is enough to show the rule, and the rule does not count copies).

@@ -132,7 +132,8 @@ const activeTopic = (tabs: Tabs): string | undefined => {
 const activeView = (tabs: Tabs): string | undefined => {
   const tab = activeTab(tabs)
   const topic = tab === undefined ? undefined : tabTopic(tab)
-  return topic === undefined ? undefined : topicView(topic, tab!.id)
+  const place = tab === undefined ? undefined : currentPlace(tab)
+  return topic === undefined ? undefined : topicView(place?.kind === 'topic' ? place.viewId ?? topic : topic, tab!.id)
 }
 
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
@@ -254,7 +255,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
     return
   }
   registry.set(selectedTopicAtom, topic.id)
-  pending = { id: topic.id, at, name: topic.name }
+  pending = { id: topicOfView(topic.view ?? topic.id), at, name: topic.name }
   const topicReady = whenReady(topic.view ?? topic.id, topic.fresh, topic.target)
   const landing = topic.fresh
     ? (tabs: Tabs) => {
@@ -421,7 +422,8 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
   if (options.flash === true) flashMessage(registry, id, ts)
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
-    const view = topicView(id, showing.id)
+    const place = currentPlace(showing)
+    const view = topicView(place.kind === 'topic' ? place.viewId ?? id : id, showing.id)
     const list = registry.get(messageListAtom(view))
     if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(view), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
     return switchToTab(showing.id)
@@ -518,7 +520,7 @@ function arriving(tabs: Tabs, tabId: string, place: Place | undefined, fresh: bo
   // A mounted tab that keeps its page shows in the next frame.
   const tab = tabs.tabs.find((other) => other.id === tabId)
   if (tab !== undefined && mountedTabs(tabs).has(tabId) && tabTopic(tab) === place.topicId) return undefined
-  return { id: place.topicId, view: topicView(place.topicId, tabId), fresh, name: 'juno.tab-switch' as const }
+  return { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tabId), fresh, name: 'juno.tab-switch' as const }
 }
 
 /**
@@ -556,7 +558,7 @@ export function goToTabEntry(index: number): void {
   const tab = activeTab(tabs)
   const place = tab?.history.entries[index]
   if (tab === undefined || place === undefined || index === tab.history.index) return
-  const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
+  const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
   show((current) => goToEntry(current, index), topic)
 }
 

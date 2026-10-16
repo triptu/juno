@@ -335,3 +335,23 @@ describe('send', () => {
     await waitFor(() => (draft() === '' ? true : undefined), WAIT_MS, 'the draft cleared')
   })
 })
+
+
+it.each(['C0ENG', 'G0MAYALEO'])('New chat in %s queues a thread root and acknowledges its dependent reply once', async channelId => {
+  const engine = await booted()
+  const target = { kind: 'channel', channelId } as const
+  engine.fake.holdNext({ method: 'chat.postMessage', before: true })
+  const sent = valueOf(await sendMessage(engine.registry, target, 'first', undefined, undefined, true))
+  expect(sent.topicId.startsWith(`p:${channelId}:`)).toBe(true)
+  const thread = watch(engine, sent.topicId)
+  const initial = await thread(rows => rows.length === 1 && rows[0]?.pending === 'sending', 'pending root')
+  expect(initial[0]?.root).toBe(true)
+  await sendMessage(engine.registry, { ...target, threadTs: initial[0]!.ts }, 'second')
+  await thread(rows => rows.length === 2, 'pending reply')
+  expect(engine.fake.messages(channelId).filter(message => message.text === 'second')).toHaveLength(0)
+  engine.fake.release()
+  await thread(rows => rows.length === 2 && rows.every(row => row.pending === undefined), 'acknowledged thread')
+  const root = engine.fake.messages(channelId).find(message => message.text === 'first')!
+  expect(engine.fake.messages(channelId).find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
+  expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(2)
+})

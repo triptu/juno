@@ -94,7 +94,7 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     const attached = takeAttachments(tabId)
     if (attached === undefined) return
     setSending(true)
-    const exit = await sendMessage(registry, target, encodeMentions(body, chat.mentions), undefined, attached.ids)
+    const exit = await sendMessage(registry, target, encodeMentions(body, chat.mentions), undefined, attached.ids, chat.thread === undefined && target.kind === 'channel' && target.threadTs === undefined && chat.conversation?.kind !== 'im')
     if (exit._tag === 'Success') return settleSentChat(tabId, exit.value.topicId)
     // The draft and its files stay; the send can be tried again.
     attached.restore()

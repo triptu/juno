@@ -6,6 +6,7 @@ import type { WindowTarget } from './window'
 export const windowCovered = (target: WindowTarget, first: string | undefined) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
+    if (target.kind === 'thread' && target.threadTs.startsWith('pending:')) return true
     if (first === undefined) return false
     if (target.kind === 'main') {
       // Socket messages can extend a cached window beyond its fetched range.
