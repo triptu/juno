@@ -1,6 +1,7 @@
 // ⌘K (spec section 10): open it with the shortcut and the Search button,
-// the two tabs, a conversation from Conversations, the pages, the Settings
-// sections and the commands (global and the open topic's), and in Messages: recent topics on an empty query, a topic by its title, a message by its
+// the two tabs, a conversation from Conversations, the commands (global
+// and the open topic's; the pages and Settings sections are in
+// `palette-pages.spec.ts`), and in Messages: recent topics on an empty query, a topic by its title, a message by its
 // text (landing on it), a channel's Main and "show its topics" (also from
 // its menu), a person's DM and a New chat to someone never messaged, a
 // command, Slack's search for what the cache lacks, and all of it from the
@@ -106,63 +107,6 @@ test('">" lists the commands, and ">theme" then Dark switches the theme', async 
   await palette.expectActive(/Theme: Light/)
   await palette.press('Enter')
   await expect.poll(scheme).toBe('light')
-})
-
-test('">" lists the pages; "Juno" opens the Juno tab, and then Memory of this chat is one of them', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { palette, tabs } = juno
-  const pages = palette.section('Pages')
-
-  await palette.open()
-  await palette.type('>')
-  for (const name of ['Home', 'All topics', 'Juno', 'New chat', 'Scheduled', 'What Juno remembers', 'Activity', 'Settings']) {
-    await expect(pages.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible()
-  }
-  await expect(pages.getByRole('option', { name: /Memory of this chat/ })).toHaveCount(0)
-  await palette.clear()
-  await palette.type('juno')
-  await palette.expectActive(/^Juno/)
-  await palette.press('Enter')
-  await palette.expectClosed()
-  await tabs.expectActive('Juno')
-
-  await palette.open()
-  await palette.type('>')
-  await expect(pages.getByRole('option', { name: /Memory of this chat/ })).toBeVisible()
-})
-
-test('"settings" lists every Settings section, and Enter on one opens Settings there', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { palette, settings, tabs } = juno
-
-  await palette.open()
-  await palette.type('settings')
-  const sections = palette.section('Settings')
-  await expect(sections.getByRole('option')).toHaveCount(8)
-  for (const name of ['General', 'Appearance', 'Notifications', 'Ignored', 'Juno', 'Connections', 'Backup & This Mac', 'About']) {
-    await expect(sections.getByRole('option', { name: new RegExp(`Settings: ${name}`) })).toBeVisible()
-  }
-  await palette.row('Settings: Notifications').hover()
-  await palette.expectActive(/Settings: Notifications/)
-  await palette.press('Enter')
-  await palette.expectClosed()
-  await tabs.expectActive('Settings')
-  await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
-})
-
-test('"scheduled" then Enter opens the Scheduled page', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { palette, tabs } = juno
-
-  await palette.open()
-  await palette.type('scheduled')
-  await palette.expectActive(/^Scheduled/)
-  await palette.press('Enter')
-  await palette.expectClosed()
-  await tabs.expectActive('Scheduled')
 })
 
 test('with a topic open, its commands come first under its name, and "resolve" resolves it', async ({ juno }) => {
