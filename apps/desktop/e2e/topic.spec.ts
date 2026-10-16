@@ -99,7 +99,7 @@ test('⋯ opens the topic menu under the right island, as a right-click on the t
     'Open in new tab',
     '-',
     'Rename',
-    'Redraw',
+    'Redraw art',
     'Mark as unread',
     'Pin',
     'Resolve',

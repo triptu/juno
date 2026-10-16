@@ -1,25 +1,37 @@
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import {
   defaultPersonColor,
+  GROUP_SUGGESTION_LIMIT,
   insertMention,
   mentionQueryAt,
   mentionTokens,
   rankSuggestions,
   removeTokenBefore,
   type MentionChannel,
+  type MentionGroup,
   type MentionPerson,
   type MentionPick,
   type MentionQuery,
   type MentionToken,
 } from '@juno/contract'
-import { mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from '@juno/state'
+import { mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MentionSuggestions, mentionRowId, type ComposerMention } from '@juno/views'
 
 import { editField, listKey } from './suggestionKeys'
 import { useEmojiSuggestions } from './emojiSuggestions'
 
-type Rows = { readonly kind: 'person'; readonly rows: ReadonlyArray<MentionPerson> } | { readonly kind: 'channel'; readonly rows: ReadonlyArray<MentionChannel> }
+type Rows =
+  | { readonly kind: 'person'; readonly rows: ReadonlyArray<MentionPerson>; readonly groups: ReadonlyArray<MentionGroup> }
+  | { readonly kind: 'channel'; readonly rows: ReadonlyArray<MentionChannel> }
+
+/** The list's rows in order, each as the pick it inserts. */
+const picksOf = (rows: Rows | undefined): ReadonlyArray<MentionPick> =>
+  rows === undefined
+    ? []
+    : rows.kind === 'person'
+      ? [...rows.rows.map((person): MentionPick => ({ kind: 'person', id: person.id, name: person.name })), ...rows.groups.map((group): MentionPick => ({ kind: 'group', id: group.id, name: group.handle }))]
+      : rows.rows.map((channel): MentionPick => ({ kind: 'channel', id: channel.id, name: channel.name }))
 
 export interface MentionsOptions {
   readonly text: string
@@ -31,12 +43,15 @@ export interface MentionsOptions {
   readonly field: RefObject<HTMLTextAreaElement | null>
   /** The conversation the composer writes to, which ranks the people. */
   readonly place: MentionPlace
+  /** Offer user groups after the people (the topic composer). */
+  readonly groups?: boolean
 }
 
 /**
  * @ and # suggestions for a composer (spec section 8, inventory 7.1). The
  * owner keeps the text and the picks; this follows the caret, asks the
- * engine for matches (`mentions.people`, `mentions.channels`), and answers
+ * engine for matches (`mentions.people`, with `groups` `mentions.groups`,
+ * and `mentions.channels`), and answers
  * the `Composer` props that draw the picked names as chips and the list
  * above the field.
  *
@@ -46,7 +61,7 @@ export interface MentionsOptions {
  * Picks and Backspace edit the field through `insertText` and `delete`, so
  * ⌘Z undoes them like typing.
  */
-export function useMentions({ text, picks, onPicks, onChange, field, place }: MentionsOptions) {
+export function useMentions({ text, picks, onPicks, onChange, field, place, groups = false }: MentionsOptions) {
   const emoji = useEmojiSuggestions({ text, onChange, field })
   const listId = useId()
   const [caret, setCaret] = useState(text.length)
@@ -57,28 +72,28 @@ export function useMentions({ text, picks, onPicks, onChange, field, place }: Me
   const tokens = mentionTokens(text, picks)
   const typed = mentionQueryAt(text, Math.min(caret, text.length), tokens)
   const query = typed !== undefined && typed.start !== dismissed ? typed : undefined
-  const { rows, answered } = useMentionRows(query, place)
-  const ids = rows === undefined ? [] : rows.rows.map((row) => mentionRowId(listId, row.id))
+  const { rows, answered } = useMentionRows(query, place, groups)
+  const listed = picksOf(rows)
+  const ids = listed.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
-  const open = query !== undefined && rows !== undefined && rows.rows.length > 0
+  const open = query !== undefined && listed.length > 0
 
-  /** Puts `row` in place of the query `at`, and keeps it with the picks. */
-  const insertPick = (at: MentionQuery, row: MentionPerson | MentionChannel) => {
-    const picked: MentionPick = { kind: at.trigger === '@' ? 'person' : 'channel', id: row.id, name: row.name }
+  /** Puts `picked` in place of the query `at`, and keeps it with the picks. */
+  const insertPick = (at: MentionQuery, picked: MentionPick) => {
     if (!picks.some((p) => p.kind === picked.kind && p.id === picked.id && p.name === picked.name)) onPicks([...picks, picked])
     const after = insertMention(text, at, picked)
     // Only what changes is typed: the name, and the space when there is none yet.
     editField(field.current, at.start, at.end, after.text.slice(at.start, after.caret))
   }
   const pick = (rowId: string) => {
-    const row = rows?.rows[ids.indexOf(rowId)]
+    const row = listed[ids.indexOf(rowId)]
     if (query === undefined || row === undefined) return
     insertPick(query, row)
     setChosen(undefined)
   }
   const held = useHeldEnter(place, (at, first) => {
     // Typing went on meanwhile: that text decides, not this answer.
-    if (field.current?.value === text) insertPick(at, first)
+    if (field.current?.value === text) insertPick(at, { kind: at.trigger === '@' ? 'person' : 'channel', id: first.id, name: first.name })
   })
 
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
@@ -132,25 +147,31 @@ export function useMentions({ text, picks, onPicks, onChange, field, place }: Me
  * the last answer narrowed to the query. `answered` is false while the
  * answer for this query is on its way.
  */
-function useMentionRows(query: MentionQuery | undefined, place: MentionPlace): { readonly rows: Rows | undefined; readonly answered: boolean } {
+function useMentionRows(query: MentionQuery | undefined, place: MentionPlace, withGroups: boolean): { readonly rows: Rows | undefined; readonly answered: boolean } {
   const people = useAtomValue(mentionPeopleAtom(query?.trigger === '@' ? query.text : undefined, place))
+  // Groups only once something is typed after the "@"; the people and the groups answer together, so the list grows once.
+  const groupQuery = withGroups && query?.trigger === '@' && query.text.trim() !== '' ? query.text : undefined
+  const groups = useAtomValue(mentionGroupsAtom(groupQuery))
   const channels = useAtomValue(mentionChannelsAtom(query?.trigger === '#' ? query.text : undefined))
   // Kept as state: a new answer replaces it during render.
   const [last, setLast] = useState<Rows | undefined>(undefined)
   if (query === undefined) return { rows: undefined, answered: false }
   const fresh: Rows | undefined =
     query.trigger === '@'
-      ? people._tag === 'Success'
-        ? { kind: 'person', rows: people.value }
+      ? people._tag === 'Success' && (groupQuery === undefined || groups._tag === 'Success')
+        ? { kind: 'person', rows: people.value, groups: groupQuery === undefined || groups._tag !== 'Success' ? [] : groups.value }
         : undefined
       : channels._tag === 'Success'
         ? { kind: 'channel', rows: channels.value }
         : undefined
   if (fresh !== undefined) {
-    if (fresh.rows !== last?.rows) setLast(fresh)
+    if (fresh.rows !== last?.rows || (fresh.kind === 'person' && last?.kind === 'person' && fresh.groups !== last.groups)) setLast(fresh)
     return { rows: fresh, answered: true }
   }
-  if (last?.kind === 'person' && query.trigger === '@') return { rows: { kind: 'person', rows: rankSuggestions(last.rows, query.text) }, answered: false }
+  if (last?.kind === 'person' && query.trigger === '@') {
+    const narrowed = groupQuery === undefined ? [] : rankSuggestions(last.groups, query.text, GROUP_SUGGESTION_LIMIT)
+    return { rows: { kind: 'person', rows: rankSuggestions(last.rows, query.text), groups: narrowed }, answered: false }
+  }
   if (last?.kind === 'channel' && query.trigger === '#') return { rows: { kind: 'channel', rows: rankSuggestions(last.rows, query.text) }, answered: false }
   return { rows: undefined, answered: false }
 }
@@ -177,11 +198,10 @@ function useHeldEnter(place: MentionPlace, insert: (at: MentionQuery, first: Men
   return { hold, drop }
 }
 
-/** The picked names as the field draws them: a person in their hue, a channel as its chip. */
+/** The picked names as the field draws them: a person in their hue, a group as a message draws it (`hueFor` of its id), a channel as its chip. */
 const marksOf = (tokens: ReadonlyArray<MentionToken>) =>
-  tokens.map((token) => ({
-    start: token.start,
-    end: token.end,
-    look: token.pick.kind,
-    ...(token.pick.kind === 'person' ? { hue: hueFor(defaultPersonColor(token.pick.id), token.pick.id) } : {}),
-  }))
+  tokens.map((token) => {
+    const { kind, id } = token.pick
+    if (kind === 'channel') return { start: token.start, end: token.end, look: 'channel' as const }
+    return { start: token.start, end: token.end, look: 'person' as const, hue: hueFor(kind === 'person' ? defaultPersonColor(id) : '', id) }
+  })

@@ -107,7 +107,7 @@ export {
   untouched,
   type NewChat,
 } from './newChat'
-export { composerEmojiAtom, mentionChannelsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
+export { composerEmojiAtom, mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
   checkMessage,
   deleteMessage,
@@ -172,7 +172,7 @@ export {
   type Theme,
 } from './shell'
 export type { PortLike } from './transport'
-export { redrawTopic, type RedrawProblem } from './art'
+export { canRedraw, redrawTopic, type RedrawProblem } from './art'
 export { aiActivityAtom } from './aiActivity'
 export { messageLink, slackLink, threadRootTs } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
@@ -238,6 +238,8 @@ export {
   openFile,
   copyImage,
   readyFiles,
+  sendableFiles,
+  whenStarted,
   removeAttachment,
   restoreAttachments,
   uploadProgressAtom,

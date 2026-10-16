@@ -11,7 +11,7 @@ const base: TopicMenuState = {
   pinned: false,
   resolved: false,
   notify: 'matters',
-  aiAssist: true,
+  canDraw: true,
 }
 
 describe('topic row menu', () => {
@@ -20,7 +20,7 @@ describe('topic row menu', () => {
       'Open in new tab',
       '—',
       'Rename',
-      'Redraw',
+      'Redraw art',
       'Mark as unread',
       'Pin',
       'Resolve',
@@ -37,7 +37,7 @@ describe('topic row menu', () => {
       'Open in new tab',
       '—',
       'Rename',
-      'Redraw',
+      'Redraw art',
       'Mark as read',
       'Unpin',
       'Reopen',
@@ -57,12 +57,12 @@ describe('topic row menu', () => {
     expect(labels(topicMenuItems({ ...base, channel: group })).at(-1)).toBe('Notify me')
   })
 
-  it('offers Redraw only with AI assist on, and never on a DM Main, which shows the person', () => {
-    expect(labels(topicMenuItems({ ...base, aiAssist: false }))).not.toContain('Redraw')
-    expect(labels(topicMenuItems({ ...base, kind: 'main' }))).toContain('Redraw')
-    expect(labels(topicMenuItems({ ...base, channel: maya }))).toContain('Redraw')
-    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: maya }))).not.toContain('Redraw')
-    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: group }))).not.toContain('Redraw')
+  it('offers Redraw art only when a drawing can be made, and never on a DM Main, which shows the person', () => {
+    expect(labels(topicMenuItems({ ...base, canDraw: false }))).not.toContain('Redraw art')
+    expect(labels(topicMenuItems({ ...base, kind: 'main' }))).toContain('Redraw art')
+    expect(labels(topicMenuItems({ ...base, channel: maya }))).toContain('Redraw art')
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: maya }))).not.toContain('Redraw art')
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: group }))).not.toContain('Redraw art')
   })
 
   it('offers the three Notify me choices with the current one checked and named in the hint', () => {

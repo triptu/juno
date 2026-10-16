@@ -67,11 +67,13 @@ export function withQuote(draft: string, text: string): string {
  * and the pending row shows in the list at once; otherwise the check bar
  * shows inside the composer until a choice, Esc or an edit. While typing
  * pauses in a public channel, the audience line warns about hiring and
- * people details. Typing @ or # suggests people and channels
- * (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
+ * people details. Typing @ or # suggests people and user groups, or
+ * channels (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
  * The draft and the send carry the picked people and channels and the
  * linked words encoded as Slack does (`encodeDraft`), while the checks read
- * the text as shown.
+ * the text as shown. A file still staging goes with the send: the message
+ * shows as sending at once and the engine posts it when the file is ready,
+ * or shows it as not sent when the file could not be read.
  */
 export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
@@ -199,7 +201,7 @@ function LoadedComposer({
 
   const here = { channelId: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) }
   const deliver = (body: string, to: Destination) => {
-    const attached = takeAttachments(id)
+    const attached = takeAttachments(id, { staging: true })
     if (attached === undefined) return
     // A fixed text ("Fix and send") moves the linked words with its fixes.
     const sentLinks = body === text ? links.current() : moveLinks(text, body, links.current())
@@ -215,7 +217,7 @@ function LoadedComposer({
     setBar(undefined)
     onSent()
     const target: SendTarget = { kind: 'channel', ...(to.kind === 'here' ? here : { channelId: detail.channel.id, threadTs: to.threadTs }) }
-    void sendMessage(registry, target, message, id, attached.ids).then((exit) => {
+    void attached.started.then(() => sendMessage(registry, target, message, id, attached.ids)).then((exit) => {
       if (exit._tag === 'Success') mark('juno.send-queued', undefined, { replace: true })
       if (exit._tag === 'Failure') {
         // Nothing was queued: the text and the files come back so they can be sent again.
@@ -239,8 +241,6 @@ function LoadedComposer({
   const send = () => {
     if (bar !== undefined) return follow(choose(bar, 'primary'))
     if ((text.trim() === '' && files.files.length === 0) || checking.current !== undefined) return
-    // A file is still on its way to the engine: Enter waits for it.
-    if (files.files.some((file) => file.state === 'staging')) return
     markSend()
     // Only Wrong place runs before sending, and only in Main. Anything else sends at once.
     if (!routeChecked || text.trim() === '') return deliver(text, { kind: 'here' })
@@ -293,6 +293,7 @@ function LoadedComposer({
     onChange: change,
     field,
     place: { channel: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) },
+    groups: true,
   })
 
   // Links are drawn where no picked name is.

@@ -8,6 +8,9 @@
  *   DM's members), then recent contacts (your DMs and group DMs by latest
  *   activity), then everyone else. A query matches the display name, the
  *   real name and the handle by word start.
+ * - `mentions.groups`: the user groups matching `query` by handle or name,
+ *   yours first, at most `GROUP_SUGGESTION_LIMIT`. The "@" list shows them
+ *   after the people, and only once something is typed after the "@".
  * - `mentions.channels`: the channels matching `query`, yours first. DMs
  *   and group DMs are not offered.
  *
@@ -37,6 +40,23 @@ export const MentionPerson = Schema.Struct({
 })
 export type MentionPerson = typeof MentionPerson.Type
 
+export const MentionGroup = Schema.Struct({
+  id: Schema.String,
+  /** Without "@": what the token shows after "@". */
+  handle: Schema.String,
+  /** The group's name, shown after the handle. */
+  name: Schema.optionalKey(Schema.String),
+  /** 0 a group you are in, 1 one you are not. */
+  tier: Schema.Int,
+  order: Schema.Int,
+  /** What a query matches: handle, name. */
+  names: Schema.Array(Schema.String),
+})
+export type MentionGroup = typeof MentionGroup.Type
+
+/** The groups the "@" list shows at most, after the people. */
+export const GROUP_SUGGESTION_LIMIT = 3
+
 export const MentionChannel = Schema.Struct({
   id: Schema.String,
   /** Without "#". */
@@ -54,6 +74,11 @@ export const mentionsPeople = liveValueRoute('mentions.people', {
   value: Schema.Array(MentionPerson),
 })
 
+export const mentionsGroups = liveValueRoute('mentions.groups', {
+  payload: { query: Schema.String },
+  value: Schema.Array(MentionGroup),
+})
+
 export const mentionsChannels = liveValueRoute('mentions.channels', {
   payload: { query: Schema.String },
   value: Schema.Array(MentionChannel),
@@ -64,4 +89,4 @@ export const mentionsEmoji = liveValueRoute('mentions.emoji', {
   value: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.NullOr(Schema.String), alias_for: Schema.NullOr(Schema.String) })),
 })
 
-export const MentionsRoutes = RpcGroup.make(mentionsPeople, mentionsChannels, mentionsEmoji)
+export const MentionsRoutes = RpcGroup.make(mentionsPeople, mentionsGroups, mentionsChannels, mentionsEmoji)

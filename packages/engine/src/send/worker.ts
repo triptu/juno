@@ -6,7 +6,10 @@
  * earlier one is not settled, so messages reach Slack in the order they
  * were sent. A `failed` row does not hold the channel up.
  *
- * - `queued`: a post with files first uploads the ones Slack does not have
+ * - `queued`: a post sent while one of its files was still staging waits
+ *   for the file (`Staging.settled` wakes the worker); a file whose bytes
+ *   will not all come fails the row, as a refused upload does. Then
+ *   a post with files uploads the ones Slack does not have
  *   yet (`upload`); a file Slack's upload host refuses makes the row
  *   `failed`, and a lost connection makes it wait. Then the row becomes
  *   `sending` in its own transaction, and one `chat.postMessage`, or
@@ -46,6 +49,7 @@ import {
   deferPost,
   failPost,
   failUpload,
+  fileStaged,
   fileUploaded,
   flushPosts,
   pendingPosts,
@@ -81,6 +85,10 @@ const LOOKUP_PAGES = 5
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
 /** `last_error` of a post Slack accepted without sending the message back (`files.share`). */
 const SHARED = 'shared'
+/** What `post` answers while a file the post took is still staging. */
+const WAITING = 'waiting'
+/** `last_error` of a post whose file could not be staged. */
+const NOT_STAGED = 'file_not_staged'
 
 export class PostWorker extends Context.Service<
   PostWorker,
@@ -165,9 +173,38 @@ export class PostWorker extends Context.Service<
           return files.flatMap((file) => (file.fileId === undefined ? [] : [file.fileId]))
         })
 
-      const post = (open: OpenWorkspace, fetcher: TopicFetcher, row: PendingPost) =>
+      /**
+       * The files the post took while they were staging (spec section 8):
+       * `waiting` while one is still being written, the post with the
+       * complete files once they are, or undefined when one will not
+       * complete and the post failed.
+       */
+      const staged = (open: OpenWorkspace, row: PendingPost) =>
         Effect.gen(function* () {
           const local = inStore(open)
+          let files = row.files
+          for (const file of row.files) {
+            if (file.staging !== true) continue
+            const status = yield* staging.status(file.id)
+            if (status._tag === 'writing') return WAITING
+            if (status._tag === 'ready') {
+              if (!(yield* local(transaction(fileStaged(row.clientMsgId, status.file))))) return undefined
+              files = files.map((each) => (each.id === file.id ? status.file : each))
+              continue
+            }
+            // The composer could not read the rest, or a restart lost it: nothing was posted, so it waits for Retry or Delete draft.
+            yield* Effect.logWarning('send: a file was not staged')
+            yield* local(transaction(failUpload(row.clientMsgId, NOT_STAGED)))
+            return undefined
+          }
+          return { ...row, files }
+        })
+
+      const post = (open: OpenWorkspace, fetcher: TopicFetcher, queued: PendingPost) =>
+        Effect.gen(function* () {
+          const local = inStore(open)
+          const row = queued.files.some((file) => file.staging === true) ? yield* staged(open, queued) : queued
+          if (row === undefined || row === WAITING) return row
           const fileIds = row.files.length === 0 ? [] : yield* upload(open, row)
           if (fileIds === undefined) return
           // The socket may have dropped during the upload or an earlier row's call: the row waits for it (spec section 8).
@@ -269,6 +306,8 @@ export class PostWorker extends Context.Service<
           // One pass posts at a time, so a row still `sending` here was cut off (a restart, a store failure) and may be in Slack.
           yield* local(transaction(recoverPosts(now)))
           const held = new Set<string>()
+          // Channels whose first row waits for a file to stage: `Staging.settled` wakes the worker for them, not a time.
+          const waiting = new Set<string>()
           for (const row of yield* local(pendingPosts)) {
             if (row.state === 'failed' || held.has(row.channel)) continue
             if (row.threadTs?.startsWith('pending:')) continue
@@ -276,14 +315,15 @@ export class PostWorker extends Context.Service<
             if (row.nextAt > now) continue
             // Checked per row, not per pass: an earlier row's call may have outlasted the socket. Its return wakes the worker.
             if (!(yield* link.online)) return undefined
-            if (row.state === 'queued') yield* post(open, fetcher, row)
-            else if (row.state === 'unknown') {
+            if (row.state === 'queued') {
+              if ((yield* post(open, fetcher, row)) === WAITING) waiting.add(row.channel)
+            } else if (row.state === 'unknown') {
               yield* lookUp(open, fetcher, row)
               // A lookup that finds nothing puts the row back in the queue, ahead of later rows: start again.
               return 0
             }
           }
-          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed' && !row.threadTs?.startsWith('pending:'))
+          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed' && !row.threadTs?.startsWith('pending:') && !waiting.has(row.channel))
           if (rest.length === 0) return undefined
           const after = yield* Clock.currentTimeMillis
           return Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - after)
@@ -308,6 +348,7 @@ export class PostWorker extends Context.Service<
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => wake))
       yield* Effect.forkScoped(Stream.runForEach(link.caughtUps, () => flush))
       yield* Effect.forkScoped(Stream.runForEach(Stream.filter(link.onlineChanges, (online) => online), () => wake))
+      yield* Effect.forkScoped(Stream.runForEach(staging.settled, () => wake))
       yield* Effect.forkScoped(loop)
       return PostWorker.of({ wake })
     }),

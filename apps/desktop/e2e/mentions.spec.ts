@@ -1,6 +1,6 @@
-// @ and # in the composer (spec section 8, inventory 7.1): people and
-// channels suggested as you type, picked with the keyboard, sent as real
-// Slack mentions and channel links, Esc and Backspace, and New chat.
+// @ and # in the composer (spec section 8, inventory 7.1): people, user
+// groups and channels suggested as you type, picked with the keyboard, sent
+// as real Slack mentions and channel links, Esc and Backspace, and New chat.
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -37,6 +37,41 @@ test('mention a person in a reply: it posts as <@U…> and shows as a mention', 
   await topic.expectSent('Thanks')
   expect(postedText(fake).at(-1)).toBe('Thanks <@U0MAYA> the plan works.')
   await expect(topic.message('Thanks').locator('[data-person="U0MAYA"]')).toHaveText('@Maya')
+})
+
+test('a user group is suggested after the people who match, and posts as Slack sends a group mention', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  // A bare "@" lists people only.
+  await topic.composer.pressSequentially('Heads up @')
+  await expect(topic.suggestions.getByRole('option').first()).toBeVisible()
+  await expect(topic.suggestion('@platform')).toHaveCount(0)
+
+  await topic.composer.pressSequentially('p')
+  await expect(topic.suggestion('@platform')).toBeVisible()
+  const options = topic.suggestions.getByRole('option')
+  await expect(options).not.toHaveCount(1)
+  await expect(options.last()).toHaveAccessibleName(/^@platform Platform team/)
+  await expect(topic.suggestions).toContainText('Groups')
+
+  await topic.composer.pressSequentially('lat')
+  await expect(options).toHaveCount(1)
+  await topic.composer.press('Enter')
+  await expect(topic.composer).toHaveValue('Heads up @platform ')
+  await expect(topic.composerChips).toHaveText(['@platform'])
+
+  await topic.composer.pressSequentially('the cutover is tonight.')
+  await topic.composer.press('Enter')
+  await topic.expectSent('Heads up')
+  expect(postedText(fake).at(-1)).toBe('Heads up <!subteam^S0PLATFORM> the cutover is tonight.')
+  const post = fake.calls.filter((call) => call.method === 'chat.postMessage').at(-1)!
+  const blocks = post.args['blocks']
+  expect(typeof blocks === 'string' ? blocks : JSON.stringify(blocks)).toContain('{"type":"usergroup","usergroup_id":"S0PLATFORM"}')
+  await expect(topic.message('Heads up').locator('[data-usergroup="S0PLATFORM"]')).toHaveText('@platform')
 })
 
 test('link a channel with #, picked with Tab', async ({ juno, fake }) => {

@@ -76,8 +76,8 @@ export interface TopicMenuState {
   readonly notify: NotifyChoice
   /** The views, in pill order, for Add to view on a Main row. Absent: no item. */
   readonly views?: ReadonlyArray<ViewChoice>
-  /** AI assist is on (spec section 15): Redraw needs the model. */
-  readonly aiAssist: boolean
+  /** Art can be drawn now (spec section 5): AI assist on, an OpenRouter key, and today's AI spend cap not reached. */
+  readonly canDraw: boolean
 }
 
 /** A view as Add to view lists it. */
@@ -153,8 +153,8 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   const isMain = state.kind === 'main'
   const items: MenuItem<TopicMenuAction>[] = [item('open-new-tab', 'Open in new tab', '⌘ click'), separator]
   if (!isMain) items.push(item('rename', 'Rename'))
-  // A new drawing of the topic's art. A DM's Main shows the person's photo, so there is nothing to redraw.
-  if (state.aiAssist && !(isMain && isDm(state.channel.kind))) items.push(item('redraw', 'Redraw'))
+  // A new drawing of the topic's art, only when one can be made. A DM's Main shows the person's photo, so there is nothing to redraw.
+  if (state.canDraw && !(isMain && isDm(state.channel.kind))) items.push(item('redraw', 'Redraw art'))
   items.push(state.unread ? item('mark-read', 'Mark as read') : item('mark-unread', 'Mark as unread'))
   items.push(state.pinned ? item('unpin', 'Unpin') : item('pin', 'Pin'))
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))

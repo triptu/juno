@@ -3,58 +3,14 @@
 // the outbox; a failed upload keeps the text and the files for Retry; a
 // message's image opens in the viewer and a file downloads into Downloads.
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-import type { Locator, Page } from '@playwright/test'
-import { samplePdf, samplePng } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
-import type { TopicPane } from './driver/juno'
+import { brief, chart, chip, chips, drop, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
-/** Shares four words with the staging bill thread in #eng. */
-const BILL_REPLY = 'the preview environments reaper should cut the staging bill'
-
-interface Upload {
-  readonly name: string
-  readonly mimeType: string
-  readonly buffer: Buffer
-}
-
-const chart = (): Upload => ({ name: 'chart.png', mimeType: 'image/png', buffer: samplePng(640, 400) })
-const brief = (): Upload => ({ name: 'launch-brief.pdf', mimeType: 'application/pdf', buffer: samplePdf('Launch brief', ['Freeze on Thursday.']) })
-
-/** Builds a DataTransfer holding `files` in the page. */
-function dataTransfer(win: Page, files: ReadonlyArray<Upload>) {
-  return win.evaluateHandle((list) => {
-    const transfer = new DataTransfer()
-    for (const file of list) transfer.items.add(new File([Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0))], file.name, { type: file.mimeType }))
-    return transfer
-  }, files.map((file) => ({ name: file.name, mimeType: file.mimeType, base64: file.buffer.toString('base64') })))
-}
-
-/** Pastes `files` into a composer's field, as ⌘V with files on the clipboard. */
-async function paste(field: Locator, files: ReadonlyArray<Upload>): Promise<void> {
-  const transfer = await dataTransfer(field.page(), files)
-  await field.focus()
-  await field.evaluate((element, data) => element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })), transfer)
-}
-
-/** Drags `files` over `target` and drops them there. */
-async function drop(target: Locator, files: ReadonlyArray<Upload>): Promise<void> {
-  const transfer = await dataTransfer(target.page(), files)
-  await target.dispatchEvent('dragenter', { dataTransfer: transfer })
-  await target.dispatchEvent('dragover', { dataTransfer: transfer })
-  await target.dispatchEvent('drop', { dataTransfer: transfer })
-}
-
-const chips = (topic: TopicPane) => topic.root.locator('[data-composer]').getByRole('button', { name: /^Remove / })
-const chip = (topic: TopicPane, name: string) => topic.root.locator('[data-composer]').getByRole('button', { name: `Remove ${name}` })
-/** Waits until `count` of a pane's chips are staged. Enter does nothing while a file is still being read, so a send waits for this. */
-const staged = (pane: { readonly root: Locator }, count: number) => expect(pane.root.locator('[data-composer] [data-attachment="ready"]')).toHaveCount(count)
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
   await juno.signIn()
@@ -285,54 +241,6 @@ test('Download saves the file into Downloads', async ({ juno }) => {
   expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
 })
 
-
-test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-  // Wrong place is the one check before sending: wait for the typing pause's answer.
-  const since = Date.now()
-  await topic.composer.fill(BILL_REPLY)
-  await expect.poll(() => {
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-    try {
-      return (db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck' AND model != ''`).get() as { at: number | null }).at ?? 0
-    } finally {
-      db.close()
-    }
-  }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
-  await topic.composer.press('Enter')
-  const post = topic.root.getByRole('button', { name: /Post in thread/ })
-  await expect(post).toBeVisible()
-
-  // Hold the file read, as when the selected file is on a slow volume.
-  await juno.win.evaluate(() => {
-    const slice = File.prototype.slice
-    File.prototype.slice = function (...args) {
-      File.prototype.slice = slice
-      const blob = slice.apply(this, args)
-      const read = blob.arrayBuffer.bind(blob)
-      blob.arrayBuffer = () => new Promise<ArrayBuffer>((resolve) => {
-        window.addEventListener('release-file-read', () => void read().then(resolve), { once: true })
-      })
-      return blob
-    }
-  })
-  await paste(topic.composer, [chart()])
-  await expect(chip(topic, 'chart.png')).toBeVisible()
-  await post.click()
-  await expect(topic.composer).toHaveValue(BILL_REPLY)
-  await expect(post).toBeVisible()
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
-
-  await juno.win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
-  await expect(topic.root.locator('[data-composer] img[src^="juno://uploads/"]')).toHaveCount(1)
-  await post.click()
-  await expect(topic.composer).toHaveValue('')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length).toBe(1)
-})
 
 // A message's images make a grid in the message; any of them opens the media viewer at it, with every one in a
 // filmstrip along the bottom. ← and → move and stop at the ends, the strip shows the one clicked, and Esc closes

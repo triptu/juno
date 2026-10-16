@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import type { MentionChannel, MentionPerson } from '@juno/contract'
-import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
+import { UsersThree } from '@phosphor-icons/react/dist/icons/UsersThree'
+import type { MentionChannel, MentionGroup, MentionPerson } from '@juno/contract'
+import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, Text, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
 import { hueFor, initials } from './look'
 
@@ -31,6 +32,8 @@ export type MentionSuggestionsProps =
   | {
       readonly kind: 'person'
       readonly rows: ReadonlyArray<MentionPerson>
+      /** User groups, after the people under their own label. */
+      readonly groups?: ReadonlyArray<MentionGroup>
       readonly id: string
       readonly activeId: string | undefined
       readonly onActivate: (rowId: string) => void
@@ -53,16 +56,19 @@ export const mentionRowId = (listId: string, id: string) => `${listId}-${id}`
  * composer, its rows' names lined up under the "@" or "#" being typed,
  * kept inside the composer's width. Focus stays in the field, which drives
  * the list with the arrow keys (`aria-activedescendant`); a press picks a
- * row without taking focus. People show their avatar and real name,
- * channels their kind.
+ * row without taking focus. People show their avatar and real name, user
+ * groups (after the people, under "Groups") their handle and name in a
+ * round tile the avatar's size, channels their kind.
  */
 export function MentionSuggestions(props: MentionSuggestionsProps) {
   const { id, activeId, onActivate, onPick } = props
+  const groups = props.kind === 'person' ? (props.groups ?? []) : []
+  const label = props.kind === 'person' ? (groups.length === 0 ? 'People' : props.rows.length === 0 ? 'Groups' : 'People and groups') : props.kind === 'emoji' ? 'Emoji' : 'Channels'
   return (
     <div data-mention-suggestions="" {...stylex.props(styles.panel, props.kind === 'channel' ? styles.underChannel : styles.underPerson)}>
       <Surface kind="popover">
-      <OptionList id={id} label={props.kind === 'person' ? 'People' : props.kind === 'emoji' ? 'Emoji' : 'Channels'} {...(activeId === undefined ? {} : { activeId })}>
-        <OptionGroupLabel>{props.kind === 'person' ? 'People' : props.kind === 'emoji' ? 'Emoji' : 'Channels'}</OptionGroupLabel>
+      <OptionList id={id} label={label} {...(activeId === undefined ? {} : { activeId })}>
+        {props.kind === 'person' && props.rows.length === 0 ? null : <OptionGroupLabel>{props.kind === 'person' ? 'People' : props.kind === 'emoji' ? 'Emoji' : 'Channels'}</OptionGroupLabel>}
         {props.kind === 'person'
           ? props.rows.map((person) => {
               const rowId = mentionRowId(id, person.id)
@@ -101,6 +107,23 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
                 />
               )
             })}
+        {groups.length === 0 ? null : <OptionGroupLabel>Groups</OptionGroupLabel>}
+        {groups.map((group) => {
+          const rowId = mentionRowId(id, group.id)
+          return (
+            <OptionRow
+              key={group.id}
+              id={rowId}
+              size={32}
+              active={rowId === activeId}
+              leading={<span aria-hidden {...stylex.props(styles.groupTile)}><Icon icon={UsersThree} size={13} /></span>}
+              label={`@${group.handle}`}
+              {...(group.name === undefined ? {} : { sub: group.name })}
+              onSelect={() => onPick(rowId)}
+              onActivate={() => onActivate(rowId)}
+            />
+          )
+        })}
         </OptionList>
       </Surface>
     </div>
@@ -112,6 +135,18 @@ const CHANNEL_ICON = '15px'
 
 const styles = stylex.create({
   emoji: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], objectFit: 'contain' },
+  // A group's tile: an avatar's size and shape, so its handle lines up with the people's names.
+  groupTile: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: sizes['--avatar-20'],
+    height: sizes['--avatar-20'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--secondary-default'],
+    color: colors['--foreground-muted'],
+  },
   // Above the field box with the usual 6px gap, never over the text. The
   // names line up under the "@"; the panel stays inside the box's width.
   panel: {

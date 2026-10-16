@@ -36,6 +36,8 @@ export interface PendingFile {
   readonly width?: number | undefined
   readonly height?: number | undefined
   readonly fileId?: string | undefined
+  /** Sent while the composer was still staging it: the bytes are not all here yet (`fileStaged`). */
+  readonly staging?: true | undefined
 }
 
 export interface PendingPost {
@@ -197,6 +199,18 @@ export const fileUploaded = (clientMsgId: string, stagedId: string, fileId: stri
       yield* sql`INSERT INTO uploaded_files (file_id, staged_name, width, height, uploaded_at) VALUES (${fileId}, ${staged.stagedName}, ${staged.width}, ${staged.height}, ${now})
         ON CONFLICT (file_id) DO NOTHING`
     }
+    return true
+  })
+
+/** A file the post took while it was staging is complete now: it is kept as staged, with its size. False when the row is gone. */
+export const fileStaged = (clientMsgId: string, staged: PendingFile): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined) return false
+    const files = post.files.map((file) => (file.id === staged.id ? { ...staged, ...(file.fileId === undefined ? {} : { fileId: file.fileId }) } : file))
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(files)} WHERE client_msg_id = ${clientMsgId}`
+    yield* touch(post)
     return true
   })
 

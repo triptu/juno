@@ -27,4 +27,13 @@ export const artRedraw = Rpc.make('art.redraw', { payload: { id: Schema.String }
 /** Puts a topic's drawing back as it was before a redraw, or removes it when there was none: the undo of `art.redraw`. */
 export const artRestore = Rpc.make('art.restore', { payload: artRestorePayload, success: Schema.Void, error: NotSignedIn })
 
-export const ArtRoutes = RpcGroup.make(artRedraw, artRestore)
+/**
+ * Whether Redraw art can draw now, for the topic menu: AI assist on, an
+ * OpenRouter key, and today's AI spend cap not reached for the engine's
+ * calls. False with no workspace. Answers within a fraction of a second;
+ * when the spend ledger is slow to say, it answers true and Redraw art
+ * says why if it then cannot draw.
+ */
+export const artAvailable = Rpc.make('art.available', { success: Schema.Boolean })
+
+export const ArtRoutes = RpcGroup.make(artRedraw, artRestore, artAvailable)
