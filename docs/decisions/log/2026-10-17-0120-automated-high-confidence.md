@@ -1,0 +1,1 @@
+- 10-17 01:20 · orchestrator · Channels move to Automated without asking only at high confidence: eight in ten latest messages from apps, or seven in ten with an integration name (was half), or Juno at 90% (was 85%). Anything less sure is a suggestion on Home. Tushar, on the first-sync jump of #alerts-prod and #deploys.

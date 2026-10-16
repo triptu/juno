@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 01:20 · orchestrator · Channels move to Automated without asking only at high confidence: eight in ten latest messages from apps, or seven in ten with an integration name (was half), or Juno at 90% (was 85%). Anything less sure is a suggestion on Home. Tushar, on the first-sync jump of #alerts-prod and #deploys.
 - 10-17 01:07 · ci-fix-2 · The Home first-sync shift test skips shifts that move only sidebar topic rows: during the first sync the list is still being built (rows take their places by recency, and clear bot channels leave for Automated as their history lands, 10-16 16:56), which sidebar.spec.ts checks. Every other shift on the page still fails the test. Chromium reported the bot rows leaving only once Main rows became shorter than thread rows (dm-rows).
 - 10-17 01:01 · test-slim · Tests: a test that only repeats another test's flow or a unit rule is removed or merged, a fixed wait gives way to a wait on a condition or an injected delay, and the gallery's layout-shift guard waits only for motion that can move a box.
 - 10-17 00:55 · orchestrator · From the design review, following native Mac conventions: Settings controls sit at the trailing edge in every section; tab Close buttons are not Tab stops (Delete and ⌘W close a focused tab); two-line picker rows are 44px; Main has no icon in the topic switcher; the default button goes last on Juno cards.
