@@ -8,10 +8,10 @@
 import type { Message, RtmFrame } from '@juno/slack-schema'
 import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
-import { FakeServer, type CallRecord, type Session } from './server.ts'
+import { FakeServer, type CallRecord, type GatedCall, type GateDecision, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
 
-export type { CallRecord, Session } from './server.ts'
+export type { CallRecord, GatedCall, GateDecision, Session } from './server.ts'
 export type { Subscription } from './state.ts'
 export { Workspace } from './state.ts'
 export { CONVERSATIONS, SELF_ID, TEAM, seedWorkspace } from './fixtures.ts'
@@ -322,6 +322,36 @@ export class FakeSlack {
 
   heldFrames(): ReadonlyArray<RtmFrame> {
     return this.server.heldFrames()
+  }
+
+  /**
+   * In-process only. Every API call `where` matches stops before Slack runs
+   * it and again before its answer, until `decide`. For tests that choose
+   * the order in which Slack decides each call (`packages/engine/test/conformance`).
+   * Without `where`, the gate opens and waiting calls go on.
+   */
+  gate(where?: (method: string, args: Readonly<Record<string, string>>) => boolean): void {
+    this.server.gate(where)
+  }
+
+  /** The calls waiting at the gate, oldest first. */
+  gated(): ReadonlyArray<GatedCall> {
+    return this.server.gated()
+  }
+
+  /** Runs, refuses or drops a call waiting before Slack runs it; answers or loses one waiting for its answer. */
+  decide(id: number, decision: GateDecision): void {
+    this.server.decide(id, decision)
+  }
+
+  /** In-process only. Frames `where` matches wait for `releaseFramesWhere`; undefined stops holding them. */
+  holdFramesWhere(where?: (frame: RtmFrame) => boolean): void {
+    this.server.holdFramesWhere(where)
+  }
+
+  /** Sends, or with `drop` discards, the held frames `where` matches. Answers how many. */
+  releaseFramesWhere(where: (frame: RtmFrame) => boolean, drop = false): number {
+    return this.server.releaseFramesWhere(where, drop)
   }
 
   /** Every session stops working: API calls get `invalid_auth`, sockets get `user_session_expiration` and close. */
