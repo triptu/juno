@@ -98,8 +98,9 @@ export class Session extends Context.Service<
                 config.fakeSlackUrl === undefined
                   ? {}
                   : {
-                      // A refused reconnect against the fake should not wait out a 60 s backoff in a test.
-                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000 },
+                      // A refused reconnect against the fake should not wait out a 60 s backoff in a test, nor a presence
+                      // test the 19 s tickle spacing (presence.spec.ts; the pacing itself is tested in @juno/slack).
+                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000, tickleSpacingMillis: 2_000 },
                       // The fake has no rate limits; spacing background calls would only slow tests, unless a test times a real first sync.
                       ...(config.fakeSlackPaced === true ? {} : { lanes: { backgroundMinIntervalMillis: 0, interactiveRefillIntervalMillis: 0 } }),
                     },
