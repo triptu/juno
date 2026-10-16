@@ -208,9 +208,10 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           </Chip>
         </button>
       )
+    // A user group reads like a person; the user's own groups mention them, so they take the accent.
     case 'usergroup':
       return (
-        <Chip variant="filled" size="inline">
+        <Chip variant={inline.isMine ? 'accent' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
           <bdi>@{inline.handle}</bdi>
         </Chip>
       )
