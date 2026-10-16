@@ -7,7 +7,7 @@
 import { Context, Layer } from 'effect'
 
 export interface SyncConfigShape {
-  /** Days without activity before a topic is quiet. The boot window and the sidebar use the same number. */
+  /** Default quiet window when no quietDays preference is stored. The running sync observes that preference. */
   readonly quietDays: number
   /** Messages per `conversations.history` page. */
   readonly historyPageLimit: number

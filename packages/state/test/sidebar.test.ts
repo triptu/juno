@@ -17,7 +17,7 @@ const b = topicRow('b')
 const c = topicRow('c')
 const window = (...rows: TopicRow[]): SidebarWindow => ({
   ...emptyWindow<TopicRow>(), order: rows.map((row) => row.id), rows: new Map(rows.map((row) => [row.id, row])),
-  filter: { kind: 'all', unreadOnly: true },
+  filter: { kind: 'all', unreadOnly: true }, quietDays: 7,
 })
 const read: TopicDetail = { ...a, unreadCount: 0, mentionsMe: false }
 const details = new Map([['a', read]])

@@ -55,6 +55,7 @@ export const ME_KEY = 'me'
 
 /** What `sync_state.boot` records once a boot completes. */
 export interface BootState {
+  readonly quietDays?: number
   readonly completedAt: number
   readonly countsLastFetched?: number
   /** The last moment the store was known to be in step with Slack; discovery sweeps and the reconnect `getView` start here. */
@@ -113,7 +114,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive'
   }))
 
 /** One thread from `getView`: root, unread and latest replies, Slack's subscription and read pointer. */
-const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): Effect.Effect<void, BootError, BootServices> =>
+const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, lane: 'interactive' | 'background'): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
@@ -121,7 +122,7 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts): E
     // Slack omits unread_replies when nothing in the thread is unread.
     for (const reply of [...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
     const topic = threadTopicOf(channel, root.ts)
-    yield* nameFirst(ctx, [root, ...seen.values()])
+    yield* nameFirst(ctx, [root, ...seen.values()], lane)
     yield* transaction(
       Effect.gen(function* () {
         // The view lists followed threads: a root without the flag is followed. Later events win over this page.
@@ -176,7 +177,7 @@ const loadThreadViews = (
       )
       for (const view of page.threads) {
         listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
-        yield* applyThreadView(ctx, view, requestedAt)
+        yield* applyThreadView(ctx, view, requestedAt, options.lane)
       }
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
@@ -375,6 +376,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const startedAt = yield* Clock.currentTimeMillis
     // Unfollowed threads count as read up to here; a reply during the boot stays unread.
     const bootTs = millisToTs(startedAt)
+    const quietDays = ctx.config.quietDays
     const windowStart = yield* windowStartMillis(ctx)
     const start = millisToTs(windowStart)
     yield* loadWorkspace(ctx, true)
@@ -397,6 +399,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const discovered = yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
     yield* fillUsers(ctx)
     const state: BootState = {
+      quietDays,
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
       // A failed discovery leaves the gap for the next sweep to search again.
@@ -457,6 +460,7 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     if (options.recheck !== undefined) yield* recheck(ctx, options.recheck)
     yield* fillUsers(ctx)
     const state: BootState = {
+      ...(previous.quietDays === undefined ? {} : { quietDays: previous.quietDays }),
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
       lastSyncAt: discovered ? startedAt : previous.lastSyncAt,

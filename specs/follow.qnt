@@ -25,7 +25,7 @@ module followProtocol {
     intent: int -> int, previous: int -> int, wroteAt: int -> int,
     accepted: int -> int, unfollowAt: int -> int, commanded: Set[int],
     pending: Set[int], noted: Set[int], refresh: Set[int], failed: Set[int], success: Set[int],
-    activity: Set[int], stale: Set[int], events: Set[Event], fetches: Set[Fetch],
+    activeWindow: Set[int], activity: Set[int], stale: Set[int], events: Set[Event], fetches: Set[Fetch],
     connected: bool, duePass: bool, catchup: bool,
     scan: List[int], phase: str, listed: Set[int], passAt: int, pageDone: bool,
     sealed: bool, label: str, target: int, failedVersion: int, before: int
@@ -42,7 +42,7 @@ module followProtocol {
       previous: threads.mapBy(_ => -1), wroteAt: threads.mapBy(_ => 0),
       accepted: threads.mapBy(_ => 0), unfollowAt: threads.mapBy(_ => 0), commanded: Set(),
       pending: Set(), noted: Set(), refresh: Set(), failed: Set(), success: Set(), activity: Set(),
-      stale: threads.exclude(window), events: Set(), fetches: Set(), connected: true, duePass: true, catchup: false,
+      activeWindow: window, stale: threads.exclude(window), events: Set(), fetches: Set(), connected: true, duePass: true, catchup: false,
       scan: List(), phase: "idle", listed: Set(), passAt: 0, pageDone: false,
       sealed: false, label: "init", target: 0, failedVersion: 0, before: -1
     },
@@ -216,7 +216,7 @@ module followProtocol {
 
   // Passage of the quiet window can make an old observation stale.
   action age(k: int): bool = all {
-    not(s.sealed), not(window.contains(k)),
+    not(s.sealed), not(s.activeWindow.contains(k)),
     s' = { ...s, activity: s.activity.exclude(Set(k)), stale: s.stale.union(Set(k)), label: "age", target: k }
   }
   // Thread 3 starts outside the window. A reply makes it active; a stale
@@ -240,7 +240,13 @@ module followProtocol {
   action hourlyPass = all {
     not(s.sealed), not(s.duePass), s' = { ...s, duePass: true, label: "hourlyPass" }
   }
-  val covered = window.union(s.activity)
+  // Window changes wait for the work permit; the next pass uses the new scope.
+  action widenWindow = all {
+    not(s.sealed), s.phase == "idle", s.fetches.size() == 0,
+    s.activeWindow != threads,
+    s' = { ...s, activeWindow: threads, duePass: true, label: "widenWindow" }
+  }
+  val covered = s.activeWindow.union(s.activity)
   pure def ordered(selected: Set[int]): List[int] = List(1, 2, 3).select(k => selected.contains(k))
   // A reconnect reads only recent activity, and never probes missing rows.
   action startScan = all {
@@ -321,7 +327,7 @@ module followProtocol {
     nondet value = Set(0, 1).oneOf()
     any {
       subscribe(k), unsubscribe(k), officialFollow(k, value), reply(k), threadMarked(k),
-      otherReply(k), age(k), undatedEvent(k), reject(k), failLookup(k), missingRoot(k), disconnect, hourlyPass, seal,
+      otherReply(k), age(k), undatedEvent(k), reject(k), failLookup(k), missingRoot(k), disconnect, hourlyPass, widenWindow, seal,
       all { s.phase == "idle", startFetch(k, "root") }
     }
   }
@@ -475,6 +481,13 @@ module followProtocol {
     if (s.label == "officialFollow") reconnect else
     if (s.label == "reconnect" and activity) otherReply(3) else
     if (s.label == "reconnect" or s.label == "otherReply") seal else progress(true, true, false, true)
+  )
+  action widerWindowStep = tick(
+    if (s.sealed) progress(true, true, false, true) else
+    if (s.label == "init") disconnect else
+    if (s.label == "disconnect") officialFollow(3, 1) else
+    if (s.label == "officialFollow") widenWindow else
+    if (s.label == "widenWindow") seal else progress(true, true, false, true)
   )
   action oldFollowActivityStep = oldFollow(true)
   action oldFollowQuietStep = oldFollow(false)

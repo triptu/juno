@@ -332,7 +332,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'requestqueue', 'discovery', 'metadata'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'requestqueue', 'discovery', 'metadata', 'quietwindow'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }
@@ -346,8 +346,10 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
   if (!outboxOnly) {
+    simulate('quietwindow', 'raiseMidSessionStep', 'invariants', 'window-raise.itf.json', false, false,
+      { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
     simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
-    for (const schedule of ['authoredRoot', 'ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet']) {
+    for (const schedule of ['authoredRoot', 'ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet', 'widerWindow']) {
       simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
     }
     simulate('readstate', 'mirrorCatchUpStep', 'invariants', 'read-mirror-catchup.itf.json', false, false,

@@ -1,0 +1,1 @@
+- 10-16 12:12 · Tushar · Reversed the fixed 7-day quiet window: General offers 1, 3, 7 and 14 days (default 7), shared by visibility and sync; increases backfill missing coverage on the background lane, decreases retain data and make no calls.

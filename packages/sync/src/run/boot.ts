@@ -1,5 +1,6 @@
 import { SlackAuthRequired } from '@juno/slack'
 import { Clock, Deferred, Effect, Scope } from 'effect'
+import { backfillWindow } from '../window'
 import { bootState, coldBoot, warmBoot } from '../boot'
 
 import type { SyncServices } from '../sync'
@@ -14,6 +15,7 @@ const bootOnce = (runtime: SyncRuntime) => {
     const previous = yield* bootState()
     if (previous === undefined) yield* coldBoot(ctx, reportBoot)
     else yield* warmBoot(ctx, previous, reportBoot, yield* openNow)
+    if (previous !== undefined && (previous.quietDays === undefined || ctx.config.quietDays > previous.quietDays)) yield* backfillWindow(ctx)
     state.lastBoot = yield* bootState()
     // Both boots read the followed threads over the window and check the ones left out: a follow pass.
     state.lastFollowPass = startedAt

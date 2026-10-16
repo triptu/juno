@@ -10,7 +10,7 @@
  * scope can close.
  *
  * The boot window is the user's quiet window (the `quietDays` pref, the
- * same one the sidebar reads), read when the sync starts. Against the fake
+ * same one the sidebar reads), observed by the sync while it runs. Against the fake
  * (`EngineConfig.fakeSlackUrl`) the complete follow pass runs with every
  * catch-up instead of hourly.
  *
@@ -26,9 +26,7 @@ import { RequestQueue } from '@juno/slack'
 import { AiProvider } from '@juno/ai'
 import { sortClearCases } from '../automatedView'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
-import { quietDaysOf } from '@juno/domain'
 import type { SlackAuthRequired } from '@juno/slack'
-import { prefs } from '@juno/store'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
 import { EngineConfig, SyncControl } from '../config'
 import { Session, type ActiveSession } from './Session'
@@ -75,10 +73,6 @@ export class SyncRunner extends Context.Service<
         Effect.gen(function* () {
           const open = yield* workspace.current
           if (open === undefined) return yield* Effect.logWarning('sync: no workspace open for the ready session')
-          const quietDays = yield* prefs.get<unknown>('quietDays').pipe(
-            Effect.provide(open.context),
-            Effect.catch(() => Effect.succeed(undefined)),
-          )
           // Cycles can overlap (a reconnect's catch-up during a sweep): syncing until the last one ends.
           // Counted per run; `stop` waits for an interrupted run's cycles to end before the next starts.
           let cycles = 0
@@ -110,7 +104,6 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.provide(
               syncConfigLayer({
-                quietDays: quietDaysOf({ now: 0, ...(typeof quietDays === 'number' ? { quietDays } : {}) }),
                 // Against the fake the complete follow pass runs with every catch-up, so tests see it each time.
                 ...(engineConfig.fakeSlackUrl === undefined ? {} : { followPassMillis: 0 }),
                 ...control.config,

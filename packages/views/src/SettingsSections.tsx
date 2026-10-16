@@ -5,6 +5,7 @@ import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
+import { QuietWindowSetting } from './QuietWindowSetting'
 import { NewTabSetting, type NewTabPageName } from './NewTabSetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
@@ -13,6 +14,9 @@ import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 // is a settings page with its title; `SettingsPage` puts the list beside it.
 
 export interface SettingsGeneralProps {
+  /** How many days of activity the sidebar shows (1, 3, 7 or 14). */
+  readonly quietDays: number
+  readonly onQuietDaysChange: (days: number) => void
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
   readonly newTabPage: NewTabPageName
   readonly onNewTabPageChange: (page: NewTabPageName) => void
@@ -26,11 +30,16 @@ export interface SettingsGeneralProps {
   readonly onClassifierChange: (enabled: boolean) => void
 }
 
-/** General: tabs, peek, Slack read mirroring and the fast classifier. */
-export function SettingsGeneral({ newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Slack read mirroring and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
+      <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
+        </Surface>
+      </Section>
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />

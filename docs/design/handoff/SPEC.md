@@ -117,7 +117,7 @@ Each row is a tile followed by three lines. The tile is the topic's art: a small
 - **Notify me on a thread** is the same three choices as on a channel or person (section 14), and it is how you follow and unfollow. **Every message** and **When it matters** both follow the thread in Slack; Every message also notifies you for every reply. **Never** unfollows the thread in Slack, so it leaves the sidebar and Slack stops notifying you about it on every device. As in Slack, a later mention of you follows it again. A thread you do not follow shows Never as its choice, and its header shows Follow instead of Resolve (section 7). Every message on a thread wins over Never on its channel, and a channel's Every message covers its Main and the threads you follow in it.
 - **Notify me on Main** is the channel's or DM's own choice; Main has no separate one.
 - **First sign-in.** Threads you do not follow start as read, so Juno does not open with hundreds of unread topics. Followed threads and Main keep Slack's unread state.
-- **Quiet.** Topics with no activity in the last 7 days are hidden unless pinned or unread.
+- **Quiet.** Topics with no activity inside the window chosen in Settings › General are hidden unless pinned, unread or open in a tab. Choose 1, 3, 7 or 14 days; the default is 7. All topics status and Home use the same window where recency applies. Lowering it only hides topics; nothing is deleted or fetched. Raising it fetches missing history in the background, and older rows appear without moving painted rows. The same window limits the first sync.
 - **Resolved.** Resolved topics are hidden until a new message arrives, which brings them back tagged "Reopened".
 - **Ignored.** Ignored channels, such as noisy alert or deploy channels, are hidden everywhere in Juno and never notify.
 - **Main threads** follow the same rules. A channel's Main appears only when the channel had recent activity of any kind, including replies in its threads. A channel with no recent activity simply does not appear.
@@ -518,7 +518,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
+- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 

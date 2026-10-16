@@ -1,6 +1,6 @@
 import { memo, Suspense, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SettingsSection } from '@juno/contract'
-import { liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { quietDaysAtom, setQuietDays, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, newTabPageAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setNewTabPage, setPeekKey, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -73,9 +73,10 @@ function General() {
     const value = Object.fromEntries(Object.entries(modelPrefs).filter(([key]) => key !== 'classifier'))
     void runCommand(registry, prefsSet, { key: 'aiModels', value: enabled ? value : { ...value, classifier: '' } })
   }
+  const quietDays = useAtomValue(quietDaysAtom)
   const peekKey = useAtomValue(peekKeyAtom)
   const newTabPage = useAtomValue(newTabPageAtom)
-  return <SettingsGeneral mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
+  return <SettingsGeneral quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : { available: 0, pending: 0 }}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)} newTabPage={newTabPage} onNewTabPageChange={(page) => setNewTabPage(registry, page)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} classifier={classifier} onClassifierChange={changeClassifier} />
 }
