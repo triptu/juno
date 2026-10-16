@@ -88,11 +88,12 @@ export function useOpenPosition(position: Position, view: string, readOnly: bool
 /**
  * A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
  * window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
- * again (`<Activity>` runs its effects again) does not jump back to it.
+ * again (`<Activity>` runs its effects again) does not jump back to it. A row above the first frame's is not drawn
+ * until `drawnAll`, so the request waits for that too.
  */
 export function useMessageFlash(position: Position, id: string, readOnly: boolean, list: MessageWindow) {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, positioned, setHeldAt } = position
+  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, setHeldAt } = position
   const flash = useAtomValue(messageFlashAtom(id))
   const flashTaken = useRef(0)
   useEffect(() => {
@@ -115,7 +116,7 @@ export function useMessageFlash(position: Position, id: string, readOnly: boolea
       pinnedTopRef.current = scroller.scrollTop
       flashChatRow(row)
     })
-  }, [id, readOnly, flash, positioned, list.rows, scrollRef, pinRef, pinnedTopRef, setHeldAt])
+  }, [id, readOnly, flash, positioned, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return flash
 }
 
