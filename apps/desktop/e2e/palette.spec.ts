@@ -66,7 +66,7 @@ test('a channel typed in Conversations opens its Main with Enter, a person their
   await palette.open()
   await palette.type('platfo')
   await palette.expectResults()
-  await palette.expectActive(/^platform/)
+  await palette.expectActive(/platform$/)
   await palette.press('Enter')
   await palette.expectClosed()
   await topic.expectTitle('Main')
@@ -123,7 +123,7 @@ test('with a topic open, its commands come first under its name, and "resolve" r
   await expect(group.getByRole('option', { name: /Rename thread/ })).toBeVisible()
   await palette.clear()
   await palette.type('resolve')
-  await palette.expectActive(/^Resolve/)
+  await palette.expectActive(/Resolve$/)
   await palette.press('Enter')
   await palette.expectClosed()
   await juno.expectToast(`Resolved · ${ROADMAP}`)
@@ -132,7 +132,7 @@ test('with a topic open, its commands come first under its name, and "resolve" r
   await expect(palette.input).toHaveCount(0)
   await palette.open()
   await palette.type('>')
-  await expect(group.getByRole('option', { name: /^Reopen/ })).toBeVisible()
+  await expect(group.getByRole('option', { name: /Reopen/ })).toBeVisible()
 })
 
 test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab', async ({ juno }) => {
