@@ -40,8 +40,12 @@ export const AUTOMATED_SAMPLE = 30
 export const AUTOMATED_MIN_MESSAGES = 4
 /** Share of messages from apps that makes a channel automated on its own. */
 export const APP_SHARE_AUTOMATED = 0.8
-/** With an integration-style name, this share is enough. */
-export const APP_SHARE_NAMED = 0.5
+/**
+ * With an integration-style name, this share is enough. A move happens without
+ * asking, so it needs high confidence; anything less is asked about on Home
+ * (owner, 10-17).
+ */
+export const APP_SHARE_NAMED = 0.7
 /**
  * Below this share a channel is people talking, and is not asked about. An
  * app that posts a minority of the messages (meeting notes, a standup bot,
@@ -109,7 +113,7 @@ export function classifyConversation(sample: ConversationSample): AutomatedVerdi
 }
 
 /** Juno's answer, the probability that a conversation is automated: at or above, move it. */
-export const JUNO_MOVE_MIN = 0.85
+export const JUNO_MOVE_MIN = 0.9
 /** At or below, leave it in All without asking. Leaving a channel in All costs less than hiding one people talk in. */
 export const JUNO_KEEP_MAX = 0.4
 

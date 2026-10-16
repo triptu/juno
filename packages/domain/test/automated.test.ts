@@ -31,8 +31,9 @@ describe('classifying a conversation', () => {
     expect(channel('random-name', senders(8, 2))).toBe('automated')
   })
 
-  it('needs only half from apps when the name says integration', () => {
-    expect(channel('alerts-prod', senders(5, 5))).toBe('automated')
+  it('moves a channel named for an integration only when seven in ten are from apps, and asks below that', () => {
+    expect(channel('alerts-prod', senders(7, 3))).toBe('automated')
+    expect(channel('alerts-prod', senders(5, 5))).toBe('ambiguous')
     expect(channel('team-sync', senders(5, 5))).toBe('ambiguous')
   })
 
@@ -73,8 +74,9 @@ describe('classifying a conversation', () => {
 
 describe("Juno's answer", () => {
   it('moves when sure it is automated, leaves it when sure it is not, and asks in between', () => {
+    expect(junoVerdict(0.95)).toBe('automated')
     expect(junoVerdict(0.9)).toBe('automated')
-    expect(junoVerdict(0.85)).toBe('automated')
+    expect(junoVerdict(0.85)).toBe('ambiguous')
     expect(junoVerdict(0.5)).toBe('ambiguous')
     expect(junoVerdict(0.4)).toBe('people')
     expect(junoVerdict(0.2)).toBe('people')
