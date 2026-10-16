@@ -18,7 +18,8 @@ export interface AvatarProps {
   readonly label: string
   /** The person's full name, for the accessible name. Omit for decoration. */
   readonly name?: string
-  readonly size?: AvatarSize
+  /** 11 is a group member in a tab icon (`GroupAvatar`): no letter fits, so the label should be empty. */
+  readonly size?: AvatarSize | 11
   /** Person colour. Use `hueForId` to pick one from a Slack id. */
   readonly hue?: HueName
   /**
