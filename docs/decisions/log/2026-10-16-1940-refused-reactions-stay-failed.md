@@ -1,0 +1,1 @@
+- 10-16 19:40 · reactions-live · A reaction Slack refuses (`message_not_found` included, which counted as done before) stays as a failed row: the chip shows what Slack has, the message offers Retry and Dismiss, and one unsent after 30 s says "Reaction not sent yet."

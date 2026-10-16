@@ -169,6 +169,11 @@ export class FakeSlack {
     this.workspace.selfUsergroups = [...input.ids]
   }
 
+  /** A custom emoji in the workspace, listed by edge `emojis/list` and taken as a reaction name. */
+  addEmoji(input: { name: string; url: string }): void {
+    this.workspace.emoji.set(input.name, { name: input.name, value: input.url })
+  }
+
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
     const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
-import type { FileView, MessageView, Person } from '@juno/contract'
+import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -68,6 +68,8 @@ export interface MessageProps {
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string) => void
   readonly onToggleReaction?: (ts: string, name: string) => void
+  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
+  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** The row took keyboard focus: the list moves its tabbable row here. */
   readonly onFocus?: (ts: string) => void
   /** Retry on a failed send, with its `clientMsgId`. */
@@ -154,6 +156,7 @@ export const Message = memo(function Message({
   onChannel,
   onLink,
   onToggleReaction,
+  onSetReaction,
   onFocus,
   onRetry,
   onDiscard,
@@ -252,6 +255,7 @@ export const Message = memo(function Message({
           progress={pending === 'sending' ? progress : undefined}
         />
         <Reactions reactions={message.reactions} onToggle={toggle} />
+        {message.reactionIssue !== undefined ? <ReactionIssueLine ts={message.ts} issue={message.reactionIssue} onSet={onSetReaction} /> : null}
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
@@ -275,6 +279,37 @@ export const Message = memo(function Message({
     </div>
   )
 })
+
+/**
+ * The user's reaction change Slack has not taken. Refused: what Slack has
+ * is shown, with Retry and Dismiss. Waiting long: one quiet line.
+ */
+function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly issue: ReactionIssue; readonly onSet: ((ts: string, name: string, on: boolean) => void) | undefined }) {
+  if (issue.state === 'waiting') {
+    return (
+      <Text variant="meta" tone="muted" as="p" data-reaction-issue="waiting" sx={styles.failed}>
+        Reaction not sent yet.
+      </Text>
+    )
+  }
+  return (
+    <Text variant="meta" tone="muted" as="p" data-reaction-issue="failed" sx={styles.failed}>
+      <span {...stylex.props(styles.failedIcon)}>
+        <Icon icon={WarningCircle} size={14} weight="bold" />
+      </span>
+      <Text variant="meta" tone="danger" as="span">
+        {issue.on ? 'Reaction not added.' : 'Reaction not removed.'}
+      </Text>{' '}
+      <TextButton tone="default" onClick={() => onSet?.(ts, issue.name, issue.on)}>
+        Retry
+      </TextButton>
+      {' · '}
+      <TextButton tone="muted" onClick={() => onSet?.(ts, issue.name, !issue.on)}>
+        Dismiss
+      </TextButton>
+    </Text>
+  )
+}
 
 const styles = stylex.create({
   row: {

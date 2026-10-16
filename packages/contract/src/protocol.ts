@@ -32,6 +32,8 @@ export const EngineConfig = Schema.Struct({
   fakeAiDelayMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: the fake provider answers only with an OpenRouter key from main (`aiKey`) and inside the spend cap, as the live one does. */
   fakeAiRequiresKey: Schema.optionalKey(Schema.Boolean),
+  /** Tests only: how long a reaction waits unsent before the message says so (the app waits 30 s). */
+  actionStallMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
   cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })

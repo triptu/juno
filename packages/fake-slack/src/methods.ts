@@ -5,6 +5,7 @@
  */
 import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
 import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
+import { isKnownReaction } from './emojiNames.ts'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
 import type { Workspace } from './state.ts'
@@ -510,7 +511,7 @@ function reaction(ctx: MethodContext, args: MethodArgs<'reactions.add'>, add: bo
   const conversation = requireConversation(ctx, args.channel, true)
   if (conversation instanceof ApiError) return conversation
   if (ws.find(args.channel, args.timestamp) === undefined) return new ApiError('message_not_found')
-  if (!/^[a-z0-9_+-]+(::skin-tone-\d)?$/.test(args.name)) return new ApiError('invalid_name')
+  if (!isKnownReaction(args.name, new Set(ws.emoji.keys()))) return new ApiError('invalid_name')
   const failure = ws.react(args.channel, args.timestamp, args.name, ws.selfId, add)
   return failure === undefined ? {} : new ApiError(failure)
 }
