@@ -1,7 +1,7 @@
 // Home (SPEC section 12, docs/design/home/): what wants the user, shown with
 // no tab open and from the sidebar's Home item; each kind of row opens its
 // topic; Mark done and Resolve all with Undo; Home with AI assist off; and
-// the caught-up state's Browse all topics.
+// the caught-up state, which has no link of its own (All topics is in the sidebar).
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
@@ -206,16 +206,13 @@ const quiet = test.extend({
   },
 })
 
-quiet('caught up, Home offers Browse all topics, which opens the All topics tab', async ({ juno, win }) => {
+quiet('caught up, Home says so and leaves All topics to the sidebar', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { home, tabs, allTopics } = juno
+  const { home } = juno
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
+  await expect(home.root.getByText('Nothing is waiting on you.')).toBeVisible()
   expect(await home.kinds()).toEqual([])
-  const browse = home.root.getByRole('button', { name: 'Browse all topics' })
-  await browse.click()
-  await tabs.expectActive('All topics')
-  await expect(allTopics.table).toBeVisible()
-  await expect(win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'All topics' })).toHaveAttribute('aria-current', 'page')
+  await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
 })

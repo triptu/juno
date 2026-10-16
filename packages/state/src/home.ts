@@ -214,7 +214,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     enter: options.enter,
     used: syncing ? previous.used : new Set<string>(),
     loading: false,
-    // The reserved slots, and the hidden Browse link's place, stay until Home appears again, so nothing moves.
+    // The reserved slots stay until Home appears again, so nothing moves.
     reservedItems: syncing ? previous.reservedItems : 0,
   })
 }
