@@ -48,10 +48,10 @@
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
     "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
     "flake": "node scripts/flake.mjs",
-    "test:remote-pool": "node scripts/heavy.mjs node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs",
+    "test:remote-pool": "node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs",
     "test:package": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
-    "test:health": "node scripts/heavy.mjs node --test scripts/health.test.mjs",
+    "test:health": "node --test scripts/health.test.mjs",
     "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs"
   },
   "devDependencies": {
