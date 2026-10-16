@@ -100,9 +100,26 @@ describe('readSlackAppSession', () => {
     )
   })
 
-  it('reports a missing team record', async () => {
-    const dir = await fixture({ team: { ...team, token: 'not-a-token' }, cookie: 'c', keychainPassword: 'p', staleTeam: { ...team, token: 'xoxp-nope' } })
-    await expect(readSlackAppSession({ dir, keychainPassword: 'p' })).rejects.toMatchObject(new SlackAppImportError('no-team'))
+  it('tells teams without a session token from no teams at all', async () => {
+    const noToken = await fixture({ team: { ...team, token: 'not-a-token' }, cookie: 'c', keychainPassword: 'p', staleTeam: { ...team, token: 'xoxp-nope' } })
+    await expect(readSlackAppSession({ dir: noToken, keychainPassword: 'p' })).rejects.toMatchObject(new SlackAppImportError('no-token'))
+    const noTeams = await fixture({ team, cookie: 'c', keychainPassword: 'p', emptyTeams: true })
+    await expect(readSlackAppSession({ dir: noTeams, keychainPassword: 'p' })).rejects.toMatchObject(new SlackAppImportError('no-team'))
+  })
+
+  it('asks for the next password while one does not decrypt the cookie', async () => {
+    const dir = await fixture({ team, cookie: 'second-d', keychainPassword: 'second' })
+    const asked: Array<number> = []
+    const passwords = ['first', 'second']
+    const session = await readSlackAppSession({
+      dir,
+      keychainPassword: async (attempt) => {
+        asked.push(attempt)
+        return passwords[attempt]
+      },
+    })
+    expect(session.cookie.value).toBe('second-d')
+    expect(asked).toEqual([0, 1])
   })
 })
 
@@ -116,14 +133,19 @@ describe('locateSlackAppData', () => {
   it('finds the direct download with its Cookies file', async () => {
     const { root, direct } = await home()
     await fixture({ team, cookie: 'c', keychainPassword: 'p' }, direct.dir)
-    expect(await locateSlackAppData(slackAppCandidates(root))).toEqual({ found: true, data: { ...direct, cookiesFile: 'Cookies' } })
+    const location = await locateSlackAppData(slackAppCandidates(root))
+    expect(location).toMatchObject({ found: true, data: { ...direct, cookiesFile: 'Cookies' } })
+    expect(location.checked).toMatchObject([
+      { variant: 'direct', exists: true, localStorage: true, cookiesFile: 'Cookies' },
+      { variant: 'app-store', exists: false, localStorage: false },
+    ])
   })
 
   it('finds the App Store container with Network/Cookies', async () => {
     const { root, appStore } = await home()
     await fixture({ team, cookie: 'c', keychainPassword: 'p', cookiesFile: 'Network/Cookies' }, appStore.dir)
     const location = await locateSlackAppData(slackAppCandidates(root))
-    expect(location).toEqual({ found: true, data: { ...appStore, cookiesFile: join('Network', 'Cookies') } })
+    expect(location).toMatchObject({ found: true, data: { ...appStore, cookiesFile: join('Network', 'Cookies') } })
   })
 
   it('prefers the install written most recently when both exist', async () => {
@@ -139,9 +161,9 @@ describe('locateSlackAppData', () => {
 
   it('tells a missing install from one without a session', async () => {
     const { root, direct } = await home()
-    expect(await locateSlackAppData(slackAppCandidates(root))).toEqual({ found: false, reason: 'not-installed' })
+    expect(await locateSlackAppData(slackAppCandidates(root))).toMatchObject({ found: false, reason: 'not-installed' })
     await mkdir(join(direct.dir, 'Local Storage', 'leveldb'), { recursive: true })
-    expect(await locateSlackAppData(slackAppCandidates(root))).toEqual({ found: false, reason: 'signed-out' })
+    expect(await locateSlackAppData(slackAppCandidates(root))).toMatchObject({ found: false, reason: 'signed-out' })
   })
 })
 

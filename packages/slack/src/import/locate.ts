@@ -48,33 +48,57 @@ export interface SlackAppData extends SlackAppCandidate {
   readonly cookiesFile: CookiesFile
 }
 
+/** What was found at one candidate: names and times only. */
+export interface SlackAppCheck {
+  readonly variant: SlackAppVariant
+  readonly dir: string
+  readonly exists: boolean
+  readonly localStorage: boolean
+  readonly cookiesFile?: CookiesFile
+  /** The cookie store's modification time, epoch milliseconds. */
+  readonly cookiesModified?: number
+}
+
 export type SlackAppLocation =
-  | { readonly found: true; readonly data: SlackAppData }
+  | { readonly found: true; readonly data: SlackAppData; readonly checked: ReadonlyArray<SlackAppCheck> }
   /** `not-installed`: no candidate directory exists. `signed-out`: one exists but lacks Local Storage or a cookie store. */
-  | { readonly found: false; readonly reason: 'not-installed' | 'signed-out' }
+  | { readonly found: false; readonly reason: 'not-installed' | 'signed-out'; readonly checked: ReadonlyArray<SlackAppCheck> }
 
 /**
  * The candidate with Local Storage and a cookie store. When several have
  * both, the one written most recently wins: it is the install in use.
  */
 export async function locateSlackAppData(candidates: ReadonlyArray<SlackAppCandidate>): Promise<SlackAppLocation> {
-  let anyDir = false
+  const checked: Array<SlackAppCheck> = []
   let best: { readonly data: SlackAppData; readonly modified: number } | undefined
   for (const candidate of candidates) {
-    if ((await modifiedAt(candidate.dir)) === undefined) continue
-    anyDir = true
-    const storage = await modifiedAt(join(candidate.dir, LOCAL_STORAGE_DIR))
-    if (storage === undefined) continue
-    for (const cookiesFile of COOKIES_FILES) {
-      const cookies = await modifiedAt(join(candidate.dir, cookiesFile))
-      if (cookies === undefined) continue
-      const modified = Math.max(storage, cookies)
-      if (best === undefined || modified > best.modified) best = { data: { ...candidate, cookiesFile }, modified }
-      break
+    const base = { variant: candidate.variant, dir: candidate.dir }
+    if ((await modifiedAt(candidate.dir)) === undefined) {
+      checked.push({ ...base, exists: false, localStorage: false })
+      continue
     }
+    const storage = await modifiedAt(join(candidate.dir, LOCAL_STORAGE_DIR))
+    const cookies = await firstCookiesFile(candidate.dir)
+    checked.push({
+      ...base,
+      exists: true,
+      localStorage: storage !== undefined,
+      ...(cookies === undefined ? {} : { cookiesFile: cookies.file, cookiesModified: cookies.modified }),
+    })
+    if (storage === undefined || cookies === undefined) continue
+    const modified = Math.max(storage, cookies.modified)
+    if (best === undefined || modified > best.modified) best = { data: { ...candidate, cookiesFile: cookies.file }, modified }
   }
-  if (best !== undefined) return { found: true, data: best.data }
-  return { found: false, reason: anyDir ? 'signed-out' : 'not-installed' }
+  if (best !== undefined) return { found: true, data: best.data, checked }
+  return { found: false, reason: checked.some((check) => check.exists) ? 'signed-out' : 'not-installed', checked }
+}
+
+async function firstCookiesFile(dir: string): Promise<{ readonly file: CookiesFile; readonly modified: number } | undefined> {
+  for (const file of COOKIES_FILES) {
+    const modified = await modifiedAt(join(dir, file))
+    if (modified !== undefined) return { file, modified }
+  }
+  return undefined
 }
 
 /** Copies Local Storage and the cookie store (with its journal) into `dest`, keeping their relative paths. */

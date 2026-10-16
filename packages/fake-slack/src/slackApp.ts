@@ -44,6 +44,8 @@ export interface SlackAppFixtureOptions {
   readonly cookiesFile?: 'Cookies' | 'Network/Cookies'
   /** Leave out the `d` cookie, as a Slack app that was signed out does. */
   readonly signedOut?: boolean
+  /** Write the newest `localConfig_v2` with no teams. */
+  readonly emptyTeams?: boolean
 }
 
 const ORIGIN = 'https://app.slack.com'
@@ -56,7 +58,8 @@ export async function writeSlackAppFixture(dir: string, options: SlackAppFixture
   const key = storageKey(ORIGIN, LOCAL_CONFIG_KEY)
   // Sequence numbers: the table holds the older write, the log the newer.
   await writeFile(join(leveldb, '000005.ldb'), tableFile([{ key, value: storageValue(localConfigJson(stale)), sequence: 10n }]))
-  await writeFile(join(leveldb, '000007.log'), logFile(20n, [{ key, value: storageValue(localConfigJson(options.team)) }]))
+  const newest = options.emptyTeams === true ? JSON.stringify({ teams: {}, orderedTeamIds: [] }) : localConfigJson(options.team)
+  await writeFile(join(leveldb, '000007.log'), logFile(20n, [{ key, value: storageValue(newest) }]))
   await writeFile(join(leveldb, 'CURRENT'), 'MANIFEST-000001\n')
   const cookies = join(dir, ...(options.cookiesFile ?? 'Cookies').split('/'))
   await mkdir(dirname(cookies), { recursive: true })

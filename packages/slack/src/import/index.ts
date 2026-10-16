@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { cookieForHost, cookieRowCount, readCookies, type SlackCookie } from './cookies.ts'
 import { scanLevelDb } from './leveldb.ts'
-import { localConfigFromRecords, pickTeam, type LocalConfigTeam } from './localConfig.ts'
+import { localConfigFromRecords, pickTeam, teamCount, type LocalConfigTeam } from './localConfig.ts'
 import { COOKIES_FILES, LOCAL_STORAGE_DIR } from './locate.ts'
 
 export { type SlackCookie } from './cookies.ts'
@@ -21,7 +21,16 @@ export { type SlackCookie } from './cookies.ts'
 export { LocalConfigTeam, pickTeam } from './localConfig.ts'
 export { snappyUncompress } from './snappy.ts'
 
-export { copySlackAppData, KEYCHAIN_SERVICE, locateSlackAppData, slackAppCandidates, type SlackAppCandidate } from './locate.ts'
+export {
+  copySlackAppData,
+  KEYCHAIN_SERVICE,
+  locateSlackAppData,
+  slackAppCandidates,
+  type CookiesFile,
+  type SlackAppCandidate,
+  type SlackAppCheck,
+  type SlackAppVariant,
+} from './locate.ts'
 
 export const SESSION_COOKIE = 'd'
 
@@ -31,11 +40,19 @@ export interface SlackAppSession {
 }
 
 /**
- * `no-local-config`, `no-team` and `signed-out` (no `d` cookie stored) mean
- * the app is not signed in. `no-keychain` means the password was not given;
- * `no-cookie` means a `d` cookie is stored but none decrypted for the team.
+ * `no-local-config`, `no-team`, `no-token` (teams, but none with a session
+ * token) and `signed-out` (no `d` cookie stored) mean the app is not signed
+ * in. `no-keychain` means no password was given; `no-cookie` means a `d`
+ * cookie is stored but no password given decrypted one for the team.
  */
-export type SlackAppImportFailure = 'no-local-config' | 'no-team' | 'signed-out' | 'no-keychain' | 'no-cookie'
+export type SlackAppImportFailure = 'no-local-config' | 'no-team' | 'no-token' | 'signed-out' | 'no-keychain' | 'no-cookie'
+
+/**
+ * The keychain password: a string, or a function asked for attempt 0, then
+ * for attempt 1, 2 and so on while the previous answer did not decrypt the
+ * cookie. It answers undefined when it has nothing more to try.
+ */
+export type KeychainPasswords = string | ((attempt: number) => Promise<string | undefined>)
 
 export class SlackAppImportError extends Error {
   readonly reason: SlackAppImportFailure
@@ -55,19 +72,23 @@ export class SlackAppImportError extends Error {
  */
 export async function readSlackAppSession(options: {
   readonly dir: string
-  readonly keychainPassword: string | (() => Promise<string | undefined>)
+  readonly keychainPassword: KeychainPasswords
   readonly teamId?: string
 }): Promise<SlackAppSession> {
   const records = await scanLevelDb(join(options.dir, LOCAL_STORAGE_DIR))
   const json = localConfigFromRecords(records)
   if (json === undefined) throw new SlackAppImportError('no-local-config')
   const team = pickTeam(json, options.teamId)
-  if (team === undefined) throw new SlackAppImportError('no-team')
+  if (team === undefined) throw new SlackAppImportError(teamCount(json) === 0 ? 'no-team' : 'no-token')
   const cookiesFile = COOKIES_FILES.map((file) => join(options.dir, file)).find((file) => existsSync(file))
   if (cookiesFile === undefined || cookieRowCount(cookiesFile, SESSION_COOKIE) === 0) throw new SlackAppImportError('signed-out')
-  const password = typeof options.keychainPassword === 'string' ? options.keychainPassword : await options.keychainPassword()
-  if (password === undefined) throw new SlackAppImportError('no-keychain')
-  const cookie = cookieForHost(readCookies(cookiesFile, SESSION_COOKIE, password), new URL(team.url).hostname)
-  if (cookie === undefined) throw new SlackAppImportError('no-cookie')
-  return { team, cookie }
+  const passwords = options.keychainPassword
+  const ask = typeof passwords === 'string' ? async (attempt: number) => (attempt === 0 ? passwords : undefined) : passwords
+  const hostname = new URL(team.url).hostname
+  for (let attempt = 0; ; attempt++) {
+    const password = await ask(attempt)
+    if (password === undefined) throw new SlackAppImportError(attempt === 0 ? 'no-keychain' : 'no-cookie')
+    const cookie = cookieForHost(readCookies(cookiesFile, SESSION_COOKIE, password), hostname)
+    if (cookie !== undefined) return { team, cookie }
+  }
 }
