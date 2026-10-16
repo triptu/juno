@@ -20,7 +20,8 @@ const opt = S.optionalKey
 // Frames the client sends.
 
 export const PingFrame = S.Struct({ type: S.Literal('ping'), id: S.Number })
-export const TickleFrame = S.Struct({ type: S.Literal('tickle'), id: opt(S.Number) })
+/** "The user is here": the official client sends it, at most every 19 s, while the user uses the Mac (research section 4, Presence). */
+export const TickleFrame = S.Struct({ type: S.Literal('tickle'), id: opt(S.Number), reason: opt(S.String) })
 export const TypingFrame = S.Struct({
   type: S.Literal('user_typing'),
   id: opt(S.Number),

@@ -88,6 +88,8 @@ export interface SlackConfigShape {
     readonly backoffCapMillis: number
     /** A `reconnect_url` is used only within this window (the official client: 285 s). */
     readonly reconnectUrlTtlMillis: number
+    /** At most one `tickle` per this long, across reconnects (the official client: 19 s). */
+    readonly tickleSpacingMillis: number
     /** Hosts a socket URL may point at (exact or any subdomain). The official client only accepts slack.com hosts. */
     readonly allowedHosts: ReadonlyArray<string>
     /** Diagnostics only (the live smoke): sees every frame's text before decoding. Never log it in the app. */
@@ -118,6 +120,7 @@ export const defaultSlackConfig: SlackConfigShape = {
     backoffBaseMillis: 1_000,
     backoffCapMillis: 60_000,
     reconnectUrlTtlMillis: 285_000,
+    tickleSpacingMillis: 19_000,
     allowedHosts: ['slack.com'],
   },
 }

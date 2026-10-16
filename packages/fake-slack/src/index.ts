@@ -8,10 +8,11 @@
 import type { Message, RtmFrame } from '@juno/slack-schema'
 import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
-import { FakeServer, type CallRecord, type GatedCall, type GateDecision, type Session } from './server.ts'
+import { FakeServer, type CallRecord, type ReceivedFrame, type GatedCall, type GateDecision, type Session } from './server.ts'
 import { asTs, Workspace, type Subscription } from './state.ts'
 
-export type { CallRecord, GatedCall, GateDecision, Session } from './server.ts'
+export { AUTO_AWAY_MILLIS } from './server.ts'
+export type { CallRecord, ReceivedFrame, GatedCall, GateDecision, Session } from './server.ts'
 export type { Subscription } from './state.ts'
 export { Workspace } from './state.ts'
 export { CONVERSATIONS, SELF_ID, TEAM, seedWorkspace } from './fixtures.ts'
@@ -110,8 +111,19 @@ export class FakeSlack {
     return this.server.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method)).length
   }
 
+  /** Frames Juno sent on the socket since start or `resetCalls()`, other than `ping`: `tickle`, `presence_sub`. */
+  get received(): ReadonlyArray<ReceivedFrame> {
+    return this.server.received
+  }
+
+  /** What colleagues see for the self user now (`FakeServer.selfPresence`). */
+  selfPresence(): 'active' | 'away' {
+    return this.server.selfPresence()
+  }
+
   resetCalls(): void {
     this.server.calls.length = 0
+    this.server.received.length = 0
     this.frames.length = 0
   }
 
@@ -429,6 +441,8 @@ export class FakeSlack {
       setNow: (i) => this.setNow(i),
       resetCalls: () => this.resetCalls(),
       calls: () => this.calls,
+      received: () => this.received,
+      selfPresence: () => this.selfPresence(),
       credentials: () => this.credentials(),
       signIn: () => this.signIn(),
       messages: (i: { channel: string }) => this.messages(i.channel),
