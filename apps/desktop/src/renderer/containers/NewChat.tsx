@@ -75,6 +75,8 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
   const channel = chat.conversation?.channelId
   const threadsOpen = open === 'thread' && (chat.conversation === undefined || channel !== undefined)
   const threadList = useAtomValue(pickThreadsAtom(threadsOpen ? { channel, query } : undefined))
+  const conversations = useHeld(conversationList._tag === 'Success' ? conversationList.value : undefined, open === 'conversation')
+  const threads = useHeld(threadList._tag === 'Success' ? threadList.value : undefined, threadsOpen)
 
   const openPicker = useCallback((picker: PickerName | undefined) => {
     setQuery('')
@@ -147,8 +149,9 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
               onOpen={openPicker}
               query={query}
               onQuery={setQuery}
-              conversations={conversationList._tag === 'Success' ? conversationList.value : undefined}
-              threads={threadsOpen ? (threadList._tag === 'Success' ? threadList.value : undefined) : []}
+              conversations={conversations.value}
+              threads={threadsOpen ? threads.value : []}
+              loading={conversations.loading || threads.loading}
               now={now}
               onPickConversation={(conversation: PickConversation) => picked((current) => pickConversation(current, conversation))}
               onPickThread={(thread: PickThread | undefined) => picked((current) => pickThread(current, thread))}
@@ -159,3 +162,15 @@ export const NewChatTab = memo(function NewChatTab({ tabId }: NewChatTabProps) {
     />
   )
 })
+
+/**
+ * A picker list's rows, kept while the next query's rows load, so typing
+ * never draws an empty list (inventory 8). `loading` says the rows are an
+ * earlier query's. Closing the list drops them, so it opens on fresh rows.
+ */
+function useHeld<A>(value: A | undefined, open: boolean): { readonly value: A | undefined; readonly loading: boolean } {
+  const [held, setHeld] = useState<A | undefined>(undefined)
+  if (!open && held !== undefined) setHeld(undefined)
+  else if (open && value !== undefined && value !== held) setHeld(value)
+  return { value: open ? (value ?? held) : undefined, loading: open && value === undefined }
+}
