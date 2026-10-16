@@ -339,10 +339,10 @@ export class Sidebar {
 
   /**
    * Makes a view through the New view pill and the sheet: the name, an icon
-   * by its label, the conversations by searching for each name, and Keep
+   * and its colour by their labels, the conversations by searching for each name, and Keep
    * these out of All. A new view is selected once saved.
    */
-  async createView(view: { readonly name: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async createView(view: { readonly name: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     await this.root.getByRole('button', { name: 'New view', exact: true }).click()
     await expect(this.viewSheet).toBeVisible()
     await this.fillViewSheet(view)
@@ -352,10 +352,11 @@ export class Sidebar {
   }
 
   /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
-  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
+  async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     const sheet = this.viewSheet
     if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
     if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('button', { name: view.color, exact: true }).click()
     for (const conversation of view.conversations ?? []) {
       await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
       await sheet.getByRole('option', { name: conversation, exact: true }).click()

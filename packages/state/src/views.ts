@@ -27,12 +27,14 @@ export interface ViewPill {
   readonly id: string
   readonly name: string
   readonly icon?: SidebarView['icon']
+  /** The icon's colour; absent is neutral. */
+  readonly color?: SidebarView['color']
   /** One of its topics has an unread mention of the user: the pill's dot. Plain unread does not count. */
   readonly mention: boolean
 }
 
 const samePills = (a: ReadonlyArray<ViewPill>, b: ReadonlyArray<ViewPill>): boolean =>
-  a.length === b.length && a.every((pill, i) => pill.id === b[i]!.id && pill.name === b[i]!.name && pill.icon === b[i]!.icon && pill.mention === b[i]!.mention)
+  a.length === b.length && a.every((pill, i) => pill.id === b[i]!.id && pill.name === b[i]!.name && pill.icon === b[i]!.icon && pill.color === b[i]!.color && pill.mention === b[i]!.mention)
 
 /**
  * The views' pills in order, with their dots. Equal lists do not notify, so
@@ -43,7 +45,7 @@ export const viewPillsAtom = Atom.make((get): ReadonlyArray<ViewPill> => {
   const held = Option.getOrUndefined(get.self<ReadonlyArray<ViewPill>>())
   // A new scope's counts are not in yet: keep each dot as it was.
   const mentions = AsyncResult.isSuccess(counts) ? new Set(counts.value.viewMentions) : new Set(held?.filter((pill) => pill.mention).map((pill) => pill.id))
-  return get(viewsAtom).map((view) => ({ id: view.id, name: view.name, ...(view.icon === undefined ? {} : { icon: view.icon }), mention: mentions.has(view.id) }))
+  return get(viewsAtom).map((view) => ({ id: view.id, name: view.name, ...(view.icon === undefined ? {} : { icon: view.icon }), ...(view.color === undefined ? {} : { color: view.color }), mention: mentions.has(view.id) }))
 }).pipe(Atom.withEquality(samePills))
 
 /** The view sheet (inventory 2.3): closed, a new view (maybe with a conversation in it already), or editing a view. */

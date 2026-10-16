@@ -5,8 +5,8 @@
 // many views that scrolls sideways without moving the list. The built-in
 // Automated view is deleted first where a test needs the bot channels in All
 // or only its own views (automated.spec.ts covers Automated itself).
-import { expect, test } from './fixtures'
-import type { Juno } from './driver/juno'
+import { expect, launchApp, test } from './fixtures'
+import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -55,6 +55,38 @@ test('a view with an icon gathers its channel, keeps it out of All, and lights o
   // Never on the selected pill.
   await sidebar.selectView('Bots')
   await sidebar.expectViewDot('Bots', false)
+})
+
+test('a view icon keeps the colour picked for it, on the selected pill and across a relaunch', async ({ juno, running, userData, fake, slackApp }) => {
+  await withoutAutomated(juno)
+  const { sidebar } = juno
+  await sidebar.createView({ name: 'Work', icon: 'Briefcase', conversations: ['eng'] })
+  await sidebar.createView({ name: 'Bots', icon: 'Robot', color: 'Teal', conversations: ['alerts-prod'] })
+  const tint = sidebar.viewPill('Bots').locator('[data-icon-tint]')
+  await expect(tint).toHaveAttribute('data-icon-tint', 'teal')
+  // The default stays neutral: no tint on Work's icon.
+  await expect(sidebar.viewPill('Work').locator('[data-icon-tint]')).toHaveCount(0)
+  // Selected (it is, once saved) and not, the icon is drawn in the same colour.
+  const selected = await tint.evaluate((el) => getComputedStyle(el).color)
+  await sidebar.selectView('Work')
+  expect(await tint.evaluate((el) => getComputedStyle(el).color)).toBe(selected)
+  await juno.win.waitForTimeout(500)
+  await running.close()
+
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const restarted = new Juno(again.app, again.win)
+    await expect(restarted.sidebar.viewPill('Bots').locator('[data-icon-tint]')).toHaveAttribute('data-icon-tint', 'teal', { timeout: 15_000 })
+    // Edit shows the colour chosen; Neutral takes it off again.
+    await restarted.sidebar.viewMenu('Bots', 'view-edit')
+    const colours = restarted.sidebar.viewSheet.getByRole('radiogroup', { name: 'Colour' })
+    await expect(colours.getByRole('button', { name: 'Teal', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await colours.getByRole('button', { name: 'Neutral', exact: true }).click()
+    await restarted.sidebar.viewSheet.getByRole('button', { name: 'Save' }).click()
+    await expect(restarted.sidebar.viewPill('Bots').locator('[data-icon-tint]')).toHaveCount(0)
+  } finally {
+    await again.close()
+  }
 })
 
 test('a view with no icon shows its name; edit it, reorder by menu and drag, and delete it with Undo', async ({ juno }) => {

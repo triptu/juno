@@ -152,6 +152,22 @@ Ink stays neutral, as everywhere else. The quick filters show no counts, only th
 | Cyan | Light | #008AB3 | #060505 | #006A8A | 5.12 | 3.84 | 5.92 | 5.27 | 5.27 | 11.22 |
 | Cyan | Dark | #5AC6EC | #04212E | #6CCFF2 | 8.50 | 8.96 | 9.89 | 8.01 | 7.79 | 8.52 |
 
+### 1.3a Icon tints
+
+`iconTints` (`--icon-tint-<accent>`, `--icon-tint-neutral`) colour a sidebar view's icon (SPEC 5, Views). Each is its accent's `--hl-text`, light and dark (`darkIconTints` in themes.stylex.ts), so it reads on the sidebar and on a selected pill's `--secondary-default` fill; neutral is `--foreground-muted`, the plain pill icon. An icon needs 3:1 (WCAG 1.4.11); measured, WCAG 2:
+
+| Tint | On sidebar, light | On selected fill, light | On sidebar, dark | On selected fill, dark |
+| --- | --- | --- | --- | --- |
+| Neutral | 4.82 | 4.39 | 6.89 | 5.01 |
+| Coral | 5.74 | 5.22 | 9.08 | 6.60 |
+| Near-black (ink) | 16.84 | 15.31 | 15.30 | 11.12 |
+| Marigold | 6.41 | 5.83 | 10.35 | 7.52 |
+| Teal | 6.37 | 5.79 | 9.96 | 7.24 |
+| Midnight blue | 13.32 | 12.11 | 9.33 | 6.78 |
+| Dark emerald | 6.53 | 5.93 | 9.80 | 7.12 |
+| Claret | 9.60 | 8.73 | 9.06 | 6.59 |
+| Cyan | 5.81 | 5.28 | 10.39 | 7.55 |
+
 ### 1.4 Context tints (public / private / DM)
 
 Always derived from the base palette so they follow dark mode. Formulas from the prototype; hex measured in Chromium.

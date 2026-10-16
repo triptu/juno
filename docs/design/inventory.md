@@ -114,7 +114,7 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
 - **Pills**, 28px, radius 8 (`Button variant="filter"`): selected bg `--secondary-default`, fg default; unselected transparent, fg muted, hover fg default. Weight 500 in both, so selecting never changes a width.
   - **All**: text.
   - **Channels** (`hash` 14) and **DMs** (`user` 14): icon-only, 28×28. Tooltip and accessible name "Channels" and "DMs".
-  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px (`--filter-pill-max-width`) with an ellipsis.
+  - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px (`--filter-pill-max-width`) with an ellipsis. The icon takes the view's colour (`--icon-tint-<accent>`, tokens 1.3a) when it has one, the same whether the pill is selected, hovered or not; without one it is the pill's muted grey.
   - **New view**: `plus` 14, 28×28, fg muted, tooltip and name "New view". Always last.
 - **Unread only** (outside the scroller, at the right): `notification` 14 (a box with a dot on its corner, the pills' own unread mark) in a 28×28 icon pill, the same `Button variant="filter"` as Channels and DMs, so its icon sits 7px in on every side as theirs does. Tooltip and accessible name "Unread only"; `aria-pressed` and the selected fill while it is on. No count and no dot. [10-15] Replaced the "Unread" text toggle.
 - **Dot**: 5px `--hl` at the pill's top right (4px in from the top and right edge), absolute so it moves nothing; only its opacity changes. Channels and DMs: the group has unread topics the sidebar would show. A view: one of its topics has an unread mention (plain unread does not count). Never on the selected pill. The name says it: "Channels, unread", "Bots, unread mention".
@@ -123,10 +123,11 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
 
 **Automated** (SPEC §5 "Automated"): Juno's own view, id `automated`, name "Automated", icon `robot`, Keep these out of All on. Made the first time a conversation goes in, last in the row; after a delete it is not made again. Its pill and sheet are those of any view. In its sheet, a conversation Juno put there shows "Added by Juno" 12 muted at the end of its row, before the check.
 
-**View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else:
+**View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else (the icon's colour belongs to the icon):
 
 1. **Name**: text field, 30px, placeholder "Name", at most 32 characters. Required.
-2. **Icon**: "Icon" 11/500 muted, then a grid of 24px icon buttons (8 per row, gap 2) from the view icon set, the first cell "None" (`prohibit`). Selected: bg `--secondary-default`, fg default. Optional.
+2. **Icon**: "Icon" 11/500 muted, then a grid of 24px icon buttons (8 per row, gap 2) from the view icon set, the first cell "None" (`prohibit`). Selected: bg `--secondary-default`, fg default, drawn in the chosen colour. Optional.
+2a. **Colour**: "Colour" 11/500 muted, then nine 24px `Swatch tint`s, gap 8: Neutral (the default), then the eight accents in the picker's order (Coral, Near-black, Marigold, Teal, Midnight blue, Dark emerald, Claret, Cyan). It colours the icon, so the chosen icon above shows it at once. Stored with the view (`sidebar_views.color`); a view saved by Juno that names no colour keeps its own.
 3. **Conversations**: a search field (30px, `magnifying-glass` 14, placeholder "Add channels and people") over a list, at most 200px tall (`--view-sheet-list-max-height`), scrolling. Chosen conversations first, each a 30px row with its channel icon or photo, name, and a check; then, while the field has text, matches from the New chat picker (`newChat.conversations`, channels, group DMs and DMs that exist). Clicking a row toggles it. "3 conversations" 12 muted under the list.
 4. **Keep these out of All**: a checkbox (`Checkbox`, as macOS sheets use), 13px, with "They show only in this view." 12 muted under it.
 

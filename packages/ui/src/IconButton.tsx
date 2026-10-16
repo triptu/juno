@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes } from 'react'
 import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { interactive } from './internal/interactive'
+import { tintColors, type IconTint } from './internal/tint'
 import { tooltip } from './Tooltip'
 
 export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
@@ -19,6 +20,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   readonly shortcut?: string
   readonly size?: IconButtonSize
   readonly iconSize?: IconSize
+  /** Draws the icon in an accent's colour (the view sheet's chosen icon). Not with `pressed`. */
+  readonly iconTint?: IconTint
   /** Icon weight override (`bold` for the send arrow). Default by icon size, `fill` when pressed. */
   readonly iconWeight?: IconWeight
   readonly radius?: IconButtonRadius
@@ -77,6 +80,7 @@ export function IconButton({
   shortcut,
   size = 30,
   iconSize,
+  iconTint,
   iconWeight,
   radius,
   variant = 'ghost',
@@ -125,6 +129,10 @@ export function IconButton({
             <Icon icon={icon} size={px} weight="fill" />
           </span>
         </span>
+      ) : iconTint !== undefined ? (
+        <span data-icon-tint={iconTint} {...stylex.props(styles.tint, tintColors[iconTint])}>
+          {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
+        </span>
       ) : iconWeight === undefined ? (
         <Icon icon={icon} size={px} />
       ) : (
@@ -153,6 +161,9 @@ const styles = stylex.create({
       bottom: `calc((100% - ${sizes['--control-24']}) / 2)`,
       left: `calc((100% - ${sizes['--control-24']}) / 2)`,
     },
+  },
+  tint: {
+    display: 'inline-flex',
   },
   pair: {
     display: 'grid',

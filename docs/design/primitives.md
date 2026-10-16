@@ -29,6 +29,7 @@ One component for every clickable control with a label. Radius, text size and ic
 | `size` | `xs` 22, `sm` 28, `md` 30, `lg` 32, `xl` 34, `2xl` 36 | Radius pill / 8 / 12 / pill / pill / pill (the 22px row Resolve is a label-sized control and the 32px and taller buttons are pills; 28 and 30 stay rounded rectangles so they nest in cards and toolbars), text 12 / 13 / 13.5 and icon 13 / 14 / 16 derive from the size |
 | `tone` | `default`, `subtle`, `muted` | Text colour for ghost and outline; hover turns default |
 | `iconStart`, `iconEnd` | Phosphor icon | Weight by size; `iconWeight` overrides (`fill` for a check that has landed) |
+| `iconTint` | an accent name or `neutral` | Draws `iconStart` in that colour from the `iconTints` tokens, on hover and when pressed too (a sidebar view's icon) |
 | `kbd` | string | Trailing mono hint ("↵", "⌘J") |
 | `pressed` | boolean | Toggle state (Pin, filters); sets `aria-pressed` |
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
@@ -42,7 +43,7 @@ The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 1
 
 ## 3. IconButton
 
-Button with only an icon. `label` is required and doubles as the tooltip (`noTooltip` turns the tooltip off). `shortcut` ("⌘[") shows as keycaps in the tooltip and ends the accessible name ("Back ⌘[").
+Button with only an icon. `label` is required and doubles as the tooltip (`noTooltip` turns the tooltip off). `shortcut` ("⌘[") shows as keycaps in the tooltip and ends the accessible name ("Back ⌘["). `iconTint` colours the icon as on Button.
 
 | Prop | Values |
 | --- | --- |
@@ -67,7 +68,7 @@ Channels are `ChannelIcon` (section 4a).
 
 `ChannelIcon` is the square tile for a channel: a chosen Phosphor icon, or the first letter of `name`, on a chosen colour, in the same hue mix as avatars so tiles and initials sit together in a row. `icon` is one of `channelIconNames` (24 plain objects that read at 16px: hash, megaphone, chats, rocket, code, bug, wrench, flask, shield, lightning, globe, compass, flag, star, heart, leaf, coffee, gift, trophy, book, briefcase, calendar, camera, truck; `channelIcons` maps a name to its component), `color` one of `channelColorNames` (the eight person hues). `defaultChannelLook(id)` is what a channel gets before anyone changes it: a colour hashed from its id and no icon, so a list of untouched channels still tells them apart by letter. `size` as Avatar; radius 16 / 12 / 12 / 8 / 7 / 6 / 5 by size. `label` for the accessible name when the channel name is not visible beside it. The choice is client-only (SPEC §3) and the view that changes it is `ChannelIconPicker` in `@juno/views`.
 
-`Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too. The label is the tooltip.
+`Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too. `tint` draws an icon tint (`iconTints`, `neutral` included) with the check in the page colour (the view sheet's Colour). The label is the tooltip.
 
 `DayToggles`: seven 28px round toggle buttons, Monday first ("M T W T F S S", each named by its day, `aria-pressed`), in a group named by `label`. An on day is filled with `--secondary-default`; an off day is muted text. `days` uses 0 for Sunday, as `Date.getDay`. The Notifications page's hours rows use it.
 

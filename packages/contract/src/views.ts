@@ -4,14 +4,16 @@
  * one too: deleting a view returns it whole, so Undo puts it back as it was.
  */
 import { Schema } from 'effect'
-import { ViewIcon } from '@juno/domain'
+import { ViewColor, ViewIcon } from '@juno/domain'
 
-export { ViewIcon }
+export { ViewColor, ViewIcon }
 
 export const SavedView = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   icon: Schema.optionalKey(ViewIcon),
+  /** The icon's colour; absent is neutral. */
+  color: Schema.optionalKey(ViewColor),
   /** The view's conversations show only in it: never in All, Channels or DMs. */
   keepOutOfAll: Schema.Boolean,
   /** Channel and DM ids. */

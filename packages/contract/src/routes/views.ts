@@ -17,7 +17,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
-import { AutomatedPlace, SavedView, ViewIcon } from '../views'
+import { AutomatedPlace, SavedView, ViewColor, ViewIcon } from '../views'
 import { CommandResult, TopicActionError } from './topics'
 
 /** A view as the pill row and the sheet show it: its conversations joined, by name. */
@@ -25,6 +25,8 @@ export const SidebarView = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   icon: Schema.optionalKey(ViewIcon),
+  /** The icon's colour; absent is neutral. */
+  color: Schema.optionalKey(ViewColor),
   keepOutOfAll: Schema.Boolean,
   /** Conversations the store knows, by name. */
   channels: Schema.Array(ChannelRef),
@@ -42,6 +44,8 @@ export const ViewDraft = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   name: Schema.String,
   icon: Schema.optionalKey(ViewIcon),
+  /** The icon's colour; null is neutral. Absent keeps an edited view's colour (a Juno settings task that does not name one). */
+  color: Schema.optionalKey(Schema.NullOr(ViewColor)),
   keepOutOfAll: Schema.Boolean,
   channels: Schema.Array(Schema.String),
 })

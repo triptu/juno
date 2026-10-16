@@ -28,6 +28,7 @@ import {
   Text,
   tooltip,
   viewIcons,
+  type AccentName,
   type ActivateEvent,
   type HueName,
   type ViewIconName,
@@ -56,6 +57,8 @@ export interface SidebarViewPill {
   readonly name: string
   /** Shown instead of the name, which becomes the tooltip and the accessible name. */
   readonly icon?: ViewIconName | undefined
+  /** The icon's colour, an accent; undefined is neutral. */
+  readonly color?: AccentName | undefined
   /** One of its topics has an unread mention of the user. */
   readonly mention: boolean
 }
@@ -373,6 +376,7 @@ function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: Vi
           data-view-pill={view.id}
           aria-label={name}
           {...(icon === undefined ? {} : { iconStart: icon, ...tooltip(view.name) })}
+          {...(icon === undefined || view.color === undefined ? {} : { iconTint: view.color })}
           pressed={on}
           draggable={onMoveView !== undefined}
           onContextMenu={(event: MouseEvent<HTMLButtonElement>) => {
