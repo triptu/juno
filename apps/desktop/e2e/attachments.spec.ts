@@ -48,6 +48,8 @@ async function drop(target: Locator, files: ReadonlyArray<Upload>): Promise<void
 
 const chips = (topic: TopicPane) => topic.root.locator('[data-composer]').getByRole('button', { name: /^Remove / })
 const chip = (topic: TopicPane, name: string) => topic.root.locator('[data-composer]').getByRole('button', { name: `Remove ${name}` })
+/** Waits until `count` of a pane's chips are staged. Enter does nothing while a file is still being read, so a send waits for this. */
+const staged = (pane: { readonly root: Locator }, count: number) => expect(pane.root.locator('[data-composer] [data-attachment="ready"]')).toHaveCount(count)
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
   await juno.signIn()
@@ -93,6 +95,7 @@ test('a file dropped on the topic is sent on its own as a file row with Download
   await drop(topic.list, [brief()])
   await expect(chip(topic, 'launch-brief.pdf')).toBeVisible()
   await expect(topic.root.locator('[data-composer]')).toContainText('launch-brief.pdf')
+  await staged(topic, 1)
   await topic.composer.press('Enter')
   await expect(chips(topic)).toHaveCount(0)
 
@@ -113,6 +116,7 @@ test('a file dropped on a reply composer is attached once and shared in that thr
   await juno.sidebar.row('Draft plan is in the doc').open()
   await drop(topic.composer, [brief()])
   await expect(chips(topic)).toHaveCount(1)
+  await staged(topic, 1)
   await topic.send('The launch brief')
   await topic.expectSent('The launch brief')
   const shares = fake.calls.filter((call) => call.method === 'files.share')
@@ -137,6 +141,7 @@ test('a removed chip is not sent, and the text row does not move', async ({ juno
   await expect(chips(topic)).toHaveCount(1)
   expect((await topic.composer.boundingBox())!.y).toBe(field!.y)
   await expect(topic.composer).toHaveValue('Two files, then one')
+  await staged(topic, 1)
 
   await topic.composer.press('Enter')
   await topic.expectSent('Two files, then one')
@@ -152,6 +157,7 @@ test('a failed upload keeps the text and the file for Retry, and is sent once', 
 
   await topic.root.locator('[data-composer] input[type="file"]').setInputFiles([chart()])
   await expect(chip(topic, 'chart.png')).toBeVisible()
+  await staged(topic, 1)
   fake.failUploads({ times: 1 })
   await topic.send('Retry this one')
   const failed = topic.failed('Retry this one')
@@ -180,6 +186,7 @@ test('a New chat keeps its files through a change of destination and sends them 
   await newChat.pickConversation('product', 'product')
   await expect(briefChip).toBeVisible()
   await expect(newChat.composer).toHaveValue('Brief for the launch')
+  await staged(newChat, 1)
 
   await newChat.send()
   await topic.expectSent('Brief for the launch')
