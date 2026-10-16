@@ -212,8 +212,8 @@ export function openSettingsSection(tabs: Tabs, section: SettingsSection, option
 /**
  * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
  * in place of the New chat's entry, so Back goes to what the tab showed
- * before. If another tab already shows the topic, that tab is focused and
- * the New chat tab closes; it does not go onto the reopen stack. A tab
+ * before, also when another tab shows the topic too: the tab you wrote in
+ * stays where you are, as any tab can show a topic another shows. A tab
  * closed while the message was sending comes back from the reopen stack
  * showing the topic, not the sent draft.
  */
@@ -227,11 +227,6 @@ export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs 
     return { ...tabs, closed: tabs.closed.with(closedAt, { ...closed, tab: { ...closed.tab, history: sentHistory(closed.tab.history, topicId) } }) }
   }
   if (currentPlace(tab).kind !== 'newChat') return tabs
-  const showing = tabShowing(tabs, topicId)
-  if (showing !== undefined) {
-    const closed = closeTab(tabs, tabId)
-    return activateTab({ ...closed, closed: tabs.closed }, showing.id)
-  }
   return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: sentHistory(tab.history, topicId) }) }
 }
 
