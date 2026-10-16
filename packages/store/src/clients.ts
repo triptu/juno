@@ -2,7 +2,7 @@
  * The two connections of one workspace.
  *
  * `StoreWriter` opens `user.db`, runs its migrations, prepares `cache.db`
- * (version check, migrations) and attaches it as `cache`, so one transaction
+ * (reset epoch check, migrations) and attaches it as `cache`, so one transaction
  * can span both files. `StoreReader` is a second, read-only connection with
  * the same attachment; live queries run on it so a long writer transaction
  * never blocks a read. Both are plain `SqlClient`s; the service type says
@@ -17,7 +17,7 @@ import { SqlError } from 'effect/sql/SqlError'
 import * as fs from 'node:fs/promises'
 import { Invalidation } from './invalidation'
 import { migrate } from './migrate'
-import { CACHE_SCHEMA_VERSION, cacheMigrations } from './migrations/cache'
+import { CACHE_RESET_EPOCH, cacheMigrations } from './migrations/cache'
 import { userMigrations } from './migrations/user'
 import { StorePaths, type WorkspacePaths } from './paths'
 
@@ -39,6 +39,22 @@ export class StoreIoError extends Schema.TaggedError<StoreIoError>()('StoreIoErr
 
 export type StoreError = SqlError | MigrationError | StoreIoError
 
+type Migrations = Record<string, Effect.Effect<void, unknown, SqlClient.SqlClient>>
+
+/**
+ * The migrations `cache.db` is brought up to when the store opens. Always
+ * `cacheMigrations`, except in a test that plays a later build with one
+ * more migration (`Store.layer(paths, { cacheMigrations })`).
+ */
+export class CacheMigrations extends Context.Reference<Migrations>('juno/store/CacheMigrations', {
+  defaultValue: () => cacheMigrations,
+}) {}
+
+export interface StoreOptions {
+  /** Tests only: the cache migrations of a later build. */
+  readonly cacheMigrations?: Migrations
+}
+
 /** The writer connection: all writes and transactions. */
 export class StoreWriter extends Context.Service<StoreWriter, SqlClient.SqlClient>()('juno/store/StoreWriter') {
   static readonly layer: Layer.Layer<StoreWriter, StoreError, StorePaths | Invalidation> = Layer.effect(
@@ -46,9 +62,10 @@ export class StoreWriter extends Context.Service<StoreWriter, SqlClient.SqlClien
     Effect.gen(function* () {
       const paths = yield* StorePaths
       const invalidation = yield* Invalidation
+      const migrations = yield* CacheMigrations
       yield* io(paths.dir, () => fs.mkdir(paths.dir, { recursive: true }))
       yield* io(paths.uploads, () => fs.mkdir(paths.uploads, { recursive: true }))
-      yield* prepareCache(paths, invalidation)
+      yield* prepareCache(paths, invalidation, migrations)
       const sql = yield* invalidation.provideReactivity(
         SqliteClient.make({ filename: paths.userDb, busyTimeout: BUSY_TIMEOUT }),
       )
@@ -98,12 +115,13 @@ export class Store extends Context.Service<
         const invalidation = yield* Invalidation
         const writer = yield* StoreWriter
         const reader = yield* StoreReader
+        const migrations = yield* CacheMigrations
 
         const resetCache = Effect.gen(function* () {
           yield* reader`DETACH DATABASE ${reader.literal(CACHE_SCHEMA)}`
           yield* writer`DETACH DATABASE ${writer.literal(CACHE_SCHEMA)}`
           yield* removeDatabaseFiles(paths.cacheDb)
-          yield* prepareCache(paths, invalidation)
+          yield* prepareCache(paths, invalidation, migrations)
           yield* attachCache(writer, paths)
           yield* attachCache(reader, paths)
           yield* invalidation.invalidateAll
@@ -116,12 +134,16 @@ export class Store extends Context.Service<
   /** Everything the store provides for one workspace directory. */
   static readonly layer = (
     paths: WorkspacePaths,
+    options: StoreOptions = {},
   ): Layer.Layer<Store | StoreWriter | StoreReader | Invalidation | StorePaths, StoreError> =>
     Store.layerNoDeps.pipe(
       Layer.provideMerge(StoreReader.layer),
       Layer.provideMerge(StoreWriter.layer),
       Layer.provideMerge(Invalidation.layer),
       Layer.provideMerge(StorePaths.layer(paths)),
+      Layer.provide(
+        options.cacheMigrations === undefined ? Layer.empty : Layer.succeed(CacheMigrations, options.cacheMigrations),
+      ),
     )
 }
 
@@ -143,45 +165,54 @@ const removeDatabaseFiles = (dbPath: string) =>
   })
 
 /**
- * Makes sure `cache.db` exists with the current schema. A file with another
- * `user_version` is deleted first, and so is one SQLite cannot open (a
- * damaged file, or one whose WAL no longer matches it): the cache is a copy
- * of Slack and syncs again. Uses a short-lived connection of its own so the
- * Migrator's table lands in `cache.db`, not in `user.db`.
+ * Makes sure `cache.db` exists and is migrated to the current schema. An
+ * update keeps the cache: pending migrations run on the existing file and
+ * its rows stay. The file is deleted first only when its `user_version` is
+ * not `CACHE_RESET_EPOCH` (a change that cannot be migrated), and when
+ * SQLite cannot open or migrate it (a damaged file, or one whose WAL no
+ * longer matches it): the cache is a copy of Slack and syncs again. Uses a
+ * short-lived connection of its own so the Migrator's table lands in
+ * `cache.db`, not in `user.db`.
  */
-const prepareCache = (paths: WorkspacePaths, invalidation: Invalidation['Service']): Effect.Effect<void, StoreError> =>
+const prepareCache = (
+  paths: WorkspacePaths,
+  invalidation: Invalidation['Service'],
+  migrations: Migrations,
+): Effect.Effect<void, StoreError> =>
   Effect.gen(function* () {
     const existed = yield* fileExists(paths.cacheDb)
     if (existed) {
-      const version = yield* readUserVersion(paths.cacheDb, invalidation).pipe(Effect.catch(() => Effect.succeed(undefined)))
-      if (version !== CACHE_SCHEMA_VERSION) {
-        yield* Effect.logInfo('cache.db schema version differs, recreating', {
-          found: version,
-          wanted: CACHE_SCHEMA_VERSION,
-        })
+      const epoch = yield* readUserVersion(paths.cacheDb, invalidation).pipe(Effect.catch(() => Effect.succeed(undefined)))
+      if (epoch !== CACHE_RESET_EPOCH) {
+        yield* Effect.logInfo('cache.db reset epoch differs, recreating', { found: epoch, wanted: CACHE_RESET_EPOCH })
         yield* removeDatabaseFiles(paths.cacheDb)
       }
     }
-    yield* createCache(paths, invalidation).pipe(
+    yield* createCache(paths, invalidation, migrations).pipe(
       Effect.catch((error) =>
         existed && error._tag !== 'StoreIoError'
           ? Effect.gen(function* () {
-              yield* Effect.logWarning('cache.db could not be opened, recreating', { error: error.message })
+              yield* Effect.logWarning('cache.db could not be opened or migrated, recreating', { error: error.message })
               yield* removeDatabaseFiles(paths.cacheDb)
-              yield* createCache(paths, invalidation)
+              yield* createCache(paths, invalidation, migrations)
             })
           : Effect.fail(error),
       ),
     )
   }).pipe(Effect.withSpan('Store.prepareCache'))
 
-/** Opens `cache.db`, creating it if needed, and migrates it to the current schema. */
-const createCache = (paths: WorkspacePaths, invalidation: Invalidation['Service']): Effect.Effect<void, StoreError> =>
+/** Opens `cache.db`, creating it if needed, and runs the migrations it has not recorded yet. */
+const createCache = (
+  paths: WorkspacePaths,
+  invalidation: Invalidation['Service'],
+  migrations: Migrations,
+): Effect.Effect<void, StoreError> =>
   Effect.scoped(
     Effect.gen(function* () {
       const sql = yield* SqliteClient.make({ filename: paths.cacheDb, busyTimeout: BUSY_TIMEOUT })
-      yield* Effect.provideService(migrate(cacheMigrations), SqlClient.SqlClient, sql)
-      yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_SCHEMA_VERSION))}`
+      const applied = yield* Effect.provideService(migrate(migrations), SqlClient.SqlClient, sql)
+      if (applied.length > 0) yield* Effect.logInfo('cache.db migrated', { applied: applied.map(([id, name]) => `${id}_${name}`) })
+      yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_RESET_EPOCH))}`
     }),
   ).pipe(invalidation.provideReactivity)
 
