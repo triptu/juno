@@ -30,7 +30,7 @@ export async function recordTrace(win: Page, name: string, run: () => Promise<vo
   const categories =
     TRACE_DIR === undefined
       ? ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink.user_timing', 'benchmark']
-      : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'benchmark', 'gpu', 'viz', ...(process.env['JUNO_TRACE_SKIA'] === undefined ? [] : SKIA)]
+      : ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'blink.user_timing', 'v8.execute', 'blink', 'cc', 'benchmark', 'gpu', 'viz', ...(process.env['JUNO_TRACE_EXTRA']?.split(',') ?? []), ...(process.env['JUNO_TRACE_SKIA'] === undefined ? [] : SKIA)]
   await cdp.send('Tracing.start', { traceConfig: { includedCategories: categories }, transferMode: 'ReturnAsStream' })
   let trace = ''
   let layers: Array<{ layerId: string; backendNodeId?: number; width: number; height: number; drawsContent: boolean }> = []
