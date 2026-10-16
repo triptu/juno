@@ -181,7 +181,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
     // right-to-left paragraph (otherwise the "@" jumps to the other end).
     case 'user':
       return inline.isMe ? (
-        <Chip variant="accent" size="inline" title="Mentions you">
+        <Chip variant="mention" size="inline" title="Mentions you">
           <bdi>@{inline.name}</bdi>
         </Chip>
       ) : (
@@ -210,7 +210,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
       )
     case 'usergroup':
       return (
-        <Chip variant={inline.isMine ? 'accent' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
+        <Chip variant={inline.isMine ? 'mention' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
           <bdi>@{inline.handle}</bdi>
         </Chip>
       )

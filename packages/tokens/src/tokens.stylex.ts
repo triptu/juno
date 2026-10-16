@@ -124,6 +124,8 @@ export const colors = stylex.defineVars({
  * - --hl-count, --hl-count-fg: the sidebar's counters, the accent at reduced
  *   brightness: a tint of it over the sidebar for the fill and a deeper
  *   (light) or dimmer (dark) accent for the text, held to 4.5:1 on the fill
+ * - --hl-mention, --hl-mention-fg: the @you chip in a message, held to 6:1;
+ *   in light the accents whose fill is lighter take the deeper --hl-text
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
@@ -139,6 +141,8 @@ export const accent = stylex.defineVars({
   '--hl-nav': `color-mix(in oklch, #CC4628 9%, ${colors['--background-subtle']})`,
   '--hl-count': '#F7DED4',
   '--hl-count-fg': '#B3371B',
+  '--hl-mention': '#B4351F',
+  '--hl-mention-fg': '#FFFFFF',
   '--hl-rule': 'color-mix(in oklch, #CC4628 30%, transparent)',
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
   '--focus-ring': '#B4351F',

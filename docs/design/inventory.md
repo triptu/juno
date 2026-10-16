@@ -321,7 +321,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 
 ### 6.2 Inline chips
 
-- **@person**: weight 600, padding 0 3, radius 4, bg `--hl-soft`, fg default. **@you**: bg `--hl`, fg `--hl-fg`. In your own bubble: `color-mix(currentColor 16%, transparent)`.
+- **@person**: weight 600, padding 0 3, radius 4, bg `--hl-soft`, fg default. **@you**: bg `--hl-mention`, fg `--hl-mention-fg` (the accent fill, deeper in light for coral, teal and cyan; 6:1 or better, tokens.md 1.3). In your own bubble: `color-mix(currentColor 16%, transparent)`.
 - **#channel**: same look as @person; clicking scopes the sidebar to that channel (stops propagation).
 - Tokens are matched against known names ("@Maya Chen", "@Maya", "#eng"); longest first.
 

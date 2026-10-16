@@ -1,0 +1,1 @@
+- 10-17 00:40 · ui-fixes-1017 · The @you chip takes its own accent pair, --hl-mention and --hl-mention-fg, held to 6:1; in light, coral, teal and cyan use the deeper --hl-text with white text.

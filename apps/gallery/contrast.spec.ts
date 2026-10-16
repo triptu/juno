@@ -78,3 +78,48 @@ test.describe('sidebar row contrast', () => {
     }
   }
 })
+
+/**
+ * The @you chip in a message (tokens.md 1.3, "@you chip"): its text holds
+ * 6:1 on its own fill in both themes and with every accent, since the chip
+ * is how a mention of you reads at a glance. The fill is opaque, so the
+ * chip's own background is what the text sits on.
+ */
+test.describe('@you chip contrast', () => {
+  const accents = ['coral', 'ink', 'marigold', 'teal', 'midnight', 'emerald', 'claret', 'cyan'] as const
+  for (const theme of ['light', 'dark'] as const) {
+    test(`${theme}: the @you chip reads with every accent`, async ({ page }) => {
+      for (const accent of accents) {
+        await page.goto(`/#/Message?__state=row/mentions-you${theme === 'light' ? '' : '&theme=dark'}${accent === 'coral' ? '' : `&accent=${accent}`}`)
+        const chip = page.locator('[data-fixture-frame] [title="Mentions you"]').first()
+        await expect(chip).toBeVisible()
+        await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
+        const contrast = await chip.evaluate((node) => {
+          const canvas = document.createElement('canvas')
+          canvas.width = canvas.height = 1
+          const context = canvas.getContext('2d', { willReadFrequently: true })!
+          const rgba = (css: string): [number, number, number, number] => {
+            context.clearRect(0, 0, 1, 1)
+            context.fillStyle = css
+            context.fillRect(0, 0, 1, 1)
+            const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data
+            return [r!, g!, b!, a! / 255]
+          }
+          const luminance = ([r, g, b]: ReadonlyArray<number>) => {
+            const [lr, lg, lb] = [r!, g!, b!].map((c) => {
+              const v = c / 255
+              return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+            })
+            return 0.2126 * lr! + 0.7152 * lg! + 0.0722 * lb!
+          }
+          const style = getComputedStyle(node)
+          const fill = rgba(style.backgroundColor)
+          const [hi, lo] = [luminance(rgba(style.color)), luminance(fill)].sort((a, b) => b - a)
+          return { opaque: fill[3] > 0.99, ratio: Math.round(((hi! + 0.05) / (lo! + 0.05)) * 100) / 100 }
+        })
+        expect(contrast.opaque, accent).toBe(true)
+        expect(contrast.ratio, `${accent}: ${contrast.ratio}`).toBeGreaterThanOrEqual(6)
+      }
+    })
+  }
+})
