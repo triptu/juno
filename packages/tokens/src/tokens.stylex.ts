@@ -799,6 +799,8 @@ export const layout = stylex.defineVars({
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',
+  // Who reacted (the reaction chip's card): narrow enough for one short name, no wider than a menu.
+  '--reactors-min-width': '160px',
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',

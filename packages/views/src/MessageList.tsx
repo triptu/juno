@@ -11,6 +11,8 @@ import { messageTime } from './time'
 export interface MessageListItem {
   readonly message: MessageView
   readonly sender: Person | undefined
+  /** The people who reacted, by id, for the chips' card of who reacted. */
+  readonly reactors?: ReadonlyMap<string, Person>
 }
 
 /**
@@ -219,6 +221,7 @@ export function MessageList({
               <Message
                 message={item.message}
                 sender={item.sender}
+                {...(item.reactors === undefined ? {} : { reactors: item.reactors })}
                 time={messageTime(item.message.at, now)}
                 now={now}
                 main={main}

@@ -397,6 +397,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
+| `--reactors-min-width` | 160px: the narrowest the reaction chip's card of who reacted gets; it grows to `--menu-width` |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |

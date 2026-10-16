@@ -39,6 +39,8 @@ export interface MessageProps {
   readonly message: MessageView
   /** The sender from the window's refs. Undefined for an unloaded root, or a user the store does not know. */
   readonly sender: Person | undefined
+  /** The people who reacted, by id: hovering a chip shows them. */
+  readonly reactors?: ReadonlyMap<string, Person>
   /** The message time, already formatted ("9:12"). */
   readonly time: string
   /** Epoch milliseconds, for `date` inlines. */
@@ -85,6 +87,8 @@ export interface MessageProps {
 }
 
 const HOVER = '@media (hover: hover)'
+
+const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 
 // A row too narrow to keep the toolbar's reserve and still leave the name and
 // time 160px: the reserve (243) + 160 + the gutter (32), its gap (12) and the
@@ -151,6 +155,7 @@ const dim = stylex.keyframes({
 export const Message = memo(function Message({
   message,
   sender,
+  reactors,
   time,
   now,
   main,
@@ -267,7 +272,7 @@ export const Message = memo(function Message({
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
-        <Reactions reactions={message.reactions} onToggle={toggle} />
+        <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} />
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
