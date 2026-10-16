@@ -1,0 +1,1 @@
+- 10-16 13:17 · follow-header · Follow and Resolve (or Reopen) each hold the other's label hidden in the same grid cell, so both take the wider width and the swap moves nothing, with no fixed width and no extra space.

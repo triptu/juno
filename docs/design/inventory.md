@@ -257,12 +257,13 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
 Right island (`flex: none`, padding 3):
 
 - **Resolve / Reopen**: 28px, `--radius-pill`, padding 0 10, gap 6, 12.5/500 `--foreground-default`, icon 14 subtle (`circle-check` / `rotate-ccw`), hover `--secondary-default`. Undo toast. Not on Main. [built M5] It runs the row check's resolve call, and Reopen runs `topics.reopen`.
+- **Follow** (on a thread you do not follow, in Resolve's place; SPEC 5 and 7): the same button with `bell` 14, label "Follow", `aria-haspopup="menu"`, pressed while its menu is open. It opens a native menu at its left edge 6px under the island: **When it matters** (sublabel "Juno decides when to notify you"), **Every message**. The choice goes through `notifications.setLevel`, as Notify me does. Follow and Resolve (or Reopen) each hold the other's label in the same grid cell, hidden, so both are the wider width and following moves nothing. [built 10-16]
 - **⋯** (`dots-three` 18 bold, `IconButton variant="island"`, 28 round, name "More", `aria-haspopup="menu"`): opens the topic menu (§15.1), the row's menu, at the button's left edge 6px under the island; shows pressed (`--secondary-hover`) while the menu is open. Between Resolve and Juno; on Main, first. Main has no Threads button: the title's switcher lists the channel's threads.
 - **Juno**: 28 round icon button (`sparkle` 16 duotone), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". `IconButton variant="island"`: hover `--secondary-default`; pressed `--secondary-hover` (`--secondary-active` under the pointer). Hidden when AI assist is off. [not built] Hidden until the Juno panel is built, since a button that does nothing is worse than none.
 - **States.** Every island control has the same three: hover a secondary fill (on the island's `--surface-default`, `--surface-hover` was too close to see), the press scale (`--press-scale`) and the keyboard focus ring. The context pill's hover is its tint one step deeper (`--tint-public-hover`, `--tint-private-hover`, `--tint-dm-hover`). The Juno panel's Open in a tab and Close use the same `island` variant. Gallery: `TopicHeader` › Interaction (hover, press and focus for each control).
 - Pin, Notify me and More are not in the header. They are in the topic menu, which is the row's menu.
 
-Narrow (a container query on the topic area): under 480px, Resolve is a 28px icon button (name still "Resolve" / "Reopen"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
+Narrow (a container query on the topic area): under 480px, Resolve and Follow are 28px icon buttons (name still "Resolve" / "Reopen" / "Follow"). The pill shows its full name up to 160px, then takes an ellipsis; the title takes the rest and shortens first. The pill's icon and tint always show. At the minimum window (720 by 480, sidebar shown) the topic is 336px and every variant fits.
 
 The message list under the header (`MessageList`, `TopicView`):
 
@@ -272,7 +273,7 @@ The message list under the header (`MessageList`, `TopicView`):
 - Open position: the "N new" divider lands `--header-band` + 80 (148px) from the scroller's top, which is 80px below the band, as before. The bottom pin, prepends, the window cap and scroll anchoring are unchanged (performance.md 3.3 and 5.2): the band and islands are out of flow and never change, so a rename, the menu or Juno pressed moves nothing in the list.
 - No script reads or writes on scroll. The band is drawn the same at scroll top and scrolled: at scroll top it only covers the empty inset.
 
-Keyboard order inside the header: context pill → title button → Resolve (threads) → ⋯ → Juno. Then the message list and the composer, as before (the Tab order row in the accessibility table).
+Keyboard order inside the header: context pill → title button → Resolve or Follow (threads) → ⋯ → Juno. Then the message list and the composer, as before (the Tab order row in the accessibility table).
 
 ## 6. Message list
 
@@ -621,7 +622,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Add to view | `stack` | | Main only | submenu §15.8 for the row's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 
-[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column.
+[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column. A second line under an item (`sublabel`, macOS 14.4 and later) is drawn where one is set, as on Follow's When it matters.
 
 ### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 
