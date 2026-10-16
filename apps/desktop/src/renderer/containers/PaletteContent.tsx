@@ -242,7 +242,15 @@ export function OpenPalette() {
   const conversationsTab = tab === 'conversations'
   const listingNow = commandListing(request.text)
   const settled = conversationsTab ? listingNow !== undefined || conversations.settled : messages.settled
-  const shownText = conversationsTab ? (listingNow !== undefined ? request.text.trim() : (conversations.local?.request.text.trim() ?? '')) : (messages.local?.request.text.trim() ?? '')
+  // Rows held from a ">" listing are the empty query's: they show as Frequent until the new text's arrive.
+  const heldConversations = conversations.local?.request.text ?? ''
+  const shownText = conversationsTab
+    ? listingNow !== undefined
+      ? request.text.trim()
+      : commandListing(heldConversations) === undefined
+        ? heldConversations.trim()
+        : ''
+    : (messages.local?.request.text.trim() ?? '')
   const shownCommand = settled ? (command ?? null) : null
 
   let sections: ReadonlyArray<PaletteSection>
