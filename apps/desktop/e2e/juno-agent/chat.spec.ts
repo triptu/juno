@@ -141,8 +141,8 @@ test('a message sent from the panel is about the topic, with the selection, and 
   })
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
-  // The context line adds "+ selection", with the words and their sender as its tooltip.
-  await expect(juno.win.locator('[data-panel-selection]')).toContainText('+ selection')
+  // The composer adds a Selection chip, with the words and their sender as its tooltip.
+  await expect(juno.win.locator('[data-panel-selection]')).toContainText('Selection')
   await expect(juno.win.locator('[data-panel-selection]')).toHaveAttribute('title', 'Leo: logical replication')
 
   await panel.send('is this settled?')
@@ -160,7 +160,7 @@ test('a message sent from the panel is about the topic, with the selection, and 
   await juno.topic.expectTitle(POSTGRES)
 })
 
-test('the context line above the panel composer names the topic Juno sees', async ({ juno }) => {
+test('the topic chip in the panel composer names the topic Juno sees', async ({ juno }) => {
   await ready(juno)
   await setWindowWidth(juno, 1400)
   await juno.sidebar.row(POSTGRES).open()
