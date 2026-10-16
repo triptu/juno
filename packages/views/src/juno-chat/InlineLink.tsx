@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import type { ActivateEvent } from '@juno/ui'
-import { accent, colors, motion, sizes, spacing, radii } from '@juno/tokens/tokens.stylex'
+import { accent, colors, motion, sizes, radii } from '@juno/tokens/tokens.stylex'
 
 export interface InlineLinkProps {
   readonly onOpen: (event: ActivateEvent) => void
@@ -44,14 +44,22 @@ export function InlineLink({ onOpen, title, children, ...data }: InlineLinkProps
 }
 
 const styles = stylex.create({
+  // Quiet at rest, as a long cited sentence must not read as one long
+  // underline: the words keep the bubble's ink over a faint dotted line,
+  // which turns solid and darker on hover. It opens inside the app, so the
+  // cursor stays the arrow.
   link: {
-    color: colors['--foreground-subtle'],
+    color: 'inherit',
     textDecorationLine: 'underline',
-    textDecorationColor: {
-      default: colors['--foreground-muted'],
-      ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
+    textDecorationStyle: {
+      default: 'dotted',
+      ':hover': { default: null, [HOVER]: 'solid' },
     },
-    textUnderlineOffset: spacing['--space-0-5'],
+    textDecorationColor: {
+      default: colors['--border-strongest'],
+      ':hover': { default: null, [HOVER]: colors['--foreground-muted'] },
+    },
+    textUnderlineOffset: sizes['--link-underline-offset'],
     cursor: 'default',
     borderRadius: radii['--radius-inline'],
     transitionProperty: 'text-decoration-color',
