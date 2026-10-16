@@ -131,12 +131,17 @@ export interface SlackAppFixture {
 
 export const KEYCHAIN_PASSWORD = 'fixture-keychain-password'
 
-export async function writeSlackApp(fake: FakeSlack, dir: string): Promise<SlackAppFixture> {
+export async function writeSlackApp(
+  fake: FakeSlack,
+  dir: string,
+  options: Pick<Parameters<typeof writeSlackAppFixture>[1], 'cookiesFile' | 'signedOut'> = {},
+): Promise<SlackAppFixture> {
   const credentials = fake.signIn()
   await writeSlackAppFixture(dir, {
     team: { id: fake.teamId, name: 'Juno Fake', domain: 'juno-fake', url: `${fake.url}/`, token: credentials.token, userId: credentials.userId },
     cookie: credentials.cookie,
     keychainPassword: KEYCHAIN_PASSWORD,
+    ...options,
   })
   return { dir, keychainPassword: KEYCHAIN_PASSWORD, credentials }
 }

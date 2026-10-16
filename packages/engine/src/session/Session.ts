@@ -201,7 +201,7 @@ export class Session extends Context.Service<
           }
           if (answer._tag === 'sessionFailed') {
             yield* restore
-            return yield* new SignInFailed({ kind: answer.kind, message: answer.message })
+            return yield* new SignInFailed({ kind: answer.kind, message: answer.message, ...(answer.details === undefined ? {} : { details: answer.details }) })
           }
           if (answer.secrets === null) {
             yield* restore
