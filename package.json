@@ -11,9 +11,10 @@
   "scripts": {
     "dev": "pnpm --filter @juno/desktop dev",
     "build": "pnpm --filter @juno/desktop build",
-    "typecheck": "node scripts/typecheck.mjs",
+    "typecheck": "node scripts/typecheck-bun.mjs",
+    "typecheck:tsc": "node scripts/typecheck.mjs",
     "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive node scripts/typecheck-bun.mjs --parity",
-    "typecheck:bun": "node scripts/heavy.mjs --queue typecheck node scripts/typecheck-bun.mjs",
+    "typecheck:bun": "node scripts/typecheck-bun.mjs",
     "lint": "oxlint . && node scripts/decision-log.mjs --check && node scripts/check-no-pointer-cursor.mjs && node scripts/check-tokens.mjs && node scripts/check-deps.mjs && node scripts/check-fixtures-redacted.mjs && node scripts/health.mjs --check",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",

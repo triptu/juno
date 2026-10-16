@@ -1,7 +1,7 @@
 // Typechecks every TypeScript project, skipping the ones whose inputs passed before.
 //
-//   pnpm typecheck                every project (unchanged ones are skipped)
-//   pnpm typecheck --no-cache     check them all
+//   pnpm typecheck:tsc            every project (unchanged ones are skipped)
+//   pnpm typecheck:tsc --no-cache check them all
 //   node scripts/typecheck.mjs --pending   list the projects that would run
 //
 // The projects are each package's `tsc -p <config>` from its typecheck script,
@@ -121,7 +121,7 @@ for (const project of projects) {
 const started = Date.now()
 // Expose this exact inventory and its input keys to the local Bun checker.
 if (process.argv.includes('--projects-json')) {
-  console.log(JSON.stringify(projects.map(({ label, cwd, config, key }) => ({ label, cwd, config, key, tscPassed: existsSync(join(cacheDir, key)) }))))
+  console.log(JSON.stringify(projects.map(({ label, cwd, config, key }) => ({ label, cwd, config, key }))))
   process.exit(0)
 }
 const selectedAt = process.argv.indexOf('--projects')

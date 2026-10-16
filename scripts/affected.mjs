@@ -158,13 +158,14 @@ function closure(start) {
 const touches = (reached) => changed.some((file) => reached.has(file))
 const plan = []
 
-// Bun has its own cache; its successes never skip the authoritative tsc run.
+// Bun checks locally and keeps its own cache. Unsupported configs are reported
+// and skipped; routine affected checks never invoke TypeScript.
 const typecheckArgs = flag('--no-cache') ? ['--no-cache'] : []
 const listed = spawnSync(process.execPath, [join(root, 'scripts/typecheck-bun.mjs'), '--pending', ...typecheckArgs], { cwd: root, encoding: 'utf8' })
 if (listed.status !== 0) throw new Error(listed.stderr || 'Could not plan local typecheck')
 const typecheckPending = JSON.parse(listed.stdout)
-if (typecheckPending.bun.length > 0) plan.push({ script: 'typecheck:bun', args: typecheckArgs, items: [], local: true, why: `${typecheckPending.bun.length} project(s), Bun on this Mac` })
-if (typecheckPending.tsc.length > 0) plan.push({ script: 'typecheck', args: [...typecheckArgs, '--projects', JSON.stringify(typecheckPending.tsc.map((project) => project.config))], items: [], why: `TypeScript fallback: ${typecheckPending.tsc.map((project) => `${project.label} (${project.reason})`).join(', ')}` })
+for (const project of typecheckPending.skipped) console.warn(`warning: skipping ${project.label}; Bun cannot check this project (${project.reason})`)
+if (typecheckPending.bun.length > 0) plan.push({ script: 'typecheck', args: typecheckArgs, items: [], local: true, why: `${typecheckPending.bun.length} project(s), pinned Bun locally` })
 // The whole lint takes about 3 s, less than a remote machine's overhead, so it runs here.
 if (changed.some((file) => !file.endsWith('.md'))) plan.push({ script: 'lint', args: [], items: [], local: true, why: 'the whole lint, on this Mac (about 3 s)' })
 
@@ -310,7 +311,7 @@ const run = (step) =>
     child.on('close', (code) => resolvePromise({ step, code: code ?? 1 }))
   })
 // Fail on local type errors before paying for remote machines.
-const localTypecheck = plan.find((step) => step.script === 'typecheck:bun')
+const localTypecheck = plan.find((step) => step.script === 'typecheck')
 const results = localTypecheck ? [await run(localTypecheck)] : []
 if (results.some(({ code }) => code !== 0)) process.exit(1)
 const remaining = plan.filter((step) => step !== localTypecheck)

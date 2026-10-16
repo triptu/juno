@@ -36,10 +36,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const started = Date.now()
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['bench:engine', 'bench:sync', 'typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
+const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
 // Measured shapes and rejected alternatives: docs/development.md, "Machine shapes".
 const remoteShapes = {
-  typecheck: '2x4',
   lint: '2x4',
   test: '2x4',
   'test:remote-pool': '2x4',
@@ -155,10 +154,9 @@ try {
 const { files, bytes } = snapshotted
 const runId = `${new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${process.pid}-${randomUUID().slice(0, 8)}`
 
-// Spec checks and typechecks take the Mac's cache of passing results along
-// (staged in the ignored .remote/ folder) and bring back what they add, so a
-// check that passed anywhere is not run again.
-const carried = { 'specs:': { name: 'specs', env: 'SPECS_CACHE_DIR' }, typecheck: { name: 'typecheck', env: 'JUNO_TYPECHECK_CACHE_DIR' } }
+// Spec checks take the Mac's cache of passing results along (staged in the
+// ignored .remote/ folder) and bring back what they add.
+const carried = { 'specs:': { name: 'specs', env: 'SPECS_CACHE_DIR' } }
 const carry = Object.entries(carried).find(([prefix]) => options.script.startsWith(prefix))?.[1]
 const specCache = carry && join(tmpdir(), 'juno-cache', carry.name)
 const stagedCache = carry && `.remote/cache-${runId}/${carry.name}`
