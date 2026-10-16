@@ -12,7 +12,7 @@ export { ComposerSlot } from './ComposerSlot'
 export { DestinationPickers, type PickerName } from './DestinationPickers'
 export { EmojiPicker } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
-export { ImageViewer, type ImageViewerProps } from './ImageViewer'
+export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaViewer'
 
 export { type MessageActions } from './Message'
 export { InlineEdit, type InlineEditProps } from './InlineEdit'

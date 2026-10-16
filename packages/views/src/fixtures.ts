@@ -17,7 +17,7 @@ import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
-import ImageViewer from './ImageViewer.fixtures'
+import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
@@ -94,7 +94,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EmptyChat,
   NoProvider,
   EngineStatusView,
-  ImageViewer,
+  MediaViewer,
   Home,
   HoverToolbar,
   JunoChatList,

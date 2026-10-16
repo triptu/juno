@@ -1,21 +1,28 @@
 import * as stylex from '@stylexjs/stylex'
 import type { FileView } from '@juno/contract'
 import { defineFixtures, scene } from '@juno/ui'
-import { downloadable, PENDING_PICTURE, withDownloads } from './fixtures/messages'
+import type { MediaFile } from './FileCard'
+import { album, albumOf, downloadable, image, PENDING_PICTURE, picture } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import { ImageViewer } from './ImageViewer'
+import { MediaViewer, type MediaViewing } from './MediaViewer'
 import { MessageList } from './MessageList'
 
 const noop = () => {}
 
 const { download: _download, ...notDownloadable } = downloadable.portrait
 
+const media = (files: ReadonlyArray<FileView>) => files as ReadonlyArray<MediaFile>
+const viewing = (items: ReadonlyArray<FileView>, index = 0): MediaViewing => ({ items: media(items), index, sender: 'Priya Shah', at: NOW - 20 * 60_000 })
+
+/** A video Slack made a poster for; the fixture plays nothing. */
+const video: FileView = { ...image('F0VID', 'standup-recording.mp4', 1280, 720, picture(1280, 720, '#7F8FA6')), kind: 'video', mimetype: 'video/mp4' }
+
 /** The viewer over a topic's list. The frame holds the fixed viewer, as the window does in the app. */
-function OverList({ file }: { readonly file: FileView }) {
+function OverList({ open }: { readonly open: MediaViewing }) {
   return (
     <div {...stylex.props(styles.window)}>
-      <MessageList items={withDownloads} main={false} now={NOW} onOpenImage={noop} onDownload={noop} />
-      <ImageViewer file={file} onClose={noop} onDownload={noop} />
+      <MessageList items={albumOf(open.items.length)} main={false} now={NOW} onOpenMedia={noop} onDownload={noop} />
+      <MediaViewer viewing={open} now={NOW} onClose={noop} onDownload={noop} onOpenFile={noop} onCopyImage={noop} />
     </div>
   )
 }
@@ -32,14 +39,22 @@ const styles = stylex.create({
 })
 
 export default defineFixtures(
-  ImageViewer,
+  MediaViewer,
   {
     Open: {
-      landscape: scene(() => <OverList file={downloadable.landscape} />),
-      portrait: scene(() => <OverList file={downloadable.portrait} />),
+      landscape: scene(() => <OverList open={viewing([downloadable.landscape])} />),
+      portrait: scene(() => <OverList open={viewing([downloadable.portrait])} />),
       // The full image has not arrived: the thumbnail fills the same box.
-      'full-loading': scene(() => <OverList file={{ ...downloadable.landscape, full: PENDING_PICTURE }} />),
-      'no-download': scene(() => <OverList file={notDownloadable} />),
+      'full-loading': scene(() => <OverList open={viewing([{ ...downloadable.landscape, full: PENDING_PICTURE }])} />),
+      'no-download': scene(() => <OverList open={viewing([notDownloadable])} />),
+    },
+    Filmstrip: {
+      // Four pictures, opened at the third: the strip marks it.
+      'at-third': scene(() => <OverList open={viewing(album.slice(0, 4), 2)} />),
+      // The first: Previous is off.
+      'at-first': scene(() => <OverList open={viewing(album, 0)} />),
+      // A video in the strip, shown by its poster.
+      'with-video': scene(() => <OverList open={viewing([album[0]!, video, album[2]!], 1)} />),
     },
   },
   { width: 816, height: 600, padded: false },

@@ -3,6 +3,7 @@ import { useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import type { MediaViewing } from './MediaViewer'
 import { Message, type MessageActions } from './Message'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
@@ -73,8 +74,8 @@ export interface MessageListProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
   readonly onDiscard?: (clientMsgId: string) => void
-  /** A thumbnail was opened. Created once, like every row callback. */
-  readonly onOpenImage?: (file: FileView) => void
+  /** An image or video was opened: the media viewer. Created once, like every row callback. */
+  readonly onOpenMedia?: (viewing: MediaViewing) => void
   /** Download on a file card. Created once. */
   readonly onDownload?: (file: FileView) => void
   /** Upload progress of the messages being sent with files, by `clientMsgId`, 0 to 1. */
@@ -172,7 +173,7 @@ export function MessageList({
   onToggleReaction,
   onRetry,
   onDiscard,
-  onOpenImage,
+  onOpenMedia,
   onDownload,
   uploadProgress,
   onMessageMenu,
@@ -237,7 +238,7 @@ export function MessageList({
                 onToggleReaction={onToggleReaction}
                 onRetry={onRetry}
                 onDiscard={onDiscard}
-                onOpenImage={onOpenImage}
+                onOpenMedia={onOpenMedia}
                 onDownload={onDownload}
                 progress={item.message.clientMsgId === undefined ? undefined : uploadProgress?.[item.message.clientMsgId]}
                 onFocus={setFocusedTs}

@@ -4,6 +4,7 @@ import { File } from '@phosphor-icons/react/dist/icons/File'
 import { FilePdf } from '@phosphor-icons/react/dist/icons/FilePdf'
 import { Image } from '@phosphor-icons/react/dist/icons/Image'
 import { MusicNote } from '@phosphor-icons/react/dist/icons/MusicNote'
+import { Play } from '@phosphor-icons/react/dist/icons/Play'
 import { VideoCamera } from '@phosphor-icons/react/dist/icons/VideoCamera'
 import { useState } from 'react'
 import type { FileKind, FileThumb, FileView } from '@juno/contract'
@@ -12,8 +13,8 @@ import { Icon, IconButton, Surface, Text, type PhosphorIcon } from '@juno/ui'
 
 export interface FilesProps {
   readonly files: ReadonlyArray<FileView>
-  /** A thumbnail is a button that opens the image viewer. Created once by the container. */
-  readonly onOpenImage?: ((file: FileView) => void) | undefined
+  /** An image or video opens the media viewer at it. Created once by the container. */
+  readonly onOpenMedia?: ((file: FileView) => void) | undefined
   /** A card with a `download` url gets a Download button. Created once by the container. */
   readonly onDownload?: ((file: FileView) => void) | undefined
   /** Roving tabindex: the buttons are in the tab order only on the row that Tab reaches. */
@@ -22,39 +23,42 @@ export interface FilesProps {
   readonly progress?: number | undefined
 }
 
-// The height of an image in a grid of them: about 3:2 in a 177px column.
-const TILE_HEIGHT = '120px'
-
 // The upload line's thickness.
 const PROGRESS_HEIGHT = '2px'
 
+/** Tiles a message's grid shows; the last says "+N" for the rest. */
+const GRID_TILES = 4
+
+/** A file the media viewer shows: an image or a video with a picture to show for it. */
+export type MediaFile = FileView & { readonly thumb: FileThumb }
+
+export const isMedia = (file: FileView): file is MediaFile => file.thumb !== undefined && (file.kind === 'image' || file.kind === 'video')
+
+/** A message's images and videos, in Slack's order: what its grid and the viewer's filmstrip show. */
+export const mediaOf = (files: ReadonlyArray<FileView>): ReadonlyArray<MediaFile> => files.filter(isMedia)
+
 /**
- * The files under a message, in Slack's order: an image with a thumbnail is
- * the thumbnail in a box of its final size, and images next to each other
- * share a two-column grid of same-size cells; anything else is a card. While
+ * The files under a message, in Slack's order. Its images and videos are one
+ * block where the first of them is: one is the picture in a box of its final
+ * size; two sit side by side, three and four fill a 2 × 2 grid (the first of
+ * three takes the left column), and more show "+N" on the fourth tile. The
+ * grid is `--thumb-max-width` × `--thumb-max-height` whatever the pictures,
+ * so it is sized before any bytes arrive. Every other file is a card. While
  * the message uploads, a slim line under the files shows how far it has got;
  * it is drawn over the row's bottom padding, so it appearing or going moves
  * nothing.
  */
-export function Files({ files, onOpenImage, onDownload, tabbable = true, progress }: FilesProps) {
+export function Files({ files, onOpenMedia, onDownload, tabbable = true, progress }: FilesProps) {
   if (files.length === 0) return null
   const tabIndex = tabbable ? 0 : -1
+  const media = mediaOf(files)
+  const first = files.findIndex(isMedia)
   return (
     <div {...stylex.props(styles.files)}>
-      {runs(files).map((run) => {
-        if (run.kind === 'card') return <FileCard key={run.file.id} file={run.file} onDownload={onDownload} tabIndex={tabIndex} />
-        // Keyed by place: a sent file's id changes when Slack's copy replaces the staged one, and the image must stay.
-        if (run.images.length === 1) {
-          const { file, thumb, index } = run.images[0]!
-          return <Thumbnail key={`thumb:${index}`} file={file} thumb={thumb} onOpen={onOpenImage} tabIndex={tabIndex} />
-        }
-        return (
-          <div key={`grid:${run.images[0]!.index}`} data-thumbnail-grid="" {...stylex.props(styles.grid)}>
-            {run.images.map(({ file, thumb, index }) => (
-              <Thumbnail key={`thumb:${index}`} file={file} thumb={thumb} onOpen={onOpenImage} tabIndex={tabIndex} tile />
-            ))}
-          </div>
-        )
+      {files.map((file, index) => {
+        if (index === first) return <MediaBlock key="media" media={media} onOpen={onOpenMedia} tabIndex={tabIndex} />
+        if (isMedia(file)) return null
+        return <FileCard key={`card:${index}`} file={file} onDownload={onDownload} tabIndex={tabIndex} />
       })}
       {progress === undefined ? null : (
         <span
@@ -73,31 +77,37 @@ export function Files({ files, onOpenImage, onDownload, tabbable = true, progres
   )
 }
 
-interface ImageAt {
-  readonly file: FileView
-  readonly thumb: FileThumb
-  readonly index: number
+interface MediaBlockProps {
+  readonly media: ReadonlyArray<MediaFile>
+  readonly onOpen: ((file: FileView) => void) | undefined
+  readonly tabIndex: number
 }
 
-type Run = { readonly kind: 'card'; readonly file: FileView } | { readonly kind: 'images'; readonly images: ReadonlyArray<ImageAt> }
-
-/** Images next to each other in Slack's order share a grid; every other file is a card of its own. */
-function runs(files: ReadonlyArray<FileView>): ReadonlyArray<Run> {
-  const out: Array<Run> = []
-  let images: Array<ImageAt> | undefined
-  files.forEach((file, index) => {
-    if (file.thumb === undefined) {
-      images = undefined
-      out.push({ kind: 'card', file })
-      return
-    }
-    if (images === undefined) {
-      images = []
-      out.push({ kind: 'images', images })
-    }
-    images.push({ file, thumb: file.thumb, index })
-  })
-  return out
+/** A message's images and videos: the lone picture, or the grid. Tiles are keyed by place, so a sent file whose id changes keeps its image. */
+function MediaBlock({ media, onOpen, tabIndex }: MediaBlockProps) {
+  if (media.length === 1) return <Thumbnail key="thumb:0" file={media[0]!} thumb={media[0]!.thumb} onOpen={onOpen} tabIndex={tabIndex} />
+  const shown = media.slice(0, GRID_TILES)
+  const more = media.length - shown.length
+  return (
+    <div
+      data-thumbnail-grid=""
+      data-count={media.length}
+      {...stylex.props(styles.grid, media.length === 2 ? styles.gridTwo : styles.gridFour)}
+    >
+      {shown.map((file, index) => (
+        <Thumbnail
+          key={`thumb:${index}`}
+          file={file}
+          thumb={file.thumb}
+          onOpen={onOpen}
+          tabIndex={tabIndex}
+          tile
+          tall={media.length === 3 && index === 0}
+          more={index === shown.length - 1 && more > 0 ? more : undefined}
+        />
+      ))}
+    </div>
+  )
 }
 
 // The thumbnail's caps, as numbers for the size arithmetic below. They
@@ -120,15 +130,20 @@ interface ThumbnailProps {
   readonly tabIndex: number
   /** A cell of a grid of images: the grid sizes the box, and the image fills it. */
   readonly tile?: boolean
+  /** The first of three tiles takes the grid's left column. */
+  readonly tall?: boolean
+  /** The last tile of a grid with more pictures than tiles: "+N" over it. */
+  readonly more?: number | undefined
 }
 
 /** With `onOpen` the box is a button with the same look; Enter and Space open it too. */
-function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false }: ThumbnailProps) {
+function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, more }: ThumbnailProps) {
   const [loaded, setLoaded] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState<string | undefined>(undefined)
   const box = thumbnailBox(thumb.width, thumb.height)
   const broken = failed === thumb.src
-  const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), onOpen !== undefined && styles.thumbButton)
+  const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), tall && styles.tall, onOpen !== undefined && styles.thumbButton)
+  const label = more === undefined ? file.name : `${file.name}, and ${more} more`
   // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
   const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
   const content = broken ? (
@@ -148,17 +163,27 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false }: ThumbnailPro
         onError={() => setFailed(thumb.src)}
         {...stylex.props(styles.image, loaded === thumb.src && styles.imageShown)}
       />
+      {file.kind === 'video' && more === undefined ? (
+        <span {...stylex.props(styles.playBadge)}>
+          <Icon icon={Play} size={14} weight="fill" />
+        </span>
+      ) : null}
+      {more === undefined ? null : (
+        <span data-more="" {...stylex.props(styles.moreScrim)}>
+          <Text variant="heading" weight="medium" tone="inherit" numeric>{`+${more}`}</Text>
+        </span>
+      )}
     </>
   )
   if (onOpen !== undefined) {
     return (
-      <button type="button" aria-label={`Open ${file.name}`} title={file.name} tabIndex={tabIndex} data-thumbnail="" onClick={() => onOpen(file)} {...sx}>
+      <button type="button" aria-label={`Open ${label}`} title={file.name} tabIndex={tabIndex} data-thumbnail="" onClick={() => onOpen(file)} {...sx}>
         {content}
       </button>
     )
   }
   return (
-    <figure role="img" aria-label={file.name} title={file.name} data-thumbnail="" {...sx}>
+    <figure role="img" aria-label={label} title={file.name} data-thumbnail="" {...sx}>
       {content}
     </figure>
   )
@@ -268,20 +293,51 @@ const styles = stylex.create({
     outlineOffset: sizes['--focus-ring-offset'],
     outlineColor: accent['--focus-ring'],
   },
-  // Two columns across the thumbnail width, every cell the same size, so a
-  // message with several images is one tidy block that is sized before any
-  // bytes arrive. The viewer shows each image whole.
+  // The grid of a message's pictures: always the thumbnail box, two columns,
+  // so it is sized before any bytes arrive whatever the pictures. The viewer
+  // shows each whole.
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gridAutoRows: TILE_HEIGHT,
     gap: spacing['--space-1-5'],
     width: layout['--thumb-max-width'],
     maxWidth: '100%',
   },
+  gridTwo: {
+    gridTemplateRows: layout['--thumb-max-height'],
+  },
+  gridFour: {
+    gridTemplateRows: `repeat(2, ${layout['--thumb-tile-height']})`,
+  },
   tile: {
     width: '100%',
     height: '100%',
+  },
+  tall: {
+    gridRow: 'span 2',
+  },
+  moreScrim: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors['--media-scrim'],
+    color: colors['--media-scrim-foreground'],
+  },
+  playBadge: {
+    position: 'absolute',
+    insetBlockStart: '50%',
+    insetInlineStart: '50%',
+    transform: 'translate(-50%, -50%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: spacing['--space-8'],
+    height: spacing['--space-8'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--media-scrim'],
+    color: colors['--media-scrim-foreground'],
   },
   box: (width: number, height: number, ratioWidth: number, ratioHeight: number) => ({
     width,

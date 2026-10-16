@@ -4,7 +4,8 @@ import type { FileView, MessageView, Person } from '@juno/contract'
 import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { Files } from './FileCard'
+import { Files, mediaOf } from './FileCard'
+import type { MediaViewing } from './MediaViewer'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
@@ -74,8 +75,8 @@ export interface MessageProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send, with its `clientMsgId`. */
   readonly onDiscard?: (clientMsgId: string) => void
-  /** A thumbnail was opened: the image viewer. */
-  readonly onOpenImage?: ((file: FileView) => void) | undefined
+  /** An image or video was opened: the media viewer, at it, with the message's others. */
+  readonly onOpenMedia?: ((viewing: MediaViewing) => void) | undefined
   /** Download on a file card. */
   readonly onDownload?: ((file: FileView) => void) | undefined
   /** How far a sending message's files have uploaded, 0 to 1. */
@@ -157,7 +158,7 @@ export const Message = memo(function Message({
   onFocus,
   onRetry,
   onDiscard,
-  onOpenImage,
+  onOpenMedia,
   onDownload,
   progress,
 }: MessageProps) {
@@ -246,7 +247,14 @@ export const Message = memo(function Message({
         ) : null}
         <Files
           files={message.files}
-          onOpenImage={onOpenImage}
+          onOpenMedia={
+            onOpenMedia === undefined
+              ? undefined
+              : (file: FileView) => {
+                  const items = mediaOf(message.files)
+                  onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
+                }
+          }
           onDownload={onDownload}
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
