@@ -91,7 +91,7 @@ function Page({ tab }: { readonly tab: Tab }) {
     case 'juno':
       return (
         <Suspense key="juno" fallback={null}>
-          <JunoTab />
+          <JunoTab tabId={tab.id} />
         </Suspense>
       )
     case 'junoPage':
@@ -203,9 +203,9 @@ export function Workspace() {
       empty={null}
       newTabLabel={newTabPage === 'home' ? 'New tab' : 'New chat'}
       side={
-        agentOn && panelOpen && panelTopic !== undefined ? (
+        agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>
-            <JunoPanel topicId={panelTopic} />
+            <JunoPanel tabId={state.active} topicId={panelTopic} />
           </Suspense>
         ) : undefined
       }
