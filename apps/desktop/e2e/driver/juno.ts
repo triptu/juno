@@ -759,6 +759,20 @@ export class Juno {
   }
 
   /**
+   * Whether this app has shown its workspace the tour. It opens once per
+   * workspace and is remembered in user.db, which signing out keeps, so a
+   * second sign-in from the same app does not show it.
+   */
+  private toured = false
+
+  /** After a first sign-in, the tour opens over the app unless the workspace has seen it; closes it. */
+  private async skipFirstTour(first: boolean): Promise<void> {
+    if (!first || this.toured) return
+    await this.tour.skip()
+    this.toured = true
+  }
+
+  /**
    * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
    * that opens, and waits for the app to come back signed in. Then skips
    * "Set up Juno" and, after a first sign-in, the tour, unless `skipSetUp`
@@ -774,7 +788,7 @@ export class Juno {
     await page.getByPlaceholder('Password').fill('password')
     await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
     if (options.skipSetUp !== false) await this.skipSetUp()
-    if (options.skipSetUp !== false && first) await this.tour.skip()
+    if (options.skipSetUp !== false) await this.skipFirstTour(first)
   }
 
   /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
@@ -809,7 +823,7 @@ export class Juno {
     const first = await this.firstSignIn.isVisible()
     await this.importButton.click()
     if (options.skipSetUp !== false) await this.skipSetUp()
-    if (options.skipSetUp !== false && first) await this.tour.skip()
+    if (options.skipSetUp !== false) await this.skipFirstTour(first)
   }
 
   /** How many times main asked the keychain for a Slack password; outside tests, each may be a macOS prompt. */
@@ -1963,7 +1977,7 @@ async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<
   }, id)
 }
 
-/** The tour (SPEC 4.1): the sheet over the app after a first sign-in, and again from Help, ⌘K or Settings › About. */
+/** The tour (SPEC 4): the sheet over the app after a first sign-in, and again from Help, ⌘K or Settings › About. */
 export class TourDriver {
   readonly root: Locator
 
@@ -1998,6 +2012,12 @@ export class TourDriver {
 
   async expectClosed(): Promise<void> {
     await expect(this.root).toHaveCount(0)
+  }
+
+  /** Open and done entering: its box is final. */
+  async expectSettled(): Promise<void> {
+    await this.expectOpen()
+    await this.root.evaluate((sheet) => Promise.all(sheet.getAnimations().map((animation) => animation.finished)))
   }
 
   async expectStep(heading: string): Promise<void> {

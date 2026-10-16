@@ -18,7 +18,7 @@ export interface TourSheetProps {
 }
 
 /**
- * The tour (SPEC 4.1): five steps that move a Slack user's picture of
+ * The tour (SPEC 4): five steps that move a Slack user's picture of
  * their workspace from channels to topics, each a product screenshot with
  * numbered callouts over it, a heading, a line or two and the callouts'
  * labels. The container puts it in a `SheetLayer`, like a macOS sheet:
@@ -94,7 +94,7 @@ const percent = (fraction: number) => `${(fraction * 100).toFixed(2)}%`
 /** One step's screenshot in both themes, with its callouts numbered over it. */
 function Picture({ step, shot, shown }: { readonly step: TourStep; readonly shot: TourShot; readonly shown: boolean }) {
   return (
-    <figure {...stylex.props(styles.layer, styles.figure, !shown && styles.hidden)} data-tour-picture={step.id}>
+    <figure {...stylex.props(styles.layer, styles.figure, !shown && styles.hidden)} inert={!shown} aria-hidden={!shown || undefined} data-tour-picture={step.id}>
       <img src={shot.light} alt={step.alt} width={shot.width} height={shot.height} draggable={false} {...stylex.props(styles.image, styles.light)} />
       <img src={shot.dark} alt={step.alt} width={shot.width} height={shot.height} draggable={false} {...stylex.props(styles.image, styles.dark)} />
       {step.callouts.map((callout, index) => {
@@ -111,7 +111,8 @@ function Picture({ step, shot, shown }: { readonly step: TourStep; readonly shot
 
 function StepText({ id, step, shown, provider }: { readonly id: string; readonly step: TourStep; readonly shown: boolean; readonly provider: (() => void) | undefined }) {
   return (
-    <div {...stylex.props(styles.layer, styles.text, !shown && styles.hidden)} id={id}>
+    // Inert at once, while it fades: a step on its way out is gone for VoiceOver and the keyboard.
+    <div {...stylex.props(styles.layer, styles.text, !shown && styles.hidden)} inert={!shown} aria-hidden={!shown || undefined} id={id}>
       <Text variant="heading" tone="default" as="h2">
         {step.heading}
       </Text>

@@ -1,4 +1,4 @@
-// The tour (SPEC 4.1): after the first sign-in the tour opens over the
+// The tour (SPEC 4): after the first sign-in the tour opens over the
 // app, once. It moves with the keys, the dots and the app menu's Back and
 // Forward without moving anything on screen, Esc skips it, a relaunch does
 // not bring it back, and ⌘K, Help and Settings › About open it again.
@@ -21,6 +21,7 @@ test('shows once after the first sign-in, steps without moving, and can be skipp
   await expect(tour.back).toBeDisabled()
   await expect(tour.dot(1)).toHaveAttribute('aria-current', 'step')
   const tabCount = await tabs.root.getByRole('tab').count()
+  await tour.expectSettled()
   const sheet = await tour.root.boundingBox()
 
   // Every way of moving, and none of them moves the sheet or anything in it.

@@ -49,7 +49,7 @@ test('after sign-in, Set up Juno takes an OpenRouter key and the default model, 
   await expect(select.locator('option:checked')).toHaveText(/^Claude Sonnet/)
   await setUp.getByRole('button', { name: 'Continue' }).click()
 
-  // The app, with Juno ready on the key just saved, after the tour a first sign-in opens (SPEC 4.1).
+  // The app, with Juno ready on the key just saved, after the tour a first sign-in opens (SPEC 4, "The tour").
   await juno.tour.skip()
   await juno.waitForSync()
   await junoNav(juno).click()
@@ -64,7 +64,7 @@ test('after sign-in, Skip for now leaves AI assist on, and the Juno tab says Jun
   await expect(juno.setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
   await juno.setUp.getByRole('button', { name: 'Skip for now' }).click()
 
-  // The tour comes next (SPEC 4.1); its last step says Juno needs a provider.
+  // The tour comes next (SPEC 4, "The tour"); its last step says Juno needs a provider.
   await juno.tour.expectOpen()
   await juno.tour.dot(5).click()
   await expect(juno.tour.root.getByText('Juno needs an AI provider before it can answer.')).toBeVisible()
