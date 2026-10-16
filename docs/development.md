@@ -619,6 +619,8 @@ TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and 
 
 `pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
+**Type stripping.** Node runs some TypeScript from source by stripping types: the agent's crash and recovery fixtures, `pnpm agent:eval`, the AI evals, `fake-slack start`, and the live scripts in `scripts/`, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `pnpm typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
+
 `pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
 ## Local Bun checks

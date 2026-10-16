@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 11:04 · tooling-1017 · Every package Node runs by stripping types sets `erasableSyntaxOnly`, so `pnpm typecheck` catches parameter properties and enums before the agent's crash tests do.
 - 10-17 01:01 · test-slim · Tests: a test that only repeats another test's flow or a unit rule is removed or merged, a fixed wait gives way to a wait on a condition or an injected delay, and the gallery's layout-shift guard waits only for motion that can move a box.
 - 10-17 00:55 · orchestrator · From the design review, following native Mac conventions: Settings controls sit at the trailing edge in every section; tab Close buttons are not Tab stops (Delete and ⌘W close a focused tab); two-line picker rows are 44px; Main has no icon in the topic switcher; the default button goes last on Juno cards.
 - 10-17 00:55 · orchestrator · A network copy of a post is deleted only if, when the delete goes out, the kept message still exists, the copy has no replies, others' reactions or edits, and after a reconnect the copy's own channel has been caught up. File copies are never deleted until Slack's behaviour is checked in the test channel. A visible duplicate is better than a lost message.

@@ -1,0 +1,1 @@
+- 10-17 11:04 · tooling-1017 · Every package Node runs by stripping types sets `erasableSyntaxOnly`, so `pnpm typecheck` catches parameter properties and enums before the agent's crash tests do.
