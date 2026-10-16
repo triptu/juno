@@ -18,6 +18,8 @@
 //   test of a package whose package.json or vitest config changed.
 // - Specs: specs:check, narrowed to --memory, --actions or --recovery when only
 //   that agent spec changed. Its own cache skips checks whose inputs passed before.
+// - Conformance: specs:conformance when the outbox spec or a file its replay
+//   against the engine reaches changed.
 // - Gallery: the behaviour tests and the shift guard for the components whose
 //   fixtures reach a changed file; all components when the gallery app, its
 //   tests or @juno/testing changed.
@@ -217,6 +219,13 @@ if (everythingChanged.length > 0 || specChanges.length > 0) {
   const args = everythingChanged.length === 0 && modes.size === 1 && !modes.has('all') ? [...modes] : []
   plan.push({ script: 'specs:check', args, items: [], why: `${specChanges.length || 'shared'} spec input(s) changed${args.length ? `, ${args[0].slice(2)} only` : ''}` })
 }
+
+// Conformance: the outbox traces replayed against the engine (specs/README.md,
+// "Conformance"). It runs when the outbox spec, its generator, or any file
+// the replay reaches (the engine, sync, the fake Slack) changed.
+const conformanceSpecs = ['specs/outbox.qnt', 'specs/outbox-conformance.qnt', 'specs/outbox-checks.mjs', 'specs/conformance.mjs', 'packages/engine/vitest.conformance.config.ts']
+const conformanceItem = { suite: 'conformance', id: 'outbox', inputs: new Set([...closure('packages/engine/test/conformance/outbox.conformance.ts'), ...conformanceSpecs]) }
+if (pending([conformanceItem]).length > 0) plan.push({ script: 'specs:conformance', args: [], items: [conformanceItem], why: 'the outbox spec or the code its replay reaches changed' })
 
 // Gallery.
 function componentFixtures() {

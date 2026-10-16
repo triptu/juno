@@ -36,7 +36,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const started = Date.now()
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
-const remoteScripts = ['bench:engine', 'bench:sync', 'typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
+const remoteScripts = ['bench:engine', 'bench:sync', 'typecheck', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:remote-pool']
 // Measured shapes and rejected alternatives: docs/development.md, "Machine shapes".
 const remoteShapes = {
   typecheck: '2x4',
@@ -51,6 +51,7 @@ const remoteShapes = {
   'test:e2e': '4x8',
   'specs:check': '8x16',
   'specs:traces': '8x16',
+  'specs:conformance': '4x8',
 }
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
