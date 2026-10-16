@@ -296,7 +296,7 @@ The `mention typing` scenario types "@ma " ten times in a reply, so every "@" op
 
 Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `apps/desktop/perf/`, and run with `pnpm perf` (all) or `pnpm perf -g "topic view"` (some), queued behind the machine-wide heavy-job lock. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported. `pnpm verify:main --with-mac` runs the suite and the feel suite on the Mac. Each prints its samples with the load average and fails when its p95 (p50 where section 1 says so) is over budget; the one-frame budgets use the rule proposed in section 8 on a display slower than 120 Hz. Both scroll scenarios trace the renderer over CDP and check the main thread's work per frame, the long animation frames and the dropped frames. Baselines and the 15 % median check below do not exist yet. To explain a number, `JUNO_PERF_TRACE=<dir>` writes a trace and a CPU profile per traced scenario, `JUNO_UNMINIFIED=1` builds with function names (the bundle check is skipped), and `node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]` sums the main thread's time by trace event and by function inside each `juno.*` measure. Add `JUNO_TRACE_SKIA=1` to record the GPU process's raster passes too (blurs, image filters, pipeline compiles); a keystroke that is slow after its frame callback is usually raster, and shows there.
 
-The scroll gate pools the frame work of two ordinary sweeps before taking the p95. Each ordinary sweep is followed by the same sweep with two background worker threads busy; the pooled held-clock p95 is printed beside the ordinary one and never substitutes for the gate. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. Every sweep checks for visible placeholders, long animation frames and dropped frames; the ordinary sweeps decide the gate.
+The scroll gate pools the frame work of two ordinary sweeps before taking the p95. Each ordinary sweep is followed by the same sweep with two background worker threads busy; the pooled held-clock p95 is recorded beside the ordinary one and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. Every sweep checks for visible placeholders, long animation frames and dropped frames; the ordinary sweeps still decide the 8.3 ms, long-frame and dropped-frame gates.
 
 The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile.
 
@@ -576,6 +576,18 @@ panel's empty-state text fades in over about 350 ms after the panel
 lands. There is no feel scenario for Home during the first sync; it is
 covered by `layout-shift.spec.ts` only. Logs are under
 `.juno-status/perf-1017/`.
+
+### Held-clock scroll gates (10-17)
+
+Sidebar, All topics, messages and chat each keep the ordinary 8.3 ms p95
+limit and also gate pooled held-clock p95 at **7 ms**. The post-caret-fix
+readings above span 2.5–5.9 ms (about 6 ms): 7 ms leaves about 1 ms of
+headroom at the slowest surface while rejecting the 13.3 ms stale-caret
+regression. This is a common regression ceiling for these fixtures, not a
+claim that all four surfaces cost the same. Each reading pools two sweeps;
+the trace must contain more than 100 measured frames in each mode. Both
+values remain in the run log, and either timing failure fails the run.
+The ordinary gate remains unchanged despite its documented noise.
 
 ### Engine speed measurements (2026-10-15)
 
