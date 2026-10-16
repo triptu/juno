@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { flushSync } from 'react-dom'
 import { createContext, useCallback, useContext, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { interactive } from './internal/interactive'
@@ -121,10 +121,10 @@ export function OptionRow({
       )}
     >
       {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <span {...stylex.props(styles.body, twoLine && styles.bodyColumn)}>
-        <span {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui)}>{label}</span>
+      <span {...stylex.props(styles.body, twoLine && styles.bodyColumn, size === 44 && styles.bodyColumnCompact)}>
+        <span {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui, size === 44 && styles.labelCompact)}>{label}</span>
         {sub !== undefined && subPlacement !== 'end' ? (
-          <span {...stylex.props(styles.sub, subPlacement === 'below' ? typeVariants.meta : typeVariants.tag)}>{sub}</span>
+          <span {...stylex.props(styles.sub, subPlacement === 'below' ? typeVariants.meta : typeVariants.tag, size === 44 && styles.subCompact)}>{sub}</span>
         ) : null}
       </span>
       {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, typeVariants.tag)}>{sub}</span> : null}
@@ -295,6 +295,8 @@ const styles = stylex.create({
   },
   rowSelected: {
     backgroundColor: colors['--secondary-default'],
+    // Muted text on the fill is under 4.5:1 in light; one step stronger, as ListRow's selected row.
+    '--foreground-muted': colors['--foreground-subtle'],
   },
   rowDisabled: {
     color: colors['--foreground-muted'],
@@ -315,6 +317,17 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: spacing['--space-0-5'],
+  },
+  // A 44px row: the two lines on fixed leadings with no gap, 4 + 20 + 16 + 4.
+  // A label given as a Text takes it with `lineHeight: 'inherit'`.
+  bodyColumnCompact: {
+    gap: 0,
+  },
+  labelCompact: {
+    lineHeight: text['--text-option-title-leading'],
+  },
+  subCompact: {
+    lineHeight: text['--text-option-meta-leading'],
   },
   label: {
     overflow: 'hidden',

@@ -1,6 +1,8 @@
 // Notifications meeting the Juno chat (SPEC 14): the hours-start summary is
 // posted in the chat with no model call and its notification opens the chat
 // at it, and Tell Juno in the why popover quotes the message beside the topic.
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import type { Juno } from '../driver/juno'
 import { ready } from './agent'
 import { expect, JunoChatPane, test } from './chat'
@@ -10,33 +12,50 @@ test.describe.configure({ timeout: 180_000 })
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/** Turns today on for the notification hours, if it is off. */
-async function includeToday(juno: Juno): Promise<void> {
-  const today = juno.notifications.day('Notifications', weekdays[new Date().getDay()]!)
-  if ((await today.getAttribute('aria-pressed')) !== 'true') await today.click()
-  await expect(today).toHaveAttribute('aria-pressed', 'true')
+/** Read the saved settings: a select's DOM value changes before its RPC commits. */
+function savedSettings(userData: string, teamId: string): unknown {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
+  try {
+    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'notifications'").get()
+    return typeof row?.value_json === 'string' ? JSON.parse(row.value_json) : undefined
+  } finally {
+    db.close()
+  }
 }
 
-/** Sets when notification hours start to the minute. The select offers half hours; the page saves whatever it is given. */
-async function setHoursFrom(juno: Juno, minutes: number): Promise<void> {
-  const select = juno.notifications.root.getByRole('combobox', { name: 'Notifications from' })
+type ReadSettings = () => unknown
+
+/** Include both sides of midnight, even when the test starts on a weekend. */
+async function everyDay(juno: Juno, saved: ReadSettings): Promise<void> {
+  for (const [day, name] of weekdays.entries()) {
+    const toggle = juno.notifications.day('Notifications', name)
+    if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click()
+    await expect.poll(saved).toMatchObject({ notificationHours: { days: expect.arrayContaining([day]) } })
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  }
+}
+
+/** The UI offers half hours; the summary test needs a start at the next minute. */
+async function setHours(juno: Juno, saved: ReadSettings, edge: 'from' | 'to', minutes: number): Promise<void> {
+  const select = juno.notifications.root.getByRole('combobox', { name: `Notifications ${edge}` })
   await select.evaluate((element, value) => {
     const options = (element as HTMLSelectElement).options
     if (![...options].some((option) => option.value === value)) element.append(new Option(value, value))
   }, String(minutes))
   await select.selectOption(String(minutes))
+  await expect.poll(saved).toMatchObject({ notificationHours: { [edge]: minutes } })
+  // Reopen to check the saved value, rather than the select's optimistic DOM value.
+  await juno.tabs.close('Settings')
+  await juno.openNotifications()
+  await expect(select).toHaveValue(String(Math.floor(minutes / 30) * 30))
 }
 
-/** Notification hours that hold the current time, on every half hour of today but the last. */
-async function coverNow(juno: Juno): Promise<void> {
-  await includeToday(juno)
-  if (minutesNow() < 12 * 60) {
-    await juno.notifications.setFrom('Notifications', '12am')
-    await juno.notifications.setTo('Notifications', '11:30pm')
-  } else {
-    await juno.notifications.setFrom('Notifications', '12:30am')
-    await juno.notifications.setTo('Notifications', '12am')
-  }
+/** Equal endpoints mean off, so use a twelve-hour window centred on now. */
+async function coverNow(juno: Juno, saved: ReadSettings): Promise<void> {
+  await everyDay(juno, saved)
+  const middle = Math.floor(minutesNow() / 30) * 30
+  await setHours(juno, saved, 'from', (middle + 18 * 60) % 1440)
+  await setHours(juno, saved, 'to', (middle + 6 * 60) % 1440)
 }
 
 const minutesNow = () => {
@@ -44,15 +63,16 @@ const minutesNow = () => {
   return now.getHours() * 60 + now.getMinutes()
 }
 
-test('the hours-start summary is a Summary message in the Juno chat, and its notification opens the chat at it', async ({ juno, slack, model }) => {
+test('the hours-start summary is a Summary message in the Juno chat, and its notification opens the chat at it', async ({ juno, slack, model, userData, fake }) => {
   await ready(juno)
   await juno.openNotifications()
-  await includeToday(juno)
+  const saved = () => savedSettings(userData, fake.teamId)
+  await everyDay(juno, saved)
   // Hours start at the next minute; the engine's minute tick delivers the summary then. Leave time to hold a message first.
   if (new Date().getSeconds() > 30) await juno.win.waitForTimeout((61 - new Date().getSeconds()) * 1000)
   const start = (minutesNow() + 1) % 1440
-  await juno.notifications.setTo('Notifications', hourLabel((Math.floor(start / 30) * 30 + 120) % 1440))
-  await setHoursFrom(juno, start)
+  await setHours(juno, saved, 'to', (Math.floor(start / 30) * 30 + 120) % 1440)
+  await setHours(juno, saved, 'from', start)
 
   // Outside the hours, a DM Juno would notify about waits for the summary.
   slack.as('Maya').dm('Can you sign the offer letter today?')
@@ -79,11 +99,11 @@ test('the hours-start summary is a Summary message in the Juno chat, and its not
   await expect(juno.topic.message('Can you sign the offer letter today?')).toBeInViewport()
 })
 
-test('Tell Juno in the why popover opens the chat beside the topic with the message quoted', async ({ juno, slack }) => {
+test('Tell Juno in the why popover opens the chat beside the topic with the message quoted', async ({ juno, slack, userData, fake }) => {
   await ready(juno)
   // Notification hours hold now, so Juno decides the DM.
   await juno.openNotifications()
-  await coverNow(juno)
+  await coverNow(juno, () => savedSettings(userData, fake.teamId))
 
   slack.as('Maya').dm('Are we still on for the board deck review?')
   await juno.sidebar.row('Maya', { exact: true }).open()
@@ -101,11 +121,3 @@ test('Tell Juno in the why popover opens the chat beside the topic with the mess
   await expect(quote).toHaveAttribute('title', /^Maya[^:]*: Are we still on for the board deck review\?/)
   await expect(panel.composer).toBeFocused()
 })
-
-function hourLabel(minutesOfDay: number): string {
-  const h24 = Math.floor(minutesOfDay / 60)
-  const m = minutesOfDay % 60
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
-  const suffix = h24 < 12 ? 'am' : 'pm'
-  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`
-}

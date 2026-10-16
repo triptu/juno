@@ -1,4 +1,4 @@
-import { startTransition, useState } from 'react'
+import { lazy, Suspense, startTransition, useEffect, useState } from 'react'
 import {
   activeTab,
   connectionStateAtom,
@@ -20,18 +20,22 @@ import {
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AccountMenu, hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
+import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openNewChat, openSettings } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
-import { Session } from './Session'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
-import { ViewSheet } from './ViewSheet'
+
+// Popover content warms on idle; the sidebar chrome stays in the initial bundle.
+const loadViewSheet = () => import('./ViewSheet').then((chunk) => ({ default: chunk.ViewSheet }))
+const loadAccountMenu = () => import('./AccountMenuContent')
+const ViewSheet = lazy(loadViewSheet)
+const AccountMenu = lazy(loadAccountMenu)
 
 function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
@@ -72,6 +76,13 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  * the rows.
  */
 export function Sidebar() {
+  useEffect(() => {
+    const idle = requestIdleCallback(() => {
+      void loadViewSheet()
+      void loadAccountMenu()
+    }, { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
   const views = useAtomValue(viewPillsAtom)
   const sheet = useAtomValue(viewSheetAtom)
@@ -125,15 +136,16 @@ export function Sidebar() {
       accountMenuOpen={menuOpen}
       onAccountMenu={setMenuOpen}
       accountMenu={
-        <AccountMenu
-          {...account}
-          workspace={user?.teamName ?? ''}
-          {...(presence === undefined ? {} : { presence })}
-          {...(paused === undefined ? {} : { paused })}
-          privacy={privacy}
-          onAction={accountAction}
-          sections={[{ title: 'Session', content: <Session /> }]}
-        />
+        <Suspense fallback={null}>
+          <AccountMenu
+            {...account}
+            workspace={user?.teamName ?? ''}
+            {...(presence === undefined ? {} : { presence })}
+            {...(paused === undefined ? {} : { paused })}
+            privacy={privacy}
+            onAction={accountAction}
+          />
+        </Suspense>
       }
       onSearch={openPalette}
       {...(activeNav === undefined ? {} : { activeNav })}
@@ -148,7 +160,7 @@ export function Sidebar() {
       onNewView={newView}
       onViewMenu={(id) => void showViewPillMenu(id)}
       onMoveView={moveView}
-      {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
+      {...(sheet === undefined ? {} : { viewSheet: <Suspense fallback={null}><ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /></Suspense> })}
       onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}

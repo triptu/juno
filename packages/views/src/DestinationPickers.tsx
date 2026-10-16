@@ -7,13 +7,14 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, PickThread } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, Popover, useOptionListKeys, type PhosphorIcon } from '@juno/ui'
-import { hueFor, initials } from './look'
-import { PickerNoMatch, PickerSearch } from './PickerSearch'
-import { relativeTime } from './time'
+import { Icon, Popover, type PhosphorIcon } from '@juno/ui'
+
+const loadLists = () => import('./DestinationLists')
+const ConversationList = lazy(() => loadLists().then(chunk => ({ default: chunk.ConversationList })))
+const ThreadList = lazy(() => loadLists().then(chunk => ({ default: chunk.ThreadList })))
 
 export type PickerName = 'conversation' | 'thread'
 
@@ -39,26 +40,6 @@ export interface DestinationPickersProps {
 
 const kindIcons: Record<ConversationKind, PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
 
-const kindLabels: Record<ConversationKind, string> = {
-  public: 'Public channel',
-  private: 'Private channel',
-  im: 'Direct message',
-  mpim: 'Group DM',
-}
-
-/** The line at the end of a conversation row. */
-const conversationSub = (conversation: PickConversation): string =>
-  conversation.kind === 'im' && conversation.empty ? 'No messages yet' : kindLabels[conversation.kind]
-
-/** "#eng", "Maya Chen": where a thread lives, in its row's meta line. */
-const placeLabel = (conversation: PickConversation): string =>
-  conversation.kind === 'public' || conversation.kind === 'private' ? `#${conversation.name}` : conversation.name
-
-const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`)
-
-const MAIN_ID = 'pick-main'
-const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
-
 /**
  * New chat's two pickers (spec section 9, inventory 8), on one row above
  * the composer. The conversation button takes the context pill's tint and
@@ -68,6 +49,10 @@ const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
  * picks, Esc closes and puts focus back on the button.
  */
 export function DestinationPickers(props: DestinationPickersProps) {
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadLists(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   const { conversation, thread, open, onOpen } = props
   const conversationLabel = conversation?.name ?? 'Pick a conversation'
   const threadLabel = thread?.title ?? (conversation === undefined ? 'Any thread' : 'Main')
@@ -94,7 +79,7 @@ export function DestinationPickers(props: DestinationPickersProps) {
           </PickerButton>
         }
       >
-        {open === 'conversation' ? <ConversationList {...props} /> : null}
+        {open === 'conversation' ? <Suspense fallback={<span data-chunk-pending="" hidden />}><ConversationList {...props} /></Suspense> : null}
       </Popover>
       <Popover
         open={open === 'thread'}
@@ -118,7 +103,7 @@ export function DestinationPickers(props: DestinationPickersProps) {
           </PickerButton>
         }
       >
-        {open === 'thread' ? <ThreadList {...props} /> : null}
+        {open === 'thread' ? <Suspense fallback={<span data-chunk-pending="" hidden />}><ThreadList {...props} /></Suspense> : null}
       </Popover>
     </div>
   )
@@ -151,6 +136,8 @@ function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen
       aria-label={label}
       aria-haspopup="dialog"
       aria-expanded={expanded}
+      onPointerEnter={() => void loadLists()}
+      onFocus={() => void loadLists()}
       onClick={onOpen}
       onKeyDown={onKeyDown}
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}
@@ -164,124 +151,8 @@ function PickerButton({ label, icon, tint, muted, wide = false, expanded, onOpen
   )
 }
 
-/** The highlighted row: the one the pointer or the arrows chose, or the first. */
-function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (id: string) => void] {
-  const [chosen, setChosen] = useState<string | undefined>(undefined)
-  return [chosen !== undefined && ids.includes(chosen) ? chosen : ids[0], setChosen]
-}
-
-function ConversationList({ query, onQuery, conversations, onPickConversation, onOpen }: DestinationPickersProps) {
-  const sections: ReadonlyArray<readonly [string, ReadonlyArray<PickConversation>]> =
-    conversations === undefined
-      ? []
-      : [
-          ['Recent', conversations.recent],
-          ['People', conversations.people],
-          ['Channels', conversations.channels],
-        ]
-  const rows = sections.flatMap(([, items]) => items)
-  const ids = rows.map((row) => rowId('conversation', row.key))
-  const [activeId, setActive] = useActive(ids)
-  const pick = (id: string) => {
-    const row = rows[ids.indexOf(id)]
-    if (row !== undefined) onPickConversation(row)
-  }
-  const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
-  return (
-    <>
-      <PickerSearch query={query} onQuery={onQuery} placeholder="Search people and channels" onKeyDown={onKeyDown} activeId={activeId} />
-      <div {...stylex.props(styles.scroll)}>
-        <OptionList label="Conversations" {...(activeId === undefined ? {} : { activeId })}>
-          {sections.map(([title, items]) =>
-            items.length === 0 ? null : (
-              <div key={title} role="group" aria-label={title}>
-                <OptionGroupLabel>{title}</OptionGroupLabel>
-                {items.map((row) => {
-                  const id = rowId('conversation', row.key)
-                  return (
-                    <OptionRow
-                      key={id}
-                      id={id}
-                      size={36}
-                      active={id === activeId}
-                      leading={<ConversationMark conversation={row} />}
-                      label={row.name}
-                      sub={conversationSub(row)}
-                      onSelect={() => onPickConversation(row)}
-                      onActivate={() => setActive(id)}
-                    />
-                  )
-                })}
-              </div>
-            ),
-          )}
-          {conversations !== undefined && rows.length === 0 ? <PickerNoMatch /> : null}
-        </OptionList>
-      </div>
-    </>
-  )
-}
-
-function ThreadList({ query, onQuery, conversation, threads, now, onPickThread, onOpen }: DestinationPickersProps) {
-  const main = conversation !== undefined && 'main'.startsWith(query.trim().toLowerCase())
-  const rows = threads ?? []
-  const ids = [...(main ? [MAIN_ID] : []), ...rows.map((row) => rowId('thread', row.id))]
-  const [activeId, setActive] = useActive(ids)
-  const pick = (id: string) => (id === MAIN_ID ? onPickThread(undefined) : onPickThread(rows[ids.indexOf(id) - (main ? 1 : 0)]))
-  const onKeyDown = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
-  return (
-    <>
-      <PickerSearch query={query} onQuery={onQuery} placeholder="Search threads" onKeyDown={onKeyDown} activeId={activeId} />
-      <div {...stylex.props(styles.scroll)}>
-        <OptionList label="Threads" {...(activeId === undefined ? {} : { activeId })}>
-          {conversation === undefined ? <OptionGroupLabel>Recent threads</OptionGroupLabel> : null}
-          {main ? (
-            <OptionRow
-              id={MAIN_ID}
-              size={44}
-              active={activeId === MAIN_ID}
-              leading={<Icon icon={ChatText} size={15} />}
-              label="Main"
-              sub="Messages outside threads"
-              onSelect={() => onPickThread(undefined)}
-              onActivate={() => setActive(MAIN_ID)}
-            />
-          ) : null}
-          {rows.map((row) => {
-            const id = rowId('thread', row.id)
-            const meta = [...(conversation === undefined ? [placeLabel(row.conversation)] : []), replies(row.replyCount), relativeTime(row.lastActivityAt, now)].join(' · ')
-            return (
-              <OptionRow
-                key={id}
-                id={id}
-                size={44}
-                active={id === activeId}
-                label={row.title}
-                sub={meta}
-                subPlacement="below"
-                onSelect={() => onPickThread(row)}
-                onActivate={() => setActive(id)}
-              />
-            )
-          })}
-          {threads !== undefined && ids.length === 0 ? <PickerNoMatch /> : null}
-        </OptionList>
-      </div>
-    </>
-  )
-}
-
-/** A person's avatar, or the conversation's kind icon. */
-function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
-  const person = conversation.person
-  if (person === undefined) return <Icon icon={kindIcons[conversation.kind]} size={15} />
-  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl })} />
-}
-
 /** The longest a thread title runs in its button before the ellipsis. */
 const THREAD_LABEL_MAX = '260px'
-/** The open list's height before it scrolls. */
-const LIST_MAX_HEIGHT = '360px'
 
 
 const styles = stylex.create({
@@ -335,12 +206,6 @@ const styles = stylex.create({
   caret: {
     display: 'inline-flex',
     color: colors['--foreground-muted'],
-  },
-  scroll: {
-    maxHeight: LIST_MAX_HEIGHT,
-    overflowY: 'auto',
-    overscrollBehavior: 'contain',
-    padding: spacing['--space-1-5'],
   },
 })
 

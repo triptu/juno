@@ -61,7 +61,12 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await sidebar.row(RINA).openInNewTab()
   await sidebar.row(ROADMAP).openInNewTab()
 
-  // The tab that slides into the closed one's place takes focus, so the next Tab goes on from the strip.
+  // The close buttons are not Tab stops: from the active tab, Tab goes straight to "+".
+  await tabs.tab(ROADMAP).focus()
+  await juno.win.keyboard.press('Tab')
+  await expect(tabs.newTabButton).toBeFocused()
+
+  // Delete on a focused tab closes it. The tab that slides into the closed one's place takes focus, so the next Tab goes on from the strip.
   await tabs.closeWithKeyboard(RINA)
   await tabs.expectCount(2)
   await tabs.expectFocused(ROADMAP)

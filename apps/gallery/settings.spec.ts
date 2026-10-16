@@ -55,3 +55,72 @@ test.describe('Settings', () => {
     expect(inSettings.titleInPage).toBe(alone.titleInPage)
   })
 })
+
+/** How far each group card's content starts from the card's leading edge: the leftmost text or control. */
+const leadingInsets = (page: Page) =>
+  page.evaluate(() => {
+    const column = document.querySelector('[data-fixture-frame] h1')!.closest('header')!.parentElement!
+    const style = getComputedStyle(column)
+    const width = column.getBoundingClientRect().width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    const cards = [...column.querySelectorAll('*')].filter(
+      (el) => el.getBoundingClientRect().width === width && getComputedStyle(el).borderTopLeftRadius !== '0px',
+    )
+    return cards.map((card) => {
+      const left = card.getBoundingClientRect().left
+      const starts: number[] = []
+      const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (node.textContent!.trim() === '') continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const box = range.getBoundingClientRect()
+        if (box.width > 0) starts.push(box.left)
+      }
+      for (const control of card.querySelectorAll('input, [role="radiogroup"], svg')) {
+        const box = control.getBoundingClientRect()
+        if (box.width > 0) starts.push(box.left)
+      }
+      return Math.round(Math.min(...starts) - left)
+    })
+  })
+
+test('every card in General, Appearance, Ignored and About starts its rows 15px in, as the Juno rows do', async ({ page }) => {
+  await open(page, 'SettingsPage', 'sections/juno')
+  const [juno] = await leadingInsets(page)
+  expect(juno).toBe(15)
+  for (const id of ['sections/general', 'sections/appearance', 'sections/ignored', 'sections/about']) {
+    await open(page, 'SettingsPage', id)
+    const insets = await leadingInsets(page)
+    expect(insets.length, id).toBeGreaterThan(0)
+    for (const inset of insets) expect(inset, id).toBe(juno)
+  }
+})
+
+test('General and Appearance put each control at the trailing edge, 15px from the card, as the Juno rows do', async ({ page }) => {
+  for (const id of ['sections/general', 'sections/appearance']) {
+    await open(page, 'SettingsPage', id)
+    const ends = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-fixture-frame] [role="radiogroup"], [data-fixture-frame] [role="group"]')].map((control) => {
+        let card = control.parentElement!
+        while (getComputedStyle(card).borderTopLeftRadius === '0px') card = card.parentElement!
+        return Math.round(card.getBoundingClientRect().right - control.getBoundingClientRect().right)
+      }),
+    )
+    expect(ends.length, id).toBeGreaterThan(0)
+    for (const end of ends) expect(end, id).toBe(15)
+  }
+})
+
+test('a saved API key looks the same in Set up Juno and Settings › Juno: the Key set chip beside the field, which keeps its placeholder', async ({ page }) => {
+  const read = () =>
+    page.evaluate(() => {
+      const field = document.querySelector<HTMLInputElement>('[data-fixture-frame] input[type="password"]')!
+      const chip = [...document.querySelectorAll('[data-fixture-frame] span')].find((span) => span.children.length === 0 && span.textContent === 'Key set')
+      return { placeholder: field.placeholder, chipBeforeField: chip !== undefined && chip.getBoundingClientRect().right <= field.getBoundingClientRect().left }
+    })
+  await open(page, 'SetUpJunoView', 'openrouter/model-chosen')
+  const setUp = await read()
+  await open(page, 'SettingsPage', 'sections/juno')
+  expect(setUp).toEqual(await read())
+  expect(setUp).toEqual({ placeholder: 'sk-or-…', chipBeforeField: true })
+})

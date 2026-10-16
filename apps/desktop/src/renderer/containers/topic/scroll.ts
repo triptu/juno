@@ -1,0 +1,118 @@
+/**
+ * The DOM side of a topic's message list: where rows are, where the list
+ * opens, and the position it holds while rows change (performance 3.3).
+ */
+import type { RefObject } from 'react'
+import type { MessageView } from '@juno/contract'
+import type { MessageWindow, ScrollSnapshot } from '@juno/state'
+import type { MessageListItem } from '@juno/views'
+
+/** Within this of the end counts as at the bottom (performance 3.3). */
+export const BOTTOM_SLACK = 32
+/** How far below the header band the "N new" divider lands when a topic opens at it. */
+const DIVIDER_GAP = 80
+/** The shortest a message row can be: the 32px avatar slot and its padding. */
+const MIN_ROW_HEIGHT = 40
+
+/**
+ * The divider's offset from the scroller's top on open: 80px below the
+ * header band, which the list runs under (inventory 5). The band's height
+ * is the scroller's `scroll-padding-top`, so the token stays the one source.
+ */
+export function dividerTop(scroller: HTMLElement): number {
+  return (Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + DIVIDER_GAP
+}
+
+/**
+ * Rows above the open position that the first frame draws: enough to fill
+ * the window however short the rows are. The rest of the window is drawn
+ * after that frame. `innerHeight` does not force a layout.
+ */
+export function firstRows(): number {
+  return Math.ceil(window.innerHeight / MIN_ROW_HEIGHT) + 2
+}
+
+const ROW = '[data-message-row]'
+
+const items = new WeakMap<MessageView, MessageListItem>()
+
+/** The window's rows with their senders. A row keeps its object while its message and sender do, so `Message` stays memoized. */
+export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
+  return window.order.map((ts) => {
+    const message = window.rows.get(ts)!
+    const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
+    const held = items.get(message)
+    if (held !== undefined && held.sender === sender) return held
+    const item = { message, sender }
+    items.set(message, item)
+    return item
+  })
+}
+
+export const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
+
+/** The first row in view and its offset from the top of the scroller. */
+export function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
+  const box = scroller.getBoundingClientRect()
+  const element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
+  const anchorKey = element?.dataset['messageRow']
+  if (element == null || anchorKey === undefined) return undefined
+  return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
+}
+
+export function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
+  const row = rowInView(scroller)
+  return row === undefined ? undefined : { anchorKey: row.anchorKey, offset: row.offset }
+}
+
+/**
+ * The position the list goes back to whenever it changes under the user:
+ * rows added above or below, the window resized. `bottom` keeps the end in
+ * view; `row` keeps an element at an offset from the top (the divider on
+ * open, a snapshot's row on restore, the row in view during a prepend)
+ * until the user scrolls. It is applied in layout effects and the resize
+ * event, before paint, and only ever writes `scrollTop`.
+ */
+export type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
+
+/** Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin. */
+export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop: RefObject<number>): void {
+  const held = pin.current
+  if (held === undefined) return
+  if (held.kind === 'row' && !held.element.isConnected) {
+    pin.current = undefined
+    return
+  }
+  if (held.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
+  else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
+  pinnedTop.current = scroller.scrollTop
+}
+
+/**
+ * The rows laid out in full rather than at their size estimate, so the
+ * position set before the first paint is where they end up: a window's
+ * worth around the open position, a window's worth around
+ * the row held during a source jump or an older page (`heldAt`), and the last window's worth,
+ * where new messages arrive and the bottom is held. A page row drawn at its
+ * estimate between the top of the view and the held row would grow a frame
+ * later and move what is on screen; the page's rows are new, so laying them
+ * out in full moves nothing. Everywhere else the browser's scroll anchoring
+ * absorbs rows growing as they come into view.
+ */
+export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
+  const eager = new Set<string>()
+  for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
+  for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
+  for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)
+  return eager
+}
+
+/** The row the open position shows at the top: the snapshot's row, the first unread one, or the end. */
+export function openIndex(list: MessageWindow, divider: number, snapshot: ScrollSnapshot | undefined): number {
+  const restored = snapshot === undefined ? -1 : list.order.indexOf(snapshot.anchorKey)
+  return restored >= 0 ? restored : divider > 0 ? divider : list.order.length
+}
+
+export function distanceFromBottom(scroller: HTMLElement): number {
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+}

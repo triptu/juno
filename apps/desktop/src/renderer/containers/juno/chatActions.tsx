@@ -1,0 +1,240 @@
+/**
+ * What the chat's rows and composer do (see `JunoChat`): sending, focus
+ * requests, the remove sheet, the reaction picker and the row callbacks.
+ */
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
+import { chatCopy, type ChatItem, type ChatPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } from '@juno/state'
+import { messageActions } from '@juno/state/agent'
+import { afterPaint, measure } from '@juno/state/perf'
+import { useAtomValue } from '@juno/state/react'
+import { RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type ReactionPickerAt, type ReactionTarget } from '@juno/views'
+import { openSlackMessage, openTopic } from '../navigation'
+import { junoCommands, openJunoPage } from './actions'
+import { scrollToRow } from './chatScroll'
+import { latest, type Window } from './chatWindow'
+
+const messages = messageActions(registry)
+
+type Removal = typeof MessageMenu.Type
+
+interface SendInput {
+  readonly contextOf: (() => SendContext | undefined) | undefined
+  readonly onSent: ((context: SendContext | undefined) => void) | undefined
+  readonly sendRef: RefObject<((text: string) => void) | null> | undefined
+  readonly quote: Quote | undefined
+  readonly setQuote: Dispatch<SetStateAction<Quote | undefined>>
+  readonly sentAtRef: RefObject<{ readonly at: number; readonly newest: string | undefined } | undefined>
+  readonly newestBubbleId: string | undefined
+  readonly scrollRef: RefObject<HTMLElement | null>
+  readonly pinnedRef: RefObject<boolean>
+  readonly pageRef: RefObject<ChatPage>
+  readonly setAtBottom: Dispatch<SetStateAction<boolean>>
+  readonly setWindow: Dispatch<SetStateAction<Window>>
+}
+
+/** Sending: the message goes out with its context and quote, and the list goes to the bottom. `sendRef` lets the panel's Catch me up send. */
+export function useChatSend({ contextOf, onSent, sendRef, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow }: SendInput) {
+  const toBottom = () => {
+    pinnedRef.current = true
+    setAtBottom(true)
+    if (pageRef.current.moreBelow) setWindow(latest)
+    const scroller = scrollRef.current
+    if (scroller !== null) scroller.scrollTop = scroller.scrollHeight
+  }
+
+  const send = (text: string) => {
+    const at = performance.now()
+    sentAtRef.current = { at, newest: newestBubbleId }
+    afterPaint(() => measure('juno.chat-send', at))
+    const context = contextOf?.()
+    junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }) })
+    setQuote(undefined)
+    toBottom()
+    onSent?.(context)
+  }
+  const sendRefCurrent = useRef(send)
+  useLayoutEffect(() => {
+    sendRefCurrent.current = send
+  })
+  useLayoutEffect(() => {
+    if (sendRef === undefined) return
+    sendRef.current = (text: string) => sendRefCurrent.current(text)
+    return () => {
+      sendRef.current = null
+    }
+  }, [sendRef])
+  return { toBottom, send }
+}
+
+/** ⌘J, Ask Juno and the sidebar's item ask for focus; the chat they name takes each request once, now or when it shows. */
+export function useFocusRequest(column: 'page' | 'panel', inputRef: RefObject<HTMLTextAreaElement | null>): void {
+  const focusRequest = useAtomValue(junoFocusAtom)
+  const focusTaken = useRef(0)
+  useEffect(() => {
+    if (focusRequest.where !== (column === 'page' ? 'tab' : 'panel') || focusRequest.n <= focusTaken.current) return
+    focusTaken.current = focusRequest.n
+    // After the input that asked: a sidebar item acts on pointerdown, and the mousedown that follows focuses the item.
+    const frame = requestAnimationFrame(() => inputRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [column, focusRequest, inputRef])
+}
+
+/** The remove sheet a message's menu opens, and the removal it confirms. */
+export function useRemoval(now: number) {
+  const [removal, setRemoval] = useState<Removal | undefined>(undefined)
+  const [removing, setRemoving] = useState(false)
+  const sheet =
+    removal === undefined ? null : (
+      <SheetLayer onClose={() => { if (!removing) setRemoval(undefined) }}>
+        <RemoveSheet sheet={removal.sheet} now={now} onKeep={() => { if (!removing) setRemoval(undefined) }} onRemove={(alsoReply) => {
+          if (removing) return
+          setRemoving(true)
+          void messages.remove(removal.messageId, alsoReply).then((done) => { setRemoving(false); if (done) setRemoval(undefined) })
+        }} />
+      </SheetLayer>
+    )
+  return { setRemoval, sheet }
+}
+
+type Picker = { readonly target: ReactionTarget; readonly x: number; readonly y: number }
+
+/** The reaction picker on a bubble or card, with the owner's current reaction selected. */
+export function useReactionPicker(items: ReadonlyArray<ChatItem>) {
+  const [picker, setPicker] = useState<Picker | undefined>(undefined)
+  const pickerAt: ReactionPickerAt | undefined =
+    picker === undefined
+      ? undefined
+      : {
+          x: picker.x,
+          y: picker.y,
+          ...selectedOf(items, picker.target),
+          onPick: (emoji) => {
+            setPicker(undefined)
+            void junoCommands.react(picker.target, emoji)
+          },
+          onClose: () => setPicker(undefined),
+        }
+  return { setPicker, pickerAt }
+}
+
+interface ActionsInput {
+  readonly items: ReadonlyArray<ChatItem>
+  readonly scrollRef: RefObject<HTMLElement | null>
+  readonly pinnedRef: RefObject<boolean>
+  readonly inputRef: RefObject<HTMLTextAreaElement | null>
+  readonly setQuote: Dispatch<SetStateAction<Quote | undefined>>
+  readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
+  readonly setRemoval: Dispatch<SetStateAction<Removal | undefined>>
+}
+
+/** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
+export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval }: ActionsInput): ChatActions {
+  const itemsRef = useRef(items)
+  useLayoutEffect(() => {
+    itemsRef.current = items
+  })
+  return useMemo<ChatActions>(
+    () => ({
+      // A `signIn` outcome is the container's: main's T3 Code sign-in window, which comes with WP18.
+      onCard: (id, command) => void junoCommands.onCard(id, command),
+      onOpen: (target, event: ActivateEvent) => {
+        switch (target._tag) {
+          case 'topic':
+            return openTopic(target.topicId, { newTab: event.metaKey })
+          case 'chatMessage':
+            return scrollToRow(scrollRef, pinnedRef, { _tag: 'message', id: target.messageId })
+          case 'message':
+            return void openSlackMessage(target.channelId, target.ts, { newTab: event.metaKey })
+          case 'url':
+            return openExternal(target.url)
+          case 'page':
+            return openJunoPage(target.page)
+        }
+      },
+      onRetry: (opId: OpId) => junoCommands.onRetry(opId),
+      onReactions: (target, event: MouseEvent<HTMLElement>) => {
+        const box = event.currentTarget.getBoundingClientRect()
+        setPicker({ target, x: box.right, y: box.bottom })
+      },
+      onReply: (target) => {
+        setQuote(quoteOf(itemsRef.current, target))
+        inputRef.current?.focus()
+      },
+      onQuote: (target) => scrollToRow(scrollRef, pinnedRef, target),
+      onUndoNote: messages.undo,
+      onGroupLabel: () => {},
+      onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
+        event.preventDefault()
+        void showChatMenu(target, itemsRef.current, selectedSpan(event.currentTarget), setRemoval, (reaction) => {
+          const box = event.currentTarget.getBoundingClientRect()
+          setPicker({ target: reaction, x: box.right, y: box.top })
+        }, (reply) => {
+          setQuote(quoteOf(itemsRef.current, reply))
+          inputRef.current?.focus()
+        })
+      },
+    }),
+    [scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval],
+  )
+}
+
+function quoteOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): Quote {
+  const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
+  const preview = item?._tag === 'juno' ? item.body.map((part) => part.text).join('').trim().split('\n', 1)[0] ?? '' : item?._tag === 'card' ? item.card._tag : ''
+  return { target, preview }
+}
+
+/** The owner's current reaction on a bubble or card, for the picker. */
+function selectedOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): { readonly selected?: string } {
+  const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
+  const reactions = item?._tag === 'juno' ? item.reactions : item?._tag === 'card' ? item.reactions : []
+  const mine = reactions.find((reaction) => reaction.by === 'owner')
+  return mine === undefined ? {} : { selected: mine.emoji }
+}
+
+/** Capture a range in the message's words before the native menu takes focus. */
+function selectedSpan(root: HTMLElement): { text: string; startByte: number; endByte: number } | undefined {
+  const selection = globalThis.getSelection()
+  const words = root.querySelector('p')
+  if (words === null || selection === null || selection.rangeCount === 0 || selection.isCollapsed) return undefined
+  const range = selection.getRangeAt(0)
+  if (!words.contains(range.startContainer) || !words.contains(range.endContainer)) return undefined
+  const prefix = range.cloneRange()
+  prefix.selectNodeContents(words)
+  prefix.setEnd(range.startContainer, range.startOffset)
+  const text = range.toString()
+  const startByte = new TextEncoder().encode(prefix.toString()).length
+  return { text, startByte, endByte: startByte + new TextEncoder().encode(text).length }
+}
+
+async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatItem>, selection: ReturnType<typeof selectedSpan>, remove: (message: typeof MessageMenu.Type) => void, react: (target: ReactionTarget) => void, reply: (target: ReactionTarget) => void): Promise<void> {
+  const copy = chatCopy.contextMenu
+  const juno = target.kind !== 'owner'
+  const reaction: ReactionTarget | undefined = target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : target.kind === 'card' ? { _tag: 'card', id: target.id } : undefined
+  const message = await messages.menu(target.kind === 'owner' ? { _tag: 'owner', opId: target.opId } : target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : { _tag: 'card', id: target.id })
+  const item = items.find((i) => (target.kind === 'owner' ? i._tag === 'owner' && i.opId === target.opId : target.kind === 'juno' ? i._tag === 'juno' && i.id === target.id : false))
+  const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? item.body.map((part) => part.text).join('') : ''
+  const span = selection ?? { text, startByte: 0, endByte: new TextEncoder().encode(text).length }
+  const chosen = await popupContextMenu([
+    { id: 'copy', label: copy.copy },
+    ...(juno ? [{ id: 'react', label: chatCopy.react.react }, { id: 'reply', label: chatCopy.react.reply }] : [{ id: 'remember', label: copy.remember, enabled: message !== null && span.endByte - span.startByte > 0 && span.endByte - span.startByte <= 280 }]),
+    { separator: true },
+    { id: 'remove', label: copy.remove, enabled: message !== null },
+  ])
+  switch (chosen) {
+    case 'copy': return copyText(span.text)
+    case 'remember':
+      if (message !== null) await messages.pin(message, span.startByte, span.endByte)
+      return
+    case 'remove':
+      if (message !== null) remove(message)
+      return
+    case 'react':
+      if (reaction !== undefined) react(reaction)
+      return
+    case 'reply':
+      if (reaction !== undefined) reply(reaction)
+      return
+  }
+}

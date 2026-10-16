@@ -1,0 +1,233 @@
+/**
+ * Where the chat's list is scrolled (see `JunoChat`): the open position,
+ * holding the bottom, the edges that move the window, read marks and the
+ * notification's target. `JunoChat` calls these hooks in this file's order,
+ * which is the order their effects run in.
+ */
+import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
+import { junoChatTargetAtom, registry } from '@juno/state'
+import { afterPaint, measure } from '@juno/state/perf'
+import { useAtomValue } from '@juno/state/react'
+import { flashChatRow } from '@juno/views'
+import { junoCommands, takePanelOpenStart } from './actions'
+import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
+
+/** Within this of the end counts as at the bottom (performance 3.3). */
+const BOTTOM_SLACK = 32
+/** Where the "New" divider lands below the header band when the chat opens at it. */
+const DIVIDER_GAP = 80
+/** The edge slots ask for more this far before they come into view. */
+const EDGE_MARGIN = '800px 0px'
+/** A Juno bubble is read once fully on screen in the focused chat this long (SPEC 13.1). */
+const READ_AFTER_MS = 1000
+
+const distanceFromBottom = (scroller: HTMLElement) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+
+type Scroller = RefObject<HTMLElement | null>
+type SetWindow = Dispatch<SetStateAction<Window>>
+type ChatTarget = ReplyTarget | { readonly _tag: 'message'; readonly id: string }
+
+/** The DOM row of a reply target or a chat message, for scrolling to it. */
+function rowOf(scroller: HTMLElement, target: ChatTarget): Element | null {
+  switch (target._tag) {
+    case 'bubble':
+      return scroller.querySelector(`[data-chat-juno="${CSS.escape(target.id)}"]`)
+    case 'card':
+      return scroller.querySelector(`[data-chat-card-row="${CSS.escape(target.id)}"]`)
+    case 'owner':
+      return scroller.querySelector(`[data-chat-owner="${CSS.escape(target.opId)}"]`)
+    case 'message':
+      return scroller.querySelector(`[data-chat-juno^="${CSS.escape(target.id)}"], [data-chat-owner="${CSS.escape(target.id)}"]`)
+  }
+}
+
+/** Scrolls a row into view and flashes it; the hold on the bottom lets go. */
+export function scrollToRow(scrollRef: Scroller, pinnedRef: RefObject<boolean>, target: ChatTarget): void {
+  const scroller = scrollRef.current
+  const row = scroller === null ? null : rowOf(scroller, target)
+  if (row === null) return
+  pinnedRef.current = false
+  row.scrollIntoView({ block: 'center', behavior: 'instant' })
+  flashChatRow(row)
+}
+
+/**
+ * Whether the list holds the bottom, where it opened, and the newest Juno row seen there. The open
+ * position is set before the first frame with rows is painted: the tab at the "New" divider, else the bottom.
+ */
+export function useChatPosition(column: 'page' | 'panel', loaded: boolean, items: ReadonlyArray<ChatItem>, scrollRef: Scroller, anchorRef: RefObject<HTMLDivElement | null>) {
+  // Hold the bottom: true while the owner is at the end, or after a send.
+  const pinnedRef = useRef(true)
+  const [positioned, setPositioned] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  // The newest of Juno's rows seen at the bottom; one that arrives while scrolled up shows the pill.
+  const newestJuno = items.findLast((item) => item._tag === 'juno' || item._tag === 'card')
+  const newestKey = newestJuno === undefined ? undefined : anchorOf(newestJuno)
+  const [seenKey, setSeenKey] = useState(newestKey)
+  if (atBottom && seenKey !== newestKey) setSeenKey(newestKey)
+  const unseen = !atBottom && newestKey !== seenKey
+
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || positioned || !loaded) return
+    const divider = anchorRef.current
+    if (column === 'page' && divider !== null) {
+      const padding = Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0
+      scroller.scrollTop += divider.getBoundingClientRect().top - scroller.getBoundingClientRect().top - padding - DIVIDER_GAP
+      pinnedRef.current = distanceFromBottom(scroller) <= BOTTOM_SLACK
+    } else {
+      scroller.scrollTop = scroller.scrollHeight
+      pinnedRef.current = true
+    }
+    setAtBottom(pinnedRef.current)
+    setPositioned(true)
+    const opened = column === 'panel' ? takePanelOpenStart() : undefined
+    if (opened !== undefined) afterPaint(() => measure('juno.panel-open', opened))
+  }, [column, positioned, loaded, scrollRef, anchorRef])
+  return { pinnedRef, positioned, atBottom, setAtBottom, unseen }
+}
+
+/**
+ * `juno.chat-bubble`: from a send to the first Juno bubble after it, painted. `sentAtRef` is set by the send.
+ * Keyed on the newest bubble, not a count: a full window drops a row for each one that arrives.
+ */
+export function useBubbleMeasure(items: ReadonlyArray<ChatItem>) {
+  const sentAtRef = useRef<{ readonly at: number; readonly newest: string | undefined } | undefined>(undefined)
+  const newestBubble = items.findLast((item) => item._tag === 'juno')
+  const newestBubbleId = newestBubble?._tag === 'juno' ? newestBubble.id : undefined
+  useLayoutEffect(() => {
+    const sent = sentAtRef.current
+    if (sent === undefined || newestBubbleId === sent.newest) return
+    sentAtRef.current = undefined
+    afterPaint(() => measure('juno.chat-bubble', sent.at))
+  }, [newestBubbleId])
+  return { sentAtRef, newestBubbleId }
+}
+
+/** At the bottom, a new row (a bubble, the status bubble, a send) is scrolled into view before paint. */
+export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boolean>, positioned: boolean, items: ReadonlyArray<ChatItem>, moreBelow: boolean): void {
+  const last = items.at(-1)
+  const lastKey = last === undefined ? undefined : `${last._tag}:${anchorOf(last) ?? ''}`
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || !positioned) return
+    if (pinnedRef.current && !moreBelow) scroller.scrollTop = scroller.scrollHeight
+  }, [positioned, lastKey, items.length, moreBelow, scrollRef, pinnedRef])
+}
+
+/** The owner's scrolling lets go of the bottom; where the list comes to rest decides whether it holds again. */
+export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boolean>, pageRef: RefObject<ChatPage>, setAtBottom: Dispatch<SetStateAction<boolean>>): void {
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null) return
+    const letGo = () => {
+      pinnedRef.current = false
+    }
+    const onScrollEnd = () => {
+      const bottom = !pageRef.current.moreBelow && distanceFromBottom(scroller) <= BOTTOM_SLACK
+      pinnedRef.current = bottom
+      setAtBottom(bottom)
+    }
+    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+    for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
+    scroller.addEventListener('scrollend', onScrollEnd)
+    return () => {
+      for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('scrollend', onScrollEnd)
+    }
+  }, [scrollRef, pinnedRef, pageRef, setAtBottom])
+}
+
+interface Edges {
+  readonly scrollRef: Scroller
+  readonly topEdgeRef: RefObject<HTMLDivElement | null>
+  readonly bottomEdgeRef: RefObject<HTMLDivElement | null>
+}
+
+/** The edges ask for the rows beyond them. */
+export function useEdges({ scrollRef, topEdgeRef, bottomEdgeRef }: Edges, positioned: boolean, page: ChatPage, items: ReadonlyArray<ChatItem>, setWindow: SetWindow): void {
+  const firstAnchor = items.map(anchorOf).find((key) => key !== undefined)
+  const lastAnchor = items.map(anchorOf).findLast((key) => key !== undefined)
+  useEffect(() => {
+    const scroller = scrollRef.current
+    const top = topEdgeRef.current
+    const bottom = bottomEdgeRef.current
+    if (scroller === null || top === null || bottom === null || !positioned) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          if (entry.target === top && page.moreAbove && firstAnchor !== undefined) setWindow({ _tag: 'around', anchor: firstAnchor as BubbleId, before: OVERLAP, limit: WINDOW })
+          if (entry.target === bottom && page.moreBelow && lastAnchor !== undefined) setWindow({ _tag: 'around', anchor: lastAnchor as BubbleId, before: OVERLAP, limit: WINDOW })
+        }
+      },
+      { root: scroller, rootMargin: EDGE_MARGIN },
+    )
+    observer.observe(top)
+    observer.observe(bottom)
+    return () => observer.disconnect()
+  }, [positioned, page.moreAbove, page.moreBelow, firstAnchor, lastAnchor, scrollRef, topEdgeRef, bottomEdgeRef, setWindow])
+}
+
+/** Read marks: unread Juno bubbles fully on screen for a second, while the window has focus. */
+export function useReadMarks(scrollRef: Scroller, positioned: boolean, items: ReadonlyArray<ChatItem>): void {
+  useEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller === null || !positioned) return
+    const shown = new Set<Element>()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const read = () => {
+      timer = undefined
+      if (!document.hasFocus() || document.visibilityState !== 'visible') return
+      // The newest bubble on screen, in list order; the mark covers everything before it.
+      const through = [...scroller.querySelectorAll('[data-chat-juno][data-unread]')].findLast((row) => shown.has(row))?.getAttribute('data-chat-juno')
+      if (through) void junoCommands.read(through)
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio >= 1) shown.add(entry.target)
+          else shown.delete(entry.target)
+        }
+        if (shown.size > 0 && timer === undefined) timer = setTimeout(read, READ_AFTER_MS)
+      },
+      { root: scroller, threshold: 1 },
+    )
+    for (const row of scroller.querySelectorAll('[data-chat-juno][data-unread]')) observer.observe(row)
+    const onFocus = () => {
+      if (shown.size > 0 && timer === undefined) timer = setTimeout(read, READ_AFTER_MS)
+    }
+    globalThis.addEventListener('focus', onFocus)
+    return () => {
+      observer.disconnect()
+      globalThis.removeEventListener('focus', onFocus)
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [positioned, items, scrollRef])
+}
+
+/**
+ * A notification asked the tab for a message (the hours-start summary): the window moves to it if it is not
+ * in it, then it scrolls into view and flashes. Before paint, so the open position does not show first. Each
+ * request is taken once; one for a message the agent has not appended yet waits for it.
+ */
+export function useChatTarget(column: 'page' | 'panel', positioned: boolean, items: ReadonlyArray<ChatItem>, scrollRef: Scroller, pinnedRef: RefObject<boolean>, setWindow: SetWindow): void {
+  const chatTarget = useAtomValue(junoChatTargetAtom)
+  const targetTaken = useRef(0)
+  const targetAsked = useRef(0)
+  useLayoutEffect(() => {
+    if (column !== 'page' || chatTarget === undefined || chatTarget.n <= targetTaken.current || !positioned) return
+    const scroller = scrollRef.current
+    const target = { _tag: 'bubble', id: chatTarget.id as BubbleId } as const
+    if (scroller === null || rowOf(scroller, target) === null) {
+      if (targetAsked.current === chatTarget.n) return
+      targetAsked.current = chatTarget.n
+      setWindow({ _tag: 'around', anchor: target.id, before: OVERLAP, limit: WINDOW })
+      return
+    }
+    targetTaken.current = chatTarget.n
+    if (registry.get(junoChatTargetAtom)?.n === chatTarget.n) registry.set(junoChatTargetAtom, undefined)
+    scrollToRow(scrollRef, pinnedRef, target)
+  }, [column, chatTarget, positioned, items, scrollRef, pinnedRef, setWindow])
+}

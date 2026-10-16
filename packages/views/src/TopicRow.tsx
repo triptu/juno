@@ -409,8 +409,11 @@ const styles = stylex.create({
     flexShrink: 0,
     color: colors['--foreground-muted'],
   },
+  // At least the stable slot, and the time ends at the row's trailing inset,
+  // so "4m" and "Yesterday" end on one edge.
   time: {
-    width: sizes['--topic-time-width'],
+    minWidth: sizes['--topic-time-width'],
+    textAlign: 'end',
     flexShrink: 0,
     marginInlineStart: 'auto',
     paddingInlineStart: spacing['--space-1'],

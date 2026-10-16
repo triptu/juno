@@ -353,16 +353,17 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width-narrow` | 680px |
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
-| `--settings-label-width` | 104px: the label column of Settings' rows (Theme, Accent, Density, Hold to peek), so every control starts on one edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
+| `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
 | `--toast-max-width` | 352px |
 | `--peek-width` | 480px peek popover, 8px right of the sidebar, from under the title bar to 8px above the window's bottom; never wider than the window has room for |
+| `--destination-list-max-height` | 360px New chat destination lists before scrolling |
 | `--popover-max-height` | 400px, and never taller than the window below the title bar (`100vh − --titlebar-height − --space-5`), so the account menu fits at the minimum window size; the content scrolls inside. `--picker-max-height` 300px |
 | `--emoji-picker-width` / `--emoji-picker-height` | 314px / 360px. The full emoji picker (`EmojiPicker`): nine 32px cells, 12px and 2px padding, the 10px scrollbar gutter and a 1px border each side, so the search field and the grid share edges. Fixed height; the grid scrolls inside |
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
@@ -428,7 +429,7 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 
 [built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
-Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
+Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
 ### Privacy mode
 
@@ -544,7 +545,7 @@ Other literal lengths and colours require tokens, or a trailing
 | Token | Value | Used for |
 | --- | --- | --- |
 | `--all-topics-place-width` | 160px | Native place select while options load. |
-| `--topic-time-width` | 48px | Stable relative-time slot in topic rows. |
+| `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
 | `--topic-people-width` | 60px | Four overlapping participant avatars. |
 | `--topic-tags-width` | 76px | Reopened status slot; Main uses the 36px control token. |
 | `--message-sender-width` | 128px | Sender names keep timestamps fixed while names resolve. |

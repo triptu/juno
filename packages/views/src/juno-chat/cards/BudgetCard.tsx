@@ -22,11 +22,11 @@ export function BudgetCard({ card, actions, enter }: BudgetCardProps) {
       because={card.because}
       buttons={
         <>
-          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'allow' })}>
-            {copy.allow}
-          </Button>
           <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(card.id, { _tag: 'dismiss' })}>
             {copy.wait}
+          </Button>
+          <Button variant="secondary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'allow' })}>
+            {copy.allow}
           </Button>
         </>
       }

@@ -1,95 +1,34 @@
-import { lazy, memo, startTransition, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { mainTopicOf, MESSAGE_WINDOW_MAX, readsMarkRead, type FileView, type MessageView, type TopicDetail } from '@juno/contract'
-import {
-  bottomWindow,
-  catchUpDoneAtom,
-  channelTopicsAtom,
-  discardMessage,
-  dividerIndex,
-  headerRenamingAtom,
-  junoAvailableAtom,
-  junoPanelOpenAtom,
-  loadOlderMessages,
-  messageFlashAtom,
-  messageListAtom,
-  messageWindowSpecAtom,
-  nowAtom,
-  openExternal,
-  openedAtNewAtom,
-  openTopic as fetchTopic,
-  refreshMessages,
-  registry,
-  retryMessage,
-  runCommand,
-  scrollSnapshotAtom,
-  shouldMarkRead,
-  topicAtom,
-  topicView,
-  type MessageWindow,
-  type ScrollSnapshot,
-  uploadProgressAtom,
-  downloadFile,
-} from '@juno/state'
-import { afterPaint, mark, measure } from '@juno/state/perf'
+import { memo, useEffect, useRef } from 'react'
+import type { FileView, TopicDetail } from '@juno/contract'
+import { discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import {
-  flashChatRow,
-  hueFor,
-  MessageList,
-  NewMessagesPill,
-  TopicHeader,
-  TopicSwitcher as TopicSwitcherView,
-  TopicView as TopicViewFrame,
-  type ActivateEvent,
-  type MenuAnchor,
-  type MessageListItem,
-  type MessageListStatus,
-  type OlderStatus,
-} from '@juno/views'
-import { toggleJunoPanel } from './juno/actions'
-import { closeTabById, onLeaveTab, openTopic, takeOpenStart } from './navigation'
-import { useMessageActions, type ComposerHandle } from './messageActions'
+import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent } from '@juno/views'
+import { closeTabById, openTopic } from './navigation'
+import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
-import { takeSendMark } from './sendMark'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
-import { cancelRename, renameTopic, showTopicMenu, toggleResolved } from './topicActions'
+import { downloadMessageFile, useTopicFiles } from './topic/files'
+import { useTopicHeader } from './topic/header'
+import { useOlderPages } from './topic/older'
+import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
+import {
+  newMessages,
+  useFirstFrame,
+  useHeldPosition,
+  useJumpToLatest,
+  useMessageFlash,
+  useOpenPosition,
+  usePosition,
+  useScrollRelease,
+  useSendMeasure,
+  useStickToBottom,
+} from './topic/position'
+import { eagerRows, firstRows, itemsOf, openIndex } from './topic/scroll'
 
-/**
- * The divider's offset from the scroller's top on open: 80px below the
- * header band, which the list runs under (inventory 5). The band's height
- * is the scroller's `scroll-padding-top`, so the token stays the one source.
- */
-function dividerTop(scroller: HTMLElement): number {
-  return (Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0) + DIVIDER_GAP
-}
-
-/** Within this of the end counts as at the bottom (performance 3.3). */
-const BOTTOM_SLACK = 32
-/** How far below the header band the "N new" divider lands when a topic opens at it. */
-const DIVIDER_GAP = 80
-/** Rows each older page adds to the window. */
-const OLDER_PAGE = 100
-/** The next page is asked for when the first row comes this close to the top. */
-const OLDER_MARGIN = '1000px 0px 0px 0px'
-/** No "Loading messages" line before this (performance 4.4). */
-const LOADING_DELAY_MS = 300
 /** Message times change at most at a day boundary; re-render the rows for it this often, not every minute. */
 const TIME_STEP = 10 * 60_000
-/** The shortest a message row can be: the 32px avatar slot and its padding. */
-const MIN_ROW_HEIGHT = 40
-
-/**
- * Rows above the open position that the first frame draws: enough to fill
- * the window however short the rows are. The rest of the window is drawn
- * after that frame. `innerHeight` does not force a layout.
- */
-function firstRows(): number {
-  return Math.ceil(window.innerHeight / MIN_ROW_HEIGHT) + 2
-}
-
-const ROW = '[data-message-row]'
 
 // Callbacks every row gets, created once and taking ids (performance 5.1).
 
@@ -99,147 +38,10 @@ function openThread(id: string, event: ActivateEvent): void {
 
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 
-const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
 
-const items = new WeakMap<MessageView, MessageListItem>()
-
-/** The window's rows with their senders. A row keeps its object while its message and sender do, so `Message` stays memoized. */
-function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
-  return window.order.map((ts) => {
-    const message = window.rows.get(ts)!
-    const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
-    const held = items.get(message)
-    if (held !== undefined && held.sender === sender) return held
-    const item = { message, sender }
-    items.set(message, item)
-    return item
-  })
-}
-
-const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
-
-/** The first row in view and its offset from the top of the scroller. */
-function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
-  const box = scroller.getBoundingClientRect()
-  const element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
-  const anchorKey = element?.dataset['messageRow']
-  if (element == null || anchorKey === undefined) return undefined
-  return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
-}
-
-function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
-  const row = rowInView(scroller)
-  return row === undefined ? undefined : { anchorKey: row.anchorKey, offset: row.offset }
-}
-
-/**
- * The position the list goes back to whenever it changes under the user:
- * rows added above or below, the window resized. `bottom` keeps the end in
- * view; `row` keeps an element at an offset from the top (the divider on
- * open, a snapshot's row on restore, the row in view during a prepend)
- * until the user scrolls. It is applied in layout effects and the resize
- * event, before paint, and only ever writes `scrollTop`.
- */
-type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
-
-/** Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin. */
-function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop: RefObject<number>): void {
-  const held = pin.current
-  if (held === undefined) return
-  if (held.kind === 'row' && !held.element.isConnected) {
-    pin.current = undefined
-    return
-  }
-  if (held.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
-  else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
-  pinnedTop.current = scroller.scrollTop
-}
-
-/**
- * The rows laid out in full rather than at their size estimate, so the
- * position set before the first paint is where they end up: a window's
- * worth around the open position, a window's worth around
- * the row held during a source jump or an older page (`heldAt`), and the last window's worth,
- * where new messages arrive and the bottom is held. A page row drawn at its
- * estimate between the top of the view and the held row would grow a frame
- * later and move what is on screen; the page's rows are new, so laying them
- * out in full moves nothing. Everywhere else the browser's scroll anchoring
- * absorbs rows growing as they come into view.
- */
-function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
-  const eager = new Set<string>()
-  for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
-  for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
-  for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)
-  return eager
-}
-
-/** The row the open position shows at the top: the snapshot's row, the first unread one, or the end. */
-function openIndex(list: MessageWindow, divider: number, snapshot: ScrollSnapshot | undefined): number {
-  const restored = snapshot === undefined ? -1 : list.order.indexOf(snapshot.anchorKey)
-  return restored >= 0 ? restored : divider > 0 ? divider : list.order.length
-}
-
-function distanceFromBottom(scroller: HTMLElement): number {
-  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
-}
-
-function useWindowFocused(): boolean {
-  const [focused, setFocused] = useState(() => document.hasFocus())
-  useEffect(() => {
-    const onFocus = () => setFocused(true)
-    const onBlur = () => setFocused(false)
-    window.addEventListener('focus', onFocus)
-    window.addEventListener('blur', onBlur)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('blur', onBlur)
-    }
-  }, [])
-  return focused
-}
-
-/**
- * The title's topic switcher (SPEC 7): the channel's Main and threads, from
- * local queries the topic keeps live while shown, so it opens with its rows
- * in the first frame. Mounted only while open; the query text is its own.
- */
-function Switcher({ detail, onClose }: { readonly detail: TopicDetail; readonly onClose: () => void }) {
-  const channel = detail.channel.id
-  const mainId = mainTopicOf(channel)
-  const result = useAtomValue(channelTopicsAtom(channel))
-  const mainUnread = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? (header.value?.unreadCount ?? 0) : 0))
-  const now = useAtomValue(nowAtom)
-  const [query, setQuery] = useState('')
-  const window = result._tag === 'Success' ? result.value : undefined
-  const threads = window === undefined ? undefined : window.order.map((id) => window.rows.get(id)!)
-  const open = (id: string, event: { readonly metaKey: boolean }) => {
-    onClose()
-    if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
-  }
-  return (
-    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
-  )
-}
-
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
-const ImageViewerPanel = lazy(() => import('./ImageViewerPanel'))
-
-/** Fetch the viewer's chunk once a topic has painted, so the first open does not wait for it. */
-let viewerLoaded = false
-function preloadViewer(): void {
-  if (viewerLoaded) return
-  viewerLoaded = true
-  window.requestIdleCallback(() => void import('./ImageViewerPanel'))
-}
-
-/** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */
-function downloadMessageFile(file: FileView): void {
-  if (file.download !== undefined) void downloadFile({ url: file.download, name: file.name })
-}
-
 export function hasArt(detail: TopicDetail): boolean {
   return !(detail.kind === 'main' && (detail.channel.kind === 'im' || detail.channel.kind === 'mpim'))
 }
@@ -315,400 +117,96 @@ interface TopicProps {
   readonly underHeader?: boolean
 }
 
+/** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
+function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, onOpenImage: (file: FileView) => void) {
+  return {
+    onOpenImage,
+    onRetry: retry,
+    onDiscard: discard,
+    onMessageMenu: messageActions.onMessageMenu,
+    actions: messageActions.actions,
+    activeMessage: messageActions.activeMessage,
+    confirmingDelete: messageActions.confirmingDelete,
+    editing: messageActions.editing,
+    onRowKey: messageActions.onRowKey,
+    onToggleReaction: messageActions.onToggleReaction,
+    onPersonMenu: personMenu,
+    onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
+      const known = list.refs.channels.get(chip.id)
+      void showChannelMenu(known ?? { id: chip.id, kind: 'public', name: chip.name, label: `#${chip.name}`, tint: 'public' })
+    },
+  }
+}
+
 function Topic({ id, view, detail, readOnly = false, underHeader = true }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
-  const scrollRef = useRef<HTMLElement>(null)
-  const anchorRef = useRef<HTMLDivElement>(null)
-
-  // The read pointer when this tab first showed the topic, for the divider.
-  const [readAtOpen] = useState(() => ({ lastReadTs: detail.lastReadTs }))
-  const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
-  const dividerBefore = at > 0 ? list.order[at] : undefined
-
-  // The Juno panel offers Catch me up while the topic opened at a "new" divider (SPEC 7); a new divider offers it again.
-  useEffect(() => {
-    if (readOnly || registry.get(openedAtNewAtom(id)) === dividerBefore) return
-    registry.set(openedAtNewAtom(id), dividerBefore)
-    registry.set(catchUpDoneAtom(id), false)
-  }, [id, readOnly, dividerBefore])
-  const agentOn = useAtomValue(junoAvailableAtom)
-  const panelOpen = useAtomValue(junoPanelOpenAtom)
-
-  // What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again.
-  const [fetchState, setFetchState] = useState<'pending' | 'done' | 'offline'>('pending')
-  const fetched = useRef(false)
-  useEffect(() => {
-    if (fetched.current) return
-    fetched.current = true
-    void fetchTopic(registry, id).then((exit) => {
-      const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
-      // This tab's window can have started while the fetch was writing the history it covers (a first send
-      // to someone never messaged) and missed that change; ask for it again, or it never shows its rows.
-      if (done && registry.get(messageListAtom(view)).meta.windowCovered !== true) refreshMessages(registry, view)
-      setFetchState(done ? 'done' : 'offline')
-    })
-  }, [id, view])
-  const [slow, setSlow] = useState(false)
-  useEffect(() => {
-    if (fetchState !== 'pending') return
-    const timer = setTimeout(() => setSlow(true), LOADING_DELAY_MS)
-    return () => clearTimeout(timer)
-  }, [fetchState])
-
-  // A partial cache is not an opening window. The header and composer paint immediately;
-  // messages wait for coverage, or show the available cache when fetching cannot finish.
-  const [positioned, setPositioned] = useState(false)
-  const contextLoaded = readAtOpen.lastReadTs === undefined || (list.order[0] !== undefined && list.order[0] <= readAtOpen.lastReadTs)
-  const showWindow = positioned || (list.meta.windowCovered === true && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
-
-  // Until the first frame is presented, only the rows from `firstRows()` above the open position down are drawn.
-  const [drawnAll, setDrawnAll] = useState(false)
-  const [atBottom, setAtBottom] = useState(true)
-  const [far, setFar] = useState(false)
-  // The newest message the user has seen at the bottom; the pill counts those after it.
-  const [seenTs, setSeenTs] = useState<string | undefined>(undefined)
-  // Files dragged over the topic, and the image open in the viewer.
-  const [dropping, setDropping] = useState(false)
-  const [viewing, setViewing] = useState<FileView | undefined>(undefined)
-  const progress = useAtomValue(uploadProgressAtom)
-  useEffect(preloadViewer, [])
-  // The position to hold (`Pin`), and the scrollTop it last set.
-  const pin = useRef<Pin | undefined>(undefined)
-  // The row held after a source jump or while an older page went in above it.
-  const [heldAt, setHeldAt] = useState<string | undefined>(undefined)
-  const pinnedTop = useRef(0)
-  // The rows and window size the bottom was held for.
-  const heldFor = useRef<{ readonly rows: MessageWindow['rows']; readonly size: string } | undefined>(undefined)
-  const last = list.order.at(-1)
-  const first = list.order[0]
-  // The window holds the newest message: no anchor.
-  const atEnd = list.spec.anchor === undefined
-  const lastRef = useRef(last)
-  const atEndRef = useRef(atEnd)
-  useLayoutEffect(() => {
-    lastRef.current = last
-    atEndRef.current = atEnd
-  })
-
-  // The open position, before the first frame with rows is painted.
-  useLayoutEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller === null || positioned || !showWindow || !list.ready || last === undefined) return
-    const snapshot = readOnly ? undefined : registry.get(scrollSnapshotAtom(view))
-    const row = snapshot === undefined ? null : scroller.querySelector(rowSelector(snapshot.anchorKey))
-    pin.current =
-      snapshot !== undefined && row !== null
-        ? { kind: 'row', element: row, offset: snapshot.offset }
-        : anchorRef.current !== null
-          ? { kind: 'row', element: anchorRef.current, offset: dividerTop(scroller) }
-          : { kind: 'bottom' }
-    hold(scroller, pin, pinnedTop)
-    const distance = distanceFromBottom(scroller)
-    const bottom = atEnd && distance <= BOTTOM_SLACK
-    if (bottom) {
-      pin.current = { kind: 'bottom' }
-      heldFor.current = { rows: list.rows, size: `${window.innerWidth}x${window.innerHeight}` }
-    }
-    setAtBottom(bottom)
-    setFar(distance > scroller.clientHeight)
-    setSeenTs(last)
-    setPositioned(true)
-  }, [view, readOnly, positioned, showWindow, list.ready, list.rows, last, atEnd])
-
-  // A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
-  // window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
-  // again (`<Activity>` runs its effects again) does not jump back to it.
-  const flash = useAtomValue(messageFlashAtom(id))
-  const flashTaken = useRef(0)
-  useEffect(() => {
-    const scroller = scrollRef.current
-    if (readOnly || flash === undefined || flash.n <= flashTaken.current || !positioned || scroller === null || !list.rows.has(flash.ts)) return
-    afterPaint(() => {
-      const row = scroller.querySelector(rowSelector(flash.ts))
-      if (row === null || flash.n <= flashTaken.current) return
-      flashTaken.current = flash.n
-      setHeldAt(flash.ts)
-      if (registry.get(messageFlashAtom(id))?.n === flash.n) registry.set(messageFlashAtom(id), undefined)
-      const box = row.getBoundingClientRect()
-      const view = scroller.getBoundingClientRect()
-      if (box.top < view.top || box.bottom > view.bottom) {
-        // A source jump releases the hold before any rows can change, like the user's scrolling.
-        pin.current = undefined
-        row.scrollIntoView({ block: 'center', behavior: 'instant' })
-      }
-      pin.current = { kind: 'row', element: row, offset: row.getBoundingClientRect().top - view.top }
-      pinnedTop.current = scroller.scrollTop
-      flashChatRow(row)
-    })
-  }, [id, readOnly, flash, positioned, list.rows])
-
-  // Rows added above the ones in view (the rest of the window after the first frame, an older page):
-  // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
-  useLayoutEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller !== null && positioned) hold(scroller, pin, pinnedTop)
-  }, [positioned, first, drawnAll, list.rows])
-
-  // A wider or narrower window reflows the rows; at the bottom, stay there. Resize runs before the frame's paint.
-  useEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller === null) return
-    const onResize = () => {
-      if (pin.current?.kind === 'bottom') hold(scroller, pin, pinnedTop)
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
-  // `juno.topic-open` (or `juno.tab-switch` back to an unmounted tab): to the first frame with the header and the list in place.
-  useLayoutEffect(() => {
-    if (!list.ready || (showWindow && list.order.length > 0 && !positioned)) return
-    const started = takeOpenStart(id)
-    if (started !== undefined) afterPaint(() => measure(started.name, started.at, { detail: { id, rows: list.order.length } }))
-  }, [id, list.ready, list.order.length, positioned, showWindow])
-
-  // The rows above the first frame's, once it is on screen; scroll anchoring keeps the rows in view still.
-  useEffect(() => {
-    if (positioned && !drawnAll) afterPaint(() => startTransition(() => setDrawnAll(true)))
-  }, [positioned, drawnAll])
-
-  // Stick to the bottom: a message that arrives, or a row that grows (a reaction, an edit), while at the
-  // bottom is scrolled into view before paint. Rows keep their identity until a row changes, so a tab
-  // shown again with nothing new and the same window size is still at the bottom (Chromium keeps a
-  // hidden scroller's offset), and skips the layout that reading the position would force.
-  useLayoutEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller === null || !positioned || pin.current?.kind !== 'bottom' || !atEnd) return
-    const size = `${window.innerWidth}x${window.innerHeight}`
-    if (heldFor.current?.rows === list.rows && heldFor.current.size === size) return
-    heldFor.current = { rows: list.rows, size }
-    hold(scroller, pin, pinnedTop)
-    setSeenTs(last)
-  }, [positioned, list.rows, last, atEnd])
-
-  // `juno.send`: from Enter to the frame that shows the message, pending or, after a very quick answer, settled.
-  useLayoutEffect(() => {
-    if (last !== undefined && list.rows.get(last)?.fromMe === true && takeSendMark()) {
-      mark('juno.send-commit', undefined, { replace: true })
-      afterPaint(() => measure('juno.send', 'juno.send'))
-    }
-  }, [last, list.rows])
-
-  // The user's own scrolling lets go of the pin; where the list comes to rest decides the next one.
-  useEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller === null) return
-    const letGo = () => {
-      pin.current = undefined
-    }
-    const record = () => {
-      if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
-    }
-    const onScrollEnd = () => {
-      if (pin.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTop.current) > 1) pin.current = undefined
-      const distance = distanceFromBottom(scroller)
-      const bottom = atEndRef.current && distance <= BOTTOM_SLACK
-      if (bottom) pin.current = { kind: 'bottom' }
-      else if (pin.current?.kind === 'bottom') pin.current = undefined
-      setAtBottom(bottom)
-      setFar(distance > scroller.clientHeight)
-      if (bottom) setSeenTs(lastRef.current)
-      record()
-    }
-    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
-    for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
-    scroller.addEventListener('scrollend', onScrollEnd)
-    // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
-    // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
-    // also recorded as the tab is left, from what is on screen then.
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
-    return () => {
-      for (const type of inputs) scroller.removeEventListener(type, letGo)
-      scroller.removeEventListener('scrollend', onScrollEnd)
-      stopLeaving()
-    }
-  }, [view, readOnly])
-
-  // Older pages. A thread whose root is in the window has nothing older.
-  const [complete, setComplete] = useState(false)
-  const [loadingOlder, setLoadingOlder] = useState(false)
-  const rootShown = first !== undefined && list.rows.get(first)?.root === true
-  const windowFull = list.order.length >= list.spec.limit
-  const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull) ? 'none' : 'more'
-  useEffect(() => {
-    const scroller = scrollRef.current
-    if (scroller === null || !drawnAll || older !== 'more' || first === undefined) return
-    const row = scroller.querySelector(rowSelector(first))
-    if (row === null) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return
-        observer.disconnect()
-        setLoadingOlder(true)
-        void loadOlderMessages(registry, id, first).then((exit) => {
-          if (exit._tag === 'Success' && exit.value.complete) setComplete(true)
-          const spec = registry.get(messageWindowSpecAtom(view))
-          // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
-          const next =
-            spec.anchor === undefined && spec.limit + OLDER_PAGE <= MESSAGE_WINDOW_MAX
-              ? { limit: spec.limit + OLDER_PAGE }
-              : { anchor: first, before: OLDER_PAGE, limit: MESSAGE_WINDOW_MAX }
-          // Scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor; the pin covers both.
-          const inView = rowInView(scroller)
-          if (inView !== undefined) {
-            pin.current = { kind: 'row', element: inView.element, offset: inView.offset }
-            pinnedTop.current = scroller.scrollTop
-            setHeldAt(inView.anchorKey)
-          }
-          registry.set(messageWindowSpecAtom(view), next)
-          setLoadingOlder(false)
-        })
-      },
-      { root: scroller, rootMargin: OLDER_MARGIN },
-    )
-    observer.observe(row)
-    return () => observer.disconnect()
-  }, [id, view, drawnAll, older, first])
-
-  // The read rule. Opening, and showing the tab again, marks the topic read. A preview never does.
-  useEffect(() => {
-    if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
-  }, [id, readOnly])
-  const unread = detail.unreadCount
-  useEffect(() => {
-    if (readOnly || unread === 0 || !positioned) return
-    if (shouldMarkRead('bottom', { active: true, focused, atBottom })) void markRead(id)
-  }, [id, readOnly, unread, positioned, focused, atBottom])
-
-  const jumpToLatest = () => {
-    const scroller = scrollRef.current
-    pin.current = { kind: 'bottom' }
-    setAtBottom(true)
-    setFar(false)
-    if (!atEnd) registry.set(messageWindowSpecAtom(view), bottomWindow)
-    if (scroller !== null) hold(scroller, pin, pinnedTop)
-    setSeenTs(last)
-  }
-
-  const [switcherOpen, setSwitcherOpen] = useState(false)
-  const main = detail.kind === 'main'
-  // The topic's native menu, from ⋯ or a right-click on the title: ⋯ shows it open until the menu closes.
-  const [menuOpen, setMenuOpen] = useState(false)
-  const openMenu = (at: MenuAnchor) => {
-    setMenuOpen(true)
-    void showTopicMenu(detail, 'header', at).finally(() => setMenuOpen(false))
-  }
-  const renaming = useAtomValue(headerRenamingAtom(detail.id))
-  const channel = detail.channel.id
-  // The switcher's queries stay live while the topic is shown, from after its first frame, so the
-  // title opens the switcher with its rows in the first frame (performance 4.4).
-  useEffect(() => {
-    if (!drawnAll || readOnly) return undefined
-    const releases = [registry.mount(channelTopicsAtom(channel)), registry.mount(topicAtom(mainTopicOf(channel)))]
-    return () => releases.forEach((release) => release())
-  }, [drawnAll, readOnly, channel])
-
+  // The hooks run their effects in this order; keep it.
+  const position = usePosition(list)
+  const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, list, readOnly)
+  const loading = useTopicFetch(id, view)
+  const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
+  const files = useTopicFiles()
+  useOpenPosition(position, view, readOnly, list, showWindow)
+  const flash = useMessageFlash(position, id, readOnly, list)
+  useHeldPosition(position, list)
+  useFirstFrame(position, id, list, showWindow)
+  useStickToBottom(position, list)
+  useSendMeasure(list)
+  useScrollRelease(position, view, readOnly)
+  const older = useOlderPages(position, id, view, list)
+  useMarkRead(id, readOnly, detail.unreadCount, position.positioned, focused, position.atBottom)
+  const header = useTopicHeader(detail, readOnly, position.drawnAll)
   const composer = useRef<ComposerHandle>(null)
-  const messageActions = useMessageActions({ detail, list, scrollRef, composer })
-
+  const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer })
+  const jump = useJumpToLatest(position, view, list)
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
-
+  // Until the first frame is on screen, the rows from `firstRows()` above the open position down; then all.
   const items = itemsOf(list)
   const rows = firstRows()
   const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)))
-  const from = drawnAll ? 0 : Math.max(0, openAt - rows)
+  const from = position.drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
-  const held = flash?.ts ?? heldAt
+  const held = flash?.ts ?? position.heldAt
   const eager = eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows)
-
-  const seenAt = seenTs === undefined ? -1 : list.order.indexOf(seenTs)
-  // The user's own messages, sent or still sending, are never new to them.
-  const newCount = seenAt < 0 ? 0 : list.order.slice(seenAt + 1).filter((ts) => list.rows.get(ts)?.fromMe !== true).length
-  const showPill = positioned && !atBottom && (newCount > 0 || far || !atEnd)
-
-  // An empty list says nothing until Slack has answered or 300 ms have passed.
-  const status: MessageListStatus =
-    showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
-
+  const pill = newMessages(position, list)
   const messages = (
     <MessageList
       items={showWindow ? shown : []}
       eager={eager}
       notDrawnAbove={showWindow ? from : 0}
-      main={main}
+      main={detail.kind === 'main'}
       now={now}
-      status={status}
+      status={listStatus(showWindow, list, loading)}
       older={!showWindow || list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
-      scrollRef={scrollRef}
+      scrollRef={position.scrollRef}
       underHeader={underHeader}
-      anchorRef={anchorRef}
+      anchorRef={position.anchorRef}
       hueOf={hueOf}
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onChannel={scopeToChannel}
       onLink={openExternal}
       onDownload={downloadMessageFile}
-      {...(progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? { uploadProgress: progress.value } : {})}
-      {...(readOnly
-        ? {}
-        : {
-            onOpenImage: setViewing,
-            onRetry: retry,
-            onDiscard: discard,
-            onMessageMenu: messageActions.onMessageMenu,
-            actions: messageActions.actions,
-            activeMessage: messageActions.activeMessage,
-            confirmingDelete: messageActions.confirmingDelete,
-            editing: messageActions.editing,
-            onRowKey: messageActions.onRowKey,
-            onToggleReaction: messageActions.onToggleReaction,
-            onPersonMenu: personMenu,
-            onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
-              const known = list.refs.channels.get(chip.id)
-              void showChannelMenu(known ?? { id: chip.id, kind: 'public', name: chip.name, label: `#${chip.name}`, tint: 'public' })
-            },
-          })}
+      {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
+      {...(readOnly ? {} : rowActions(list, messageActions, files.setViewing))}
     />
   )
   if (readOnly) return messages
-
   const sent = () => {
-    jumpToLatest()
+    jump()
     void markRead(id)
   }
-
   return (
     <TopicViewFrame
-      header={
-        <TopicHeader
-          detail={detail}
-          menuOpen={menuOpen}
-          onMenu={openMenu}
-          onPill={() => scopeToChannel(detail.channel.id)}
-          onPillMenu={() => void showChannelMenu(detail.channel)}
-          {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
-          {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
-          {...(main ? {} : { onResolve: () => toggleResolved(detail.id) })}
-          switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
-        />
-      }
-      pill={showPill ? <NewMessagesPill count={newCount} onJump={jumpToLatest} /> : undefined}
-      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={dropping} />}
-      floating={
-        <>
-          {messageActions.floating}
-          {viewing === undefined ? null : (
-            <Suspense fallback={null}>
-              <ImageViewerPanel file={viewing} onClose={() => setViewing(undefined)} onDownload={downloadMessageFile} />
-            </Suspense>
-          )}
-        </>
-      }
-      onFiles={(files) => attach(id, files)}
-      onDragFiles={setDropping}
+      header={header}
+      pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
+      composer={<TopicComposer key={id} detail={detail} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
+      floating={<>{messageActions.floating}{files.viewer}</>}
+      onFiles={(dropped) => attach(id, dropped)}
+      onDragFiles={files.setDropping}
     >
       {messages}
     </TopicViewFrame>

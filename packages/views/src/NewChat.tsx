@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import type { PickConversation } from '@juno/contract'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
-import { FrequentConversations } from './FrequentConversations'
+import { FrequentConversations, loadFrequentRows } from './FrequentConversations'
 
 export interface NewChatProps {
   readonly frequent?: ReadonlyArray<PickConversation>
@@ -29,6 +29,10 @@ export const startOfConversation = (name: string) => `This is the start of your 
  * the composer sit at the bottom, where the topic's composer will be.
  */
 export function NewChat({ preview, note = NEW_CHAT_NOTE, composer, frequent = [], selectedConversation, onPickConversation }: NewChatProps) {
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void loadFrequentRows(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   return (
     <div data-new-chat="" {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.middle)}>

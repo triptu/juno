@@ -36,10 +36,12 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
   return routes
 }
 
-/** Opens one state and waits until it is drawn: fonts loaded, theme applied, entrance animations done. */
+/** Opens one state and waits until it is drawn: chunks and fonts loaded, theme applied, entrance animations done. */
 export async function openState(page: Page, route: Route, theme: Theme = 'light'): Promise<void> {
   await page.goto(stateUrl(route, theme))
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
+  // Wait for code, not data: loading and pending-image fixtures intentionally never settle.
+  await expect(page.locator('[data-chunk-pending]')).toHaveCount(0)
   await page.evaluate(() => document.fonts.ready)
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
   // Let entrances (toasts, popovers) finish; an endless animation does not hold this up.

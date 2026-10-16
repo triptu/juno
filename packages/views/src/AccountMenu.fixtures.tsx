@@ -1,22 +1,15 @@
-import { Button, defineFixtures, fixture, Text } from '@juno/ui'
+import { defineFixtures, fixture } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
+import { SessionView } from './SessionView'
 
 const noop = () => {}
 
 const base = { name: 'Tushar', initials: 'T', hue: 'cyan', workspace: 'juno-fake.slack.com', onAction: noop, sections: [] } as const
 
+// The app's Session block: the account line and Sign out (containers/Session.tsx).
 const session = {
   title: 'Session',
-  content: (
-    <>
-      <Text variant="meta" tone="muted" as="p">
-        Signed in to Juno Fake as tushar
-      </Text>
-      <Button variant="ghost" size="sm" tone="muted">
-        Sign out
-      </Button>
-    </>
-  ),
+  content: <SessionView teamName="Juno Fake" userName="tushar" onSignOut={noop} />,
 }
 
 export default defineFixtures(
