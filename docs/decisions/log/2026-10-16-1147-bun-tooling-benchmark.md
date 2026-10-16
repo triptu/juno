@@ -1,0 +1,1 @@
+- 10-16 11:47 · Tushar · Bun's test runner is a candidate for pure package suites; keep pnpm for installs and oxlint for linting. Why: Bun passed the unchanged domain suite over 11× faster, but its clean install omitted Electron's native binary.
