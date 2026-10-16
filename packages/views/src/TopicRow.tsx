@@ -57,6 +57,8 @@ export interface TopicRowProps {
 }
 
 const HOVER = '@media (hover: hover)'
+// Only the mask's alpha counts; the colours are not painted.
+const PLACE_MASK = `linear-gradient(to left, transparent ${sizes['--control-22']}, black calc(${sizes['--control-22']} + ${spacing['--space-3']}))` // tokens-allow: mask alpha, not a colour
 
 
 const REOPENED_TITLE = 'New activity after it was resolved'
@@ -112,6 +114,8 @@ export const TopicRow = memo(function TopicRow({
     hue: hueFor(person.color, person.id),
     ...(person.avatarUrl === undefined ? {} : { src: person.avatarUrl }),
   }))
+  const hasPeople = people.length > 0
+  const resolvable = row.canResolveOnHover && !renaming
 
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onPrefetch?.(row.id)
@@ -200,8 +204,8 @@ export const TopicRow = memo(function TopicRow({
             </span>
           </span>
         </span>
-        <span {...stylex.props(styles.line3)}>
-          <span {...stylex.props(styles.where)}>
+        <span {...stylex.props(styles.line3, hasPeople && styles.line3People)}>
+          <span {...stylex.props(styles.where, resolvable && !hasPeople && styles.whereUnderAction)}>
             <span {...stylex.props(styles.place)}>
               <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
                 <Icon icon={whereIcon(row)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
@@ -225,13 +229,13 @@ export const TopicRow = memo(function TopicRow({
               </span>
             ) : null}
           </span>
-          <span {...stylex.props(styles.people)}>
-            {people.length > 0 ? (
+          {hasPeople ? (
+            <span {...stylex.props(styles.people, resolvable && styles.peopleUnderAction)}>
               <AvatarStack people={people} more={row.moreParticipants ?? 0} surface={selected ? 'surface' : 'subtle'} />
-            ) : null}
-          </span>
-          <span {...stylex.props(styles.actionSlot)}>
-            {row.canResolveOnHover && !renaming ? (
+            </span>
+          ) : null}
+          {resolvable ? (
+            <span {...stylex.props(styles.actionSlot)}>
               <IconButton
                 icon={Check}
                 label={`Resolve ${row.title}`}
@@ -243,8 +247,8 @@ export const TopicRow = memo(function TopicRow({
                 tabIndex={tabbable ? 0 : -1}
                 onClick={() => onResolve(row.id)}
               />
-            ) : null}
-          </span>
+            </span>
+          ) : null}
         </span>
       </span>
       {/* The counts and the @ are tags whose meaning is only in a tooltip; the
@@ -355,6 +359,14 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
+    // While Resolve shows over the end of a meta line with no people, the
+    // place text fades out under it instead of running beneath the button.
+    '--row-place-mask': {
+      default: 'none',
+      ':hover': { default: null, [HOVER]: PLACE_MASK },
+      ':focus-visible': PLACE_MASK,
+      ':has(:focus-visible)': PLACE_MASK,
+    },
   },
   // Light muted text fails contrast on the secondary fill (tokens.md 1.7);
   // the selected row points it at the value made for a fill, which keeps it
@@ -436,14 +448,19 @@ const styles = stylex.create({
     width: sizes['--control-28'],
     flexShrink: 0,
   },
-  // A fixed slot at the end of the line, before Resolve: the stack ends on
-  // the same edge in every row and the place never moves when it changes.
+  // The stack takes only its own width and ends on the row's trailing
+  // edge, under the time and the counts. Without people there is no slot.
   people: {
+    gridRow: 1,
+    gridColumn: 2,
     display: 'inline-flex',
-    justifyContent: 'flex-end',
+    justifySelf: 'end',
     alignItems: 'center',
-    width: sizes['--topic-people-width'],
-    overflow: 'hidden',
+  },
+  // Resolve shows in the stack's place on hover or keyboard focus; only
+  // opacity changes, so nothing moves.
+  peopleUnderAction: {
+    opacity: 'calc(1 - var(--row-action-opacity))',
   },
   badges: {
     display: 'inline-flex',
@@ -452,18 +469,24 @@ const styles = stylex.create({
     flexShrink: 0,
     paddingTop: spacing['--space-pixel'],
   },
-  // The place and its tags on the left, the people in a fixed slot on the
-  // right, then Resolve. The tags follow the name, so they never float.
+  // The place and its tags on the left, the people sized to their content
+  // on the right. The tags follow the name, so they never float. Resolve
+  // overlays the end of the line, so it takes no space when hidden.
   line3: {
     display: 'grid',
-    gridTemplateColumns: `minmax(0, 1fr) ${sizes['--topic-people-width']} ${sizes['--control-22']}`,
+    gridTemplateColumns: 'minmax(0, 1fr)',
     alignItems: 'center',
     gap: spacing['--space-2'],
     minWidth: 0,
     marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
   },
+  line3People: {
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+  },
   where: {
+    gridRow: 1,
+    gridColumn: 1,
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2'],
@@ -487,14 +510,19 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     flexShrink: 0,
   },
+  // Over the end of the line, across every column, so it adds no width.
   actionSlot: {
+    gridRow: 1,
+    gridColumn: '1 / -1',
+    justifySelf: 'end',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
     width: sizes['--control-22'],
     height: sizes['--control-22'],
-    marginInlineStart: 'auto',
     opacity: 'var(--row-action-opacity)',
+  },
+  whereUnderAction: {
+    maskImage: 'var(--row-place-mask)',
   },
 })

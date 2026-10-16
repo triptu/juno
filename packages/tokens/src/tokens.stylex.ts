@@ -811,7 +811,6 @@ export const sizes = stylex.defineVars({
   '--control-22': '22px',
   '--control-24': '24px',
   '--topic-time-width': '48px',
-  '--topic-people-width': '84px',
   '--message-sender-width': '128px',
   '--threads-button-width': '128px',
   '--threads-button-narrow-width': '64px',
