@@ -534,7 +534,7 @@ test.describe('large workspace', () => {
       const box = (await list.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
       const warmed = await juno.lastMark('juno.prefetch')
-      await scrollReading(win, 'scroll-sidebar', { steps: 30, direction: 1, interval: await refreshInterval(win), layoutLimit: 2000 })
+      await scrollReading(win, 'scroll-sidebar', { steps: 30, direction: 1, interval: await refreshInterval(win), layoutLimit: 2000, at: { x: box.x + box.width / 2, y: box.y + box.height / 2 } })
       // Rows that scroll under the still pointer are not warmed (performance.md 3.2).
       expect(await juno.lastMark('juno.prefetch')).toBe(warmed)
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
@@ -581,7 +581,7 @@ test.describe('large workspace', () => {
       console.log(`All topics rows: ${total}`)
       const tableBox = (await table.boundingBox())!
       await win.mouse.move(tableBox.x + tableBox.width / 2, tableBox.y + tableBox.height / 2)
-      await scrollReading(win, 'scroll-all-topics', { steps: 80, direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true })
+      await scrollReading(win, 'scroll-all-topics', { steps: 80, direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true, at: { x: tableBox.x + tableBox.width / 2, y: tableBox.y + tableBox.height / 2 } })
     } finally {
       await running.close()
     }
@@ -902,7 +902,7 @@ test.describe('topic view', () => {
 
       const box = (await juno.topic.scroller.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      await scrollReading(win, 'scroll-messages', { steps: 30, direction: 1, interval: await refreshInterval(win), layoutLimit: 2000 })
+      await scrollReading(win, 'scroll-messages', { steps: 30, direction: 1, interval: await refreshInterval(win), layoutLimit: 2000, at: { x: box.x + box.width / 2, y: box.y + box.height / 2 } })
     } finally {
       await running.close()
     }
@@ -1047,7 +1047,7 @@ test.describe('Juno chat', () => {
       const scroller = win.locator('main [data-juno-chat] [data-scroll]')
       const box = (await scroller.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      await scrollReading(win, 'scroll-chat', { steps: 30, direction: -1, interval: await refreshInterval(win), layoutLimit: 2000 })
+      await scrollReading(win, 'scroll-chat', { steps: 30, direction: -1, interval: await refreshInterval(win), layoutLimit: 2000, at: { x: box.x + box.width / 2, y: box.y + box.height / 2 } })
 
       // ⌘J beside a topic: the panel painted with its composer.
       await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))

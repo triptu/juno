@@ -296,7 +296,7 @@ The `mention typing` scenario types "@ma " ten times in a reply, so every "@" op
 
 Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `apps/desktop/perf/`, and run with `pnpm perf` (all) or `pnpm perf -g "topic view"` (some), queued behind the machine-wide heavy-job lock. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported. `pnpm verify:main --with-mac` runs the suite and the feel suite on the Mac. Each prints its samples with the load average and fails when its p95 (p50 where section 1 says so) is over budget; the one-frame budgets use the rule proposed in section 8 on a display slower than 120 Hz. Both scroll scenarios trace the renderer over CDP and check the main thread's work per frame, the long animation frames and the dropped frames. Baselines and the 15 % median check below do not exist yet. To explain a number, `JUNO_PERF_TRACE=<dir>` writes a trace and a CPU profile per traced scenario, `JUNO_UNMINIFIED=1` builds with function names (the bundle check is skipped), and `node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]` sums the main thread's time by trace event and by function inside each `juno.*` measure. Add `JUNO_TRACE_SKIA=1` to record the GPU process's raster passes too (blurs, image filters, pipeline compiles); a keystroke that is slow after its frame callback is usually raster, and shows there.
 
-The scroll gate pools the frame work of two ordinary sweeps before taking the p95. Each ordinary sweep is followed by the same sweep with two background worker threads busy; the pooled held-clock p95 is recorded beside the ordinary one and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. Every sweep checks for visible placeholders, long animation frames and dropped frames; the ordinary sweeps still decide the 8.3 ms, long-frame and dropped-frame gates.
+Each scroll scenario runs three kinds of sweep, twice each, over the same distance down and back, and pools the two of a kind before taking the p95. The **continuous** sweep is one scroll gesture with a delta every frame (CDP `Input.synthesizeScrollGesture`, mouse source, 2,000 px/s), as a trackpad sends; it carries the 8.3 ms gate (owner's decision, 10-17, section 8.5). The **stepped** sweep is 200 px wheel steps 100 ms apart, each its own gesture; its p95 is reported, not gated. The **held-clock** sweep repeats the stepped one with two background worker threads busy and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. The continuous and stepped sweeps both fail on a visible placeholder, a long animation frame or 1 % dropped frames, and both count toward the dirty-layout ceiling.
 
 The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile. `node scripts/perf-frames.mjs <dir>/<name>.trace.json [--sequence <n>]` splits a scroll sweep's frame work the way the gate counts it into stages (script, GC, input, applying the scroll offset, style, layout, prepaint, paint, layerize, commit), for all frames and for those over 8.3 ms, and lists the heaviest frames. Read stage sizes from a trace without extra categories: the invalidation-tracking categories make prepaint and DOM removal several times slower.
 
@@ -752,14 +752,26 @@ a major garbage collection (32 to 50 ms, mostly marking) that lands on a
 step. LoAF entries show no scripts and no blocking time for both kinds,
 since neither is a script. The four in the gated run of 10-17 have the same shape (no scripts; 56 to 225 ms; two with a wheel event in them and two without), but that run saved no traces, so they are matched by shape, not by time.
 
-**Decision for the owner.** The ordinary gate drives the list with 200 px
-wheel steps 100 ms apart, each its own scroll gesture. A trackpad on a
-120 Hz display sends a delta every frame within one gesture, which keeps the
-clock up and moves a few pixels at a time. Options: keep the gate as it is
-and accept that it fails on clock alone, or add a continuous-gesture sweep
-(CDP `Input.synthesizeScrollGesture` or per-frame wheel deltas) as the
-ordinary case and keep the stepped sweep as a reported number. This pass
-changes neither the gate nor any budget.
+**Decision (owner, 10-17): gate a continuous gesture.** The stepped sweep
+drives the list with 200 px wheel steps 100 ms apart, each its own scroll
+gesture; a trackpad on a 120 Hz display sends a delta every frame within one
+gesture. The 8.3 ms gate now runs on a continuous gesture at 2,000 px/s
+(section 7.3); the stepped p95 is still printed, and the 7 ms held-clock
+gate, the long-frame, dropped-frame, placeholder and layout checks are
+unchanged. The budget is unchanged. First run, ms (load 2.4 to 3.5, 8.1
+during the sidebar reading):
+
+| List | Continuous (gated) | Stepped (reported) | Held-clock, stepped (gated) |
+| --- | --- | --- | --- |
+| Sidebar | 6.3 | 11.7 | 4.2 |
+| All topics | 6.3 | 16.5 | 5.3 |
+| Messages | 6.7 | 10.7 | 2.6 |
+| Chat | 4.4 | 10.7 | 3.1 |
+
+All five scroll scenarios passed, with no long animation frame and at most
+0.2 % dropped frames. A gesture moves each list by 17 to 33 px a frame, so
+few rows enter per frame. The stepped numbers still show what a single large
+wheel step after a pause costs.
 
 **Gate results.** `pnpm perf -g scroll`, before and after the fix, back
 to back on the quiet Mac under the exclusive lock (load 2.5 to 3.4), ms,
