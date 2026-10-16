@@ -3,6 +3,8 @@
 // the outbox; a failed upload keeps the text and the files for Retry; a
 // message's image opens in the viewer and a file downloads into Downloads.
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import type { Locator, Page } from '@playwright/test'
 import { samplePdf, samplePng } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
@@ -12,6 +14,8 @@ test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
+/** Shares four words with the staging bill thread in #eng. */
+const BILL_REPLY = 'the preview environments reaper should cut the staging bill'
 
 interface Upload {
   readonly name: string
@@ -221,16 +225,26 @@ test('Download saves the file into Downloads', async ({ juno }) => {
 })
 
 
-test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake }) => {
+test('a send check keeps the draft while a newly attached file is still being read', async ({ juno, fake, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
-  await topic.composer.fill('can you recieve the the report by friday')
+  // Wrong place is the one check before sending: wait for the typing pause's answer.
+  const since = Date.now()
+  await topic.composer.fill(BILL_REPLY)
+  await expect.poll(() => {
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+    try {
+      return (db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck' AND model != ''`).get() as { at: number | null }).at ?? 0
+    } finally {
+      db.close()
+    }
+  }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
   await topic.composer.press('Enter')
-  const fix = topic.root.getByRole('button', { name: /Fix and send/ })
-  await expect(fix).toBeVisible()
+  const post = topic.root.getByRole('button', { name: /Post in thread/ })
+  await expect(post).toBeVisible()
 
   // Hold the file read, as when the selected file is on a slow volume.
   await juno.win.evaluate(() => {
@@ -247,14 +261,14 @@ test('a send check keeps the draft while a newly attached file is still being re
   })
   await paste(topic.composer, [chart()])
   await expect(chip(topic, 'chart.png')).toBeVisible()
-  await fix.click()
-  await expect(topic.composer).toHaveValue('can you recieve the the report by friday')
-  await expect(fix).toBeVisible()
+  await post.click()
+  await expect(topic.composer).toHaveValue(BILL_REPLY)
+  await expect(post).toBeVisible()
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
 
   await juno.win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
   await expect(topic.root.locator('[data-composer] img[src^="juno://uploads/"]')).toHaveCount(1)
-  await fix.click()
-  await topic.expectSent('can you receive the report by friday?')
-  expect(fake.calls.filter((call) => call.method === 'files.share')).toHaveLength(1)
+  await post.click()
+  await expect(topic.composer).toHaveValue('')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length).toBe(1)
 })

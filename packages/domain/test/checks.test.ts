@@ -28,10 +28,6 @@ describe('clarity check', () => {
     expect(clarityCheck('see i.e. the doc', { capitalI: true })).toBeUndefined()
   })
 
-  it('never flags lowercase style by default', () => {
-    expect(clarityCheck("i think i'll ship it friday, im around after lunch")?.fixed).toBe("i think i'll ship it friday, i'm around after lunch")
-    expect(clarityCheck('sounds good, i can take it')).toBeUndefined()
-  })
 
   it('adds a missing question mark to a question', () => {
     const r = clarityCheck('Can we ship this on Friday')
@@ -107,6 +103,10 @@ describe('audience check', () => {
 })
 
 describe('clarity preferences', () => {
+  it('never flags lowercase style by default', () => {
+    expect(clarityCheck("i think i'll ship it friday, im around after lunch")?.fixed).toBe("i think i'll ship it friday, i'm around after lunch")
+    expect(clarityCheck('sounds good, i can take it')).toBeUndefined()
+  })
   it('leaves lowercase i alone without suppressing typos', () => {
     expect(clarityCheck('i think so', { capitalI: false })).toBeUndefined()
     expect(clarityCheck('i recieve it', { capitalI: false })?.fixed).toBe('i receive it')
@@ -118,8 +118,8 @@ describe('clarity preferences', () => {
     expect(clarityCheck('can i recieve the report', { questionMarks: false })?.fixed).toBe('can i receive the report')
   })
   it('turns off the long sentence note independently', () => {
-    const text = 'i ' + 'word '.repeat(41)
-    expect(clarityCheck(text, { longSentences: false })?.longSentence).toBe(false)
+    const text = 'i ' + Array.from({ length: 41 }, (_, i) => `word${i}`).join(' ')
+    expect(clarityCheck(text, { capitalI: true, longSentences: false })?.longSentence).toBe(false)
     expect(clarityCheck(text, { capitalI: false })?.longSentence).toBe(true)
     expect(clarityCheck(text, { capitalI: false, longSentences: false })).toBeUndefined()
   })
