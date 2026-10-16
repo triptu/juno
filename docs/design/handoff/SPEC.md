@@ -105,7 +105,9 @@ While the mode is on, macOS notifications keep their title (who or where) and re
 
 While the mode is on, a small footer at the bottom of the sidebar says "Message text hidden" with a **Show** button, which turns it off in one click. The avatar menu item reads **Show message text**.
 
-The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text. Juno never turns it off by itself. (Turning it on by itself when sharing starts is researched in `docs/research/screen-share-detection.md`, not built.)
+The mode is remembered across a relaunch, and the first frame after a relaunch is already blurred: a restart in the middle of a call must never show text.
+
+**While sharing.** When another app starts recording or sharing the screen (a Zoom or Meet share, a screen recording), Juno turns the mode on by itself and the footer reads "Message text hidden while sharing". A share already running when Juno opens counts. When the capture stops, Juno turns the mode off again, but only if sharing turned it on and you have not touched it since; a mode you turned on yourself stays on. Show turns it off for the rest of this share; the next share hides the text again. macOS cannot say who is capturing, so a screenshot tool or a recorder left running counts too, which is why the footer says why. Settings › General has the switch, on by default (section 14). How Juno tells: `docs/research/screen-share-detection.md`.
 
 ### Row anatomy
 
@@ -518,7 +520,7 @@ The order: ignored channel → Every message (thread, channel or person) → Nev
 
 **Settings** (⌘,) is the one place for everything you set, in the app and for Juno Agent. It opens in a tab like any page, and there is one Settings tab. A quiet list of sections runs down its left side, as in a Mac app's settings, and the open section shows beside it in the settings column:
 
-- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); and Use fast classifier (section 15).
+- **General**: "Show topics active in the last", a segmented control with 1 day, 3 days, 7 days (the default) and 14 days, saved as a workspace preference (section 5); New tabs open, a New chat (the default) or Home, which covers "+", ⌘T and the tab that replaces the last one closed (section 6); the peek key (section 5); Mark messages read in Slack too (on by default, also covers Mark as unread); Hide message text while sharing the screen (on by default, section 5, Privacy mode; disabled with a one-line reason where macOS does not tell Juno); and Use fast classifier (section 15).
 - **Appearance**, **Notifications** (the settings above), **Ignored** and **About**, below.
 - **Juno**, **Connections**, and **Backup & This Mac** (section 13.10).
 
