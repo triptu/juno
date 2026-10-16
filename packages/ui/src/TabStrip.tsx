@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { revealFocus } from './internal/revealFocus'
 
 export interface TabStripProps {
   readonly label?: string
@@ -29,13 +30,15 @@ export interface TabStripProps {
  * a horizontal scroller with no visible scrollbar, as wide as the tabs need
  * and no wider, so `trailing` follows the last tab and the rest of the
  * strip is free to drag the window by. The active tab scrolls itself into
- * view when it changes, like browser tabs.
+ * view when it changes, like browser tabs, and a tab that takes keyboard
+ * focus scrolls into view whole. Tabs draw the inset ring, so the strip
+ * needs no room around them.
  */
 export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, children }: TabStripProps) {
   return (
     <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} {...stylex.props(styles.scroller)}>
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} {...stylex.props(styles.scroller)}>
         {children}
       </div>
       {trailing ? (
