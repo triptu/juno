@@ -66,7 +66,8 @@ export class AiSpend extends Context.Service<AiSpend, {
         Effect.sync(() => { listeners++ }).pipe(Effect.andThen(SubscriptionRef.update(links, (n) => n + 1))),
         () => Effect.sync(() => { listeners-- }),
       )
-      return SubscriptionRef.changes(asks)
+      // Each change carries every open ask, so only the latest matters: a slow agent never works through stale lists.
+      return SubscriptionRef.changes(asks).pipe(Stream.buffer({ capacity: 1, strategy: 'sliding' }))
     }))
 
     const answer = (answer: Answer): Effect.Effect<void> => Effect.gen(function* () {

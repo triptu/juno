@@ -12,6 +12,8 @@ import type { SpendLedger } from './index'
 export const answerEngineSpend = (spend: SpendLedger): Effect.Effect<never, never, AgentHost> => Effect.gen(function* () {
   const client = yield* AgentHost
   yield* client['host.spend.asks']().pipe(
+    // Each list holds every open ask, so only the latest one needs answers.
+    Stream.buffer({ capacity: 1, strategy: 'sliding' }),
     Stream.runForEach((asks) => Effect.forEach(asks, (ask) => {
       if (ask._tag === 'settle') {
         spend.settle(ask.id, ask.actual ?? undefined)
