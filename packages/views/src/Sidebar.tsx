@@ -109,7 +109,11 @@ export interface SidebarProps {
   readonly onCloseViewSheet?: () => void
   readonly onToggleUnread: () => void
   readonly onClearScope: () => void
-  /** The fixed secondary header line, for sync progress or a connection notice. */
+  /**
+   * The status card at the foot of the sidebar: the first sync's progress,
+   * or why the rows may be behind Slack. The footer shows only while it is
+   * set, or while privacy mode is on.
+   */
   readonly status?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
@@ -122,11 +126,11 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search, New chat, the account button and a fixed status line,
- * the nav items, a hairline, the quick filters with their dots and the
- * Unread toggle, the scope chip when scoped, the list the
- * owner renders into it, and, only while privacy mode is on, a footer that
- * says so with a Show button.
+ * space, Search, New chat and the account button, the nav items, a
+ * hairline, the quick filters with their dots and the Unread toggle, the
+ * scope chip when scoped, the list the owner renders into it, and a footer
+ * while there is something to say: the sync status card, and, while
+ * privacy mode is on, a card that says so with a Show button.
  */
 export function Sidebar({
   titlebarLeading,
@@ -205,7 +209,6 @@ export function Sidebar({
             </span>
           </div>
         </div>
-        <div {...stylex.props(styles.status)}>{status}</div>
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
@@ -310,17 +313,20 @@ export function Sidebar({
 
       {children}
 
-      {privacy ? (
+      {status !== undefined || privacy ? (
         <div {...stylex.props(styles.footer)}>
-          <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
-            <Icon icon={EyeSlash} size={14} />
-            <Text variant="meta" tone="subtle" truncate sx={styles.privacyText}>
-              Message text hidden
-            </Text>
-            <Button variant="raised" size="xs" aria-label="Show message text" onClick={onPrivacyOff}>
-              Show
-            </Button>
-          </div>
+          {status}
+          {privacy ? (
+            <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
+              <Icon icon={EyeSlash} size={14} />
+              <Text variant="meta" tone="subtle" truncate sx={styles.privacyText}>
+                Message text hidden
+              </Text>
+              <Button variant="raised" size="xs" aria-label="Show message text" onClick={onPrivacyOff}>
+                Show
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </aside>
@@ -421,7 +427,6 @@ const styles = stylex.create({
   // then the leading controls; the strip drags the window and the buttons
   // inside opt out.
   header: { flexShrink: 0 },
-  status: { height: spacing['--space-4'], lineHeight: spacing['--space-4'] },
   titlebar: {
     display: 'flex',
     alignItems: 'center',
@@ -476,6 +481,9 @@ const styles = stylex.create({
   },
   // The sidebar inset on every side, so the widget sits as far from the bottom as from the edges.
   footer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-2'],
     flexShrink: 0,
     padding: layout['--sidebar-inset'],
     borderTopWidth: '1px',

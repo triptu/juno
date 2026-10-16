@@ -49,7 +49,7 @@ Conventions that apply everywhere (SPEC §16):
 
 Right-aligned group, gap 2px, inside the 44px bar.
 
-The header always reserves a secondary text slot below the icon bar: meta text, `--space-4` (16px) height and line height, with `--space-4` horizontal inset. It is empty when there is no status. During the first sync it says "Syncing", then "Syncing N of M". Offline, rate-limit and stopped notices use this same single line; their explanation is the tooltip, and stopped offers Restart inline. The progress bar is `--space-0-5` (2px), absolutely positioned along the header's bottom edge, with no layout space. No status transition changes the header height or moves the navigation, filters or list.
+The header has no status line: the nav starts right under the 44px bar. Sync progress and the offline, rate-limit and stopped notices are the status card at the foot of the sidebar (below, "Sync status card").
 
 | Button | Icon | Size | Accessible name | Action |
 | --- | --- | --- | --- | --- |
@@ -77,6 +77,18 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 - [built] Hide or Show message text, after Set yourself away or active.
 - [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Settings ("⌘,", also Juno › Settings… in the app menu). Set status, AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) stays under the items until they are: the account line, then Sign out under it, its text starting on the line's edge at the menu's inset. The diagnostics (build line, engine state, Ping engine) moved to Settings › About on 10-16. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
 - [built 10-16] One active item, as in a native menu: the pointer and the arrow keys move the same highlight (`useMenuActive` in `@juno/ui`), and the pointer leaving the list clears it. Rows have no hover style of their own. Every OptionList (menus, the palette, @ suggestions, the view sheet, the New chat pickers) works this way, and lists opt out of the title bar's drag region, which otherwise swallows the pointer over a menu that hangs off it.
+
+**Sync status card** (SPEC section 5, item 5). Shown during the first sync and while the rows may be behind Slack; later catch-ups show nothing. It sits in the footer strip under the topic list (the same strip as the privacy footer: the sidebar inset on all four sides, a 1px `--border-subtle` top rule; with both, the status card is first and they are 8 apart). The card: radius 8, bg `--secondary-default`, colour `--foreground-subtle`, padding 10 on every side, gap 10; a 20px leading slot, then two lines, then an optional raised xs button. Line one 13.5/500 `--foreground-default`, line height 20, `role="status"` named "Sync status"; line two 12.5 subtle with tabular figures, line height 16, one line with an ellipsis. So the card is 56px in every state. It fades in over `--duration-appear`; nothing else moves. [built]
+
+| State | Leading | Line one | Line two | Button |
+| --- | --- | --- | --- | --- |
+| First sync, listing | `ProgressRing` 20, empty track | Syncing with Slack | Finding your conversations | none |
+| First sync, counting | `ProgressRing` 20, N of M | Syncing with Slack | N of M conversations | none |
+| Offline (after 5 s) | `wifi-slash` 18 | You're offline | Juno catches up when you're back. | none |
+| Rate limited | `hourglass-medium` 18 | Slack asked us to slow down | Juno will catch up in a minute. | none |
+| Engine stopped | `warning-circle` 18 | Sync stopped | The topics here are kept. | Restart |
+
+The full sentence of each notice is the card's tooltip. The ring is the progressbar ("Sync progress", value text "N of M conversations"). The gallery's geometry test holds the card's 10 / 10 / 10 inset and its icon and Restart 10 from either side, centred.
 
 **Privacy footer** (SPEC section 5, Privacy mode). Shown only while the mode is on, under the topic list. The strip has the sidebar inset (`--sidebar-inset` 10) on all four sides and a 1px `--border-subtle` top rule. Inside it, one 30px line (`--control-30`), radius 8, bg `--secondary-default`, colour `--foreground-subtle`: `eye-slash` 14 at 10 from the left, gap 8, "Message text hidden" 12 meta subtle with an ellipsis, then a raised xs button "Show" (22px; accessible name "Show message text") 4px from the top, right and bottom. One click turns the mode off and the strip goes. [built] The gallery's geometry test holds the 10 / 10 / 10 and 4 / 4 / 4.
 
