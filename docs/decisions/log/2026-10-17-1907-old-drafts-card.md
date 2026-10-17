@@ -1,0 +1,1 @@
+- 10-17 19:07 · cards-followup-drafts · Old drafts: untouched 14 days in a topic with activity since; Delete and Keep act only on the draft as the review showed it (its `updated_at`), so a draft typed since is never lost, and Keep lasts until the draft is edited (`drafts.kept_at`). Both cards have a switch in Settings › Tidy up and rank after Tidy up.

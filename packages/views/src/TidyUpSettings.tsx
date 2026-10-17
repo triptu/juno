@@ -22,7 +22,8 @@ export interface SettingsTidyUpProps {
  * Settings › Tidy up (SPEC 14): what Resolve does, in the same words as the
  * review's info, then when Juno suggests a topic: how quiet it must be, and
  * which kinds. The rule that never suggests a topic waiting on you is
- * stated, not a switch.
+ * stated, not a switch. Then the other review cards, each with a switch:
+ * follow-ups that look done, and old drafts.
  */
 export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProps) {
   return (
@@ -63,6 +64,22 @@ export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProp
               <Checkbox label="Direct messages" checked={prefs.dms} onChange={(event) => onChange({ ...prefs, dms: event.currentTarget.checked })} />
             </span>
           </div>
+        </Surface>
+      </Section>
+      <Section heading="Other cards" sub="Each opens a review on Home, row by row, with Undo. Neither changes anything in Slack.">
+        <Surface kind="group" padding="md" sx={[styles.card, styles.checks]}>
+          <Checkbox
+            label="Follow-ups that look done"
+            description="A later message of yours in the same topic, with a file, a link, or words like “Here's”, seems to keep a promise. Needs AI assist."
+            checked={prefs.followUps}
+            onChange={(event) => onChange({ ...prefs, followUps: event.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Old drafts"
+            description="A draft untouched for two weeks, in a topic that moved on since."
+            checked={prefs.drafts}
+            onChange={(event) => onChange({ ...prefs, drafts: event.currentTarget.checked })}
+          />
         </Surface>
       </Section>
     </Page>

@@ -2421,7 +2421,7 @@ export class PrivacyMode {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves'
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts'
 
 /** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {
@@ -2476,20 +2476,17 @@ export class HomePane {
     return this.item(kind).getByRole('button', { name, exact: true })
   }
 
-  /** Tidy up's row, which opens the review sheet. */
-  async review(): Promise<SettledReviewSheet> {
-    await this.item('tidyUp').locator('[data-home-review]').click()
-    const sheet = new SettledReviewSheet(this.win)
-    await expect(sheet.root).toBeVisible()
-    return sheet
+  /** Tidy up's row, which opens its review sheet. */
+  review(): Promise<ReviewSheetPane> {
+    return this.reviewOf('tidyUp', 'settled')
   }
 
-  /** Automated's record, which opens its review sheet. */
-  async reviewMoves(): Promise<AutomatedRecordSheet> {
-    await this.item('automatedMoves').locator('[data-home-review]').click()
-    const sheet = new AutomatedRecordSheet(this.win)
-    await expect(sheet.root).toBeVisible()
-    return sheet
+  /** A review card's row, which opens its review sheet (`data-sheet="<sheet>"`): "settled", "automated", "doneFollowUps", "oldDrafts". */
+  async reviewOf(kind: HomeItemKind, sheet: string): Promise<ReviewSheetPane> {
+    await this.item(kind).locator('[data-home-review]').click()
+    const pane = new ReviewSheetPane(this.win, sheet)
+    await expect(pane.root).toBeVisible()
+    return pane
   }
 
   /** Right-clicks a row and chooses `item` in its menu. Returns the menu's labels. */
@@ -2500,68 +2497,19 @@ export class HomePane {
   }
 }
 
-/** Automated's record (SPEC 12): each channel Juno moved, with the fact that decided it, Move back and Keep. */
-export class AutomatedRecordSheet {
-  constructor(readonly win: Page) {}
+/**
+ * A Home card's review sheet (SPEC 12, `docs/design/settled-suggestions/`),
+ * the same for every card (`ReviewSheet`): each proposal with its reason,
+ * the card's action and its "no", what the row says once acted on, and Undo.
+ */
+export class ReviewSheetPane {
+  constructor(
+    readonly win: Page,
+    readonly name: string,
+  ) {}
 
   get root(): Locator {
-    return this.win.locator('[data-sheet="automated"]')
-  }
-
-  get title(): Locator {
-    return this.root.getByRole('heading', { level: 2 })
-  }
-
-  /** A move's row, by its channel label ("#ci-builds"). */
-  row(label: string): Locator {
-    return this.root.locator('[data-settled-row]').filter({ has: this.win.locator('[data-settled-title]', { hasText: label }) })
-  }
-
-  reason(label: string): Locator {
-    return this.row(label).locator('[data-settled-reason]')
-  }
-
-  status(label: string): Promise<string | null> {
-    return this.row(label).getAttribute('data-settled-status')
-  }
-
-  /** Move back, or Move to Automated for a move back out. */
-  moveBack(label: string): Locator {
-    return this.row(label).locator('[data-settled-resolve]')
-  }
-
-  keep(label: string): Locator {
-    return this.row(label).locator('[data-settled-keep]')
-  }
-
-  undo(label: string): Locator {
-    return this.row(label).locator('[data-settled-undo]')
-  }
-
-  /** The text the row shows once acted on: "Moved back to All", "Kept in Automated". */
-  done(label: string): Locator {
-    return this.row(label).locator('[data-settled-done]')
-  }
-
-  get close(): Locator {
-    return this.root.locator('[data-settled-close]')
-  }
-
-  get about(): Locator {
-    return this.root.locator('[data-settled-about]')
-  }
-
-  get explainer(): Locator {
-    return this.root.locator('[data-settled-explainer]')
-  }
-}
-
-/** Tidy up's review (SPEC 12, `docs/design/settled-suggestions/`): every proposal with its reason, Resolve and Keep open. */
-export class SettledReviewSheet {
-  constructor(readonly win: Page) {}
-
-  get root(): Locator {
-    return this.win.locator('[data-sheet="settled"]')
+    return this.win.locator(`[data-sheet="${this.name}"]`)
   }
 
   get title(): Locator {
@@ -2570,42 +2518,57 @@ export class SettledReviewSheet {
 
   /** A proposal's row, by text in its title. */
   row(title: string): Locator {
-    return this.root.locator('[data-settled-row]').filter({ has: this.win.locator('[data-settled-title]', { hasText: title }) })
+    return this.root.locator('[data-review-row]').filter({ has: this.win.locator('[data-review-title]', { hasText: title }) })
   }
 
   reason(title: string): Locator {
-    return this.row(title).locator('[data-settled-reason]')
+    return this.row(title).locator('[data-review-reason]')
   }
 
+  /** The message or draft quoted in the row. */
+  quote(title: string): Locator {
+    return this.row(title).locator('[data-review-quote]')
+  }
+
+  /** `open`, `done` or `declined`. */
   status(title: string): Promise<string | null> {
-    return this.row(title).getAttribute('data-settled-status')
+    return this.row(title).getAttribute('data-review-status')
   }
 
-  resolve(title: string): Locator {
-    return this.row(title).locator('[data-settled-resolve]')
+  /** The card's action: Resolve, Move back, Mark done, Delete. */
+  act(title: string): Locator {
+    return this.row(title).locator('[data-review-act]')
   }
 
-  keep(title: string): Locator {
-    return this.row(title).locator('[data-settled-keep]')
+  /** The card's "no": Keep open, Keep, Not done. */
+  decline(title: string): Locator {
+    return this.row(title).locator('[data-review-decline]')
+  }
+
+  /** What the row says once acted on: "Resolved", "Moved back to All", "Kept in Follow-up". */
+  outcome(title: string): Locator {
+    return this.row(title).locator('[data-review-outcome]')
   }
 
   undo(title: string): Locator {
-    return this.row(title).locator('[data-settled-undo]')
+    return this.row(title).locator('[data-review-undo]')
   }
 
-  get resolveAll(): Locator {
-    return this.root.locator('[data-settled-resolve-all]')
+  /** The bottom button that acts on every row still open: Resolve all. */
+  get all(): Locator {
+    return this.root.locator('[data-review-all]')
   }
 
-  get done(): Locator {
-    return this.root.locator('[data-settled-close]')
+  /** Done, which closes the sheet. */
+  get close(): Locator {
+    return this.root.locator('[data-review-close]')
   }
 
   get about(): Locator {
-    return this.root.locator('[data-settled-about]')
+    return this.root.locator('[data-review-about]')
   }
 
   get explainer(): Locator {
-    return this.root.locator('[data-settled-explainer]')
+    return this.root.locator('[data-review-explainer]')
   }
 }

@@ -14,9 +14,10 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
+import { CommandResult, DraftRestore, FollowUpRestore } from './topics'
 
 /** Ranked in this order: at most one of each, and at most three in all. */
-export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'automatedMoves'])
+export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'automatedMoves'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /**
@@ -56,6 +57,38 @@ export const AutomatedMove = Schema.Struct({
 })
 export type AutomatedMove = typeof AutomatedMove.Type
 
+/**
+ * A promise in Follow-up and the later message of the user's that looks
+ * like it kept it (`followUpDelivery` in `@juno/domain`), for the review of
+ * follow-ups that look done.
+ */
+export const FollowUpMatch = Schema.Struct({
+  /** The promise's message, the key of its `follow_ups` row. */
+  promiseTs: Schema.String,
+  /** The promise in words: "You said you'd send the deck". */
+  promise: Schema.String,
+  /** The matching message. */
+  ts: Schema.String,
+  /** What it shows: a file, a link, or words that hand the thing over. */
+  kind: Schema.Literals(['file', 'link', 'said']),
+  /** The matching message as a one-line preview: its words, or "File: deck.pdf". */
+  text: Schema.String,
+})
+export type FollowUpMatch = typeof FollowUpMatch.Type
+
+/** A topic's draft as the review of old drafts shows it. */
+export const OldDraft = Schema.Struct({
+  /** The first line with words. */
+  text: Schema.String,
+  /** When it was last changed, epoch milliseconds. */
+  at: Schema.Number,
+  /** Messages in the topic since, counted up to a cap. */
+  since: Schema.Int,
+  /** There were more than `since`: the row says "50+". */
+  more: Schema.optionalKey(Schema.Literal(true)),
+})
+export type OldDraft = typeof OldDraft.Type
+
 /** A topic as a Home row names it. */
 export const HomeTopic = Schema.Struct({
   id: Schema.String,
@@ -71,6 +104,10 @@ export const HomeTopic = Schema.Struct({
   settled: Schema.optionalKey(SettledWhy),
   /** Automated's record: the move, on the conversation's Main. `at` is when it was made. */
   moved: Schema.optionalKey(AutomatedMove),
+  /** Follow-ups that look done: the promise and the message that matches it. */
+  followUp: Schema.optionalKey(FollowUpMatch),
+  /** Old drafts: the draft. */
+  draft: Schema.optionalKey(OldDraft),
 })
 export type HomeTopic = typeof HomeTopic.Type
 
@@ -123,10 +160,14 @@ export const TidyUpPrefs = Schema.Struct({
   threads: Schema.Boolean,
   /** Suggest the Main of a DM or group DM. */
   dms: Schema.Boolean,
+  /** Suggest marking done a follow-up your own later message seems to keep. */
+  followUps: Schema.Boolean,
+  /** Suggest deleting drafts untouched for two weeks in topics that moved on. */
+  drafts: Schema.Boolean,
 })
 export type TidyUpPrefs = typeof TidyUpPrefs.Type
 export const TIDY_UP_PREF = 'tidyUp'
-export const TIDY_UP_DEFAULTS: TidyUpPrefs = { quiet: '4h', threads: true, dms: true }
+export const TIDY_UP_DEFAULTS: TidyUpPrefs = { quiet: '4h', threads: true, dms: true, followUps: true, drafts: true }
 export const TIDY_UP_QUIET_MILLIS: Record<TidyUpQuiet, number> = { '1h': 3_600_000, '4h': 4 * 3_600_000, '1d': 86_400_000, '3d': 3 * 86_400_000 }
 
 /** Reads the saved preference, filling what is missing or wrong from the defaults. */
@@ -137,6 +178,8 @@ export function tidyUpPrefsOf(value: unknown): TidyUpPrefs {
     quiet,
     threads: typeof saved.threads === 'boolean' ? saved.threads : TIDY_UP_DEFAULTS.threads,
     dms: typeof saved.dms === 'boolean' ? saved.dms : TIDY_UP_DEFAULTS.dms,
+    followUps: typeof saved.followUps === 'boolean' ? saved.followUps : TIDY_UP_DEFAULTS.followUps,
+    drafts: typeof saved.drafts === 'boolean' ? saved.drafts : TIDY_UP_DEFAULTS.drafts,
   }
 }
 
@@ -165,4 +208,27 @@ export const homeMarkDone = Rpc.make('home.markDone', {
   error: NotSignedIn,
 })
 
-export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen)
+const followUpKey = { topicId: Schema.String, messageTs: Schema.String }
+
+/** The review's Mark done on a follow-up that looks done. Undo is `followUps.restore`. */
+export const followUpsMarkDone = Rpc.make('followUps.markDone', { payload: followUpKey, success: CommandResult, error: NotSignedIn })
+
+/** The review's Not done: the promise stays in Follow-up, and `matchTs` and older messages are not proposed again. Undo is `followUps.restore`. */
+export const followUpsNotDone = Rpc.make('followUps.notDone', { payload: { ...followUpKey, matchTs: Schema.String }, success: CommandResult, error: NotSignedIn })
+
+/** Puts a `follow_ups` row's done and not-done marks back as they were. */
+export const followUpsRestore = Rpc.make('followUps.restore', { payload: FollowUpRestore, success: CommandResult, error: NotSignedIn })
+
+/** A draft as the review showed it: a draft changed since (`updatedAt` differs) is left alone, and the command returns no undo. */
+const shownDraft = { topicId: Schema.String, updatedAt: Schema.String }
+
+/** The review's Delete on an old draft. Undo is `drafts.restore`. */
+export const draftsDiscard = Rpc.make('drafts.discard', { payload: shownDraft, success: CommandResult, error: NotSignedIn })
+
+/** The review's Keep: the draft is not proposed again until it changes. Undo is `drafts.restore`. */
+export const draftsKeep = Rpc.make('drafts.keep', { payload: shownDraft, success: CommandResult, error: NotSignedIn })
+
+/** Puts a draft back as it was, with its time, unless a newer one was typed since. */
+export const draftsRestore = Rpc.make('drafts.restore', { payload: DraftRestore, success: CommandResult, error: NotSignedIn })
+
+export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen, followUpsMarkDone, followUpsNotDone, followUpsRestore, draftsDiscard, draftsKeep, draftsRestore)

@@ -50,15 +50,17 @@ test('a bot channel joined later moves by itself, the card says why, and Move ba
   await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel to Automated')
   await expect(home.meta('automatedMoves')).toHaveText('ci-builds')
 
-  const sheet = await home.reviewMoves()
+  const sheet = await home.reviewOf('automatedMoves', 'automated')
   await expect(sheet.title).toHaveText('Juno moved 1 channel to Automated')
   await expect(sheet.reason(CI_BUILDS)).toHaveText('Apps wrote 6 of the last 6 top-level messages')
   await sheet.about.click()
   await expect(sheet.explainer).toContainText('Nothing changes in Slack.')
+  // The info covers the top of the list; the button closes it again.
+  await sheet.about.click()
 
-  await sheet.moveBack(CI_BUILDS).click()
+  await sheet.act(CI_BUILDS).click()
   await juno.expectToast('Moved #ci-builds back to All')
-  await expect(sheet.done(CI_BUILDS)).toHaveText('Moved back to All')
+  await expect(sheet.outcome(CI_BUILDS)).toHaveText('Moved back to All')
   await sidebar.row(CI_BUILDS).expectVisible()
 
   // Undo on the row gives the channel back to Automated, where Juno had put it.
@@ -70,7 +72,7 @@ test('a bot channel joined later moves by itself, the card says why, and Move ba
   await sheet.row(CI_BUILDS).locator('a').focus()
   await juno.win.keyboard.press('k')
   await juno.expectToast('Keeping #ci-builds in Automated')
-  await expect(sheet.done(CI_BUILDS)).toHaveText('Kept in Automated')
+  await expect(sheet.outcome(CI_BUILDS)).toHaveText('Kept in Automated')
   await sheet.close.click()
   await expect(sheet.root).toHaveCount(0)
   await sidebar.selectView('Automated')
@@ -123,7 +125,7 @@ test('a channel people take over goes back to All, and the card says people star
   // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
   await home.button('automatedMoves', 'Dismiss').click()
   await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
-  const sheet = await home.reviewMoves()
+  const sheet = await home.reviewOf('automatedMoves', 'automated')
   await expect(sheet.reason(ALERTS)).toHaveText('Moved back: people start most conversations here')
   await expect(sheet.row(ALERTS)).toContainText('People wrote 21 of the last 30 top-level messages')
 })

@@ -15,12 +15,14 @@
  *   for "Pick up where you left off".
  * - `markFollowUpDone`, `resolveAllTopics`: the two row buttons.
  * - `actOnSettled`: Resolve or Keep open on one row of Tidy up's review.
+ * - `actOnDoneFollowUp`, `actOnOldDraft`: the two buttons of the reviews of
+ *   follow-ups that look done and of old drafts.
  * - `tidyUpPrefsAtom`, `setTidyUpPrefs`: Settings › Tidy up.
  */
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
+import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
@@ -349,6 +351,35 @@ export async function actOnSettled(registry: Registry, topic: HomeTopic, action:
     action === 'resolve'
       ? await runActionExit(registry, topicsResolve, { id: topic.id }, { text: `Resolved · ${topic.title}`, check: true })
       : await runActionExit(registry, topicsKeepOpen, { id: topic.id }, { text: `Keeping open · ${topic.title}` })
+  return Exit.isSuccess(exit) ? (exit.value as CommandResult).undo : undefined
+}
+
+/**
+ * One row of the review of follow-ups that look done: Mark done, or Not
+ * done (the promise stays, and this match is not proposed again), each
+ * with a toast and Undo. Resolves with the undo, or undefined when nothing
+ * changed.
+ */
+export async function actOnDoneFollowUp(registry: Registry, topic: HomeTopic, action: 'done' | 'notDone'): Promise<UndoCommand | undefined> {
+  const match = topic.followUp
+  if (match === undefined) return undefined
+  const key = { topicId: topic.id, messageTs: match.promiseTs }
+  const exit =
+    action === 'done'
+      ? await runActionExit(registry, followUpsMarkDone, key, { text: 'Follow-up done', check: true })
+      : await runActionExit(registry, followUpsNotDone, { ...key, matchTs: match.ts }, { text: 'Kept in Follow-up' })
+  return Exit.isSuccess(exit) ? (exit.value as CommandResult).undo : undefined
+}
+
+/** One row of the review of old drafts: Delete or Keep, each with a toast and Undo. */
+export async function actOnOldDraft(registry: Registry, topic: HomeTopic, action: 'delete' | 'keep'): Promise<UndoCommand | undefined> {
+  const draft = topic.draft
+  if (draft === undefined) return undefined
+  const shown = { topicId: topic.id, updatedAt: String(draft.at) }
+  const exit =
+    action === 'delete'
+      ? await runActionExit(registry, draftsDiscard, shown, { text: `Draft deleted · ${topic.title}` })
+      : await runActionExit(registry, draftsKeep, shown, { text: `Keeping draft · ${topic.title}` })
   return Exit.isSuccess(exit) ? (exit.value as CommandResult).undo : undefined
 }
 

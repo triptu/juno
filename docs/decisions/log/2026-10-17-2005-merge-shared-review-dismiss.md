@@ -1,0 +1,1 @@
+- 10-17 20:05 · release-keeper · Merging cards-followup-drafts after automated-record-until-seen: the shared review sheet (HomeReview, useReview, ReviewList) is kept, with Automated's Dismiss, home.movesShown and home.movesSeen carried over; ReviewList's data-review-outcome already marks only the shown word.

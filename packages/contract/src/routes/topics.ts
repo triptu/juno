@@ -216,6 +216,22 @@ export type StoredArt = typeof StoredArt.Type
 /** The undo of a redraw: the drawing before it, or `null` when the topic had none. */
 export const artRestorePayload = { id: Schema.String, previous: Schema.NullOr(StoredArt) }
 
+/** A `follow_ups` row's marks as stored: when it was marked done, and the newest match the user said was not it. */
+export const FollowUpRestore = Schema.Struct({
+  topicId: Schema.String,
+  messageTs: Schema.String,
+  doneAt: Schema.NullOr(Schema.String),
+  matchKeptTs: Schema.NullOr(Schema.String),
+})
+
+/** A topic's draft as stored. */
+export const DraftRestore = Schema.Struct({
+  topicId: Schema.String,
+  text: Schema.String,
+  updatedAt: Schema.String,
+  keptAt: Schema.NullOr(Schema.String),
+})
+
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.restore', restorePayload),
   Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
@@ -234,6 +250,9 @@ export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('views.removeChannel', { id: Schema.String, channel: Schema.String }),
   // An answer about the Automated view, put back as it was.
   Schema.TaggedStruct('views.sortChannel', { channel: Schema.String, to: AutomatedPlace, restore: Schema.optionalKey(AutomatedRestore) }),
+  // A follow-up or a draft from Home's reviews, put back as stored.
+  Schema.TaggedStruct('followUps.restore', FollowUpRestore.fields),
+  Schema.TaggedStruct('drafts.restore', DraftRestore.fields),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 

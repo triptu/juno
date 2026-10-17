@@ -1,0 +1,1 @@
+- 10-17 19:06 · cards-followup-drafts · A follow-up looks done when a later message of yours in the topic has a file, a link, or opens by handing something over ("Here's", "Attached", "Done"); the rules decide, not a model, and the row quotes the message so you judge the match. Not done holds until a newer match (`follow_ups.match_kept_ts`).

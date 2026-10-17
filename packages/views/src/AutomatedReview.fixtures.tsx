@@ -7,14 +7,14 @@ import { homeItems } from './fixtures/home'
 import { OverHome as SheetOverHome } from './fixtures/sheetFrame'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
-import type { SettledStatus } from './settled'
+import type { ReviewStatus } from './reviewModel'
 
 const noop = () => {}
 
 /** The record with its buttons working, so the gallery and the shift guard see a row change state in place. */
-function Live({ item = automatedMovesItem, initial = new Map(), ...rest }: Partial<AutomatedReviewProps> & { readonly item?: HomeItem; readonly initial?: ReadonlyMap<string, SettledStatus> }) {
-  const [statuses, setStatuses] = useState<ReadonlyMap<string, SettledStatus>>(initial)
-  const set = (id: string, status: SettledStatus) => setStatuses(new Map([...statuses, [id, status]]))
+function Live({ item = automatedMovesItem, initial = new Map(), ...rest }: Partial<AutomatedReviewProps> & { readonly item?: HomeItem; readonly initial?: ReadonlyMap<string, ReviewStatus> }) {
+  const [statuses, setStatuses] = useState<ReadonlyMap<string, ReviewStatus>>(initial)
+  const set = (id: string, status: ReviewStatus) => setStatuses(new Map([...statuses, [id, status]]))
   return (
     <AutomatedReview
       title={item.title}
@@ -22,8 +22,8 @@ function Live({ item = automatedMovesItem, initial = new Map(), ...rest }: Parti
       statuses={statuses}
       now={NOW}
       onOpen={noop}
-      onMoveBack={(id) => set(id, 'resolved')}
-      onKeep={(id) => set(id, 'kept')}
+      onAct={(id) => set(id, 'done')}
+      onDecline={(id) => set(id, 'declined')}
       onUndo={(id) => set(id, 'open')}
       onClose={noop}
       {...rest}
@@ -40,9 +40,9 @@ function OverHome({ children }: { readonly children: ReactNode }) {
   return <SheetOverHome home={homeWith(automatedMovesItem)}>{children}</SheetOverHome>
 }
 
-const acted: ReadonlyMap<string, SettledStatus> = new Map([
-  [movedIn[0]!.id, 'resolved'],
-  [movedOut.id, 'kept'],
+const acted: ReadonlyMap<string, ReviewStatus> = new Map([
+  [movedIn[0]!.id, 'done'],
+  [movedOut.id, 'declined'],
 ])
 
 export default defineFixtures(
@@ -55,7 +55,7 @@ export default defineFixtures(
       about: scene(() => <OverHome><Live initialAbout /></OverHome>),
       // One moved back, one kept: each row stays where it was and says what happened, with Undo.
       acted: scene(() => <OverHome><Live initial={acted} /></OverHome>),
-      'focus-row': scene(() => <OverHome><Live initialActive={movedTopics[1]!.id} /></OverHome>, { focus: `[data-settled-row="${movedTopics[1]!.id}"] a` }),
+      'focus-row': scene(() => <OverHome><Live initialActive={movedTopics[1]!.id} /></OverHome>, { focus: `[data-review-row="${movedTopics[1]!.id}"] a` }),
       'minimum-window': scene(() => <OverHome><Live /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Home's card: the whole row opens the record.

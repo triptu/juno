@@ -26,6 +26,7 @@ import uploadedFiles from './202610181000_uploaded_files'
 import aiRefusals from './202610181130_ai_refusals'
 import aiTitleVersion from './202610181500_ai_title_version'
 import automatedMoves from './202610181600_automated_moves'
+import reviewKeeps from './202610181900_review_keeps'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -59,4 +60,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610181130_ai_refusals': aiRefusals,
   '202610181500_ai_title_version': aiTitleVersion,
   '202610181600_automated_moves': automatedMoves,
+  '202610181900_review_keeps': reviewKeeps,
 }

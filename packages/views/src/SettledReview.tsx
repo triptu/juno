@@ -1,83 +1,44 @@
+import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import type { HomeTopic } from '@juno/contract'
-import { Button } from '@juno/ui'
-import { ReviewExplainer, ReviewSheet } from './ReviewSheet'
-import { settledCopy, type SettledStatus } from './settled'
-import { SettledList, type SettledRowProps } from './SettledList'
+import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
+import type { ReviewEntry, ReviewVerbs } from './reviewModel'
+import { settledCopy, settledReason } from './settled'
+import { relativeTime } from './time'
 
-export interface ResolveExplainerProps {
-  readonly onSettings: () => void
+export const settledVerbs: ReviewVerbs = {
+  act: settledCopy.resolve,
+  actIcon: Check,
+  actKey: 'R',
+  decline: settledCopy.keep,
+  declineKey: 'K',
+  done: settledCopy.resolved,
+  declined: settledCopy.kept,
 }
 
-/** What Resolve does, in four lines, and the way to Settings › Tidy up. */
-export function ResolveExplainer({ onSettings }: ResolveExplainerProps) {
-  return (
-    <ReviewExplainer
-      title={settledCopy.about}
-      lines={settledCopy.explain}
-      action={
-        <Button variant="secondary" size="sm" onClick={onSettings} data-settled-settings="">
-          {settledCopy.settings}
-        </Button>
-      }
-    />
-  )
+export const settledAbout: ReviewAbout = { label: settledCopy.about, lines: settledCopy.explain, settings: settledCopy.settings }
+
+/** Tidy up's proposals as review rows: the title, why it looks settled, and where it is and when it last moved. */
+export function settledEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
+  return topics.map((topic) => ({
+    id: topic.id,
+    topicId: topic.id,
+    title: topic.title,
+    ...(topic.art === undefined ? {} : { art: topic.art }),
+    ...(topic.settled === undefined ? {} : { reason: settledReason(topic.settled, topic.at, now) }),
+    meta: [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
+  }))
 }
 
-export interface SettledReviewProps {
+export interface SettledReviewProps extends Omit<ReviewSheetProps, 'name' | 'title' | 'lead' | 'about' | 'verbs' | 'entries' | 'all'> {
   readonly topics: ReadonlyArray<HomeTopic>
-  readonly statuses: ReadonlyMap<string, SettledStatus>
   readonly now: number
-  /** Start with What Resolve does open; the gallery shows it. */
-  readonly initialAbout?: boolean
-  readonly initialActive?: string
-  readonly autoFocus?: boolean
-  readonly onOpen: SettledRowProps['onOpen']
-  readonly onResolve: SettledRowProps['onResolve']
-  readonly onKeep: SettledRowProps['onKeep']
-  readonly onUndo: SettledRowProps['onUndo']
-  /** Resolves every proposal still open. */
-  readonly onResolveAll: () => void
-  readonly onSettings: () => void
-  readonly onClose: () => void
 }
-
-const KEYS = [
-  ['↑↓', 'Move'],
-  ['↵', 'Open'],
-  ['R', 'Resolve'],
-  ['K', 'Keep open'],
-] as const
 
 /**
- * Tidy up's review (SPEC 12): a sheet with every topic that looks settled,
- * why, and Resolve or Keep open for each; Resolve all and Done at the
- * bottom, as a Mac sheet has its buttons. The info button says what
- * Resolve does and leads to Settings › Tidy up. A panel for `SheetLayer`,
- * which closes it on Esc and keeps Tab inside.
+ * Tidy up's review (SPEC 12): every topic that looks settled, why, and
+ * Resolve or Keep open for each; Resolve all and Done at the bottom. The
+ * info button says what Resolve does and leads to Settings › Tidy up.
  */
-export function SettledReview({ topics, statuses, now, initialAbout = false, initialActive, autoFocus = false, onOpen, onResolve, onKeep, onUndo, onResolveAll, onSettings, onClose }: SettledReviewProps) {
-  const left = topics.filter((topic) => (statuses.get(topic.id) ?? 'open') === 'open').length
-  return (
-    <ReviewSheet
-      sheet="settled"
-      title={settledCopy.title(topics.length)}
-      lead={settledCopy.lead}
-      aboutLabel={settledCopy.about}
-      about={<ResolveExplainer onSettings={onSettings} />}
-      initialAbout={initialAbout}
-      keys={KEYS}
-      buttons={
-        <>
-          <Button variant="secondary" size="md" onClick={onClose} data-settled-close="">
-            {settledCopy.done}
-          </Button>
-          <Button variant="primary" size="md" dimmed={left === 0} onClick={left === 0 ? undefined : onResolveAll} data-settled-resolve-all="">
-            {settledCopy.resolveAll}
-          </Button>
-        </>
-      }
-    >
-      <SettledList topics={topics} statuses={statuses} now={now} label={settledCopy.title(topics.length)} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onResolve={onResolve} onKeep={onKeep} onUndo={onUndo} />
-    </ReviewSheet>
-  )
+export function SettledReview({ topics, now, ...rest }: SettledReviewProps) {
+  return <ReviewSheet name="settled" title={settledCopy.title(topics.length)} lead={settledCopy.lead} about={settledAbout} verbs={settledVerbs} entries={settledEntries(topics, now)} all={settledCopy.resolveAll} {...rest} />
 }

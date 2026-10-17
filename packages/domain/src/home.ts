@@ -5,20 +5,23 @@
  */
 
 /** Ranked in this order. */
-export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves'
+export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'doneFollowUps' | 'oldDrafts' | 'automatedMoves'
 
 /**
  * Automated's question comes before Tidy up: it is asked once, and an
- * unanswered one keeps a channel in the wrong place. Automated's record
- * comes last: it reports what Juno already did, and nothing waits on it.
+ * unanswered one keeps a channel in the wrong place. The other review
+ * cards come after it: nothing is lost while they wait. Automated's record
+ * comes last: it reports what Juno already did.
  */
-export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'automatedMoves']
+export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'automatedMoves']
 
 /** Moved a lot: a followed topic with at least this many new messages. */
 export const MOVED_A_LOT_MIN = 8
 /** Tidy up: a settled score at least this high, on at least this many topics. */
 export const SETTLED_MIN_SCORE = 0.8
 export const TIDY_UP_MIN_TOPICS = 2
+/** The cards that open a review sheet, and the fewest topics each needs once the rows above took theirs. */
+export const REVIEW_MIN_TOPICS: Partial<Record<HomeKind, number>> = { tidyUp: TIDY_UP_MIN_TOPICS, doneFollowUps: 1, oldDrafts: 1 }
 /** At most this many rows; on a window shorter than `HOME_SHORT_WINDOW` px, `HOME_SHORT_LIMIT`. */
 export const HOME_LIMIT = 3
 
@@ -46,8 +49,8 @@ export interface HomeCandidate<T> {
 /**
  * Ranks candidates into rows: kinds in `HOME_KINDS` order, at most one of
  * each (the first given wins), a topic only once (the higher kind keeps it;
- * Tidy up drops the topics already shown and needs `TIDY_UP_MIN_TOPICS`
- * left), at most `limit` rows.
+ * a review card drops the topics already shown and needs
+ * `REVIEW_MIN_TOPICS` left), at most `limit` rows.
  */
 export function rankHomeItems<T>(candidates: ReadonlyArray<HomeCandidate<T>>, limit = HOME_LIMIT): ReadonlyArray<HomeCandidate<T>> {
   const shown = new Set<string>()
@@ -56,9 +59,10 @@ export function rankHomeItems<T>(candidates: ReadonlyArray<HomeCandidate<T>>, li
     if (out.length >= limit) break
     for (const candidate of candidates) {
       if (candidate.kind !== kind) continue
-      if (kind === 'tidyUp') {
+      const least = REVIEW_MIN_TOPICS[kind]
+      if (least !== undefined) {
         const topicIds = candidate.topicIds.filter((id) => !shown.has(id))
-        if (topicIds.length < TIDY_UP_MIN_TOPICS) continue
+        if (topicIds.length < least) continue
         topicIds.forEach((id) => shown.add(id))
         out.push({ ...candidate, topicIds })
         break
@@ -113,4 +117,66 @@ export function settledEvidence(messages: ReadonlyArray<{ readonly user_id: stri
   if (closing && last.text.length <= AGREED_MAX && AGREED.test(last.text)) return { kind: 'agreed', ...by }
   if (mine && written.some((message) => message.user_id !== selfId)) return { kind: 'afterYou' }
   return { kind: 'quiet', ...by }
+}
+
+/** A message of the user's after a promise, as `followUpDelivery` reads it. */
+export interface LaterMessage {
+  readonly ts: string
+  readonly user_id: string | null
+  readonly text: string
+  /** How many files it carries. */
+  readonly files: number
+}
+
+/** What a later message of the user's shows: a file, a link, or words that hand the thing over. */
+export interface Delivery {
+  readonly ts: string
+  readonly kind: 'file' | 'link' | 'said'
+}
+
+/** A link in Slack's markup (`<https://…|label>`) or bare. */
+const LINK = /<https?:\/\/[^>\s]+>|\bhttps?:\/\/\S+/i
+/** "Here's the deck", "Attached", "Sent it over", "Done": words that open a message handing something over. */
+const HANDED_OVER = /^\s*(here(?:'s|\u2019s| is| are| you go| it is)|attached|sent|shared|uploaded|posted|done|just sent|pushed)(?![\p{L}\p{N}])/iu
+
+/**
+ * Whether the user kept a promise, from their own later messages in the
+ * same topic (`docs/design/settled-suggestions/README.md`, "More
+ * self-management", card 4): the first message of theirs after it with a
+ * file, a link, or words that open by handing something over ("Here's the
+ * deck", "Attached", "Done"). Denied words ("not done yet") do not count.
+ * `after` skips messages up to a match the user said was not it, so only
+ * a newer one is proposed. The row shows the message itself, so the user
+ * judges the match, not Juno.
+ */
+export function followUpDelivery(promiseTs: string, messages: ReadonlyArray<LaterMessage>, selfId: string, after?: string): Delivery | undefined {
+  const from = after !== undefined && after > promiseTs ? after : promiseTs
+  const mine = messages.filter((message) => message.user_id === selfId && message.ts > from).toSorted((a, b) => (a.ts < b.ts ? -1 : 1))
+  for (const message of mine) {
+    if (message.files > 0) return { ts: message.ts, kind: 'file' }
+    if (DENIED.test(message.text) || isQuestion(message.text)) continue
+    if (LINK.test(message.text)) return { ts: message.ts, kind: 'link' }
+    if (HANDED_OVER.test(message.text)) return { ts: message.ts, kind: 'said' }
+  }
+  return undefined
+}
+
+/** Old drafts: untouched this long. */
+export const OLD_DRAFT_MILLIS = 14 * 24 * 60 * 60 * 1000
+
+/**
+ * A draft worth clearing (card 5): untouched for `OLD_DRAFT_MILLIS`, in a
+ * topic with activity after it, and not kept as it is now (`keptAt` is the
+ * `updatedAt` the user chose Keep at; editing the draft ends the keep).
+ * Times are epoch milliseconds.
+ */
+export function isOldDraft(draft: { readonly updatedAt: number; readonly keptAt?: number }, lastActivity: number | undefined, now: number): boolean {
+  if (now - draft.updatedAt < OLD_DRAFT_MILLIS) return false
+  if (lastActivity === undefined || lastActivity <= draft.updatedAt) return false
+  return draft.keptAt !== draft.updatedAt
+}
+
+/** A draft's first line with words, for its row. */
+export function draftFirstLine(text: string): string {
+  return text.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? ''
 }

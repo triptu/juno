@@ -1,8 +1,5 @@
 import type { SettledWhy } from '@juno/contract'
 
-/** What the user did with a proposal while the review is open. */
-export type SettledStatus = 'open' | 'resolved' | 'kept'
-
 /** The words Tidy up uses, shared by the review and Settings › Tidy up (SPEC 12 and 14). */
 export const settledCopy = {
   title: (count: number) => (count === 1 ? '1 topic looks settled' : `${count} topics look settled`),

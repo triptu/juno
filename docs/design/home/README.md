@@ -82,7 +82,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 ## Items: how they are chosen and capped
 
 - Candidates come from the local cache only: followed topics, read state, the last-opened log and mentions. No network call, no AI call, before first paint.
-- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then tidy up. At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
+- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then Automated, then tidy up, then follow-ups that look done and old drafts (SPEC §12). At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
 - Cap at three. If the window is shorter than 600px, cap at two.
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.

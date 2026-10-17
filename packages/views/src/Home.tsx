@@ -1,13 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
-import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { metaOf, rowButtons } from './homeRows'
+import { metaOf, opensReview, rowButtons, TILE_ICONS } from './homeRows'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -26,7 +24,7 @@ export interface HomeProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
-  /** Tidy up's row and Automated's record: opens the review of every topic or move (`SettledReview`, `AutomatedReview`). */
+  /** A review card's row (Tidy up, Automated's record, follow-ups that look done, old drafts): opens its review sheet. */
   readonly onReview: (itemId: string) => void
   /** Automated's Move (`automated`) and Keep in All (`kept`). */
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
@@ -107,19 +105,19 @@ type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<H
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
- * One row: a link to the topic (Tidy up's and Automated's record open their review), and its buttons in
+ * One row: a link to the topic (a review card's opens its review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, Automated's Keep
  * in All and Move, or Dismiss on Automated's record. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
 function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss }: HomeRowProps) {
   const topic = item.topics[0]
-  const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' || item.kind === 'automatedMoves' ? Robot : undefined
+  const tileIcon = TILE_ICONS[item.kind]
   const body = (
     <>
       {tileIcon !== undefined || topic === undefined ? (
         <span {...stylex.props(styles.iconTile)}>
-          <Icon icon={tileIcon ?? Broom} size={18} />
+          <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
         </span>
       ) : (
         <TopicArt topicId={topic.id} recipe={topic.art} size={40} />
@@ -146,7 +144,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       : undefined
   return (
     <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
-      {item.kind === 'tidyUp' || item.kind === 'automatedMoves' ? (
+      {opensReview(item.kind) ? (
         <button type="button" aria-haspopup="dialog" onClick={() => onReview(item.id)} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
           {body}
           <span {...stylex.props(styles.caret)}>
