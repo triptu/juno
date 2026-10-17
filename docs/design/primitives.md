@@ -55,7 +55,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
 | `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
-| `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics in the unified Home proposal) |
+| `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics) |
 
 ## 4. Avatar and AvatarStack
 

@@ -1,0 +1,1 @@
+- 10-17 05:54 · home-newchat · The destination chip sits above Home's field on its left edge, between Recent and the field, so the field's text keeps its full width; a new destination rises into the chip's fixed slot.

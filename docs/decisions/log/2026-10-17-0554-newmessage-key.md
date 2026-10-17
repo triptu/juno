@@ -1,0 +1,1 @@
+- 10-17 05:54 · home-newchat · ⌘N writes a new message from Home with the destination list open, using a Home tab without a draft; ⌘T, + and the last tab closed open Home.

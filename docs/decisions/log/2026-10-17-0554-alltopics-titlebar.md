@@ -1,0 +1,1 @@
+- 10-17 05:54 · home-newchat · All topics is a list icon button in the sidebar's title bar, in New chat's place; the nav holds Home and Juno. While All topics is the current tab the button takes the nav's active look (IconButton current).
