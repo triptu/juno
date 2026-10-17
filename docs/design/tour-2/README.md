@@ -1,5 +1,7 @@
 # The second tour: three directions
 
+The owner picked C on 2026-10-17. It is built as the welcome card (SPEC 4, "The welcome"; inventory 1.2). The built card fits the minimum window: there, Home hides its scene and greeting and shows one row while the card shows.
+
 The first tour spent two of its five steps on how topics work, and its numbered rings made each picture a diagram to decode. These directions lead with what you get: Home, peek, tabs, the app tidying itself, and Juno, which sends nothing until you click. Topics get one line, as a benefit.
 
 The shots come from the gallery (`TourDirections` in `packages/views/src/tour/TourDirections.fixtures.tsx`) and use the real views with fixture data. Each is in light and dark. They show the sidebar as it was on 2026-10-17. Home's move to a title bar icon (`home-icon`) and the settled card's reasons (`settled-suggestions`) will show in the built tour's pictures, because `pnpm tour:shots` shoots the real views.
