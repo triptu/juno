@@ -225,8 +225,10 @@ async function armHomeSample(nav: Locator): Promise<void> {
 // Home from the sidebar's Home item, with a topic open in the tab: the
 // pointerdown to the first presented frame that shows Home's greeting and
 // rows, read from the local cache (performance.md section 1, "Home open").
-// Every fourth sample comes back after the home.view subscription's idle
-// time, so both a warm and a cold query are in the numbers.
+// Every fourth sample comes back after 31 s idle, past the home.view
+// atom's idle time, when the CPU has slowed down. The pointer entering the
+// Home item warms home.view (performance.md 4.2), and that prefetch is still
+// held here, so these opens render cached data on a slow CPU.
 test('home open: from a topic to Home painted', async ({ juno, win }) => {
   test.setTimeout(360_000)
   await juno.signIn()
