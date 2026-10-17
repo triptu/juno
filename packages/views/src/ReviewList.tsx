@@ -14,8 +14,6 @@ export interface ReviewRowProps {
   readonly verbs: ReviewVerbs
   /** The row is the list's current one: its link is the Tab stop, and the keys act on it. */
   readonly active: boolean
-  /** A row in a narrow card: no art, smaller gaps. */
-  readonly compact?: boolean
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onAct: (id: string) => void
   readonly onDecline: (id: string) => void
@@ -29,12 +27,12 @@ export interface ReviewRowProps {
  * is and says what happened, with Undo in the same slot, so nothing under
  * the pointer moves.
  */
-export function ReviewRow({ entry, status, verbs, active, compact = false, onOpen, onAct, onDecline, onUndo, onFocusRow }: ReviewRowProps) {
+export function ReviewRow({ entry, status, verbs, active, onOpen, onAct, onDecline, onUndo, onFocusRow }: ReviewRowProps) {
   const handlers = activateHandlers<HTMLAnchorElement>((event) => onOpen(entry.topicId, event))
   const handled = status !== 'open'
   const words = entry.words ?? verbs
   return (
-    <li data-review-row={entry.id} data-review-status={status} {...stylex.props(styles.row, compact && styles.rowCompact)}>
+    <li data-review-row={entry.id} data-review-status={status} {...stylex.props(styles.row)}>
       <a
         href={`#topic/${encodeURIComponent(entry.topicId)}`}
         tabIndex={active ? 0 : -1}
@@ -45,13 +43,11 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
           handlers.onClick(event)
         }}
         onFocus={() => onFocusRow(entry.id)}
-        {...stylex.props(styles.link, compact && styles.linkCompact)}
+        {...stylex.props(styles.link)}
       >
-        {compact ? null : (
-          <span {...stylex.props(styles.art, handled && styles.dim)}>
-            <PlaceTile tile={entry} />
-          </span>
-        )}
+        <span {...stylex.props(styles.art, handled && styles.dim)}>
+          <PlaceTile tile={entry} />
+        </span>
         <span {...stylex.props(styles.lines)}>
           <Text variant="ui" weight="medium" tone={handled ? 'subtle' : 'default'} truncate tooltipWhenTruncated data-review-title="">
             {entry.title}
@@ -112,7 +108,6 @@ export interface ReviewListProps {
   readonly statuses: ReadonlyMap<string, ReviewStatus>
   readonly verbs: ReviewVerbs
   readonly label: string
-  readonly compact?: boolean
   /** The row whose link takes focus first. The gallery passes one to show a focused row. */
   readonly initialActive?: string
   /** Focus the first row when the list appears, as a sheet does with its first control. */
@@ -128,7 +123,7 @@ export interface ReviewListProps {
  * Enter opens (⌘Enter in a new tab), and the verbs' two keys act. ⌘Z is
  * Edit › Undo, which undoes the last action; the container follows it.
  */
-export function ReviewList({ entries, statuses, verbs, label, compact = false, initialActive, autoFocus = false, onOpen, onAct, onDecline, onUndo }: ReviewListProps) {
+export function ReviewList({ entries, statuses, verbs, label, initialActive, autoFocus = false, onOpen, onAct, onDecline, onUndo }: ReviewListProps) {
   const [active, setActive] = useState(initialActive ?? entries[0]?.id)
   const list = useRef<HTMLUListElement>(null)
   const focusRow = (id: string) => list.current?.querySelector<HTMLElement>(`[data-review-row="${CSS.escape(id)}"] a`)?.focus()
@@ -173,7 +168,6 @@ export function ReviewList({ entries, statuses, verbs, label, compact = false, i
           status={statuses.get(entry.id) ?? 'open'}
           verbs={verbs}
           active={entry.id === active}
-          compact={compact}
           onOpen={onOpen}
           onAct={onAct}
           onDecline={onDecline}
@@ -208,9 +202,6 @@ const styles = stylex.create({
       ':has(a:focus-visible)': colors['--surface-hover'],
     },
   },
-  rowCompact: {
-    paddingInlineEnd: spacing['--space-1-5'],
-  },
   link: {
     display: 'flex',
     alignItems: 'center',
@@ -227,9 +218,6 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
-  },
-  linkCompact: {
-    paddingBlock: spacing['--space-1-5'],
   },
   art: {
     display: 'inline-flex',

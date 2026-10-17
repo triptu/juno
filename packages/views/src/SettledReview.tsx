@@ -6,7 +6,7 @@ import { metaLine, type ReviewEntry, type ReviewVerbs } from './reviewModel'
 import { settledCopy, settledReason } from './settled'
 import { relativeTime } from './time'
 
-export const settledVerbs: ReviewVerbs = {
+const settledVerbs: ReviewVerbs = {
   act: settledCopy.resolve,
   actIcon: Check,
   actKey: 'R',
@@ -16,10 +16,10 @@ export const settledVerbs: ReviewVerbs = {
   declined: settledCopy.kept,
 }
 
-export const settledAbout: ReviewAbout = { label: settledCopy.about, lines: settledCopy.explain, settings: settledCopy.settings }
+const settledAbout: ReviewAbout = { label: settledCopy.about, lines: settledCopy.explain, settings: settledCopy.settings }
 
 /** Tidy up's proposals as review rows: the title, why it looks settled, and where it is and when it last moved. */
-export function settledEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
+function settledEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
   return topics.map((topic) => ({
     id: topic.id,
     title: topic.title,

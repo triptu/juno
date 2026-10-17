@@ -29,17 +29,15 @@ export interface ReviewAbout {
   readonly settings?: string
 }
 
-export interface ReviewExplainerProps {
+interface ReviewExplainerProps {
   readonly about: ReviewAbout
   readonly onSettings?: (() => void) | undefined
-  /** Over the list, under the sheet's head: the sheet keeps its size, so nothing moves when it opens. */
-  readonly floating?: boolean
 }
 
-/** What the action does, and the way to its settings. */
-export function ReviewExplainer({ about, onSettings, floating = false }: ReviewExplainerProps) {
+/** What the action does, and the way to its settings, over the list under the sheet's head: the sheet keeps its size, so nothing moves when it opens. */
+function ReviewExplainer({ about, onSettings }: ReviewExplainerProps) {
   return (
-    <Surface kind={floating ? 'popover' : 'inset'} padding="md" sx={[styles.explainer, floating && styles.floating]} data-review-explainer="">
+    <Surface kind="popover" padding="md" sx={styles.explainer} data-review-explainer="">
       <Text variant="ui" weight="medium">
         {about.label}
       </Text>
@@ -116,7 +114,7 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
         {/* The info opens over the list, not above it, so the sheet keeps its size and nothing moves. */}
         {showAbout ? (
           <div id={aboutId} {...stylex.props(styles.aboutLayer)}>
-            <ReviewExplainer about={about} onSettings={onSettings} floating />
+            <ReviewExplainer about={about} onSettings={onSettings} />
           </div>
         ) : null}
         <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
@@ -182,10 +180,6 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-2'],
-    marginTop: spacing['--space-2'],
-  },
-  floating: {
-    marginTop: 0,
   },
   // Over the top of the list, inset as the head's text is; a tall one scrolls with the list.
   aboutLayer: {
