@@ -32,11 +32,13 @@ export interface ExecutorCall {
 
 /**
  * What a destination gave back, for a connection call: `model` is what the model reads with the
- * card's outcome, `line` the card's one result line (a result, or the server's error).
+ * card's outcome, `line` the card's one result line (a result, or the server's error), and
+ * `shown` the result as a person reads it, behind "Show result".
  */
 export interface ExecutorOutput {
   readonly model?: string
   readonly line?: string
+  readonly shown?: string
 }
 
 export type ExecutorResult =

@@ -161,7 +161,7 @@ export function createDispatcher(options: DispatcherOptions) {
       result = { _tag: 'unknown', detail: 'The action failed in Juno.' }
     }
     if (result.output !== undefined) {
-      store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line) VALUES (?, ?, ?)').run(attemptId, result.output.model ?? null, result.output.line ?? null)
+      store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line, shown) VALUES (?, ?, ?, ?)').run(attemptId, result.output.model ?? null, result.output.line ?? null, result.output.shown ?? null)
     }
     switch (result._tag) {
       case 'done':

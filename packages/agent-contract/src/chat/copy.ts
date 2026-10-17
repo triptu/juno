@@ -199,8 +199,15 @@ export const chatCopy = {
     change: {
       apply: 'Apply',
       applied: 'Applied',
-      /** A connection call that only looks something up, once it ran. */
+      /** A connection call that only looks something up, or that no review judged a change, once it ran. */
       done: 'Done',
+      /** A connection call's result: its one line, and the disclosure for the rest. */
+      result: {
+        found: (count: number) => (count === 0 ? 'Found nothing' : count === 1 ? 'Found 1 result' : `Found ${count} results`),
+        saved: 'Saved',
+        show: 'Show result',
+        hide: 'Hide result',
+      },
       showAll: 'Show all',
       /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
       review: {

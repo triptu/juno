@@ -134,4 +134,6 @@ export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actio
     attempt_id TEXT PRIMARY KEY REFERENCES attempts (id),
     model TEXT,
     line TEXT
-  ) STRICT`]] }
+  ) STRICT`],
+  // The result as a person reads it, trimmed, for the card's "Show result".
+  ['ALTER TABLE action_outputs ADD COLUMN shown TEXT']] }
