@@ -277,6 +277,13 @@ export const longCode = window([
   ...Array.from({ length: 12 }, (_, index) => ({ ago: 48 - index, from: index % 2 === 0 ? people.leo : people.maya, text: `Follow-up ${index + 1} on the migration log.` })),
 ])
 
+/** A long report last, taller than its frame, as a feedback channel's newest message often is. */
+export const tallLast = window([
+  { ago: 40, from: people.maya, text: 'Posting the weekly report below.' },
+  { ago: 39, from: people.leo, text: 'Thanks.' },
+  { ago: 30, from: people.jonas, blocks: Array.from({ length: 40 }, (_, index) => p(`Point ${index + 1} of the report: what changed this week and what we try next.`)) },
+])
+
 /** Fifty reaction kinds on one message, and a few on another. */
 export const manyReactions = window([
   { ago: 30, from: people.maya, text: 'Reply ideas shipped. Thank you all.', reactions: Array.from({ length: 50 }, (_, index) => reaction(`emoji-${index}`, String.fromCodePoint(0x1f600 + index), 1 + (index % 7), index % 9 === 0)) },

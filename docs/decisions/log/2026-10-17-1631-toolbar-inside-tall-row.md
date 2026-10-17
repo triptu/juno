@@ -1,0 +1,1 @@
+- 10-17 16:31 · small-ui-1017 · A message toolbar with room neither above its row (under the header band) nor below it (past the list's bottom, on the composer) goes inside the row at the top of the part in view, so a tall last message's toolbar is never clipped. `placeToolbar` decides it with the same one measurement; the list's bottom padding stays as it is.
