@@ -10,7 +10,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { largeSeed, startFakeSlack } from '@juno/fake-slack'
+import { largeSeed, SELF_ID, startFakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
 
 /**
@@ -23,11 +23,11 @@ const QUICK_START_CEILING_MS = 30_000
 const PREVIEW_BUDGET_MS = 10_000
 const LATENCY_MS = 300
 
-/** A first sign-in against a seed of this size, with live latency and pacing. */
-const signInOn = (seed: Parameters<typeof largeSeed>[0]) => test.extend({
+/** A first sign-in against a seed of this size, with live latency and pacing unless `options` say otherwise. */
+const signInOn = (seed: Parameters<typeof largeSeed>[0], options: { readonly latency?: number; readonly paced?: boolean } = {}) => test.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: largeSeed(seed), latencyMillis: LATENCY_MS })
+    const fake = await startFakeSlack({ seed: largeSeed(seed), latencyMillis: options.latency ?? LATENCY_MS })
     await use(fake)
     await fake.close()
   },
@@ -37,14 +37,17 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0]) => test.extend({
     await rm(dir, { recursive: true, force: true })
   },
   running: async ({ fake, slackApp, userData }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, paced: true })
+    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, paced: options.paced ?? true })
     await use(running)
     await running.close()
   },
 })
 
 /** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */
-const medium = signInOn({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } })
+const MEDIUM = { topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }
+const medium = signInOn(MEDIUM)
+/** The same seed with no pacing and short calls: the history order matters here, not the time it takes. */
+const mediumQuick = signInOn(MEDIUM, { latency: 50, paced: false })
 
 medium('first sign-in shows threads and DMs before history is read, channels once sorted, then fills in without a reload', async ({ juno }) => {
   test.setTimeout(180_000)
@@ -99,4 +102,41 @@ medium('the busiest channels show a preview seconds after sign-in, before their 
   expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.kind === 'api')).toHaveLength(0)
   expect(fake.heldCount({ method: 'conversations.history' })).toBe(1)
   fake.release({ method: 'conversations.history' })
+})
+
+mediumQuick('Home is ready once DMs, mentions and unread threads have history, before the last history page', async ({ juno, fake, win }) => {
+  test.setTimeout(120_000)
+  // What Home is made of (SPEC 12, owner 10-18): DMs and group DMs, conversations with an unread mention, and those
+  // with unread replies in a followed thread. History reads them first, one conversation at a time.
+  const ws = fake.workspace
+  const threads = ws.threadCounts()
+  const forHome = new Set([...ws.conversations.values()].filter((c) => {
+    if (!c.members.has(SELF_ID)) return false
+    const entry = ws.countEntry(c)
+    return c.kind === 'im' || c.kind === 'mpim' || (entry.has_unreads && entry.mention_count > 0)
+      || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0 || (threads.unread_count_by_channel?.[c.id] ?? 0) > 0
+  }).map((c) => c.id))
+  // The history of anything else waits, so the sync stops at the first conversation Home does not need.
+  fake.gate((method, args) => method === 'conversations.history' && args['_x_reason'] === 'history' && !forHome.has(args['channel'] ?? ''))
+  await juno.signIn()
+  await juno.home.navItem.click()
+
+  // Home is ready: the greeting with no syncing line and the rows that wait, while the sidebar still syncs.
+  await expect(juno.home.greeting).toBeVisible({ timeout: 60_000 })
+  await expect(juno.home.root.locator('h2 + p')).toHaveCount(0)
+  await expect(juno.home.root.getByText('All caught up.')).toHaveCount(0)
+  await expect(juno.home.root.locator('[data-home-item]').first()).toBeVisible()
+  await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack')
+  expect(fake.gated().filter((call) => call.method === 'conversations.history')).toHaveLength(1)
+  const read = new Set(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
+  expect([...forHome].filter((id) => !read.has(id))).toEqual([])
+  const early = await juno.home.kinds()
+  const firstRow = win.locator('[data-home] [data-home-item]').first()
+  const top = (await firstRow.boundingBox())!.y
+
+  // The rest of history lands: the rows shown stay first and in place; what lands later goes below them.
+  fake.gate()
+  await juno.waitForSync()
+  expect((await juno.home.kinds()).slice(0, early.length)).toEqual(early)
+  expect((await firstRow.boundingBox())!.y).toBe(top)
 })
