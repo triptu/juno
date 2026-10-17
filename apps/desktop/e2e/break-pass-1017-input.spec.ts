@@ -82,8 +82,9 @@ test('Enter right after typing in the destination search picks the match', async
   await juno.win.keyboard.type('Typed fast')
   await juno.win.keyboard.press('Enter')
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typed fast').length).toBe(1)
-  // ⌘N used the launch tab's Home: one tab, empty again.
-  await juno.tabs.expectCount(1)
+  // ⌘N used the launch tab's Home: it stays active and empty, with the new thread in a tab behind it.
+  await expect.poll(() => juno.tabs.titles()).toEqual(['Home', expect.stringMatching(/^Typed fast/)])
+  await juno.tabs.expectActive('Home')
   await expect(juno.write.composer).toHaveValue('')
 })
 
