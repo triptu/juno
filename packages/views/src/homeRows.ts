@@ -14,13 +14,15 @@ export function metaOf(item: HomeItem, now: number): string {
   return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
 
-/** A row's buttons: Mark done, Resolve all, or Automated's Keep in All and Move. */
-export function rowButtons(item: HomeItem, onMarkDone: (itemId: string) => void, onResolveAll: (itemId: string) => void, onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void) {
+/** A row's buttons: Mark done, Resolve all, Automated's Keep in All and Move, or Dismiss on Automated's record. */
+export function rowButtons(item: HomeItem, onMarkDone: (itemId: string) => void, onResolveAll: (itemId: string) => void, onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void, onDismiss?: (itemId: string) => void) {
   return (
     item.kind === 'followUp'
       ? [{ label: 'Mark done', run: () => onMarkDone(item.id) }]
       : item.kind === 'tidyUp'
         ? [{ label: 'Resolve all', run: () => onResolveAll(item.id) }]
+        : item.kind === 'automatedMoves'
+          ? onDismiss === undefined ? [] : [{ label: 'Dismiss', run: () => onDismiss(item.id) }]
         : item.kind === 'automated'
           ? [
               { label: 'Keep in All', run: () => onSort(item.id, 'kept') },

@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
@@ -48,7 +48,20 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
   }
   const review = (itemId: string) => {
     const item = itemOf(itemId)
-    if (item !== undefined) setReviewing(item)
+    if (item === undefined) return
+    setReviewing(item)
+    // Opening Automated's record is seeing its moves: they are not listed again, and Dismiss has nothing left to do.
+    if (item.kind === 'automatedMoves') {
+      markHomeItemUsed(registry, key, itemId)
+      markMovesSeen(registry, item)
+    }
+  }
+  // Dismiss on Automated's record: its moves are seen without opening it.
+  const dismiss = (itemId: string) => {
+    const item = itemOf(itemId)
+    if (item === undefined) return
+    markHomeItemUsed(registry, key, itemId)
+    markMovesSeen(registry, item)
   }
 
   // Automated's question: Move or Keep in All, remembered, with Undo; right-click has the conversation's menu, with Ignore.
@@ -64,19 +77,23 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
     const main = item.topics[0]?.id
     void showChannelMenu({ ...item.channel, ...(main === undefined ? {} : { mainId: main }) })
   }
-  return { markDone, resolveAll, review, sort, itemMenu }
+  return { markDone, resolveAll, review, dismiss, sort, itemMenu }
 }
 
 const closeCard = () => closeWelcome(registry)
 
-/** Tells the engine once per appearance that Home showed Automated's record, so its moves are shown only this once. */
-function useMovesSeen(items: ReadonlyArray<HomeItem> | undefined, appearedAt: number | undefined): void {
+/**
+ * Tells the engine once per appearance that Home showed Automated's record,
+ * so the card waits a day before it shows again. Its moves stay until the
+ * record is opened or the card dismissed.
+ */
+function useMovesShown(items: ReadonlyArray<HomeItem> | undefined, appearedAt: number | undefined): void {
   const told = useRef<number | undefined>(undefined)
   const record = items?.find((item) => item.kind === 'automatedMoves')
   useEffect(() => {
     if (record === undefined || appearedAt === undefined || told.current === appearedAt) return
     told.current = appearedAt
-    markMovesSeen(registry, record)
+    markMovesShown(registry)
   }, [record, appearedAt])
 }
 
@@ -120,7 +137,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
   const welcome = useWelcome(shown?.now)
-  useMovesSeen(shown?.view.items, shown?.now)
+  useMovesShown(shown?.view.items, shown?.now)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
   useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
@@ -129,7 +146,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
-  const { markDone, resolveAll, review, sort, itemMenu } = itemActions(key, view.items, setReviewing)
+  const { markDone, resolveAll, review, dismiss, sort, itemMenu } = itemActions(key, view.items, setReviewing)
 
   return (
     <>
@@ -150,6 +167,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onReview={review}
       onSort={sort}
       onItemMenu={itemMenu}
+      onDismiss={dismiss}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />

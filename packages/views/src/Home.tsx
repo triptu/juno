@@ -32,6 +32,8 @@ export interface HomeProps {
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
   /** Right-click on Automated's row: the conversation's menu, with Ignore. */
   readonly onItemMenu: (itemId: string) => void
+  /** Dismiss on Automated's record: its moves are not listed again. Without it the card has no button. */
+  readonly onDismiss?: (itemId: string) => void
   /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
@@ -51,7 +53,7 @@ export interface HomeProps {
  * when a title line is rewritten: a title is one ellipsised line in a 52px
  * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -86,6 +88,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
                   onReview={onReview}
                   onSort={onSort}
                   onItemMenu={onItemMenu}
+                  onDismiss={onDismiss}
                 />
               ))}
             </ul>
@@ -98,27 +101,18 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
   )
 }
 
-interface HomeRowProps {
-  readonly item: HomeItem
-  readonly done: boolean
-  readonly now: number
-  readonly onOpen: (topicId: string, event: ActivateEvent) => void
-  readonly onMarkDone: (itemId: string) => void
-  readonly onResolveAll: (itemId: string) => void
-  readonly onReview: (itemId: string) => void
-  readonly onSort: HomeProps['onSort']
-  readonly onItemMenu: HomeProps['onItemMenu']
-}
+/** A row's own props, and the callbacks Home passes down. */
+type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss'>
 
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
  * One row: a link to the topic (Tidy up's and Automated's record open their review), and its buttons in
- * a slot that is always there: Mark done, Resolve all, or Automated's Keep
- * in All and Move. Automated's row opens the conversation's menu on
+ * a slot that is always there: Mark done, Resolve all, Automated's Keep
+ * in All and Move, or Dismiss on Automated's record. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu }: HomeRowProps) {
+function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss }: HomeRowProps) {
   const topic = item.topics[0]
   const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' || item.kind === 'automatedMoves' ? Robot : undefined
   const body = (
@@ -141,7 +135,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       </span>
     </>
   )
-  const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort)
+  const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort, onDismiss)
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
   const menu =
     item.kind === 'automated'

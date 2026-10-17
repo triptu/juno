@@ -5,6 +5,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
 - 10-17 20:10 · orchestrator · Juno never writes default notification hours into Slack's schedule: it writes only after the hours are set on that install or the switch is turned on (the hours are shown above it). The live check had applied the defaults on a Mac without the owner's hours; his previous schedule was restored exactly.
+- 10-17 19:44 · automated-record-until-seen · A move on Automated's record card stays until the user opens the sheet or presses the card's Dismiss, not just until Home has shown it; the card still appears at most once a day (owner, 10-17).
 - 10-17 19:39 · release-keeper · Merging automated-explain after privacy-titles: its automated_moves migration is renumbered 202610181600, after ai_title_version (1500), because the Migrator only runs ids above the newest one an install has.
 - 10-17 19:30 · owner · A popover lines up with the control that opened it: the topic switcher starts at the title button's left edge, not the pill's, and moves in only at the window's edge. In a picker list only the keyboard or pointer row is filled; the current item is marked with accent text and a check.
 - 10-17 19:25 · ci-fix-28 · Home's field does not take focus when it mounts while a menu or dialog outside Home is open, so the account menu opened during launch stays open.

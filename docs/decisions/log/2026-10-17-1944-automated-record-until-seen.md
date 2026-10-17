@@ -1,0 +1,1 @@
+- 10-17 19:44 · automated-record-until-seen · A move on Automated's record card stays until the user opens the sheet or presses the card's Dismiss, not just until Home has shown it; the card still appears at most once a day (owner, 10-17).
