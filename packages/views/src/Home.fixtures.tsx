@@ -118,6 +118,10 @@ export default defineFixtures(
           <Home {...base} items={[rewritten.waiting, homeItems.resume, rewritten.moved]} />
         </PrivacyOn>
       )),
+      // Juno's proactive ask, ranked after the follow-up, with Not now and Start.
+      'learn-ask': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.ask, homeItems.tidyUp], onAsk: noop }),
+      'learn-ask-connection': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.askConnection], onAsk: noop }, { hover: '[data-home-item="ask"] button' }),
+      'learn-ask-narrow': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.ask, homeItems.resume], onAsk: noop }, narrow),
       'follow-up-and-tidy-up': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }),
       'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
       // The Automated question, after the ones it ranks below.

@@ -21,8 +21,12 @@ import type {
   ReviewRule,
   ConnectionsPage,
   JunoSettingsPage,
+  MemoryDoc,
+  MemoryDocsPage,
+  MemoryEntryId,
   MemoryPage,
   PinId,
+  ProactiveAsk,
   RemembersPage,
   ReviewPage,
   ScheduledPage,
@@ -30,7 +34,10 @@ import type {
   JobId,
   T3Address,
 } from '@juno/agent-contract'
+import { chatCopy } from '@juno/agent-contract'
+import type { HomeItem } from '@juno/contract'
 import type { Registry } from '../client'
+import { aiAssistOnAtom } from '../notifications'
 import { afterPaint } from '../perf'
 import type { JunoView } from '../tabs'
 import { call, live, rememberCards } from './chat'
@@ -53,6 +60,28 @@ export async function junoSettingsNow(registry: Registry): Promise<JunoSettingsP
   return Exit.isSuccess(exit) && exit.value._tag === 'Some' ? exit.value.value : undefined
 }
 export const remembersPageAtom = page<{ readonly page: RemembersPage; readonly revisions: ReadonlyArray<{ readonly id: PinId; readonly revision: Revision }> }>('agent.remembers.page')
+/** Juno's memory of the owner: the docs, the recent changes, and each entry's revision for an edit. */
+export const docsPageAtom = page<{ readonly page: MemoryDocsPage; readonly revisions: ReadonlyArray<{ readonly id: MemoryEntryId; readonly revision: Revision }> }>('agent.docs.page')
+/** Juno's proactive asks, for Home's card. */
+export const asksAtom = page<{ readonly asks: ReadonlyArray<ProactiveAsk> }>('agent.asks.list')
+
+/**
+ * The open asks as Home items, oldest first, while AI assist is on (SPEC
+ * 13.6): "Let Juno learn how you work", with Not now and Start.
+ */
+export const homeAsksAtom = Atom.make((get): ReadonlyArray<HomeItem> => {
+  const result = get(asksAtom)
+  if (result._tag !== 'Success' || !get(aiAssistOnAtom)) return []
+  const learn = chatCopy.ask.learn
+  return result.value.asks.filter((ask) => ask.status._tag === 'open').map((ask): HomeItem => ({
+    id: `ask:${ask.id}`,
+    kind: 'ask',
+    title: ask.reason === 'connection' ? learn.title.connection(ask.connection ?? '') : learn.title.setup,
+    topics: [],
+    at: ask.at,
+    ask: { id: ask.id, ...(ask.connection === undefined ? {} : { connection: ask.connection }), sources: ask.sources },
+  }))
+})
 export const scheduledPageAtom = page<{ readonly page: ScheduledPage; readonly revisions: ReadonlyArray<{ readonly id: ScheduleId; readonly revision: Revision }> }>('agent.scheduled.page')
 export const connectionsPageAtom = page<ConnectionsPage>('agent.connections.page')
 type ReviewSnapshot = { readonly page: ReviewPage; readonly cards: ReadonlyArray<typeof CardBinding.Type> }
@@ -167,6 +196,12 @@ export function junoPageActions(registry: Registry) {
     settings: (change: JunoSettingsChange) => outcome(call(registry, 'agent.settings.change', { opId: op(), change })),
     editPin: (id: PinId, revision: Revision, text: string) => outcome(call(registry, 'agent.remembers.edit', { opId: op(), id, revision, text })),
     removePin: (id: PinId, revision: Revision) => outcome(call(registry, 'agent.remembers.remove', { opId: op(), id, revision })),
+    /** The owner's own note, edit or delete on the memory page. A refusal answers with its line. */
+    addDoc: (doc: MemoryDoc, text: string) => answer(call(registry, 'agent.docs.add', { opId: op(), doc, text })),
+    editDoc: (id: MemoryEntryId, revision: Revision, text: string) => answer(call(registry, 'agent.docs.edit', { opId: op(), id, revision, text })),
+    deleteDoc: (id: MemoryEntryId, revision: Revision) => answer(call(registry, 'agent.docs.delete', { opId: op(), id, revision })),
+    /** Start or Not now on a proactive ask, from Home. */
+    answerAsk: (id: string, choice: 'start' | 'dismiss') => outcome(call(registry, 'agent.asks.answer', { opId: op(), id, answer: choice })),
     schedule: (id: ScheduleId, revision: Revision, action: 'pause' | 'resume' | 'delete') => outcome(call(registry, 'agent.scheduled.action', { opId: op(), id, revision, action })),
     /** One tool's Enabled switch or auto-review rule. */
     tool: (id: ConnectionId, tool: string, change: { readonly enabled?: boolean; readonly review?: ReviewRule }) => outcome(call(registry, 'agent.connections.tool', { opId: op(), id, tool, ...change })),

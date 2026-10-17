@@ -163,6 +163,8 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
       },
       onQuote: (target) => scrollToRow(scrollRef, pinnedRef, target),
       onUndoNote: messages.undo,
+      onUndoMemory: messages.undoMemory,
+      onAsk: (id, choice) => void messages.ask(id, choice),
       onGroupLabel: () => {},
       onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
         event.preventDefault()

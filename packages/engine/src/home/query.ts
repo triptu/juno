@@ -44,6 +44,7 @@ import {
   settledEvidence,
   tsToMillis,
   type HomeCandidate,
+  type HomeKind,
   type Ts,
 } from '@juno/domain'
 import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
@@ -119,7 +120,8 @@ function waitingQuestion(messages: ReadonlyArray<MessageRow>, selfId: string, di
 }
 
 interface Candidate {
-  readonly item: Omit<HomeItem, 'topics' | 'aiTitle'>
+  /** The engine's own kinds: a proactive ask comes from the agent. */
+  readonly item: Omit<HomeItem, 'topics' | 'aiTitle' | 'kind' | 'ask'> & { readonly kind: HomeKind }
   readonly rows: ReadonlyArray<HomeRow>
   /** Tidy up: why each topic looks settled, by topic id, `by` still a user id. */
   readonly settled?: ReadonlyMap<string, SettledWhy>

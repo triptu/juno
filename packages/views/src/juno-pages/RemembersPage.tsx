@@ -23,12 +23,25 @@ const kb = (bytes: number): string => `${(bytes / 1024).toFixed(1)} KB`
  * replaces the pin with the owner's words. The page says when the active
  * budget is full, and when a pin changed under an open edit.
  */
-export function RemembersPage({ page, now, editing, onEditStart, onDraftChange, onSave, onCancel, onRemove }: RemembersPageProps) {
-  const full = page.usedBytes >= page.budgetBytes
-  const copy = chatCopy.pages.remembers
+export function RemembersPage(props: RemembersPageProps) {
+  const { page } = props
   return (
     <Page>
       <PageHeader title="What Juno remembers" subtitle={`Lines you asked Juno to keep, in your words. ${kb(page.usedBytes)} of ${kb(page.budgetBytes)} used.`} />
+      <PinList {...props} />
+    </Page>
+  )
+}
+
+/**
+ * The pins alone, for the memory page's Pinned section: the full line when
+ * the budget is used, then the pins, or how to pin one.
+ */
+export function PinList({ page, now, editing, onEditStart, onDraftChange, onSave, onCancel, onRemove }: RemembersPageProps) {
+  const full = page.usedBytes >= page.budgetBytes
+  const copy = chatCopy.pages.remembers
+  return (
+    <>
       {full ? (
         <Text variant="preview" tone="muted" as="p" data-remembers-full="">
           {copy.full}
@@ -43,7 +56,7 @@ export function RemembersPage({ page, now, editing, onEditStart, onDraftChange, 
           ))}
         </Surface>
       )}
-    </Page>
+    </>
   )
 }
 

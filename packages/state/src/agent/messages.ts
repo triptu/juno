@@ -1,5 +1,5 @@
 import { Exit } from 'effect'
-import { type MessageMenu, type ReplyTarget, type ChatMessageId } from '@juno/agent-contract'
+import { type AskAnswer, type AskId, type MessageMenu, type ReplyTarget, type ChatMessageId } from '@juno/agent-contract'
 import type { Registry } from '../client'
 import { showToast } from '../undo'
 import { call } from './chat'
@@ -19,6 +19,10 @@ export function messageActions(registry: Registry) {
     },
     pin: (message: typeof MessageMenu.Type, startByte: number, endByte: number) => command('agent.remembers.pin', { opId: uuidv7(), messageId: message.messageId, revision: message.revision, startByte, endByte }),
     remove: (messageId: ChatMessageId, alsoRemoveReply: boolean) => command('agent.chat.remove', { opId: uuidv7(), messageId, alsoRemoveReply }),
+    /** Undo on an "Updated memory" note. */
+    undoMemory: (run: string) => void command('agent.docs.undo', { opId: uuidv7(), run }),
+    /** Start, Not now or Stop on a proactive ask. */
+    ask: (id: AskId, answer: AskAnswer) => command('agent.asks.answer', { opId: uuidv7(), id, answer }),
     undo: (id: ChatMessageId) => {
       const [kind, pin, revision] = id.split(':')
       if (kind === 'pin' && pin !== undefined && revision !== undefined) void command('agent.remembers.remove', { opId: uuidv7(), id: pin, revision: Number(revision) })

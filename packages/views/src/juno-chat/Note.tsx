@@ -11,13 +11,27 @@ export interface NoteProps {
   readonly actions: ChatActions
 }
 
-/** A quiet centred line between bubbles: "Remembered · Undo", "Removed", or the fixed secret-blocked line. */
+/**
+ * A quiet centred line between bubbles: "Remembered · Undo", "Updated memory ·
+ * People, Projects · Undo", "Removed", or the fixed secret-blocked line.
+ */
 export const Note = memo(function Note({ item, actions }: NoteProps) {
   const copy = chatCopy.note
   return (
     <div data-chat-note={item.kind} {...stylex.props(styles.root)}>
       <Text variant="meta" tone="muted" dir="auto" sx={styles.text}>
-        {item.kind === 'remembered' ? (
+        {item.kind === 'memoryUpdated' ? (
+          <>
+            {copy.memoryUpdated}
+            {item.docs !== undefined && item.docs.length > 0 ? ` · ${item.docs.map((doc) => chatCopy.docs.titles[doc]).join(', ')}` : null}
+            {item.undo && item.run !== undefined ? (
+              <>
+                {' · '}
+                <TextButton onClick={() => actions.onUndoMemory(item.run!)}>{copy.undo}</TextButton>
+              </>
+            ) : null}
+          </>
+        ) : item.kind === 'remembered' ? (
           <>
             {copy.remembered}
             {item.undo ? (

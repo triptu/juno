@@ -4,8 +4,10 @@ export * from './chat'
 export * from './cards'
 export * from './pages'
 export * from './settings'
+export * from './docs'
 import { ChatRpcs } from './chat'
 import { CardRpcs } from './cards'
 import { ActivityRpcs, ConnectionsRpcs, MemoryRpcs, RemembersRpcs, ReviewRpcs, ScheduledRpcs } from './pages'
 import { SettingsRpcs } from './settings'
-export const AgentRpcs = ChatRpcs.merge(CardRpcs, ScheduledRpcs, RemembersRpcs, MemoryRpcs, ActivityRpcs, ConnectionsRpcs, ReviewRpcs, SettingsRpcs)
+import { DocsRpcs, AskRpcs } from './docs'
+export const AgentRpcs = ChatRpcs.merge(CardRpcs, ScheduledRpcs, RemembersRpcs, MemoryRpcs, ActivityRpcs, ConnectionsRpcs, ReviewRpcs, SettingsRpcs, DocsRpcs, AskRpcs)

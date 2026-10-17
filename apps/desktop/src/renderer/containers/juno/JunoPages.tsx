@@ -1,5 +1,5 @@
 import { memo, useState, type ReactNode } from 'react'
-import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { aiAssistOnAtom, copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
 import {
@@ -11,19 +11,19 @@ import {
   memoryPageAtom,
   PAGE_MAX,
   PAGE_ROWS,
-  remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
   setAgentProvider,
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
 import { openSettings } from '../navigation'
 import { junoCommands, openJunoTab } from './actions'
 import { useBackupSettings } from './BackupSettings'
 import { ConnectionConfigure } from './ConnectionConfigure'
 import { useNoProvider } from './NoProviderFrame'
+import { MemoryDocs } from './MemoryDocs'
 
 /** The pages' RPC-backed commands, one set for the app. */
 const actions = junoPageActions(registry)
@@ -44,7 +44,7 @@ const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP
 export const JunoPageBody = memo(function JunoPageBody({ page }: { readonly page: JunoTabPage }) {
   switch (page) {
     case 'remembers':
-      return <Remembers />
+      return <MemoryDocs />
     case 'memory':
       return <Memory />
     case 'activity':
@@ -267,33 +267,6 @@ function withShown(page: JunoSettingsPageModel, shown: Shown): JunoSettingsPageM
     compactionModels: pick(page.compactionModels, shown.compaction),
     ...(page.fallbackModels === undefined ? {} : { fallbackModels: pick(page.fallbackModels, shown.fallback) }),
   }
-}
-
-function Remembers() {
-  const result = useAtomValue(remembersPageAtom)
-  const now = useNow()
-  const [editing, setEditing] = useState<{ readonly id: PinId; readonly draft: string } | undefined>(undefined)
-  if (result._tag !== 'Success') return null
-  const { page, revisions } = result.value
-  const revisionOf = (id: PinId) => revisions.find((entry) => entry.id === id)?.revision ?? 0
-  return (
-    <RemembersPage
-      page={page}
-      now={now}
-      {...(editing === undefined ? {} : { editing })}
-      onEditStart={(id) => setEditing({ id, draft: page.pins.find((pin) => pin.id === id)?.text ?? '' })}
-      onDraftChange={(draft) => setEditing((current) => (current === undefined ? current : { ...current, draft }))}
-      onSave={() => {
-        if (editing === undefined) return
-        void actions.editPin(editing.id, revisionOf(editing.id), editing.draft).then((outcome) => {
-          // A stale edit stays open: the page marks the pin "This changed. Check it and save again."
-          if (outcome === 'ok') setEditing(undefined)
-        })
-      }}
-      onCancel={() => setEditing(undefined)}
-      onRemove={(id) => void actions.removePin(id, revisionOf(id))}
-    />
-  )
 }
 
 function Memory() {

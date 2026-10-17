@@ -24,6 +24,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
+import { withAsks } from './homeAsks'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
@@ -191,9 +192,10 @@ export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown |
  * When the sync ends, the rows already shown stay where they are, the
  * free slots take the next items, and the scene stays.
  */
-export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean; readonly welcome?: boolean }): void {
-  const result = registry.get(homeViewAtom)
-  if (result._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
+export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean; readonly welcome?: boolean; readonly asks?: ReadonlyArray<HomeItem> }): void {
+  const served = registry.get(homeViewAtom)
+  if (served._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
+  const result = { value: withAsks(served.value, options.asks ?? []) }
   const now = new Date()
   const previous = registry.get(homeShownAtom(key))
   const limit = homeItemLimit(options.windowHeight, options.welcome)

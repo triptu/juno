@@ -15,6 +15,7 @@ import {
   type RunId,
   type RunOutcome,
 } from '@juno/agent-contract'
+import { DOC_TITLES, isDoc } from '@juno/agent-memory'
 import { activityActions } from '../actions/activity'
 import { activityScripts } from '../scripts'
 import { SCRIPT_TOOL } from '../runtime/codemode'
@@ -161,6 +162,13 @@ function describe(q: Queries, step: StepRow, place: (channel: unknown) => string
       return { label: 'Changed a schedule', ...opt(text(args['action'])) }
     case 'remember':
       return { label: 'Remembered a line' }
+    case 'memory_write':
+      // A change named by its entry alone has no doc in its arguments: the tool's summary names it.
+      return { label: step.outcome === 'failed' ? 'Could not update memory' : `Updated memory · ${docTitle(args['doc']) ?? docTitle(step.detail) ?? 'Notes'}` }
+    case 'memory_read':
+      return { label: 'Read notes about you', ...opt(docTitle(args['doc'])) }
+    case 'memory_search':
+      return { label: 'Searched notes about you', ...opt(text(args['query'])) }
     case 'remove_messages':
       return { label: 'Proposed a removal' }
     case 'juno_views':
@@ -175,6 +183,10 @@ function describe(q: Queries, step: StepRow, place: (channel: unknown) => string
       return step.tool === SCRIPT_TOOL ? { label: 'Ran a script' } : { label: step.tool, ...opt(rest()) }
   }
 }
+
+/** A doc's title from its key ("people") or its title ("People"), as Juno's notes name it. */
+const docTitle = (value: unknown): string | undefined =>
+  typeof value !== 'string' ? undefined : isDoc(value) ? DOC_TITLES[value] : Object.values(DOC_TITLES).find((title) => title === value)
 
 const opt = (input: string | undefined): { readonly input?: string } => (input === undefined || input === '' ? {} : { input: clip(input, STEP_MAX) })
 

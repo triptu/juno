@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
+import type { AskId, AskStatus, Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
@@ -13,6 +13,8 @@ const base: Omit<JunoChatListProps, 'items'> = { banner: { _tag: 'none' }, moreA
 const list = (items: ReadonlyArray<ChatItem>, overrides: Partial<JunoChatListProps> = {}, frame?: FixtureFrame) => fixture<JunoChatListProps>({ ...base, items, ...overrides }, frame)
 
 const MINUTE = 60_000
+
+const learnAsk = (status: AskStatus, at: number): ChatItem => ({ _tag: 'ask', ask: { id: 'a1' as AskId, kind: 'learn', reason: 'setup', sources: ['Littlebird', 'Notion'], status, at } })
 
 const ask = (id: string, t: string, delivery: Parameters<typeof owner>[3]) => [day(0), owner(id, t, 'single', delivery, NOW - MINUTE)]
 
@@ -115,6 +117,14 @@ export default defineFixtures(
       'blocked-budget': list([...reply('m-e9', { _tag: 'blocked', reason: 'budget' }, 'Here is the first half of the summary. Maya posted the migration plan and'), ...juno('m-e9-b', '', { cards: [budget('c-e9')], at: NOW })]),
     },
     Notes: {
+      // Juno changed its notes about the owner in this reply: the docs it touched, with Undo.
+      'memory-updated-undo': list([day(0), owner('m-n5', 'I lead the sync team now, and Priya is my manager', 'single', { _tag: 'sent' }, NOW - MINUTE), ...juno('m-n5-r', 'Congratulations. I noted both.', { at: NOW }), { _tag: 'note', id: messageId('memory:r-n5'), kind: 'memoryUpdated', docs: ['you', 'people'], run: 'r-n5', undo: true }]),
+      'memory-updated': list([day(0), owner('m-n6', 'Keep my replies short in #eng', 'single', { _tag: 'sent' }, NOW - 3 * MINUTE), ...juno('m-n6-r', 'Will do.', { at: NOW - 2 * MINUTE }), { _tag: 'note', id: messageId('memory:r-n6'), kind: 'memoryUpdated', docs: ['preferences'], run: 'r-n6' }]),
+      // A new chat holding only the ask: the empty state, with the ask under its suggestions.
+      'learn-ask-empty': list([day(0), learnAsk({ _tag: 'open' }, NOW - MINUTE)]),
+      // A proactive ask in the chat, and the same ask once its pass has run.
+      'learn-ask': list([day(0), ...juno('m-n7', 'Happy to help with anything in Slack.', { at: NOW - 2 * MINUTE }), learnAsk({ _tag: 'open' }, NOW - MINUTE)]),
+      'learn-done': list([day(0), learnAsk({ _tag: 'done', written: 14 }, NOW - 20 * MINUTE), { _tag: 'note', id: messageId('memory:learn:a1'), kind: 'memoryUpdated', docs: ['you', 'people', 'projects', 'style'], run: 'learn:a1', undo: true }]),
       'remembered-undo': list([day(0), owner('m-n1', 'Remember that the offsite is on the 23rd', 'single', { _tag: 'sent' }, NOW - MINUTE), { _tag: 'note', id: messageId('m-n1-n'), kind: 'remembered', text: 'The offsite is on the 23rd', undo: true }]),
       remembered: list([day(0), owner('m-n2', 'Remember that the offsite is on the 23rd', 'single', { _tag: 'sent' }, NOW - MINUTE), { _tag: 'note', id: messageId('m-n2-n'), kind: 'remembered', text: 'The offsite is on the 23rd' }]),
       removed: list([day(0), owner('m-n3', 'What did I miss?', 'single', { _tag: 'sent' }, NOW - 3 * MINUTE), { _tag: 'note', id: messageId('m-n3-n'), kind: 'removed' }, ...juno('m-n3-r', 'Two things in #eng this morning.', { at: NOW - MINUTE })]),

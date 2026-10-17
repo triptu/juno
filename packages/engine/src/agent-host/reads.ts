@@ -130,7 +130,7 @@ export interface ParsedSearch {
   readonly in: ReadonlyArray<string>
 }
 
-/** `from:@maya`, `from:<@U1>`, `from:U1`, `in:#eng`, `in:<#C1|eng>`, `in:C1`; everything else is text. */
+/** `from:@maya`, `from:<@U1>`, `from:U1`, `from:me` (the signed-in user), `in:#eng`, `in:<#C1|eng>`, `in:C1`; everything else is text. */
 export function parseSearch(query: string): ParsedSearch {
   const words: Array<string> = []
   const from: Array<string> = []
@@ -168,7 +168,8 @@ export const search = (query: string, offsetCursor: string | undefined, limit: n
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const parsed = parseSearch(query)
-    const from = yield* resolveIds(sql, 'users', parsed.from)
+    const [team] = parsed.from.some((name) => name.toLowerCase() === 'me') ? yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1` : []
+    const from = yield* resolveIds(sql, 'users', parsed.from.map((name) => (name.toLowerCase() === 'me' ? (team?.self_user_id ?? name) : name)))
     const into = yield* resolveIds(sql, 'conversations', parsed.in)
     const terms = ftsQuery(parsed.text)
     const offset = Math.max(0, Number(offsetCursor ?? 0) || 0)

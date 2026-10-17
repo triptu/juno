@@ -7,10 +7,13 @@ import { type Compactor, type CompactorState } from '../compactor/scheduler'
 import type { InboxState } from '../inbox/inbox'
 import { type Job, type JobDriver, type Jobs } from '../jobs/jobs'
 import { JOBS_MIGRATIONS } from '../jobs/schema'
+import { MEMORY_DOCS_MIGRATIONS } from '../memory-docs/schema'
 import { enterRecovery, observeOwner } from '../ownership/ownership'
 import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
 import type { Ownership } from '../ownership/service'
 import type { PinResult } from '../pins/pins'
+import type { Learning } from '../memory-docs/learn'
+import type { McpManagerApi } from '../mcp/manager'
 import type { ProviderGuardApi } from '../providers'
 import { REDACTION_MIGRATIONS, type Redaction, type RemovalBackup } from '../redaction'
 import { type JunoTool, type ToolRun } from '../request/tool'
@@ -89,6 +92,8 @@ export interface TurnsOptions {
   readonly compaction?: ModelRef | ((store: Store) => ModelRef | undefined)
   /** The subagents' cheaper model. Default: the compaction model; no `delegate` tool without either. */
   readonly subagent?: ModelRef
+  /** The MCP manager once the store is open, for the learning pass's reads (`withMcp`). */
+  readonly connections?: () => McpManagerApi | undefined
   /** Slack reads through the AgentHost port. No Slack tools without it. */
   readonly views?: ViewHost
   readonly host?: HostReads
@@ -181,6 +186,8 @@ export interface Turns {
   }
   /** Cards, clicks and dispatch (WP15). */
   readonly actions: Actions
+  /** The learning passes behind Juno's `learn` asks (SPEC 13.8). */
+  readonly learning: Learning
   /** The owner's Remove and the purge after it (WP16). */
   readonly redaction: Redaction
   /** Who owns Juno, move, restore and Activate (WP21). */
@@ -209,7 +216,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   return openCore({
     agentDir: options.agentDir,
     ...(options.now ? { now: options.now } : {}),
-    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, MEMORY_DOCS_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
     router: {
       beforeOpen: async () => {
         // A restore staged before the restart replaces agent.sqlite now (§14.4).
@@ -310,6 +317,7 @@ async function start(
   session.journal().resume()
   jobs.resume()
   router.start()
+  services.learning.recover()
   actions.start()
   redaction.start()
   compactor?.poke()

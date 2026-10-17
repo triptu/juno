@@ -107,6 +107,7 @@ Integration limits found during WP9:
 | `compactor/` | Background memory jobs on `runJob` and WP9's compaction provider: at most 8 at once, never past a live run's cutoff, paused while Juno is paused or compaction's share of the cap is used |
 | `jobs/` | Background jobs behind Task cards (subagents now, T3 in WP18), the `delegate` tool, milestone reports into the inbox; each T3 question has its own report, even during an existing wait. Failed Task Stop attempts stay visible on the card while the session is watched |
 | `memory-tools/` | `remember` |
+| `memory-docs/` | Juno's notes about the owner: `memory_read`, `memory_search`, `memory_write`, the outline, proactive asks and the learning pass (see "Notes about the owner") |
 | `pins/` | Pin changes on the trusted side, each bumping `pin_rev` in its transaction |
 
 **The chat's surface** is two calls: `accept` queues an input (a message, maybe a reply; a reaction; a report, wake or click), and `subscribe` listens to events. Nothing stops a run from outside: to change course the owner sends another message, and "stop" is a message like any other. Only recovery, the guard and shutdown end a run early. How Juno talks (how many bubbles, how long, whether to answer a reaction) is the model's judgement, guided by the short prompt in `request/prompt.ts`; the code keeps hard rules only for safety and cost.
@@ -138,6 +139,27 @@ The router parses the stream and publishes each block once it closes: a bubble a
 **`remember`** takes exact words the owner wrote in this run. The trusted side finds them among the run's owner messages (`[H, cutoff)`) and copies the bytes; the model never names a message id or offsets. "Remember this" (`pins.pinMessage`), edits and Undo name the pin version they replace.
 
 **Testing.** `test/turns.test.ts` runs the engine in-process with `fakeProvider`; `test/turns-crash.test.ts` kills it mid-turn under the crash harness.
+
+## Notes about the owner
+
+`src/memory-docs/` keeps Juno's own memory of the owner beside the pins (SPEC 13.8): five docs (`you`, `people`, `projects`, `preferences`, `style`), each a list of short notes. The rules (`checkEntry`, `outline`, `renderDocs`, `searchDocs`, `looksSecret`) are `@juno/agent-memory`'s `docs.ts`.
+
+| File | Does |
+| --- | --- |
+| `schema.ts` | `MEMORY_DOCS_MIGRATIONS`, replicated, so backup, move and restore carry them: `memory_entries` (a note, its source, `tainted`, `version`; a deleted note keeps its row with no text, so an id like `e12` is never reused), `memory_writes` (every change, by run, with the text around it), `memory_docs_state.rev`, `juno_asks` |
+| `store.ts` | `writeEntry` (one transaction; the write id comes from the call, so a replay finds it), `undoRun` (a note's Undo: a run's changes, newest first, each only while its note is as the change left it), `ownerAdd`, `ownerEdit` (the owner's words), `ownerDelete` (the note and every earlier text of it), `forgetRuns` (called inside a removal for runs started by the removed messages), `outlineNow` |
+| `tools.ts` | `memory_read`, `memory_search`, `memory_write`. Each gives Activity's run log a summary: a write names its doc, so its step reads "Updated memory · People" even when it named only an entry (`serve/activity.ts`); a read or search counts its notes and keeps none of them. A write runs in any run with no card. In a clean run its source is the owner's words; in a tainted one it is marked `tainted` and keeps the source the model named (`owner`, `slack` or a connection's name) |
+| `asks.ts`, `offers.ts` | Proactive asks: the setup ask once ever, once Slack is signed in, AI is on, the mode is on and main has a provider; a `connection` ask when Littlebird or Notion becomes ready later. A connection ready when the setup ask is made, or while it is still open or running, is `covered`. `start.ts` checks on every presence, provider and connection change |
+| `learn.ts` | The learning pass (`Turns.learning`): a tool loop on the guard, each request stamped on the `subagent` spend path, with only the Slack reads, the context connections' reads and `memory_read`/`memory_write`. It stops at `learnLimits` (24 requests, five minutes, $0.50), at today's cap, at Pause or AI off and at Stop, keeping what it wrote; a pass the last process left running is `stopped` with `interrupted` and Try again starts it over. It never starts a chat run |
+| `views.ts` | The memory page (`agent.docs.page`), the chat's `memoryUpdated` notes (one per run or pass, at its last change, Undo for a minute or until the owner's next message) and the asks for the chat and Home (`agent.asks.list`) |
+
+**Memory is context, never authority.** The prompt says so, and `scripts/check-deps.mjs` fails an import of `memory-docs/` from `policy/`, `grants/`, `review/`, `actions/`, `mcp/reviewed.ts` or `mcp/manager.ts`.
+
+**The outline and the cache.** `request/builder.ts` reads the outline once per run (by `h`) and puts it in the memory message after `<memory>` and before `<recent>`, counted with the system text. A write during a run leaves the run's later requests unchanged; a write between runs changes only what follows the summary, which a new run sends again anyway. `test/memory-cache.test.ts` measures it on the fake model's usage: six runs with two writes, after twenty earlier ones, read 98.0% of their input from cache, against 98.8% with no outline and 85.6% with a fresh outline at the top of the memory message. The fake counts shared character prefixes; a real provider caches only up to its cache breakpoints, so its numbers can differ, though the order of the three should hold.
+
+**Not covered yet.** The grammar check runs in the engine and does not read the Writing style doc. Notes written by runs that only saw a removed message, without being started by it, stay; the owner can delete them on the page.
+
+`test/memory-docs.test.ts` runs the tools, Undo, removal, the outline and the pass on the engine; `apps/desktop/e2e/juno-agent/learn.spec.ts` runs the flow in the app.
 
 ## Codemode for reads
 

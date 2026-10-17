@@ -4,6 +4,8 @@ export { junoReadsImagesAtom, junoThumbAtom } from './files'
 export {
   activityPageAtom,
   connectionsPageAtom,
+  docsPageAtom,
+  homeAsksAtom,
   junoPageActions,
   junoSettingsAtom,
   junoSettingsNow,
