@@ -76,7 +76,7 @@ const timedOut = (message) => /ETIMEDOUT|deadline exceeded|DeadlineExceeded|time
  * is tracked on its own, so a working list does not hide failing creates.
  */
 export function noteCall(outage, { call, ok, error = '', now }) {
-  const calls = { ...(outage?.calls ?? {}) }
+  const calls = { ...outage?.calls }
   if (ok) delete calls[call]
   else {
     const previous = calls[call] ?? { since: now, timedOut: 0, failed: 0 }

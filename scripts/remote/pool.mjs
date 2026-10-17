@@ -2,11 +2,14 @@
 // destroying machines so a killed run or failed Namespace call can be recovered.
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { hostname, tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { activeOutage, attemptSettled, capacity, defaultCap, describeOutage, machinesToDestroy, mayPass, noteCall, outageAfterMs, outageExit, outageRemindMs, parseDuration, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
+import { daemonScript } from './daemon-home.mjs'
+import { alive, lock, lockIsNew, lockOwner, lockPath, takeLock, unlock } from './locks.mjs'
+import { noteNamespace, outageWatcher } from './outage.mjs'
+import { attemptSettled, capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -21,18 +24,8 @@ mkdirSync(dir, { recursive: true })
 // 502, 503 and 504 came back from Namespace's API during the 10-17 outage.
 const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused|\b50[234]\b|Gateway Time-?out|Bad Gateway/i.test(error.message)
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
-const alive = (pid) => {
-  if (!pid) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error.code === 'EPERM'
-  }
-}
 const vcpu = (machine) => Number(/:(\d+)x/.exec(machine)?.[1] ?? 8)
 const statePath = (id) => join(dir, `${id}.json`)
-const lockPath = (id) => join(dir, `${id}.lock`)
 function read(id) {
   try {
     return JSON.parse(readFileSync(statePath(id), 'utf8'))
@@ -47,36 +40,6 @@ function write(state) {
 }
 const entries = () => readdirSync(dir).filter((name) => name.endsWith('.json')).map((name) => read(name.slice(0, -5))).filter(Boolean)
 const machines = () => entries().filter((state) => !state.pending)
-function lockOwner(id) {
-  try {
-    return Number(readFileSync(join(lockPath(id), 'pid'), 'utf8'))
-  } catch {
-    return undefined
-  }
-}
-function lock(id) {
-  try {
-    mkdirSync(lockPath(id))
-    writeFileSync(join(lockPath(id), 'pid'), String(process.pid))
-    return true
-  } catch {
-    return false
-  }
-}
-const unlock = (id) => rmSync(lockPath(id), { recursive: true, force: true })
-function lockIsNew(id) {
-  try { return Date.now() - statSync(lockPath(id)).mtimeMs <= 30_000 } catch { return false }
-}
-function takeLock(id) {
-  const pid = lockOwner(id)
-  if (pid !== undefined && !alive(pid)) unlock(id)
-  if (pid === undefined && existsSync(lockPath(id))) {
-    // A process can die between mkdir and writing its PID. Allow time for a
-    // live creator to finish publishing the lock before recovering it.
-    if (!lockIsNew(id)) unlock(id)
-  }
-  return lock(id)
-}
 const inventoryPath = join(dir, 'inventory-cache')
 const revisionPath = join(dir, 'inventory-revision')
 const inventoryRevision = () => {
@@ -89,25 +52,7 @@ export function invalidateInventory() {
   rmSync(inventoryPath, { force: true })
 }
 
-// Failing Namespace calls, shared by every process so waiting clients can say
-// why they wait: docs/development.md, "Remote runs", "Outages".
-// Not a .json file: those are machine and reservation records.
-const outagePath = join(dir, 'namespace-outage')
-const outageAfter = parseDuration(process.env.JUNO_REMOTE_OUTAGE_AFTER) ?? outageAfterMs
 const listTimeoutMs = Number(process.env.JUNO_REMOTE_LIST_TIMEOUT_SECONDS ?? 90) * 1000
-export function outage() {
-  try { return activeOutage(JSON.parse(readFileSync(outagePath, 'utf8')), Date.now(), outageAfter) } catch { return undefined }
-}
-function noteNamespace(call, ok, error) {
-  let current
-  try { current = JSON.parse(readFileSync(outagePath, 'utf8')) } catch { /* No failures recorded. */ }
-  if (ok && !current?.calls?.[call]) return
-  const next = noteCall(current, { call, ok, error, now: Date.now() })
-  if (!next) { rmSync(outagePath, { force: true }); return }
-  const temporary = `${outagePath}.${process.pid}.tmp`
-  writeFileSync(temporary, JSON.stringify(next))
-  renameSync(temporary, outagePath)
-}
 
 let daemonInventory
 export function list() {
@@ -145,25 +90,8 @@ function forget(id) {
   rmSync(statePath(id), { force: true })
   unlock(id)
 }
-// The daemon runs from a copy of these two files in the pool folder, never from
-// a worktree: on 10-17 one started by verify:main outlived its temporary checkout.
+// The daemon runs from a copy in the pool folder (daemon-home.mjs).
 const watcherVersion = 12
-const daemonSources = ['pool.mjs', 'pool-decisions.mjs']
-function daemonHome() {
-  const here = dirname(fileURLToPath(import.meta.url))
-  const hash = createHash('sha256')
-  for (const name of daemonSources) hash.update(name).update('\0').update(readFileSync(join(here, name)))
-  const home = join(dir, 'daemon', hash.digest('hex').slice(0, 16))
-  if (!daemonSources.every((name) => existsSync(join(home, name)))) {
-    const temporary = `${home}.${process.pid}.tmp`
-    rmSync(temporary, { recursive: true, force: true })
-    mkdirSync(temporary, { recursive: true })
-    for (const name of daemonSources) copyFileSync(join(here, name), join(temporary, name))
-    rmSync(home, { recursive: true, force: true })
-    renameSync(temporary, home)
-  }
-  return home
-}
 export function ensureReaper() {
   if (!takeLock('watcher-start')) return
   try {
@@ -182,14 +110,11 @@ export function ensureReaper() {
       if (!/\/pool\.mjs --watch\s*$/.test(command)) return
       try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
     }
-    const home = daemonHome()
-    for (const name of existsSync(join(dir, 'daemon')) ? readdirSync(join(dir, 'daemon')) : []) {
-      if (join(dir, 'daemon', name) !== home) rmSync(join(dir, 'daemon', name), { recursive: true, force: true })
-    }
-    const child = spawn(process.execPath, [join(home, 'pool.mjs'), '--watch'], { cwd: home, detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
+    const daemon = daemonScript(dir)
+    const child = spawn(process.execPath, [daemon, '--watch'], { cwd: dir, detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
     child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(scriptFile, join(home, 'pool.mjs'))
+    writeFileSync(scriptFile, daemon)
     writeFileSync(versionFile, String(watcherVersion))
     child.unref()
   } finally { unlock('watcher-start') }
@@ -272,11 +197,7 @@ async function provision(machine, pending, create) {
   pending = { ...pending, creating: Date.now() }
   write(pending)
   try {
-    let id
-    try { id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token }) } catch (error) {
-      if (transient(error)) noteNamespace('create', false, error.message)
-      throw error
-    }
+    const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
     noteNamespace('create', true)
     // Admission must never observe neither the pending reservation nor its machine.
     while (!takeLock('decide')) await sleep(100)
@@ -287,6 +208,7 @@ async function provision(machine, pending, create) {
     } finally { unlock('decide') }
     return { id, warm: false, images: [] }
   } catch (error) {
+    if (transient(error)) noteNamespace('create', false, error.message)
     write({ ...pending, pid: undefined, failed: true, failedAt: Date.now() })
     if (error.instanceId && destroy(error.instanceId)) rmSync(statePath(pending.id), { force: true })
     throw error
@@ -362,39 +284,16 @@ function dispatch(instances) {
     else blocked.push(request)
   }
 }
-const minutes = (ms) => ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`
 const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th')}`
 
 export async function acquire(machine, create, log, { fresh = false } = {}) {
   if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
   if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
   if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
-  const outageWait = parseDuration(process.env.JUNO_REMOTE_OUTAGE_WAIT)
+  const watchOutage = outageWatcher(log, Date.now())
   ensureReaper()
   let createFailures = 0
   const started = Date.now()
-  // Says once, then every few minutes, why nothing is admitted; gives up when
-  // JUNO_REMOTE_OUTAGE_WAIT is set and the outage has lasted that long.
-  let toldAt = 0
-  const watchOutage = () => {
-    const active = outage()
-    if (!active) {
-      if (toldAt) log('Namespace answers again; waiting for a machine')
-      toldAt = 0
-      return false
-    }
-    const text = describeOutage(active)
-    if (outageWait !== undefined && Date.now() - active.since >= outageWait) {
-      const error = new Error(`${text}. Gave up after ${minutes(Date.now() - active.since)} of outage (JUNO_REMOTE_OUTAGE_WAIT=${process.env.JUNO_REMOTE_OUTAGE_WAIT}); use --local to run on this Mac.`)
-      error.outage = true
-      throw error
-    }
-    if (!toldAt) log(`${text}. Waiting${outageWait === undefined ? '' : ` until ${minutes(outageWait)} of outage`}; use --local to run on this Mac.`)
-    else if (Date.now() - toldAt >= outageRemindMs) log(`still waiting, ${Math.floor((Date.now() - started) / 60_000)} min so far: ${text}`)
-    else return true
-    toldAt = Date.now()
-    return true
-  }
   for (;;) {
     while (!takeLock('decide')) await sleep(100)
     const request = { id: randomUUID(), pid: process.pid, machine, fresh, cap: maxVcpu, capSet: process.env.JUNO_REMOTE_MAX_VCPU !== undefined, created: started }
@@ -493,7 +392,6 @@ export async function reap() {
     }
   } finally { unlock('watcher') }
 }
-export { outageExit }
 export function status() {
   return machines().map((state) => ({ ...state, busy: alive(lockOwner(state.id)), idleFor: Date.now() - state.lastUsed }))
 }

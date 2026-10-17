@@ -35,8 +35,9 @@ import { fileURLToPath } from 'node:url'
 import { runnerConfig, checkRunner, runnerCommand } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
-import { acquire, destroy, idleMinutes, keep, outage, outageExit, reap, release, status } from './remote/pool.mjs'
-import { describeOutage } from './remote/pool-decisions.mjs'
+import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
+import { outage } from './remote/outage.mjs'
+import { describeOutage, outageExit } from './remote/pool-decisions.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const started = Date.now()
