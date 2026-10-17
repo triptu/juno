@@ -68,9 +68,6 @@ test('with AI assist off, the topic menu has no Redraw art and a selection offer
     const row = sidebar.row(POSTGRES)
     await row.expectVisible()
     await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
-    const { labels } = await row.chooseInMenu('pin')
-    expect(labels).toContain('Pin')
-    expect(labels).not.toContain('Redraw art')
 
     // Text selected in a message: the toolbar has Quote and no Ask Juno.
     await row.open()
@@ -87,6 +84,10 @@ test('with AI assist off, the topic menu has no Redraw art and a selection offer
     const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
     await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
     await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
+
+    const { labels } = await row.chooseInMenu('pin')
+    expect(labels).toContain('Pin')
+    expect(labels).not.toContain('Redraw art')
   } finally {
     await again.close()
   }

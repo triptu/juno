@@ -440,14 +440,15 @@ test.describe('Message actions', () => {
     expect(await boxes(page)).toEqual(before)
   })
 
-  test('the selection’s Quote button floats over the list, outside the rows', async ({ page }) => {
+  test('the selection’s toolbar floats over the list, outside the rows, with Quote and Ask Juno', async ({ page }) => {
     await open(page, 'TopicView', 'interaction/selection-quote')
-    const button = page.locator('[data-selection-quote]')
-    await expect(button).toBeVisible()
-    await expect(page.locator('[data-message-row] [data-selection-quote]')).toHaveCount(0)
+    const toolbar = page.locator('[data-selection-toolbar]')
+    await expect(toolbar.locator('[data-selection-quote]')).toBeVisible()
+    await expect(toolbar.locator('[data-selection-ask-juno]')).toBeVisible()
+    await expect(page.locator('[data-message-row] [data-selection-toolbar]')).toHaveCount(0)
     // Centred over the selection, above it.
     const selection = await page.evaluate(() => window.getSelection()!.getRangeAt(0).getBoundingClientRect().toJSON() as DOMRect)
-    const box = (await button.boundingBox())!
+    const box = (await toolbar.boundingBox())!
     expect(Math.abs(box.x + box.width / 2 - (selection.x + selection.width / 2)), JSON.stringify({ box, selection })).toBeLessThanOrEqual(1)
     expect(box.y + box.height).toBeLessThan(selection.y)
   })
