@@ -28,7 +28,7 @@ import {
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
 import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
-import { chunk } from './chunks'
+import { chunk, usePreloaded } from './chunks'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
@@ -37,11 +37,13 @@ import { AllTopicsPage, closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, 
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicTab } from './TopicView'
-import { WebPanel } from './WebPanel'
 
 // Settings warms on idle after the first paint, outside the startup bundle.
 const settings = chunk(() => import('./Settings'))
 const SettingsTab = settings.component((module) => module.SettingsTab)
+// The web panel warms on idle, outside the startup bundle.
+const webPanelChunk = chunk(() => import('./WebPanel'))
+const WebPanel = webPanelChunk.component((module) => module.WebPanel)
 
 const kindIcons: Record<TopicDetail['channel']['kind'], WorkspaceTabIcon> = {
   public: 'hash',
@@ -276,6 +278,7 @@ export function Workspace() {
   // The web panel takes the same slot, in the tab it was opened in (SPEC 7).
   const webPanel = useAtomValue(webPanelAtom)
   const webShown = webPanel !== undefined && webPanel.tabId === state.active
+  usePreloaded(webPanelChunk, webShown)
 
   useWorkspaceEffects(state.active)
   // A closed tab takes its web panel with it.
@@ -302,7 +305,9 @@ export function Workspace() {
       empty={null}
       side={
         webShown ? (
-          <WebPanel key={webPanel.opened} url={webPanel.url} />
+          <Suspense fallback={null}>
+            <WebPanel key={webPanel.opened} url={webPanel.url} />
+          </Suspense>
         ) : agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>
             <JunoPanel tabId={state.active} topicId={panelTopic} />
