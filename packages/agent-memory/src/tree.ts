@@ -4,7 +4,7 @@ export interface Ref extends Key { readonly v: number }
 export const limits = {
   target: 512, attempts: 5, node: 16_384, context: 16_384, input: 32_768,
   pins: 4_096, pin: 280, tail: 24_576, active: 65_536, reserve: 16_384,
-  framing: 64, toolResult: 2_048, toolCall: 8_192, high: 128_000, low: 64_000, workers: 8,
+  framing: 64, toolResult: 2_048, wholeResult: 49_152, toolCall: 8_192, high: 128_000, low: 64_000, workers: 8,
 } as const;
 
 export function nodeKey(a: number, w: number): Key {

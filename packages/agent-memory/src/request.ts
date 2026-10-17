@@ -25,7 +25,9 @@ export function requiredWindow(systemAndTools: readonly string[], path: 'chat' |
 /** One provider entry can cover several contiguous archive chunks. */
 interface EntryBase { readonly sourcePos: number; readonly sourceEnd: number; readonly text: string; readonly metadata: string }
 export type ActiveEntry = (EntryBase & { readonly kind: 'user' | 'juno' | 'work' | 'wake' | 'card' | 'note' }) |
-  (EntryBase & { readonly kind: 'tool-call' | 'tool-result'; readonly callId: string });
+  (EntryBase & { readonly kind: 'tool-call'; readonly callId: string }) |
+  /** `whole`: a result the model needs in full, such as a tool's argument schema. Paged only past `limits.wholeResult`. */
+  (EntryBase & { readonly kind: 'tool-result'; readonly callId: string; readonly whole?: boolean });
 export interface RequestInput {
   readonly rev: number; readonly gen: number; readonly pins: Pins;
   readonly lines: readonly Line[]; readonly covered: number; readonly h: number; readonly cutoff: number;
@@ -71,7 +73,7 @@ export function buildRequest(input: RequestInput): Request {
   if (input.active.some(e => (e.kind === 'user' && utf8Bytes(e.text) > limits.active) ||
       (e.kind === 'tool-call' && utf8Bytes(e.text) > limits.toolCall))) return { kind: 'blocked', reason: 'input' };
   if (input.pins.active.reduce((n, p) => n + utf8Bytes(p.text), 0) > limits.pins) return { kind: 'blocked', reason: 'input' };
-  let active = input.active.map(e => e.kind === 'tool-result' ? { ...e, text: page(e.text, e.sourcePos, limits.toolResult) } : e);
+  let active = input.active.map(e => e.kind === 'tool-result' ? { ...e, text: page(e.text, e.sourcePos, e.whole ? limits.wholeResult : limits.toolResult) } : e);
   let tail = input.tail.map(renderSource);
   let omitted: Range | undefined;
   let lines = input.lines;
