@@ -297,7 +297,8 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (event.nativeEvent.isComposing) return false
     if (sendTo.onKey(event)) return true
-    if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !event.metaKey) {
+    // A held Backspace that just cleared the text keeps the destination; only a new press goes back to Juno.
+    if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !event.metaKey && !event.repeat) {
       event.preventDefault()
       destination.choose(undefined)
       return true
