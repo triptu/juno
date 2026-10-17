@@ -10,8 +10,8 @@ export type { TextVariant, Weight }
 export type TextTone = 'inherit' | 'default' | 'secondary' | 'subtle' | 'muted' | 'accent' | 'danger'
 
 export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | 'className'> {
-  /** The type role: family, size, weight, line height and tracking. Default `ui`. */
-  readonly variant?: TextVariant
+  /** The type role: family, size, weight, line height and tracking. Default `ui`. `inherit` keeps the parent's, for text inside a control that sets its own. */
+  readonly variant?: TextVariant | 'inherit'
   readonly tone?: TextTone
   /** Overrides the variant's weight, for example 600 on an unread title. */
   readonly weight?: Weight
@@ -84,7 +84,7 @@ export function Text({
   children,
   ...rest
 }: TextProps) {
-  const Tag = as ?? blockTags[variant] ?? 'span'
+  const Tag = as ?? (variant === 'inherit' ? undefined : blockTags[variant]) ?? 'span'
   const enter = tooltipWhenTruncated
     ? (event: PointerEvent<HTMLElement>) => {
         titleWhenTruncated(event)
@@ -97,7 +97,7 @@ export function Text({
       onPointerEnter={enter}
       {...stylex.props(
         styles.base,
-        typeVariants[variant],
+        variant !== 'inherit' && typeVariants[variant],
         tones[tone],
         weight && weightStyles[weight],
         truncate && styles.truncate,
