@@ -6,4 +6,4 @@
 export { startFakeLittlebird, unknownTool, type FakeLittlebird } from './littlebird'
 export { startFakeNotion, type FakeNotion } from './notion'
 export { startFakeMcpServer, type FakeMcpServer } from './server'
-export { json, type FakeTool } from './handler'
+export { json } from './handler'

@@ -18,7 +18,6 @@ import { authorize, recordAttempt, recordReceipt, settleAuthorization } from '..
 import { uuidv7 } from '../store/store'
 import { looksDestructive, mcpExecutors, runWrite } from './actions'
 import { hintOf, type McpManagerApi } from './manager'
-import { parseObject } from './catalogue'
 import { result } from './results'
 import type { McpToolsContext } from './tools'
 import { T3, destructiveArguments } from './types'
@@ -36,12 +35,14 @@ export function ruleFor(manager: McpManagerApi, server: string, tool: string, ar
   return manager.rule(server, tool)
 }
 
-/** The server's one-line description of a tool and its read-only mark, for the review. */
+/**
+ * The server's one-line description of a tool and, for the review, its read-only mark only while it
+ * counts: set the first time Juno saw the tool, with its schema unchanged since (SPEC 13.9).
+ */
 function toolFacts(manager: McpManagerApi, server: string, tool: string): { readonly about?: string; readonly readOnly?: boolean } {
-  const definition = manager.tool(server, tool).definition
-  const { hint } = hintOf(definition)
-  const annotations = parseObject(parseObject(JSON.parse(definition)).annotations ?? {})
-  return { ...(hint === undefined ? {} : { about: hint }), ...(annotations.readOnlyHint === true ? { readOnly: true } : {}) }
+  const current = manager.tool(server, tool)
+  const { hint } = hintOf(current.definition)
+  return { ...(hint === undefined ? {} : { about: hint }), ...(current.hinted ? { readOnly: true } : {}) }
 }
 
 const withReview = (proposed: Change, rule: ReviewRule, review: Review, line: ReviewLine) => {
