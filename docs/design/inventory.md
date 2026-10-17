@@ -224,6 +224,7 @@ Every Main (a channel's, a DM's or a group DM's) has two lines and no line 3:
 | Reopened | Reopened tag; row is back after a resolve |
 | Thread set to Never (shown because it mentions you) | opacity .6, `bell-slash` icon |
 | Resolved (pinned only) | green `circle-check` 14 before the title, no Resolve on hover |
+| Privacy mode (SPEC section 5) | Preview blurred (`data-sensitive`, `--privacy-blur`). The title too while `titleSensitive` is set: it is the root's first words, or an AI title from before titles left out sensitive details. Same box, so nothing moves when it turns sharp; a cut-off blurred title shows no tooltip |
 | Renaming | Title replaced by input: 24px, margin −2 0, padding 0 6, 1px `--border-strongest`, radius 6, bg surface, 14/600; text preselected; Enter saves, Esc cancels, blur saves. Row click disabled |
 
 ### 3.3 Density (Settings › Appearance)
@@ -514,7 +515,7 @@ The composer is the topic composer (§7) at the bottom of Home, with a stack in 
   - The text filter finds words in titles and in any message of a topic, each word a prefix.
 - Table: padding `4 28 40`. Grid `minmax(200px,1fr) minmax(72px,150px) 104px 44px 84px` (`--all-topics-columns`), gap 16. Columns give way in order, by container queries on the page that keep 16px for a scrollbar: Where shrinks from 150 to 72 (its name takes an ellipsis); under a 664px page the Where column hides (`--all-topics-columns-narrow`); under 576px Msgs hides too (`--all-topics-columns-narrowest`); under 516px Status hides, the title takes the rest (`--all-topics-columns-compact`, `minmax(0, 1fr) 84px`) and the table's side padding is 8, so its text stays on the header's 20px edge. The table never scrolls sideways, so a focused row's inset ring is always whole (decided 10-17). The header row is sticky. A virtual list (performance 3.5): rows the engine has not sent yet are placeholders with the row's geometry. Header row 11/500 uppercase 0.06em muted, padding 10 12: TOPIC · WHERE · STATUS · MSGS (right) · UPDATED (right).
 - Row: `role="row"` in a `grid` with `aria-rowindex`, height 52, padding 8 12, radius 8, border-bottom 1px `--border-subtle`, hover `--surface-hover`. ↑ and ↓ move between rows (roving tabindex), Enter opens.
-  - Topic: title 14 (600 unread, else 500) ellipsis, a Main row's title is its channel label ("#eng") + Main tag + `pin` 12 muted if pinned; preview "Sender: text" 12.5 muted ellipsis. Rename from the menu turns the title into the rename field, as on a sidebar row.
+  - Topic: title 14 (600 unread, else 500) ellipsis, a Main row's title is its channel label ("#eng") + Main tag + `pin` 12 muted if pinned; preview "Sender: text" 12.5 muted ellipsis. In privacy mode the preview blurs, and a thread's title does too while `titleSensitive` is set (as the sidebar row, 3.2). Rename from the menu turns the title into the rename field, as on a sidebar row.
   - Where: channel icon 13 + name, 13 subtle.
   - Status chip 22px, padding 0 8, radius 6, 12/500: Open (`--secondary-default` / subtle), Resolved (success tint), Quiet and Unfollowed (transparent, muted).
   - Msgs 13 subtle tabular right; Updated 13 muted tabular right ("3m", "1h", "Yesterday").
