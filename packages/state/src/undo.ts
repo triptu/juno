@@ -74,15 +74,19 @@ export function dismissToast(registry: Registry, key: number): void {
 
 /**
  * Runs a user's action. When it changed something, keeps its undo and
- * shows `toast` with Undo. Resolves with whether it succeeded.
+ * shows `toast` with Undo. Resolves with whether it succeeded. `shown`,
+ * when given, resolves once the change has reached the live queries a
+ * menu reads; the toast waits for it, so it never names a change the app
+ * does not show yet.
  */
 export async function runAction<R extends Rpc.Any>(
   registry: Registry,
   route: R,
   payload: Rpc.PayloadConstructor<R>,
   toast: ToastContent,
+  shown?: () => Promise<unknown>,
 ): Promise<boolean> {
-  return Exit.isSuccess(await runActionExit(registry, route, payload, toast))
+  return Exit.isSuccess(await runActionExit(registry, route, payload, toast, shown))
 }
 
 /** `runAction`, resolving with the command's exit, so a caller can say why it failed. */
@@ -91,12 +95,14 @@ export async function runActionExit<R extends Rpc.Any>(
   route: R,
   payload: Rpc.PayloadConstructor<R>,
   toast: ToastContent,
+  shown?: () => Promise<unknown>,
 ): Promise<Exit.Exit<unknown, unknown>> {
   const exit = await runCommand(registry, route, payload)
   if (Exit.isFailure(exit)) return exit
   const undo = (exit.value as CommandResult).undo
   if (undo === undefined) return exit
   registry.set(undoStackAtom, [...registry.get(undoStackAtom), undo].slice(-UNDO_LIMIT))
+  if (shown !== undefined) await shown()
   showToast(registry, toast, true)
   return exit
 }
