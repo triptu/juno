@@ -24,13 +24,13 @@ export const HomeTitleOutput = Type.Object({
  * Generation, as one tool call so it can say it is not sure. Rewrites the
  * title line of a Home item that the rules already found (SPEC section 12);
  * Home shows the plain title until it arrives and when it is not confident.
- * The user is looking at Home, so 8 s is the most worth waiting for.
+ * Nothing waits on it, so 45 s leaves room for a slow call and a retry.
  */
 export const homeTitle = defineStructuredTask<HomeTitleInput, typeof HomeTitleOutput>({
   name: 'homeTitle',
   version: 1,
   tier: 'generation',
-  timeoutMillis: 8000,
+  timeoutMillis: 45_000,
   prompt,
   tool: { name: 'item_title', description: 'Report the title line for the Home item.' },
   output: HomeTitleOutput,

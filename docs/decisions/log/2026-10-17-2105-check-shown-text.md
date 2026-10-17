@@ -1,0 +1,1 @@
+- 10-17 21:05 · checks-after-send · Post-send checks read the text as the composer showed it (`decodeDraft`), not as Slack encodes it. The line is matched against the message's edit text, so a message with a mention or a linked word never got its line, and Review would have opened Slack's markup.

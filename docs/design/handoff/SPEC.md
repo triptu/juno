@@ -300,9 +300,9 @@ All text fixes show **after sending**, only for messages sent from Juno. Enter n
 - **Long sentences:** note a sentence over 40 words, without rewriting it.
 - **Grammar (uses AI):** clear it's/its, your/you're, their/there/they're, then/than, affect/effect, lose/loose, could of, missing or doubled words, and obviously wrong verb agreement. It never flags capitalisation, lowercase style, slang, abbreviations, tone, punctuation style, emoji or code. Validated minimal word edits cannot change surrounding prose.
 
-Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. No model answers within one second (`docs/research/grammar-post-send.md`), so the grammar request starts when typing pauses, for the draft as it will be sent, and the second after sending usually has its answer already. Each exact text is asked once, with no retries; its answer is cached by the text. Typing again stops the request that pause started, and the next pause asks about the new text. A request for the text being sent runs to its end. A send with no pause before it starts the request then. The request deadline is 3 seconds; the suggestion still shows only within the one-second window, and nothing ever holds Enter. The local pass starts after the send is accepted. Every grammar request, including failed and stopped ones, counts against a persisted 500-call daily limit, is spent as background work in the daily AI limit, and is recorded in the AI activity log.
+Each check has its own switch in Settings › General. Local rules work with AI assist off. Grammar requires AI assist and a key. Nothing is asked while typing: the grammar request starts once the send is accepted, for the exact text sent, and runs to its end with a 20-second deadline and no retry. Each exact text is asked once; its answer is cached by the text. Every grammar request, including failed ones, counts against a persisted 500-call daily limit, is spent as background work in the daily AI limit, and is recorded in the AI activity log. Nothing ever holds Enter.
 
-A finding appears only within one second of sending and while the user is still on that topic with the app visible. Leaving the topic, late answers or missing rows drop it silently, without a badge, queue or later popup. The quiet overlay on the sent message shows the small fix, such as “its → it's”, and one action: **Edit**. It reserves no space and never moves other messages. Edit opens the existing inline editor with the fixes as an unsaved draft; only the user's Save changes the message. Esc dismisses the suggestion. Ignoring it dismisses it after eight seconds. A changed message cannot receive an old suggestion.
+The local fixes show as soon as the send is accepted. A grammar answer shows whenever it comes, as long as it comes within two minutes of the send, the message still exists and it has not been edited; its fixes join the local ones on the same line. The line sits under the sent message, like "Not sent": the fix itself when there is one, such as “its → it's”, or the count, such as “2 small fixes”, with the fixes after it in muted text, then **Review** and **Dismiss**. It never takes focus and is not a toast: it stays on the message until Review or Dismiss, whether or not the topic is in view. If you have left the topic, it waits there for when you come back, with no notification, badge or queue. Review opens the existing inline editor with the fixes as an unsaved draft; only the user's Save changes the message. Editing the message removes the line, and a changed message cannot receive an old suggestion. Lines are kept in memory only, so they do not come back after a restart.
 
 ![Send-time routing check](screenshots/05-ui.png)
 
@@ -637,18 +637,21 @@ The read switch says: “When you read something in Juno, Slack shows it as read
 
 Split the AI work into two kinds. **Decisions** are fast, cheap and structured: a choice, a score or a probability, in well under a second. They can run on every message and every send. **Generation** is a language model producing text, used sparingly. A decision-model approach (such as TypeSafe's Jev) suits the first kind. A general model through OpenRouter suits the second. Show nothing unless a decision is confident, and use calibrated thresholds so the UI stays quiet.
 
-| Feature | Kind | When it runs | Shows when |
-| --- | --- | --- | --- |
-| Topic titles | Generation | New thread, and on drift | Always, with no marker |
-| Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | Likely reply to one of them |
-| Local checks | Pure rules | On send, according to each preference | Concrete fixes or a long sentence found |
-| Grammar check | Decision, minimal span edits | Typing pause (or the send, without one), one 3 s request per exact text; read after a Juno send | Within one second of sending, still on the visible topic; clear errors only |
-| Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
-| Settled, suggest resolve | Decision | Once a topic has been idle 2 minutes | High score, quiet for the time Settings › Tidy up sets, and nothing waiting on you; the reason shown comes from the last messages |
-| Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |
-| Command routing (⌘K) | Decision | As you type in ⌘K | Clear intent and target |
-| Home items | Both | When Home appears, from cached rules first | On Home: follow-ups, settled topics, and a sharper title line for an item |
-| Juno chat | Generation with tools | On request, and for schedules and jobs you set up | In chat, with action cards (section 13.3) |
+| Feature | Kind | When it runs | Deadline | Shows when |
+| --- | --- | --- | --- | --- |
+| Topic titles | Generation | New thread, and on drift | 60 s, background | Always, with no marker |
+| Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | 5 s | Likely reply to one of them |
+| Local checks | Pure rules | Once a Juno send is accepted, according to each preference | none, no model | Concrete fixes or a long sentence found, at once, as a line on the sent message |
+| Grammar check | Decision, minimal span edits | Once a Juno send is accepted, one request per exact text sent, no retry | 20 s, background | Whenever the answer comes within two minutes of the send, on the unedited message, until reviewed or dismissed; clear errors only |
+| Audience check | Decision | Typing pause | none: local rules for now | Sensitivity does not fit the channel |
+| Settled, suggest resolve | Decision | Once a topic has been idle 2 minutes | 30 s, background | High score, quiet for the time Settings › Tidy up sets, and nothing waiting on you; the reason shown comes from the last messages |
+| Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | 2 s, so a notification is not late | Only as an outcome, and its short reason under "Why did this notify?" |
+| Command routing (⌘K) | Decision | As you type in ⌘K | 4 s, while you wait | Clear intent and target |
+| Home items | Both | When Home appears, from cached rules first | 45 s for follow-ups and titles, 30 s for settled topics and Automated, background | On Home: follow-ups, settled topics, and a sharper title line for an item |
+| Topic art | Generation | When a topic enters the sidebar; Redraw from the topic menu | 60 s, background; 15 s for Redraw | The drawing replaces the placeholder |
+| Juno chat | Generation with tools | On request, and for schedules and jobs you set up | the agent's own | In chat, with action cards (section 13.3) |
+
+Background work keeps a generous deadline, since nobody waits on it; a timed-out call is tried again on a later pass. Every deadline and its reason is in `docs/architecture.md`, "AI call deadlines".
 
 Things AI must not do: send anything without a click, rewrite your voice (the one exception is the nudge draft when a reply watch runs out, 13.6), add "needs you" style labels to the sidebar, or create noise to look helpful. A global AI assist switch turns off every AI surface, the Juno chat included.
 

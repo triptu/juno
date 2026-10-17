@@ -3,7 +3,7 @@ import { memo, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, Button, focusRing, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import { mediaOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
@@ -69,8 +69,12 @@ export interface MessageProps {
   /** The toolbar asks to confirm a delete and stays shown. */
   readonly active?: boolean
   readonly confirmingDelete?: boolean
+  /**
+   * The fix line after sending (SPEC section 8): "its → it's" or "2 small fixes", with `detail` (the fixes, or
+   * the long-sentence note) in muted text after it. Review opens the edit field with the fixes; Dismiss removes it.
+   */
+  readonly suggestion?: { readonly label: string; readonly detail?: string; readonly onReview: () => void; readonly onDismiss: () => void } | undefined
   /** The inline edit field, in place of the body while the message is edited. */
-  readonly suggestion?: { readonly label: string; readonly onEdit: () => void } | undefined
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
@@ -173,7 +177,8 @@ const dim = stylex.keyframes({
  * A message Juno is still sending looks like the message it becomes, so the
  * swap moves nothing; a send that takes longer than `--delay-pending` dims
  * its content. A failed send keeps its text and shows "Not sent" with Retry
- * and Delete draft under it.
+ * and Delete draft under it. A sent message with fixes to offer shows its fix
+ * line in the same place, with Review and Dismiss.
  */
 export const Message = memo(function Message({
   message,
@@ -256,14 +261,6 @@ export const Message = memo(function Message({
         message.mentionsMe && styles.rowMention,
       )}
     >
-      {suggestion !== undefined && editor === undefined ? (
-        <span {...stylex.props(styles.suggestion)}>
-          <Surface kind="toolbar" padding="xs" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestionBar}>
-            <Text variant="meta" tone="default" as="span" truncate sx={styles.suggestionLabel}>{suggestion.label}</Text>
-            <Button variant="ghost" size="sm" onClick={suggestion.onEdit}>Edit</Button>
-          </Surface>
-        </span>
-      ) : null}
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
           <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
@@ -320,6 +317,24 @@ export const Message = memo(function Message({
         <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} />
         {message.reactionIssue !== undefined ? <ReactionIssueLine ts={message.ts} issue={message.reactionIssue} onSet={onSetReaction} /> : null}
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+        {suggestion !== undefined && editor === undefined ? (
+          <Text variant="meta" tone="muted" as="p" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestion}>
+            <Text variant="meta" tone="default" as="span" sx={styles.suggestionLabel}>{suggestion.label}</Text>
+            {suggestion.detail === undefined ? null : (
+              <Text variant="meta" tone="muted" as="span" truncate tooltipWhenTruncated sx={styles.suggestionDetail}>
+                {suggestion.detail}
+              </Text>
+            )}
+            <span aria-hidden>·</span>
+            <TextButton tone="default" onClick={suggestion.onReview}>
+              Review
+            </TextButton>
+            <span aria-hidden>·</span>
+            <TextButton tone="muted" onClick={suggestion.onDismiss}>
+              Dismiss
+            </TextButton>
+          </Text>
+        ) : null}
         {pending === 'failed' && clientMsgId !== undefined ? (
           <Text variant="meta" tone="muted" as="p" data-send-failed="" sx={styles.failed}>
             <span {...stylex.props(styles.failedIcon)}>
@@ -338,7 +353,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined && suggestion === undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
     </div>
   )
 })
@@ -375,26 +390,20 @@ function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly
 }
 
 const styles = stylex.create({
-  // Over the end of the row before, as a narrow row's toolbar is, so the
-  // message it is about stays readable and nothing reserves space for it.
+  // A line of its own under the message, like "Not sent", so it covers nothing.
   suggestion: {
-    position: 'absolute',
-    top: `calc(-1 * ${layout['--toolbar-height']})`,
-    right: spacing['--space-2'],
-    zIndex: z['--z-toolbar'],
     display: 'flex',
-    maxWidth: '80%',
-  },
-  suggestionBar: {
-    display: 'inline-flex',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: spacing['--space-1'],
     minWidth: 0,
+    marginTop: spacing['--space-0-5'],
+    userSelect: 'none',
   },
   suggestionLabel: {
-    paddingInline: spacing['--space-2'],
+    flexShrink: 0,
+  },
+  suggestionDetail: {
     minWidth: 0,
-    userSelect: 'none',
   },
   row: {
     position: 'relative',

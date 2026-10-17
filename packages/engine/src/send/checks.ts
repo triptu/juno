@@ -4,7 +4,7 @@ import { sendCheckDefaults, type ClarityFinding, type RouteFinding, type SendChe
 import { channelLabel, clarityCheck, resolveTitle, sendChecksApply, threadTopicId, topicStatus, type ChannelId, type Ts, type ClarityPrefs } from '@juno/domain'
 import { StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
-import type { GrammarChecks } from './grammar'
+import { grammarApplies, type GrammarChecks } from './grammar'
 import { aiAssistOn, decisionProviderAvailable } from '../ai'
 import type { AiCredentials } from '../aiCredentials'
 import type { EngineConfig } from '../config'
@@ -169,21 +169,14 @@ export const checkMessage = (input: CheckInput): Effect.Effect<SendCheck, never,
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
-/** The place a composer writes to: grammar requests are stopped per place. */
-export const slotOf = (input: { readonly channelId: string; readonly threadTs?: string | undefined }): string => `${input.channelId}/${input.threadTs ?? ''}`
-
-/** While typing pauses: grammar for the text as it will be sent, and Main routing. */
-export const precheckMessage = (input: CheckInput & { readonly message?: string | undefined }, budget: ReturnType<typeof dailyBudget>, grammar: GrammarChecks): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
+/** While typing pauses in Main: the wrong-place question. Grammar waits for the send. */
+export const precheckMessage = (input: CheckInput, budget: ReturnType<typeof dailyBudget>): Effect.Effect<void, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
-    const slot = slotOf(input)
     const open = yield* (yield* Workspace).current
-    if (open === undefined || !sendChecksApply(input.text)) return yield* grammar.stop(slot)
+    if (open === undefined || input.threadTs !== undefined || !sendChecksApply(input.text)) return
     yield* Effect.gen(function* () {
-      if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return yield* grammar.stop(slot)
-      const options = yield* checkPrefs
-      // Grammar only starts its request here, so routing does not wait for it.
-      yield* options.grammar ? grammar.prefetch(slot, input.message ?? input.text, open) : grammar.stop(slot)
-      if (options.wrongPlace && input.threadTs === undefined) yield* askRoute(input, budget)
+      if (!(yield* aiAssistOn) || !(yield* decisionProviderAvailable)) return
+      if ((yield* checkPrefs).wrongPlace) yield* askRoute(input, budget)
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })
 
@@ -198,26 +191,47 @@ const checkPrefs = Effect.gen(function* () {
   return { wrongPlace: enabled('wrongPlace'), typos: enabled('typos'), capitalI: enabled('capitalI'), questionMarks: enabled('questionMarks'), longSentences: enabled('longSentences'), grammar: enabled('grammar') }
 })
 
+const grammarOn = (options: { readonly grammar: boolean }) => Effect.gen(function* () {
+  return options.grammar && (yield* aiAssistOn) && (yield* decisionProviderAvailable)
+})
+
 /**
- * Runs only after a Juno send. Local fixes and grammar never hold Enter. Grammar waits at most `waitMillis`,
- * what is left of the second after sending, usually for the request the last typing pause started.
+ * Runs once a Juno send is accepted, and never holds it: the local fixes at once, and the grammar request for
+ * the exact text sent started in the background. `grammar` says its answer is worth waiting for (`grammarForSent`).
  */
-export const postcheckMessage = (text: string, grammarChecks: GrammarChecks, waitMillis: number): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
+export const postcheckMessage = (text: string, grammarChecks: GrammarChecks, workspace: unknown): Effect.Effect<SendCheck & { readonly grammar: boolean }, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
+  Effect.gen(function* () {
+    if (!sendChecksApply(text)) return { grammar: false }
+    const open = yield* (yield* Workspace).current
+    if (open === undefined || open !== workspace) return { grammar: false }
+    return yield* Effect.gen(function* () {
+      const options = yield* checkPrefs
+      const grammar = (yield* grammarOn(options)) && grammarApplies(text)
+      if (grammar) yield* grammarChecks.start(text, open)
+      const local = clarity(text, options)
+      return { grammar, ...(local === undefined ? {} : { clarity: local }) }
+    }).pipe(Effect.provide(open.context), Effect.orDie)
+  })
+
+/**
+ * The grammar answer for a sent text, waiting at most `waitMillis` for its request, merged with the local fixes.
+ * Empty when grammar found nothing, so the local finding already shown stays.
+ */
+export const grammarForSent = (text: string, grammarChecks: GrammarChecks, workspace: unknown, waitMillis: number): Effect.Effect<SendCheck, never, Workspace | AiProvider | EngineConfig | AiCredentials> =>
   Effect.gen(function* () {
     if (!sendChecksApply(text)) return {}
     const open = yield* (yield* Workspace).current
-    if (open === undefined) return {}
+    if (open === undefined || open !== workspace) return {}
     return yield* Effect.gen(function* () {
       const options = yield* checkPrefs
-      const local = clarity(text, options)
-      const ai = options.grammar && (yield* aiAssistOn) && (yield* decisionProviderAvailable)
-      const grammar = (ai ? yield* grammarChecks.answer(text, open, waitMillis) : []).filter((edit) => options.typos || edit.kind !== 'doubled')
+      if (!(yield* grammarOn(options))) return {}
+      const grammar = (yield* grammarChecks.answer(text, open, waitMillis)).filter((edit) => options.typos || edit.kind !== 'doubled')
+      if (grammar.length === 0) return {}
       // Run local rules on the grammar result so overlapping doubled-word fixes apply once.
       let fixed = text
       for (const edit of grammar.toReversed()) fixed = fixed.slice(0, edit.start) + edit.to + fixed.slice(edit.start + edit.from.length)
-      const found = grammar.length === 0 ? local : clarity(fixed, options)
+      const found = clarity(fixed, options)
       const fixes = [...new Set([...grammar.map((edit) => `${edit.from} → ${edit.to}`), ...(found?.fixes ?? [])])]
-      const result = fixes.length === 0 ? found : { fixes, fixed: found?.fixed ?? fixed, confidence: 0.9, ...(found?.note === undefined ? {} : { note: found.note }) }
-      return result === undefined ? {} : { clarity: result }
+      return { clarity: { fixes, fixed: found?.fixed ?? fixed, confidence: 0.9, ...(found?.note === undefined ? {} : { note: found.note }) } }
     }).pipe(Effect.provide(open.context), Effect.orDie)
   })

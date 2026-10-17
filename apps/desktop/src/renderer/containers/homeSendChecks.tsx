@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { audienceCheck, type PickConversation, type SendTarget } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, precheckMessage, registry, sendCheckPrefsAtom, stopPrecheck } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, precheckMessage, registry, sendCheckPrefsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning } from '@juno/views'
 import { preloadBar, sendCheck, SendCheckPanel } from './sendCheckChunk'
@@ -30,24 +30,15 @@ export function useHomeSendChecks(text: string, target: SendTarget | undefined, 
     checking.current = undefined
     return () => { checking.current = undefined }
   }, [text, channelId, threadTs, enabled])
-  // The place and text the last pause asked about.
-  const asked = useRef<{ readonly channelId: string; readonly threadTs: string | undefined; readonly text: string } | undefined>(undefined)
   useEffect(() => {
-    // The text changed after the pause, so its grammar request stops. Empty means sent or cleared: the engine keeps a sent text's request.
-    const last = asked.current
-    if (last !== undefined && (last.text !== text || last.channelId !== channelId || last.threadTs !== threadTs)) {
-      asked.current = undefined
-      if (text.trim() !== '') stopPrecheck(registry, last.channelId, last.threadTs)
-    }
     if (!enabled || channelId === undefined || text.trim() === '') return
     const timer = setTimeout(() => {
-      asked.current = { channelId, threadTs, text }
-      precheckMessage(registry, channelId, text, threadTs)
+      if (wrongPlace) precheckMessage(registry, channelId, text, threadTs)
       const found = conversation === undefined ? undefined : audienceCheck(text, conversation)
       if (found !== undefined) setWarning({ key, message: found.message })
     }, 400)
     return () => clearTimeout(timer)
-  }, [text, channelId, threadTs, enabled, conversation, key])
+  }, [text, channelId, threadTs, enabled, wrongPlace, conversation, key])
   const follow = (outcome: Outcome) => {
     if (outcome.kind === 'bar') setBar(outcome.bar)
     else {

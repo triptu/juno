@@ -67,10 +67,14 @@ export interface TextTask<I> extends TaskBase<I> {
 
 export type Task<I = unknown> = StructuredTask<I, TSchema> | TextTask<I>
 
+/** Each task's deadline, and why, is in docs/architecture.md, "AI call deadlines". These are the tier defaults. */
 export const DECISION_TIMEOUT_MILLIS = 1500
-export const GENERATION_TIMEOUT_MILLIS = 20_000
-/** Topic art: the study's p90 was 4.8 s, the live check on 2026-10-14 saw 4.5 to 9.5 s per call; nothing waits on it, so there is room for one retry. */
-export const ART_TIMEOUT_MILLIS = 15_000
+/** Titles: background work, so a slow provider and one retry fit. */
+export const GENERATION_TIMEOUT_MILLIS = 60_000
+/** Topic art from the job: the live check on 2026-10-14 saw 4.2 to 14.0 s per call; nothing waits on it. */
+export const ART_TIMEOUT_MILLIS = 60_000
+/** Redraw: the owner asked and is watching the topic, so it gives up sooner. */
+export const ART_REDRAW_TIMEOUT_MILLIS = 15_000
 
 export function defineStructuredTask<I, S extends TSchema>(
   task: Omit<StructuredTask<I, S>, 'shape' | 'timeoutMillis'> & { readonly timeoutMillis?: number },

@@ -5,16 +5,18 @@
  * message shows as a pending row in `messages.list` until Slack has it.
  * Drafts live in the engine per topic, so they outlive tabs and restarts;
  * the composer reads one once and writes it back as the user types.
- * `precheckMessage` asks the models while typing pauses, and `stopPrecheck`
- * drops the grammar request when the text changes after it; `checkMessage`
- * runs the checks on send before the composer sends, with no model in the way.
+ * `precheckMessage` asks the route model while typing pauses in Main;
+ * `checkMessage` runs the checks on send before the composer sends, with no
+ * model in the way. The other checks run once the send is accepted, and their
+ * fix line waits on the sent message (`sentSuggestions.ts`).
  */
 import {
+  decodeDraft,
   draftsGet,
   draftsSet,
   messagesCheck,
+  messagesGrammar,
   messagesPrecheck,
-  messagesPrecheckStop,
   messagesPostcheck,
   messagesDelete,
   messagesDiscard,
@@ -29,7 +31,7 @@ import {
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
-import { watchSentMessage } from './sentSuggestions'
+import { offerSentSuggestion } from './sentSuggestions'
 import { releaseSidebarTopic } from './sidebar'
 
 /**
@@ -46,11 +48,19 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
   })
   // Your own send moves its row at once, even while the sidebar holds its order.
   if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
-  if (exit._tag === 'Success' && sendChecksApply(text)) {
-    const receive = watchSentMessage(registry, { clientMsgId, topicId: exit.value.topicId, original: text, sentAt })
-    void runCommand(registry, messagesPostcheck, { clientMsgId }).then((checked) => receive(checked._tag === 'Success' ? checked.value.clarity : undefined))
-  }
+  // The line belongs to the text as the field showed it, which is what the message's edit text is.
+  if (exit._tag === 'Success' && sendChecksApply(text)) void checkSent(registry, { clientMsgId, original: decodeDraft(text).text, sentAt })
   return exit
+}
+
+/** Local fixes show as soon as they are found; a grammar answer, whenever it comes, replaces them with the merged list. */
+async function checkSent(registry: Registry, sent: { readonly clientMsgId: string; readonly original: string; readonly sentAt: number }) {
+  const local = await runCommand(registry, messagesPostcheck, { clientMsgId: sent.clientMsgId })
+  if (local._tag !== 'Success') return
+  if (local.value.clarity !== undefined) offerSentSuggestion(registry, sent, local.value.clarity)
+  if (!local.value.grammar) return
+  const grammar = await runCommand(registry, messagesGrammar, { clientMsgId: sent.clientMsgId })
+  if (grammar._tag === 'Success' && grammar.value.clarity !== undefined) offerSentSuggestion(registry, sent, grammar.value.clarity)
 }
 
 /**
@@ -73,18 +83,10 @@ export function checkMessage(registry: Registry, to: { readonly channelId: strin
   return Promise.race([checked, late]).finally(() => clearTimeout(timer))
 }
 
-/**
- * Warms Main routing and the grammar answer for `message`, the draft as it will be sent (`text` when absent).
- * Grammar suggestions still show only after sending.
- */
-export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string, message?: string): void {
-  if (!sendChecksApply(text)) return stopPrecheck(registry, channelId, threadTs)
-  void runCommand(registry, messagesPrecheck, { channelId, text, ...(threadTs === undefined ? {} : { threadTs }), ...(message === undefined || message === text ? {} : { message }) })
-}
-
-/** The draft at this place changed after a pause: the grammar request that pause started stops. */
-export function stopPrecheck(registry: Registry, channelId: string, threadTs?: string): void {
-  void runCommand(registry, messagesPrecheckStop, { channelId, ...(threadTs === undefined ? {} : { threadTs }) })
+/** In Main, asks the route model about the draft so Enter finds a ready answer. Grammar waits for the send. */
+export function precheckMessage(registry: Registry, channelId: string, text: string, threadTs?: string): void {
+  if (threadTs !== undefined || !sendChecksApply(text)) return
+  void runCommand(registry, messagesPrecheck, { channelId, text })
 }
 
 /** Retry on a failed row. */

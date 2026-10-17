@@ -1,0 +1,1 @@
+- 10-17 20:51 · checks-after-send · Wrong place stays the only check before sending, on typing pauses, and Enter still never waits for it. Its deadline goes from 1.5 s to 5 s: at 1.5 s a chat model in the classifier's place mostly timed out, and a later answer still serves the next Enter on the same draft.

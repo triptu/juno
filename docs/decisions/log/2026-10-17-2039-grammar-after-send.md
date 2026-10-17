@@ -1,0 +1,1 @@
+- 10-17 20:39 · checks-after-send · Grammar asks nothing while typing: its request starts once a send is accepted, for the exact text sent, with a 20 s deadline and no retry, and its fixes show whenever they come within two minutes of the send. The one-second window is gone; the owner saw answers in AI activity that never reached the topic.

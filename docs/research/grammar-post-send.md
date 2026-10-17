@@ -1,8 +1,17 @@
 # Post-send grammar model study
 
+## Change, 10-17
+
+The owner asked for grammar to run after sending, not while typing, and for
+slower answers to still show. The one-second window is gone: the request now
+starts once the send is accepted, for the text sent, with a 20 s deadline, and
+its fixes show on the sent message whenever they come within two minutes
+(SPEC section 8). Typing pauses no longer start a request. The result below
+still decides the model; the timings no longer decide whether a fix shows.
+
 ## Result, 10-16
 
-The owner's goal: grammar is checked after sending, is never intrusive, shows
+The owner's goal then: grammar is checked after sending, is never intrusive, shows
 only within one second of sending and only while he is still on the topic, and
 messages over 1,000 characters are ignored.
 
@@ -45,7 +54,7 @@ Run `pnpm --filter @juno/ai grammar:bench` with the same environment key the eng
 The script never prints the key or provider error bodies. It uses the production
 provider, prompt, protected-text masking, output schema and edit filter. Requests
 have one attempt and at most 256 output tokens. The measurement deadline is ten
-seconds so slow full answers remain measurable; production stops at 3 s.
+seconds so slow full answers remain measurable; production stopped at 3 s until 10-17 and stops at 20 s since.
 
 The labelled set in `packages/ai/eval/grammar-cases.ts` has 40 invented short
 messages: 20 clean and 20 with errors. It includes lowercase style, slang,
