@@ -21,7 +21,7 @@ SPEC §12 (Home, Tidy up), §14 (Settings › Tidy up) and §15 decide behaviour
 | `automated-sheet-about-*.png` | The info button open: What Automated is |
 | `automated-sheet-minimum-*.png` | The minimum window |
 | `unfollow-ignore-card-*.png` | Cards 1 and 6 on Home, under a mention in an ignored channel ("Maya mentioned you in #deploys") |
-| `unfollow-sheet-*.png`, `unfollow-sheet-acted-*.png`, `unfollow-sheet-about-*.png` | Card 1's review: the lead says Unfollow also unfollows in Slack and that a mention follows again; one unfollowed and one kept, with Undo; What Unfollow does |
+| `unfollow-sheet-*.png`, `unfollow-sheet-acted-*.png`, `unfollow-sheet-about-*.png` | Card 1's review: the lead says Unfollow applies in Slack and that a mention follows again; one unfollowed and one kept, with Undo; What Unfollow does |
 | `ignore-sheet-*.png`, `ignore-sheet-acted-*.png`, `ignore-sheet-about-*.png` | Card 6's review: nothing changes in Slack; What Ignore does, including that a mention of you still breaks through |
 
 Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,AutomatedReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.

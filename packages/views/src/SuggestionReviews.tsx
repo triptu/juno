@@ -17,7 +17,7 @@ import { relativeTime } from './time'
 /** The words of the Unfollow review. */
 export const unfollowCopy = {
   title: (count: number) => (count === 1 ? '1 thread you never open' : `${count} threads you never open`),
-  lead: 'You follow these, but have not read them in two weeks. Unfollow also unfollows in Slack, on all your devices. A mention of you follows it again.',
+  lead: 'You follow these, but have not read them in two weeks. Unfollow applies in Slack, on all your devices. A mention of you follows it again.',
   about: {
     label: 'What Unfollow does',
     lines: [

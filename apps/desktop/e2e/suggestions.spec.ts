@@ -47,7 +47,7 @@ test('Unfollow threads you never open: the reason, what Slack sees, Unfollow, Un
   const sheet = await juno.home.reviewOf('unfollow', 'unfollow')
   await expect(sheet.title).toHaveText('2 threads you never open')
   // The sheet says what happens in Slack before anything is done.
-  await expect(sheet.lead).toContainText('Unfollow also unfollows in Slack, on all your devices. A mention of you follows it again.')
+  await expect(sheet.lead).toContainText('Unfollow applies in Slack, on all your devices. A mention of you follows it again.')
   await expect(sheet.reason(QUEUE)).toHaveText(/^(At least )?7 replies, never opened$/)
 
   // Unfollow: the row stays and says so, and Slack unfollows; the thread leaves the sidebar once the sheet closes.
