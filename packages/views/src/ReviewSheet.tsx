@@ -129,9 +129,9 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
           <Kbd>↵</Kbd>
           <Text variant="meta" tone="muted">{reviewCopy.open}</Text>
           <Kbd>{verbs.actKey}</Kbd>
-          <Text variant="meta" tone="muted" data-review-hint-act="">{words.act}</Text>
+          <Hint current={words.act} all={entries.map((entry) => (entry.words ?? verbs).act)} data-review-hint-act="" />
           <Kbd>{verbs.declineKey}</Kbd>
-          <Text variant="meta" tone="muted">{words.decline}</Text>
+          <Hint current={words.decline} all={entries.map((entry) => (entry.words ?? verbs).decline)} />
         </span>
         <span {...stylex.props(styles.buttons)}>
           <Button variant={all === undefined ? 'primary' : 'secondary'} size="md" onClick={onClose} data-review-close="">
@@ -148,7 +148,30 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
   )
 }
 
+/** A key's word in the hints: the current row's, in a cell as wide as the widest row's, so moving between rows moves nothing. */
+function Hint({ current, all, ...data }: { readonly current: string; readonly all: ReadonlyArray<string> } & Readonly<Record<`data-${string}`, string>>) {
+  const labels = [...new Set([current, ...all])]
+  return (
+    <span {...data} {...stylex.props(styles.hint)}>
+      {labels.map((label) => (
+        <Text key={label} variant="meta" tone="muted" aria-hidden={label !== current || undefined} sx={[styles.hintLabel, label !== current && styles.hintHidden]}>
+          {label}
+        </Text>
+      ))}
+    </span>
+  )
+}
+
 const styles = stylex.create({
+  hint: {
+    display: 'inline-grid',
+  },
+  hintLabel: {
+    gridArea: '1 / 1',
+  },
+  hintHidden: {
+    visibility: 'hidden',
+  },
   sheet: {
     containerType: 'inline-size',
     containerName: 'review',
