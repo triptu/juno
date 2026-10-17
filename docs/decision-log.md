@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 04:20 · ci-fix-36 · A new tab (⌘T, "+", ⌘N's new Home tab) does not cancel a topic open still waiting in the current tab: the topic opens there and the new tab opens after it. Why: a click on a topic followed at once by ⌘T lost the click, as a topic opened in a new tab already never did.
 - 10-18 04:20 · Tushar · No Apple Developer ID for now: releases stay ad-hoc signed, so each update asks once for "Juno Safe Storage" (choose Always Allow) and the updater offers the DMG instead of installing in place. Not wanted: a writing-style-aware grammar check and a "what changed" Home card after an update.
 - 10-18 03:50 · ci-fix-36 · A send from Home goes even when another tab is chosen before its wrong-place check answers; only editing the text or changing the destination drops a check still running. Why: hiding a tab runs its effect cleanups, which dropped the send without a word (the break-pass DM flake). A test-only send trace (`sendTrace.ts`) now prints a failing send's path into run.log.
 - 10-18 03:45 · release-keeper · Every DMG built from a keeper-green commit is also published to triptu/juno-releases as the next patch version (0.1.1 first, from 66828cf7), with a "Release x.y.z" commit on main and 3–8 changelog lines. Why: no release had ever been published and every DMG was 0.1.0, so installs were never offered an update.
