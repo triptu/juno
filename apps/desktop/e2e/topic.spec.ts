@@ -121,11 +121,11 @@ test('⋯ opens the topic menu under the right island, as a right-click on the t
   await rina.expectAbsent()
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
 
-  // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island.
+  // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
   const every = await juno.topic.chooseInTitleMenu('notify-every')
   expect(every.labels.slice(0, 7)).toEqual(never.labels.slice(0, 7))
-  const left = (await juno.topic.header.locator('[data-island="left"]').boundingBox())!
-  expect(Math.round(every.at!.x)).toBe(Math.round(left.x))
+  const title = (await juno.topic.titleButton.boundingBox())!
+  expect(Math.round(every.at!.x)).toBe(Math.round(title.x))
   expect(every.labels).toContain('> Never ✓')
   await rina.expectVisible()
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)

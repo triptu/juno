@@ -26,14 +26,19 @@ for (const { component, state, trigger, panel } of cases) {
   })
 }
 
-test('TopicHeader at 336px: the switcher moves in from the edge and stays inside', async ({ page }) => {
+test('TopicHeader at 336px: the switcher moves in from the window edge and stays inside', async ({ page }) => {
   const route = (await readRoutes(page)).find((each) => each.component === 'TopicHeader' && each.state === 'switcher-336')!
   await openState(page, route)
   const frame = page.locator(`[data-fixture-frame="${route.route}"]`)
-  const bounds = (await frame.boundingBox())!
+  const wide = (await frame.boundingBox())!
+  // The frame does not clip, so the window's edge stands in for the pane's: end the window at the frame's right edge.
+  await page.setViewportSize({ width: Math.ceil(wide.x + wide.width), height: page.viewportSize()!.height })
+  await openState(page, route)
+  const width = await page.evaluate(() => document.documentElement.clientWidth)
   const button = (await frame.locator('h1 button').first().boundingBox())!
   const box = (await frame.locator('[aria-label="Topics in this channel"]').first().boundingBox())!
+  expect(box.x + box.width).toBeLessThanOrEqual(width)
+  // It moved in only as far as the edge needed: at the trigger's left edge, or left of it by the overflow.
   expect(box.x).toBeLessThanOrEqual(button.x + 1)
-  expect(box.x).toBeGreaterThanOrEqual(bounds.x)
-  expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1)
+  expect(box.x).toBeGreaterThanOrEqual(0)
 })

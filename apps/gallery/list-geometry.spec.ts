@@ -3,7 +3,7 @@ import { openState, type Route } from './support'
 
 /**
  * Lists and cards from the 10-17 design review: the topic switcher opens on
- * the topic on screen, a selected option row keeps its second line readable,
+ * the topic on screen, only one option row is filled while the current one is marked,
  * and a Juno card's header reads as one meta line.
  */
 
@@ -43,19 +43,36 @@ test('a card header reads as one meta line: the dot after the kind has the kind�
   }
 })
 
-test('a selected option row prints its second line in the subtle colour, which keeps 4.5:1 on the fill', async ({ page }) => {
+test('only the keyboard or pointer row is filled; the current row is marked with accent text and a check', async ({ page }) => {
   await open(page, 'TopicHeader', 'switcher/switcher-thread')
-  const colours = await page.evaluate(() => {
-    const row = document.querySelector('[data-topic-switcher] [role="option"][aria-selected="true"]')!
-    const lines = [...row.querySelectorAll('span')].filter((span) => span.children.length === 0 && /repl/.test(span.textContent!))
-    const probe = document.createElement('span')
-    probe.style.color = 'var(--foreground-subtle)'
-    document.body.append(probe)
-    const subtle = getComputedStyle(probe).color
-    probe.remove()
-    return { line: getComputedStyle(lines[0]!).color, subtle }
-  })
-  expect(colours.line).toBe(colours.subtle)
+  const read = () =>
+    page.evaluate(() => {
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-topic-switcher] [role="option"]')]
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--hl-text)'
+      document.body.append(probe)
+      const accent = getComputedStyle(probe).color
+      probe.remove()
+      const current = rows.find((row) => row.getAttribute('aria-selected') === 'true')!
+      return {
+        filled: rows.filter((row) => getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)').map((row) => row.id),
+        current: current.id,
+        checked: current.querySelectorAll('svg').length > 0,
+        // The first element with text of its own is the title.
+        title: getComputedStyle([...current.querySelectorAll('*')].find((el) => el.children.length === 0 && el.textContent!.trim() !== '')!).color,
+        accent,
+      }
+    })
+  // It opens on the current row: that row is the one filled.
+  const opened = await read()
+  expect(opened.filled).toEqual([opened.current])
+  expect(opened.checked).toBe(true)
+  expect(opened.title).toBe(opened.accent)
+  // The pointer on Main fills Main alone; the current row keeps only its mark.
+  await page.locator('[data-topic-switcher] [role="option"]').first().hover()
+  const moved = await read()
+  expect(moved.filled).toHaveLength(1)
+  expect(moved.filled[0]).not.toBe(moved.current)
 })
 
 test('two-line picker rows are 44px, and Main’s title starts on the threads’ edge', async ({ page }) => {
