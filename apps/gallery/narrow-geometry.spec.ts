@@ -126,4 +126,15 @@ test.describe('the minimum window with the sidebar shown', () => {
     expect(rowBox!.x).toBeGreaterThanOrEqual(tableBox.left)
     expect(rowBox!.x + rowBox!.width).toBeLessThanOrEqual(tableBox.right)
   })
+
+  test('the Juno chat at 336 gives Juno\'s bubbles the width, with the time as their tooltip', async ({ page }) => {
+    const at = route('JunoChatList', 'chat/minimum-window')
+    await openState(page, at)
+    const frame = frameOf(page, at)
+    const bubbles = frame.locator('[data-chat-juno]')
+    // The widest bubble: before, the time and React and Reply beside it left about 146px.
+    const width = await bubbles.evaluateAll((rows) => Math.max(...rows.flatMap((row) => [...row.querySelectorAll('[data-tooltip]')].map((node) => node.getBoundingClientRect().width))))
+    expect(width).toBeGreaterThanOrEqual(220)
+    await expect(bubbles.locator('time')).toHaveCount(0)
+  })
 })

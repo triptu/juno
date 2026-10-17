@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode, Ref } from 'react'
+import { useRef, type ReactNode, type Ref } from 'react'
 import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
 import { chat, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { ScrollArea, Text } from '@juno/ui'
+import { ScrollArea, Text, useNarrowerThan } from '@juno/ui'
 import { CardRow } from './CardRow'
 import type { ChatActions } from './commands'
 import { DaySeparator } from './DaySeparator'
@@ -45,6 +45,14 @@ export interface JunoChatListProps {
 }
 
 /**
+ * Under this column width (the Juno tab at the minimum window is 336, the
+ * Juno panel at its narrowest 360) the column takes the panel's padding and
+ * bubble width, and a Juno bubble's time moves from beside it to its
+ * tooltip, so the bubble keeps the room (inventory 12).
+ */
+const COMPACT_BELOW = 400
+
+/**
  * The one long chat (SPEC 13.1): bubbles, cards, ending lines, the status
  * bubble under the newest bubble while a run is active, and the
  * separators, in the centred 720px column. Juno's bubbles arrive one at a
@@ -58,13 +66,15 @@ export interface JunoChatListProps {
 export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page', eagerTail = 0 }: JunoChatListProps) {
   // With AI assist off an empty chat is the one AI-off line (SPEC 13.7), not suggestions it cannot act on.
   const empty = items.length === 0 && banner._tag !== 'aiOff'
+  const columnRef = useRef<HTMLDivElement>(null)
+  const compact = useNarrowerThan(columnRef, COMPACT_BELOW)
   return (
     <ScrollArea scrollbar="hover" evenInset underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div role="list" aria-label="Juno chat" {...stylex.props(styles.column, column === 'panel' && styles.panel)}>
+      <div ref={columnRef} role="list" aria-label="Juno chat" data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
         {items.map((item, index) => (
-          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} eager={index >= items.length - eagerTail} />
+          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} eager={index >= items.length - eagerTail} compact={compact} />
         ))}
         {banner._tag === 'aiOff' ? (
           <div {...stylex.props(styles.aiOff)}>
@@ -103,12 +113,12 @@ function keyOf(item: ChatItem): string {
   }
 }
 
-function Row({ item, now, actions, anchorRef, eager }: { readonly item: ChatItem; readonly now: number; readonly actions: ChatActions; readonly anchorRef: Ref<HTMLDivElement> | undefined; readonly eager: boolean }): ReactNode {
+function Row({ item, now, actions, anchorRef, eager, compact }: { readonly item: ChatItem; readonly now: number; readonly actions: ChatActions; readonly anchorRef: Ref<HTMLDivElement> | undefined; readonly eager: boolean; readonly compact: boolean }): ReactNode {
   switch (item._tag) {
     case 'owner':
       return <OwnerBubble item={item} now={now} actions={actions} eager={eager} />
     case 'juno':
-      return <JunoBubble item={item} now={now} actions={actions} eager={eager} />
+      return <JunoBubble item={item} now={now} actions={actions} eager={eager} compact={compact} />
     case 'card':
       return <CardRow item={item} now={now} actions={actions} />
     case 'ending':
@@ -151,6 +161,11 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-3'],
     '--bubble-max-width': chat['--bubble-max-width-panel'],
     '--card-max-width': '100%',
+  },
+  // A narrow Juno tab: the panel's sides and bubble width.
+  compact: {
+    paddingInline: spacing['--space-4'],
+    '--bubble-max-width': chat['--bubble-max-width-panel'],
   },
   // A fixed slot at each end, so a page arriving never moves the rows.
   edge: {
