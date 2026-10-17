@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { openState, type Route } from './support'
 
 /**
@@ -27,7 +27,11 @@ interface Geometry {
 async function measure(page: Page, target: string): Promise<Geometry> {
   const hovered = page.locator('[data-fixture-frame]').locator(target).first()
   await hovered.hover()
-  const row = hovered.locator('xpath=ancestor-or-self::*[@data-message-row][1]')
+  return read(hovered.locator('xpath=ancestor-or-self::*[@data-message-row][1]'))
+}
+
+/** Measures `row`, whose toolbar shows, without moving the pointer. */
+async function read(row: Locator): Promise<Geometry> {
   await expect(row.getByRole('toolbar')).toBeVisible()
   return row.evaluate((element) => {
     const content = element.children[1]!
@@ -77,6 +81,35 @@ for (const [id, target, header] of [
 test('a row whose top is under the header band gets the toolbar below it, clear of its text', async ({ page }) => {
   await open(page, 'interaction/hover-toolbar-under-band')
   const at = await measure(page, '[data-message-row] [data-msg-text]')
+  expect(at.row.top).toBeLessThan(at.listTop)
+  expect(at.toolbar.top).toBeGreaterThanOrEqual(at.textBottom)
+  expect(at.toolbar.top).toBeLessThan(at.row.bottom)
+  expect(at.toolbar.bottom).toBeGreaterThan(at.row.bottom)
+})
+
+/** Scrolls the list to `top` and waits for `scrollend`. Returns where it was. */
+const scrollList = (page: Page, top: number) =>
+  page.locator('[data-fixture-frame] [data-scroll-area]').evaluate(
+    (element, to) =>
+      new Promise<number>((resolve) => {
+        const from = element.scrollTop
+        element.addEventListener('scrollend', () => resolve(from), { once: true })
+        element.scrollTop = to
+      }),
+    top,
+  )
+
+test('a hovered row that scrolls under the header band under a still pointer gets the toolbar below it', async ({ page }) => {
+  await open(page, 'interaction/hover-toolbar-under-band')
+  const underBand = await scrollList(page, 0)
+  // The pointer rests on the name, which is still inside the row once the row has scrolled up.
+  const before = await measure(page, '[data-message-row] [data-sender]')
+  expect(before.row.top).toBeGreaterThanOrEqual(before.listTop)
+  expect(before.toolbar.top).toBeLessThan(before.row.top)
+  await scrollList(page, underBand)
+  const row = page.locator('[data-fixture-frame] [data-message-row]').first()
+  expect(await row.evaluate((element) => element.matches(':hover'))).toBe(true)
+  const at = await read(row)
   expect(at.row.top).toBeLessThan(at.listTop)
   expect(at.toolbar.top).toBeGreaterThanOrEqual(at.textBottom)
   expect(at.toolbar.top).toBeLessThan(at.row.bottom)
