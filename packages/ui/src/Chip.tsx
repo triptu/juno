@@ -209,10 +209,14 @@ const styles = stylex.create({
     },
   },
   // Mine: the soft accent fill with its ring, and the count in the default
-  // text colour so the pill reads as pressed.
+  // text colour so the pill reads as pressed. The ring stays on hover, so
+  // the fill steps up to the stronger tint instead.
   pressed: {
     color: colors['--foreground-default'],
-    backgroundColor: accent['--hl-soft'],
+    backgroundColor: {
+      default: accent['--hl-soft'],
+      ':hover': { default: null, [HOVER]: accent['--hl-bubble'] },
+    },
     borderColor: {
       default: accent['--hl-ring'],
       ':hover': { default: null, [HOVER]: accent['--hl-ring'] },

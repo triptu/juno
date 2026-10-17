@@ -17,6 +17,8 @@ export default defineFixtures(
     Toggle: {
       toggleable: fixture({ reactions: few, onToggle: () => {} }),
       'hover-chip': fixture({ reactions: few, onToggle: () => {} }, { hover: 'button' }),
+      // Not mine: the border darkens. Mine (above) keeps its ring and its fill steps up.
+      'hover-chip-other': fixture({ reactions: few, onToggle: () => {} }, { hover: 'button[aria-pressed="false"]' }),
       'press-chip': fixture({ reactions: few, onToggle: () => {} }, { press: 'button' }),
     },
   },
