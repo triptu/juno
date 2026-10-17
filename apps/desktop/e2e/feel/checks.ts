@@ -30,7 +30,7 @@ export interface Verdict {
 
 export type Check = (evidence: Evidence) => Verdict
 
-interface Window {
+export interface Window {
   /** Look only at frames after this mark. */
   readonly from?: string
   /** And before this one. */
@@ -61,7 +61,7 @@ function markTime(recording: Recording, label: string | undefined, fallback: num
   return mark.t
 }
 
-function framesIn(recording: Recording, window: Window): ReadonlyArray<ProbeFrame> {
+export function framesIn(recording: Recording, window: Window): ReadonlyArray<ProbeFrame> {
   const from = markFrame(recording, window.from, 0)
   const to = markFrame(recording, window.to, recording.frames.length)
   const frames = recording.frames.slice(from, to)
@@ -81,8 +81,8 @@ export function shotAtTime(evidence: Evidence, t: number): number {
   return frame === undefined ? 0 : shotOfFrame(evidence, frame.index)
 }
 
-const shot = (evidence: Evidence, frame: ProbeFrame) => shotOfFrame(evidence, frame.index)
-const shotsOf = (evidence: Evidence, frames: ReadonlyArray<ProbeFrame>) => [...new Set(frames.map((frame) => shot(evidence, frame)))]
+export const shot = (evidence: Evidence, frame: ProbeFrame) => shotOfFrame(evidence, frame.index)
+export const shotsOf = (evidence: Evidence, frames: ReadonlyArray<ProbeFrame>) => [...new Set(frames.map((frame) => shot(evidence, frame)))]
 
 /** The images between two marks, by their stamped frame. */
 function pixelsIn(evidence: Evidence, window: Window): ReadonlyArray<ShotPixels> {
@@ -91,8 +91,8 @@ function pixelsIn(evidence: Evidence, window: Window): ReadonlyArray<ShotPixels>
   return evidence.pixels.filter((p) => p.frame !== null && p.frame >= from && p.frame < to)
 }
 
-const pass = (name: string, detail: string, shots: ReadonlyArray<number> = []): Verdict => ({ name, status: 'pass', detail, shots })
-const fail = (name: string, detail: string, shots: ReadonlyArray<number>): Verdict => ({ name, status: 'fail', detail, shots })
+export const pass = (name: string, detail: string, shots: ReadonlyArray<number> = []): Verdict => ({ name, status: 'pass', detail, shots })
+export const fail = (name: string, detail: string, shots: ReadonlyArray<number>): Verdict => ({ name, status: 'fail', detail, shots })
 
 const isRect = (value: ProbeValue): value is Rect => typeof value === 'object' && value !== null && 'width' in value
 const isScroll = (value: ProbeValue): value is ScrollValue => typeof value === 'object' && value !== null && 'fromBottom' in value
@@ -154,37 +154,6 @@ export function contentHoldsStill(probe: string, options: Window & { readonly to
     }
     if (jumps.length === 0) return pass(name, `no row in view moved over ${frames.length} animation frames`)
     return fail(name, `content jumped in ${jumps.length} animation frames: ${jumps.slice(0, 6).map((j) => `${Math.round(j.by)}px at frame #${shot(evidence, j.frame)}`).join(', ')}`, shotsOf(evidence, jumps.map((j) => j.frame)).slice(0, 12))
-  }
-}
-
-/**
- * Consecutive boxes of a `rows` probe with the same key (bubbles of one
- * group) sit exactly `gap` apart in every frame: no space opens between them,
- * whether a row was laid out at its size estimate or not.
- */
-export function evenGaps(probe: string, label: string, gap: number, options: Window = {}): Check {
-  const name = `${label} stay ${gap} px apart`
-  return (evidence) => {
-    const { recording } = evidence
-    const frames = framesIn(recording, options)
-    const off: Array<{ frame: ProbeFrame; key: string; by: number }> = []
-    let pairs = 0
-    for (const frame of frames) {
-      const boxes = frame.values[probe]
-      if (!Array.isArray(boxes)) continue
-      for (let i = 1; i < boxes.length; i++) {
-        const above = boxes[i - 1]!
-        const below = boxes[i]!
-        if (above.key === '' || above.key !== below.key) continue
-        pairs++
-        const by = below.y - (above.y + above.height)
-        if (Math.abs(by - gap) > 0.5) off.push({ frame, key: below.key, by })
-      }
-    }
-    if (pairs === 0) return fail(name, 'no two bubbles of one group were in view', [])
-    if (off.length === 0) return pass(name, `${pairs} pairs over ${frames.length} animation frames`)
-    const frameCount = new Set(off.map((o) => o.frame.index)).size
-    return fail(name, `${off.length} of ${pairs} pairs off, in ${frameCount} animation frames: ${off.slice(0, 6).map((o) => `${Math.round(o.by * 10) / 10}px at frame #${shot(evidence, o.frame)}`).join(', ')}`, shotsOf(evidence, off.map((o) => o.frame)).slice(0, 12))
   }
 }
 

@@ -4,8 +4,9 @@
 import { startFakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import { answer, test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
-import { contentHoldsStill, evenGaps, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, noLongFrames, scrollsOneWay, staysDrawn, switchesOnce } from './checks'
+import { contentHoldsStill, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, noLongFrames, scrollsOneWay, staysDrawn, switchesOnce } from './checks'
 import { Feel } from './feel'
+import { evenGaps } from './gaps'
 import { Studio } from './studio'
 
 // The feel fixtures of `./feel`, on the base that runs the agent.
