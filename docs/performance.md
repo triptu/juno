@@ -20,8 +20,9 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → every active conversation in the sidebar | 30 s | Every member conversation with activity in the window has its row, from `client.counts` (a provisional Main until its history lands). Live 23 to 25 s on 147 conversations (10-17). Measured by `pnpm sync:timeline`, live; not asserted in CI. |
 | First sign-in → unread counts exact for unread DMs and mentions | 1.6 s per DM, group DM and channel that mentions you, after the quick start | DMs and group DMs are read first, the unread ones first, then the channels that mention you (`historyOrder`: the owner's order of 10-16 with unread before read inside it), and each page makes its count exact. Live the 3 unread DMs were exact at 6.4 s and the mention, behind 51 read DMs, at 84.8 s (10-18). Measured by `pnpm sync:timeline` (`unreadDmsAndMentionsRight`), live; the order is asserted by `sync.test.ts`. |
 | First sign-in → no unread count left as a dot | 1.6 s per DM, group DM and unread conversation after the quick start | The unread followed threads and the other unread channels come next. Live 111.7 s for 73 conversations (10-18), 170.7 s with the 10-16 order. |
+| First sign-in → Home ready | 1.6 s per DM, group DM, conversation with an unread mention and conversation with unread followed threads, after the quick start | Home is ready once those have history, the `getView` pages are stored and the preview search is done (`sync_state.homeReady`, owner 10-18): the syncing line goes and Home's checks and AI titles start, while the rest of history fills in. Live 86.1 s, behind 54 DMs and 1 mention, instead of 235.9 s at the boot's end (10-18). Measured by `pnpm sync:timeline` (`homeReady`), live; `quick-start.spec.ts` checks on the fake that Home is ready before the last history page. |
 | First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, DMs, mentions, unread followed threads and other unread channels first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
-| Last history page → first sync ended | 30 s | The boot is recorded (Home ready, AI titles and Home's checks may start) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
+| Last history page → first sync ended | 30 s | The boot is recorded (Automated's job and its record may start; Home was ready before) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Home open (the sidebar's Home button, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts` over the opens that follow 300 ms after the last action. |
@@ -1364,6 +1365,22 @@ A first version read every unread conversation before the read DMs. It was measu
 | Calls | 366 | 367 | 368 |
 
 The unread DMs were exact at 6.4 s. The mention waits behind the read DMs, as the owner's order says, so it lands where the 10-16 order put it; the 10-17 figure was not a milestone of those runs but that place (position 53 of 146) times the measured spacing. The other unread channels now come before the user's own channels and the rest, which takes the last dot from 171 s to 112 s. No 429 in either run. The tests that check these orders and the paced first sync run at a tenth of the app's spacing (`fakeSlackPaceScale`, `scaledPacing` in `@juno/slack`): every method's spacing, the total ceiling and the interactive refill divided alike, so the ratios hold and the two paced tests take 9 s instead of 174 s.
+
+### Home ready before the first sync ends (2026-10-18)
+
+Home used to wait for the whole first sync. With the history order of 10-18, the conversations Home is made of are read first: DMs and group DMs, conversations with an unread mention, then those with unread followed threads. Home is ready once they have history, the `getView` pages are stored and the preview search is done (`sync_state.homeReady`). The syncing line goes, Home's checks and AI titles start, and the rest of history fills in behind it. Until the first sync ends, an item a later conversation brings fills a free reserved slot below the rows shown, so nothing painted moves; a caught-up Home stays so for the visit. Recent, Automated's job and its record still wait for the boot.
+
+`JUNO_LIVE=1 pnpm sync:timeline`, the same workspace (147 active conversations), one run on each side:
+
+| Seconds from start | Before (first-sync-order) | After |
+| --- | --- | --- |
+| Home ready | 235.9 | 86.1 |
+| Unread DMs and mentions exact | 84.8 | 86.1 |
+| Last history page | 222.8 | 224.0 |
+| First sync ended | 235.9 | 236.9 |
+| Calls | 368 | 368 |
+
+Home was ready right after the last of the 54 DMs and the one channel with a mention; no channel had only unread followed threads. No 429. Unread counts settled at 268.8 s in the second run, after the sync had ended, which looks like a message arriving in the live workspace, not a sync change.
 
 ### First sync timeline (2026-10-17)
 
