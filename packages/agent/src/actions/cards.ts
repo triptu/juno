@@ -328,12 +328,15 @@ function clickOutputOf(store: Store, cardId: string): string | undefined {
 /**
  * Whether a Change card's call made a change: "Applied" then, else "Done". A connection call made a
  * change only when its auto-review judged it one (`risk`); a call the review judged a read, or that
- * had no review (Always ask), claims nothing. A server's own read-only mark never decides this.
- * A Change card that is not a connection call (a correction, 13.10) always made one.
+ * had no review (Always ask), claims nothing, except a delete, which Juno's own check marks with
+ * its fixed line. A server's own read-only mark never decides this. A Change card that is not a
+ * connection call (a correction, 13.10) always made one.
  */
 function changes(payload: Extract<CardPayload, { _tag: 'change' }>): boolean {
-  if (payload.review === undefined) return true
-  return payload.review.risk !== undefined && payload.review.risk !== 'read'
+  const review = payload.review
+  if (review === undefined) return true
+  if (review.line === chatCopy.card.change.review.delete) return true
+  return review.risk !== undefined && review.risk !== 'read'
 }
 
 /** One line on what a card asks, for the model: its outcome, or the quote in a reply to it. Rendered from the stored payload. */
