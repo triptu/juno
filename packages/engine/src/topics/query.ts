@@ -46,6 +46,7 @@ import {
   isDm,
   isFollowed,
   isResolved,
+  previewSender,
   quietDaysOf,
   resolveTitle,
   rowTags,
@@ -53,6 +54,7 @@ import {
   topicStatus,
   tsToMillis,
   byLatestActivity,
+  type PreviewPerson,
   type ResolvedTitle,
   type Topic,
   type TopicStatus,
@@ -427,7 +429,7 @@ export const shapeRows = (
     const missing: Array<string> = []
     for (const id of userIds) if (!users.has(id)) missing.push(id)
     if (missing.length > 0) {
-      const found = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`
+      const found = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, is_bot FROM users WHERE id IN ${sql.in(missing)}`
       for (const id of missing) users.set(id, null)
       for (const user of found) users.set(user.id, user)
     }
@@ -466,7 +468,7 @@ export const shapeRows = (
       const entry: CacheEntry =
         hit !== undefined && sameSource(hit.source, row) && (peopleHold || samePeople(hit.people, personOf))
           ? hit
-          : { ...entryOf(row, columns, selfId, personOf, usergroups), source: row, parsed: columns }
+          : { ...entryOf(row, columns, selfId, personOf, users, usergroups), source: row, parsed: columns }
       next.set(row.topic_id, entry)
       entries.push(entry)
     }
@@ -516,6 +518,7 @@ function entryOf(
   columns: ParsedColumns,
   selfId: string | undefined,
   personOf: (id: string) => Person,
+  users: ReadonlyMap<string, UserRow | null>,
   usergroups: ReadonlyMap<string, UsergroupName> | undefined,
 ): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'moreParticipants' | 'sender' | 'title'> {
   const { participants, preview } = columns
@@ -535,7 +538,21 @@ function entryOf(
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
   named.push(...members)
-  const sender = preview.senderId !== undefined && preview.sender !== 'You' ? use(preview.senderId).name : preview.sender
+  // The preview's name (SPEC section 5): "You", nothing for the other side of a DM, else a first name, with a last
+  // initial when a namesake wrote in the topic or is in the group DM. A bot keeps its whole name.
+  const previewPerson = (id: string): PreviewPerson => {
+    const realName = users.get(id)?.real_name
+    return { id, name: use(id).name, ...(realName == null ? {} : { realName }) }
+  }
+  const mine = preview.sender === 'You' || (selfId !== undefined && preview.senderId === selfId)
+  const others = mine || row.c_kind === 'im' ? [] : [...(preview.namesakes ?? []), ...columns.members].filter((id) => id !== selfId && id !== preview.senderId)
+  const app = preview.senderId === undefined ? undefined : users.get(preview.senderId)?.is_bot === 1 ? use(preview.senderId).name : undefined
+  const sender = previewSender({
+    kind: row.c_kind,
+    mine,
+    ...(preview.senderId === undefined || app !== undefined ? { botName: app ?? preview.sender } : { person: previewPerson(preview.senderId) }),
+    others: others.map(previewPerson),
+  })
   const topic = topicFrom(row, columns, info)
   return {
     topic,

@@ -3,13 +3,14 @@
  * the activity row the index stores. `sync` loads the inputs and writes the
  * row; nothing here touches a database.
  */
-import { messageBody, messageTitle, previewText, type Lookups, type MessageContent } from '@juno/richtext'
+import { messageBody, messageTitle, type Lookups } from '@juno/richtext'
 import { compareTs, type Ts, type UserId } from './ids'
 import { messageMentionsMeDirectly, type Me } from './mentions'
+import { messagePreviewText, type PreviewMessage } from './preview'
 import type { ReadState } from './reads'
 import type { TopicActivity, TopicPreview } from './topic'
 
-export interface IndexMessage extends MessageContent {
+export interface IndexMessage extends PreviewMessage {
   readonly ts: Ts
   readonly userId?: UserId
   readonly deleted?: boolean
@@ -61,7 +62,7 @@ export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   }
 
   const sender = latest.userId === input.me.userId ? 'You' : input.senderName(latest.userId)
-  const preview: TopicPreview = { sender, text: previewText(messageBody(latest, input.lookups)) }
+  const preview: TopicPreview = { sender, text: messagePreviewText(latest, input.lookups) }
 
   return {
     activity: {

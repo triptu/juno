@@ -48,9 +48,9 @@ export const RowChannel = Schema.Struct({
 })
 export type RowChannel = typeof RowChannel.Type
 
-/** The row's preview. The view joins them as "Sender: text", or shows the sender alone when the text is empty. */
+/** The row's preview. The view joins them as "Sender: text", or shows the one that is not empty. */
 export const TopicPreview = Schema.Struct({
-  /** "You" for own messages, otherwise the sender's display name. */
+  /** "You" for own messages, a first name or a bot's name otherwise, and empty for the other side of a one-to-one DM (`previewSender`). */
   sender: Schema.String,
   /** Latest message with quote lines stripped. May be empty. */
   text: Schema.String,
