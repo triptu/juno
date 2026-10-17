@@ -1,0 +1,1 @@
+- 10-17 18:05 · ci-fix-26 · A Juno chat send no longer does nothing while an attached image is still being read: it waits for an image Juno takes and leaves out one that stays, as a send already waited for files that were read.
