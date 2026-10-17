@@ -81,6 +81,28 @@ function applyBounds(window: BrowserWindow, panel: Panel): void {
   const zoom = window.webContents.getZoomFactor()
   const { x, y, width, height } = panel.bounds
   panel.view.setBounds({ x: Math.round(x * zoom), y: Math.round(y * zoom), width: Math.round(width * zoom), height: Math.round(height * zoom) })
+  panel.view.setBorderRadius(Math.round(PANEL_RADIUS * zoom))
+}
+
+/** `--radius-panel` in @juno/tokens: the page's corners follow the panel's. */
+const PANEL_RADIUS = 18
+const FAVICON_MAX_BYTES = 64 * 1024
+
+/**
+ * The renderer may load images only from Slack's hosts, so the icon goes to
+ * it as a data url, fetched on the page's own session.
+ */
+async function faviconData(contents: Electron.WebContents, url: string): Promise<string | null> {
+  if (!/^https?:\/\//i.test(url)) return null
+  try {
+    const response = await contents.session.fetch(url)
+    const type = response.headers.get('content-type') ?? ''
+    if (!response.ok || !type.startsWith('image/')) return null
+    const bytes = Buffer.from(await response.arrayBuffer())
+    return bytes.length > FAVICON_MAX_BYTES ? null : `data:${type.split(';')[0]};base64,${bytes.toString('base64')}`
+  } catch {
+    return null
+  }
 }
 
 function create(window: BrowserWindow): Panel {
@@ -103,15 +125,21 @@ function create(window: BrowserWindow): Panel {
   // What the header shows: title, icon and whether the page is still loading.
   const sendState = () => {
     if (window.isDestroyed() || contents.isDestroyed()) return
-    const state: WebPanelState = { url: contents.getURL(), title: contents.getTitle(), favicon: panel.favicon, loading: contents.isLoading() }
+    const url = contents.getURL()
+    const title = contents.getTitle()
+    const state: WebPanelState = { url, title: title === url ? '' : title, favicon: panel.favicon, loading: contents.isLoading() }
     window.webContents.send(Events.webPanelState, state)
   }
   contents.on('did-start-loading', sendState)
   contents.on('did-stop-loading', sendState)
   contents.on('page-title-updated', sendState)
   contents.on('page-favicon-updated', (_event, favicons) => {
-    panel.favicon = favicons[0] ?? null
-    sendState()
+    const page = contents.getURL()
+    void faviconData(contents, favicons[0] ?? '').then((data) => {
+      if (contents.isDestroyed() || contents.getURL() !== page) return
+      panel.favicon = data
+      sendState()
+    })
   })
   contents.on('did-navigate', () => {
     panel.favicon = null
