@@ -36,6 +36,7 @@ export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=
 spec_jobs=$(at_least $(( cores / 2 )) 1)
 if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi
 export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
+script_started=$SECONDS
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
   while sleep 2; do
@@ -48,15 +49,27 @@ export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_APALACHE=${SPECS_APALACHE:-$(a
     now=($(head -1 /proc/stat)); idle=$(( now[4] + now[5] - prev[4] - prev[5] )); total=0
     for i in 1 2 3 4 5 6 7 8; do total=$(( total + now[i] - prev[i] )); done
     [ $total -gt 0 ] && echo $(( 100 * (total - idle) / total )) >> /out/cpu.txt; prev=("${now[@]}")
+    # Busy stops at 100%; the tasks waiting for a core and the time they wait show how far past it the machine is.
+    running=$(awk '$1 == "procs_running" { print $2 }' /proc/stat)
+    pressure=$(awk -F'avg10=' '/^some/ { split($2, a, " "); print a[1] }' /proc/pressure/cpu 2>/dev/null)
+    echo "$(( SECONDS - script_started )) ${running:-0} ${pressure:-0}" >> /out/load.txt
   done ) &
 sampler=$!
-script_started=$SECONDS
 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
 if [ -s /out/cpu.txt ]; then
   sort -n /out/cpu.txt | awk '{ s += $1; v[NR] = $1 } END { printf "remote: CPU busy %d%% on average, %d%% at the median, over %d s on %d cores\n", s / NR, v[int((NR + 1) / 2)], NR * 2, '"$cores"' }' >&2
+fi
+if [ -s /out/load.txt ]; then
+  # Runnable tasks per core (1 means every core has one, more means tasks queue) and the share of time some task
+  # waited for a core (the kernel's CPU pressure, over 10 s), at the median and the 90th percentile, then every 30 s.
+  pick() { sort -n | awk '{ v[NR] = $1 } END { m = int((NR + 1) / 2); q = int(NR * 0.9); if (q < 1) q = 1; print v[m], v[q] }'; }
+  runnable=$(awk '{ printf "%.1f\n", $2 / '"$cores"' }' /out/load.txt | pick)
+  pressure=$(awk '{ print $3 }' /out/load.txt | pick)
+  echo "remote: runnable per core ${runnable% *} at the median, ${runnable#* } at p90; CPU pressure ${pressure% *}% at the median, ${pressure#* }% at p90" >&2
+  awk '{ b = int($1 / 30); r[b] += $2; p[b] += $3; c[b]++ } END { for (b in c) printf "remote: load +%d s: runnable per core %.1f, CPU pressure %.0f%%\n", b * 30, r[b] / c[b] / '"$cores"', p[b] / c[b] }' /out/load.txt | sort -t+ -k2 -n >&2
 fi
 
 reports=()
