@@ -151,10 +151,16 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
           ),
         }
 
+  const handlers = rowHandlers(actions, rowMessage, latest, scrollRef, composer)
   return {
     actions,
     suggestion,
-    ...rowHandlers(actions, rowMessage, latest, scrollRef, composer),
+    ...handlers,
+    // ↑ selects a message, which E then edits: the field's chunk comes now if the idle preload has not run.
+    selectNewest: () => {
+      void editField.load()
+      handlers.selectNewest()
+    },
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
