@@ -590,7 +590,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear` (`--duration-menu-in` for popovers and menus), origin at the anchor corner. Exit opacity only | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue | |
+| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue. `global.css` turns every transition off (`0s`) and shortens every animation to 0.01ms, so a state change such as a row's fill shows in its own frame | |
 | Hover | Only inside `@media (hover: hover)` | |
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |

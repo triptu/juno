@@ -115,15 +115,12 @@ const styles = stylex.create({
   },
   // Both layers fill the box. The swap is opacity alone; `fade` animates it,
   // not a transition, because a transition starts only when the row renders.
-  // That includes the 0.01ms one global.css gives everything under reduced
-  // motion, which draws one frame of the old opacity.
   layer: {
     position: 'absolute',
     inset: 0,
     display: 'block',
     lineHeight: 0,
     opacity: 1,
-    transitionProperty: 'none',
   },
   hidden: {
     opacity: 0,

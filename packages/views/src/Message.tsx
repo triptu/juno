@@ -562,11 +562,6 @@ const styles = stylex.create({
     display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
-    // Under reduced motion global.css gives every element a 0.01ms
-    // transition, and the flip is often written just after the slot shows:
-    // the slot would then be drawn above the row, under the band, until the
-    // next frame. The slot never animates, so it has no transition.
-    transitionProperty: 'none',
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
