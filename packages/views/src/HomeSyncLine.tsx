@@ -24,6 +24,7 @@ export function HomeSyncLine({ line, progress }: HomeSyncLineProps) {
 }
 
 const styles = stylex.create({
-  // Home's line has tabular figures, each one `ch` wide.
-  count: (digits: number) => ({ display: 'inline-block', minWidth: `${digits}ch`, textAlign: 'end' }),
+  // Home's line has tabular figures, each one `ch` wide. A fixed width, not a minimum: the count never has more digits
+  // than the total, and a box that cannot grow keeps the words after it still even by a fraction of a pixel.
+  count: (digits: number) => ({ display: 'inline-block', width: `${digits}ch`, textAlign: 'end' }),
 })

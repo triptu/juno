@@ -46,7 +46,7 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0]) => test.extend({
 /** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */
 const medium = signInOn({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } })
 
-medium('first sign-in shows threads, channels and DMs before history is read, then fills in without a reload', async ({ juno }) => {
+medium('first sign-in shows threads and DMs before history is read, channels once sorted, then fills in without a reload', async ({ juno }) => {
   test.setTimeout(180_000)
   await juno.signIn({ skipSetUp: false })
   const signedIn = Date.now()
@@ -57,10 +57,11 @@ medium('first sign-in shows threads, channels and DMs before history is read, th
   await expect(sidebar.rows.first()).toBeVisible({ timeout: Math.max(0, QUICK_START_CEILING_MS - (Date.now() - signedIn)) })
   const quickStartMs = Date.now() - signedIn
   test.info().annotations.push({ type: 'quick start', description: `${quickStartMs} ms from sign-in to sidebar rows` })
-  const first = await sidebar.titles()
-  // A channel's Main is titled with its name; a thread with the first words of its root.
-  expect(first.some((title) => title.startsWith('#'))).toBe(true)
-  expect(first.some((title) => !title.startsWith('#') && title.split(' ').length >= 3)).toBe(true)
+  // A thread is titled with the first words of its root.
+  expect((await sidebar.titles()).some((title) => !title.startsWith('#') && title.split(' ').length >= 3)).toBe(true)
+  // A channel's Main is titled with its name. A channel waits out of All until Automated's rules have read its
+  // history, five seconds at most, so a bot channel never shows there first (SPEC 5, "The topic list").
+  await expect.poll(async () => (await sidebar.titles()).some((title) => title.startsWith('#')), { timeout: 10_000 }).toBe(true)
   await sidebar.filter('DMs')
   await expect(sidebar.rows.first()).toBeVisible()
   await sidebar.filter('All')

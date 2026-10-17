@@ -29,6 +29,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     usersOnBackground: false,
     onSelfPresence: options.onSelfPresence ?? (() => Effect.void),
     onHistory: options.onHistory ?? (() => Effect.void),
+    onListed: options.onListed ?? Effect.void,
     unknownUsers: new Set(),
     usergroupTopics: new Set(),
     photoless: new Set(),

@@ -221,10 +221,13 @@ describe('cold boot', () => {
     const early = window.order.map((id) => window.rows.get(id)!)
     // Followed threads from the first getView page, titled from their first words.
     expect(early.some((row) => row.id.startsWith('t:') && row.title !== '')).toBe(true)
-    // Channels and DMs from client.counts alone: their time and an unread dot, no preview yet.
-    const alerts = early.find((row) => row.id === 'm:C0ALERTSPROD')!
-    expect(alerts).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
+    // DMs from client.counts alone: their time and an unread dot, no preview yet. Channels wait out of All until
+    // Automated's rules have read their history, so a bot channel never shows there first.
     expect(early.find((row) => row.id === 'm:G0MAYALEO')!.preview.text).toBe('')
+    expect(early.some((row) => row.id === 'm:C0ALERTSPROD')).toBe(false)
+    // With history still held, the channels show after `HOLD_MILLIS`, from client.counts alone.
+    const held = await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the channels after the hold')
+    expect(held.find((row) => row.id === 'm:C0ALERTSPROD')).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
 
     // History lands while the boot is still running: previews and exact counts arrive in the same list, and the
     // bot channel is sorted into Automated as soon as its page is stored, before the boot ends.

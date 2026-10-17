@@ -22,6 +22,7 @@ export const keys = {
   sidebarViews: ['sidebar_views'] satisfies InvalidationKeys,
   automatedChannels: ['automated_channels'] satisfies InvalidationKeys,
   automatedMoves: ['automated_moves'] satisfies InvalidationKeys,
+  automatedHolds: ['automated_holds'] satisfies InvalidationKeys,
   syncedRanges: (channel: string) => ({ synced_ranges: [channel] }) satisfies InvalidationKeys,
   messages: (channel: string) => ({ messages: [channel] }) satisfies InvalidationKeys,
 }

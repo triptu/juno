@@ -78,6 +78,7 @@ const context = (): Effect.Effect<SyncContext> =>
       usersOnBackground: false,
       onSelfPresence: () => Effect.void,
       onHistory: () => Effect.void,
+      onListed: Effect.void,
       unknownUsers: new Set(),
       usergroupTopics: new Set(),
       photoless: new Set(),

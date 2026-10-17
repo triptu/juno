@@ -67,7 +67,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               {title}
             </h2>
             {line === undefined ? null : (
-              <Text variant="body" tone="muted" as="p" numeric truncate sx={styles.line}>
+              <Text variant="body" tone="muted" as="p" numeric sx={styles.line}>
                 {line}
               </Text>
             )}
@@ -233,15 +233,16 @@ const styles = stylex.create({
   itemsWelcome: { marginTop: { default: spacing['--space-8'], [SHORT]: 0 } },
   // The card's own top margin closes up on a short window too (`WelcomeCard`).
   welcome: { width: '100%', maxWidth: layout['--home-width'] },
+  // As wide as the greeting and centred in the column, so the syncing line can start under its first letter.
   greeting: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    alignSelf: 'stretch',
+    alignItems: 'flex-start',
+    alignSelf: 'center',
     maxWidth: '100%',
     minWidth: 0,
     marginTop: spacing['--space-3-5'],
-    textAlign: 'center',
+    textAlign: 'start',
     position: 'relative',
   },
   title: {
@@ -258,12 +259,14 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
-  // In the gap above the rows, so they stay put when it goes; as wide as the column, so a new count moves nothing.
+  // In the gap above the rows, so they stay put when it goes. It starts where the greeting starts and its copy
+  // runs to the right, so neither "Syncing with Slack." becoming the count nor the count going up moves its first word.
   line: {
     position: 'absolute',
     top: `calc(100% + ${spacing['--space-1-5']})`,
     insetInline: 0,
     margin: 0,
+    whiteSpace: 'nowrap',
   },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {

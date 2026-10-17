@@ -70,6 +70,13 @@ export interface RunSyncOptions {
    * Automated when it is clearly a bot channel). It must not fail.
    */
   readonly onHistory?: (channel: string) => Effect.Effect<void>
+  /**
+   * Runs once the cold boot has listed the conversations and named the
+   * people of the DMs, before the quick start lets the sidebar show rows
+   * (the engine holds the channels Automated's rules have not decided yet
+   * out of All). It must not fail.
+   */
+  readonly onListed?: Effect.Effect<void>
 }
 
 /**
