@@ -21,9 +21,6 @@ const KEPT = 120
 
 const trace = (): SendTrace | undefined => (globalThis as { __junoSendTrace?: SendTrace }).__junoSendTrace
 
-/** Whether the trace is on; a caller that builds an entry checks this first. */
-export const sendTracing = (): boolean => trace() !== undefined
-
 /** Appends `what` with `detail`, read only while tracing. */
 export function traceSend(what: string, detail?: () => Record<string, unknown>): void {
   const on = trace()
