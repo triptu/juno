@@ -279,3 +279,20 @@ chatTest('a Juno response leaves the owner bubble where it first painted', async
     await chat.expectJuno('You said: Check the layout of this reply')
   })
 })
+
+// A conversation that fits the view learns its start while the slot above its first message is on screen: the slot
+// stays, empty, so the messages do not move; the next open knows the start and keeps no slot (SPEC 7, "Under the islands").
+test('a short conversation keeps its messages still when its start becomes known, and has no slot when opened again', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const slot = juno.topic.list.locator('[data-older-line]')
+  await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
+    await win.locator('[data-topic-id="m:D0MAYA"]').click()
+    await expect(juno.topic.list.locator('[data-message-row]').first()).toBeVisible()
+    await expect(slot).toHaveAttribute('data-older-line', 'ended')
+  })
+  await juno.sidebar.row(POSTGRES).open()
+  await win.locator('[data-topic-id="m:D0MAYA"]').click()
+  await expect(juno.topic.list.locator('[data-message-row]').first()).toBeVisible()
+  await expect(slot).toHaveCount(0)
+})

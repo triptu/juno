@@ -245,7 +245,7 @@ export function MessageList({
         {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >
         {items.length > 0 && older !== 'none' ? (
-          <div aria-live="polite" data-older-line="" {...stylex.props(styles.olderLine)}>
+          <div aria-live="polite" data-older-line={older} {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
               <Text variant="meta" tone="muted">
                 Loading older messages
