@@ -1,13 +1,15 @@
 import * as stylex from '@stylexjs/stylex'
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
+import { ListChecks } from '@phosphor-icons/react/dist/icons/ListChecks'
+import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { metaOf, rowButtons } from './homeRows'
+import { metaOf, opensReview, rowButtons } from './homeRows'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -26,7 +28,7 @@ export interface HomeProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
-  /** Tidy up's row and Automated's record: opens the review of every topic or move (`SettledReview`, `AutomatedReview`). */
+  /** A review card's row (Tidy up, Automated's record, follow-ups that look done, old drafts): opens its review sheet. */
   readonly onReview: (itemId: string) => void
   /** Automated's Move (`automated`) and Keep in All (`kept`). */
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
@@ -110,17 +112,20 @@ interface HomeRowProps {
   readonly onItemMenu: HomeProps['onItemMenu']
 }
 
+/** The cards drawn with an icon tile instead of their topic's art. */
+const TILE_ICONS: Partial<Record<HomeItem['kind'], typeof Broom>> = { tidyUp: Broom, automated: Robot, automatedMoves: Robot, doneFollowUps: ListChecks, oldDrafts: NotePencil }
+
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
- * One row: a link to the topic (Tidy up's and Automated's record open their review), and its buttons in
+ * One row: a link to the topic (a review card's opens its review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, or Automated's Keep
  * in All and Move. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
 function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
-  const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' || item.kind === 'automatedMoves' ? Robot : undefined
+  const tileIcon = TILE_ICONS[item.kind]
   const body = (
     <>
       {tileIcon !== undefined || topic === undefined ? (
@@ -152,7 +157,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       : undefined
   return (
     <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
-      {item.kind === 'tidyUp' || item.kind === 'automatedMoves' ? (
+      {opensReview(item.kind) ? (
         <button type="button" aria-haspopup="dialog" onClick={() => onReview(item.id)} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
           {body}
           <span {...stylex.props(styles.caret)}>
