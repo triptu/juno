@@ -20,7 +20,7 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { Composer, DestinationChip, destinationLabel, HomeRecent, HomeWriteTop, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { Composer, DestinationChip, destinationLabel, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { junoCommands } from './juno/actions'
@@ -110,8 +110,13 @@ function sendToMention(sendTo: ReturnType<typeof useSendTo>, listId: string): Co
   }
 }
 
-/** ⌘N, ⌘T and "+" ask this Home to focus its field, and with ⌘N to open its destination list. */
-function useFocusRequest(tabId: string, focusField: () => void, openList: () => void, focusList: () => void): void {
+/**
+ * ⌘N, ⌘T and "+" ask this Home to focus its field, and with ⌘N to open its
+ * destination list. Keys typed since the shortcut were held
+ * (`holdKeys`); they are typed into the field or the search once it has
+ * focus, which for a search not yet mounted is when it mounts.
+ */
+function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefined, openList: () => void, search: () => HTMLElement | null | undefined): void {
   const request = useAtomValue(homeFocusAtom)
   const active = useAtomValue(tabsAtom, (tabs) => tabs.active === tabId)
   // Taken during render, so the list is open in the same frame; the focus moves once it has painted.
@@ -127,9 +132,18 @@ function useFocusRequest(tabId: string, focusField: () => void, openList: () => 
     registry.set(homeFocusAtom, undefined)
     // With the list, focus goes to its search: its own autoFocus can run while a new tab is still hidden, and
     // moving focus to the field would close the list.
-    if (request.list) focusList()
-    else focusField()
-  }, [taken, focusField, focusList])
+    const target = request.list ? search : field
+    target()?.focus()
+    if (target() === document.activeElement) return releaseKeys()
+    const root = field()?.closest('[data-home]')
+    const onFocus = () => {
+      if (target() !== document.activeElement) return
+      root?.removeEventListener('focusin', onFocus)
+      releaseKeys()
+    }
+    root?.addEventListener('focusin', onFocus)
+    return () => root?.removeEventListener('focusin', onFocus)
+  }, [taken, field, search])
 }
 
 /** Sends the draft where it goes: Juno opens its chat with the question; a person or channel gets it in its Main and Home stays. */
@@ -226,10 +240,11 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const files = useAttachments(tabId, { tabbable: false })
   const listId = useId()
   const focusField = useCallback(() => inputRef.current?.focus(), [])
-  const focusList = useCallback(() => inputRef.current?.closest('[data-home]')?.querySelector<HTMLElement>('[role="dialog"][aria-label="Send to"] input')?.focus(), [])
+  const field = useCallback(() => inputRef.current, [])
+  const search = useCallback(() => inputRef.current?.closest('[data-home]')?.querySelector<HTMLElement>('[role="dialog"][aria-label="Send to"] input'), [])
   const destination = useDestination(tabId, focusField)
   const sendTo = useSendTo(draft, (conversation) => destination.choose(conversation, true))
-  useFocusRequest(tabId, focusField, destination.openList, focusList)
+  useFocusRequest(tabId, field, destination.openList, search)
 
   // Shown again: the field takes focus, so keys typed after ⌘T or a click on Home reach it.
   useLayoutEffect(() => {
