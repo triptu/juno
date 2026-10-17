@@ -37,7 +37,7 @@ export interface HomeRecentProps {
   readonly onPick: (conversation: PickConversation) => void
   /** ⌘-click or ⌘Enter: opens the conversation instead. */
   readonly onOpen: (conversation: PickConversation) => void
-  /** Keep Recent's space while its rows may still arrive (the first sync), so the chip and the field never move. */
+  /** Recent's room, empty, while its rows can still change (the first sync, or the ranking on its way): rows that would re-rank under the pointer stay out, and nothing moves when they come. */
   readonly reserve?: boolean
 }
 
@@ -49,14 +49,16 @@ export interface HomeRecentProps {
  * the caret. Below about 400px the columns stack. Recent always keeps room
  * for five rows in each column, so rows that arrive later move nothing above;
  * the rows sit at the bottom of that room, so the chip stays close under them.
+ * While `reserve` is set the room stays empty, so rows never change under the
+ * pointer during the first sync.
  */
 export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve = false }: HomeRecentProps) {
   // Both columns always take their place, so one that fills later moves nothing; the keys skip an empty one.
   const lists = [people, channels]
   const filled = lists.flatMap((list, index) => (list.length > 0 ? [index] : []))
   const [at, setAt] = useState<readonly [number, number]>([0, 0])
-  if (filled.length === 0 && !reserve) return null
-  if (filled.length === 0) return <RecentReserved />
+  if (reserve) return <RecentReserved />
+  if (filled.length === 0) return null
   const column = filled.includes(at[0]) ? at[0] : filled[0]!
   const row = Math.min(at[1], lists[column]!.length - 1)
   const move = (event: KeyboardEvent<HTMLElement>) => {

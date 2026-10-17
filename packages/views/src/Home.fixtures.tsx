@@ -27,14 +27,16 @@ interface Write {
   readonly noRecent?: boolean
   /** Only the first few of each column: a new account. */
   readonly fewRecent?: number
+  /** The first sync is running: Recent's room stays empty. */
+  readonly syncing?: boolean
   /** A running job's state line in place of the placeholder (SPEC 13.4). */
   readonly jobLine?: string
 }
 
 /** The composer as the container builds it: Recent, the chip, then the field. */
-function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, jobLine }: Write = {}): ReactNode {
+function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, syncing = false, jobLine }: Write = {}): ReactNode {
   const chip = <DestinationChip destination={destination} open={listOpen} onOpen={noop} query="" onQuery={noop} conversations={listOpen ? recentConversations : undefined} onPick={noop} />
-  const recent = noRecent ? null : <HomeRecent people={recentPeople.slice(0, fewRecent)} channels={recentChannels.slice(0, fewRecent)} chosen={destination?.key} onPick={noop} onOpen={noop} />
+  const recent = noRecent ? null : <HomeRecent people={recentPeople.slice(0, fewRecent)} channels={recentChannels.slice(0, fewRecent)} chosen={destination?.key} onPick={noop} onOpen={noop} reserve={syncing} />
   const active = sendTo?.rows[0]?.key
   return (
     <Composer
@@ -131,9 +133,10 @@ export default defineFixtures(
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }),
       'caught-up-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }, narrow),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
-      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3 }),
+      // Recent keeps its room empty until the sync ends, so its rows never re-rank under the pointer.
+      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
       // Mid-sync: the rows that landed so far, with room kept for the rest.
-      'syncing-rows': state({ line: 'Syncing with Slack.', items: [homeItems.waiting], loading: true, reservedItems: 3 }),
+      'syncing-rows': state({ line: 'Syncing with Slack.', items: [homeItems.waiting], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
