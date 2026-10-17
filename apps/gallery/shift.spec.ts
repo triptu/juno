@@ -177,7 +177,11 @@ for (let part = 0; part < shards; part++) {
         // after it would be gone or different: open the state again whenever a touch changed what it draws.
         const original = await markup(page, route)
         for (const [index, element] of (await targets(page, route)).entries()) {
-          if ((await markup(page, route)) !== original) await openState(page, route)
+          if ((await markup(page, route)) !== original) {
+            // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
+            await page.goto('about:blank')
+            await openState(page, route)
+          }
           for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
       })
