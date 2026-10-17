@@ -2,10 +2,8 @@ import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState,
 import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
 import {
   emptyHomeDraft,
-  frequentConversationsAtom,
   homeDraftAtom,
   homeFocusAtom,
-  homeViewAtom,
   junoAvailableAtom,
   pickConversation,
   pickConversationsAtom,
@@ -21,12 +19,13 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { AttachmentNote, Composer, DestinationChip, destinationLabel, holdKeys, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { AttachmentNote, Composer, destinationLabel, holdKeys, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
+import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
 import { useMentions } from './mentions'
-import { openJuno, openTopic } from './navigation'
+import { openJuno } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
 
@@ -42,7 +41,6 @@ function typeIn(field: HTMLTextAreaElement | null, text: string): void {
 /** A first @ or # with what follows it, and nothing else typed yet. */
 const FIRST = /^([@#])([^\s@#]*)$/
 
-const isPeople = (conversation: PickConversation) => conversation.kind === 'im' || conversation.kind === 'mpim'
 
 /** The "Send to" rows for a first @ (people) or # (channels): the recent ones that match, then the rest, at most six. */
 function sendToRows(sections: PickConversations | undefined, trigger: '@' | '#'): ReadonlyArray<PickConversation> {
@@ -53,6 +51,7 @@ function sendToRows(sections: PickConversations | undefined, trigger: '@' | '#')
 }
 
 function placeholderOf(draft: HomeDraft, junoOn: boolean, jobLine: string | undefined): string {
+  if (draft.thread !== undefined) return `Reply in ${draft.thread.title}`
   if (draft.conversation !== undefined) return `Message ${destinationLabel(draft.conversation)}`
   if (!junoOn) return 'Start with @ for a person or # for a channel'
   // A running job's state line replaces the placeholder while Juno is chosen (SPEC 13.4).
@@ -181,7 +180,7 @@ function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefi
   }, [taken, field, search])
 }
 
-/** Sends the draft where it goes: Juno opens its chat with the question; a person or channel gets it in its Main and Home stays. */
+/** Sends the draft where it goes: Juno opens its chat with the question; a person or channel gets it in its Main or the thread chosen, and Home stays. */
 async function deliver(tabId: string, body: string, to: Destination, junoOn: boolean, openList: () => void): Promise<boolean> {
   const current = registry.get(homeDraftAtom(tabId))
   const here = sendTarget(current)
@@ -205,7 +204,8 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
   setHomeDraft(registry, tabId, emptyHomeDraft)
   const exit = await sendMessage(registry, target, encodeMentions(body, current.mentions), undefined, attached.ids, startsThread)
   if (exit._tag === 'Success') {
-    if (current.conversation !== undefined) showToast(registry, { text: `Sent to ${destinationLabel(current.conversation)}` })
+    if (current.thread !== undefined && target.kind === 'channel' && target.threadTs === current.thread.rootTs) showToast(registry, { text: `Replied in ${current.thread.title}` })
+    else if (current.conversation !== undefined) showToast(registry, { text: `Sent to ${destinationLabel(current.conversation)}` })
     return true
   }
   // Nothing was queued: the draft, its destination and its files come back, unless something new was written meanwhile.
@@ -216,7 +216,7 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
 }
 
 /** Where the draft goes, and the chip's list: choosing from Recent, the list or a first @ or # sets it and puts focus back in the field. */
-function useDestination(tabId: string, focusField: () => void) {
+export function useDestination(tabId: string, focusField: () => void) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const openList = () => {
@@ -301,7 +301,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     onPicks: (picks) => set({ ...latest(), mentions: picks }),
     onChange: (text) => set({ ...latest(), draft: text }),
     field: inputRef,
-    place: { channel: draft.conversation?.channelId, threadTs: undefined },
+    place: { channel: draft.conversation?.channelId, threadTs: draft.thread?.rootTs },
   })
   // Juno takes plain text: the @ and # suggestions are for people and channels in Slack.
   const toSlack = draft.conversation !== undefined
@@ -342,43 +342,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       {...(toSlack ? { leading: files.leading } : {})}
       attachments={files.chips !== undefined && !toSlack && junoOn ? <AttachmentNote chips={files.chips} note={JUNO_FILES_NOTE} /> : files.chips}
       onFiles={files.onFiles}
-      above={<HomeWriteTop recent={<Recent chosen={draft.conversation?.key} onPick={destination.choose} />} chip={<Chip destination={draft.conversation} junoOn={junoOn} onType={(text) => typeIn(inputRef.current, text)} {...destination.chip} />} />}
+      above={<WriteTop tabId={tabId} draft={draft} junoOn={junoOn} destination={destination} focusField={focusField} onType={(text) => typeIn(inputRef.current, text)} />}
     />
   )
 })
-
-/** Recent, from the local ranking: five people and five channels. ⌘-click or ⌘Enter opens a conversation instead of choosing it. */
-function Recent({ chosen, onPick }: { readonly chosen: string | undefined; readonly onPick: (conversation: PickConversation) => void }) {
-  const frequent = useAtomValue(frequentConversationsAtom)
-  const recent = frequent._tag === 'Success' ? frequent.value : []
-  // Until the first sync ends and the ranking is here, Recent keeps its room empty: rows landing mid-sync re-rank under the pointer.
-  const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready)
-  return (
-    <HomeRecent
-      people={recent.filter(isPeople)}
-      channels={recent.filter((conversation) => !isPeople(conversation))}
-      chosen={chosen}
-      onPick={onPick}
-      onOpen={(conversation) => (conversation.mainId === undefined ? onPick(conversation) : openTopic(conversation.mainId, { newTab: true }))}
-      reserve={syncing || frequent._tag !== 'Success'}
-    />
-  )
-}
-
-interface ChipProps {
-  readonly destination: PickConversation | undefined
-  readonly junoOn: boolean
-  readonly open: boolean
-  readonly query: string
-  readonly onQuery: (query: string) => void
-  readonly onOpen: (open: boolean) => void
-  readonly onPick: (conversation: PickConversation | undefined) => void
-  readonly onType: (text: string) => void
-}
-
-/** The destination chip, with its list's live query while it is open. */
-function Chip({ destination, junoOn, open, query, onQuery, onOpen, onPick, onType }: ChipProps) {
-  const list = useAtomValue(pickConversationsAtom(open ? query : undefined))
-  const conversations = useHeld(list._tag === 'Success' ? list.value : undefined, open)
-  return <DestinationChip destination={destination} juno={junoOn} open={open} onOpen={onOpen} query={query} onQuery={onQuery} conversations={conversations.value} loading={conversations.loading} onPick={onPick} onType={onType} />
-}
