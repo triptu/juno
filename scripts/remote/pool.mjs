@@ -6,7 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpat
 import { hostname, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap, orphanGraceMs } from './pool-decisions.mjs'
+import { attemptSettled, capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -229,16 +229,25 @@ function reconcile() {
   const remaining = remainingSnapshot.instances
   const present = new Set(remaining.map((instance) => instance.cluster_id))
   for (const state of states) if (!present.has(state.id) && !state.live && state.created < remainingSnapshot.startedAt) forget(state.id)
-  for (const entry of pending) if (!entry.live) {
-    const observed = instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
-    const gone = !remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
-    if (!entry.failed || (observed && gone) || Date.now() - entry.created >= orphanGraceMs) rmSync(statePath(entry.id), { force: true })
+  for (const { live, ...entry } of pending) if (!live) {
+    // The daemon reads one inventory per tick, so a machine destroyed above is
+    // seen gone on the next tick; remember that it was seen.
+    const observed = entry.seen || instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    const visible = remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    // A client that died before nsc create left nothing behind; one that died
+    // during it is treated as a failure from now on.
+    if (!entry.failed && !entry.creating) rmSync(statePath(entry.id), { force: true })
+    else if (!entry.failed) write({ ...entry, pid: undefined, failed: true, failedAt: Date.now() })
+    else if (attemptSettled({ entry, observed, present: visible, inventoryStartedAt: remainingSnapshot.startedAt, now: Date.now() })) rmSync(statePath(entry.id), { force: true })
+    else if (observed && !entry.seen) write({ ...entry, seen: true })
   }
   return remaining
 }
 
 async function provision(machine, pending, create) {
   invalidateInventory()
+  pending = { ...pending, creating: Date.now() }
+  write(pending)
   try {
     const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
     // Admission must never observe neither the pending reservation nor its machine.
@@ -250,7 +259,7 @@ async function provision(machine, pending, create) {
     } finally { unlock('decide') }
     return { id, warm: false, images: [] }
   } catch (error) {
-    write({ ...pending, pid: undefined, failed: true })
+    write({ ...pending, pid: undefined, failed: true, failedAt: Date.now() })
     if (error.instanceId && destroy(error.instanceId)) rmSync(statePath(pending.id), { force: true })
     throw error
   } finally { invalidateInventory() }
