@@ -129,7 +129,7 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
 }
 
 /** The channel icon's size. */
-const CHANNEL_ICON = '15px'
+const CHANNEL_ICON = '15px' // tokens-allow: the channel icon's size
 
 const styles = stylex.create({
   emoji: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], objectFit: 'contain' },

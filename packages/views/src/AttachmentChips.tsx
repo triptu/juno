@@ -27,7 +27,7 @@ export interface AttachmentChipsProps {
 }
 
 // A chip's longest side: a file chip's name gives way past it.
-const CHIP_MAX_WIDTH = '240px'
+const CHIP_MAX_WIDTH = '240px' // tokens-allow: a file chip's widest
 
 const FAILED = 'Could not read this file'
 

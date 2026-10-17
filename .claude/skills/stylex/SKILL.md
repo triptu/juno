@@ -15,8 +15,10 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    heights, fonts, shadows, durations, easing and layout sizes. `pnpm lint` runs `scripts/check-tokens.mjs` on UI, views and renderer StyleX calls.
    It rejects literal colours and lengths, including nested conditions and templates.
    Zero, percentages and 1px border/outline hairlines pass. For geometry exceptions,
-   add a trailing `// tokens-allow: reason` on the declaration line. Constants and
-   runtime parameters are not evaluated; review those for token use.
+   add a trailing `// tokens-allow: reason` on the declaration line. A module constant used in
+   a style is checked as its value, and takes the allow comment on its own line. A `color-mix(`
+   with a literal share ("currentColor 6%") is a raw colour. Runtime parameters are not
+   evaluated; review those for token use.
    - Allowed raw values: `0`, `none`, `auto`, `transparent`, `1px` hairlines. Before writing any
      other number, search `tokens.stylex.ts` for it (focus ring, press scale, disabled opacity and
      font weights have tokens or are being added). A one-off size that no other component will

@@ -193,7 +193,7 @@ const styles = stylex.create({
   link: {
     color: accent['--hl-text'],
     textDecorationLine: 'underline',
-    textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
+    textDecorationColor: colors['--link-underline'],
     textUnderlineOffset: sizes['--link-underline-offset'],
   },
 })

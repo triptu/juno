@@ -238,7 +238,7 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
 }
 
 /** The longest a place's name runs in its button before the ellipsis. */
-const THREAD_LABEL_MAX = '260px'
+const THREAD_LABEL_MAX = '260px' // tokens-allow: a place name's widest in its button
 
 // The new destination rises 4px into the chip with the fade; with reduced motion it only fades.
 const rise = stylex.keyframes({

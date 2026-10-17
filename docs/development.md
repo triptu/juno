@@ -1096,9 +1096,12 @@ the hardened package; the packaged smoke instead uses Chromium CDP. The
 including aliased imports and nested conditions. Raw CSS colours, px/rem/em
 lengths (also inside templates and calc), and numeric length properties fail.
 Zero, percentages, unitless values, token references and 1px border/outline
-hairlines pass. Named component constants and runtime style parameters are
-not evaluated. For a real geometry exception, put `// tokens-allow: reason`
-after the declaration on the same line; an empty reason does not pass.
+hairlines pass. A `color-mix(` with a literal share is a raw colour; one whose
+shares are tokens passes. A module constant used in a style is checked as its
+value (a number used as a factor inside a template is not a length). Runtime
+style parameters are not evaluated. For a real geometry exception, put
+`// tokens-allow: reason` after the declaration on the same line (for a
+constant, after the constant); an empty reason does not pass.
 Run the rule tests with `node --test scripts/check-tokens.test.mjs`.
 
 Measured on the shared Mac (2026-10-15), the token check alone took 0.36 s

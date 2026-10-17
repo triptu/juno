@@ -29,3 +29,18 @@ test('hairline allowance does not cover negative widths or rounded corners', () 
     assert.equal(checkSource(source(declaration)).length, 1, declaration)
   }
 })
+
+test('a colour mix with a literal share is a raw colour; a token share is not', () => {
+  assert.equal(checkSource(source("color: 'color-mix(in oklch, currentColor 6%, transparent)'")).length, 1)
+  assert.equal(checkSource(source('color: `color-mix(in oklch, ${hues.a} ${hues.share}, ${colors.b})`')).length, 0)
+})
+
+test('follows a module constant into the style that uses it, and honours its own allow comment', () => {
+  const style = (constant) => `import * as sx from '@stylexjs/stylex';\n${constant}\nconst styles = sx.create({ root: { maxWidth: WIDE } });`
+  assert.equal(checkSource(style("const WIDE = '160px'")).length, 1)
+  assert.equal(checkSource(style("const WIDE = 'min(200px, 100%)'")).length, 1)
+  assert.equal(checkSource(style("const WIDE = '160px' // tokens-allow: The pill's widest.")).length, 0)
+  assert.equal(checkSource(style("const WIDE = sizes['--x']")).length, 0)
+  // A count used as a factor in a calc() is not a length.
+  assert.equal(checkSource("import * as sx from '@stylexjs/stylex';\nconst ROWS = 5\nconst styles = sx.create({ root: { minHeight: `calc(${ROWS} * ${sizes.row})` } });").length, 0)
+})

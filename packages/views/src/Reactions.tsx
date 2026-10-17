@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { Person, ReactionView } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Chip } from '@juno/ui'
 import { useReactorsPopover } from './reactorsPopover'
 
@@ -15,8 +15,6 @@ export interface ReactionsProps {
   readonly people?: ReadonlyMap<string, Person>
 }
 
-// A custom emoji in a chip is drawn at the chip's text size.
-const CHIP_EMOJI_SIZE = '14px'
 
 /** The reaction chips under a message (inventory 6.4). Mine reads as pressed. Hovering one shows who reacted. */
 export function Reactions({ reactions, onToggle, people }: ReactionsProps) {
@@ -78,8 +76,8 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
   },
   image: {
-    width: CHIP_EMOJI_SIZE,
-    height: CHIP_EMOJI_SIZE,
+    width: sizes['--icon-14'],
+    height: sizes['--icon-14'],
     objectFit: 'contain',
   },
 })

@@ -112,7 +112,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
 }
 
 /** The presence dot: 10px with a 2px ring in the menu surface (inventory 2.1). */
-const DOT = '10px'
+const DOT = '10px' // tokens-allow: the presence dot
 
 const styles = stylex.create({
   root: {

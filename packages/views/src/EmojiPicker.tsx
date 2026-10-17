@@ -261,7 +261,7 @@ function neighbour(container: HTMLElement, from: HTMLElement, key: string): HTML
 }
 
 // The emoji glyph and custom images in a 32px cell.
-const GLYPH = '20px'
+const GLYPH = '20px' // tokens-allow: an emoji glyph in a 32px cell
 // A section heading: tag text with its block padding. Sticky headers keep
 // this much of the scroller's top clear when focus moves up.
 const HEADING_HEIGHT = `calc(${spacing['--space-2']} + ${text['--text-tag-leading']} + ${spacing['--space-1']})`

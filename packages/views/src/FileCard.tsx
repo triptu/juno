@@ -23,7 +23,7 @@ export interface FilesProps {
 }
 
 // The upload line's thickness.
-const PROGRESS_HEIGHT = '2px'
+const PROGRESS_HEIGHT = '2px' // tokens-allow: the upload line's thickness
 
 
 /**

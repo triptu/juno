@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { MouseEvent, ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
-import { Chip, CodeBlock, Divider, Text, type HueName } from '@juno/ui'
+import { Chip, CodeBlock, Divider, focusRing, Text, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
 import { slackDate } from './time'
 
@@ -26,9 +26,9 @@ export interface MessageBodyProps {
 
 // An emoji-only message (one to three emoji and nothing else) is drawn
 // larger, as Slack does. A ratio of the body size, used nowhere else.
-const EMOJI_ONLY_SCALE = '1.75em'
+const EMOJI_ONLY_SCALE = '1.75em' // tokens-allow: a ratio of the body size
 // Custom emoji images sit on the text line at a little over its size.
-const INLINE_EMOJI_SIZE = '1.25em'
+const INLINE_EMOJI_SIZE = '1.25em' // tokens-allow: a ratio of the line's text
 const MAX_EMOJI_ONLY = 3
 
 const isSpace = (inline: BodyInline) => inline.kind === 'text' && inline.text.trim() === ''
@@ -172,7 +172,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
         onLink?.(inline.url)
       }
       return (
-        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, styles.focusRing)}>
+        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, focusRing.outside)}>
           {styled(inline.text, inline.style)}
         </a>
       )
@@ -201,7 +201,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           tabIndex={tabIndex}
           data-channel={inline.id}
           data-channel-name={inline.name}
-          {...stylex.props(styles.channelButton, styles.focusRing)}
+          {...stylex.props(styles.channelButton, focusRing.outside)}
         >
           <Chip variant="filled" size="inline">
             <bdi>#{inline.name}</bdi>
@@ -236,7 +236,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
         onLink?.(inline.url ?? '')
       }
       return (
-        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, styles.focusRing)}>
+        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, focusRing.outside)}>
           {time}
         </a>
       )
@@ -288,7 +288,7 @@ const styles = stylex.create({
     paddingBlock: spacing['--space-1'],
     paddingInline: spacing['--space-2-5'],
     borderRadius: radii['--radius-md'],
-    backgroundColor: 'color-mix(in oklch, currentColor 6%, transparent)',
+    backgroundColor: colors['--quote-fill'],
     color: colors['--foreground-subtle'],
     whiteSpace: 'pre-wrap',
   },
@@ -347,7 +347,7 @@ const styles = stylex.create({
   link: {
     color: accent['--hl-text'],
     textDecorationLine: 'underline',
-    textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
+    textDecorationColor: colors['--link-underline'],
     textUnderlineOffset: sizes['--link-underline-offset'],
     cursor: 'pointer', // external-link-cursor
     borderRadius: radii['--radius-xs'],
@@ -382,13 +382,6 @@ const styles = stylex.create({
     font: 'inherit',
     cursor: 'default',
     borderRadius: radii['--radius-tag'],
-  },
-  focusRing: {
-    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
 })
 
