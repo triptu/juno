@@ -25,7 +25,7 @@ export const attach = (key: string, files: ReadonlyArray<File>) =>
 /**
  * A composer's attachments (spec section 8): the attach button, the chips
  * and the handler for pasted and dropped files, for the composer whose
- * draft `key` owns (a topic, or a New chat tab). Without `tabbable` the
+ * draft `key` owns (a topic, or a Home tab). Without `tabbable` the
  * attach button is out of the Tab order and works by pointer.
  */
 export function useAttachments(key: string, { tabbable = true }: { readonly tabbable?: boolean } = {}) {

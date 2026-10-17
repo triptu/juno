@@ -2,7 +2,7 @@ import { chunk } from './chunks'
 
 /**
  * The check bar's chunk (`SendCheckPanel.tsx`), shared by the topic composer
- * and New chat. The bar only shows after Enter, so it stays out of the start
+ * and Home's. The bar only shows after Enter, so it stays out of the start
  * bundle.
  */
 export const sendCheck = chunk(() => import('./SendCheckPanel'))

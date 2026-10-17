@@ -1,7 +1,8 @@
 /**
- * Handlers for New chat (`contract/src/routes/newChat.ts`). The two picker
- * queries follow the open workspace like search (`search/handlers.ts`) and
- * never call Slack. Sending is the send feature's (`send/`).
+ * Handlers for Home's destination picks and Recent, and ⌘K's ranked
+ * conversations (`contract/src/routes/newChat.ts`, named for the New chat
+ * page they were built for). The queries follow the open workspace like
+ * search (`search/handlers.ts`) and never call Slack. Sending is the send feature's (`send/`).
  */
 import { NewChatRoutes } from '@juno/contract'
 import type { InvalidationKeys } from '@juno/store'
