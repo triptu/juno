@@ -1,5 +1,7 @@
 /** What a Home row says and offers, apart from how it looks (`Home`). */
+import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
+import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { ListChecks } from '@phosphor-icons/react/dist/icons/ListChecks'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
@@ -9,16 +11,18 @@ import { placesLine } from './settled'
 import { relativeTime } from './time'
 
 /** The cards drawn with an icon tile instead of their topic's art. */
-export const TILE_ICONS: Partial<Record<HomeItemKind, PhosphorIcon>> = { tidyUp: Broom, automated: Robot, automatedMoves: Robot, doneFollowUps: ListChecks, oldDrafts: NotePencil }
+export const TILE_ICONS: Partial<Record<HomeItemKind, PhosphorIcon>> = { tidyUp: Broom, automated: Robot, automatedMoves: Robot, doneFollowUps: ListChecks, oldDrafts: NotePencil, unfollow: BellSlash, ignore: EyeSlash }
 
 /** The cards whose row opens a review sheet. */
-export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' || kind === 'doneFollowUps' || kind === 'oldDrafts' || kind === 'automatedMoves'
+export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' || kind === 'doneFollowUps' || kind === 'oldDrafts' || kind === 'unfollow' || kind === 'ignore' || kind === 'automatedMoves'
 
 /** The meta line: plain data, the same with and without AI. */
 export function metaOf(item: HomeItem, now: number): string {
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
   if (opensReview(item.kind)) return placesLine(item.topics.map((topic) => topic.place))
   const topic = item.topics[0]
+  // A mention in an ignored channel: the title names the person and the channel, so the meta line has the thread and the time.
+  if (item.kind === 'mentioned') return [topic?.title === item.channel?.label ? undefined : topic?.title, item.at === undefined ? undefined : relativeTime(item.at, now)].filter((part) => part !== undefined && part !== '').join(' · ')
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
   const first = topic?.title
   const place = topic?.place

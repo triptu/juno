@@ -66,7 +66,7 @@ export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProp
           </div>
         </Surface>
       </Section>
-      <Section heading="Other cards" sub="Each opens a review on Home, row by row, with Undo. Neither changes anything in Slack.">
+      <Section heading="Other cards" sub="Each opens a review on Home, row by row, with Undo. Each review says what it changes in Slack before you act.">
         <Surface kind="group" padding="md" sx={[styles.card, styles.checks]}>
           <Checkbox
             label="Follow-ups that look done"
@@ -79,6 +79,18 @@ export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProp
             description="A draft untouched for two weeks, in a topic that moved on since."
             checked={prefs.drafts}
             onChange={(event) => onChange({ ...prefs, drafts: event.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Threads you never open"
+            description="A followed thread with two weeks of replies you have not read. Unfollow also unfollows in Slack."
+            checked={prefs.unfollow}
+            onChange={(event) => onChange({ ...prefs, unfollow: event.currentTarget.checked })}
+          />
+          <Checkbox
+            label="Channels you never read"
+            description="A channel you have not read in 30 days, with more than 50 messages since. Ignore is only in Juno."
+            checked={prefs.ignore}
+            onChange={(event) => onChange({ ...prefs, ignore: event.currentTarget.checked })}
           />
         </Surface>
       </Section>

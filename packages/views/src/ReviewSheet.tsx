@@ -108,7 +108,7 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
           </Text>
           <IconButton icon={Info} label={about.label} size={28} expanded={showAbout} aria-controls={showAbout ? aboutId : undefined} onClick={() => setShowAbout(!showAbout)} data-review-about="" />
         </span>
-        <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
+        <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead} data-review-lead="">
           {lead}
         </Text>
       </div>

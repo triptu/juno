@@ -126,7 +126,7 @@ export default defineFixtures(
       'appearance-comfortable': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />, { density: 'comfortable' }),
       // Tidy up (SPEC 14): what Resolve does, then when Juno suggests a topic.
       'tidy-up': at('tidy-up', <SettingsTidyUp prefs={TIDY_UP_DEFAULTS} onChange={noop} aiAssist />),
-      'tidy-up-ai-off': at('tidy-up', <SettingsTidyUp prefs={{ quiet: '1d', threads: true, dms: false, followUps: true, drafts: false }} onChange={noop} aiAssist={false} />),
+      'tidy-up-ai-off': at('tidy-up', <SettingsTidyUp prefs={{ quiet: '1d', threads: true, dms: false, followUps: true, drafts: false, unfollow: true, ignore: false }} onChange={noop} aiAssist={false} />),
       'tidy-up-minimum-window': at('tidy-up', <SettingsTidyUp prefs={TIDY_UP_DEFAULTS} onChange={noop} aiAssist />, { width: 336, height: 436, padded: false }),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       'ai-activity-background-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, spentUsd: 2.51, backgroundUsd: 2.5 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),

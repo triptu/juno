@@ -20,6 +20,7 @@ import Home from './Home.fixtures'
 import SettledReview from './SettledReview.fixtures'
 import AutomatedReview from './AutomatedReview.fixtures'
 import ReviewCards from './ReviewCards.fixtures'
+import SuggestionReviews from './SuggestionReviews.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
@@ -106,6 +107,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   SettledReview,
   AutomatedReview,
   ReviewCards,
+  SuggestionReviews,
   HoverToolbar,
   JunoChatList,
   JunoComposer,
