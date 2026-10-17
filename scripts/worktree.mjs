@@ -1,16 +1,18 @@
 // Creates and removes agent worktrees with a cheap install.
 //
-//   node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--no-install]
+//   node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
 //   node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
 //
 // `add` checks out <branch> (default <name>; an existing branch is reused, a
-// new one starts at --base, default origin/main) and runs
+// new one starts at --base, default origin/main; --detach checks out <ref>
+// with no branch, as a DMG build does) and runs
 // `pnpm install --frozen-lockfile`. The workspace uses pnpm's global virtual
 // store, so the install links about 1,000 entries and takes about a second
 // when the store is warm. It prints the worktree's path last.
 //
 // Worktrees go on /Volumes/AgentWork when that volume is mounted (file event
-// logging and Spotlight are off there), else in <repo>/.claude/worktrees.
+// logging and Spotlight are off there), else in <repo>/.claude/worktrees
+// (`worktreeFolder` in scripts/worktree-folder.mjs).
 // Either folder gets a .metadata_never_index file so Spotlight skips it.
 // The install waits while the load average is above 8.
 //
@@ -19,8 +21,9 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { loadavg } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { worktreeFolder } from './worktree-folder.mjs'
 
 const [command, target, ...rest] = process.argv.slice(2)
 const option = (name) => {
@@ -30,13 +33,12 @@ const option = (name) => {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim()
 
 const main = dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir'))
-const volume = '/Volumes/AgentWork'
-const folder = existsSync(join(volume, '.fseventsd/no_log')) ? join(volume, 'worktrees', basename(main)) : join(main, '.claude/worktrees')
+const folder = worktreeFolder(main)
 
 if (command === 'add' && target) await add(target)
 else if (command === 'remove' && target) remove(target)
 else {
-  console.error('usage: node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--no-install]')
+  console.error('usage: node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]')
   console.error('       node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]')
   process.exitCode = 2
 }
@@ -46,12 +48,16 @@ async function add(name) {
   if (existsSync(path)) throw new Error(`${path} already exists`)
   mkdirSync(folder, { recursive: true })
   writeFileSync(join(folder, '.metadata_never_index'), '')
+  const detach = option('--detach')
   const branch = option('--branch') ?? name
   const base = option('--base') ?? 'origin/main'
   const exists = execFileSync('git', ['-C', main, 'branch', '--list', branch], { encoding: 'utf8' }).trim() !== ''
-  if (!exists && base.startsWith('origin/')) git('-C', main, 'fetch', '--quiet', 'origin', base.slice('origin/'.length))
-  if (exists) git('-C', main, 'worktree', 'add', '--quiet', path, branch)
-  else git('-C', main, 'worktree', 'add', '--quiet', '-b', branch, path, base)
+  if (detach) git('-C', main, 'worktree', 'add', '--quiet', '--detach', path, detach)
+  else {
+    if (!exists && base.startsWith('origin/')) git('-C', main, 'fetch', '--quiet', 'origin', base.slice('origin/'.length))
+    if (exists) git('-C', main, 'worktree', 'add', '--quiet', path, branch)
+    else git('-C', main, 'worktree', 'add', '--quiet', '-b', branch, path, base)
+  }
   if (!rest.includes('--no-install')) {
     for (let waited = 0; loadavg()[0] > 8; waited += 30) {
       if (waited % 300 === 0) console.error(`worktree: load ${loadavg()[0].toFixed(1)} is above 8; waiting to install`)
