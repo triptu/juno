@@ -39,6 +39,8 @@ export interface DispatcherOptions {
   readonly position: () => Promise<JournalPosition>
   /** Something a card shows changed. */
   readonly onChange: () => void
+  /** A click's child settled and its card's outcome is recorded: done, failed or unknown. */
+  readonly onSettled?: (cardId: string) => void
   readonly onReport?: (error: unknown) => void
 }
 
@@ -93,6 +95,7 @@ export function createDispatcher(options: DispatcherOptions) {
       store.db.prepare('UPDATE approvals SET refused = ? WHERE id = ? AND refused IS NULL').run(reason, item.approvalId)
     })
     settleCard(item.cardId)
+    options.onSettled?.(item.cardId)
   }
 
   const settleCard = (cardId: string) => settleCardOutcome(store, cardId)
@@ -157,6 +160,9 @@ export function createDispatcher(options: DispatcherOptions) {
       options.onReport?.(error)
       result = { _tag: 'unknown', detail: 'The action failed in Juno.' }
     }
+    if (result.output !== undefined) {
+      store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line) VALUES (?, ?, ?)').run(attemptId, result.output.model ?? null, result.output.line ?? null)
+    }
     switch (result._tag) {
       case 'done':
         crashPoint('attempt.beforeReceipt')
@@ -171,6 +177,7 @@ export function createDispatcher(options: DispatcherOptions) {
     }
     settleCard(item.cardId)
     options.onChange()
+    options.onSettled?.(item.cardId)
     return true
   }
 

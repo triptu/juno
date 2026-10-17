@@ -7,6 +7,7 @@ import type { McpManagerApi } from './manager'
 import { McpError, denied, destructiveArguments, forbidden } from './types'
 import { json, parseObject, validateArguments } from './catalogue'
 import { notionCheck, notionPreconditions, notionReconcile } from './notion'
+import { clickOutput } from './results'
 
 export const toolKey = (id: string, name: string) => `mcp:${encodeURIComponent(id)}:${encodeURIComponent(name)}`
 const connectHash = (manager: McpManagerApi, id: string) => digestJson(json(manager.stored(id).config))
@@ -65,7 +66,11 @@ export function mcpExecutors(manager: McpManagerApi): ReadonlyArray<Executor> {
           return 'valid'
         } catch { return 'preconditionFailed' }
       },
-      run: async ({ payload }) => (await runWrite(manager, config.id, tool.name, payload)).result,
+      // The click's result goes to the model with the card's outcome, and its first line to the card.
+      run: async ({ payload }) => {
+        const ran = await runWrite(manager, config.id, tool.name, payload)
+        return ran.value === undefined ? ran.result : { ...ran.result, output: clickOutput(ran.value) }
+      },
       reconcile: async ({ payload }) => {
         if (identity(manager, config.id, payload) !== 'valid' || tool.name !== 'notion-update-page') return { _tag: 'unknown' }
         try {

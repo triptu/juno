@@ -66,6 +66,15 @@ export function createActions(options: ActionsOptions & {
   ]
   const dispatcher = createDispatcher({
     store, executors, position: options.position, onChange: changed,
+    // A connection call or a sign-in a click ran: the run goes on with its outcome, which this input
+    // carries (`carryOutcomes`), as a question card's answer does.
+    onSettled: (cardId) => {
+      const card = cardRow(store, cardId)
+      if (card === undefined || card.quiet === 1 || (card.kind !== 'change' && card.kind !== 'connect')) return
+      // Only once every child settled and the outcome waits to be carried.
+      if (store.db.prepare('SELECT 1 FROM card_outcomes WHERE card_id = ? AND carried_by IS NULL').get(cardId) === undefined) return
+      options.accept({ opId: `outcome:${cardId}`, kind: 'click', text: `<card-settled card="${cardId}"/>` })
+    },
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   let starting: Promise<void> = Promise.resolve()

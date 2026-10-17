@@ -299,8 +299,24 @@ export function carryOutcomes(store: Store, opId: string): string {
     const rows = store.db
       .prepare('SELECT card_outcomes.card_id AS id, cards.kind, outcome, summary FROM card_outcomes JOIN cards ON cards.id = card_outcomes.card_id WHERE carried_by = ? ORDER BY at, card_id')
       .all(opId) as Array<{ id: string; kind: string; outcome: CardOutcome; summary: string }>
-    return rows.map((row) => `<card-outcome card="${row.id}" kind="${row.kind}" outcome="${row.outcome}">${escaped(row.summary)}</card-outcome>`).join('\n')
+    // A connection call a click ran carries what it gave back, as the tool's result would have been.
+    return rows.map((row) => {
+      const output = row.kind === 'change' ? clickOutputOf(store, row.id) : undefined
+      return `<card-outcome card="${row.id}" kind="${row.kind}" outcome="${row.outcome}">${escaped(row.summary)}${output ? `\n${escaped(output)}` : ''}</card-outcome>`
+    }).join('\n')
   })
+}
+
+/** The model text of the last attempt any child of a card made, if its executor gave one. */
+function clickOutputOf(store: Store, cardId: string): string | undefined {
+  const row = store.db
+    .prepare(
+      `SELECT action_outputs.model FROM action_outputs JOIN attempts ON attempts.id = action_outputs.attempt_id
+       JOIN authorizations ON authorizations.id = attempts.authorization_id JOIN intents ON intents.id = authorizations.intent_id
+       WHERE intents.card_id = ? AND action_outputs.model IS NOT NULL ORDER BY attempts.rowid DESC LIMIT 1`,
+    )
+    .get(cardId) as { model: string } | undefined
+  return row?.model
 }
 
 /** One line on what a card asks, for the model: its outcome, or the quote in a reply to it. Rendered from the stored payload. */
@@ -403,7 +419,9 @@ function doneLine(payload: CardPayload, receipt: unknown): { readonly line: stri
       return { line: copy.connect.connected }
     case 'change': {
       const open = (receipt as { open?: unknown } | null)?.open
-      return Schema.is(OpenTarget)(open) ? { line: copy.change.applied, open } : { line: copy.change.applied }
+      // The auto-review judged it only reads: nothing was applied.
+      const line = payload.review?.risk === 'read' ? copy.change.done : copy.change.applied
+      return Schema.is(OpenTarget)(open) ? { line, open } : { line }
     }
     case 'remove':
       return { line: copy.remove.removed(payload.messages.length) }
@@ -461,10 +479,27 @@ function statusOf(store: Store, card: CardRow, payload: CardPayload, evidences: 
   const outcomes = evidences.map((e) => (e.attempts.some((a) => a.outcome === 'done') ? 'done' : e.attempts.some((a) => a.outcome === 'consumed' || a.outcome === 'submitted' || a.outcome === 'cancel-requested') || e.attempts.length === 0 ? 'working' : 'failed'))
   if (outcomes.every((o) => o === 'done')) {
     const receipt = receiptOf(store, evidences[0])
-    return { _tag: 'done', ...doneLine(payload, receipt) }
+    const detail = payload._tag === 'change' ? outputOf(store, evidences[0]?.attempts.find((a) => a.outcome === 'done')?.id)?.line : undefined
+    return { _tag: 'done', ...doneLine(payload, receipt), ...(detail ? { detail } : {}) }
   }
   if (outcomes.includes('working')) return { _tag: 'working' }
-  return { _tag: 'failed', line: chatCopy.card.failed }
+  // A connection call says what went wrong: the server's error, else what Juno recorded.
+  const detail = payload._tag === 'change' ? failureOf(store, evidences.flatMap((e) => e.attempts).at(-1)?.id) : undefined
+  return { _tag: 'failed', line: chatCopy.card.failed, ...(detail ? { detail } : {}) }
+}
+
+/** What a connection call a click ran gave back (`action_outputs`), by its attempt. */
+function outputOf(store: Store, attemptId: string | undefined): { readonly model: string | null; readonly line: string | null } | undefined {
+  if (attemptId === undefined) return undefined
+  return store.db.prepare('SELECT model, line FROM action_outputs WHERE attempt_id = ?').get(attemptId) as { model: string | null; line: string | null } | undefined
+}
+
+function failureOf(store: Store, attemptId: string | undefined): string | undefined {
+  if (attemptId === undefined) return undefined
+  const line = outputOf(store, attemptId)?.line
+  if (line) return line
+  const row = store.db.prepare('SELECT action_results.detail FROM attempts JOIN action_results ON action_results.authorization_id = attempts.authorization_id WHERE attempts.id = ?').get(attemptId) as { detail: string } | undefined
+  return row?.detail
 }
 
 function receiptOf(store: Store, child: ChildEvidence | undefined): unknown {
