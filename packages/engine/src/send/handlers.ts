@@ -4,7 +4,7 @@
  * workspace and never calls Slack. `messages.precheck` asks the route model; `messages.check` reads its answer.
  * `messages.postcheck` and `messages.grammar` check a sent message afterwards (`checks.ts`, `grammar.ts`).
  */
-import { NotSignedIn, SendRoutes } from '@juno/contract'
+import { decodeDraft, NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
 import { AiProvider } from '@juno/ai'
 import { Clock, Effect, Stream } from 'effect'
@@ -52,7 +52,8 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.send': (payload) => provide(sendMessage(payload)).pipe(Effect.tap(() => Effect.gen(function* () {
         const at = yield* Clock.currentTimeMillis
         for (const [id, entry] of sent) if (at - entry.at >= SENT_CHECK_WINDOW_MILLIS) sent.delete(id)
-        sent.set(payload.clientMsgId, { text: payload.text, at, workspace: yield* workspace.current })
+        // Checked as the field showed it, the form the edit field opens with, not as Slack encodes it.
+        sent.set(payload.clientMsgId, { text: decodeDraft(payload.text).text, at, workspace: yield* workspace.current })
       }))),
       // The send is accepted: local fixes now, and the grammar request for the exact text sent starts.
       'messages.postcheck': ({ clientMsgId }) => Effect.gen(function* () {

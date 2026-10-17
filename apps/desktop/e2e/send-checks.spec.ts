@@ -249,6 +249,24 @@ test('Home checks a channel draft and can post in the suggested thread', async (
   expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
 })
 
+test('a message with a mention gets its fix line, and Review opens it as the field showed it', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(POSTGRES).open()
+  await topic.composer.pressSequentially('Thanks @ma')
+  await expect(topic.suggestion('Maya')).toBeVisible()
+  await topic.composer.press('Enter')
+  await topic.composer.pressSequentially('the the build is green')
+  await topic.composer.press('Enter')
+  await topic.expectSent('Thanks')
+  expect(posts(fake).map((call) => call.args['text'])).toEqual(['Thanks <@U0MAYA> the the build is green'])
+  const suggestion = juno.win.locator('[data-send-suggestion]')
+  await expect(suggestion).toContainText('the the → the')
+  await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
+  await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toHaveValue('Thanks @Maya the build is green')
+})
+
 test('Home sends local mistakes unchanged; the fix line waits on the message in its topic', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()

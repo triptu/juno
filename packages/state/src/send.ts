@@ -11,6 +11,7 @@
  * fix line waits on the sent message (`sentSuggestions.ts`).
  */
 import {
+  decodeDraft,
   draftsGet,
   draftsSet,
   messagesCheck,
@@ -47,7 +48,8 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
   })
   // Your own send moves its row at once, even while the sidebar holds its order.
   if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
-  if (exit._tag === 'Success' && sendChecksApply(text)) void checkSent(registry, { clientMsgId, original: text, sentAt })
+  // The line belongs to the text as the field showed it, which is what the message's edit text is.
+  if (exit._tag === 'Success' && sendChecksApply(text)) void checkSent(registry, { clientMsgId, original: decodeDraft(text).text, sentAt })
   return exit
 }
 
