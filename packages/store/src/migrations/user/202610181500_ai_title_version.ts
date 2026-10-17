@@ -10,6 +10,8 @@ import { SqlClient } from 'effect/sql'
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`ALTER TABLE topic_overlay ADD COLUMN ai_title_version INTEGER`
-  yield* sql`CREATE INDEX topic_overlay_old_ai_title ON topic_overlay (topic_id) WHERE ai_title IS NOT NULL AND ai_title_version IS NULL`
+  // Safe to run again, as later migrations must be (test/migrations.test.ts).
+  const columns = new Set((yield* sql<{ name: string }>`SELECT name FROM pragma_table_info('topic_overlay')`).map((column) => column.name))
+  if (!columns.has('ai_title_version')) yield* sql`ALTER TABLE topic_overlay ADD COLUMN ai_title_version INTEGER`
+  yield* sql`CREATE INDEX IF NOT EXISTS topic_overlay_old_ai_title ON topic_overlay (topic_id) WHERE ai_title IS NOT NULL AND ai_title_version IS NULL`
 })
