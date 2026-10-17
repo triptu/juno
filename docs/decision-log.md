@@ -9,6 +9,7 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 - 10-17 11:40 · tooling-1017 · Health tools get a time limit scaled by load and one retry on timeout, and a timeout is reported as a timeout, not as a finding; lint still fails then, since nothing was checked.
 - 10-17 11:25 · tooling-1017 · The T3 watcher reads 1 s after a change and backs off to 10 s, and wakes early on `t3_thread_wait` or an answer Juno sends; T3 Code has no change notification, and its wait only wakes on a run's end.
 - 10-17 11:04 · tooling-1017 · Every package Node runs by stripping types sets `erasableSyntaxOnly`, so `pnpm typecheck` catches parameter properties and enums before the agent's crash tests do.
+- 10-17 05:56 · ci-fix-17 · The 5 s quick-start budget is asserted by `quick start` in `perf.spec.ts` on the Mac; `quick-start.spec.ts` keeps the flow with a 30 s ceiling and records the time, since a timing budget cannot hold inside a loaded remote plan (2.7 s quiet, before and after the tour).
 - 10-17 04:30 · narrow-fixes · Under a 560px All topics table Msgs hides too, so the table fits down to 500px; it scrolls sideways only below that, where a focused row's ring can be cut.
 - 10-17 04:22 · narrow-fixes · A ListRow with `wrap` puts its controls on their own line under the text when the text would get narrower than 200px; the Notifications hours rows use it.
 - 10-17 04:21 · narrow-fixes · On a page under 576px wide Home keeps 24px sides instead of 48, and a greeting too long for the column takes an ellipsis; it stays one line.

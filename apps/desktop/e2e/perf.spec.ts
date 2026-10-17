@@ -1236,3 +1236,32 @@ test('New chat open to first paint', async ({ juno, win }) => {
   }
   within('New chat open, p95', stats('New chat open to first paint', samples).p95, 50)
 })
+
+test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per call, production pacing', async () => {
+  test.setTimeout(300_000)
+  const samples: number[] = []
+  for (let i = 0; i < 3; i++) {
+    const fake = await startFakeSlack({ seed: largeSeed(), latencyMillis: 300 })
+    const userData = await tempUserData()
+    const slackDir = await tempUserData()
+    try {
+      const slackApp = await writeSlackApp(fake, slackDir)
+      const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, paced: true })
+      try {
+        const juno = new Juno(running.app, running.win)
+        await juno.signIn({ skipSetUp: false })
+        const signedIn = Date.now()
+        await juno.skipSetUp()
+        await expect(juno.sidebar.rows.first()).toBeVisible({ timeout: 60_000 })
+        samples.push(Date.now() - signedIn)
+      } finally {
+        await running.close()
+      }
+    } finally {
+      await fake.close()
+      await rm(userData, { recursive: true, force: true })
+      await rm(slackDir, { recursive: true, force: true })
+    }
+  }
+  within('quick start, slowest of three', stats('quick start, sign-in to sidebar rows', samples).p95, 5_000)
+})

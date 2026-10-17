@@ -1,0 +1,1 @@
+- 10-17 05:56 · ci-fix-17 · The 5 s quick-start budget is asserted by `quick start` in `perf.spec.ts` on the Mac; `quick-start.spec.ts` keeps the flow with a 30 s ceiling and records the time, since a timing budget cannot hold inside a loaded remote plan (2.7 s quiet, before and after the tour).
