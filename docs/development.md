@@ -35,7 +35,6 @@ Run these from the repo root.
 | `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
-| `pnpm tour:shots` | Builds the gallery and regenerates the tour's screenshots and callout boxes in `packages/views/src/tour/shots/` ("The tour's screenshots"). |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
 | `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
@@ -534,13 +533,6 @@ timeout. Global setup prevents this mismatch after a merge.
 - **Screenshots.** `pnpm gallery:shots` writes `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`.
 - **Behaviour specs.** The `behaviour` project in `apps/gallery/playwright.config.ts` runs every `*.spec.ts` in `apps/gallery/` except `shots.spec.ts`, so a new spec file runs without editing the config. `pnpm affected` passes a changed spec as `/<name>.spec.ts`; the slash keeps `geometry.spec.ts` from also matching `list-geometry.spec.ts`.
 
-### The tour's screenshots
-
-The tour (SPEC 4, "The tour") shows five screenshots of Juno, each in a light and a dark copy, in `packages/views/src/tour/shots/`. They are generated, never drawn by hand, so they show the UI as it is:
-
-- The scenes are gallery states, `TourScene` (`packages/views/src/tour/TourScene.fixtures.tsx`): the window at its minimum size, 720 × 480, built from the real views and fixture data. Each scene names its callouts' targets in `data-tour-anchors` (Playwright selectors).
-- `pnpm tour:shots` builds the gallery, shoots every scene at 2x in both themes into `<step>-<theme>.webp` (lossy WebP at 0.92, about 60 to 90 KB each), measures each anchor's box and writes `shots/manifest.ts`, which `TourSheet` imports. It fails when an anchor finds nothing, falls outside the picture, is covered, or sits in a different place in the two themes. It runs locally through the heavy-job queue (about 15 s) and needs the installed Google Chrome.
-- Refresh them after a change that alters what a scene shows (a row, the sidebar's top, the topic header, the Juno chat or a card), look at them (`GALLERY_SHOTS_ONLY=TourSheet pnpm gallery:shots` shows them in the sheet), and commit the WebP files with the manifest. The copy and the callout labels are in `src/tour/copy.ts`.
 
 ### The layout-shift guard
 

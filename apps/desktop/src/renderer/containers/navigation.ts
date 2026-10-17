@@ -68,7 +68,8 @@ import {
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
-  showTour,
+  showWelcome,
+  tickWelcome,
   signedInAtom,
   slackLink,
   tabByNumber,
@@ -317,6 +318,8 @@ export function openTopicInBackground(id: string): void {
 }
 
 function openTopicFresh(id: string, options: OpenOptions, target: string | undefined, snapshot: ScrollSnapshot | undefined): void {
+  // A topic in a new tab: the welcome card's second hint (SPEC 4).
+  if (options.newTab === true) tickWelcome(registry, 'tab')
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
     switchToTab(showing.id)
@@ -380,6 +383,12 @@ export function newMessage(conversation?: PickConversation): void {
  * subscription expires, replacing it first would lay out an empty page
  * and then Home in separate frames. The wait is bounded as for All topics.
  */
+/** Help › Show the Tour, ⌘K and Settings › About: the welcome card again, on Home (SPEC 4). */
+export function showTheTour(): void {
+  showWelcome(registry)
+  openHome()
+}
+
 export function openHome(options: OpenOptions = {}): void {
   const ready = new Promise<void>((resolve) => {
     const release = registry.mount(homeViewAtom)
@@ -670,7 +679,7 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'settings.open':
       return openSettings()
     case 'tour.show':
-      return showTour(registry)
+      return showTheTour()
     default: {
       const number = Number(command.slice('tab.select.'.length))
       if (paletteTakesTabNumber(number)) return

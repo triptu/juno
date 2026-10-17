@@ -21,7 +21,6 @@ import {
   privacyAtom,
   registry,
   setPresence,
-  showTour,
   tabsAtom,
   tabTopic,
   themeAtom,
@@ -30,7 +29,7 @@ import {
 import { chatCopy } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { closeJunoPanel, openPanel } from './juno/actions'
-import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic } from './navigation'
+import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
@@ -147,8 +146,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
     // ⌘N: Home's composer with the destination list open (SPEC 12).
     row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: '⌘N' }),
-    // The tour (SPEC 4), as Help › Show the Tour opens it.
-    row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTour(registry)),
+    // The welcome card (SPEC 4) again, as Help › Show the Tour brings it.
+    row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTheTour()),
     privacy
       ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: '⌃⌘H' })
       : row('privacy', 'hide-text', 'Hide message text', 'privacy mode screen share blur', () => setPrivacy(true), { ...stays, hint: '⌃⌘H' }),

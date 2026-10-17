@@ -14,6 +14,7 @@ import { art, NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { destinationLabel, HomeRecent, SendToList, sendToRowId } from './HomeWrite'
+import { WelcomeCard, type WelcomeHintName } from './WelcomeCard'
 import { HomeWriteTop } from './HomeWriteTop'
 
 const noop = () => {}
@@ -93,6 +94,10 @@ const base: HomeProps = {
 const two = [homeItems.waiting, homeItems.resume]
 const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
 
+const card = (done: ReadonlyArray<WelcomeHintName> = [], hidden = false) => <WelcomeCard done={done} peekKey="option" onClose={noop} hidden={hidden} />
+/** The minimum window with the sidebar shown: the container shows one row while the card does. */
+const minimum: FixtureFrame = { width: 336, height: 436, padded: false }
+
 const state = (props: Partial<HomeProps> = {}, frame?: FixtureFrame) => fixture<HomeProps>({ ...base, ...props }, frame)
 
 const scenes: ReadonlyArray<HomeSceneName> = ['morning', 'midday', 'evening', 'night', 'friday', 'winter', 'autumn', 'caughtUp']
@@ -151,6 +156,21 @@ export default defineFixtures(
       // A running job's state line in place of the placeholder (SPEC 13.4); a long one takes an ellipsis.
       'job-line': state({ composer: write({ jobLine: 'T3 Code · tests running, 2 of 5' }) }),
       'job-line-long': state({ composer: write({ jobLine: 'T3 Code · Fix the sidebar flake · tests running, 2 of 5, the slowest suite still has four minutes to go' }) }),
+    },
+    // The welcome card (SPEC 4) under the rows, over the field its last hint points at.
+    Welcome: {
+      fresh: state({ welcome: card() }),
+      'one-done': state({ welcome: card(['peek']) }),
+      'all-set': state({ welcome: card(['peek', 'tab', 'juno']) }),
+      // The scene and the greeting give the card their room; the card is whole above the field.
+      'minimum-window': state({ items: [homeItems.waiting], welcome: card() }, minimum),
+      'minimum-window-all-set': state({ items: [homeItems.waiting], welcome: card(['peek', 'tab', 'juno']) }, minimum),
+      'short-window': state({ items: [homeItems.waiting], welcome: card(['tab']) }, { width: 720, height: 520, padded: false }),
+      narrow: state({ welcome: card(['juno']) }, narrow),
+      // Before the sidebar has rows, and after Hide: the card's room, empty, so the rows never move.
+      'room-kept': state({ welcome: card([], true) }),
+      // The first sync: reserved rows and the card's room.
+      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3, welcome: card([], true) }),
     },
     Empty: {
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }),

@@ -442,7 +442,6 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 576px; `--all-topics-columns-compact` (`minmax(0, 1fr) 84px`) drops Status under 516px, so the table never scrolls sideways |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
-| `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 1.2) |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--send-to-width` 320px Home's "Send to" list for a first @ or #, `--menu-width-picker` 340px Home's destination list and All topics' place list |
@@ -606,15 +605,6 @@ Menus and popovers enter in 80ms, other entrances in 240ms, exits 150ms, pops 22
 | `--opacity-dim` | 0.6 | The decorative tile of a resolved or unsubscribed row. Never on text: at 0.6 muted text drops to 2.3:1 |
 | `--opacity-tab-icon` | 0.75 | Tab icon |
 | `--opacity-kbd` | 0.75 | ⌘Z inside the toast Undo button |
-
-## 9a. Two-copy content
-
-| Token | Light | Dark | Use |
-| --- | --- | --- | --- |
-| `--show-light` | `block` | `none` | `display` of the light copy of content made in both themes: the tour's screenshots |
-| `--show-dark` | `none` | `block` | `display` of the dark copy |
-
-Both copies are in the page and the theme picks one, so the view never knows the theme and a theme change swaps them in the same frame as the colours.
 
 ## 10. Spec overrides of the prototype
 

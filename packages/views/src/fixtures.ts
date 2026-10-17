@@ -40,14 +40,13 @@ import SessionView from './SessionView.fixtures'
 import SetUpJunoView from './SetUpJunoView.fixtures'
 import SignInView from './SignInView.fixtures'
 import Shell from './Shell.fixtures'
-import TourScene from './tour/TourScene.fixtures'
-import TourSheet from './TourSheet.fixtures'
 import Sidebar from './Sidebar.fixtures'
 import ThreadLink from './ThreadLink.fixtures'
 import TitlebarNav from './TitlebarNav.fixtures'
 import TopicHeader from './TopicHeader.fixtures'
 import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
+import WelcomeCard from './WelcomeCard.fixtures'
 import Workspace from './Workspace.fixtures'
 import WhyPopover from './WhyPopover.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
@@ -157,9 +156,8 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicHeader,
   TopicRow,
   TopicView,
-  TourScene,
-  TourSheet,
   UnknownCard: unknownCardSet,
   WhyPopover,
+  WelcomeCard,
   Workspace,
 }

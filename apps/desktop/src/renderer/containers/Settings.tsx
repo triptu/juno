@@ -1,13 +1,13 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, showTour, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus } from './EngineStatus'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
-import { openSettings } from './navigation'
+import { openSettings, showTheTour } from './navigation'
 import { NotificationsPage } from './Notifications'
 import { QuickReactions } from './QuickReactions'
 import { Updates } from './Updates'
@@ -54,7 +54,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
     case 'backup':
       return <JunoBackup />
     case 'about':
-      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<EngineStatus />} onShowTour={() => showTour(registry)} />
+      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<EngineStatus />} onShowTour={showTheTour} />
   }
 }
 

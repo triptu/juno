@@ -36,7 +36,6 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `sizes` | `--control-<px>`, `--tile-<px>`, `--avatar-<px>`, `--initials-<px>`, `--icon-<px>`, misc | control, tile, avatar and icon sizes named by pixel value |
 | `z` | `--z-<layer>` | stacking order from `toolbar` (2) to `toast` (45) |
 | `opacity` | `--opacity-disabled` / `-dim` / `-tab-icon` / `-kbd` | |
-| `themed` | `--show-light`, `--show-dark` | `display` values for content made in a light and a dark copy (the tour's screenshots); `darkThemed` swaps them |
 
 ## Naming
 

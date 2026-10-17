@@ -671,7 +671,7 @@ export class Juno {
   readonly peek: PeekPopover
   readonly privacy: PrivacyMode
   readonly palette: PaletteDriver
-  readonly tour: TourDriver
+  readonly welcome: WelcomeDriver
 
   constructor(app: ElectronApplication, win: Page) {
     this.app = app
@@ -691,7 +691,7 @@ export class Juno {
     this.peek = new PeekPopover(win)
     this.privacy = new PrivacyMode(app, win)
     this.palette = new PaletteDriver(app, win)
-    this.tour = new TourDriver(app, win)
+    this.welcome = new WelcomeDriver(app, win)
   }
 
   /**
@@ -2075,67 +2075,65 @@ async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<
 }
 
 /**
- * The tour (SPEC 4): the sheet over the app, by itself once per workspace
- * when the sidebar has rows (only in apps launched with `tour: true`), and
- * from Help, ⌘K or Settings › About.
+ * The welcome card (SPEC 4, "The welcome"): three things to try on Home,
+ * by itself once per workspace when the sidebar has rows (only in apps
+ * launched with `tour: true`), and again from Help, ⌘K or Settings › About.
  */
-export class TourDriver {
+export class WelcomeDriver {
   readonly root: Locator
 
   constructor(
     readonly app: ElectronApplication,
     readonly win: Page,
   ) {
-    this.root = win.getByRole('dialog', { name: 'Tour of Juno' })
+    // The card's room can stay on Home, empty and hidden; this is the card on screen.
+    this.root = win.locator('[data-home]').filter({ visible: true }).locator('section[data-welcome]').filter({ visible: true })
   }
 
-  /** The step on screen: its heading is the one visible. */
   get heading(): Locator {
-    return this.root.getByRole('heading', { level: 2 })
+    return this.root.getByRole('heading', { level: 3 })
   }
 
-  get next(): Locator {
-    return this.root.locator('[data-tour-next]')
+  /** Hide, or Done once all three are ticked. */
+  get close(): Locator {
+    return this.root.locator('[data-welcome-close]')
   }
 
-  get back(): Locator {
-    return this.root.getByRole('button', { name: 'Back', exact: true })
+  hint(name: 'peek' | 'tab' | 'juno'): Locator {
+    return this.root.locator(`[data-welcome-hint="${name}"]`)
   }
 
-  /** The dot for step `n`, counted from 1. */
-  dot(n: number): Locator {
-    return this.root.getByRole('group', { name: 'Steps' }).getByRole('button', { name: new RegExp(`^Step ${n} of `) })
-  }
-
-  async expectOpen(): Promise<void> {
+  async expectShown(): Promise<void> {
     await expect(this.root).toBeVisible({ timeout: 15_000 })
   }
 
-  async expectClosed(): Promise<void> {
+  async expectGone(): Promise<void> {
     await expect(this.root).toHaveCount(0)
   }
 
-  /** Open and done entering: its box is final. */
-  async expectSettled(): Promise<void> {
-    await this.expectOpen()
-    await this.root.evaluate((sheet) => Promise.all(sheet.getAnimations().map((animation) => animation.finished)))
+  /** Exactly these hints are ticked. */
+  async expectTicked(...names: ReadonlyArray<'peek' | 'tab' | 'juno'>): Promise<void> {
+    for (const name of ['peek', 'tab', 'juno'] as const) {
+      if (names.includes(name)) await expect(this.hint(name)).toHaveAttribute('data-done', '')
+      else await expect(this.hint(name)).not.toHaveAttribute('data-done')
+    }
   }
 
-  async expectStep(heading: string): Promise<void> {
-    await expect(this.heading).toHaveText(heading)
+  /** The whole card is on screen above Home's field, without scrolling. */
+  async expectWholeAboveField(): Promise<void> {
+    const card = await this.root.boundingBox()
+    const chip = await this.win.locator('[data-home]').filter({ visible: true }).getByRole('button', { name: /^Send to: / }).boundingBox()
+    const viewport = this.win.viewportSize()
+    if (card === null || chip === null) throw new Error('No card or no field')
+    expect(card.y).toBeGreaterThanOrEqual(0)
+    expect(card.y + card.height).toBeLessThanOrEqual(chip.y)
+    if (viewport !== null) expect(card.x + card.width).toBeLessThanOrEqual(viewport.width)
   }
 
   /** Help › Show the Tour, through its app menu item. */
   async openFromHelp(): Promise<void> {
     await clickAppMenu(this.app, 'tour')
-    await this.expectOpen()
-  }
-
-  /** Waits for the tour to open, and closes it with Esc. */
-  async skip(): Promise<void> {
-    await this.expectOpen()
-    await this.win.keyboard.press('Escape')
-    await this.expectClosed()
+    await this.expectShown()
   }
 }
 

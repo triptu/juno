@@ -16,7 +16,7 @@ export {
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
-export { closeTour, showTour, tourOpenAtom, tourStepAtom } from './tour'
+export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } from './welcome'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
@@ -151,7 +151,6 @@ export {
   densityAtom,
   editUndo,
   fullScreenAtom,
-  holdMenuCommands,
   onMenuCommand,
   onNotificationOpen,
   openExternal,

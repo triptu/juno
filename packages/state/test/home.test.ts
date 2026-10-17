@@ -42,9 +42,11 @@ describe('Home copy and scene', () => {
     expect(seasonal.some((day, index) => seasonal[index + 1] === day + 1)).toBe(false)
   })
 
-  it('caps the rows at two on a short window', () => {
+  it('caps the rows at two on a short window, and one there while the welcome card shows', () => {
     expect(homeItemLimit(800)).toBe(3)
     expect(homeItemLimit(560)).toBe(2)
+    expect(homeItemLimit(800, true)).toBe(3)
+    expect(homeItemLimit(480, true)).toBe(1)
   })
 })
 

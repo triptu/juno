@@ -1,8 +1,8 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
+import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, welcomeAtom, type Welcome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { Home, type ActivateEvent } from '@juno/views'
+import { Home, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
 import { TidyUpReview } from './TidyUpReview'
@@ -19,7 +19,7 @@ function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
   const appeared = useRef(false)
   useLayoutEffect(() => {
     // The entrance plays once, when Home first has something to show; the items arriving later just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current })
+    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current, welcome: registry.get(welcomeAtom) !== undefined })
     if (stage > 0) appeared.current = true
   }, [key, stage])
   useLayoutEffect(() => {
@@ -66,6 +66,25 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
   return { markDone, resolveAll, review, sort, itemMenu }
 }
 
+const closeCard = () => closeWelcome(registry)
+
+/**
+ * The welcome card (SPEC 4) as this Home shows it. Once it has shown, its
+ * room stays until Home appears again (`appearedAt` changes), empty after
+ * Hide or Done, so the rows above it never move.
+ */
+function useWelcome(appearedAt: number | undefined) {
+  const welcome = useAtomValue(welcomeAtom)
+  const peekKey = useAtomValue(peekKeyAtom)
+  // The card as this appearance last showed it, so its room stays after it goes.
+  const [kept, setKept] = useState<{ readonly at: number | undefined; readonly last: Welcome | undefined }>({ at: appearedAt, last: welcome })
+  const same = kept.at === appearedAt
+  if (!same || (welcome !== undefined && welcome !== kept.last)) setKept({ at: appearedAt, last: welcome ?? (same ? kept.last : undefined) })
+  const last = welcome ?? (same ? kept.last : undefined)
+  if (last === undefined) return undefined
+  return <WelcomeCard done={last.done} peekKey={peekKey} onClose={closeCard} hidden={welcome === undefined || !welcome.ready} />
+}
+
 /**
  * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
  * at the bottom. It shows the items `home.view` had when Home appeared
@@ -83,6 +102,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
+  const welcome = useWelcome(shown?.now)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
   useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
@@ -113,6 +133,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onSort={sort}
       onItemMenu={itemMenu}
       composer={<HomeComposer tabId={tabId} />}
+      welcome={welcome}
     />
     {reviewing === undefined ? null : (
       <TidyUpReview

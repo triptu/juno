@@ -40,6 +40,8 @@ export interface HomeProps {
   readonly composer?: ReactNode
   /** Nothing to show yet (a few milliseconds): the column is empty, the composer is already in its place. */
   readonly waiting?: boolean
+  /** The welcome card (`WelcomeCard`, SPEC 4) under the rows; on a short window the scene and greeting give it their room. */
+  readonly welcome?: ReactNode
 }
 
 /**
@@ -49,18 +51,18 @@ export interface HomeProps {
  * when a title line is rewritten: a title is one ellipsised line in a 52px
  * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   return (
     <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
-        {waiting ? null : <div {...stylex.props(styles.column)}>
-          <div {...stylex.props(...part())}>
+        {waiting ? null : <div {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
+          <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part())}>
             <HomeScene name={scene} />
           </div>
-          <div {...stylex.props(styles.greeting, ...part())}>
+          <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part())}>
             <h2 id={headingId} {...stylex.props(styles.title)}>
               {title}
             </h2>
@@ -71,7 +73,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
             )}
           </div>
           {items.length === 0 && reservedItems === 0 ? null : (
-            <ul aria-labelledby={headingId} {...stylex.props(styles.items, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
+            <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
               {items.map((item) => (
                 <HomeRow
                   key={item.id}
@@ -88,6 +90,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               ))}
             </ul>
           )}
+          {welcome === undefined ? null : <div data-home-welcome="" {...stylex.props(styles.welcome, ...part())}>{welcome}</div>}
         </div>}
       </div>
       {composer}
@@ -192,6 +195,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
 const HOVER = '@media (hover: hover)'
 // The column's 480 and its 48 on each side: under this the page keeps 24 on each side, and the column takes the rest.
 const NARROW = '@container home (width < 576px)'
+/** Recent's own threshold (HomeWrite): below it the welcome card takes the scene's and the greeting's room. */
+const SHORT = '@container home (height < 560px)'
 
 const rise = stylex.keyframes({
   from: { opacity: 0 },
@@ -229,6 +234,13 @@ const styles = stylex.create({
     paddingBlock: spacing['--space-12'],
     paddingInline: { default: spacing['--space-12'], [NARROW]: spacing['--space-6'] },
   },
+  // With the welcome card: on a short window the scene and the greeting go and the gaps close up, so the card is whole above the field.
+  columnWelcome: { paddingBlock: { default: spacing['--space-12'], [SHORT]: spacing['--space-4'] } },
+  sceneGives: { display: { default: 'block', [SHORT]: 'none' } },
+  greetingGives: { display: { default: 'flex', [SHORT]: 'none' } },
+  itemsWelcome: { marginTop: { default: spacing['--space-8'], [SHORT]: 0 } },
+  // The card's own top margin closes up on a short window too (`WelcomeCard`).
+  welcome: { width: '100%', maxWidth: layout['--home-width'] },
   greeting: {
     display: 'flex',
     flexDirection: 'column',
