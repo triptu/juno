@@ -50,7 +50,7 @@ test(`a move restores the chat and pending cards for review${point === undefined
   const settings = await openSettings(juno, 'Backup & This Mac')
   await pickFolder(juno, shared)
   await settings.getByRole('button', { name: 'Choose folder' }).click()
-  await expect(settings.locator('[data-backup-folder]')).toHaveText(shared)
+  await expect(settings.locator('[data-backup-folder]')).toHaveAttribute('title', shared)
   await settings.getByRole('button', { name: 'Export recovery phrase' }).click()
   const phraseSheet = juno.win.getByRole('dialog', { name: 'Your recovery phrase' })
   await expect(phraseSheet).toBeVisible()
