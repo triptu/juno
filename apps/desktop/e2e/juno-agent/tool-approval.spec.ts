@@ -5,12 +5,13 @@
 import type { FakeMcpServer } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { addServer, card, openChat, ready } from './agent'
+import { addServer, card, configure, openChat, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   // A run a click started: the card's outcome is its input.
   if (request.input.includes('<card-outcome') && request.toolResult === undefined) {
+    if (request.input.includes('Prefers short messages')) return '<say>You prefer short messages.</say>'
     if (request.input.includes('outcome="done"')) return `<say>Saved. ${/note-[0-9]+/.exec(request.input)?.[0] ?? 'no id'}</say>`
     return '<say>Saving the note failed.</say>'
   }
@@ -73,14 +74,21 @@ test('an approved call runs once, the card shows its result, and Juno goes on wi
   await pane.expectJuno('That needs your OK.')
   const asked = card(pane, 'change')
   await expect(asked).toBeVisible()
-  // Named by what it does, with a short verb on the button.
+  // Named by what it does, with a short verb on the button, and its values without JSON quotes.
   await expect(asked.locator('[data-chat-card-kind]')).toHaveText('Create note in Context')
+  await expect(asked.locator('[data-change-field="title"]')).toContainText('Lunch')
+  await expect(asked.locator('[data-change-field="title"]')).not.toContainText('"')
   expect(mcp.calls).toHaveLength(0)
   await asked.screenshot({ path: test.info().outputPath('card-before.png') })
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'done')
   await expect(asked).toContainText('Applied')
-  await expect(asked.locator('[data-card-result]')).toContainText('note-1')
+  // A plain line, never the server's JSON; all of it is behind Show result.
+  await expect(asked.locator('[data-card-result]')).toHaveText('Saved')
+  expect(await asked.innerText()).not.toContain('{"')
+  await asked.screenshot({ path: test.info().outputPath('card-applied.png') })
+  await asked.getByRole('button', { name: 'Show result' }).click()
+  await expect(asked.locator('[data-card-result-full]')).toHaveText('id: note-1\nsaved: true')
   await asked.screenshot({ path: test.info().outputPath('card-after.png') })
   expect(mcp.calls.map((call) => call.name)).toEqual(['create_note'])
   // The run goes on with the result.
@@ -99,4 +107,25 @@ test('a failed call shows the server error, and Juno hears it', async ({ juno, m
   await expect(asked.locator('[data-card-result]')).toContainText('Notes are full for this workspace.')
   await asked.screenshot({ path: test.info().outputPath('card-failed.png') })
   await pane.expectJuno('Saving the note failed.')
+})
+
+test('a read under Always ask says Done once it ran, with how many it found', async ({ juno, mcp }) => {
+  await ready(juno)
+  const { id, row } = await addServer(juno, 'Context', mcp.url)
+  const sheet = await configure(juno, row)
+  await sheet.locator('[data-tool="search_user_context"]').getByRole('combobox', { name: 'Auto-review: search_user_context' }).selectOption('always')
+  await expect(sheet.locator('[data-tool="search_user_context"]')).toHaveAttribute('data-tool-review', 'always')
+  await sheet.getByRole('button', { name: 'Done' }).click()
+  const pane = await openChat(juno)
+  await pane.send(`learn about me on ${id}`)
+  await pane.expectJuno('That needs your OK.')
+  const asked = card(pane, 'change')
+  await expect(asked.locator('[data-chat-card-kind]')).toHaveText('Search Context')
+  await asked.getByRole('button', { name: 'Search' }).click()
+  await expect(asked).toHaveAttribute('data-card-status', 'done')
+  await expect(asked).toContainText('Done')
+  await expect(asked).not.toContainText('Applied')
+  await expect(asked.locator('[data-card-result]')).toHaveText('Found 1 result')
+  await asked.screenshot({ path: test.info().outputPath('search-done.png') })
+  await pane.expectJuno('You prefer short messages.')
 })
