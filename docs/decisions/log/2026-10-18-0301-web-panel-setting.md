@@ -1,0 +1,1 @@
+- 10-18 03:01 · web-panel-setting · Settings › General › Open links in Juno (on by default) is a workspace preference (`webPanel`); off, `openWebPanel` sends every web link to the default browser and an open panel closes. `followWebPanel` holds the preference so a click reads the saved value without waiting.
