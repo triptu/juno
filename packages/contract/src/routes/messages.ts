@@ -256,6 +256,8 @@ export const TopicDetail = Schema.Struct({
    * stays put when the topic is marked read. Absent when nothing is read.
    */
   lastReadTs: Schema.optionalKey(Schema.String),
+  /** Set by Mark as unread until the topic is next marked read. The open topic stays unread while it is set (SPEC 7). Absent means no. */
+  markedUnread: Schema.optionalKey(Schema.Boolean),
   lastActivityTs: Schema.optionalKey(Schema.String),
   /** Threads: the root's ts. */
   rootTs: Schema.optionalKey(Schema.String),

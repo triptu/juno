@@ -62,13 +62,13 @@ export interface TopicTabProps {
  *   the layout effect of the first frame that has rows. A tab that was
  *   unmounted comes back at its `ScrollSnapshot` instead.
  * - The divider sits where the read pointer was when the tab first showed
- *   the topic, so marking read does not move it.
+ *   the topic, so marking read does not move it. Mark as unread moves it.
  * - At the bottom, a new message is scrolled into view before paint;
  *   scrolled up, the "N new messages" pill counts them.
  * - Near the top, the next older page is fetched, one request at a time,
  *   and the window widens; scroll anchoring keeps the rows in view still.
  * - Marks read by `shouldMarkRead`: on open and when shown, then at the
- *   bottom of a focused window.
+ *   bottom of a focused window, unless the topic was marked unread.
  */
 export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
   const result = useAtomValue(topicAtom(id))
@@ -152,7 +152,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   const focused = useWindowFocused()
   // The hooks run their effects in this order; keep it.
   const position = usePosition(list)
-  const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, list, readOnly)
+  const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, detail.markedUnread === true, list, readOnly)
   const loading = useTopicFetch(detail.id, view)
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
   const files = useTopicFiles()
@@ -164,7 +164,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   useSendMeasure(list)
   useScrollRelease(position, view, readOnly)
   const older = useOlderPages(position, detail.id, view, list)
-  useMarkRead(detail.id, readOnly, detail.unreadCount, position.positioned, focused, position.atBottom)
+  useMarkRead(detail.id, readOnly, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll)
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer })
