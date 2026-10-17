@@ -57,6 +57,9 @@ const fresh = (teamId: string | undefined, request: WelcomeRun['request']): Welc
 
 const welcomeRunAtom = Atom.make<WelcomeRun>(fresh(undefined, 'auto')).pipe(Atom.keepAlive)
 
+/** Whether the sidebar has rows: a boolean, so the card does not recompute as the list changes. */
+const sidebarHasRowsAtom = Atom.make((get): boolean => get(sidebarListAtom).order.length > 0)
+
 const isHint = (value: unknown): value is WelcomeHint => typeof value === 'string' && (welcomeHints as ReadonlyArray<string>).includes(value)
 
 /** The card's hints in its order: those saved and those done in this run. */
@@ -79,15 +82,14 @@ export const welcomeAtom = Atom.make((get): Welcome | undefined => {
   const ticks = get(savedTicksAtom)
   if (!AsyncResult.isSuccess(ticks)) return undefined
   const done = doneOf(own.request === 'open' ? [] : ticks.value, own.ticks)
-  const ready = get(sidebarListAtom).order.length > 0
-  if (own.request === 'open') return { done, ready }
+  if (own.request === 'open') return { done, ready: get(sidebarHasRowsAtom) }
   if (!tourOpensItself) return undefined
   const seen = get(savedSeenAtom)
   if (!AsyncResult.isSuccess(seen) || seen.value === true) return undefined
   // Done in an earlier run: seen. Done in this one: "You're all set" until Done.
   if (done.length === welcomeHints.length && !own.finished) return undefined
   if (Option.getOrUndefined(get.self<Welcome | undefined>()) !== undefined) return { done, ready: true }
-  return { done, ready }
+  return { done, ready: get(sidebarHasRowsAtom) }
 })
 
 const runOf = (registry: Registry): WelcomeRun => {
