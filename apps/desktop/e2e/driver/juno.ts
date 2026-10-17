@@ -2491,9 +2491,9 @@ export class HomePane {
     await expect(sheet.root).toBeVisible()
     return sheet
   /** Another card's row, which opens its review sheet (`data-sheet="<sheet>"`). */
-  async reviewOf(kind: HomeItemKind, sheet: string): Promise<ReviewSheetPane> {
+  async reviewOf(kind: HomeItemKind, sheet: string): Promise<SettledReviewSheet> {
     await this.item(kind).locator('[data-home-review]').click()
-    const pane = new ReviewSheetPane(this.win, sheet)
+    const pane = new SettledReviewSheet(this.win, sheet)
     await expect(pane.root).toBeVisible()
     return pane
   }
@@ -2564,15 +2564,10 @@ export class AutomatedRecordSheet {
 
 /** Tidy up's review (SPEC 12, `docs/design/settled-suggestions/`): every proposal with its reason, Resolve and Keep open. */
 export class SettledReviewSheet {
-  constructor(readonly win: Page) {}
-/**
- * A Home card's review sheet (SPEC 12, `docs/design/settled-suggestions/`):
- * every proposal with its reason, the card's action and its "no", and Undo.
- */
-export class ReviewSheetPane {
+  // Every Home card's review is the same sheet (`ReviewSheet`): `name` is its `data-sheet`, and `act`, `decline` are its two buttons.
   constructor(
     readonly win: Page,
-    readonly name: string,
+    readonly name = 'settled',
   ) {}
 
   get root(): Locator {
@@ -2602,19 +2597,29 @@ export class ReviewSheetPane {
     return this.row(title).getAttribute('data-review-status')
   }
 
+  /** The card's action: Resolve, Mark done, Delete. */
   act(title: string): Locator {
     return this.row(title).locator('[data-review-act]')
   }
 
+  /** The card's "no": Keep open, Not done, Keep. */
   decline(title: string): Locator {
     return this.row(title).locator('[data-review-decline]')
+  }
+
+  resolve(title: string): Locator {
+    return this.act(title)
+  }
+
+  keep(title: string): Locator {
+    return this.decline(title)
   }
 
   undo(title: string): Locator {
     return this.row(title).locator('[data-review-undo]')
   }
 
-  get all(): Locator {
+  get resolveAll(): Locator {
     return this.root.locator('[data-review-all]')
   }
 
@@ -2628,24 +2633,5 @@ export class ReviewSheetPane {
 
   get explainer(): Locator {
     return this.root.locator('[data-review-explainer]')
-  }
-}
-
-/** Tidy up's review: Resolve and Keep open. */
-export class SettledReviewSheet extends ReviewSheetPane {
-  constructor(win: Page) {
-    super(win, 'settled')
-  }
-
-  resolve(title: string): Locator {
-    return this.act(title)
-  }
-
-  keep(title: string): Locator {
-    return this.decline(title)
-  }
-
-  get resolveAll(): Locator {
-    return this.all
   }
 }
