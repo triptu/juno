@@ -106,6 +106,22 @@ export function onSharingPrivacy(listener: (state: PrivacyState) => void): () =>
   })
 }
 
+/**
+ * The window is in macOS full screen, where the traffic lights are hidden. Starts as main loaded the page
+ * (`?fullscreen=1` on a reload in full screen); `onFullScreen` follows it after that.
+ */
+export const fullScreenAtom = Atom.make<boolean>(launchParam('fullscreen') === '1')
+
+const decodeFullScreen = Schema.decodeUnknownOption(Schema.Boolean)
+
+/** Calls `listener` each time the window enters or leaves full screen. Returns the unsubscribe. */
+export function onFullScreen(listener: (fullScreen: boolean) => void): () => void {
+  return window.juno.window.onFullScreen((value) => {
+    const fullScreen = decodeFullScreen(value)
+    if (fullScreen._tag === 'Some') listener(fullScreen.value)
+  })
+}
+
 const decodeSharing = Schema.decodeUnknownOption(SharingSetting)
 
 /** "Hide message text while sharing the screen", as main holds it; undefined if main did not answer. */

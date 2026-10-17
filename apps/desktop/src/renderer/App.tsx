@@ -4,6 +4,7 @@ import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
 import { Frame } from './containers/Frame'
+import { followFullScreen } from './containers/fullScreen'
 import { Peek } from './containers/Peek'
 import { followSharingPrivacy } from './containers/privacy'
 import { Session } from './containers/Session'
@@ -55,6 +56,8 @@ export function App() {
   const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
+
+  useEffect(followFullScreen, [])
 
   useEffect(() => {
     if (signedIn !== undefined) return

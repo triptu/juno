@@ -21,8 +21,11 @@ const workspaceTabs = [
 
 const nav = (hidden: boolean) => <TitlebarNav sidebarHidden={hidden} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
 
-/** The signed-in window with fixture rows. `peek` fills the shell's peek slot, `page` the workspace. */
-export function SignedIn({ width, hidden = false, peek, page }: { readonly width?: number; readonly hidden?: boolean; readonly peek?: ReactNode; readonly page?: ReactNode }) {
+/**
+ * The signed-in window with fixture rows. `peek` fills the shell's peek slot, `page` the workspace.
+ * `fullScreen` draws the title bars as in macOS full screen, with no room for the traffic lights.
+ */
+export function SignedIn({ width, hidden = false, fullScreen = false, peek, page }: { readonly width?: number; readonly hidden?: boolean; readonly fullScreen?: boolean; readonly peek?: ReactNode; readonly page?: ReactNode }) {
   return (
     <Shell
       {...(width === undefined ? {} : { sidebarWidth: width })}
@@ -34,6 +37,7 @@ export function SignedIn({ width, hidden = false, peek, page }: { readonly width
       sidebar={
         <Sidebar
           titlebarLeading={nav(false)}
+          fullScreen={fullScreen}
           account={{ name: 'Tushar', initials: 'T', hue: 'cyan' }}
           filter={{ kind: 'all', unreadOnly: false }}
           dots={{ channels: true, dms: true }}
@@ -61,7 +65,7 @@ export function SignedIn({ width, hidden = false, peek, page }: { readonly width
         </Sidebar>
       }
     >
-      <Workspace tabs={workspaceTabs} activeId={page === undefined ? 'postgres' : 'pinned'} {...(hidden ? { leading: nav(true) } : {})}>
+      <Workspace tabs={workspaceTabs} activeId={page === undefined ? 'postgres' : 'pinned'} {...(hidden ? { leading: nav(true) } : {})} fullScreen={fullScreen}>
         {page}
       </Workspace>
     </Shell>
@@ -77,6 +81,9 @@ export default defineFixtures(
       'sidebar-widest': scene(() => <SignedIn width={480} />),
       'sidebar-hidden': scene(() => <SignedIn hidden />),
       'sidebar-hidden-minimum-window': scene(() => <SignedIn hidden />, { width: 720, height: 480 }),
+      // macOS hides the traffic lights in full screen, so the title bars start at their own padding.
+      'full-screen': scene(() => <SignedIn fullScreen />),
+      'full-screen-sidebar-hidden': scene(() => <SignedIn hidden fullScreen />),
       'signed-out': scene(() => (
         <Shell>
           <SignInView mode="first-run" onSignIn={noop} onImport={noop} />

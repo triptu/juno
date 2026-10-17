@@ -4,6 +4,7 @@ import type { TopicDetail } from '@juno/contract'
 import {
   activeTab,
   currentPlace,
+  fullScreenAtom,
   junoAvailableAtom,
   junoPanelOpenAtom,
   junoPanelWidthAtom,
@@ -252,6 +253,7 @@ export function Workspace() {
   const state = useAtomValue(tabsAtom)
   const strip = useAtomValue(tabStripAtom)
   const sidebarHidden = useAtomValue(sidebarLayoutAtom, (layout) => layout.collapsed)
+  const fullScreen = useAtomValue(fullScreenAtom)
   const mounted = mountedTabs(state)
   // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
   const agentOn = useAtomValue(junoAvailableAtom)
@@ -275,6 +277,7 @@ export function Workspace() {
       onNewTab={openNewTab}
       onTabContextMenu={tabMenu}
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
+      fullScreen={fullScreen}
       nothingShown={state.active === undefined}
       empty={null}
       newTabLabel={newTabPage === 'home' ? 'New tab' : 'New chat'}

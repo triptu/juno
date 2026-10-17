@@ -101,6 +101,26 @@ test.describe('sidebar inset', () => {
   })
 })
 
+test.describe('full-screen title bar', () => {
+  /** The left edge of `label`'s button from the left of its pane (the sidebar, or the tab strip), in CSS px. */
+  const leftOf = (page: Page, pane: string, label: string) =>
+    page.evaluate(([pane, label]) => {
+      const box = document.querySelector(pane!)!.getBoundingClientRect()
+      return document.querySelector(`${pane} button[aria-label^="${label}"]`)!.getBoundingClientRect().left - box.left
+    }, [pane, label])
+
+  test('without the traffic lights, Hide sidebar starts at the sidebar inset, and Show sidebar at the strip padding', async ({ page }) => {
+    await open(page, 'Shell', 'window/signed-in')
+    expect(await leftOf(page, 'aside[aria-label="Sidebar"]', 'Hide sidebar')).toBe(78)
+    await open(page, 'Shell', 'window/full-screen')
+    expect(await leftOf(page, 'aside[aria-label="Sidebar"]', 'Hide sidebar')).toBe(10)
+    await open(page, 'Shell', 'window/sidebar-hidden')
+    expect(await leftOf(page, '[data-tab-strip]', 'Show sidebar')).toBe(78)
+    await open(page, 'Shell', 'window/full-screen-sidebar-hidden')
+    expect(await leftOf(page, '[data-tab-strip]', 'Show sidebar')).toBe(10)
+  })
+})
+
 test.describe('centred columns', () => {
   for (const [component, id] of [
     ['TopicView', 'thread/long-thread'],

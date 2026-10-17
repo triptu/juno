@@ -32,10 +32,10 @@ export interface WorkspaceProps extends WorkspaceStripProps {
 const COVER = '@container workspace-body (width < 856px)'
 
 /** The right pane: the tab strip (a window drag region, `WorkspaceStrip`) over the page. */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, fullScreen, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
-      <WorkspaceStrip tabs={tabs} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onNewTab={onNewTab} newTabLabel={newTabLabel} onMoveTab={onMoveTab} onTabContextMenu={onTabContextMenu} leading={leading} />
+      <WorkspaceStrip tabs={tabs} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onNewTab={onNewTab} newTabLabel={newTabLabel} onMoveTab={onMoveTab} onTabContextMenu={onTabContextMenu} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} />
       <div {...stylex.props(styles.body)}>
         <main {...stylex.props(styles.page)}>
           {children}

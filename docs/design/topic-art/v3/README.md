@@ -1,6 +1,6 @@
 # Topic art, round 3: colour
 
-The owner, looking at the dark sidebar with nine topics: the art feels monotonous although each drawing is distinct and good. This folder measures why and compares five colour directions on the same sidebar. Round 2 (`../v2/`) chose the drawings, the vocabulary and no container; none of that changes here.
+The owner, looking at the dark sidebar with nine topics: the art feels monotonous although each drawing is distinct and good. This folder measures why and compares five colour directions on the same sidebar, then (round 3b, below) a calmer set after the owner chose direction 5. Round 2 (`../v2/`) chose the drawings, the vocabulary and no container; none of that changes here.
 
 ## Files
 
@@ -10,7 +10,7 @@ The owner, looking at the dark sidebar with nine topics: the art feels monotonou
 | `oklch.mjs` | OKLCH to sRGB, the sRGB chroma limit and WCAG contrast, no dependencies. |
 | `metrics.mjs` | Prints the contrast table below. |
 | `render.mjs` | Screenshots the gallery's `Sidebar`, `Art`, `every-row` state under each direction, in light and dark, with the direction's values injected as CSS variables. Also draws the same recipes at 16px and 20px, and the privacy state for directions 0 and 4. |
-| `sheet.mjs` | Puts the six sidebars side by side: `renders/compare-light.png`, `renders/compare-dark.png`. |
+| `sheet.mjs` | Puts sidebars side by side: directions 0 to 5 in `renders/compare-<theme>.png`; `node sheet.mjs <name> <ids>` for any set, as `renders/<name>-<theme>.png`. |
 | `renders/` | `<direction>-sidebar-<theme>.png`, `<direction>-small-<theme>.png` (16px row, then 20px), `<direction>-privacy-<theme>.png`. |
 
 To re-run from the repo root: `pnpm --filter @juno/gallery build`, then `node docs/design/topic-art/v3/render.mjs` and `node docs/design/topic-art/v3/sheet.mjs`.
@@ -34,7 +34,7 @@ Each is a full set of `--art-<hue>-<role>` values in `directions.mjs`. Chroma wr
 
 | | Direction | What changes |
 | --- | --- | --- |
-| 0 | Now | The tokens on main. |
+| 0 | Round 2 | Round 2's tokens, in the hue the model picked. |
 | 1 | More chroma | Same lightness. Ink chroma 0.06 light and 0.075 dark, soft 0.06 and 0.055, accent 0.13 and 0.11. Dark gets more ink chroma than light: a thin pale line on near-black needs more to read as a colour. |
 | 2 | Per-hue lightness | Direction 1 with lightness lifted per hue (amber +0.05, olive +0.04, sage +0.02, teal +0.01, coral 0, sky -0.02, plum -0.03, periwinkle -0.04, halved for ink and fills) and chroma as a share of each hue's maximum. |
 | 3 | Tinted ground | Direction 2 on a rounded square in the hue (radius 10 at 40px, drawing at 80%): light L 0.935, dark L 0.285. |
@@ -46,27 +46,35 @@ Each is a full set of `--art-<hue>-<role>` values in `directions.mjs`. Chroma wr
 Contrast against the sidebar (`--background-subtle`: #FAF8F3 light, #151411 dark), from the declared values. Ranges run over the eight hues. The ink must stay under an unread row's preview (`--foreground-secondary`) and far under the title. A read row's preview is the muted grey (4.8:1 light, 6.9:1 dark); the ink sits above that today and still does.
 
 
-### Light: title 15.0:1, unread preview 8.3:1, unread count text 5.7:1 on the sidebar
+### light: title 15.0:1, unread preview 8.3:1, unread count text 5.7:1 on the sidebar
 
 | Direction | Ink contrast (min to max) | Ink chroma | Accent contrast | Accent chroma | Soft chroma |
 | --- | --- | --- | --- | --- | --- |
-| Now | 7.5 to 7.7 | 0.022 to 0.022 | 3.5 to 3.9 | 0.100 to 0.100 | 0.038 to 0.038 |
+| Round 2 | 7.5 to 7.7 | 0.022 to 0.022 | 3.5 to 3.9 | 0.100 to 0.100 | 0.038 to 0.038 |
 | More chroma | 7.4 to 7.9 | 0.060 to 0.060 | 3.5 to 4.0 | 0.106 to 0.130 | 0.056 to 0.060 |
 | Per-hue lightness | 6.5 to 7.9 | 0.048 to 0.075 | 3.1 to 4.5 | 0.081 to 0.140 | 0.025 to 0.070 |
 | Tinted ground | 6.5 to 7.9 | 0.048 to 0.075 | 3.1 to 4.5 | 0.081 to 0.140 | 0.034 to 0.075 |
 | Two-tone | 6.5 to 7.9 | 0.052 to 0.080 | 3.4 to 4.9 | 0.083 to 0.140 | 0.048 to 0.085 |
 | Two-tone, hues spread | 6.5 to 7.9 | 0.052 to 0.080 | 3.4 to 4.9 | 0.083 to 0.140 | 0.048 to 0.085 |
+| Round 2, hues spread | 7.5 to 7.7 | 0.022 to 0.022 | 3.5 to 3.9 | 0.100 to 0.100 | 0.038 to 0.038 |
+| Calm a | 7.5 to 7.8 | 0.032 to 0.032 | 3.5 to 3.9 | 0.106 to 0.110 | 0.045 to 0.045 |
+| Calm b | 7.3 to 8.0 | 0.032 to 0.032 | 3.4 to 4.2 | 0.107 to 0.110 | 0.045 to 0.045 |
+| Calm c | 7.3 to 8.0 | 0.035 to 0.035 | 3.4 to 4.2 | 0.107 to 0.115 | 0.050 to 0.050 |
 
-### Dark: title 15.5:1, unread preview 9.9:1, unread count text 7.5:1 on the sidebar
+### dark: title 15.5:1, unread preview 9.9:1, unread count text 7.5:1 on the sidebar
 
 | Direction | Ink contrast (min to max) | Ink chroma | Accent contrast | Accent chroma | Soft chroma |
 | --- | --- | --- | --- | --- | --- |
-| Now | 9.1 to 9.3 | 0.028 to 0.028 | 7.2 to 7.7 | 0.085 to 0.085 | 0.032 to 0.032 |
+| Round 2 | 9.1 to 9.3 | 0.028 to 0.028 | 7.2 to 7.7 | 0.085 to 0.085 | 0.032 to 0.032 |
 | More chroma | 8.9 to 9.5 | 0.075 to 0.075 | 7.1 to 7.8 | 0.110 to 0.110 | 0.055 to 0.055 |
 | Per-hue lightness | 8.3 to 9.8 | 0.069 to 0.085 | 6.5 to 9.1 | 0.091 to 0.115 | 0.036 to 0.060 |
 | Tinted ground | 8.3 to 9.8 | 0.069 to 0.085 | 7.0 to 9.7 | 0.094 to 0.115 | 0.041 to 0.065 |
 | Two-tone | 8.3 to 9.8 | 0.063 to 0.080 | 7.8 to 9.4 | 0.087 to 0.115 | 0.054 to 0.085 |
 | Two-tone, hues spread | 8.3 to 9.8 | 0.063 to 0.080 | 7.8 to 9.4 | 0.087 to 0.115 | 0.054 to 0.085 |
+| Round 2, hues spread | 9.1 to 9.3 | 0.028 to 0.028 | 7.2 to 7.7 | 0.085 to 0.085 | 0.032 to 0.032 |
+| Calm a | 9.4 to 9.7 | 0.035 to 0.035 | 8.0 to 8.6 | 0.095 to 0.095 | 0.040 to 0.040 |
+| Calm b | 9.0 to 9.8 | 0.035 to 0.035 | 7.5 to 9.0 | 0.095 to 0.095 | 0.040 to 0.040 |
+| Calm c | 9.0 to 9.8 | 0.035 to 0.035 | 7.8 to 9.4 | 0.100 to 0.100 | 0.042 to 0.042 |
 
 - Every direction keeps ink under the unread preview and far under the title in both themes. Directions 2 to 5 were tuned for that: the per-hue lift is halved for ink, and ink starts at L 0.445 light and 0.775 dark.
 - The unread count stays the most saturated thing in the row. Its text is chroma 0.146 in dark and 0.165 in light; the art's accent tops out at 0.14 light and 0.115 dark, on a dot or two.
@@ -91,3 +99,28 @@ Direction 5: the two-tone palette, with each drawing taking its topic's pebble h
 - The drawing, its recipe and the stored row do not change. The recipe's `data-hue` is still parsed and stored (Redraw quotes it); the renderer is told which hue to paint with.
 
 The exact token values are in `docs/design/tokens.md` 1.9 and `packages/tokens/src/tokens.stylex.ts` / `themes.stylex.ts`.
+
+## Round 3b: calm
+
+Direction 5 shipped. The owner's answer, verbatim: "let's go with option 5 - spread hues, color from topic, and all but don't go overboard with chroma/brightness, your sample is too bright, i think if we spread hues, we should fine with current as well with just a bit more brightness."
+
+So the hue from the topic id stays, and the colour goes back near round 2:
+
+| | Direction | What changes |
+| --- | --- | --- |
+| 6 | Round 2, hues spread | Round 2's values exactly, in the topic's hue. In dark the fills still read as holes. |
+| 7a | Calm a | Ink chroma 0.032 light and 0.035 dark, soft 0.045 and 0.04, accent 0.11 and 0.095. Dark ink 0.79, accent 0.75, fill 0.40. One lightness for every hue. |
+| 7b | Calm b | Calm a with a quarter of `LIFT` on ink and half on the other roles. |
+| 7c | Calm c | Calm b with the dark fill at 0.43 and accent at 0.76, and the light fill at chroma 0.05. **Chosen.** |
+
+Dark ink is held at 0.785 before the lift. At 0.80 it reached 10.0:1, over the unread preview's 9.9:1.
+
+Renders: `renders/calm-light.png` and `renders/calm-dark.png` put round 2 (in the model's hues), direction 5 (round 3, as shipped) and calm c side by side. `renders/calm-candidates-<theme>.png` has every candidate. Calm c alone: `7c-calm-bright-sidebar-<theme>.png`, `-small-` (16px and 20px) and `-privacy-`.
+
+What the renders show:
+
+- **6 · Round 2, hues spread** already fixes most of "too similar": neighbours differ. In dark, the drawings are still pale outlines round dark centres.
+- **7a and 7b** lift the fill a little; in dark it still reads as a dark centre at 0.40. With the lift halved, 7b differs from 7a only on amber and periwinkle, and it is not loud.
+- **7c** is the one where the dark fill reads as a quiet surface without turning into a block. It is clearly calmer than direction 5, and in light it is close to round 2 with a trace more colour. Neighbouring rows still differ by hue.
+
+The ink is 7.3 to 8.0:1 in light and 9.0 to 9.8:1 in dark: under the unread preview (8.3:1 and 9.9:1) and far under the title (15.0:1 and 15.5:1). The exact values are in `docs/design/tokens.md` 1.9.

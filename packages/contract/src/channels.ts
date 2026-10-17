@@ -93,6 +93,8 @@ export const Events = {
   agentProviderChanged: 'agent.providerChanged',
   /** Main turned privacy mode on or off because sharing started or ended, with a `PrivacyState`. */
   privacyChanged: 'privacy.changed',
+  /** The window entered or left macOS full screen, with a boolean: true in full screen. */
+  windowFullScreen: 'window.fullScreen',
 } as const
 
 /**
@@ -279,6 +281,10 @@ export interface JunoBridge {
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>
     /** Calls `listener` with each `PrivacyState` main sets because sharing started or ended, undecoded. Returns the unsubscribe. */
     readonly onPrivacy: (listener: (state: unknown) => void) => () => void
+  }
+  readonly window: {
+    /** Calls `listener` each time the window enters or leaves full screen, with the new state undecoded. Returns the unsubscribe. */
+    readonly onFullScreen: (listener: (fullScreen: unknown) => void) => () => void
   }
   readonly sharing: {
     /** Resolves with a `SharingSetting`. */

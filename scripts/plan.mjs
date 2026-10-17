@@ -18,6 +18,7 @@
 // result; the exit code is 1 if any step failed.
 
 import { spawn } from 'node:child_process'
+import { availableParallelism } from 'node:os'
 import { createInterface } from 'node:readline'
 import { forwardSignals } from './remote/children.mjs'
 
@@ -49,6 +50,19 @@ export function lanes(steps, serial) {
   return [app, rest].filter((lane) => lane.length > 0)
 }
 
+/**
+ * Worker counts for lanes that run side by side, so together they fit the machine. With the defaults (8 desktop
+ * workers, 3 gallery workers per core, the unit and spec lane at full width beside them) an 8-core plan ran 4 to 7
+ * runnable tasks per core and tests waited for a core most of the time; with these it ran 1.6 at the median, about
+ * 6% slower (docs/development.md, "Machine shapes"). A step's own KEY=VALUE words still win.
+ */
+export function sideBySide(cores) {
+  return {
+    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor((cores * 5) / 8))), GALLERY_WORKERS: String(cores) },
+    rest: { JUNO_VITEST_WORKERS: String(Math.max(2, Math.floor(cores / 2))), JUNO_TEST_PACKAGE_JOBS: '1', SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
+  }
+}
+
 if (import.meta.main) {
   let steps
   try {
@@ -62,11 +76,13 @@ if (import.meta.main) {
   forwardSignals(children)
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)
+  const cores = Number(process.env.JUNO_RUNNER_JOB_CORES) || availableParallelism()
+  const shared = planned.length > 1 ? sideBySide(cores) : undefined
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()
       const command = low ? ['nice', ['-n', '10', 'pnpm', step.script, ...step.args]] : ['pnpm', [step.script, ...step.args]]
-      const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...step.env, JUNO_HEAVY_HELD: '1' } })
+      const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(shared === undefined ? {} : appSuites.includes(step.script) ? shared.app : shared.rest), ...step.env, JUNO_HEAVY_HELD: '1' } })
       children.add(child)
       const prefix = `[${step.script}] `
       for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) createInterface({ input: stream }).on('line', (line) => out.write(prefix + line + '\n'))

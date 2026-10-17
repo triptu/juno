@@ -296,46 +296,47 @@ export const hues = stylex.defineVars({
  * four roles the recipe may name and five Tide tones for the placeholder. The
  * renderer in `@juno/topic-art` writes these as `var(--art-<hue>-<role>)` and
  * `var(--tide-<hue>-<tone>)`, so one SVG string serves both themes; the dark
- * values are in themes.stylex.ts. Two-tone: the line and the soft fill both
- * carry the hue, lightness steps by hue (amber and olive higher, periwinkle
- * and plum lower), and chroma is a share of what each hue reaches at that
- * lightness, capped (v3/directions.mjs, `4-two-tone`). The line stays under
- * the preview text's contrast. Written as oklch() so the browser maps
+ * values are in themes.stylex.ts. Calm: one chroma for every hue, a small
+ * lift over round 2 (ink 0.035, soft 0.05), and lightness stepped a little
+ * by hue (amber and olive higher, periwinkle and plum lower; v3/directions.mjs,
+ * `7c-calm-bright`). The colour spread comes from the hue, taken from the
+ * topic id, not from chroma. The line stays under the preview text's
+ * contrast. Written as oklch() so the browser maps
  * out-of-gamut chroma itself.
  */
 export const art = stylex.defineVars({
-  '--art-coral-ink': 'oklch(0.445 0.08 32)',
-  '--art-coral-soft': 'oklch(0.83 0.048 32)',
-  '--art-coral-accent': 'oklch(0.58 0.14 32)',
-  '--art-coral-accent2': 'oklch(0.72 0.097 32)',
-  '--art-amber-ink': 'oklch(0.47 0.066 72)',
-  '--art-amber-soft': 'oklch(0.86 0.056 72)',
-  '--art-amber-accent': 'oklch(0.63 0.108 72)',
-  '--art-amber-accent2': 'oklch(0.75 0.088 72)',
-  '--art-olive-ink': 'oklch(0.465 0.067 112)',
-  '--art-olive-soft': 'oklch(0.854 0.085 112)',
-  '--art-olive-accent': 'oklch(0.62 0.11 112)',
-  '--art-olive-accent2': 'oklch(0.744 0.091 112)',
-  '--art-sage-ink': 'oklch(0.455 0.08 150)',
-  '--art-sage-soft': 'oklch(0.842 0.085 150)',
-  '--art-sage-accent': 'oklch(0.6 0.132 150)',
-  '--art-sage-accent2': 'oklch(0.732 0.1 150)',
-  '--art-teal-ink': 'oklch(0.45 0.052 185)',
-  '--art-teal-soft': 'oklch(0.836 0.074 185)',
-  '--art-teal-accent': 'oklch(0.59 0.083 185)',
-  '--art-teal-accent2': 'oklch(0.726 0.07 185)',
-  '--art-sky-ink': 'oklch(0.435 0.06 235)',
-  '--art-sky-soft': 'oklch(0.818 0.054 235)',
-  '--art-sky-accent': 'oklch(0.56 0.095 235)',
-  '--art-sky-accent2': 'oklch(0.708 0.083 235)',
-  '--art-periwinkle-ink': 'oklch(0.425 0.08 275)',
-  '--art-periwinkle-soft': 'oklch(0.806 0.049 275)',
-  '--art-periwinkle-accent': 'oklch(0.54 0.14 275)',
-  '--art-periwinkle-accent2': 'oklch(0.696 0.088 275)',
-  '--art-plum-ink': 'oklch(0.43 0.08 320)',
-  '--art-plum-soft': 'oklch(0.812 0.077 320)',
-  '--art-plum-accent': 'oklch(0.55 0.14 320)',
-  '--art-plum-accent2': 'oklch(0.702 0.1 320)',
+  '--art-coral-ink': 'oklch(0.43 0.035 32)',
+  '--art-coral-soft': 'oklch(0.875 0.05 32)',
+  '--art-coral-accent': 'oklch(0.6 0.115 32)',
+  '--art-coral-accent2': 'oklch(0.76 0.07 32)',
+  '--art-amber-ink': 'oklch(0.443 0.035 72)',
+  '--art-amber-soft': 'oklch(0.9 0.05 72)',
+  '--art-amber-accent': 'oklch(0.625 0.115 72)',
+  '--art-amber-accent2': 'oklch(0.785 0.07 72)',
+  '--art-olive-ink': 'oklch(0.44 0.035 112)',
+  '--art-olive-soft': 'oklch(0.895 0.05 112)',
+  '--art-olive-accent': 'oklch(0.62 0.115 112)',
+  '--art-olive-accent2': 'oklch(0.78 0.07 112)',
+  '--art-sage-ink': 'oklch(0.435 0.035 150)',
+  '--art-sage-soft': 'oklch(0.885 0.05 150)',
+  '--art-sage-accent': 'oklch(0.61 0.115 150)',
+  '--art-sage-accent2': 'oklch(0.77 0.07 150)',
+  '--art-teal-ink': 'oklch(0.432 0.035 185)',
+  '--art-teal-soft': 'oklch(0.88 0.05 185)',
+  '--art-teal-accent': 'oklch(0.605 0.107 185)',
+  '--art-teal-accent2': 'oklch(0.765 0.07 185)',
+  '--art-sky-ink': 'oklch(0.425 0.035 235)',
+  '--art-sky-soft': 'oklch(0.865 0.05 235)',
+  '--art-sky-accent': 'oklch(0.59 0.115 235)',
+  '--art-sky-accent2': 'oklch(0.75 0.07 235)',
+  '--art-periwinkle-ink': 'oklch(0.42 0.035 275)',
+  '--art-periwinkle-soft': 'oklch(0.855 0.05 275)',
+  '--art-periwinkle-accent': 'oklch(0.58 0.115 275)',
+  '--art-periwinkle-accent2': 'oklch(0.74 0.07 275)',
+  '--art-plum-ink': 'oklch(0.422 0.035 320)',
+  '--art-plum-soft': 'oklch(0.86 0.05 320)',
+  '--art-plum-accent': 'oklch(0.585 0.115 320)',
+  '--art-plum-accent2': 'oklch(0.745 0.07 320)',
 
   '--tide-coral-base': 'oklch(0.905 0.02 32)',
   '--tide-coral-soft': 'oklch(0.865 0.028 32)',

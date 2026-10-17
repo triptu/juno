@@ -16,6 +16,11 @@ export interface TabStripProps {
    */
   readonly leading?: ReactNode
   /**
+   * The window is in full screen, where macOS hides the traffic lights:
+   * `leading` starts at the strip's own padding instead of after their space.
+   */
+  readonly fullScreen?: boolean
+  /**
    * The new-tab button, right after the last tab as in Safari and Chrome.
    * It sits outside the scroller, so when the tabs overflow it stays at the
    * strip's end and never scrolls away.
@@ -48,7 +53,7 @@ export interface TabStripProps {
  * (`internal/tabDrag.ts`): transforms only, written once a frame, and no tab
  * re-renders until the drop.
  */
-export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, onMove, children }: TabStripProps) {
+export function TabStrip({ label = 'Tabs', leading, fullScreen = false, trailing, onKeyDown, onMove, children }: TabStripProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const drag = useRef<TabDrag | undefined>(undefined)
   const move = useRef(onMove)
@@ -95,7 +100,7 @@ export function TabStrip({ label = 'Tabs', leading, trailing, onKeyDown, onMove,
     })
   }
   return (
-    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && styles.stripLeading)}>
+    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && !fullScreen && styles.stripLeading)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
       <div ref={scroller} role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} onPointerDown={movable ? onPointerDown : undefined} {...stylex.props(styles.scroller)}>
         {children}
@@ -130,7 +135,7 @@ const styles = stylex.create({
     userSelect: 'none',
     WebkitAppRegion: 'drag',
   },
-  // With the sidebar hidden the strip starts after the traffic lights.
+  // With the sidebar hidden the strip starts after the traffic lights, except in full screen, which has none.
   stripLeading: {
     paddingInlineStart: layout['--titlebar-lights-inset'],
   },
