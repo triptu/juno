@@ -1,0 +1,1 @@
+- 10-17 11:39 · home-review · Home's Recent keeps its five-row room above its label, not under its rows, so the last row is always 12 above the chip and rows that land later still move nothing.
