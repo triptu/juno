@@ -750,6 +750,16 @@ Right-click a view's pill (§2.3). Edit view… (opens the view sheet) · Move l
 
 Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a check on the views that hold the conversation; choosing an unchecked view adds it ("Added #alerts-prod to Bots"), a checked one removes it ("Removed #alerts-prod from Bots"), each with Undo. Then a separator and **New view…**, which opens the sheet with the conversation already chosen. With no views, the submenu holds New view… alone.
 
+### 15.9 Text menu
+
+Right-click a text field (the composers, search, settings fields) or selected text that no other menu takes (SPEC "Feels native"). Built in main (`textMenu.ts`) from Chromium's `context-menu` event, on the app window and the sign-in window, with the system's labels:
+
+- **Misspelled word** (fields only): one item per guess, or a disabled "No Guesses Found" · — · Learn Spelling · —
+- **Selection:** Look Up “word” (macOS; the selection shortened to 24 characters) · Search with Google (opens the browser) · —
+- **Field:** Cut (⌘X) · Copy (⌘C) · Paste (⌘V) · Paste and Match Style (⌥⇧⌘V) · Select All (⌘A), each disabled when the field cannot do it. Read-only text has Copy alone.
+
+A password field offers no Look Up or Search. A right-click that opens a Juno menu calls `preventDefault`, and Chromium then reports nothing to main, so the two never open together. Row menus skip right-clicks inside a field (`inField` in `@juno/views`), which keep this menu.
+
 ## 16. Toasts
 
 **Shows:** shot 18-toast-undo.

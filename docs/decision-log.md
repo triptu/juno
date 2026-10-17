@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 04:25 · text-menu · Fields and plain selections get the macOS text menu from main (`textMenu.ts`, Chromium's `context-menu` event). Juno's menus win by calling `preventDefault` on the DOM event, which stops Chromium from reporting it, so no list of Juno targets lives in main. Items use ids through `popupContextMenu`, not Electron roles, so the one test seam covers them; labels copy the system's title case.
 - 10-18 04:20 · Tushar · No Apple Developer ID for now: releases stay ad-hoc signed, so each update asks once for "Juno Safe Storage" (choose Always Allow) and the updater offers the DMG instead of installing in place. Not wanted: a writing-style-aware grammar check and a "what changed" Home card after an update.
 - 10-18 03:45 · release-keeper · Every DMG built from a keeper-green commit is also published to triptu/juno-releases as the next patch version (0.1.1 first, from 66828cf7), with a "Release x.y.z" commit on main and 3–8 changelog lines. Why: no release had ever been published and every DMG was 0.1.0, so installs were never offered an update.
 - 10-18 03:01 · web-panel-setting · Settings › General › Open links in Juno (on by default) is a workspace preference (`webPanel`); off, `openWebPanel` sends every web link to the default browser and an open panel closes. `followWebPanel` holds the preference so a click reads the saved value without waiting.
