@@ -50,7 +50,18 @@ export const TYPOS: Readonly<Record<string, string>> = {
 }
 
 /** Doubled words that are often correct English. */
-const DOUBLE_OK = new Set(['had', 'that', 'is', 'was', 'very', 'no', 'bye', 'ha'])
+const DOUBLE_OK = new Set(['had', 'that', 'was', 'very', 'no', 'bye', 'ha'])
+/** "What it is is": a doubled "is" is correct after these words, and a slip after any other. */
+const IS_IS_OK = new Set(['it', 'this', 'that', 'what', 'which'])
+
+/** Whether `word` written twice is a slip. `before` is the text ahead of the pair. */
+function doubledSlip(word: string, before: string): boolean {
+  const lower = word.toLowerCase()
+  if (DOUBLE_OK.has(lower)) return false
+  if (lower !== 'is') return true
+  const previous = /([A-Za-z']+)\s*$/.exec(before)?.[1]?.toLowerCase()
+  return previous === undefined || !IS_IS_OK.has(previous)
+}
 
 const QUESTION_OPENER = /^(can|could|would|should|what|when|where|why|how|is|are|do|does|did|will|any|anyone|who|which)\b/i
 export const LONG_SENTENCE_WORDS = 40
@@ -120,8 +131,8 @@ function fixEditable(text: string, fixes: ClarityFix[], prefs: ClarityPrefs): st
     fixes.push({ kind: 'typo', from: word, to: replacement, label: `${word} → ${replacement}` })
     return replacement
   })
-  out = out.replace(/\b([A-Za-z]+)\s+\1\b/gi, (whole, word: string) => {
-    if (prefs.typos === false || DOUBLE_OK.has(word.toLowerCase())) return whole
+  out = out.replace(/\b([A-Za-z]+)\s+\1\b/gi, (whole, word: string, offset: number, all: string) => {
+    if (prefs.typos === false || !doubledSlip(word, all.slice(0, offset))) return whole
     fixes.push({ kind: 'doubled', from: whole, to: word, label: `${whole} → ${word}` })
     return word
   })
@@ -154,6 +165,22 @@ function classifyLines(text: string): Line[] {
   return out
 }
 
+/** "the" at the end of one line and "the" at the start of the next: the second goes. Both must be editable text. */
+function joinDoubled(lines: ReadonlyArray<Line>, fixedLines: string[], fixes: ClarityFix[]): void {
+  for (let i = 0; i + 1 < lines.length; i++) {
+    if (lines[i]?.kind !== 'text' || lines[i + 1]?.kind !== 'text') continue
+    const end = segments(fixedLines[i] ?? '').at(-1)
+    const start = segments(fixedLines[i + 1] ?? '')[0]
+    if (end === undefined || start === undefined || end.protect || start.protect) continue
+    const last = /([A-Za-z]+)\s*$/.exec(end.text)
+    const first = /^(\s*)([A-Za-z]+)\b\s*/.exec(start.text)
+    if (last?.[1] === undefined || first?.[2] === undefined || last[1].toLowerCase() !== first[2].toLowerCase()) continue
+    if (!doubledSlip(last[1], end.text.slice(0, last.index))) continue
+    fixedLines[i + 1] = `${first[1] ?? ''}${(fixedLines[i + 1] ?? '').slice(first[0].length)}`
+    fixes.push({ kind: 'doubled', from: `${last[1]}\n${first[2]}`, to: last[1], label: `${last[1]} ${first[2]} → ${last[1]}` })
+  }
+}
+
 function wordCount(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length
 }
@@ -174,6 +201,8 @@ export function clarityCheck(text: string, prefs: ClarityPrefs = {}): ClarityRes
       .map((s) => (s.protect ? s.text : fixEditable(s.text, fixes, prefs)))
       .join('')
   })
+
+  if (prefs.typos !== false) joinDoubled(lines, fixedLines, fixes)
 
   const bodyText = fixedLines
     .filter((_, i) => lines[i]?.kind === 'text')

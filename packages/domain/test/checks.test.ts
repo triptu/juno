@@ -21,6 +21,29 @@ describe('clarity check', () => {
     expect(clarityCheck('He had had enough.')).toBeUndefined()
   })
 
+  it('removes a doubled is, except where English doubles it', () => {
+    const r = clarityCheck('The build is is green.')
+    expect(r?.fixes.map((f) => f.label)).toEqual(['is is → is'])
+    expect(r?.fixed).toBe('The build is green.')
+    expect(clarityCheck('Sure, what it is is a bug.')).toBeUndefined()
+  })
+
+  it('finds doubled words whatever their case', () => {
+    const r = clarityCheck('The the build is green.')
+    expect(r?.fixes.map((f) => f.label)).toEqual(['The the → The'])
+    expect(r?.fixed).toBe('The build is green.')
+    expect(clarityCheck('I think THE the build is green.')?.fixed).toBe('I think THE build is green.')
+  })
+
+  it('finds a word doubled across a line break', () => {
+    const r = clarityCheck('I think the\nthe build is green.')
+    expect(r?.fixes.map((f) => f.label)).toEqual(['the the → the'])
+    expect(r?.fixed).toBe('I think the\nbuild is green.')
+    // A quote or code line on either side is left alone.
+    expect(clarityCheck('> I think the\nthe build is green.')).toBeUndefined()
+    expect(clarityCheck('I think `the`\nthe build is green.')).toBeUndefined()
+  })
+
   it('capitalises a lone lowercase i only when asked to', () => {
     const r = clarityCheck("i think i'll do it, if i can.", { capitalI: true })
     expect(r?.fixes.map((f) => f.label)).toEqual(['i → I'])
