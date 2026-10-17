@@ -6,7 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpat
 import { hostname, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { attemptSettled, capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
+import { activeOutage, attemptSettled, capacity, defaultCap, describeOutage, machinesToDestroy, mayPass, noteCall, outageAfterMs, outageExit, outageRemindMs, parseDuration, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -18,7 +18,8 @@ const maxVcpu = Math.min(planCap, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? def
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
-const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused/i.test(error.message)
+// 502, 503 and 504 came back from Namespace's API during the 10-17 outage.
+const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused|\b50[234]\b|Gateway Time-?out|Bad Gateway/i.test(error.message)
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
 const alive = (pid) => {
   if (!pid) return false
@@ -88,6 +89,26 @@ export function invalidateInventory() {
   rmSync(inventoryPath, { force: true })
 }
 
+// Failing Namespace calls, shared by every process so waiting clients can say
+// why they wait: docs/development.md, "Remote runs", "Outages".
+// Not a .json file: those are machine and reservation records.
+const outagePath = join(dir, 'namespace-outage')
+const outageAfter = parseDuration(process.env.JUNO_REMOTE_OUTAGE_AFTER) ?? outageAfterMs
+const listTimeoutMs = Number(process.env.JUNO_REMOTE_LIST_TIMEOUT_SECONDS ?? 90) * 1000
+export function outage() {
+  try { return activeOutage(JSON.parse(readFileSync(outagePath, 'utf8')), Date.now(), outageAfter) } catch { return undefined }
+}
+function noteNamespace(call, ok, error) {
+  let current
+  try { current = JSON.parse(readFileSync(outagePath, 'utf8')) } catch { /* No failures recorded. */ }
+  if (ok && !current?.calls?.[call]) return
+  const next = noteCall(current, { call, ok, error, now: Date.now() })
+  if (!next) { rmSync(outagePath, { force: true }); return }
+  const temporary = `${outagePath}.${process.pid}.tmp`
+  writeFileSync(temporary, JSON.stringify(next))
+  renameSync(temporary, outagePath)
+}
+
 let daemonInventory
 export function list() {
   if (daemonInventory) return daemonInventory
@@ -99,12 +120,14 @@ export function list() {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const startedAt = Date.now()
     const revision = inventoryRevision()
-    const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 90_000 })
+    const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: listTimeoutMs })
     if (result.status !== 0) {
       const error = new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
+      if (transient(error)) noteNamespace('list', false, error.message)
       if (attempt < 3 && transient(error)) continue
       throw error
     }
+    noteNamespace('list', true)
     // nsc prints null when no instance exists.
     const instances = JSON.parse(result.stdout) ?? []
     if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
@@ -249,7 +272,12 @@ async function provision(machine, pending, create) {
   pending = { ...pending, creating: Date.now() }
   write(pending)
   try {
-    const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
+    let id
+    try { id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token }) } catch (error) {
+      if (transient(error)) noteNamespace('create', false, error.message)
+      throw error
+    }
+    noteNamespace('create', true)
     // Admission must never observe neither the pending reservation nor its machine.
     while (!takeLock('decide')) await sleep(100)
     try {
@@ -334,15 +362,39 @@ function dispatch(instances) {
     else blocked.push(request)
   }
 }
+const minutes = (ms) => ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`
 const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th')}`
 
 export async function acquire(machine, create, log, { fresh = false } = {}) {
   if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
   if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
   if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
+  const outageWait = parseDuration(process.env.JUNO_REMOTE_OUTAGE_WAIT)
   ensureReaper()
   let createFailures = 0
   const started = Date.now()
+  // Says once, then every few minutes, why nothing is admitted; gives up when
+  // JUNO_REMOTE_OUTAGE_WAIT is set and the outage has lasted that long.
+  let toldAt = 0
+  const watchOutage = () => {
+    const active = outage()
+    if (!active) {
+      if (toldAt) log('Namespace answers again; waiting for a machine')
+      toldAt = 0
+      return false
+    }
+    const text = describeOutage(active)
+    if (outageWait !== undefined && Date.now() - active.since >= outageWait) {
+      const error = new Error(`${text}. Gave up after ${minutes(Date.now() - active.since)} of outage (JUNO_REMOTE_OUTAGE_WAIT=${process.env.JUNO_REMOTE_OUTAGE_WAIT}); use --local to run on this Mac.`)
+      error.outage = true
+      throw error
+    }
+    if (!toldAt) log(`${text}. Waiting${outageWait === undefined ? '' : ` until ${minutes(outageWait)} of outage`}; use --local to run on this Mac.`)
+    else if (Date.now() - toldAt >= outageRemindMs) log(`still waiting, ${Math.floor((Date.now() - started) / 60_000)} min so far: ${text}`)
+    else return true
+    toldAt = Date.now()
+    return true
+  }
   for (;;) {
     while (!takeLock('decide')) await sleep(100)
     const request = { id: randomUUID(), pid: process.pid, machine, fresh, cap: maxVcpu, capSet: process.env.JUNO_REMOTE_MAX_VCPU !== undefined, created: started }
@@ -372,6 +424,7 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
           if (!current.result.pending) return current.result
           return await provision(machine, current.result.pending, create)
         }
+        if (Date.now() - reportedAt >= 10_000 && watchOutage()) reportedAt = Date.now()
         if (Date.now() - reportedAt >= 10_000) {
           const position = queue().filter((item) => !item.result && !item.error).findIndex((item) => item.id === request.id) + 1
           if (position > 0) log(`waiting: ${ordinal(position)} in queue, ${vcpu(machine)} cores, ${Math.floor((Date.now() - started) / 1000)} s elapsed`)
@@ -380,9 +433,19 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
         await sleep(500)
       }
     } catch (error) {
-      if (!transient(error) || ++createFailures > 2) throw error
-      log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
-      await sleep(createFailures * 2000)
+      if (error.outage || !transient(error)) throw error
+      if (++createFailures <= 2) {
+        log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
+        await sleep(createFailures * 2000)
+      } else {
+        // The failed attempt keeps its reservation and label until an inventory
+        // settles it, so a machine that arrives late is destroyed, not doubled.
+        log(`infrastructure: create failed ${createFailures} times; retrying in a minute (${error.message.split('\n').at(-1)})`)
+        for (const until = Date.now() + 60_000; Date.now() < until;) {
+          watchOutage()
+          await sleep(Math.min(10_000, until - Date.now()))
+        }
+      }
     } finally { rmSync(requestPath(request.id), { force: true }) }
   }
 }
@@ -430,6 +493,7 @@ export async function reap() {
     }
   } finally { unlock('watcher') }
 }
+export { outageExit }
 export function status() {
   return machines().map((state) => ({ ...state, busy: alive(lockOwner(state.id)), idleFor: Date.now() - state.lastUsed }))
 }
