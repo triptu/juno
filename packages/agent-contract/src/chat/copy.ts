@@ -358,8 +358,8 @@ export const chatCopy = {
         `Juno reads your own Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`} and keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
       bodyConnection: (name: string) => `Juno reads ${name} and adds what it learns about you to its notes. You can edit or delete them in What Juno remembers.`,
       /** Home's meta line. */
-      meta: (sources: ReadonlyArray<string>) => `Reads your Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`} · You can edit what it keeps`,
-      metaConnection: (name: string) => `Reads ${name} · You can edit what it keeps`,
+      meta: (sources: ReadonlyArray<string>) => `Reads your Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`}`,
+      metaConnection: (name: string) => `Reads ${name}`,
       start: 'Start',
       notNow: 'Not now',
       stop: 'Stop',

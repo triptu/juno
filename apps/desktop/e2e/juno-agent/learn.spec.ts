@@ -52,7 +52,7 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
     return ask.count()
   }, { timeout: 30_000 }).toBe(1)
   await expect(juno.home.title('ask')).toHaveText('Let Juno learn how you work')
-  await expect(juno.home.meta('ask')).toHaveText('Reads your Slack messages · You can edit what it keeps')
+  await expect(juno.home.meta('ask')).toHaveText('Reads your Slack messages')
   await ask.getByRole('button', { name: 'Start', exact: true }).click()
 
   // The pass runs in the background and never shows the typing bubble; the chat's ask says what it kept.

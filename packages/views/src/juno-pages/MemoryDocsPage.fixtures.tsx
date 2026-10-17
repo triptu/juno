@@ -20,5 +20,5 @@ export default defineFixtures(
       empty: page({ page: docsEmpty, pinned: <PinList page={{ pins: [], usedBytes: 0, budgetBytes: 4096 }} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} /> }),
     },
   },
-  { width: 960, height: 900, padded: false },
+  { width: 960, height: 1500, padded: false },
 )
