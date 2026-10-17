@@ -53,8 +53,8 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
       <div {...stylex.props(styles.inner, padding === 'tight' && styles.innerTight)}>
       <div {...stylex.props(styles.header, padding === 'tight' && styles.headerTight)}>
         <span {...stylex.props(styles.title)}>
-          {/* The kind is a short name and never cuts; the source after it takes the ellipsis. */}
-          <Text variant="meta" weight="medium" tone="subtle" sx={styles.kind}>
+          {/* The kind is a short name and never cuts; the source after it takes the ellipsis. A label with no source (a connection call's "Create note in Notion") cuts itself. */}
+          <Text variant="meta" weight="medium" tone="subtle" data-chat-card-kind truncate={source === undefined && label !== undefined} sx={[styles.kind, source === undefined && label !== undefined && styles.kindCuts]}>
             {label ?? chatCopy.card.kind[kind]}
           </Text>
           {source !== undefined ? (
@@ -124,8 +124,9 @@ function AfterLine({ id, status, actions }: { readonly id: CardId; readonly stat
       )
     case 'done':
       return (
-        <After>
+        <After truncate={status.detail !== undefined}>
           {status.line}
+          <Detail text={status.detail} />
           {status.undo ? (
             <>
               {' · '}
@@ -142,13 +143,29 @@ function AfterLine({ id, status, actions }: { readonly id: CardId; readonly stat
       )
     case 'failed':
       // The card runs once: no retry and no "can't tell" row (SPEC 13.3).
-      return <After>{status.line}</After>
+      return (
+        <After truncate={status.detail !== undefined}>
+          {status.line}
+          <Detail text={status.detail} />
+        </After>
+      )
   }
 }
 
-function After({ children }: { readonly children: ReactNode }) {
+/** A connection call's one result line, on the after-line itself, so the footer keeps its height. */
+function Detail({ text }: { readonly text: string | undefined }) {
+  if (text === undefined) return null
   return (
-    <Text variant="meta" tone="muted" as="p" sx={styles.after}>
+    <>
+      {' · '}
+      <span data-card-result dir="auto">{text}</span>
+    </>
+  )
+}
+
+function After({ children, truncate = false }: { readonly children: ReactNode; readonly truncate?: boolean }) {
+  return (
+    <Text variant="meta" tone="muted" as="p" truncate={truncate} sx={styles.after}>
       {children}
     </Text>
   )
@@ -239,6 +256,10 @@ const styles = stylex.create({
   kind: {
     whiteSpace: 'nowrap',
     flexShrink: 0,
+  },
+  kindCuts: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   dot: {
     whiteSpace: 'pre',

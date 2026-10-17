@@ -80,6 +80,8 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('working', {}),
   Schema.TaggedStruct('done', {
     line: Schema.String,
+    /** One short line of what came back ("3 results", a new page's id), for a connection call. */
+    detail: Schema.optionalKey(Schema.String),
     /** "Undo" after a resolve or a remember. */
     undo: Schema.optionalKey(Schema.Literal(true)),
     open: Schema.optionalKey(OpenTarget),
@@ -87,7 +89,8 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('dismissed', {}),
   /** After 7 days, or when the source changed: "Expired · Ask again". */
   Schema.TaggedStruct('expired', {}),
-  Schema.TaggedStruct('failed', { line: Schema.String }),
+  /** `detail`: the destination's error, in one short line, for a connection call. */
+  Schema.TaggedStruct('failed', { line: Schema.String, detail: Schema.optionalKey(Schema.String) }),
 ])
 export type CardStatus = typeof CardStatus.Type
 
@@ -324,6 +327,9 @@ export const ChangeCard = Schema.TaggedStruct('change', {
   caption: Schema.optionalKey(Schema.String),
   /** Why Juno asked: the auto-review of a connection call. */
   review: Schema.optionalKey(ToolReview),
+  /** The header, by what the call does ("Search Littlebird"), and the button's verb ("Search"). Older cards have neither. */
+  title: Schema.optionalKey(Schema.String),
+  verb: Schema.optionalKey(Schema.String),
 })
 export type ChangeCard = typeof ChangeCard.Type
 

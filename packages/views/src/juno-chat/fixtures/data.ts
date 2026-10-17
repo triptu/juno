@@ -188,8 +188,8 @@ export const working: CardStatus = { _tag: 'working' }
 export const mayHaveHappened: CardStatus = { _tag: 'open', mayHaveHappened: true }
 export const dismissed: CardStatus = { _tag: 'dismissed' }
 export const expired: CardStatus = { _tag: 'expired' }
-export const done = (line: string, extra: { readonly undo?: true; readonly open?: OpenTarget } = {}): CardStatus => ({ _tag: 'done', line, ...extra })
-export const failed = (line: string): CardStatus => ({ _tag: 'failed', line })
+export const done = (line: string, extra: { readonly undo?: true; readonly open?: OpenTarget; readonly detail?: string } = {}): CardStatus => ({ _tag: 'done', line, ...extra })
+export const failed = (line: string, detail?: string): CardStatus => ({ _tag: 'failed', line, ...(detail === undefined ? {} : { detail }) })
 
 /* Cards ------------------------------------------------------------------- */
 
@@ -312,6 +312,17 @@ export const change = (id: string, cardStatus: CardStatus = open, long = false, 
       : []),
   ],
   caption: 'Moves the offsite a day later, as you asked Maya.',
+  ...(review === undefined ? {} : { review }),
+})
+
+/** A connection call named by what it does (SPEC 13.3): "Create page in Notion", or a search of Littlebird. */
+export const connectionCall = (id: string, kind: 'create' | 'search', cardStatus: CardStatus = open, review?: Extract<Card, { _tag: 'change' }>['review']): Card => ({
+  _tag: 'change',
+  id: cardId(id),
+  status: cardStatus,
+  ...(kind === 'create'
+    ? { server: 'Notion', target: 'notion-create-pages', title: 'Create page in Notion', verb: 'Create page', fields: [{ name: 'title', after: 'Offsite agenda' }, { name: 'content', after: 'Morning: roadmap. Afternoon: hiring retro.' }] }
+    : { server: 'Littlebird', target: 'search_user_context', title: 'Search Littlebird', verb: 'Search', fields: [{ name: 'query', after: 'What I work on and how I like to work' }] }),
   ...(review === undefined ? {} : { review }),
 })
 

@@ -49,6 +49,9 @@ export const ChangePayload = Schema.TaggedStruct('change', {
   ...action, server: Schema.String, target: Schema.String, caption: Schema.optionalKey(Schema.String),
   /** The auto-review that led here, set by the trusted side, never by the model. */
   review: Schema.optionalKey(P.ToolReview),
+  /** What the call does and its button ("Create note in Notion", "Create note"), set by the trusted side. */
+  title: Schema.optionalKey(Schema.String),
+  verb: Schema.optionalKey(Schema.String),
 })
 export const RemovePayload = Schema.TaggedStruct('remove', {
   ...action, messages: P.RemoveCard.fields.messages, offerReply: Schema.optionalKey(P.ChatMessageId),

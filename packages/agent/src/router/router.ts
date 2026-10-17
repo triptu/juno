@@ -325,12 +325,12 @@ class Router {
     const journal = this.session.journal()
     const input = find(this.store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(this.store, journal, input, { steer: false, text: () => this.inputText(input) }))
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(this.store, journal, input, { steer: false, text: () => this.inputText(input, run) }))
     // A crash can leave a steered input recorded in run_inputs but not yet in pi.
     for (const opId of run.inputs.keys()) {
       if (opId === run.opId) continue
       const queued = find(this.store, opId)
-      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(this.store, journal, queued, { steer: true, text: () => this.inputText(queued) }))
+      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(this.store, journal, queued, { steer: true, text: () => this.inputText(queued, run) }))
     }
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
@@ -353,7 +353,12 @@ class Router {
   /** A bubble's text: from the live run, or from the archive. */
   private bubbleText = (id: string) => this.current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(this.store, id)
 
-  private inputText = (op: InboxOp) => withImages(this.store, op.opId, modelText(this.store, op, this.bubbleText, this.options.cards))
+  private inputText = (op: InboxOp, run: Live) => {
+    const text = withImages(this.store, op.opId, modelText(this.store, op, this.bubbleText, this.options.cards))
+    // A connection call's result carried with the input is something Juno read (§6.4).
+    if (this.options.cards?.carriesData?.(op.opId)) this.taint(run)
+    return text
+  }
 
   private recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
     const added = transaction(this.store.db, () =>
@@ -429,7 +434,7 @@ class Router {
         })) continue
         // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic or with files.
         if (untrusted) run.clean = false
-        run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op) }))
+        run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op, run) }))
         this.emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
     })()

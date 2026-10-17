@@ -203,12 +203,14 @@ export const chatCopy = {
     change: {
       apply: 'Apply',
       applied: 'Applied',
+      /** A connection call that only looks something up, once it ran. */
+      done: 'Done',
       showAll: 'Show all',
       /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
       review: {
         always: 'Asked because your rule for this tool is Always ask.', failed: "Asked because Juno couldn't review this call.",
         notAsked: "Asked because you didn't ask for this.", untrusted: 'Asked because only something Juno read asked for this.',
-        implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
+        implied: "Asked because your message didn't ask for this exact change.", delete: "Asked because deleting can't be undone.",
         send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
         ranRead: 'Ran without asking because it only looks something up.',

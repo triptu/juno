@@ -30,13 +30,22 @@ export interface ExecutorCall {
   readonly opId: string
 }
 
+/**
+ * What a destination gave back, for a connection call: `model` is what the model reads with the
+ * card's outcome, `line` the card's one result line (a result, or the server's error).
+ */
+export interface ExecutorOutput {
+  readonly model?: string
+  readonly line?: string
+}
+
 export type ExecutorResult =
   /** The destination did it. `receipt` is the evidence kept; `open` is where "Open" goes. */
-  | { readonly _tag: 'done'; readonly receipt: Schema.Json }
+  | { readonly _tag: 'done'; readonly receipt: Schema.Json; readonly output?: ExecutorOutput }
   /** A definite rejection: nothing happened. `detail` is for Activity only. */
-  | { readonly _tag: 'failed'; readonly detail: string }
+  | { readonly _tag: 'failed'; readonly detail: string; readonly output?: ExecutorOutput }
   /** It may have happened. */
-  | { readonly _tag: 'unknown'; readonly detail: string }
+  | { readonly _tag: 'unknown'; readonly detail: string; readonly output?: ExecutorOutput }
 
 export interface Executor {
   readonly tool: string

@@ -6,6 +6,7 @@ import {
   budget,
   change,
   connect,
+  connectionCall,
   dismissed,
   done,
   expired,
@@ -196,7 +197,13 @@ export const changeCard = defineFixtures(
       failed: card(change('c4', failed('Failed'))),
       // The auto-review asked (SPEC 13.9): one fixed line says why.
       'asked-delete': card(change('c5', open, false, { rule: 'auto', intent: 'explicit', risk: 'delete', line: "Asked because deleting can't be undone." })),
-      'asked-implied': card(change('c6', open, false, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because you didn't ask for exactly this." })),
+      'asked-implied': card(change('c6', open, false, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." })),
+      // A connection call named by what it does, with its verb on the button, and its result once it ran.
+      'call-open': card(connectionCall('c7', 'create', open, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." })),
+      'call-applied': card(connectionCall('c8', 'create', done('Applied', { detail: 'Created page "Offsite agenda"' }))),
+      'call-failed': card(connectionCall('c9', 'create', failed('Failed', 'Notes are full for this workspace.'))),
+      'search-asked': card(connectionCall('c10', 'search', open, { rule: 'always', line: 'Asked because your rule for this tool is Always ask.' })),
+      'search-done': card(connectionCall('c11', 'search', done('Done', { detail: 'Prefers short messages; works on the Juno desktop app.' }), { rule: 'always', line: 'Asked because your rule for this tool is Always ask.' })),
     },
   },
   frame,

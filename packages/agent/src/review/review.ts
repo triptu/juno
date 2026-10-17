@@ -27,7 +27,8 @@ export interface ReviewQuestion {
 export interface ReviewRequest {
   readonly state: {
     readonly owner: ReadonlyArray<string>
-    readonly call: { readonly server: string; readonly tool: string; readonly args: string }
+    /** `about` and `readOnly`: the server's one-line description of the tool and its own read-only mark. */
+    readonly call: { readonly server: string; readonly tool: string; readonly args: string; readonly about?: string; readonly readOnly?: true }
   }
   readonly questions: { readonly intent: ReviewQuestion; readonly risk: ReviewQuestion }
 }
@@ -55,6 +56,7 @@ const RESERVE = dollars(0.001)
 const SURE = 0.6
 const OWNER_LIMIT = 2000
 const ARGS_LIMIT = 4000
+const ABOUT_LIMIT = 300
 
 const INTENT: ReviewQuestion = {
   type: 'choice',
@@ -73,7 +75,8 @@ const RISK: ReviewQuestion = {
   type: 'choice',
   instructions:
     'Judge what the call in `call` does to the world if it runs, from its tool name and its arguments. ' +
-    'When the arguments name the operation, such as a tool that takes one command string, the arguments decide what the call does, not the tool name.',
+    'When the arguments name the operation, such as a tool that takes one command string, the arguments decide what the call does, not the tool name. ' +
+    "`about` is the server's own description of the tool and `readOnly` its own mark that the tool changes nothing: use them, with the name and the arguments.",
   criteria: {
     read: 'It only reads: it looks something up, lists, searches, or shows help or a schema, and changes nothing.',
     reversible: 'It makes a change that is easy to undo, such as editing a page or a draft whose old content is kept.',
@@ -101,11 +104,14 @@ export function ownerWordsInRun(store: Store, runId: string): ReadonlyArray<stri
   return rows.map((row) => row.text).filter((text) => text.trim() !== '')
 }
 
-export function reviewRequest(owner: ReadonlyArray<string>, call: { readonly server: string; readonly tool: string; readonly args: unknown }): ReviewRequest {
+export function reviewRequest(owner: ReadonlyArray<string>, call: { readonly server: string; readonly tool: string; readonly args: unknown; readonly about?: string; readonly readOnly?: boolean }): ReviewRequest {
   return {
     state: {
       owner: owner.slice(-10).map((text) => text.slice(0, OWNER_LIMIT)),
-      call: { server: call.server, tool: call.tool, args: JSON.stringify(call.args).slice(0, ARGS_LIMIT) },
+      call: {
+        server: call.server, tool: call.tool, args: JSON.stringify(call.args).slice(0, ARGS_LIMIT),
+        ...(call.about ? { about: call.about.slice(0, ABOUT_LIMIT) } : {}), ...(call.readOnly ? { readOnly: true as const } : {}),
+      },
     },
     questions: { intent: INTENT, risk: RISK },
   }

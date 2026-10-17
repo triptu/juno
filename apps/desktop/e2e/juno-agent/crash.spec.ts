@@ -100,7 +100,7 @@ for (const point of MESSAGE_POINTS) {
   })
 }
 
-/** Connects the fake Littlebird, has Juno propose a note, and clicks Apply with `point` armed. */
+/** Connects the fake Littlebird, has Juno propose a note, and clicks Add material with `point` armed. */
 async function applyNote(juno: Juno, mcp: FakeLittlebird, app: RunningApp['app']): Promise<{ readonly pid: number | undefined }> {
   await ready(juno)
   const { id } = await addServer(juno, 'Notes', mcp.url)
@@ -111,7 +111,7 @@ async function applyNote(juno: Juno, mcp: FakeLittlebird, app: RunningApp['app']
   await expect(change).toHaveAttribute('data-card-status', 'open')
   expect(mcp.materials()).toHaveLength(0)
   const pid = await hooks(app, 'agentPid')
-  await change.getByRole('button', { name: 'Apply' }).click()
+  await change.getByRole('button', { name: 'Add material' }).click()
   return { pid }
 }
 
@@ -232,7 +232,7 @@ for (const point of ['rotation.drained', 'rotation.committed'] as const) {
       const chat = await openChat(juno)
       await chat.send(`${NOTE} on ${id}`)
       await chat.expectJuno('The note is ready for you to review.')
-      await card(chat, 'change').getByRole('button', { name: 'Apply' }).click()
+      await card(chat, 'change').getByRole('button', { name: 'Add material' }).click()
       await expect(card(chat, 'change')).toHaveAttribute('data-card-status', 'done')
       await chat.send(`${NOTE} on ${id} again`)
       await expect(card(chat, 'change')).toHaveCount(2)
@@ -265,7 +265,7 @@ for (const point of ['backup.segmentWritten', 'backup.manifestRenamed', 'ownersh
       const chat = await openChat(juno)
       await chat.send(`${NOTE} on ${id}`)
       await chat.expectJuno('The note is ready for you to review.')
-      await card(chat, 'change').getByRole('button', { name: 'Apply' }).click()
+      await card(chat, 'change').getByRole('button', { name: 'Add material' }).click()
       await expect(card(chat, 'change')).toHaveAttribute('data-card-status', 'done')
       await chat.send(`${NOTE} on ${id} again`)
       await expect(card(chat, 'change')).toHaveCount(2)
