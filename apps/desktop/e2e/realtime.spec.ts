@@ -15,6 +15,8 @@ async function openMain(juno: Juno): Promise<void> {
   await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
+  // Opening the row leaves the pointer on the list, which holds its order (SPEC 5): rows leaving would wait for it to go.
+  await juno.sidebar.leave()
 }
 
 test('an edit, a delete and a reaction made while the socket is down show once it is back', async ({ juno, fake }) => {
