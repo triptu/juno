@@ -1,0 +1,1 @@
+- 10-17 12:14 · break-pass-b · A `Popover` that opens upward is capped at the room above its anchor, so Home's destination list keeps its search in view in a 480px window; downward panels are unchanged.

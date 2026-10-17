@@ -1,0 +1,1 @@
+- 10-17 12:10 · break-pass-b · Home's first @ or #: Tab or Enter before the rows for the typed text land waits for them and picks the first, with later keys held, so "@j⏎" typed at speed no longer picks a person from the earlier rows.

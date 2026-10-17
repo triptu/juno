@@ -1,0 +1,1 @@
+- 10-17 12:12 · break-pass-b · A send from Home to a person or channel empties the field at once, as a topic's does, so text typed while it waits (a DM to open) is kept; if nothing is queued the draft comes back unless something new was written.
