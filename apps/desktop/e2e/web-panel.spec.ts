@@ -38,6 +38,8 @@ async function openLinks(juno: Juno) {
 test('a click opens a link in the web panel; ⌘-click and Google apps open the browser; ⌘K hides the page; close ends it', async ({ juno, fake }) => {
   seedLinks(fake)
   const link = await openLinks(juno)
+  // Wide enough that the panel sits beside the topic and leaves its links clickable.
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
   const panel = juno.win.getByTestId('web-panel')
   const url = page(fake)
 
