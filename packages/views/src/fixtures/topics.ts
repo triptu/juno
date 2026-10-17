@@ -75,7 +75,8 @@ export function row(input: RowInput): TopicRow {
     newThreads: 0,
     lastActivityTs: `${Math.floor(at / 1000)}.000100`,
     lastActivityAt: at,
-    preview: { sender, text },
+    // As the engine sends it: no name for the other side of a one-to-one DM.
+    preview: { sender: input.channel.kind === 'im' && sender !== 'You' ? '' : sender, text },
     ...rest,
   }
 }

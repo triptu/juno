@@ -154,14 +154,12 @@ export const TopicRow = memo(function TopicRow({
       {/* The message sets the direction; the sender is isolated so a Latin
           name before Arabic text, or the reverse, keeps its own order. */}
       <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
-        {row.preview.text.length === 0 ? (
-          row.preview.sender
-        ) : previewNamesSender(row) ? (
+        {row.preview.text.length === 0 || row.preview.sender.length === 0 ? (
+          row.preview.text || row.preview.sender
+        ) : (
           <>
             <bdi>{row.preview.sender}</bdi>: {row.preview.text}
           </>
-        ) : (
-          row.preview.text
         )}
       </Text>
       {hasTrail ? (
@@ -322,14 +320,6 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
  */
 function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
   return row.kind === 'main'
-}
-
-/**
- * Whether the preview starts with "Sender:". Not in a one-to-one DM when the
- * other person wrote it: the row already names them. "You:" stays.
- */
-function previewNamesSender(row: TopicRowModel): boolean {
-  return row.channel.kind !== 'im' || row.preview.sender === 'You'
 }
 
 /** A person as the stack (18px, the 48px photo) or the group tile (28px, the 72px photo) draws them. */

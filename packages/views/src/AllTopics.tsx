@@ -144,8 +144,8 @@ export const AllTopicsRow = memo(function AllTopicsRow({
           ) : null}
         </span>
         <Text variant="meta" tone="muted" truncate dir="auto" data-sensitive="">
-          {row.preview.text.length === 0 ? (
-            row.preview.sender
+          {row.preview.text.length === 0 || row.preview.sender.length === 0 ? (
+            row.preview.text || row.preview.sender
           ) : (
             <>
               <bdi>{row.preview.sender}</bdi>: {row.preview.text}
