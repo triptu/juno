@@ -1250,7 +1250,8 @@ test('a new tab with Home open to its composer painted', async ({ juno, win }) =
     await expect.poll(() => win.evaluate(() => performance.getEntriesByName('home-open').length)).toBe(i + 1)
     samples.push(await win.evaluate(() => performance.getEntriesByName('home-open').at(-1)!.duration))
   }
-  within('Home open, p95', stats('New tab with Home to its composer', samples).p95, 50)
+  // One frame, as New chat open was: the new tab and its focused composer are the next frame (docs/performance.md section 1).
+  within('new tab with Home, p95', stats('New tab with Home to its composer', samples).p95, oneFrameBudget(await refreshInterval(win)))
 })
 
 test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per call, production pacing', async () => {
