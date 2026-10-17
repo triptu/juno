@@ -44,13 +44,23 @@ function clipOf(node: HTMLElement): HTMLElement | undefined {
 /**
  * Keeps an open panel inside its pane: shifts it sideways when it would
  * run past an edge, and narrows it when the pane is narrower than the
- * panel. One read of the two boxes, then one write, before the first paint.
+ * panel. A panel that opens upward is also capped at the room above its
+ * anchor, so in a short window its top (a search field) stays in view and
+ * the rest scrolls. The boxes are read once, then written, before the
+ * first paint.
  */
 function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   const clip = clipOf(panel)
-  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth }
+  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0 }
   const box = panel.getBoundingClientRect()
   const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
+  const surface = panel.firstElementChild
+  if (placement.startsWith('top') && surface instanceof HTMLElement) {
+    // The panel's bottom is fixed to the anchor, so the room does not depend on what the panel holds yet.
+    const room = Math.max(0, box.bottom - bounds.top - gap)
+    const own = Number.parseFloat(getComputedStyle(surface).maxHeight)
+    if (!(own <= room)) surface.style.maxHeight = `${room}px`
+  }
   const room = bounds.right - bounds.left - 2 * gap
   const width = Math.min(box.width, room)
   const left = Math.max(bounds.left + gap, Math.min(box.left, bounds.right - gap - width))
