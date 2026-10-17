@@ -52,11 +52,11 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   // The info covers the top of the list; the button closes it again.
   await sheet.about.click()
 
-  // One Resolve: the row stays and says so, the topic leaves the sidebar, and the row's Undo brings it back.
+  // One Resolve: the row stays and says so, and the row's Undo brings it back. The sidebar holds behind the sheet (SPEC 5).
   await sheet.act(KEYS).click()
   await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'done')
   await juno.expectToast('Resolved · The staging deploy keys need rotating')
-  await juno.sidebar.row(KEYS).expectAbsent()
+  await juno.sidebar.row(KEYS).expectVisible()
   await sheet.undo(KEYS).click()
   await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'open')
   await juno.sidebar.row(KEYS).expectVisible()
@@ -72,12 +72,13 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   await sheet.all.click()
   await juno.expectToast('Resolved 1 topic')
   await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'done')
-  await juno.sidebar.row(KEYS).expectAbsent()
-  await juno.sidebar.row(INCIDENT).expectVisible()
+  await juno.sidebar.row(KEYS).expectVisible()
 
-  // Esc closes; nothing is left open, so the card's Resolve all is gone.
+  // Esc closes and the resolved topic leaves the sidebar; nothing is left open, so the card's Resolve all is gone.
   await win.keyboard.press('Escape')
   await expect(sheet.root).toHaveCount(0)
+  await juno.sidebar.row(KEYS).expectAbsent()
+  await juno.sidebar.row(INCIDENT).expectVisible()
   await expect(juno.home.button('tidyUp', 'Resolve all')).toHaveCount(0)
 
   // The kept topic is not suggested again until someone writes in it, and the resolved one is gone.

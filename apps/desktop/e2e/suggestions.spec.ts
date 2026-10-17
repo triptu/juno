@@ -50,12 +50,13 @@ test('Unfollow threads you never open: the reason, what Slack sees, Unfollow, Un
   await expect(sheet.lead).toContainText('Unfollow also unfollows in Slack, on all your devices. A mention of you follows it again.')
   await expect(sheet.reason(QUEUE)).toHaveText(/^(At least )?7 replies, never opened$/)
 
-  // Unfollow: the row stays and says so, Slack unfollows, and the thread leaves the sidebar.
+  // Unfollow: the row stays and says so, and Slack unfollows; the thread leaves the sidebar once the sheet closes.
   await sheet.act(QUEUE).click()
   await expect(sheet.row(QUEUE)).toHaveAttribute('data-review-status', 'done')
   await juno.expectToast(`Unfollowed · ${QUEUE}`)
   await expect.poll(followed).toBe(false)
-  await juno.sidebar.row(QUEUE).expectAbsent()
+  // The sidebar holds behind the sheet (SPEC 5).
+  await juno.sidebar.row(QUEUE).expectVisible()
 
   // Undo on the row follows it again in Slack.
   await sheet.undo(QUEUE).click()
@@ -74,6 +75,8 @@ test('Unfollow threads you never open: the reason, what Slack sees, Unfollow, Un
   await expect.poll(followed).toBe(false)
   await juno.win.keyboard.press('Escape')
   await expect(sheet.root).toHaveCount(0)
+  // Closed, the unfollowed thread leaves the sidebar.
+  await juno.sidebar.row(QUEUE).expectAbsent()
   fake.injectMessage({ channel: 'C0PLATFORM', threadTs: queue, user: 'U0MAYA', text: '<@U0TUSHAR> can you check the numbers before Friday?' })
   await expect.poll(followed).toBe(true)
   await juno.sidebar.row(QUEUE).expectVisible()
@@ -104,11 +107,12 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   await sheet.about.click()
   await expect(sheet.explainer).toHaveCount(0)
 
-  // Ignore hides it from the sidebar; the row's Undo shows it again.
+  // Ignore hides it from the sidebar once the sheet closes; the row's Undo takes it back.
   await sheet.act(BUILDS).click()
   await expect(sheet.row(BUILDS)).toHaveAttribute('data-review-status', 'done')
   await juno.expectToast(`Ignoring ${BUILDS}`)
-  await juno.sidebar.row(BUILDS).expectAbsent()
+  // The sidebar holds behind the sheet (SPEC 5).
+  await juno.sidebar.row(BUILDS).expectVisible()
   await sheet.undo(BUILDS).click()
   await expect(sheet.row(BUILDS)).toHaveAttribute('data-review-status', 'open')
   await juno.sidebar.row(BUILDS).expectVisible()
@@ -116,6 +120,7 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   // Ignore again: Settings › Ignored lists it, and Stop ignoring brings it back.
   await sheet.act(BUILDS).click()
   await juno.win.keyboard.press('Escape')
+  await juno.sidebar.row(BUILDS).expectAbsent()
   await juno.openSettings('Ignored')
   await expect(juno.settings.ignored('build-chatter')).toBeVisible()
   await juno.settings.stopIgnoring('build-chatter')

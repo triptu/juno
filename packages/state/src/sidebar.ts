@@ -228,8 +228,15 @@ const sidebarPausedAtom = Atom.make(false).pipe(Atom.keepAlive)
 /** Topics the user acted on while the list is engaged (a send, resolve, rename, follow): they take their live place at once. */
 const sidebarReleasedAtom = Atom.make<ReadonlyArray<string>>([]).pipe(Atom.keepAlive)
 
+/**
+ * How many sheets are open over the window. While one is, the list holds as
+ * it does under the pointer, so nothing moves behind the sheet; what waited
+ * applies when the last one closes.
+ */
+const sidebarSheetsAtom = Atom.make(0).pipe(Atom.keepAlive)
+
 /** Whether the list holds its order now (SPEC 5, "Holding the order"). */
-const sidebarHoldAtom = Atom.make((get) => get(sidebarEngagedAtom) && !get(sidebarPausedAtom))
+const sidebarHoldAtom = Atom.make((get) => (get(sidebarEngagedAtom) || get(sidebarSheetsAtom) > 0) && !get(sidebarPausedAtom))
 
 /** The pointer or keyboard focus came into the list, or both have left it. Leaving shows the held changes in one step. */
 export function setSidebarEngaged(registry: Registry, engaged: boolean): void {
@@ -240,21 +247,42 @@ export function setSidebarEngaged(registry: Registry, engaged: boolean): void {
   if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
 }
 
+/** A sheet opened over the window: the list holds from the order shown, paused or not. */
+export function openSidebarSheet(registry: Registry): void {
+  const open = registry.get(sidebarSheetsAtom)
+  if (open === 0 && registry.get(sidebarPausedAtom)) registry.set(sidebarPausedAtom, false)
+  registry.set(sidebarSheetsAtom, open + 1)
+}
+
+/**
+ * A sheet closed. When it was the last, what waited applies in one step,
+ * the moves made in the sheet with the rest. Under the pointer the list
+ * then shows the live order until it is touched again, as after an
+ * explicit action.
+ */
+export function closeSidebarSheet(registry: Registry): void {
+  const open = Math.max(0, registry.get(sidebarSheetsAtom) - 1)
+  registry.set(sidebarSheetsAtom, open)
+  if (open > 0) return
+  if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
+  else if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+}
+
 /** The pointer moved, or focus moved, in the list: a paused hold starts again from the order shown. */
 export function resumeSidebarHold(registry: Registry): void {
   if (registry.get(sidebarPausedAtom)) registry.set(sidebarPausedAtom, false)
 }
 
-/** The user acted on this topic: its move, arrival or departure shows at once, even while the list holds. */
+/** The user acted on this topic: its move, arrival or departure shows at once, even while the list holds, except behind a sheet. */
 export function releaseSidebarTopic(registry: Registry, id: string): void {
-  if (!registry.get(sidebarEngagedAtom)) return
+  if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
   const released = registry.get(sidebarReleasedAtom)
   if (!released.includes(id)) registry.set(sidebarReleasedAtom, [...released, id])
 }
 
-/** An explicit action elsewhere: show the live order now, and keep showing it until the list is touched again. */
+/** An explicit action elsewhere: show the live order now, and keep showing it until the list is touched again. Behind a sheet it waits for the sheet to close. */
 export function flushSidebar(registry: Registry): void {
-  if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
+  if (registry.get(sidebarEngagedAtom) && registry.get(sidebarSheetsAtom) === 0) registry.set(sidebarPausedAtom, true)
 }
 
 /**

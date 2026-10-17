@@ -179,11 +179,15 @@ export function scrollsOneWay(probe: string, direction: 'down' | 'up', options: 
 
 const intersects = (a: Rect, b: Rect) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 
+/** The source's box is somewhere else after the shift. */
+const moved = (source: ShiftSource) => differs(source.before, source.after, 0.5)
+
 const showSource = (source: ShiftSource) => `${source.node} ${show(source.before)} -> ${show(source.after)}`
 
 /**
- * No layout-shift entry. With `region`, only shifts of elements inside that
- * region count. Shifts within 500 ms of a press are left out unless
+ * No layout-shift entry that moved a box. With `region`, only shifts of
+ * elements inside that region count. An entry whose every box is where it
+ * was (Chromium reports some text changes so) does not count. Shifts within 500 ms of a press are left out unless
  * `includeInput`, since a press may replace what is on screen. With
  * `warn`, a shift is reported but does not fail the run.
  */
@@ -196,11 +200,15 @@ export function noLayoutShift(options: Window & { readonly includeInput?: boolea
     const area = options.region === undefined ? undefined : recording.regions[options.region]
     if (options.region !== undefined && area === undefined) return fail(name, `no region ${options.region}`, [])
     const inArea = (source: ShiftSource) => area === undefined || intersects(source.before, area) || intersects(source.after, area)
-    const counted = recording.shifts
+    const inWindow = recording.shifts
       .filter((s) => s.t >= from && s.t < to && s.value > 0 && (options.includeInput === true || !s.hadRecentInput))
       .map((s) => ({ ...s, sources: s.sources.filter(inArea) }))
       .filter((s) => s.sources.length > 0 || area === undefined)
-    if (counted.length === 0) return pass(name, `${recording.shifts.length} entries in the recording, none counted`)
+    // Chromium reports some text changes as a shift whose every box is where it was: nothing moved, so it does not count.
+    // An entry without sources cannot be told apart from a real one, so it counts.
+    const counted = inWindow.filter((s) => s.sources.length === 0 || s.sources.some(moved))
+    const still = inWindow.length - counted.length
+    if (counted.length === 0) return pass(name, `${recording.shifts.length} entries in the recording, none counted${still > 0 ? `; ${still} with no box moved` : ''}`)
     const sources = counted.flatMap((s) => s.sources).slice(0, 4).map(showSource)
     const detail = `${counted.length} shifts, score ${counted.reduce((sum, s) => sum + s.value, 0).toFixed(4)}: ${sources.join('; ')}`
     const shots = [...new Set(counted.map((s) => shotAtTime(evidence, s.t)))].slice(0, 12)

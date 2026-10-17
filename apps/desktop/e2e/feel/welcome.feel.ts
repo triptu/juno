@@ -77,7 +77,7 @@ async function appear(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promi
       name: 'welcome-appear',
       title: 'Sign in for the first time: the welcome card fills its room whole, once, and the field below never moves',
       probes: card,
-      regions: { home: HOME, room: ROOM },
+      regions: { home: HOME },
       settleMs: 1000,
       checks: [
         happened('the card showed', (r) => r.frames.some((f) => f.values['card'] !== null)),
@@ -85,8 +85,7 @@ async function appear(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promi
         landsAndStays('card', 'the welcome card'),
         staysDrawn('cardOpacity', 'the welcome card'),
         ...aroundHolds().slice(0, 2),
-        // The card's room: the syncing line's count above it reports a shift with the same box before and after (a suite problem).
-        noLayoutShift({ region: 'room', includeInput: true }),
+        noLayoutShift({ region: 'home', includeInput: true }),
         noFlicker('home', 'Home'),
       ],
     },
