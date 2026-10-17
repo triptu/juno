@@ -1,0 +1,1 @@
+- 10-17 12:53 · home-review-2 · Home's Recent stays empty in its room until the first sync ends and its ranking has arrived, as Home's rows keep their slots, so its rows never re-rank under the pointer; the destination list has every conversation meanwhile.

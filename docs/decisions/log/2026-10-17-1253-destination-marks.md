@@ -1,0 +1,1 @@
+- 10-17 12:53 · home-review-2 · Home's destination list (and All topics' place filter) draws Recent's marks, a face, group initials or the channel's tile, so a conversation looks the same in Recent, the chip's list and the Send to list.
