@@ -71,6 +71,7 @@ test('a search with no read-only mark runs under Auto with no card', async ({ ju
   await pane.send(`learn about me on ${id}`)
   // While the call runs, the status bubble names the connection and what the tool does.
   await expect(pane.root.locator('[data-chat-status]')).toHaveText('Searching Context')
+  await pane.root.locator('[data-chat-status]').screenshot({ path: test.info().outputPath('status.png') })
   release()
   held = undefined
   await pane.expectJuno('You prefer short messages.')
