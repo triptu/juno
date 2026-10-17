@@ -529,6 +529,7 @@ export class FakeServer {
     if (path === '/signin' && method === 'POST') return this.#signIn(request, response)
     if (path.startsWith('/client/') && method === 'GET') return this.#client(request, response)
     if (path === '/health') return json(response, 200, { ok: true })
+    if (path.startsWith('/web/') && method === 'GET') return html(response, WEB_PAGES[path] === undefined ? 404 : 200, WEB_PAGES[path] ?? '<title>Not found</title>')
     json(response, 404, { ok: false, error: 'not_found' })
   }
 
@@ -759,6 +760,12 @@ function json(response: ServerResponse, status: number, body: unknown): void {
     'x-slack-req-id': randomBytes(6).toString('hex'),
   })
   response.end(JSON.stringify(body))
+}
+
+/** Pages outside Slack, for the web panel: a link in a message can point here instead of the real web. */
+const WEB_PAGES: Record<string, string> = {
+  '/web/page': '<!doctype html><title>Fake page</title><h1>Fake page</h1><p><a href="/web/other">Other page</a></p>',
+  '/web/other': '<!doctype html><title>Other fake page</title><h1>Other fake page</h1><p><a href="/web/page">Back</a></p>',
 }
 
 function html(response: ServerResponse, status: number, body: string): void {
