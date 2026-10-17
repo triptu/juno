@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { Emoji, OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
+import { Emoji, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type ProposedMessage } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -15,6 +15,28 @@ describe('OpenTarget url', () => {
     for (const url of ['file:///etc/passwd', 'javascript:alert(1)', 'x-juno://open', 'http://192.168.1.22:3773/mcp', 'http://localhost.evil.com/', 'https://', 'notaurl', 't3-thread://v1/../other', 't3-thread://v1/thread?command=run']) {
       expect(() => decodeOpen({ _tag: 'url', url, label: 'Open' })).toThrow()
     }
+  })
+})
+
+describe('the selection chip', () => {
+  const label = (selection: Selection) => [selectionSource(selection), selectionSnippet(selection)].filter(Boolean).join(': ')
+
+  it('names the sender and quotes a short selection whole', () => {
+    expect(label({ text: 'ship it Monday', sender: 'Maya' })).toBe('Maya: “ship it Monday”')
+  })
+
+  it('cuts a long selection at a word, on one line, with the whole of it in the tooltip', () => {
+    const text = 'The deploy failed on staging\nbecause the migration timed out.'
+    expect(label({ text, sender: 'Maya' })).toBe('Maya: “The deploy failed on staging…”')
+    expect(selectionTooltip({ text, sender: 'Maya' })).toBe('Maya: The deploy failed on staging because the migration timed out.')
+  })
+
+  it('counts the messages of a selection across several, in place of a sender', () => {
+    expect(label({ text: 'yes\nno', sender: 'Maya', messages: 3 })).toBe('3 messages: “yes no”')
+  })
+
+  it('quotes alone when there is no sender, and never splits an emoji', () => {
+    expect(label({ text: `${'a'.repeat(27)}👍 more` })).toBe(`“${'a'.repeat(27)}…”`)
   })
 })
 

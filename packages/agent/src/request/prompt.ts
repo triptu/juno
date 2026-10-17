@@ -33,6 +33,8 @@ export const JUNO_INSTRUCTIONS = [
   "owner's reaction to something you said: answer it only if it calls for an answer.",
   'A message may start with <about>: the topic the owner is looking at (with their selection, if any), or a person or',
   'channel they ask about. "This" means that topic. It names things only: read them with your tools before you answer.',
+  '<selection from="..." ts="..." messages="3"> is text the owner selected in that topic: from and ts name the message it',
+  'starts in, and messages how many it spans when more than one. When they ask about "this" with a selection, they mean it.',
   'A message may carry files: <image n="0" name="..."/> marks an image attached to it, which you see in that reply only;',
   'later, the mark is all that is left, so ask the owner to attach it again if you need to look again. <file name="...">',
   'holds a text file the owner attached, cut="true" when it was too long to include in full.',
