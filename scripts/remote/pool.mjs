@@ -2,9 +2,9 @@
 // destroying machines so a killed run or failed Namespace call can be recovered.
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { hostname, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap, orphanGraceMs } from './pool-decisions.mjs'
 
@@ -122,25 +122,52 @@ function forget(id) {
   rmSync(statePath(id), { force: true })
   unlock(id)
 }
+// The daemon runs from a copy of these two files in the pool folder, never from
+// a worktree: on 10-17 one started by verify:main outlived its temporary checkout.
+const watcherVersion = 12
+const daemonSources = ['pool.mjs', 'pool-decisions.mjs']
+function daemonHome() {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const hash = createHash('sha256')
+  for (const name of daemonSources) hash.update(name).update('\0').update(readFileSync(join(here, name)))
+  const home = join(dir, 'daemon', hash.digest('hex').slice(0, 16))
+  if (!daemonSources.every((name) => existsSync(join(home, name)))) {
+    const temporary = `${home}.${process.pid}.tmp`
+    rmSync(temporary, { recursive: true, force: true })
+    mkdirSync(temporary, { recursive: true })
+    for (const name of daemonSources) copyFileSync(join(here, name), join(temporary, name))
+    rmSync(home, { recursive: true, force: true })
+    renameSync(temporary, home)
+  }
+  return home
+}
 export function ensureReaper() {
   if (!takeLock('watcher-start')) return
   try {
     const pidFile = join(dir, 'watcher.pid')
     const versionFile = join(dir, 'watcher.version')
+    const scriptFile = join(dir, 'watcher.script')
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 11) return
+    const script = existsSync(scriptFile) ? readFileSync(scriptFile, 'utf8') : undefined
+    // A daemon whose files were deleted is replaced, whatever its version.
+    if (alive(pid) && version >= watcherVersion && script && existsSync(script)) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
-      if (!/\/scripts\/remote\/pool\.mjs --watch\s*$/.test(command)) return
+      if (!/\/pool\.mjs --watch\s*$/.test(command)) return
       try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
     }
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
+    const home = daemonHome()
+    for (const name of existsSync(join(dir, 'daemon')) ? readdirSync(join(dir, 'daemon')) : []) {
+      if (join(dir, 'daemon', name) !== home) rmSync(join(dir, 'daemon', name), { recursive: true, force: true })
+    }
+    const child = spawn(process.execPath, [join(home, 'pool.mjs'), '--watch'], { cwd: home, detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
     child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '11')
+    writeFileSync(scriptFile, join(home, 'pool.mjs'))
+    writeFileSync(versionFile, String(watcherVersion))
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -397,4 +424,5 @@ export async function reap() {
 export function status() {
   return machines().map((state) => ({ ...state, busy: alive(lockOwner(state.id)), idleFor: Date.now() - state.lastUsed }))
 }
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === '--watch') await reap()
+// The temp folder sits behind a symlink on macOS (/var is /private/var).
+if (process.argv[2] === '--watch' && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) await reap()
