@@ -647,5 +647,3 @@ Other literal lengths and colours require tokens, or a trailing
 | Token | Value | Used for |
 | --- | --- | --- |
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
-| `--threads-button-width` | 128px | Threads button before and after its count arrives. |
-| `--threads-button-narrow-width` | 64px | Threads button below the header's 480px breakpoint. |

@@ -86,39 +86,28 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
 }
 
 export interface IslandButtonProps {
-  /** Keep the counter's space while its value loads or changes. */
-  readonly reserveCount?: boolean
-
   readonly icon: PhosphorIcon
-  /** The visible text in a roomy header. */
+  /** The visible text in a roomy header, and the accessible name in both forms. */
   readonly label: string
   /** A label this button can turn into (Follow and Resolve): the roomy label keeps the wider of the two widths, so the swap moves nothing. */
   readonly reserve?: string
-  /** What a narrow header shows beside the icon ("12" for Threads). Absent: the icon only. */
-  readonly narrowLabel?: string
-  /** The accessible name, when it differs from `label` ("Threads, 12"). It holds in the narrow form. */
-  readonly name?: string
-  /** A toggle or a popover's button is down. */
-  readonly pressed?: boolean
-  readonly expanded?: boolean
   /** `at` is under the right island, at the button's left edge, where a menu it opens goes. */
   readonly onClick: (at: MenuAnchor) => void
 }
 
 /**
- * A text button in the right island: Follow, Resolve, Reopen, Threads. In a
- * narrow header it becomes a 28px icon button, or the icon and a short
- * label, by CSS alone; its accessible name never changes.
+ * A text button in the right island: Follow, Resolve, Reopen. In a narrow
+ * header it becomes a 28px icon button by CSS alone; its accessible name
+ * never changes.
  */
-export function IslandButton({ reserveCount = false, icon, label, reserve, narrowLabel, name, pressed, expanded, onClick }: IslandButtonProps) {
+export function IslandButton({ icon, label, reserve, onClick }: IslandButtonProps) {
   return (
     <button
       type="button"
-      aria-label={name ?? label}
-      {...tooltip(name ?? label)}
-      aria-expanded={expanded}
+      aria-label={label}
+      {...tooltip(label)}
       onClick={(event) => onClick(underRightIsland(event.currentTarget))}
-      {...stylex.props(styles.reset, styles.island, reserveCount && styles.countWidth, narrowLabel === undefined && styles.iconOnlyWhenNarrow, (pressed === true || expanded === true) && styles.islandDown)}
+      {...stylex.props(styles.reset, styles.island, styles.iconOnlyWhenNarrow)}
     >
       <span {...stylex.props(styles.islandIcon)}>
         <Icon icon={icon} size={14} />
@@ -133,7 +122,6 @@ export function IslandButton({ reserveCount = false, icon, label, reserve, narro
           </span>
         </span>
       )}
-      {narrowLabel === undefined ? null : <span {...stylex.props(styles.narrow)}>{narrowLabel}</span>}
     </button>
   )
 }
@@ -181,10 +169,6 @@ export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
 }
 
 const styles = stylex.create({
-  countWidth: {
-    justifyContent: 'flex-start',
-    width: { default: sizes['--threads-button-width'], [NARROW]: sizes['--threads-button-narrow-width'] },
-  },
   heading: {
     display: 'flex',
     flexGrow: 0,
@@ -276,21 +260,12 @@ const styles = stylex.create({
   iconOnlyWhenNarrow: {
     paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 },
   },
-  islandDown: {
-    backgroundColor: {
-      default: colors['--secondary-hover'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
-    },
-  },
   islandIcon: {
     display: 'inline-flex',
     color: colors['--foreground-subtle'],
   },
   roomy: {
     display: { default: 'inline', [NARROW]: 'none' },
-  },
-  narrow: {
-    display: { default: 'none', [NARROW]: 'inline' },
   },
   // Both labels in one cell: the cell is as wide as the wider, and only the shown one is painted.
   roomyStack: {
