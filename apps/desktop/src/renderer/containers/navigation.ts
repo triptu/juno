@@ -665,7 +665,7 @@ export function warmTopic(id: string): void {
   prefetchTopic(registry, id)
 }
 
-/** Pointer enter or focus on the sidebar's Home item: after the idle TTL, `openHome` then has a value at once. */
+/** Pointer enter or focus on the sidebar's Home button: after the idle TTL, `openHome` then has a value at once. */
 export function warmHome(): void {
   prefetchHome(registry)
 }

@@ -413,7 +413,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 | Token | Value |
 | --- | --- |
-| `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 280px and `--sidebar-max-width` 480px. The live width is an inline `width` on the shell's sidebar box, set during the drag, not a token value |
+| `--sidebar-width` | 384px default; the owner drags it between `--sidebar-min-width` 312px and `--sidebar-max-width` 480px. The live width is an inline `width` on the shell's sidebar box, set during the drag, not a token value |
 | `--sidebar-resize-hit` | 6px hit area centred on the sidebar edge |
 | `--titlebar-lights-inset` | 78px kept free for the traffic lights, in the sidebar bar or, with the sidebar hidden, at the start of the tab strip |
 | `--juno-panel-width` | 440px default (a Juno bubble holds about 50 characters a line at 14px); `--juno-panel-min-width` 360 and `--juno-panel-max-width` 640 bound a drag on its edge. Beside the topic it gives way to keep `--juno-panel-topic-min` 480px, down to its minimum; under that it covers the topic (the `Workspace` view's container query repeats min + topic min + two insets, 856px) |

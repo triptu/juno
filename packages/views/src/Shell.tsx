@@ -6,7 +6,7 @@ import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 export interface ShellProps {
   /** The left pane. Without one (signed out) the page fills the window under a drag strip. */
   readonly sidebar?: ReactNode
-  /** The sidebar's width in CSS pixels, 280 to 480. Default 384. */
+  /** The sidebar's width in CSS pixels, 312 to 480. Default 384. */
   readonly sidebarWidth?: number
   /** Hidden: the sidebar keeps its state but takes no space (spec section 4). */
   readonly sidebarHidden?: boolean

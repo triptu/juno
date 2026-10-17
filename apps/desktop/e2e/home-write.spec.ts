@@ -197,11 +197,11 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
   await write.expectDestination('Juno')
 })
 
-test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno, win }) => {
+test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { tabs, sidebar, topic, nav } = juno
-  const home = win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
+  const home = juno.home.navItem
 
   // A fresh launch shows one Home tab, selected.
   await juno.expectNothingOpen()

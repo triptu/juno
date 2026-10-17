@@ -237,7 +237,7 @@ export default defineFixtures(
       'with privacy': scene(() => <PrivacyOn>{full({ status: <EngineNotice kind="offline" />, privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
     },
     Nav: {
-      // Home tab active, or no tab open.
+      // Home tab active, or no tab open: Home is the title bar's button, with the nav's active look.
       'home-active': scene(() => full({ activeNav: 'home' })),
       // All topics is the title bar's button: it takes the nav's active look.
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
@@ -280,6 +280,15 @@ export default defineFixtures(
         ),
         { tooltip: '[aria-label="All topics"]' },
       ),
+      home: scene(
+        () => (
+          <>
+            {full()}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[aria-label="Home"]' },
+      ),
       'view-pill': scene(
         () => (
           <>
@@ -312,7 +321,9 @@ export default defineFixtures(
       'unread-hover': scene(() => full(), { hover: '[aria-label="Unread only"]' }),
       'unread-focus': scene(() => full(), { focus: '[aria-label="Unread only"]' }),
       'view-hover': scene(() => full(viewChrome), { hover: '[data-view-pill="vdesign"]' }),
-      'nav-focus': scene(() => full(), { focus: '[aria-label="Pages"] [role="button"]:nth-of-type(2)' }),
+      'nav-focus': scene(() => full(), { focus: '[aria-label="Pages"] [role="button"]' }),
+      'home-hover': scene(() => full(), { hover: '[aria-label="Sidebar title bar"] [aria-label="Home"]' }),
+      'home-focus': scene(() => full(), { focus: '[aria-label="Sidebar title bar"] [aria-label="Home"]' }),
       // The first pill sits on the row's start edge; its ring must show whole.
       'filter-focus': scene(() => full(viewChrome), { focus: '[aria-label="Quick filters"] [aria-label="All"]' }),
       // A view pill half under the row's end: keyboard focus scrolls it in, ring and all.

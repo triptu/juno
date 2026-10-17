@@ -1,5 +1,5 @@
 // Home (SPEC section 12, docs/design/home/): what wants the user, shown with
-// no tab open and from the sidebar's Home item; each kind of row opens its
+// no tab open and from the sidebar's Home button; each kind of row opens its
 // topic; Mark done and Resolve all with Undo; Home with AI assist off; and
 // the caught-up state, which has no link of its own (All topics is in the sidebar).
 import { DatabaseSync } from 'node:sqlite'

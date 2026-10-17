@@ -2369,12 +2369,12 @@ export class HomePane {
     await expect(this.greeting).toBeVisible()
   }
 
-  /** The sidebar's Home item. */
+  /** The sidebar title bar's Home button (SPEC 5). */
   get navItem(): Locator {
-    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
+    return this.win.locator('header[aria-label="Sidebar title bar"]').getByRole('button', { name: 'Home' })
   }
 
-  /** Opens Home from the sidebar, which reads the items afresh. */
+  /** Opens Home from the sidebar title bar, which reads the items afresh. */
   async open(): Promise<void> {
     await this.navItem.click()
     await this.expectShown()
