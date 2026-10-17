@@ -31,9 +31,14 @@ test('the composer has Cut, Copy and Paste, and Paste pastes', async ({ juno }) 
   await juno.chooseNextMenuItem('paste')
   const box = await composer.boundingBox()
   // Past the end of the text, so nothing is selected.
-  await composer.click({ button: 'right', position: { x: box!.width - 24, y: (await firstWord(composer)).y } })
+  const point = { x: box!.width - 24, y: (await firstWord(composer)).y }
+  await composer.click({ button: 'right', position: point })
+  const menu = await juno.lastMenu()
   // Nothing is selected, so Cut and Copy are off.
-  expect((await juno.lastMenu()).labels).toEqual(['(Cut)', '(Copy)', 'Paste', 'Paste and Match Style', 'Select All'])
+  expect(menu.labels).toEqual(['(Cut)', '(Copy)', 'Paste', 'Paste and Match Style', 'Select All'])
+  // It opens where the right-click was.
+  expect(Math.abs(menu.at!.x - (box!.x + point.x))).toBeLessThanOrEqual(1)
+  expect(Math.abs(menu.at!.y - (box!.y + point.y))).toBeLessThanOrEqual(1)
   await expect(composer).toHaveValue('Hello from the menu')
 })
 

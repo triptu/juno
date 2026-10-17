@@ -61,7 +61,8 @@ function textMenuItems(params: ContextMenuParams): ContextMenuItem[] {
 async function showTextMenu(window: BrowserWindow, contents: WebContents, params: ContextMenuParams): Promise<void> {
   const items = textMenuItems(params)
   if (items.length === 0) return
-  const chosen = await popupContextMenu(items, window)
+  // Where Chromium says, so the context-menu key opens it at the field, not under the pointer.
+  const chosen = await popupContextMenu(items, window, { x: params.x, y: params.y })
   if (chosen === null || contents.isDestroyed()) return
   if (chosen.startsWith('replace:')) return contents.replaceMisspelling(chosen.slice('replace:'.length))
   switch (chosen) {
