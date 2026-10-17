@@ -7,10 +7,13 @@ import { type Compactor, type CompactorState } from '../compactor/scheduler'
 import type { InboxState } from '../inbox/inbox'
 import { type Job, type JobDriver, type Jobs } from '../jobs/jobs'
 import { JOBS_MIGRATIONS } from '../jobs/schema'
+import { MEMORY_DOCS_MIGRATIONS } from '../memory-docs/schema'
 import { enterRecovery, observeOwner } from '../ownership/ownership'
 import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
 import type { Ownership } from '../ownership/service'
 import type { PinResult } from '../pins/pins'
+import type { Learning } from '../memory-docs/learn'
+import type { McpManagerApi } from '../mcp/manager'
 import type { ProviderGuardApi } from '../providers'
 import { REDACTION_MIGRATIONS, type Redaction, type RemovalBackup } from '../redaction'
 import { type JunoTool, type ToolRun } from '../request/tool'
@@ -34,6 +37,7 @@ import { type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
 import { createTurnServices } from './services'
 import { createTurnSession } from './session'
+import { stepLog } from './steps'
 import { closeTurns, turnApi } from './turns'
 /**
  * Opens the turn engine on an agent directory: WP8's durable core with
@@ -88,6 +92,8 @@ export interface TurnsOptions {
   readonly compaction?: ModelRef | ((store: Store) => ModelRef | undefined)
   /** The subagents' cheaper model. Default: the compaction model; no `delegate` tool without either. */
   readonly subagent?: ModelRef
+  /** The MCP manager once the store is open, for the learning pass's reads (`withMcp`). */
+  readonly connections?: () => McpManagerApi | undefined
   /** Slack reads through the AgentHost port. No Slack tools without it. */
   readonly views?: ViewHost
   readonly host?: HostReads
@@ -180,6 +186,8 @@ export interface Turns {
   }
   /** Cards, clicks and dispatch (WP15). */
   readonly actions: Actions
+  /** The learning passes behind Juno's `learn` asks (SPEC 13.8). */
+  readonly learning: Learning
   /** The owner's Remove and the purge after it (WP16). */
   readonly redaction: Redaction
   /** Who owns Juno, move, restore and Activate (WP21). */
@@ -208,7 +216,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   return openCore({
     agentDir: options.agentDir,
     ...(options.now ? { now: options.now } : {}),
-    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
+    migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, MEMORY_DOCS_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],
     router: {
       beforeOpen: async () => {
         // A restore staged before the restart replaces agent.sqlite now (§14.4).
@@ -241,6 +249,12 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
 }
 
 const noop = () => {}
+
+/** "Claude Sonnet 5.5": the catalogue's name without its maker ("Anthropic: "), or the model's id. */
+function modelName(guard: ProviderGuardApi, call: { readonly provider: string; readonly model: string }): string {
+  const name = guard.models.getModel(call.provider, call.model)?.name
+  return name === undefined || name === '' ? call.model : name.replace(/^[^:]+:\s*/, '')
+}
 
 /** The backup, or undefined without a keychain. A backup that cannot start is reported, and Juno runs without it. */
 function openBackup(store: Store, options: TurnsOptions, observed: (deviceName: string) => void, changed: () => void): Backup | undefined {
@@ -287,7 +301,7 @@ async function start(
     hooks: [
       { task: 'pi.generation', handlers: router.hooks.generation },
       // A script's call that is not a read is refused before the router counts it.
-      { task: 'pi.tool', handlers: scripts ? { beforeTool: (call: Parameters<typeof scripts.guard>[0]) => scripts.guard(call) ?? router.hooks.tool.beforeTool(call) } : router.hooks.tool },
+      { task: 'pi.tool', handlers: scripts ? { ...router.hooks.tool, beforeTool: (call: Parameters<typeof scripts.guard>[0]) => scripts.guard(call) ?? router.hooks.tool.beforeTool(call) } : router.hooks.tool },
     ],
   } as Extension
   const settings: JournalSettings = {
@@ -303,6 +317,7 @@ async function start(
   session.journal().resume()
   jobs.resume()
   router.start()
+  services.learning.recover()
   actions.start()
   redaction.start()
   compactor?.poke()
@@ -310,6 +325,16 @@ async function start(
   const scheduleDriver = driveScheduler(scheduler, options.onReport ?? noop)
   void scheduleDriver.tick()
 
-  const close = closeTurns({ scheduleDriver, services, compactor, session, backup, release })
+  // Activity's model and cost per run, from the guard's own log of each chat request it ended.
+  const usage = stepLog(store)
+  const stopUsage = guard.onCall((call) => {
+    const runId = call.path === 'chat' && call.outcome !== 'blocked' ? router.latestRun() : undefined
+    if (runId !== undefined) usage.request(runId, { model: call.model, name: modelName(guard, call), costUsd: call.costUsd })
+  })
+  const closeAll = closeTurns({ scheduleDriver, services, compactor, session, backup, release })
+  const close = async () => {
+    stopUsage()
+    await closeAll()
+  }
   return turnApi({ store, guard, opened, options, services, session, models, compactor, backup, scheduleDriver, close })
 }

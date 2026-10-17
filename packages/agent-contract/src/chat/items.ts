@@ -11,6 +11,7 @@
  * rest are separators.
  */
 import { Schema } from 'effect'
+import { MemoryDoc, ProactiveAsk } from './docs'
 import { Card } from './cards'
 import { OwnerFile } from './files'
 import { BubbleId, CardId, ChatMessageId, OpId, RunId, ScheduleId } from './ids'
@@ -255,15 +256,21 @@ export type StatusItem = typeof StatusItem.Type
 
 /**
  * A quiet line between bubbles, with fixed copy from `chatCopy.note`.
- * `remembered` follows a pin ("Remembered · Undo"); `removed` marks where a
- * message was redacted; `secretBlocked` says Juno stopped a tool call that
- * held a key or a token (plan v3 §10.1), in fixed words, never the model's.
+ * `remembered` follows a pin ("Remembered · Undo"); `memoryUpdated` follows
+ * a run that changed Juno's memory of the owner ("Updated memory · People ·
+ * Undo"); `removed` marks where a message was redacted; `secretBlocked` says
+ * Juno stopped a tool call that held a key or a token (plan v3 §10.1), in
+ * fixed words, never the model's.
  */
 export const NoteItem = Schema.TaggedStruct('note', {
   id: ChatMessageId,
-  kind: Schema.Literals(['remembered', 'removed', 'secretBlocked']),
+  kind: Schema.Literals(['remembered', 'memoryUpdated', 'removed', 'secretBlocked']),
   /** The pin's text for `remembered`, so Undo is informed. */
   text: Schema.optionalKey(Schema.String),
+  /** `memoryUpdated`: the docs the run changed, in page order. */
+  docs: Schema.optionalKey(Schema.Array(MemoryDoc)),
+  /** `memoryUpdated`: the run or learning pass whose changes Undo puts back. */
+  run: Schema.optionalKey(Schema.String),
   /** Undo is open until the owner's next send or for 60 s, whichever is first. */
   undo: Schema.optionalKey(Schema.Literal(true)),
 })
@@ -291,7 +298,11 @@ export type DayItem = typeof DayItem.Type
 export const NewDividerItem = Schema.TaggedStruct('newDivider', { count: Schema.Int })
 export type NewDividerItem = typeof NewDividerItem.Type
 
-export const ChatItem = Schema.Union([OwnerMessageItem, JunoBubbleItem, CardItem, EndingItem, StatusItem, NoteItem, GroupLabelItem, DayItem, NewDividerItem])
+/** A proactive ask from Juno's own code (SPEC 13.6): Start or Not now, then the pass's line. */
+export const AskItem = Schema.TaggedStruct('ask', { ask: ProactiveAsk })
+export type AskItem = typeof AskItem.Type
+
+export const ChatItem = Schema.Union([OwnerMessageItem, JunoBubbleItem, CardItem, AskItem, EndingItem, StatusItem, NoteItem, GroupLabelItem, DayItem, NewDividerItem])
 export type ChatItem = typeof ChatItem.Type
 
 const endOf: Record<GroupPosition, GroupPosition> = { single: 'single', first: 'single', middle: 'last', last: 'last' }

@@ -127,4 +127,13 @@ const actions2 = [
 export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actions1, actions2, ['ALTER TABLE cards ADD COLUMN expired_at INTEGER'], ['CREATE TABLE resolve_undos (card_id TEXT PRIMARY KEY REFERENCES cards(id))'],
   // A connection call the auto-review ran with no click keeps its card row, so the ledger and Activity
   // see it, but the chat never shows it and it takes no click.
-  ['ALTER TABLE cards ADD COLUMN quiet INTEGER NOT NULL DEFAULT 0']] }
+  ['ALTER TABLE cards ADD COLUMN quiet INTEGER NOT NULL DEFAULT 0'],
+  // What a connection call a click ran gave back: `model` for the model's next input (untrusted, bounded),
+  // `line` for the card's one result line. Both may be empty.
+  [`CREATE TABLE action_outputs (
+    attempt_id TEXT PRIMARY KEY REFERENCES attempts (id),
+    model TEXT,
+    line TEXT
+  ) STRICT`],
+  // The result as a person reads it, trimmed, for the card's "Show result".
+  ['ALTER TABLE action_outputs ADD COLUMN shown TEXT']] }

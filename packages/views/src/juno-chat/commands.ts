@@ -4,7 +4,7 @@
  * the card RPCs without importing views).
  */
 import type { MouseEvent, ReactNode } from 'react'
-import type { BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, OwnerFile, ReplyTarget } from '@juno/agent-contract'
+import type { AskAnswer, AskId, BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, OwnerFile, ReplyTarget } from '@juno/agent-contract'
 import type { ActivateEvent } from '@juno/ui'
 
 export type { CardCommand } from '@juno/agent-contract'
@@ -35,6 +35,10 @@ export interface ChatActions {
   readonly onQuote: (target: ReplyTarget) => void
   /** Undo on a "Remembered" note. */
   readonly onUndoNote: (id: ChatMessageId) => void
+  /** Undo on an "Updated memory" note: puts back what that run or learning pass changed. */
+  readonly onUndoMemory: (run: string) => void
+  /** Start, Not now or Stop on a proactive ask. */
+  readonly onAsk: (id: AskId, answer: AskAnswer) => void
   readonly onGroupLabel: (id: string, action: GroupLabelAction) => void
   /** Right-click on a bubble: the container shows the native menu. */
   readonly onContextMenu?: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => void
@@ -50,5 +54,7 @@ export const noopActions: ChatActions = {
   onReply: () => {},
   onQuote: () => {},
   onUndoNote: () => {},
+  onUndoMemory: () => {},
+  onAsk: () => {},
   onGroupLabel: () => {},
 }

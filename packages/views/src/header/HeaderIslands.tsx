@@ -22,10 +22,12 @@ export interface HeaderIslandsProps {
   /**
    * Which island gives way in a narrow area. `left` (the default): the
    * title shortens and the buttons keep their size. `right`: the left
-   * island keeps its width and the right one shrinks (the Juno header,
-   * whose title is one word and whose banner chip is long).
+   * island keeps its width and the right one shrinks (the Juno header over
+   * the chat, whose title is one word and whose banner chip is long).
+   * `both`: each shortens (the Juno header over a page, whose name and chip
+   * can both be long).
    */
-  readonly give?: 'left' | 'right'
+  readonly give?: 'left' | 'right' | 'both'
 }
 
 /**
@@ -39,6 +41,7 @@ export interface HeaderIslandsProps {
  */
 export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'left' }: HeaderIslandsProps) {
   const keep = give === 'right'
+  const share = give === 'both'
   // The panel floats already, so its header is the islands' row with no
   // surfaces of its own: the controls sit on the panel, 4px in from its top
   // corners, on the same line as the topic's islands.
@@ -51,7 +54,7 @@ export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'lef
             {left}
           </div>
           {right === undefined ? null : (
-            <div data-island="right" {...stylex.props(styles.bare, styles.right, keep && styles.giving)}>
+            <div data-island="right" {...stylex.props(styles.bare, styles.right, (keep || share) && styles.giving)}>
               {right}
             </div>
           )}
@@ -70,7 +73,7 @@ export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'lef
       <div {...stylex.props(styles.row, columns[column])}>
         {wrapLeft === undefined ? island : wrapLeft(island)}
         {right === undefined ? null : (
-          <Surface kind="island" data-island="right" sx={[styles.right, keep && styles.giving]}>
+          <Surface kind="island" data-island="right" sx={[styles.right, (keep || share) && styles.giving]}>
             {right}
           </Surface>
         )}

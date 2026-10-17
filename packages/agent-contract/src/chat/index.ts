@@ -1,3 +1,4 @@
+export * from './docs'
 export * from './cards'
 export type * from './commands'
 export * from './copy'

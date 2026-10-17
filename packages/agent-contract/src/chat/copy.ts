@@ -14,6 +14,9 @@ import { filesLeftCopy } from './files'
 /** "$2.00", "$0.35". Two decimals, always. */
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
 
+/** "Littlebird", "Littlebird and Notion", "Littlebird, Notion and Drive". */
+const listed = (names: ReadonlyArray<string>): string => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
+
 const priceUsd = (amount: number) => Number.isInteger(amount) ? `$${amount}` : usd(amount)
 
 export const chatCopy = {
@@ -46,6 +49,8 @@ export const chatCopy = {
     settings: 'Settings',
     review: 'Review',
   },
+  /** The Juno header's switcher (SPEC 13.10): the chat's row, and the menu's name. */
+  switcher: { chat: 'Chat', label: 'Juno pages' },
   /** The Juno panel (SPEC 7, inventory 12.1). */
   panel: {
     openInTab: 'Open in a tab',
@@ -97,6 +102,8 @@ export const chatCopy = {
   },
   note: {
     remembered: 'Remembered',
+    /** "Updated memory · People, Projects · Undo". */
+    memoryUpdated: 'Updated memory',
     removed: 'Removed',
     secretBlocked: 'Juno stopped a tool call that held a key or a token. Nothing was sent.',
     undo: 'Undo',
@@ -203,14 +210,24 @@ export const chatCopy = {
     change: {
       apply: 'Apply',
       applied: 'Applied',
+      /** A connection call that only looks something up, or that no review judged a change, once it ran. */
+      done: 'Done',
+      /** A connection call's result: its one line, and the disclosure for the rest. */
+      result: {
+        found: (count: number) => (count === 0 ? 'Found nothing' : count === 1 ? 'Found 1 result' : `Found ${count} results`),
+        saved: 'Saved',
+        show: 'Show result',
+        hide: 'Hide result',
+      },
       showAll: 'Show all',
       /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
       review: {
         always: 'Asked because your rule for this tool is Always ask.', failed: "Asked because Juno couldn't review this call.",
         notAsked: "Asked because you didn't ask for this.", untrusted: 'Asked because only something Juno read asked for this.',
-        implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
+        implied: "Asked because your message didn't ask for this exact change.", delete: "Asked because deleting can't be undone.",
         send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
+        ranRead: 'Ran without asking because it only looks something up.',
         ranNever: 'Ran without asking because your rule for this tool is Never ask.',
         ruleChanged: 'Asked because your rule for this tool changed.',
       },
@@ -299,11 +316,89 @@ export const chatCopy = {
     remember: 'Remember this',
     remove: 'Remove',
   },
+  /** Juno's memory of the owner (SPEC 13.8), on the memory page and in the chat's notes. */
+  docs: {
+    titles: { you: 'About you', people: 'People', projects: 'Projects', preferences: 'Preferences', style: 'Writing style' },
+    hints: {
+      you: 'Your role and your work.',
+      people: 'People you work with.',
+      projects: 'What you work on.',
+      preferences: 'How you like things done.',
+      style: 'How you write in Slack. Juno uses it when it drafts a message for you.',
+    },
+    title: 'What Juno remembers',
+    subtitle: 'Short notes Juno keeps about you and updates as it learns. Edit or delete any of them.',
+    docEmpty: 'Nothing yet.',
+    source: { owner: 'Your words', slack: 'Slack' },
+    /** After the source, for a note written in a run that had read Slack or a connection. */
+    outside: 'Written after reading outside content',
+    add: 'Add',
+    addLabel: (doc: string) => `Add to ${doc}`,
+    entryLabel: 'Note',
+    save: 'Save',
+    cancel: 'Cancel',
+    edit: 'Edit',
+    delete: 'Delete',
+    changes: 'Recent changes',
+    change: {
+      add: (doc: string) => `Added to ${doc}`,
+      update: (doc: string) => `Changed in ${doc}`,
+      remove: (doc: string) => `Removed from ${doc}`,
+    },
+    byOwner: 'By you',
+    undone: 'Undone',
+    deleted: 'Deleted',
+    pinned: 'Pinned',
+    pinnedSub: 'Lines you asked Juno to keep, word for word.',
+    refused: {
+      empty: 'Write something first.',
+      tooLong: 'Keep a note to a line or two.',
+      secret: 'That looks like a key or a password. Juno never keeps those.',
+      full: 'Juno keeps as many notes as it can. Delete one to add another.',
+      stale: 'This changed. Check it and save again.',
+    },
+    learnAgain: 'Learn again',
+  },
+  /** Juno's proactive asks (SPEC 13.6), in the chat and as a Home card. */
+  ask: {
+    /** The card's header line. */
+    label: 'Juno asks',
+    learn: {
+      title: { setup: 'Let Juno learn how you work', connection: (name: string) => `Let Juno learn from ${name}` },
+      body: (sources: ReadonlyArray<string>) =>
+        `Juno reads your own Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`} and keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
+      bodyConnection: (name: string) => `Juno reads ${name} and adds what it learns about you to its notes. You can edit or delete them in What Juno remembers.`,
+      /** Home's meta line. */
+      meta: (sources: ReadonlyArray<string>) => `Reads your Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`}`,
+      metaConnection: (name: string) => `Reads ${name}`,
+      start: 'Start',
+      notNow: 'Not now',
+      stop: 'Stop',
+      tryAgain: 'Try again',
+      open: 'Open',
+      done: (written: number) => (written === 0 ? 'Done · Nothing new to keep' : `Done · Kept ${written === 1 ? '1 note' : `${written} notes`}`),
+      failed: { budget: "Stopped at today's AI limit", failed: "Juno couldn't finish", noModel: 'Choose a model in Settings › Juno first' },
+      stopped: { owner: 'Stopped', paused: 'Stopped when Juno paused', interrupted: 'Stopped when Juno closed' },
+      /** After a line for a pass that ended early: " · Kept 4 notes". */
+      kept: (written: number) => (written === 0 ? '' : ` · Kept ${written === 1 ? '1 note' : `${written} notes`}`),
+      dismissed: 'Not now',
+      started: 'Juno is learning how you work',
+    },
+  },
   pages: {
     activity: {
       outcome: { replied: 'Replied', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
-      /** Who asked, for a run without a named job. */
-      who: { owner: 'You', click: 'You', wake: 'A schedule', report: 'A job' },
+      subtitle: 'Every run Juno made: what started it, what it read, what it did, and what you decided.',
+      empty: { title: 'No runs yet', body: 'Runs show up here as Juno answers you or wakes on a schedule.' },
+      /** What started a run that was not a message of yours, before its name. */
+      trigger: { schedule: 'Schedule', job: 'Job', answer: 'You answered', reaction: 'You reacted', removed: 'A removed message' },
+      /** The run read outside content, so it asked before acting (SPEC 13.9). */
+      read: 'Read',
+      readOutside: 'Read outside content',
+      askedFirst: 'Content Juno read in this run could hold instructions, so it asked before acting.',
+      steps: 'Steps',
+      moreSteps: (n: number) => `${n} more ${n === 1 ? 'step' : 'steps'}`,
+      older: 'Show older runs',
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },

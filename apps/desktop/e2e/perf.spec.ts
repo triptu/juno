@@ -1225,11 +1225,34 @@ test.describe('Juno chat', () => {
       const panels = await panelOpens(juno, win)
       console.log(`panel open, in order: ${panels.map((ms) => ms.toFixed(1)).join(' ')}`)
       within('panel open, p95', stats('panel open, ⌘J to the panel painted (juno.panel-open)', panels).p95, oneFrame)
+
+      // The panel's switcher to Activity, its window the newest 50 of the 80 runs above, and back.
+      const switches = await pageSwitches(juno, win)
+      within('switch to Activity, p95', stats('switch to Activity in the panel, pick to the page painted (juno.page-switch)', switches).p95, 50)
     } finally {
       await running.close()
     }
   })
 })
+
+/** The panel's switcher to Activity and back to the chat, twenty times: each `juno.page-switch`, in order. */
+async function pageSwitches(juno: Juno, win: Page): Promise<number[]> {
+  const pick = async (label: string) => {
+    await win.locator('aside[data-juno-panel] [data-juno-header] button[aria-haspopup="menu"]').click()
+    await win.getByRole('menu', { name: 'Juno pages' }).getByRole('menuitem', { name: label, exact: true }).click()
+  }
+  await juno.tabs.menu('juno')
+  const switches: number[] = []
+  for (let i = 0; i < 20; i++) {
+    const before = (await juno.measures('juno.page-switch')).length
+    await pick('Activity')
+    await expect.poll(async () => (await juno.measures('juno.page-switch')).length, { timeout: 15_000 }).toBeGreaterThan(before)
+    switches.push((await juno.measures('juno.page-switch')).at(-1)!)
+    await pick('Chat')
+    await expect(win.locator('aside[data-juno-panel] [data-juno-chat]')).toBeVisible()
+  }
+  return switches
+}
 
 /** ⌘J twenty times beside the open topic: each `juno.panel-open`, in order. With JUNO_PERF_TRACE, the first two are traced. */
 async function panelOpens(juno: Juno, win: Page): Promise<number[]> {

@@ -1,7 +1,8 @@
 // Home (SPEC section 12, docs/design/home/): what wants the user, shown with
 // no tab open and from the sidebar's Home button; each kind of row opens its
 // topic; Mark done and Resolve all with Undo; Home with AI assist off; and
-// the caught-up state, which has no link of its own (All topics is in the sidebar).
+// the caught-up state, which has no link of its own (All topics is in the sidebar);
+// and a DM's row drawn as the sidebar draws its Main: the photo, named once.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
@@ -130,6 +131,30 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await home.openItem('resume')
   await topic.expectTitle(POSTGRES)
   await tabs.expectCount(1)
+})
+
+test("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { home } = juno
+
+  // Elena's question in a #hiring thread: the tile is the thread's art, and the meta line has the thread and the channel.
+  await home.open()
+  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite\. Panel notes… · hiring · \d+m$/)
+  await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(1)
+  await expect(home.item('waiting').locator('img')).toHaveCount(0)
+
+  // Maya asks in the DM: now the newest question. The tile is Maya's photo, as her DM's row in the sidebar, and she is named once.
+  slack.as('Maya').dm('Can you look at the hiring plan today?')
+  await expect
+    .poll(async () => {
+      await freshHome(juno, OFFSITE)
+      return home.meta('waiting').textContent()
+    }, { timeout: 30_000 })
+    .toMatch(/^Maya /)
+  await expect(home.meta('waiting')).toHaveText(/^Maya · (now|\d+m)$/)
+  await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(0)
+  await expect(home.item('waiting').locator('img')).toHaveAttribute('src', /U0MAYA/)
 })
 
 test('Mark done clears a follow-up, and Resolve all resolves the settled topics with Undo', async ({ juno, fake, win }) => {

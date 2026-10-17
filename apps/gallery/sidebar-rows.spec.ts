@@ -112,3 +112,12 @@ test('the list scrollbar shows only while the pointer is over the list, and noth
   await page.keyboard.press('End')
   await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(top)
 })
+
+test('in privacy mode an AI title stays sharp while its preview blurs', async ({ page }) => {
+  await open(page, 'Sidebar', 'privacy/on')
+  // Rina Sato · Staff backend is an AI title. An old one looks the same: nothing marks or blurs it.
+  const hiring = page.locator('[data-topic-id="C0HIRING:1760000000.000300"]')
+  const filterOf = (part: string) => hiring.locator(`[data-row-part="${part}"]`).evaluate((node) => getComputedStyle(node).filter)
+  await expect.poll(() => filterOf('preview')).toBe('blur(6px)')
+  expect(await filterOf('title')).toBe('none')
+})

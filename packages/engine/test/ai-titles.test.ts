@@ -41,7 +41,7 @@ it('titles recent sidebar threads after sync without opening them and respects t
   expect(calls()).toBe(before)
 })
 
-it('titles again, once, an AI title made before titles left out sensitive details', async () => {
+it('leaves a stored AI title as it is, sharp in privacy mode, with no second call', async () => {
   const engine = await bootedEngine(engines, { aiJobs: true })
   const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
   const thread = titled.find(row => row.kind === 'thread')!
@@ -55,18 +55,16 @@ it('titles again, once, an AI title made before titles left out sensitive detail
       db.close()
     }
   }
-  // An invented title as the old prompt might have written it, stored before the version column.
-  sql(db => db.prepare("UPDATE topic_overlay SET ai_title = 'Go with 100k for Donna', ai_title_version = NULL WHERE topic_id = ?").run(thread.id))
+  // An invented title as an older prompt might have written it.
+  sql(db => db.prepare("UPDATE topic_overlay SET ai_title = 'Go with 100k for Donna' WHERE topic_id = ?").run(thread.id))
+  const stored = () => sql(db => db.prepare('SELECT ai_title, ai_title_at FROM topic_overlay WHERE topic_id = ?').get(thread.id)) as { ai_title: string; ai_title_at: string }
+  const before = stored()
+  const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
+  const asked = calls()
   engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-  const stored = () => sql(db => db.prepare('SELECT ai_title, ai_title_version, ai_title_at FROM topic_overlay WHERE topic_id = ?').get(thread.id)) as { ai_title: string; ai_title_version: number | null; ai_title_at: string }
-  for (let tries = 0; tries < 100 && stored().ai_title_version === null; tries++) await new Promise(resolve => setTimeout(resolve, 100))
-  const made = stored()
-  expect(made.ai_title_version).toBe(2)
-  expect(made.ai_title).not.toBe('Go with 100k for Donna')
-  // Made again once: later passes leave it.
-  engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key-2' })
   await new Promise(resolve => setTimeout(resolve, 3_000))
-  expect(stored().ai_title_at).toBe(made.ai_title_at)
+  expect(stored()).toEqual(before)
+  expect(calls()).toBe(asked)
 })
 
 it('asks a title the model refused once, not again on later passes or after a wake, and again once the thread has a new message', async () => {

@@ -181,9 +181,9 @@ describe('the auto-review of a connection call', () => {
   const review: fc.Arbitrary<Review> = fc.oneof(
     fc.constant({ _tag: 'failed' } as const),
     fc.constant({ _tag: 'skipped' } as const),
-    fc.record({ _tag: fc.constant('answered' as const), intent: fc.constantFrom('explicit', 'implied', 'notAsked'), risk: fc.constantFrom('reversible', 'write', 'delete', 'send') }) as fc.Arbitrary<Review>,
+    fc.record({ _tag: fc.constant('answered' as const), intent: fc.constantFrom('explicit', 'implied', 'notAsked'), risk: fc.constantFrom('read', 'reversible', 'write', 'delete', 'send') }) as fc.Arbitrary<Review>,
   )
-  const answered = (intent: 'explicit' | 'implied' | 'notAsked', risk: 'reversible' | 'write' | 'delete' | 'send'): Review => ({ _tag: 'answered', intent, risk })
+  const answered = (intent: 'explicit' | 'implied' | 'notAsked', risk: 'read' | 'reversible' | 'write' | 'delete' | 'send'): Review => ({ _tag: 'answered', intent, risk })
 
   it('runs under Auto only what the owner asked for exactly and can be undone', () => {
     expect(reviewDecision('auto', false, answered('explicit', 'reversible'))).toEqual({ _tag: 'run', line: 'ranExplicit' })
@@ -192,6 +192,16 @@ describe('the auto-review of a connection call', () => {
     expect(reviewDecision('auto', true, answered('explicit', 'send'))).toEqual({ _tag: 'card', line: 'send' })
     expect(reviewDecision('auto', true, answered('implied', 'write'))).toEqual({ _tag: 'card', line: 'write' })
     expect(reviewDecision('auto', true, answered('notAsked', 'delete'))).toEqual({ _tag: 'card', line: 'notAsked' })
+  })
+
+  it('runs under Auto a call the review found only reads, when the owner at least implied it', () => {
+    // A lookup through a tool that takes a command, such as `info update-feature-flag`, judged by its arguments.
+    expect(reviewDecision('auto', false, answered('implied', 'read'))).toEqual({ _tag: 'run', line: 'ranRead' })
+    expect(reviewDecision('auto', false, answered('explicit', 'read'))).toEqual({ _tag: 'run', line: 'ranRead' })
+    expect(reviewDecision('auto', false, answered('notAsked', 'read'))).toEqual({ _tag: 'card', line: 'notAsked' })
+    expect(reviewDecision('always', false, answered('explicit', 'read'))).toEqual({ _tag: 'card', line: 'always' })
+    expect(reviewDecision('never', false, answered('implied', 'read'))).toEqual({ _tag: 'run', line: 'ranNever' })
+    expect(reviewDecision('auto', false, floorRisk(answered('implied', 'read'), true))).toEqual({ _tag: 'card', line: 'delete' })
   })
 
   it('never takes a call that looks like a delete as reversible', () => {
@@ -221,7 +231,7 @@ describe('the auto-review of a connection call', () => {
 
   it('never lets a call only untrusted text asked for run, under any rule', () => {
     // The reviewer sees only the owner's words, so such a call is answered notAsked; a run that read nothing cannot hold one.
-    fc.assert(fc.property(rule, fc.constantFrom('reversible', 'write', 'delete', 'send'), (r, risk) =>
+    fc.assert(fc.property(rule, fc.constantFrom('read', 'reversible', 'write', 'delete', 'send'), (r, risk) =>
       reviewDecision(r, false, answered('notAsked', risk as 'reversible'))._tag === 'card'))
   })
 
@@ -231,7 +241,7 @@ describe('the auto-review of a connection call', () => {
       if (decision._tag === 'card') return true
       if (r === 'always') return false
       if (r === 'never') return clean || (rv._tag === 'answered' && rv.intent !== 'notAsked')
-      return rv._tag === 'answered' && rv.intent === 'explicit' && rv.risk === 'reversible'
+      return rv._tag === 'answered' && ((rv.intent === 'explicit' && rv.risk === 'reversible') || (rv.intent !== 'notAsked' && rv.risk === 'read'))
     }))
   })
 

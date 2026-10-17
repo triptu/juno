@@ -2,6 +2,7 @@ import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import type { FollowUpMatch, HomeTopic, OldDraft } from '@juno/contract'
 import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
+import { tileOf } from './tileModel'
 import type { ReviewEntry, ReviewVerbs } from './reviewModel'
 import { quietSpan } from './settled'
 import { relativeTime } from './time'
@@ -66,7 +67,7 @@ export function doneFollowUpEntries(topics: ReadonlyArray<HomeTopic>, now: numbe
   return topics.flatMap((topic) => {
     const match = topic.followUp
     if (match === undefined) return []
-    return [{ id: topic.id, topicId: topic.id, title: match.promise, ...(topic.art === undefined ? {} : { art: topic.art }), reason: deliveryReason(match), quote: match.text, meta: metaLine(topic.title, topic.place === topic.title ? undefined : topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)) }]
+    return [{ id: topic.id, title: match.promise, ...tileOf(topic), reason: deliveryReason(match), quote: match.text, meta: metaLine(topic.title, topic.main === true ? undefined : topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)) }]
   })
 }
 
@@ -81,7 +82,7 @@ export function oldDraftEntries(topics: ReadonlyArray<HomeTopic>, now: number): 
   return topics.flatMap((topic) => {
     const draft = topic.draft
     if (draft === undefined) return []
-    return [{ id: topic.id, topicId: topic.id, title: topic.title, ...(topic.art === undefined ? {} : { art: topic.art }), reason: draftReason(draft, now), quote: draft.text, meta: topic.place }]
+    return [{ id: topic.id, title: topic.title, ...tileOf(topic), reason: draftReason(draft, now), quote: draft.text, meta: topic.place }]
   })
 }
 

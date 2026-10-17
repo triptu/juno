@@ -41,8 +41,8 @@ test('"stop" sent while Juno is busy joins the same run and is answered as a mes
 
   // One run, the owner's, answered both.
   const activity = await openPage(juno, 'Activity')
-  const runs = activity.locator('section[data-activity-run]')
+  const runs = activity.locator('[data-activity-run]')
   await expect(runs).toHaveCount(1)
   await expect(runs).toHaveAttribute('data-activity-run', 'replied')
-  await expect(runs).toHaveAttribute('aria-label', /^You, /)
+  await expect(runs.locator('[data-activity-trigger="message"]')).toHaveText('what is on today?')
 })

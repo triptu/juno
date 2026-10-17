@@ -1,20 +1,41 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
 import { menuKeys } from '@juno/contract/channels'
-import type { ReactNode } from 'react'
+import { colors } from '@juno/tokens/tokens.stylex'
+import { Fragment, type ReactNode } from 'react'
 import { ArrowsOutSimple } from '@phosphor-icons/react/dist/icons/ArrowsOutSimple'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { Chip, IconButton, OptionList, OptionRow, Popover, useMenuActive } from '@juno/ui'
+import { Chip, IconButton, OptionList, OptionRow, OptionSeparator, Popover, useMenuActive } from '@juno/ui'
 import { HeaderTitleButton } from '../header/HeaderControls'
 import { HeaderIslands } from '../header/HeaderIslands'
 import { JunoMark } from './JunoMark'
 import { TextButton } from './TextButton'
 
+/** What a Juno tab or the Juno panel shows: the chat, or one of its pages. Connections and Settings are sections of Settings. */
+export type JunoView = 'chat' | Exclude<JunoPage, 'settings' | 'connections'>
+
+/** Where the switcher can go: a Juno view, or a section of Settings. */
+export type JunoTarget = JunoView | 'connections' | 'settings'
+
+/**
+ * The switcher's rows in order, a separator between groups: the chat, Juno's
+ * own pages, then the Settings sections. A new Juno page is one entry here
+ * and one title in `chatCopy.pageTitles`. Review is not listed: its banner
+ * chip opens it, and the title names it while it shows.
+ */
+export const junoSwitcher: ReadonlyArray<ReadonlyArray<JunoTarget>> = [['chat'], ['scheduled', 'remembers', 'memory', 'activity'], ['connections', 'settings']]
+
+/** A target's name, as the menu row and the title say it. */
+export const junoTargetTitle = (target: JunoTarget): string => (target === 'chat' ? chatCopy.switcher.chat : chatCopy.pageTitles[target])
+
 export interface JunoHeaderProps {
   readonly banner: Banner
   readonly menuOpen: boolean
   readonly onMenu: (open: boolean) => void
-  readonly onOpenPage: (page: JunoPage) => void
+  /** The view shown under the header, named in the title and checked in the menu. Default the chat. */
+  readonly current?: JunoView
+  /** A row of the switcher, or the banner chip's Review. */
+  readonly onOpenPage: (target: JunoTarget) => void
   /** The paused chip's Resume. */
   readonly onResume: () => void
   /** `page` for the Juno tab (the chat's 720px column), `panel` for the Juno panel (its full width). Default `page`. */
@@ -23,26 +44,26 @@ export interface JunoHeaderProps {
   readonly actions?: ReactNode
 }
 
-const pages: ReadonlyArray<{ readonly page: JunoPage; readonly label: string }> = (['scheduled', 'remembers', 'memory', 'activity', 'connections', 'settings'] as const).map((page) => ({
-  page,
-  label: chatCopy.pageTitles[page],
-}))
-
 /**
  * The Juno header (inventory 12 and 12.1): the topic header's islands and
- * band over the chat. Left: the Juno title button, which opens the Juno
- * menu with the six pages. Right, only when there is something to show:
- * the one banner chip, then the panel's `actions`. The chip's action is a
- * text button: Resume on paused, Review on recovery. The owner's area is
- * `position: relative`, with the chat list under it.
+ * band over the chat or a Juno page, in the same place on each. Left: the
+ * Juno title button, "Juno" over the chat and "Juno · Activity" over a
+ * page, which opens the switcher: the chat and every Juno page, with a
+ * check on the one shown, then Connections and Settings. Right, only when
+ * there is something to show: the one banner chip, then the panel's
+ * `actions`. The chip's action is a text button: Resume on paused, Review
+ * on recovery. The owner's area is `position: relative`, with the chat
+ * list or the page under it.
  */
-export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, column = 'page', actions }: JunoHeaderProps) {
+export function JunoHeader({ banner, menuOpen, onMenu, current = 'chat', onOpenPage, onResume, column = 'page', actions }: JunoHeaderProps) {
   const chip = banner._tag === 'none' ? null : <BannerChip banner={banner} onResume={onResume} onOpenPage={onOpenPage} />
+  const onPage = current !== 'chat'
   return (
     <HeaderIslands
       column={column}
-      give="right"
-      data={{ 'data-juno-header': '' }}
+      // "Juno" keeps its width over the chat; over a page the name and the chip share the room.
+      give={onPage ? 'both' : 'right'}
+      data={{ 'data-juno-header': current }}
       left={
         <Popover
           open={menuOpen}
@@ -51,12 +72,25 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
           placement="bottom-start"
           role="menu"
           label="Juno menu"
-          anchor={<HeaderTitleButton title="Juno" leading={<JunoMark />} expanded={menuOpen} onOpen={() => onMenu(!menuOpen)} />}
+          anchor={
+            <HeaderTitleButton
+              title={onPage ? junoTargetTitle(current) : 'Juno'}
+              leading={
+                <>
+                  <JunoMark />
+                  {onPage ? <span {...stylex.props(styles.context)}>{'Juno · '}</span> : null}
+                </>
+              }
+              expanded={menuOpen}
+              onOpen={() => onMenu(!menuOpen)}
+            />
+          }
         >
           <JunoMenu
-            onOpenPage={(page) => {
+            current={current}
+            onOpenPage={(target) => {
               onMenu(false)
-              onOpenPage(page)
+              onOpenPage(target)
             }}
           />
         </Popover>
@@ -73,16 +107,21 @@ export function JunoHeader({ banner, menuOpen, onMenu, onOpenPage, onResume, col
   )
 }
 
-/** The Juno menu's pages, with one active row for the pointer and the keyboard. */
-function JunoMenu({ onOpenPage }: { readonly onOpenPage: (page: JunoPage) => void }) {
-  const menu = useMenuActive(
-    pages.map((entry) => `juno-page-${entry.page}`),
-    (id) => onOpenPage(id.slice('juno-page-'.length) as JunoPage),
-  )
+const rowId = (target: JunoTarget) => `juno-page-${target}`
+
+/** The switcher's rows, with one active row for the pointer and the keyboard, and a check on the view shown. */
+function JunoMenu({ current, onOpenPage }: { readonly current: JunoView; readonly onOpenPage: (target: JunoTarget) => void }) {
+  const targets = junoSwitcher.flat()
+  const menu = useMenuActive(targets.map(rowId), (id) => onOpenPage(id.slice('juno-page-'.length) as JunoTarget))
   return (
-    <OptionList role="menu" label="Juno pages" {...menu.list}>
-      {pages.map((entry) => (
-        <OptionRow key={entry.page} {...menu.row(`juno-page-${entry.page}`)} label={entry.label} onSelect={() => onOpenPage(entry.page)} />
+    <OptionList role="menu" label={chatCopy.switcher.label} {...menu.list}>
+      {junoSwitcher.map((group, index) => (
+        <Fragment key={group[0]}>
+          {index === 0 ? null : <OptionSeparator />}
+          {group.map((target) => (
+            <OptionRow key={target} {...menu.row(rowId(target))} label={junoTargetTitle(target)} selected={target === current} onSelect={() => onOpenPage(target)} />
+          ))}
+        </Fragment>
       ))}
     </OptionList>
   )
@@ -103,7 +142,7 @@ export function JunoPanelActions({ onOpenInTab, onClose }: { readonly onOpenInTa
  * the full line. In a narrow header the chip shrinks: the line takes the
  * ellipsis, and its action (Resume, Review) stays whole.
  */
-function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Exclude<Banner, { _tag: 'none' }>; readonly onResume: () => void; readonly onOpenPage: (page: JunoPage) => void }) {
+function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Exclude<Banner, { _tag: 'none' }>; readonly onResume: () => void; readonly onOpenPage: (target: JunoTarget) => void }) {
   const copy = chatCopy.banner
   const text = copy[banner._tag]
   const action =
@@ -131,7 +170,17 @@ function BannerChip({ banner, onResume, onOpenPage }: { readonly banner: Exclude
   )
 }
 
+/** The header's own width at the minimum window (336), under the narrowest panel (360). */
+const MINIMUM = '@container (width < 352px)'
+
 const styles = stylex.create({
+  // "Juno · " before a page's name: the context, quieter than the name. At the minimum window it goes, so the name keeps its room.
+  context: {
+    display: { default: 'inline', [MINIMUM]: 'none' },
+    flexShrink: 0,
+    color: colors['--foreground-muted'],
+    whiteSpace: 'pre',
+  },
   chipLine: {
     display: 'flex',
     alignItems: 'baseline',

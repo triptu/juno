@@ -66,9 +66,9 @@ export interface ToolDefinition<Args> {
   /**
    * The status bubble's line while the run uses this tool, counting real
    * things: `count` is how many calls of it the run has made ("Reading 3
-   * conversations").
+   * conversations"), and `args` this call's arguments, as the model wrote them.
    */
-  readonly status: (count: number) => string
+  readonly status: (count: number, args: unknown) => string
   /** The text the model sees. A thrown error is shown to the model as the tool's error. */
   readonly run: (args: Args, call: ToolCall) => Promise<ToolOutput>
 }
@@ -77,10 +77,25 @@ export interface ToolDefinition<Args> {
 export interface JunoTool {
   readonly name: string
   readonly registration: ToolRegistration
-  readonly status: (count: number) => string
+  readonly status: (count: number, args: unknown) => string
 }
 
-export type ToolOutput = { readonly text: string; readonly isError?: boolean }
+export type ToolOutput = {
+  readonly text: string
+  readonly isError?: boolean
+  /** What came back, counted, for Activity's run log only ("12 messages"). Never sent to the model. */
+  readonly summary?: string
+}
+
+/** Each call's `summary`, by pi's call id, until the run log takes it after the call. */
+const summaries = new Map<string, string>()
+
+/** The summary a call's tool gave, once. */
+export function takeSummary(callId: string): string | undefined {
+  const summary = summaries.get(callId)
+  summaries.delete(callId)
+  return summary
+}
 
 export function defineTool<Args>(tool: ToolDefinition<Args>): JunoTool {
   const registration = {
@@ -90,6 +105,7 @@ export function defineTool<Args>(tool: ToolDefinition<Args>): JunoTool {
     replay: tool.replay,
     execute: async (args: Args, api: { readonly callId: string }, context?: { readonly abortSignal?: AbortSignal }) => {
       const output = await tool.run(args, { callId: api.callId, ...(context?.abortSignal ? { signal: context.abortSignal } : {}) })
+      if (output.summary !== undefined) summaries.set(api.callId, output.summary)
       return { output: [{ type: 'text', text: output.text }], ...(output.isError ? { isError: true } : {}) }
     },
   }

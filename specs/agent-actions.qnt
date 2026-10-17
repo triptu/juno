@@ -20,7 +20,7 @@ module actionsProtocol {
   // owner's intent was ("explicit", "implied", "notAsked", or "failed" when
   // the model call failed or timed out), and whether the call can be undone.
   // `rule` is the rule the call followed when the review ran.
-  type Review = { id: int, rev: int, intent: str, reversible: bool, rule: str }
+  type Review = { id: int, rev: int, intent: str, reversible: bool, reads: bool, rule: str }
   type Attempt = { id: int, auth: int, child: int, payload: Payload, key: int }
   type Receipt = { attempt: int, child: int, payload: Payload }
   // `pauses` is how many Pauses had happened when it was minted: Pause revokes
@@ -118,13 +118,17 @@ module actionsProtocol {
   // the owner's own words in the run and the proposed call, so a call that
   // only untrusted text asked for is "notAsked" whatever that text says.
   // `untrustedIntent` is the bug that also shows it the text the run read.
-  action reviewWith(k: int, answer: str, reversible: bool, bug: str): bool = {
+  // `reads`: the review judged, from the call's arguments, that it only reads (a lookup through a
+  // tool that takes a command). A read can be undone, so `reads` implies `reversible`.
+  action reviewRiskWith(k: int, answer: str, reversible: bool, reads: bool, bug: str): bool = {
     nondet i = currentIntent(k).oneOf()
     val said = if (i.cause == "untrusted" and answer != "failed" and bug != "untrustedIntent") "notAsked" else answer
+    val undone = (reversible or reads) and said != "failed"
     if (not(i.conn) or s.reviews.exists(r => r.id == k and r.rev == i.rev)) idle else
-    s' = { ...s, reviews: s.reviews.union(Set({ id: k, rev: i.rev, intent: said, reversible: reversible and said != "failed", rule: ruleOf(s) })),
+    s' = { ...s, reviews: s.reviews.union(Set({ id: k, rev: i.rev, intent: said, reversible: undone, reads: reads and undone, rule: ruleOf(s) })),
       label: "review", target: k }
   }
+  action reviewWith(k: int, answer: str, reversible: bool, bug: str): bool = reviewRiskWith(k, answer, reversible, false, bug)
   // Settings › Connections: only the owner sets a rule. Setting one, on the tool or the
   // connection, is the owner looking again: the tool is no longer fresh.
   action setRule(rule: str): bool = s' = { ...s, connRule: rule, fresh: false, label: "rule" }
@@ -137,15 +141,18 @@ module actionsProtocol {
     if (st.toolRule != "auto") st.toolRule else if (st.fresh and st.connRule == "never") "auto" else st.connRule
   pure def reviewMatches(st: State, i: Intent, answers: Set[str], needReversible: bool): bool =
     st.reviews.exists(r => r.id == i.id and r.rev == i.rev and answers.contains(r.intent) and (r.reversible or not(needReversible)))
+  pure def reviewMatchesRead(st: State, i: Intent, answers: Set[str]): bool =
+    st.reviews.exists(r => r.id == i.id and r.rev == i.rev and answers.contains(r.intent) and r.reads)
   // Whether the reviewer and `rule` let this connection call run with no
   // click. Always ask: never. A tool marked read-only: in a clean run. Auto:
-  // an explicit, reversible review. Never ask: a call from a clean run, or one
+  // an explicit, reversible review, or a review that found the call only reads
+  // and the owner's words at least implied it. Never ask: a call from a clean run, or one
   // the owner's words at least implied and the review found reversible;
   // untrusted text alone still asks. A failed review asks.
   pure def allowsUnder(st: State, i: Intent, rule: str): bool = i.conn and i.tier == 3 and rule != "always" and
     ((i.hint and i.clean) or
      (if (rule == "never") i.clean or reviewMatches(st, i, Set("explicit", "implied"), true)
-      else reviewMatches(st, i, Set("explicit"), true)))
+      else reviewMatches(st, i, Set("explicit"), true) or reviewMatchesRead(st, i, Set("explicit", "implied"))))
   // The rule is the one in force at authorization.
   pure def reviewAllows(st: State, i: Intent): bool = allowsUnder(st, i, ruleOf(st))
   // The rule the review of this intent saw, for the `ruleAtReview` bug.
@@ -554,7 +561,8 @@ module actionsProtocol {
       all { s.current.get(k) == 0, proposeHinted(k, "owner") }, all { s.current.get(k) == 0, proposeHinted(k, "untrusted") },
       { nondet answer = Set("explicit", "implied", "notAsked", "failed").oneOf()
         nondet reversible = Set(true, false).oneOf()
-        all { currentIntent(k) != Set(), reviewWith(k, answer, reversible, "") } },
+        nondet reads = Set(true, false).oneOf()
+        all { currentIntent(k) != Set(), reviewRiskWith(k, answer, reversible, reads, "") } },
       { nondet rule = Set("auto", "always", "never").oneOf(); setRule(rule) },
       { nondet rule = Set("auto", "always", "never").oneOf(); setToolRule(rule) }, changeTool,
       all { s.nextSpend < 8, reserve(false, false, 2, true, "") }, all { s.nextSpend < 8, reserve(true, false, 2, true, "") },
@@ -574,7 +582,7 @@ module actionsProtocol {
   pure def c(op: str, k: int): Command = { op: op, k: k }
   // The auto-review commands, apart so that `execute`'s chain stays within the simulator's nesting limit.
   pure val reviewOps = Set("conn", "connUntrusted", "connHinted", "reviewExplicit", "reviewNotAsked", "reviewIrreversible",
-    "reviewImplied", "reviewFailed", "alwaysRule", "neverRule", "toolAlways", "changeTool", "scriptChild", "scriptReview", "scriptAuthorize")
+    "reviewImplied", "reviewImpliedRead", "reviewFailed", "alwaysRule", "neverRule", "toolAlways", "changeTool", "scriptChild", "scriptReview", "scriptAuthorize")
   action executeReview(k: int, op: str, bug: str): bool =
     if (op == "conn") proposeConn(k, "owner") else
     if (op == "connUntrusted") proposeConn(k, "untrusted") else
@@ -583,6 +591,7 @@ module actionsProtocol {
     if (op == "reviewNotAsked") reviewWith(k, "notAsked", true, bug) else
     if (op == "reviewIrreversible") reviewWith(k, "explicit", false, bug) else
     if (op == "reviewImplied") reviewWith(k, "implied", true, bug) else
+    if (op == "reviewImpliedRead") reviewRiskWith(k, "implied", true, true, bug) else
     if (op == "reviewFailed") reviewWith(k, "failed", false, bug) else
     if (op == "alwaysRule") setRule("always") else
     if (op == "neverRule") setRule("never") else
@@ -956,6 +965,8 @@ module actionsProtocol {
   action freshResetWitnessStep = script(List(c("neverRule", 0), c("changeTool", 0), c("neverRule", 0), c("conn", 0), c("authorize", 0)), "")
   // The owner's words implied it, and it can be undone, after reading Notion: Auto asks, Never ask runs it.
   action neverImpliedWitnessStep = script(List(c("neverRule", 0), c("report", 0), c("conn", 0), c("reviewImplied", 0), c("authorize", 0)), "")
+  // A lookup the owner's words implied, judged a read from its arguments, runs under Auto with no click after a read.
+  action impliedReadWitnessStep = script(List(c("report", 0), c("conn", 0), c("reviewImpliedRead", 0), c("authorize", 0)), "")
   // An irreversible call under Auto asks: the click runs it once.
   action irreversibleClickWitnessStep = script(List(c("conn", 0), c("reviewIrreversible", 0), c("authorize", 0), c("click", 0)), "")
   val clickedOnce = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => not(a.review)) and s.receipts.size() == 1

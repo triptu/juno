@@ -8,9 +8,9 @@
  *
  * - What Juno remembers: the active pins, with their source message.
  * - Memory of this chat: the published memory view as a dated timeline.
- * - Activity: one row per run: who asked, when, how it ended, whether it
- *   read untrusted content, and its actions (`actions/activity.ts`). The
- *   folded read line is not built yet.
+ * - Activity: one row per run, newest first (`activity.ts`): what started
+ *   it, what it read, its steps and actions with the owner's decisions, and
+ *   its model and cost.
  * - Scheduled (WP19) is empty. Review is served by the ownership module
  *   (`ownership.review()`); `reviewPage` is its empty form without an
  *   engine. Connections is served separately by mcp/pages.ts when its
@@ -18,24 +18,14 @@
  */
 import { limits, utf8Bytes } from '@juno/agent-memory'
 import {
-  chatCopy,
-  type ActivityPage,
-  type ActivityRun,
   type ChatMessageId,
-  type Ending,
   type MemoryLine,
   type MemoryPage,
   type PinId,
   type RemembersPage,
   type ReviewPage,
-  type RunId,
-  type RunOutcome,
 } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
-import { activityActions } from '../actions/activity'
-import { activityScripts } from '../scripts'
-import type { Origin } from '../router/events'
-import { parseOutput } from '../router/output'
 import { view } from '../store/memory'
 import type { Store } from '../store/store'
 
@@ -100,51 +90,7 @@ export function memoryPage(store: Store, window: PageWindow): MemoryPage {
 
 /* Activity ----------------------------------------------------------------- */
 
-const outcomeOf = (ending: Ending, quiet: boolean): RunOutcome => {
-  switch (ending._tag) {
-    case 'complete':
-      return quiet ? 'stayedQuiet' : 'replied'
-    case 'interrupted':
-      return 'interrupted'
-    case 'blocked':
-      return 'blocked'
-    case 'failed':
-      return 'failed'
-  }
-}
-
-/** A report's op is `report:<job>:<seq>:<event>`: the job's title names who asked. */
-const whoOf = (store: Store, origin: Origin, opId: string): string => {
-  if (origin === 'report') {
-    const job = store.db.prepare('SELECT title FROM jobs WHERE id = ?').get(opId.split(':')[1] ?? '') as { title: string } | undefined
-    if (job !== undefined) return job.title
-  }
-  return chatCopy.pages.activity.who[origin]
-}
-
-/** Runs that have ended; the live run shows in the chat. */
-export function activityPage(store: Store, window: PageWindow): ActivityPage {
-  const runs = store.db
-    .prepare('SELECT id, op_id AS opId, origin, clean, started_at AS at, ending FROM runs WHERE ended_at IS NOT NULL ORDER BY started_at, id')
-    .all() as Array<{ id: string; opId: string; origin: Origin; clean: number; at: number; ending: string }>
-  const { rows, moreAbove } = windowed(runs, (run) => run.id, window)
-  const said = store.db.prepare("SELECT text FROM messages WHERE kind = 'juno' AND origin_op = ? ORDER BY id")
-  return {
-    runs: rows.map((run): ActivityRun => {
-      const text = (said.all(run.opId) as Array<{ text: string }>).map((row) => row.text).join('\n\n')
-      return {
-        id: run.id as RunId,
-        who: whoOf(store, run.origin, run.opId),
-        at: run.at,
-        outcome: outcomeOf(JSON.parse(run.ending) as Ending, parseOutput(text).bubbles.length === 0),
-        actions: activityActions(store, run.id),
-        ...activityScripts(store, run.id),
-        tainted: run.clean === 0,
-      }
-    }),
-    moreAbove,
-  }
-}
+export { activityPage } from './activity'
 
 /* Review ------------------------------------------------------------------- */
 

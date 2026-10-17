@@ -1,10 +1,12 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
+import { chatCopy } from '@juno/agent-contract'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
-import { openTopic } from './navigation'
+import { openJuno, openTopic } from './navigation'
 import { HomeReview } from './HomeReview'
 import { showChannelMenu } from './placeMenus'
 
@@ -14,12 +16,19 @@ function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
 }
 
-/** Takes Home at each stage (`showHome`), and while the first sync runs adds the items each new value brings (`fillHome`). */
-function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
+/**
+ * Takes Home at each stage (`showHome`), with Juno's open asks as they are
+ * then, and while the first sync runs adds the items each new value brings (`fillHome`).
+ */
+function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown, asks: ReadonlyArray<HomeItem>): void {
   const appeared = useRef(false)
+  const asksRef = useRef(asks)
+  useLayoutEffect(() => {
+    asksRef.current = asks
+  })
   useLayoutEffect(() => {
     // The entrance plays once, when Home first has something to show; the items arriving later just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current, welcome: registry.get(welcomeAtom) !== undefined })
+    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current, welcome: registry.get(welcomeAtom) !== undefined, asks: asksRef.current })
     if (stage > 0) appeared.current = true
   }, [key, stage])
   useLayoutEffect(() => {
@@ -76,8 +85,20 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
     const main = item.topics[0]?.id
     void showChannelMenu({ ...item.channel, ...(main === undefined ? {} : { mainId: main }) })
   }
-  return { markDone, resolveAll, review, dismiss, sort, itemMenu }
+  // A proactive ask: Start runs the learning pass in the background, Not now puts it away, and the row opens the chat at it.
+  const ask = (itemId: string, answer: 'start' | 'dismiss' | 'open') => {
+    const id = itemOf(itemId)?.ask?.id
+    if (id === undefined) return
+    if (answer === 'open') return openJuno()
+    markHomeItemUsed(registry, key, itemId)
+    void pageActions.answerAsk(id, answer).then((outcome) => {
+      if (answer === 'start' && outcome === 'ok') showToast(registry, { text: chatCopy.ask.learn.started })
+    })
+  }
+  return { markDone, resolveAll, review, dismiss, sort, itemMenu, ask }
 }
+
+const pageActions = junoPageActions(registry)
 
 const closeCard = () => closeWelcome(registry)
 
@@ -138,14 +159,15 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const welcome = useWelcome(shown?.now)
   useMovesShown(shown?.view.items, shown?.now)
 
+  const asks = useAtomValue(homeAsksAtom)
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
-  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
+  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value, asks)
 
   // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
   if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
-  const { markDone, resolveAll, review, dismiss, sort, itemMenu } = itemActions(key, view.items, setReviewing)
+  const { markDone, resolveAll, review, dismiss, sort, itemMenu, ask } = itemActions(key, view.items, setReviewing)
   const closeReview = (item: HomeItem, allDone: boolean) => {
     if (allDone) markHomeItemUsed(registry, key, item.id)
     setReviewing(undefined)
@@ -171,6 +193,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onSort={sort}
       onItemMenu={itemMenu}
       onDismiss={dismiss}
+      onAsk={ask}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />

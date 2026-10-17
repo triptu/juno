@@ -27,6 +27,8 @@ export interface OpenRouterRequest {
   readonly compaction: boolean
   /** The last user message's text: the input the request answers. */
   readonly input: string
+  /** The first user message's text: in a chat request, Juno's memory (pins, summary, the outline of its notes, recent messages). */
+  readonly memory: string
   /** When the request follows a tool call: the tool's result text. */
   readonly toolResult?: string
   /** The image parts the request's user messages carried, by type and size in bytes. */
@@ -208,7 +210,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         const answers = (options.review ?? fakeReview)(review)
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answers: {
           intent: { type: 'choice', ...choice(answers.intent, ['explicit', 'implied', 'notAsked']) },
-          risk: { type: 'choice', ...choice(answers.risk, ['reversible', 'write', 'delete', 'send']) },
+          risk: { type: 'choice', ...choice(answers.risk, ['read', 'reversible', 'write', 'delete', 'send']) },
         } }))
         return
       }
@@ -223,7 +225,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
       const messages = body.messages ?? []
       const users = messages.filter((message) => message.role === 'user').map((message) => textOf(message.content)).filter((text) => text !== '')
       const result = toolResultOf(messages)
-      const request: OpenRouterRequest = { path, model, key, compaction: COMPACTION_MODELS.includes(model), input: users.at(-1) ?? '', images: imagesOf(messages), ...(result === undefined ? {} : { toolResult: result }) }
+      const request: OpenRouterRequest = { path, model, key, compaction: COMPACTION_MODELS.includes(model), input: users.at(-1) ?? '', memory: users[0] ?? '', images: imagesOf(messages), ...(result === undefined ? {} : { toolResult: result }) }
       requests.push(request)
       if (options.key !== undefined && key !== options.key) {
         res.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: { message: 'User not found.', code: 401 } }))

@@ -80,6 +80,10 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('working', {}),
   Schema.TaggedStruct('done', {
     line: Schema.String,
+    /** One plain line of what came back ("Found 3 results", a new page's title), for a connection call. */
+    detail: Schema.optionalKey(Schema.String),
+    /** All of what came back, as a person reads it and trimmed, behind "Show result". */
+    result: Schema.optionalKey(Schema.String),
     /** "Undo" after a resolve or a remember. */
     undo: Schema.optionalKey(Schema.Literal(true)),
     open: Schema.optionalKey(OpenTarget),
@@ -87,7 +91,8 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('dismissed', {}),
   /** After 7 days, or when the source changed: "Expired · Ask again". */
   Schema.TaggedStruct('expired', {}),
-  Schema.TaggedStruct('failed', { line: Schema.String }),
+  /** `detail`: the destination's error, in one short line, and `result` all of it, for a connection call. */
+  Schema.TaggedStruct('failed', { line: Schema.String, detail: Schema.optionalKey(Schema.String), result: Schema.optionalKey(Schema.String) }),
 ])
 export type CardStatus = typeof CardStatus.Type
 
@@ -303,7 +308,7 @@ export const ReviewRule = Schema.Literals(['auto', 'always', 'never'])
 export type ReviewRule = typeof ReviewRule.Type
 export const ReviewIntent = Schema.Literals(['explicit', 'implied', 'notAsked'])
 export type ReviewIntent = typeof ReviewIntent.Type
-export const ReviewRisk = Schema.Literals(['reversible', 'write', 'delete', 'send'])
+export const ReviewRisk = Schema.Literals(['read', 'reversible', 'write', 'delete', 'send'])
 export type ReviewRisk = typeof ReviewRisk.Type
 export const ToolReview = Schema.Struct({
   rule: ReviewRule,
@@ -324,6 +329,9 @@ export const ChangeCard = Schema.TaggedStruct('change', {
   caption: Schema.optionalKey(Schema.String),
   /** Why Juno asked: the auto-review of a connection call. */
   review: Schema.optionalKey(ToolReview),
+  /** The header, by what the call does ("Search Littlebird"), and the button's verb ("Search"). Older cards have neither. */
+  title: Schema.optionalKey(Schema.String),
+  verb: Schema.optionalKey(Schema.String),
 })
 export type ChangeCard = typeof ChangeCard.Type
 

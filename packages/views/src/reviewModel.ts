@@ -1,16 +1,14 @@
 import type { PhosphorIcon } from '@juno/ui'
+import type { PlaceTileModel } from './tileModel'
 
 /** What the user did with a row while the review is open: the card's action, its "no", or nothing yet. */
 export type ReviewStatus = 'open' | 'done' | 'declined'
 
 /** One proposal as the sheet shows it. */
-export interface ReviewEntry {
+export interface ReviewEntry extends PlaceTileModel {
   /** Unique in the sheet. */
   readonly id: string
-  /** The topic the row opens; its art draws the tile. */
-  readonly topicId: string
   readonly title: string
-  readonly art?: string
   /** Why it is proposed: a fact from the data, in plain words. */
   readonly reason?: string
   /** A message or draft the reason refers to, quoted under it. */

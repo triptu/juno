@@ -4,8 +4,8 @@ import { Avatar } from './Avatar'
 import type { AvatarStackPerson } from './AvatarStack'
 import { firstGrapheme } from './internal/grapheme'
 
-/** 44 is a sidebar row's tile, 16 a tab's icon. */
-type GroupAvatarSize = 44 | 16
+/** 44 is a sidebar row's tile, 20 a destination mark on Home, 16 a tab's icon. */
+type GroupAvatarSize = 44 | 20 | 16
 
 export interface GroupAvatarProps {
   /** The group's other members, two or more. Two are drawn; people with a photo go first. */
@@ -23,7 +23,7 @@ export interface GroupAvatarProps {
  */
 export function GroupAvatar({ people, size = 44, name }: GroupAvatarProps) {
   const [front, back] = [...people.filter((person) => person.src !== undefined), ...people.filter((person) => person.src === undefined)]
-  const member = size === 44 ? 28 : 11
+  const member = MEMBER[size]
   const draw = (person: AvatarStackPerson) => (
     <Avatar label={size === 44 ? firstGrapheme(person.initials) : ''} size={member} hue={person.hue} {...(person.src === undefined ? {} : { src: person.src })} />
   )
@@ -57,18 +57,24 @@ const styles = stylex.create({
   },
 })
 
+const MEMBER = { 44: 28, 20: 13, 16: 11 } as const
+
 const boxes = stylex.create({
   44: { width: sizes['--tile-44'], height: sizes['--tile-44'] },
+  20: { width: sizes['--avatar-20'], height: sizes['--avatar-20'] },
   16: { width: sizes['--icon-16'], height: sizes['--icon-16'] },
 })
 
 // The front member's circle plus a gap, centred where it sits over the back
-// one: 28px members 16px apart (centre 30, radius 14 + 2), or 11px members
-// 5px apart (centre 10.5, radius 5.5 + 1). Only the mask's alpha counts.
+// one: 28px members 16px apart (centre 30, radius 14 + 2), 13px members 7px
+// apart (centre 13.5, radius 6.5 + 1), or 11px members 5px apart (centre
+// 10.5, radius 5.5 + 1). Only the mask's alpha counts.
 const CUT_44 = 'radial-gradient(circle at 30px 30px, transparent 16px, black 16.5px)' // tokens-allow: mask geometry, not a colour
+const CUT_20 = 'radial-gradient(circle at 13.5px 13.5px, transparent 7.5px, black 8px)' // tokens-allow: mask geometry, not a colour
 const CUT_16 = 'radial-gradient(circle at 10.5px 10.5px, transparent 6.5px, black 7px)' // tokens-allow: mask geometry, not a colour
 
 const cuts = stylex.create({
   44: { maskImage: CUT_44 },
+  20: { maskImage: CUT_20 },
   16: { maskImage: CUT_16 },
 })

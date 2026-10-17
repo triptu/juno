@@ -1,5 +1,5 @@
 import { memo, useState, type ReactNode } from 'react'
-import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { aiAssistOnAtom, copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
 import {
@@ -9,43 +9,42 @@ import {
   junoPageActions,
   junoSettingsAtom,
   memoryPageAtom,
-  remembersPageAtom,
+  PAGE_MAX,
+  PAGE_ROWS,
   reviewPageAtom,
   scheduledPageAtom,
   setAgentProvider,
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
+import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
 import { openSettings } from '../navigation'
 import { junoCommands, openJunoTab } from './actions'
 import { useBackupSettings } from './BackupSettings'
 import { ConnectionConfigure } from './ConnectionConfigure'
 import { useNoProvider } from './NoProviderFrame'
+import { MemoryDocs } from './MemoryDocs'
 
 /** The pages' RPC-backed commands, one set for the app. */
 const actions = junoPageActions(registry)
 
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
-/** Rows Memory and Activity open with, and add for each "Load more"; the agent's page limit is 200. */
-const PAGE_ROWS = 50
-const PAGE_MAX = 200
 
 const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
 
 /**
- * A Juno page in its tab (SPEC 13.10): a page behind the Juno menu, live
- * from the agent. Until its first value arrives the page draws nothing
- * (performance 4.4: no spinner under 300 ms). Commands answer through the
- * page's own stream, so a refusal shows as the page staying as it was.
- * Settings › Juno, Connections and Backup & This Mac are sections of
- * Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
+ * A Juno page's body, live from the agent (SPEC 13.10), under the Juno
+ * header (`JunoPageView`). Until its first value arrives the page draws
+ * nothing (performance 4.4: no spinner under 300 ms). Commands answer
+ * through the page's own stream, so a refusal shows as the page staying as
+ * it was. Settings › Juno, Connections and Backup & This Mac are sections
+ * of Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
  */
-export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: JunoTabPage }) {
+export const JunoPageBody = memo(function JunoPageBody({ page }: { readonly page: JunoTabPage }) {
   switch (page) {
     case 'remembers':
-      return <Remembers />
+      return <MemoryDocs />
     case 'memory':
       return <Memory />
     case 'activity':
@@ -268,33 +267,6 @@ function withShown(page: JunoSettingsPageModel, shown: Shown): JunoSettingsPageM
     compactionModels: pick(page.compactionModels, shown.compaction),
     ...(page.fallbackModels === undefined ? {} : { fallbackModels: pick(page.fallbackModels, shown.fallback) }),
   }
-}
-
-function Remembers() {
-  const result = useAtomValue(remembersPageAtom)
-  const now = useNow()
-  const [editing, setEditing] = useState<{ readonly id: PinId; readonly draft: string } | undefined>(undefined)
-  if (result._tag !== 'Success') return null
-  const { page, revisions } = result.value
-  const revisionOf = (id: PinId) => revisions.find((entry) => entry.id === id)?.revision ?? 0
-  return (
-    <RemembersPage
-      page={page}
-      now={now}
-      {...(editing === undefined ? {} : { editing })}
-      onEditStart={(id) => setEditing({ id, draft: page.pins.find((pin) => pin.id === id)?.text ?? '' })}
-      onDraftChange={(draft) => setEditing((current) => (current === undefined ? current : { ...current, draft }))}
-      onSave={() => {
-        if (editing === undefined) return
-        void actions.editPin(editing.id, revisionOf(editing.id), editing.draft).then((outcome) => {
-          // A stale edit stays open: the page marks the pin "This changed. Check it and save again."
-          if (outcome === 'ok') setEditing(undefined)
-        })
-      }}
-      onCancel={() => setEditing(undefined)}
-      onRemove={(id) => void actions.removePin(id, revisionOf(id))}
-    />
-  )
 }
 
 function Memory() {

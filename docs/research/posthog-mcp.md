@@ -39,14 +39,14 @@ The owner asked Juno to turn on a PostHog feature flag for one person. Juno answ
 
 ## What this means for Juno
 
-- **Tier.** `exec` is not on any read list and is not marked read-only, so every `exec` call, `help` and `info` included, is a connection call that gets the auto-review. Under Auto the review asks unless the owner's words asked for exactly that call. A lookup such as `info update-feature-flag` is likely "implied", so it shows a card. Under Never ask, after Juno has read something, a lookup the owner's words implied runs with no card. One rule covers all of PostHog in CLI mode.
-- **Tools mode fits Juno better.** Juno already defers schemas: `find_tools` searches a server's tools and returns one schema only when the model needs it. In tools mode each PostHog tool has its own Configure row, its own rule and its own read-only mark, so the owner can keep `update-feature-flag` on Auto or Always ask and let the lookups run. To use it, add PostHog in Settings › Connections with the address `https://mcp.posthog.com/mcp?mode=tools`.
+- **Tier.** `exec` is not on any read list and is not marked read-only, so every `exec` call, `help` and `info` included, is a connection call that gets the auto-review. The review judges the command, not only the tool's name (decision log, 10-17): a lookup such as `info update-feature-flag` is a read and runs with no card under Auto when the owner's words pointed toward it; `call update-feature-flag {...}` is a change and asks unless the owner asked for exactly it. One rule covers all of PostHog in CLI mode.
+- **Tools mode is an option.** Juno already defers schemas: `find_tools` searches a server's tools and returns one schema only when the model needs it. In tools mode each PostHog tool has its own Configure row, its own rule and its own read-only mark, so the owner can, for example, set `update-feature-flag` to Always ask while other writes stay on Auto. To use it, add PostHog in Settings › Connections with the address `https://mcp.posthog.com/mcp?mode=tools`.
 - **The prompt hint.** `find_tools` tells the model that a tool taking one command string is a small command line: run its help and info commands before a call, and never guess a schema. Juno's other tools know nothing specific to PostHog.
 
 ## Trying it on the owner's other Mac
 
 1. Update Juno to a build with this change. Open Settings › Connections and check that PostHog is connected.
 2. In the Juno chat, ask: "Turn on the PostHog flag actions-cards-feed for <a test person>". Use a flag that is safe to change.
-3. Juno should look up the tool through `exec` (`help`, `info update-feature-flag`) and then call it, not say the schema was cut off or guess. Under Auto, each `exec` call the review finds only implied shows a Change card first; Activity lists each call and why it asked.
+3. Juno should look up the tool through `exec` (`help`, `info update-feature-flag`) with no card, then propose the change. Under Auto the change shows a Change card unless the request asked for exactly it; Activity lists each call and why it ran or asked.
 4. If the schema is too large, Juno now says "Juno can't use this tool: its description and argument schema are N KB, more than the 48 KB Juno can read." Report N.
 5. Optionally, try tools mode: remove PostHog, add it again with `https://mcp.posthog.com/mcp?mode=tools`, and compare.

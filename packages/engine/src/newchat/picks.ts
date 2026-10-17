@@ -4,7 +4,7 @@
  */
 import type { PickConversation } from '@juno/contract'
 import { channelLabelBare, contextTint, mainTopicId, type ChannelId, type ConversationKind } from '@juno/domain'
-import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
+import { parseIds, personFrom, tileMemberIds, userName, type UserRow } from '../topicRows'
 
 /** A conversation row with whether Juno holds any of its messages. */
 export interface ConversationRow {
@@ -38,10 +38,10 @@ export function pickOf(row: ConversationRow, users: ReadonlyMap<string, UserRow>
       return { ...base, name: person.name, person }
     }
     case 'mpim': {
-      const memberNames = parseIds(row.member_ids_json)
-        .filter((id) => id !== selfId)
-        .map((id) => userName(id, users.get(id)))
-      return { ...base, name: channelLabelBare({ kind: 'mpim', name: row.name ?? row.id, memberNames }) }
+      const memberIds = parseIds(row.member_ids_json)
+      const memberNames = memberIds.filter((id) => id !== selfId).map((id) => userName(id, users.get(id)))
+      const members = tileMemberIds({ members: memberIds }, selfId).map((id) => personFrom(id, users.get(id)))
+      return { ...base, name: channelLabelBare({ kind: 'mpim', name: row.name ?? row.id, memberNames }), ...(members.length === 0 ? {} : { members }) }
     }
     default:
       return { ...base, name: row.name ?? row.id }

@@ -4,9 +4,9 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { chatCopy, type CardId, type CardKind, type CardStatus, type OpenTarget, type Place, type PlaceTint } from '@juno/agent-contract'
-import { chat, colors, motion, opacity, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { chat, colors, motion, opacity, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, IconButton, Surface, Text, type PhosphorIcon } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
@@ -32,6 +32,8 @@ export interface ChatCardProps {
   readonly padding?: 'normal' | 'tight'
   /** Play the fade on mount. Pass false for a card drawn in a settled state (the review page, the gallery). */
   readonly enter?: boolean
+  /** Start with a connection call's full result shown, for a card drawn that way (the gallery). */
+  readonly resultShown?: boolean
   readonly children?: ReactNode
 }
 
@@ -45,16 +47,19 @@ export interface ChatCardProps {
  * outcome arrives; the view never composes an after-line, it prints
  * `status.line`.
  */
-export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', enter = true, children }: ChatCardProps) {
+export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', enter = true, resultShown = false, children }: ChatCardProps) {
   const open = status === undefined || status._tag === 'open'
   const working = status?._tag === 'working'
+  // A connection call's full result, shown under the after-line on request.
+  const [showResult, setShowResult] = useState(resultShown)
+  const result = status?._tag === 'done' || status?._tag === 'failed' ? status.result : undefined
   return (
     <Surface kind="card" as="article" padding="none" data-chat-card={kind} data-card-status={status?._tag} aria-busy={working || undefined} sx={enter ? styles.cardEnter : styles.card}>
       <div {...stylex.props(styles.inner, padding === 'tight' && styles.innerTight)}>
       <div {...stylex.props(styles.header, padding === 'tight' && styles.headerTight)}>
         <span {...stylex.props(styles.title)}>
-          {/* The kind is a short name and never cuts; the source after it takes the ellipsis. */}
-          <Text variant="meta" weight="medium" tone="subtle" sx={styles.kind}>
+          {/* The kind is a short name and never cuts; the source after it takes the ellipsis. A label with no source (a connection call's "Create note in Notion") cuts itself. */}
+          <Text variant="meta" weight="medium" tone="subtle" data-chat-card-kind truncate={source === undefined && label !== undefined} sx={[styles.kind, source === undefined && label !== undefined && styles.kindCuts]}>
             {label ?? chatCopy.card.kind[kind]}
           </Text>
           {source !== undefined ? (
@@ -98,8 +103,15 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
               {buttons}
             </div>
           ) : (
-            <AfterLine id={id} status={status} actions={actions} />
+            <AfterLine id={id} status={status} actions={actions} result={result === undefined ? undefined : { shown: showResult, toggle: () => setShowResult((value) => !value) }} />
           )}
+        </div>
+      ) : null}
+      {result !== undefined && showResult ? (
+        <div {...stylex.props(styles.result)} data-card-result-full>
+          <Text variant="meta" tone="default" selectable dir="auto" as="p" sx={styles.resultText}>
+            {result}
+          </Text>
         </div>
       ) : null}
       </div>
@@ -108,7 +120,7 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
 }
 
 /** What a settled card prints where its buttons were. */
-function AfterLine({ id, status, actions }: { readonly id: CardId; readonly status: CardStatus; readonly actions: ChatActions }) {
+function AfterLine({ id, status, actions, result }: { readonly id: CardId; readonly status: CardStatus; readonly actions: ChatActions; readonly result?: ResultToggle }) {
   const copy = chatCopy.card
   switch (status._tag) {
     case 'open':
@@ -124,8 +136,9 @@ function AfterLine({ id, status, actions }: { readonly id: CardId; readonly stat
       )
     case 'done':
       return (
-        <After>
+        <After truncate={status.detail !== undefined} trailing={<ShowResult toggle={result} />}>
           {status.line}
+          <Detail text={status.detail} />
           {status.undo ? (
             <>
               {' · '}
@@ -142,15 +155,63 @@ function AfterLine({ id, status, actions }: { readonly id: CardId; readonly stat
       )
     case 'failed':
       // The card runs once: no retry and no "can't tell" row (SPEC 13.3).
-      return <After>{status.line}</After>
+      return (
+        <After truncate={status.detail !== undefined} trailing={<ShowResult toggle={result} />}>
+          {status.line}
+          <Detail text={status.detail} />
+        </After>
+      )
   }
 }
 
-function After({ children }: { readonly children: ReactNode }) {
+/** A connection call's one result line, on the after-line itself, so the footer keeps its height. */
+function Detail({ text }: { readonly text: string | undefined }) {
+  if (text === undefined) return null
   return (
-    <Text variant="meta" tone="muted" as="p" sx={styles.after}>
-      {children}
-    </Text>
+    <>
+      {' · '}
+      <span data-card-result dir="auto">{text}</span>
+    </>
+  )
+}
+
+interface ResultToggle {
+  readonly shown: boolean
+  readonly toggle: () => void
+}
+
+/** "Show result" after the line, a quiet disclosure for everything a connection call gave back. */
+function ShowResult({ toggle }: { readonly toggle: ResultToggle | undefined }) {
+  if (toggle === undefined) return null
+  const copy = chatCopy.card.change.result
+  return (
+    <>
+      {' · '}
+      <TextButton aria-expanded={toggle.shown} onClick={toggle.toggle}>
+        {toggle.shown ? copy.hide : copy.show}
+      </TextButton>
+    </>
+  )
+}
+
+/** The after-line. `trailing` never cuts: the line before it takes the ellipsis. */
+function After({ children, truncate = false, trailing }: { readonly children: ReactNode; readonly truncate?: boolean; readonly trailing?: ReactNode }) {
+  if (trailing === undefined || trailing === null) {
+    return (
+      <Text variant="meta" tone="muted" as="p" truncate={truncate} sx={styles.after}>
+        {children}
+      </Text>
+    )
+  }
+  return (
+    <p {...stylex.props(styles.afterRow)}>
+      <Text variant="meta" tone="muted" truncate={truncate} sx={styles.afterCuts}>
+        {children}
+      </Text>
+      <Text variant="meta" tone="muted" sx={styles.afterTrailing}>
+        {trailing}
+      </Text>
+    </p>
   )
 }
 
@@ -240,6 +301,10 @@ const styles = stylex.create({
     whiteSpace: 'nowrap',
     flexShrink: 0,
   },
+  kindCuts: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
   dot: {
     whiteSpace: 'pre',
     flexShrink: 0,
@@ -283,6 +348,36 @@ const styles = stylex.create({
   after: {
     textWrap: 'pretty',
     userSelect: 'none',
+  },
+  afterRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    minWidth: 0,
+    margin: 0,
+    userSelect: 'none',
+  },
+  afterCuts: {
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  afterTrailing: {
+    flexShrink: 0,
+    whiteSpace: 'pre',
+  },
+  // About twelve lines, then the box scrolls. It opens only on a click, never while the card enters.
+  result: {
+    maxHeight: `calc(12 * 1.5 * ${text['--text-meta-size']} + 2 * ${spacing['--space-2-5']})`,
+    boxSizing: 'border-box',
+    overflowY: 'auto',
+    paddingBlock: spacing['--space-2-5'],
+    paddingInline: spacing['--space-3'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--background'],
+    minWidth: 0,
+  },
+  resultText: {
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'anywhere',
   },
   danger: {
     display: 'inline-flex',

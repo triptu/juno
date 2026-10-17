@@ -133,7 +133,7 @@ test('a schedule from a clean run wakes once after a quit past its due time', as
     await expect(page.getByText('Nothing scheduled')).toBeVisible()
 
     const activity = await openPage(first.juno, 'Activity')
-    await expect(activity.locator('section[data-activity-run="replied"][aria-label^="A schedule,"]')).toHaveCount(1)
+    await expect(activity.locator('[data-activity-run="replied"]').filter({ has: first.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
   } finally {
     await first.running.close()
   }
@@ -147,7 +147,7 @@ test('a schedule from a clean run wakes once after a quit past its due time', as
     expect(wakes(model)).toBe(1)
     await expect(last.junoBubble('Here is the launch checklist.')).toHaveCount(1)
     const activity = await openPage(second.juno, 'Activity')
-    await expect(activity.locator('section[data-activity-run][aria-label^="A schedule,"]')).toHaveCount(1)
+    await expect(activity.locator('[data-activity-run]').filter({ has: second.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
   } finally {
     await second.running.close()
   }

@@ -15,6 +15,9 @@
  * - `steered`: input that arrived while the run was busy was handed to pi,
  *   which places it at the run's next step.
  * - `remembered`: a pin was written ("Remembered · Undo").
+ * - `memoryUpdated`: Juno changed its memory of the owner ("Updated memory ·
+ *   People · Undo"). `runId` is a chat run or a learning pass (`learn:<ask>`).
+ * - `asked`: a proactive ask was offered or answered, or its pass moved.
  * - `ended`: the run settled with its ending; the status bubble clears.
  */
 import type { Ending } from '@juno/agent-contract'
@@ -41,6 +44,8 @@ export type TurnEvent =
     }
   | { readonly _tag: 'steered'; readonly runId: string; readonly opId: string }
   | { readonly _tag: 'remembered'; readonly runId: string; readonly pinId: string; readonly version: number; readonly text: string }
+  | { readonly _tag: 'memoryUpdated'; readonly runId: string; readonly doc: string }
+  | { readonly _tag: 'asked' }
   | { readonly _tag: 'ended'; readonly runId: string; readonly opId: string; readonly ending: Ending }
 
 /** The live run, for a renderer that attaches mid-run. */

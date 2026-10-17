@@ -146,8 +146,8 @@ test('an empty chat asks what you need, a run shows the status bubble, and a run
   await chat.expectJuno('You said: fail once')
 
   const activity = await openPage(juno, 'Activity')
-  await expect(activity.locator('section[data-activity-run="failed"]')).toHaveCount(1)
-  await expect(activity.locator('section[data-activity-run="replied"]')).toHaveCount(1)
+  await expect(activity.locator('[data-activity-run="failed"]')).toHaveCount(1)
+  await expect(activity.locator('[data-activity-run="replied"]')).toHaveCount(1)
 })
 
 test('a message over the size limit stays in the chat, marked too long, and never reaches the model', async ({ juno, model }) => {

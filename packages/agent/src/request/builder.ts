@@ -17,12 +17,19 @@
  * 4. `guard.stamp` revalidates `gen` and `pin_rev` and admits the window;
  *    the guard checks both again at dispatch.
  *
+ * The outline of Juno's memory of the owner (`<about-owner>`, SPEC 13.8)
+ * sits in the memory message after the view and before the tail. It is
+ * read once per run (by `h`), so a write during a run leaves the run's
+ * later requests as they were, and an unchanged memory leaves the prefix up
+ * to the tail as the provider cached it. A change costs the tail, which a
+ * new run sends again anyway. It is counted with the system text.
+ *
  * The builder sees each archive entry as one active entry. An assistant
  * message with several tool calls is counted as one call (its first) and
  * the other results as notes, because the memory rules pair one call id
  * with one entry; the guard still counts every byte sent.
  */
-import { isSchemaResult, pageMcpResult } from '../mcp/results'
+import { isSchemaResult, pageMcpResult, schemaNote } from '../mcp/results'
 import { buildRequest, type ActiveEntry, type Line, type Pins, type Source } from '@juno/agent-memory'
 import type { Ending } from '@juno/agent-contract'
 import { AdmissionError, providerFailure, type ProviderGuardApi, type StreamProgress } from '../providers'
@@ -68,20 +75,30 @@ export function createRequestBuilder(options: {
   readonly guard: ProviderGuardApi
   /** The system text and the tool declarations, as sent. */
   readonly systemAndTools: () => ReadonlyArray<string>
+  /** The outline of Juno's memory of the owner now, or none. */
+  readonly outline?: () => string
 }): RequestBuilder {
   const { store, guard } = options
+  let frozen: { readonly h: number; readonly text: string } | undefined
+  const outlineFor = (h: number): string => {
+    if (options.outline === undefined) return ''
+    if (frozen?.h !== h) frozen = { h, text: options.outline() }
+    return frozen.text
+  }
   return {
     chat: (request) => {
       const snapshot = read(store, request.h)
+      const about = outlineFor(request.h)
       const systemAndTools = options.systemAndTools()
+      const counted = about === '' ? systemAndTools : [...systemAndTools, about]
       const built = buildRequest({
-        ...snapshot, h: request.h, systemAndTools, parents: [], contextWindow: request.model.contextWindow,
+        ...snapshot, h: request.h, systemAndTools: counted, parents: [], contextWindow: request.model.contextWindow,
         multiplier: multiplier(store, request.model.provider),
       })
       if (built.kind === 'blocked') {
         return { _tag: 'refused', ending: built.reason === 'protocol' ? { _tag: 'interrupted' } : { _tag: 'blocked', reason: 'tooLarge' } }
       }
-      const rendered = built.messages.slice(systemAndTools.length)
+      const rendered = built.messages.slice(counted.length)
       const [pins = '', memory = '', ...rest] = rendered
       const tail = rest.slice(0, rest.length - built.active.length)
       const paged = new Map<string, string>()
@@ -90,7 +107,7 @@ export function createRequestBuilder(options: {
       })
       const memoryMessage = {
         role: 'user', timestamp: 0,
-        content: ['<remembered>', pins, '</remembered>', '<memory>', memory, '</memory>', '<recent>', ...tail, '</recent>'].join('\n'),
+        content: ['<remembered>', pins, '</remembered>', '<memory>', memory, '</memory>', ...(about === '' ? [] : [about]), '<recent>', ...tail, '</recent>'].join('\n'),
       } as WireMessage
       const system = request.messages.filter((m) => role(m) === 'system')
       const run = request.messages.filter((m) => role(m) !== 'system').map((m) => {
@@ -162,9 +179,23 @@ function read(store: Store, h: number): Snapshot {
   const sourceOf = (row: Row): Source => ({ id: row.id, version: row.version, text: row.text, kind: row.kind, removed: row.redacted_gen !== null || removed.has(row.id) })
   return {
     rev: published.rev, gen: published.gen, pins, lines: published.lines, covered: published.covered, cutoff,
-    tail: rows(published.covered, h).map(sourceOf),
+    tail: noted(rows(published.covered, h)).map(sourceOf),
     active: activeEntries(store, rows(h, cutoff)),
   }
+}
+
+/**
+ * A schema an earlier run loaded is one line in the recent history, not the schema: its chunks after
+ * the first are left empty, so each archive row keeps its one tail entry.
+ */
+function noted(rows: ReadonlyArray<Row>): ReadonlyArray<Row> {
+  let schema: { entry: number; incarnation: string } | undefined
+  return rows.map((row) => {
+    if (schema !== undefined && row.entry_id === schema.entry && row.incarnation === schema.incarnation) return { ...row, text: '' }
+    const note = row.kind === 'tool' ? schemaNote(row.text) : undefined
+    schema = note === undefined ? undefined : { entry: row.entry_id, incarnation: row.incarnation }
+    return note === undefined ? row : { ...row, text: note }
+  })
 }
 
 /** One active entry per pi entry: its chunks are contiguous archive rows. */

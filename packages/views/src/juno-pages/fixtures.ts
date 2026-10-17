@@ -1,5 +1,5 @@
 /** Invented page data for the gallery. Times are relative to `NOW`. */
-import type { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryPage, RemembersPage, ScheduledPage } from '@juno/agent-contract'
+import type { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryDocsPage, MemoryEntryId, MemoryPage, RemembersPage, ScheduledPage } from '@juno/agent-contract'
 import { NOW } from '../juno-chat/fixtures/data'
 
 const MINUTE = 60_000
@@ -38,6 +38,43 @@ export const remembers: RemembersPage = {
 
 export const remembersFull: RemembersPage = { ...remembers, usedBytes: 4096 }
 
+const eid = (id: string) => id as MemoryEntryId
+const slack = { _tag: 'slack' } as const
+const own = { _tag: 'owner' } as const
+const littlebird = { _tag: 'connection', name: 'Littlebird' } as const
+
+/** Juno's notes about an invented owner, from their words, Slack and Littlebird. */
+export const docs: MemoryDocsPage = {
+  docs: [
+    { doc: 'you', entries: [
+      { id: eid('e1'), text: 'Staff engineer on the sync team. Leads the Postgres 16 migration.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e2'), text: 'Works from Lisbon, usually 9:30 to 18:00.', source: own, outside: false, at: NOW - 6 * DAY },
+    ] },
+    { doc: 'people', entries: [
+      { id: eid('e3'), text: 'Maya Chen: owns the migration plan; reviews each other\'s backfill PRs.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e4'), text: 'Priya Raman: manager. Weekly 1:1 on Thursdays.', source: littlebird, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e5'), text: 'Leo: fixes most sidebar test flakes.', source: slack, outside: true, at: NOW - 9 * DAY },
+    ] },
+    { doc: 'projects', entries: [
+      { id: eid('e6'), text: 'Postgres 16 migration: dual-write window, then a backfill in 200-row batches, then the cutover behind a flag.', source: slack, outside: true, at: NOW - 2 * DAY },
+    ] },
+    { doc: 'preferences', entries: [] },
+    { doc: 'style', entries: [
+      { id: eid('e7'), text: 'Short messages, mostly lowercase, no sign-off. Opens with "hey" in DMs and with the point in channels.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e8'), text: 'Uses "sgtm" and "will do"; one emoji at most, usually 🙏.', source: slack, outside: true, at: NOW - 2 * DAY },
+    ] },
+  ],
+  changes: [
+    { id: 'w5', doc: 'you', kind: 'update', by: 'owner', text: 'Works from Lisbon, usually 9:30 to 18:00.', source: own, outside: false, at: NOW - 6 * DAY + HOUR },
+    { id: 'w4', doc: 'people', kind: 'add', by: 'juno', text: 'Priya Raman: manager. Weekly 1:1 on Thursdays.', source: littlebird, outside: true, at: NOW - 2 * DAY },
+    { id: 'w3', doc: 'style', kind: 'add', by: 'juno', text: 'Short messages, mostly lowercase, no sign-off. Opens with "hey" in DMs and with the point in channels.', source: slack, outside: true, at: NOW - 2 * DAY },
+    { id: 'w2', doc: 'projects', kind: 'remove', by: 'juno', text: 'Q3 pricing page refresh.', source: slack, outside: true, at: NOW - 3 * DAY, undone: true },
+    { id: 'w1', doc: 'people', kind: 'remove', by: 'owner', source: own, outside: false, at: NOW - 4 * DAY },
+  ],
+}
+
+export const docsEmpty: MemoryDocsPage = { docs: docs.docs.map((section) => ({ doc: section.doc, entries: [] })), changes: [] }
+
 export const memory: MemoryPage = {
   lines: [
     { _tag: 'line', id: 'l1', from: NOW - 40 * DAY, to: NOW - 21 * DAY, text: 'You set up the daily #eng catch-up and asked Juno to keep the offsite date. The Postgres 16 plan started; Maya owns it.' },
@@ -49,74 +86,133 @@ export const memory: MemoryPage = {
   coveredThrough: NOW - DAY,
 }
 
+type Run = ActivityPage['runs'][number]
+
+const run = (id: string, at: number, fields: Partial<Omit<Run, 'id' | 'at'>> & Pick<Run, 'trigger'>): Run => ({
+  id: rid(id), at, outcome: 'replied', actions: [], sources: [], steps: [], tainted: false, model: 'Claude Sonnet 5.5', costUsd: 0.004, ...fields,
+})
+const said = (words: string) => ({ _tag: 'message' as const, words, files: 0 })
+
+/** A realistic three days: many runs a day, your messages beside schedules, jobs and card answers. */
 export const activity: ActivityPage = {
   runs: [
-    {
-      id: rid('r1'),
-      who: 'You',
-      at: NOW - 5 * MINUTE,
-      outcome: 'replied',
-      actions: [
-        { id: 'a1', tier: 3, label: 'Send a message to #eng', decision: 'approved', outcome: 'done' },
-        { id: 'a2', tier: 2, label: 'Start T3 Code on juno', decision: 'noClick', outcome: 'done' },
-        {
-          id: 'a7', tier: 3, label: 'Change notion-update-page in Notion', decision: 'noClick', outcome: 'done',
-          review: { rule: 'auto', intent: 'explicit', risk: 'reversible', line: 'Ran without asking because you asked for it and it can be undone.' },
-        },
-      ],
-      reads: 'Read 3 topics, looked back 4 times',
-      tainted: false,
-    },
-    {
-      id: rid('r2'),
-      who: 'Daily catch-up',
-      at: NOW - 30 * MINUTE,
-      outcome: 'stayedQuiet',
-      actions: [],
-      reads: 'Read 12 topics',
+    run('r1', NOW - 5 * MINUTE, {
+      trigger: said('Catch me up on #eng and draft a reply to Maya about the Postgres 16 plan'),
+      sources: ['#eng', 'Postgres 16 migration plan'],
       tainted: true,
-    },
-    {
-      id: rid('r5'),
-      who: 'You',
-      at: NOW - 40 * MINUTE,
-      outcome: 'replied',
-      actions: [],
+      costUsd: 0.018,
+      steps: [
+        { label: 'Read #eng', result: '24 messages', outcome: 'done' },
+        { label: 'Read a thread in #eng', result: '9 messages', outcome: 'done' },
+        { label: 'Searched Slack', input: 'postgres 16 from:@maya', result: '3 messages', outcome: 'done' },
+        { label: 'Drafted a message', result: 'Proposed a Send message card.', outcome: 'done' },
+      ],
+      actions: [{ id: 'a1', tier: 3, label: 'Message to Maya Chen', decision: 'approved', outcome: 'done' }],
+    }),
+    run('r2', NOW - 22 * MINUTE, {
+      trigger: { _tag: 'schedule', name: 'Watch #alerts-prod for pages' },
+      outcome: 'stayedQuiet',
+      sources: ['#alerts-prod'],
+      tainted: true,
+      model: 'Claude Haiku 5.5',
+      costUsd: 0.0006,
+      steps: [{ label: 'Read #alerts-prod', result: '0 messages', outcome: 'done' }],
+    }),
+    run('r3', NOW - 41 * MINUTE, {
+      trigger: said('what did Leo decide about the pricing page copy?'),
+      sources: ['Slack', 'Littlebird'],
+      tainted: true,
+      costUsd: 0.011,
       reads: 'Ran 1 script: 3 reads, 1 cancelled',
       scriptCalls: [
-        { tool: 'slack_search', args: '{"query":"deploy in:#eng"}', outcome: 'done' },
+        { tool: 'slack_search', args: '{"query":"pricing from:@leo"}', outcome: 'done' },
         { tool: 'slack_replies', args: '{"channel":"C0ENG","thread":"1760500000.000001"}', outcome: 'done' },
-        { tool: 'connection_read', args: '{"server":"notion","tool":"notion-search","args":{"query":"rollout"}}', outcome: 'cancelled' },
+        { tool: 'connection_read', args: '{"server":"littlebird","tool":"search","args":{"query":"pricing copy"}}', outcome: 'cancelled' },
       ],
+      steps: [{ label: 'Ran a script', result: 'Ran 3 reads.', outcome: 'done' }],
+    }),
+    run('r4', NOW - 58 * MINUTE, {
+      trigger: { _tag: 'job', name: 'Fix the sidebar flake' },
+      sources: ['the report from Fix the sidebar flake'],
       tainted: true,
-    },
-    {
-      id: rid('r3'),
-      who: 'You',
-      at: NOW - 2 * HOUR,
+      costUsd: 0.007,
+      steps: [{ label: 'Used T3 Code: t3_thread_read', input: '{"threadId":"t-412"}', outcome: 'done' }],
+    }),
+    run('r5', NOW - 1.5 * HOUR, {
+      trigger: { _tag: 'answer', question: 'Which branch should the fix start from?' },
+      costUsd: 0.003,
+      steps: [{ label: 'Proposed a T3 Code session', input: 'Fix the sidebar flake', result: 'Proposed a Proposed task card.', outcome: 'done' }],
+      actions: [{ id: 'a2', tier: 2, label: 'Start Fix the sidebar flake', decision: 'approved', outcome: 'done' }],
+    }),
+    run('r6', NOW - 2 * HOUR, {
+      trigger: said('remember that the offsite is on the 23rd'),
+      costUsd: 0.002,
+      steps: [{ label: 'Remembered a line', result: 'Remembered.', outcome: 'done' }],
+      actions: [{ id: 'a3', tier: 1, label: 'Remember "the offsite is on the 23rd"', decision: 'noClick', outcome: 'done' }],
+    }),
+    run('r7', NOW - 2.5 * HOUR, {
+      trigger: said('post the rollout note in #deploys and close the two old deploy threads'),
       outcome: 'failed',
-      actions: [
-        { id: 'a3', tier: 3, label: 'Send a message to Maya Chen', decision: 'approved', outcome: 'failed', failure: { text: 'Slack did not accept the message.', details: 'chat.postMessage: ratelimited (retry-after 30) at 2026-10-14T07:31:02Z, attempt 2 of 2' } },
-        { id: 'a4', tier: 3, label: 'Resolve 2 topics', decision: 'dismissed', outcome: 'none' },
-        {
-          id: 'a8', tier: 3, label: 'Change notion-delete-page in Notion', decision: 'dismissed', outcome: 'none',
-          review: { rule: 'auto', intent: 'explicit', risk: 'delete', line: "Asked because deleting can't be undone." },
-        },
-        { id: 'a5', tier: 1, label: 'Remember "the offsite is on the 23rd"', decision: 'noClick', outcome: 'done' },
-      ],
-      reads: 'Read 1 topic',
-      tainted: false,
-    },
-    {
-      id: rid('r4'),
-      who: 'Fix the sidebar flake',
-      at: NOW - DAY,
-      outcome: 'interrupted',
-      actions: [{ id: 'a6', tier: 3, label: 'Answer a question from T3 Code', decision: 'expired', outcome: 'none' }],
+      sources: ['#deploys'],
       tainted: true,
-    },
+      costUsd: 0.009,
+      steps: [
+        { label: 'Read #deploys', result: '12 messages', outcome: 'done' },
+        { label: 'Drafted a message', result: 'Proposed a Send message card.', outcome: 'done' },
+        { label: 'Proposed resolving topics', result: 'Proposed a Resolve card.', outcome: 'done' },
+        { label: 'Used Notion: notion-update-page', input: '{"page":"Rollout","status":"Shipped"}', result: 'The connection could not complete this request.', outcome: 'failed' },
+      ],
+      actions: [
+        { id: 'a4', tier: 3, label: 'Message to #deploys', decision: 'approved', outcome: 'failed', failure: { text: 'It did not go through.', details: 'chat.postMessage: ratelimited (retry-after 30), attempt 2 of 2' } },
+        { id: 'a5', tier: 3, label: 'Resolve 2 topics', decision: 'dismissed', outcome: 'none' },
+        {
+          id: 'a6', tier: 3, label: 'Change notion-update-page in Notion', decision: 'approved', outcome: 'done',
+          review: { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because you didn't ask for exactly this." },
+        },
+      ],
+    }),
+    run('r8', NOW - 3 * HOUR, {
+      trigger: { _tag: 'reaction', emoji: '🎉' },
+      outcome: 'stayedQuiet',
+      costUsd: 0.001,
+    }),
+    run('r9', NOW - 4 * HOUR, {
+      trigger: { _tag: 'schedule', name: 'Catch you up on #eng' },
+      sources: ['#eng', '#design-review', '#incidents'],
+      tainted: true,
+      costUsd: 0.021,
+      steps: [
+        { label: 'Read #eng', result: '31 messages', outcome: 'done' },
+        { label: 'Read #design-review', result: '8 messages', outcome: 'done' },
+        { label: 'Read #incidents', result: '2 messages', outcome: 'done' },
+      ],
+    }),
+    ...Array.from({ length: 6 }, (_, n) =>
+      run(`r1${n}`, NOW - DAY - n * 70 * MINUTE, {
+        trigger: n % 3 === 2 ? { _tag: 'schedule', name: 'Watch #alerts-prod for pages' } : said(['is the hiring loop for Leo still on?', 'summarize #design-review since Monday', 'who owns the incident follow-ups?', 'draft a note to Priya about the launch'][n % 4]!),
+        outcome: n % 3 === 2 ? 'stayedQuiet' : 'replied',
+        sources: n % 3 === 2 ? ['#alerts-prod'] : n % 2 === 0 ? ['#hiring'] : ['#design-review', 'Notion'],
+        tainted: true,
+        model: n % 3 === 2 ? 'Claude Haiku 5.5' : 'Claude Sonnet 5.5',
+        costUsd: n % 3 === 2 ? 0.0005 : 0.006 + n / 1000,
+        steps: [{ label: n % 3 === 2 ? 'Read #alerts-prod' : 'Searched Slack', result: `${4 + n} messages`, outcome: 'done' }],
+      }),
+    ),
+    run('r20', NOW - 3 * DAY, {
+      trigger: said('stop'),
+      outcome: 'interrupted',
+      costUsd: 0.001,
+    }),
+    // A message since removed, from a run that made no request.
+    { id: rid('r21'), at: NOW - 3 * DAY - HOUR, trigger: said(''), outcome: 'interrupted', actions: [], sources: [], steps: [], tainted: false },
   ],
   moreAbove: true,
+}
+
+/** 500 runs over two weeks, for the page's budget and its long scroll. */
+export const activityLong: ActivityPage = {
+  runs: Array.from({ length: 500 }, (_, n) => ({ ...activity.runs[n % 9]!, id: rid(`long-${n}`), at: NOW - n * 40 * MINUTE })),
+  moreAbove: false,
 }
 
 export const connections: ConnectionsPage = {

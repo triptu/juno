@@ -6,6 +6,9 @@ import { delegateTool } from '../jobs/delegate'
 import { createJobs, type Jobs } from '../jobs/jobs'
 import { subagentDriver } from '../jobs/subagent'
 import { rememberTool } from '../memory-tools/remember'
+import { outlineNow } from '../memory-docs/store'
+import { memoryDocsTools } from '../memory-docs/tools'
+import { createLearning } from '../memory-docs/learn'
 import { createOwnership } from '../ownership/service'
 import type { ProviderGuardApi } from '../providers'
 import { createRedaction, removeExecutor, removeTool } from '../redaction'
@@ -53,7 +56,7 @@ export function createTurnServices(setup: Setup) {
       ...registered.filter((r) => r.callers?.includes('model') ?? true).map(declaration),
     ]
   }
-  const builder = createRequestBuilder({ store, guard, systemAndTools })
+  const builder = createRequestBuilder({ store, guard, systemAndTools, outline: () => outlineNow(store) })
   const router = createRouter({
     store, session, builder, model: models.running, tools,
     rotate: session.rotate,
@@ -61,7 +64,7 @@ export function createTurnServices(setup: Setup) {
     startWake: (opId, persist) => scheduler.start(opId, persist),
     rotationDue: session.rotationDue,
     onRunEnded: poke,
-    cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
+    cards: { carry: (opId) => actions.carry(opId), carriesData: (opId) => actions.carriesData(opId), quote: (cardId) => actions.quote(cardId) },
     admits: () => ownership.admits() && (options.online?.() ?? true),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
@@ -83,7 +86,17 @@ export function createTurnServices(setup: Setup) {
     actions.propose({ runId: event.runId, callId: `budget:${today.day}:${today.raises}`, payload: budgetCard(store, guard.spend) })
   })
   const ownership = openOwnership(store, options, backup, router, actions, session)
-  return { router, jobs, scheduler, actions, redaction, ownership, tools, section, scripts: scripting?.scripts }
+  const learning = createLearning({
+    store, guard,
+    // A pass loops over tools, which a Codex turn does not: there it uses the cheaper model.
+    model: () => (models.running().provider === 'openai-codex' ? subagentModel : models.running()),
+    ...(options.host ? { host: options.host } : {}),
+    ...(options.connections ? { connections: options.connections } : {}),
+    written: (runId, doc) => router.emit({ _tag: 'memoryUpdated', runId, doc }),
+    changed: () => router.emit({ _tag: 'asked' }),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+  })
+  return { router, jobs, scheduler, actions, redaction, ownership, learning, tools, section, scripts: scripting?.scripts }
 }
 
 type Router = ReturnType<typeof createRouter>
@@ -143,6 +156,7 @@ function createTools({ store, options, guard, router, jobs, scheduler, viewSetti
       current: () => router.toolRun(),
       remembered: (runId, pin) => router.emit({ _tag: 'remembered', runId, pinId: pin.id, version: pin.version, text: pin.text }),
     }),
+    ...memoryDocsTools({ store, current: () => router.toolRun(), written: (runId, doc) => router.emit({ _tag: 'memoryUpdated', runId, doc }) }),
   ]
   const redactionTools = [removeTool({ store, current: () => router.toolRun(), propose: actions.propose })]
   const scheduleContext = { store, scheduler, current: () => router.toolRun(), propose: actions.propose }

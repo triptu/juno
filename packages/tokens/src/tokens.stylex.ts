@@ -941,6 +941,8 @@ export const sizes = stylex.defineVars({
   '--avatar-20': '20px',
   '--avatar-18': '18px',
   '--avatar-16': '16px',
+  // A group DM's member in a 20px destination mark (GroupAvatar).
+  '--avatar-13': '13px',
   // A group DM's member in a 16px tab icon (GroupAvatar).
   '--avatar-11': '11px',
   '--avatar-stack-overlap': '-4px',

@@ -174,7 +174,7 @@ A determinate ring, as macOS draws one for a download: `value` out of `max`, a `
 
 ## 16. Page, PageHeader, Section
 
-`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 (every settings page), padding 40 32 72. The scroller keeps a stable scrollbar gutter, so the column does not move when the page starts or stops overflowing. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
+`Page`: scrolling page with a centred column, `width` `narrow` 680 | `default` 720 | `settings` 760 (every settings page), padding 40 32 72. The scroller keeps a stable scrollbar gutter, so the column does not move when the page starts or stops overflowing. Inside `PageUnderHeader` (a context a frame sets when a header's islands lie over the page, the Juno pages), the scroller takes the `--header-inset` top padding, `scroll-padding-top: --header-band` and the scrollbar track below the band, as `ScrollArea underHeader` does, and the column's top padding is 16. `PageHeader`: serif `title` (`size` `compact` for the 32px All topics title), `subtitle`, `trailing` slot. `Section`: 15/600 `heading` + 13 muted `sub` + children (usually a `Surface group`).
 
 ## 17. CodeBlock
 

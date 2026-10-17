@@ -498,6 +498,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--avatar-2xs` | 20px | Mention and To-picker rows; initials 9 |
 | `--avatar-3xs` | 18px | Avatar stack (one initial at 8.5, overlap −4, 1.5px ring in the colour of the surface the stack sits on) |
 | `--avatar-16` | 16px | A DM tab's photo in the tab icon slot; initials 7 (`--initials-16`) |
+| `--avatar-13` | 13px | A group DM member in a 20px destination mark (`GroupAvatar`, Home's Recent and destination lists); no initial fits, so the photo or the colour alone |
 | `--avatar-11` | 11px | A group DM member in a 16px tab icon (`GroupAvatar`); no initial fits, so the photo or the colour alone. In the 44px row tile the members use `--avatar-28` |
 
 ### Icons

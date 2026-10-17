@@ -22,6 +22,15 @@ export default defineFixtures(GroupAvatar, {
     'no-photos': fixture({ people: [dev, priya], name: 'Dev, Priya' }),
   },
   Size: {
+    // Home's destination mark, in Recent and the destination lists.
+    'mark-20': scene(() => (
+      <Row>
+        <GroupAvatar people={[maya, leo]} size={20} />
+        <Text variant="body">Maya, Leo</Text>
+        <GroupAvatar people={[dev, priya]} size={20} />
+        <Text variant="body">Dev, Priya</Text>
+      </Row>
+    )),
     // The tab's icon slot, beside a tab title.
     'tab-16': scene(() => (
       <Row>

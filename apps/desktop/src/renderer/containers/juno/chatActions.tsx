@@ -3,14 +3,14 @@
  * requests, the remove sheet and the row callbacks.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
 import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
-import { junoCommands, openJunoPage } from './actions'
+import { junoCommands } from './actions'
 import { scrollToRow } from './chatScroll'
 import { latest, type Window } from './chatWindow'
 
@@ -102,13 +102,17 @@ interface ActionsInput {
   /** Opens the reactions of a bubble or card under (or over) this box (`useReactionPicker`). */
   readonly openPicker: (target: ReactionTarget, box: DOMRect) => void
   readonly setRemoval: Dispatch<SetStateAction<Removal | undefined>>
+  /** A link to a Juno page ("Show in Activity"): in the chat's own tab or panel. */
+  readonly openPage: (page: JunoPage) => void
 }
 
 /** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
-export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval }: ActionsInput): ChatActions {
+export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, openPage }: ActionsInput): ChatActions {
   const itemsRef = useRef(items)
+  const openPageRef = useRef(openPage)
   useLayoutEffect(() => {
     itemsRef.current = items
+    openPageRef.current = openPage
   })
   return useMemo<ChatActions>(
     () => ({
@@ -125,7 +129,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
           case 'url':
             return openExternal(target.url)
           case 'page':
-            return openJunoPage(target.page)
+            return openPageRef.current(target.page)
         }
       },
       onRetry: (opId: OpId) => junoCommands.onRetry(opId),
@@ -136,6 +140,8 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
       },
       onQuote: (target) => scrollToRow(scrollRef, pinnedRef, target),
       onUndoNote: messages.undo,
+      onUndoMemory: messages.undoMemory,
+      onAsk: (id, choice) => void messages.ask(id, choice),
       onGroupLabel: () => {},
       onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
         event.preventDefault()

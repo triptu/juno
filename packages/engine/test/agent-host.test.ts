@@ -13,6 +13,7 @@ import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
 import { AgentHostRpcs, HostDispatch, HostPresence, HostTopicId } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
+import { SELF_ID } from '@juno/fake-slack'
 import { prefsSet } from '@juno/contract'
 import { runCommand, topicAtom } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
@@ -208,6 +209,10 @@ describe('the AgentHost port', () => {
     expect(fromMaya.messages.map((m) => m.text)).toEqual([injection])
     const fromLeo = await ok(client['host.slack.search']({ accountId: account, query: 'from:@leo maintenance', limit: 10 } as never))
     expect(fromLeo.messages).toEqual([])
+    // `from:me` is the signed-in user: what the learning pass reads.
+    const fromMe = await ok(client['host.slack.search']({ accountId: account, query: 'from:me', limit: 50 } as never))
+    expect(fromMe.messages.length).toBeGreaterThan(0)
+    expect(fromMe.messages.every((m) => m.senderId === SELF_ID)).toBe(true)
 
     expect(await ok(client['host.slack.person']({ accountId: account, userId: 'U0MAYA' } as never))).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
     expect((await failure(client['host.slack.person']({ accountId: account, userId: 'U0NOBODY' } as never)))).toMatchObject({ reason: 'notFound' })

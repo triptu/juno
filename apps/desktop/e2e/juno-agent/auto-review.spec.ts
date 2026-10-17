@@ -5,7 +5,7 @@
 import type { FakeLittlebird } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { addServer, card, configure, openChat, openPage, ready } from './agent'
+import { addServer, card, configure, openChat, openPage, openRuns, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 /** "add material on <id>" calls add_material, "delete material on <id>" delete_material; the rest is echoed. */
@@ -93,13 +93,14 @@ test('a call the owner asked for that can be undone runs with no card, and a del
   await expect(asked).toBeVisible()
   await expect(asked.locator('[data-change-review]')).toHaveText("Asked because deleting can't be undone.")
   expect(mcp.calls.map((call) => call.name)).not.toContain('delete_material')
-  await asked.getByRole('button', { name: 'Apply' }).click()
+  await asked.getByRole('button', { name: 'Delete material' }).click()
   await expect(asked).toContainText('Applied')
   expect(mcp.calls.filter((call) => call.name === 'delete_material')).toHaveLength(1)
   expect(mcp.materials()).toHaveLength(0)
 
   // Activity records both, each with the review's line.
   const activity = await openPage(juno, 'Activity')
+  await openRuns(activity)
   await expect(activity.getByText('Ran without asking because you asked for it and it can be undone.')).toBeVisible()
   await expect(activity.getByText("Asked because deleting can't be undone.")).toBeVisible()
 })

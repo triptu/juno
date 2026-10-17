@@ -11,10 +11,16 @@ export interface ChangeCardProps {
   readonly card: ChangeCardModel
   readonly actions: ChatActions
   readonly enter?: boolean
+  /** Start with the call's full result shown (the gallery). */
+  readonly resultShown?: boolean
 }
 
-/** A write to a connection: the server and target, each field with its before and after, rendered from the payload. Apply or Dismiss. */
-export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
+/**
+ * A connection call: named by what it does ("Create note in Notion"), each field with its before
+ * and after, rendered from the payload. Its button is the action's verb ("Create note"), or Apply
+ * on a card made before cards had one; Dismiss.
+ */
+export function ChangeCard({ card, actions, enter, resultShown }: ChangeCardProps) {
   const copy = chatCopy.card.change
   return (
     <ChatCard
@@ -22,17 +28,22 @@ export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
       kind="change"
       actions={actions}
       enter={enter}
-      source={
-        <Text variant="meta" tone="muted" truncate>
-          {card.server} · {card.target}
-        </Text>
-      }
+      resultShown={resultShown}
+      {...(card.title !== undefined
+        ? { label: card.title }
+        : {
+            source: (
+              <Text variant="meta" tone="muted" truncate>
+                {card.server} · {card.target}
+              </Text>
+            ),
+          })}
       status={card.status}
       because={card.because}
       dismiss
       buttons={
         <Button variant="primary" size="md" onClick={() => actions.onCard(card.id, { _tag: 'apply' })}>
-          {copy.apply}
+          {card.verb ?? copy.apply}
         </Button>
       }
     >
