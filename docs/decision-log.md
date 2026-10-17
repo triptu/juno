@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 19:54 · live-fixes · The fake's `subscriptions.thread.getView` sends `unread_replies` for a thread with unread replies and `latest_replies` otherwise, never both, as seen live on 10-17 (one unread and two read threads); the sync already read either.
 - 10-17 18:08 · release-keeper · Batch worktrees, helper worktrees and the packaging deploy copy go on /Volumes/AgentWork when it is mounted, chosen by one helper (scripts/worktree-folder.mjs), so their file churn stays off the main disk.
 - 10-17 18:05 · ci-fix-26 · A Juno chat send no longer does nothing while an attached image is still being read: it waits for an image Juno takes and leaves out one that stays, as a send already waited for files that were read.
 - 10-17 17:55 · gallery-compact · The gallery draws states in Compact, the app's default density, so reviews and screenshots show what people see. A state can ask for Comfortable with `frame.density` (Appearance settings, the Appearance page, one message list, one topic row), and `density=comfortable` or `density=compact` in the address overrides both. The geometry specs expect Compact sizes; in Compact the message toolbar meets the row's edge instead of coming 2px into it.
