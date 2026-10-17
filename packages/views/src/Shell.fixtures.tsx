@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { defineFixtures, scene } from '@juno/ui'
 import { AppearanceSettings } from './AppearanceSettings'
 import { NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
+import { SettingsPage } from './SettingsPage'
+import { SettingsAppearance } from './SettingsSections'
 import { Shell } from './Shell'
 import { Sidebar } from './Sidebar'
 import { SignInView } from './SignInView'
@@ -83,6 +85,19 @@ export default defineFixtures(
       // macOS hides the traffic lights in full screen, so the title bars start at their own padding.
       'full-screen': scene(() => <SignedIn fullScreen />),
       'full-screen-sidebar-hidden': scene(() => <SignedIn hidden fullScreen />),
+      // The minimum window with the sidebar shown and Settings open: its list is a rail of icons, and no title bar icon is current.
+      'settings-minimum-window': scene(
+        () => (
+          <SignedIn
+            page={
+              <SettingsPage section="appearance" onSection={noop}>
+                <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />
+              </SettingsPage>
+            }
+          />
+        ),
+        { width: 720, height: 480 },
+      ),
       'signed-out': scene(() => (
         <Shell>
           <SignInView mode="first-run" onSignIn={noop} onImport={noop} />
