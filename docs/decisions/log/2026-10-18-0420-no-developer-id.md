@@ -1,0 +1,1 @@
+- 10-18 04:20 · Tushar · No Apple Developer ID for now: releases stay ad-hoc signed, so each update asks once for "Juno Safe Storage" (choose Always Allow) and the updater offers the DMG instead of installing in place. Not wanted: a writing-style-aware grammar check and a "what changed" Home card after an update.
