@@ -245,8 +245,11 @@ export {
 } from './palette'
 export { attachFiles } from './staging'
 export {
+  attachedFiles,
+  attachLocal,
   attachmentsAtom,
   clearAttachments,
+  settleLocal,
   downloadFile,
   openFile,
   copyImage,

@@ -8,10 +8,11 @@
  * attached (`staging.ts`), and `messages.send` names the staged ones.
  */
 import * as Atom from 'effect/reactivity/Atom'
-import { filesUnstage, uploadsProgress } from '@juno/contract'
+import { filesUnstage, MAX_FILES_PER_MESSAGE, uploadsProgress } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
+import type { FileLike } from './staging'
 
 declare const window: { readonly juno: JunoBridge }
 
@@ -25,7 +26,16 @@ export interface Attachment {
   readonly state: 'staging' | 'ready' | 'failed'
   /** An image's preview, once staged. */
   readonly preview?: string | undefined
+  /** Held here only, for Juno: never staged in the engine (`attachLocal`). */
+  readonly local?: true
 }
+
+/**
+ * Each attached file, by chip id, while its chip is in a composer: a send
+ * to Juno reads it there, since Juno's files never go through the engine
+ * (SPEC 12, "Writing").
+ */
+export const attachedFiles = new Map<string, FileLike>()
 
 /** The files of the composer whose draft `key` owns, in the order they were attached. */
 export const attachmentsAtom = Atom.family((_key: string) => Atom.make<ReadonlyArray<Attachment>>([]).pipe(Atom.keepAlive))
@@ -35,8 +45,39 @@ export const update = (registry: Registry, key: string, change: (files: Readonly
 
 /** Removes a chip; its staged bytes are deleted. */
 export function removeAttachment(registry: Registry, key: string, id: string): void {
+  const local = registry.get(attachmentsAtom(key)).find((each) => each.id === id)?.local === true
   update(registry, key, (current) => current.filter((each) => each.id !== id))
-  void runCommand(registry, filesUnstage, { id })
+  attachedFiles.delete(id)
+  if (!local) void runCommand(registry, filesUnstage, { id })
+}
+
+/**
+ * Adds files to a composer only Juno reads (the Juno tab and the panel).
+ * Nothing is staged in the engine, since nothing goes to Slack from there:
+ * a chip is ready at once, or `staging` when `reading` says the renderer
+ * reads its file first (`settleLocal`). Empty files and files past
+ * `MAX_FILES_PER_MESSAGE` are left out, as `attachFiles` does. Returns the
+ * chips added.
+ */
+export function attachLocal(registry: Registry, key: string, files: ReadonlyArray<FileLike>, reading: (file: FileLike) => boolean): ReadonlyArray<Attachment> {
+  const room = MAX_FILES_PER_MESSAGE - registry.get(attachmentsAtom(key)).length
+  const added = files
+    .filter((file) => file.size > 0)
+    .slice(0, Math.max(0, room))
+    .map((file): Attachment => {
+      const attachment = { id: crypto.randomUUID(), name: file.name.trim() === '' ? 'Untitled' : file.name, size: file.size, mimetype: file.type || 'application/octet-stream', state: reading(file) ? ('staging' as const) : ('ready' as const), local: true as const }
+      attachedFiles.set(attachment.id, file)
+      return attachment
+    })
+  if (added.length > 0) update(registry, key, (current) => [...current, ...added])
+  return added
+}
+
+/** A Juno-only chip once the renderer has read its file: ready with an image's preview, or failed. */
+export function settleLocal(registry: Registry, key: string, id: string, settled: { readonly preview?: string } | 'failed'): void {
+  update(registry, key, (current) =>
+    current.map((each) => (each.id !== id ? each : settled === 'failed' ? { ...each, state: 'failed' as const } : { ...each, state: 'ready' as const, ...settled })),
+  )
 }
 
 /** The staged files of a composer that a send takes, or undefined while one is still staging. Failed chips are left out. */
@@ -66,6 +107,7 @@ export const whenStarted = (ids: ReadonlyArray<string>): Promise<unknown> => Pro
 
 /** Empties a composer's chips after a send; the post owns the staged files now. */
 export function clearAttachments(registry: Registry, key: string): void {
+  for (const each of registry.get(attachmentsAtom(key))) attachedFiles.delete(each.id)
   registry.set(attachmentsAtom(key), [])
 }
 
@@ -74,7 +116,8 @@ export function clearAttachments(registry: Registry, key: string): void {
  * staging whose staging has ended since cannot be sent any more: it comes
  * back failed.
  */
-export function restoreAttachments(registry: Registry, key: string, files: ReadonlyArray<Attachment>): void {
+export function restoreAttachments(registry: Registry, key: string, files: ReadonlyArray<Attachment>, bodies?: ReadonlyMap<string, FileLike>): void {
+  for (const [id, body] of bodies ?? []) attachedFiles.set(id, body)
   const back = files.map((file) => (file.state === 'staging' && !firstChunks.has(file.id) ? { ...file, state: 'failed' as const } : file))
   update(registry, key, (current) => [...back, ...current.filter((each) => !files.some((file) => file.id === each.id))])
 }
