@@ -68,6 +68,7 @@ import { moveSheet, phraseSheet, restoreSheet } from './juno-pages/BackupSheets.
 import ThisMacSection from './juno-pages/ThisMacSection.fixtures'
 import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
 import ConnectionToolsSheet from './juno-pages/ConnectionToolsSheet.fixtures'
+import JunoPageFrame from './juno-pages/JunoPageFrame.fixtures'
 import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
 import ProviderSection from './juno-pages/ProviderSection.fixtures'
@@ -112,6 +113,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   JunoChatList,
   JunoComposer,
   JunoHeader,
+  JunoPageFrame,
   JunoSettingsPage,
   ProviderSection,
   MemoryPage,

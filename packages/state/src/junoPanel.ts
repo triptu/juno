@@ -16,6 +16,10 @@
  * - `openedAtNewAtom(topicId)`: the first message under the "new" divider the
  *   topic opened at, set by the topic view. A message sent from the panel
  *   carries it, so Juno knows what is new.
+ * - `junoPanelViewAtom(tabId)`: what the panel shows in a tab, the chat or a
+ *   Juno page the header's switcher picked (SPEC 13.10). In memory: the
+ *   panel opens on the chat, and a request for its composer (⌘J, Ask Juno, a
+ *   quote) brings the chat back.
  * - `junoFocusAtom`: bumped to ask the visible Juno composer for focus (⌘J,
  *   Ask Juno), so the request reaches a composer that mounts after it.
  * - `junoQuoteAtom`: a message to quote in the panel's composer, from the
@@ -31,7 +35,7 @@ import { liveQuery, runCommand } from './atoms'
 import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
 import { signedInAtom } from './session'
-import { activeTab, setJunoPanel, tabsAtom, updateTabs } from './tabs'
+import { activeTab, setJunoPanel, tabsAtom, updateTabs, type JunoView } from './tabs'
 
 export const JUNO_PANEL_PREF = 'junoPanel'
 
@@ -52,7 +56,18 @@ export function setJunoPanelOpen(registry: Registry, open: boolean): void {
   const tab = activeTab(registry.get(tabsAtom))
   if (tab === undefined || (tab.junoPanel === true) === open) return
   updateTabs(registry, (tabs) => setJunoPanel(tabs, tab.id, open))
-  if (!open) registry.set(junoAboutAtom(tab.id), undefined)
+  if (!open) {
+    registry.set(junoAboutAtom(tab.id), undefined)
+    registry.set(junoPanelViewAtom(tab.id), 'chat')
+  }
+}
+
+export const junoPanelViewAtom = Atom.family((_tabId: string) => Atom.make<JunoView>('chat').pipe(Atom.keepAlive))
+
+/** The panel in the active tab shows the chat again, for a request that needs its composer. */
+function panelToChat(registry: Registry): void {
+  const tab = activeTab(registry.get(tabsAtom))
+  if (tab !== undefined && registry.get(junoPanelViewAtom(tab.id)) !== 'chat') registry.set(junoPanelViewAtom(tab.id), 'chat')
 }
 
 const savedPanelAtom = liveQuery(prefsGet)({ key: JUNO_PANEL_PREF })
@@ -109,10 +124,12 @@ let quoteRequests = 0
 
 /** The panel clears the request once it has taken it, so a panel that opens later does not quote it again. */
 export function quoteInJuno(registry: Registry, topicId: string, selection: Selection): void {
+  panelToChat(registry)
   registry.set(junoQuoteAtom, { n: ++quoteRequests, topicId, selection })
 }
 
 export function focusJunoComposer(registry: Registry, where: JunoFocusRequest['where']): void {
+  if (where === 'panel') panelToChat(registry)
   registry.set(junoFocusAtom, { n: registry.get(junoFocusAtom).n + 1, where })
 }
 

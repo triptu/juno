@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { type About, type Place, type SendContext } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
-import { junoAboutAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
+import { junoAboutAtom, junoPanelViewAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoHeader, JunoPanelActions, JunoPanelContext, type PanelPlace } from '@juno/views'
-import { closeJunoPanel, moveJunoToTab, openJunoPage, resumeJuno } from './actions'
+import { showJunoPanelView } from '../navigation'
+import { closeJunoPanel, moveJunoToTab, resumeJuno } from './actions'
+import { JunoPageView } from './JunoPages'
 import { JunoChat } from './JunoChat'
 import { NoProviderFrame, useNoProvider } from './NoProviderFrame'
 import { focusTopicComposer, useTopicSelection, visibleRange } from './topicContext'
@@ -50,7 +52,11 @@ const panelPlaceOf = (detail: TopicDetail): PanelPlace => ({ tint: detail.channe
  * tab, so they wait there while the panel shows in another tab.
  */
 export function JunoPanel({ tabId, topicId }: { readonly tabId: string; readonly topicId: string }) {
-  return useNoProvider() ? <NoProviderFrame column="panel" actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />} /> : <PanelChat tabId={tabId} topicId={topicId} />
+  const view = useAtomValue(junoPanelViewAtom(tabId))
+  if (useNoProvider()) return <NoProviderFrame column="panel" actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />} />
+  // The header's switcher shows a Juno page in the panel, in place, beside the topic (SPEC 13.10).
+  if (view !== 'chat') return <JunoPageView view={view} column="panel" onSwitch={(target) => showJunoPanelView(tabId, target)} actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />} />
+  return <PanelChat tabId={tabId} topicId={topicId} />
 }
 
 function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicId: string }) {
@@ -86,13 +92,15 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
     <JunoChat
       column="panel"
       draftKey={`panel:${tabId}`}
+      onOpenPage={(page) => showJunoPanelView(tabId, page)}
       header={(banner) => (
         <JunoHeader
           column="panel"
           banner={banner}
           menuOpen={menuOpen}
           onMenu={setMenuOpen}
-          onOpenPage={openJunoPage}
+          current="chat"
+          onOpenPage={(target) => showJunoPanelView(tabId, target)}
           onResume={resumeJuno}
           actions={<JunoPanelActions onOpenInTab={moveJunoToTab} onClose={close} />}
         />

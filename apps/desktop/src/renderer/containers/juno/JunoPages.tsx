@@ -1,14 +1,17 @@
-import { memo, useState, type ReactNode } from 'react'
+import { memo, useLayoutEffect, useState, type ReactNode } from 'react'
 import { chatCopy, modelChoiceKey, type ConnectionId, type JunoSettingsPage as JunoSettingsPageModel, type PinId } from '@juno/agent-contract'
 import type { ProviderChange, ProviderKind } from '@juno/contract'
 import { aiAssistOnAtom, copyText, nowAtom, registry, type JunoTabPage } from '@juno/state'
 import {
   activityPageAtom,
   agentProviderAtom,
+  chatItemsAtom,
   connectionsPageAtom,
   junoPageActions,
   junoSettingsAtom,
   memoryPageAtom,
+  PAGE_MAX,
+  PAGE_ROWS,
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
@@ -16,9 +19,11 @@ import {
   type JunoSettingsChange,
 } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type ProviderDrafts } from '@juno/views'
-import { openSettings } from '../navigation'
-import { junoCommands, openJunoTab } from './actions'
+import { ActivityPage, ConnectionsPage, JunoBackupPage, JunoHeader, JunoPageFrame, JunoSettingsPage, MemoryPage, noopActions, ProviderSection, RemembersPage, ReviewPage, RulesSection, ScheduledPage, type ChatActions, type JunoTarget, type ProviderDrafts } from '@juno/views'
+import { afterPaint, measure } from '@juno/state/perf'
+import { openSettings, showJunoView, takeJunoSwitchStart } from '../navigation'
+import { junoCommands, openJunoTab, resumeJuno } from './actions'
+import { useAgentState } from './chatWindow'
 import { useBackupSettings } from './BackupSettings'
 import { ConnectionConfigure } from './ConnectionConfigure'
 import { useNoProvider } from './NoProviderFrame'
@@ -28,9 +33,6 @@ const actions = junoPageActions(registry)
 
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
-/** Rows Memory and Activity open with, and add for each "Load more"; the agent's page limit is 200. */
-const PAGE_ROWS = 50
-const PAGE_MAX = 200
 
 const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
 
@@ -43,6 +45,54 @@ const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP
  * Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
  */
 export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: JunoTabPage }) {
+  return <JunoPageView view={page} column="page" onSwitch={showJunoView} />
+})
+
+/** The banner chip over a Juno page: the chat's, read from a one-row window of it. */
+const BANNER_WINDOW = { _tag: 'latest', limit: 1 } as const
+
+/**
+ * A Juno page under the Juno header, in a Juno tab or the Juno panel (SPEC
+ * 13.10): the header's switcher in the same place as over the chat, naming
+ * the page. `onSwitch` moves within the tab or the panel.
+ */
+export function JunoPageView({ view, column, onSwitch, actions: islandActions }: {
+  readonly view: JunoTabPage
+  readonly column: 'page' | 'panel'
+  readonly onSwitch: (target: JunoTarget) => void
+  /** The panel's Open in a tab and Close. */
+  readonly actions?: ReactNode
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const agent = useAgentState()
+  // A switch to this page ends once it is painted (`juno.page-switch`).
+  useLayoutEffect(() => {
+    const at = takeJunoSwitchStart()
+    if (at !== undefined) afterPaint(() => measure('juno.page-switch', at, { detail: { view, column } }))
+  }, [view, column])
+  const banner = useAtomValue(chatItemsAtom(BANNER_WINDOW), (result) => (result._tag === 'Success' ? result.value.banner : undefined))
+  return (
+    <JunoPageFrame
+      column={column}
+      header={
+        <JunoHeader
+          column={column}
+          current={view}
+          banner={agent === 'off' ? { _tag: 'aiOff' } : (banner ?? { _tag: 'none' })}
+          menuOpen={menuOpen}
+          onMenu={setMenuOpen}
+          onOpenPage={onSwitch}
+          onResume={resumeJuno}
+          {...(islandActions === undefined ? {} : { actions: islandActions })}
+        />
+      }
+    >
+      <JunoPageBody page={view} />
+    </JunoPageFrame>
+  )
+}
+
+const JunoPageBody = memo(function JunoPageBody({ page }: { readonly page: JunoTabPage }) {
   switch (page) {
     case 'remembers':
       return <Remembers />
