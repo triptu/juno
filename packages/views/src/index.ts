@@ -66,6 +66,8 @@ export {
 export { TopicArt } from '@juno/ui'
 // The app's one tooltip, mounted once at the root.
 export { TooltipLayer } from '@juno/ui'
+// Keys typed while focus is on its way: after ⌘N and ⌘T, until Home's field or search has it.
+export { holdKeys, releaseKeys } from '@juno/ui'
 export { NotificationsPage, type HoursKind } from './NotificationsPage'
 export { SettingsPage, settingsSections } from './SettingsPage'
 export { AiActivityPage } from './AiActivityPage'

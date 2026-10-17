@@ -24,7 +24,7 @@ import {
 } from '@juno/state'
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
-import { Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
+import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab, type WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
 import { HomePage } from './Home'
 import { runJunoShortcut } from './juno/actions'
@@ -198,10 +198,25 @@ function onMouseUp(event: MouseEvent): void {
   else if (event.button === 4) stepTabHistory(1)
 }
 
+/**
+ * ⌘N and ⌘T reach the page before main's menu runs them and sends the
+ * command back. Keys typed in that time are held from the shortcut's own
+ * key, so they reach Home's field or search, not the field that had focus.
+ */
+function holdKeysAfterNewShortcut(event: KeyboardEvent): void {
+  if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) return
+  const key = event.key.toLowerCase()
+  if (key === 'n' || key === 't') holdKeys()
+}
+
 /** The workspace's app-wide wiring: menu commands, notifications, idle preloads, per-tab focus and the mouse's back and forward buttons. */
 function useWorkspaceEffects(active: string | undefined): void {
   useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
+  useEffect(() => {
+    window.addEventListener('keydown', holdKeysAfterNewShortcut, true)
+    return () => window.removeEventListener('keydown', holdKeysAfterNewShortcut, true)
+  }, [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
   useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.

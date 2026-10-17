@@ -24,6 +24,7 @@ import {
   type PickConversation,
   type TopicDetail,
 } from '@juno/contract'
+import { holdKeys } from '@juno/views'
 import {
   activateTab,
   activeTab,
@@ -328,7 +329,8 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
  */
 function openHomeTab(list: boolean, conversation?: PickConversation): void {
   // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘T must not land in
-  // the field the old tab had focused.
+  // the field the old tab had focused; they are held, and Home types them into its field or search.
+  holdKeys()
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   show((tabs) => {
     const next = openPlace(tabs, homePlace, { newTab: true })
@@ -358,6 +360,8 @@ export function newMessage(conversation?: PickConversation): void {
   const home = current !== undefined && currentPlace(current).kind === 'home' ? current : tabShowingPlace(tabs, homePlace)
   if (home === undefined || !untouched(registry.get(homeDraftAtom(home.id)))) return openHomeTab(conversation === undefined, conversation)
   if (conversation !== undefined) setHomeDraft(registry, home.id, pickConversation(registry.get(homeDraftAtom(home.id)), conversation))
+  // Keys typed before the list's search has focus go into it once it does (`useFocusRequest`).
+  holdKeys()
   if (home.id !== tabs.active) switchToTab(home.id)
   requestHomeFocus(registry, home.id, conversation === undefined)
 }
