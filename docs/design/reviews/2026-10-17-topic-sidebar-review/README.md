@@ -108,3 +108,64 @@ A milestone review of the sidebar (title bar with All topics, nav, quick filters
     - `layout-shift.spec.ts:183` (sidebar rows while sync fills): the anchor row was removed as rows landed.
     - `tour.spec.ts:24`: the Topics group grew 77px, one more row, while the tour stepped.
   - This branch changes no row's height and no list order (rows have a fixed height, and the place line fits in it), so these go to the CI keeper. A row that moves under the pointer during sync is still worth a look: Home holds its rows still for the same reason.
+
+## Round 2: the decisions on the owner's items
+
+Decided by the orchestrator for the owner, on `topic-sidebar-review-2` from `41ad6fe9`.
+
+**1. No slot for older messages that cannot come.** The "Loading older messages" slot is kept only while older messages can still load. Once the topic's start is known (a thread's root is shown, or a page said so) there is none. The fact is kept per topic for the run (`topicStartKnownAtom`), so a topic opened again has no slot from its first frame. If the start becomes known while the slot is on screen, as in a short conversation, the slot stays empty until the topic opens again (`OlderStatus` `ended`), so the messages never move under the reader. `layout-shift.spec.ts` covers this: the three-message DM with Maya holds still while its start arrives, and has no slot when opened again.
+
+The remaining gap is now measured and symmetric. At scroll top the first message starts where the header band ends, 24px under the islands. That is the same 24px the last message keeps above the composer's field (the list's 16 plus the composer's 8). The column's top padding is `--header-band` − `--header-inset`, and `message-geometry.spec.ts` checks both gaps.
+
+| | Before | After |
+| --- | --- | --- |
+| Thread at its top, light | ![](shots/r2-top-gap-before-light.jpg) | ![](shots/r2-top-gap-after-light.jpg) |
+| Thread at its top, dark | ![](shots/r2-top-gap-before-dark.jpg) | ![](shots/r2-top-gap-after-dark.jpg) |
+| Minimum window, light | ![](shots/r2-top-gap-minimum-before-light.jpg) | ![](shots/r2-top-gap-minimum-after-light.jpg) |
+| Minimum window, dark | ![](shots/r2-top-gap-minimum-before-dark.jpg) | ![](shots/r2-top-gap-minimum-after-dark.jpg) |
+
+While older messages may come, the slot is still there: `shots/r2-more-above-after-light.jpg`.
+
+**2. The place pill gives way first in a narrow header.** Under the header's 480px width, a thread's place pill is its icon alone: a 24px circle in its tint (`ContextPill iconWhenNarrow`). It keeps the same accessible name, and its tooltip names the place and its kind ("hiring · Private channel"). The title takes the room. One refinement: a Main keeps its channel's name, because its title is the one word "Main" and needs no more room (`shots/r2-narrow-main-after-light.jpg`). `narrow-geometry.spec.ts` checks all three forms.
+
+| | Before | After |
+| --- | --- | --- |
+| DM thread, light | ![](shots/r2-narrow-dm-before-light.jpg) | ![](shots/r2-narrow-dm-after-light.jpg) |
+| DM thread, dark | ![](shots/r2-narrow-dm-before-dark.jpg) | ![](shots/r2-narrow-dm-after-dark.jpg) |
+| Private thread, light | ![](shots/r2-narrow-thread-before-light.jpg) | ![](shots/r2-narrow-thread-after-light.jpg) |
+| Private thread, dark | ![](shots/r2-narrow-thread-before-dark.jpg) | ![](shots/r2-narrow-thread-after-dark.jpg) |
+
+A first version wrote the narrow styles with `default: null`. In StyleX that removes the wide value, so every header shot lost its pill's padding. The stylex skill now lists this pitfall.
+
+**3. The hover toolbar is one Tab stop.** Tab reaches one button on the focused message's toolbar: the one last focused, or the first reaction. ← and → move along the visible buttons and wrap, Home and End go to the ends, and Esc returns focus to the message. This uses `moveFocus` from `@juno/ui` and is covered by `roving.spec.ts`.
+
+**4. The icon and colour pickers are radio groups.** In the view sheet and the channel icon picker, each group is one Tab stop on its chosen item. Every arrow moves to the next or previous choice and chooses it, and Home and End go to the ends. The items say `aria-checked`, not `aria-pressed`. This uses `radioItem` and `radioKeys` from `@juno/ui`. The e2e driver's colour query and `views.spec.ts` now ask for radios. The channel picker's focus shot now shows the ring on the chosen icon, where Tab lands.
+
+| | Before | After |
+| --- | --- | --- |
+| Light | ![](shots/r2-icon-focus-before-light.jpg) | ![](shots/r2-icon-focus-after-light.jpg) |
+| Dark | ![](shots/r2-icon-focus-before-dark.jpg) | ![](shots/r2-icon-focus-after-dark.jpg) |
+
+**5. Code follow-ups.**
+
+- **Focus ring.** `focusRing` (`outside`, `inset`) is exported from `@juno/ui`, and every primitive uses it. The six topic views (`ThreadLink`, `MessageBody`, `MediaGrid`, `HeaderControls`, `TopicRow`, `Message`) no longer write the outline by hand.
+- **Kind icon.** `kindIcon` in `look.ts` is the one kind-to-icon map. The header pill and the row's meta line use it, as the scope chip and the view sheet already did.
+- **Token lint, new rules.**
+  - A module constant used in a style is checked as its value. A number used as a factor in a `calc()` is not counted as a length.
+  - A `color-mix(` with a literal share is a raw colour.
+  - Rule tests are in `check-tokens.test.mjs`.
+- **What the new rules found.**
+  - New tokens replace values in the topic views: `--link-underline`, `--quote-fill`, `--header-pill-max-width` and `--header-title-min-width`. The reaction chip's emoji uses `--icon-14`.
+  - 18 documented one-offs elsewhere now carry a `tokens-allow` reason.
+
+Not done here: 17 other views still write their focus ring by hand, mostly in Home, the Juno chat and the tour. Those areas belong to other work, so they should move to `focusRing` when next touched (`docs/design/primitives.md` says so).
+
+**Verification, round 2.**
+
+- **Gallery shots.** Regenerated for `TopicView`, `TopicHeader`, `MessageList`, `HoverToolbar`, `Sidebar`, `ChannelIconPicker` and `PeekView`. They changed only as intended:
+  - the topic and peek lists lost the slot and moved up;
+  - the 336px headers show the icon pill;
+  - the channel picker's focus shot moved to the chosen icon.
+  - The few other differences are one-pixel anti-aliasing and the random topic art.
+- **Typecheck and lint.** Local typecheck of `ui`, `views`, `state`, `gallery` and `desktop`; `pnpm lint` passed (10 of 10). `node --test scripts/check-tokens.test.mjs`: 7 of 7.
+- **`pnpm affected`:** see the next note.
