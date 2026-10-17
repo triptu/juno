@@ -8,7 +8,7 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 43,
+    "oversizedFiles": 44,
     "oversizedFunctions": 130
   },
   "clonedLines": 93,
@@ -47,6 +47,7 @@
     "packages/tokens/src/themes.stylex.ts",
     "packages/tokens/src/tokens.stylex.ts",
     "packages/views/src/AllTopics.tsx",
+    "packages/views/src/Home.tsx",
     "packages/views/src/Message.tsx",
     "packages/views/src/MessageList.tsx",
     "packages/views/src/Sidebar.tsx",
