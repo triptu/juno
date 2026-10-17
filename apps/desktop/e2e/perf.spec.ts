@@ -8,7 +8,7 @@
 //   pnpm perf -g "topic view"  some of them
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
 import { rm } from 'node:fs/promises'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
@@ -196,6 +196,32 @@ test('row hover to paint', async ({ juno, win }) => {
   within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
 })
 
+/** Records the next pointerdown on Home's nav item to Home painted in `window.__homeSample`. */
+async function armHomeSample(nav: Locator): Promise<void> {
+  await nav.evaluate((node) => {
+    const w = window as unknown as { __homeSample?: Promise<number> }
+    w.__homeSample = new Promise((resolve) => {
+      node.addEventListener(
+        'pointerdown',
+        (event) => {
+          const start = event.timeStamp
+          const shown = () => document.querySelector('[data-home]:not([data-home-waiting]) [data-home-item]') !== null
+          const frame = () => requestAnimationFrame(() => {
+            if (!shown()) return frame()
+            setTimeout(() => {
+              const end = performance.now()
+              performance.measure('juno.home-open', { start, end })
+              resolve(end - start)
+            }, 0)
+          })
+          frame()
+        },
+        { once: true },
+      )
+    })
+  })
+}
+
 // Home from the sidebar's Home item, with a topic open in the tab: the
 // pointerdown to the first presented frame that shows Home's greeting and
 // rows, read from the local cache (performance.md section 1, "Home open").
@@ -235,28 +261,7 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     await win.waitForTimeout(idle ? (held ? 30_500 : 31_000) : 300)
     const nav = home.navItem
     const queries = await win.evaluate(() => (window as unknown as { __homeQuery: number[] }).__homeQuery.length)
-    await nav.evaluate((node) => {
-      const w = window as unknown as { __homeSample?: Promise<number> }
-      w.__homeSample = new Promise((resolve) => {
-        node.addEventListener(
-          'pointerdown',
-          (event) => {
-            const start = event.timeStamp
-            const shown = () => document.querySelector('[data-home]:not([data-home-waiting]) [data-home-item]') !== null
-            const frame = () => requestAnimationFrame(() => {
-              if (!shown()) return frame()
-              setTimeout(() => {
-                const end = performance.now()
-                performance.measure('juno.home-open', { start, end })
-                resolve(end - start)
-              }, 0)
-            })
-            frame()
-          },
-          { once: true },
-        )
-      })
-    })
+    await armHomeSample(nav)
     // `press`, not `click`: a pointerup in the next frame defers the end of the measure by a frame (performance.md 7.1).
     const box = (await nav.boundingBox())!
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
