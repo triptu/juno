@@ -1,0 +1,1 @@
+- 10-17 15:18 · ci-fix-23 · Desktop tests open a sidebar row only once its box has held for two frames, and wait for a move they caused (`sidebar.expectFirst`) first; first-sync layout checks start once the bot channels have left for Automated (the tour also waits for the sync card to go) rather than skipping the list's moves, so they still fail on any other row jump.
