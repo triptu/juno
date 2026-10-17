@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
+import { NO_LIMIT_USD } from '@juno/agent-contract'
 import type { AiActivity, AiCallOutcome, AiCallRow } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Chip, EmptyState, ListRow, Page, PageHeader, Section, Select, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, Chip, EmptyState, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import { cell } from './juno-pages/cell'
 import { fullTime, messageTime } from './time'
 
@@ -37,9 +38,9 @@ const OUTCOMES: Record<AiCallOutcome, string> = {
 /** Why a call was not ok, in plain words. A code not listed shows as it is. */
 const KINDS: Record<string, string> = {
   'no-key': 'No OpenRouter key',
-  cap: 'Daily spend cap reached',
-  'no-agent': 'Juno’s agent was not running to check the spend cap',
-  'no-answer': 'Juno’s agent did not answer the spend check in time',
+  cap: 'Daily AI limit reached',
+  'no-agent': 'Juno’s agent was not running to check the daily limit',
+  'no-answer': 'Juno’s agent did not answer the daily limit check in time',
   'assist-off': 'AI assist is off',
   'too-large': 'The request was too large',
   'key-changed': 'The key changed during the call',
@@ -58,9 +59,28 @@ const kindLabel = (kind: string): string => KINDS[kind] ?? kind
 
 const ALL = 'all'
 
+/** Today's spend from the agent's ledger, counted as the daily limit counts it. */
+export interface AiSpendToday {
+  readonly spentUsd: number
+  /** Today's limit: the daily limit plus any "Allow $1 more". */
+  readonly limitUsd: number
+  /** The daily limit the owner set. `NO_LIMIT_USD` or more is no limit. */
+  readonly capUsd: number
+  /** Topic art, titles, Home and the send checks. */
+  readonly backgroundUsd: number
+  readonly backgroundLimitUsd: number
+}
+
+/** The limit "No limit" turned off goes back to. */
+const DEFAULT_LIMIT_USD = 5
+
 export interface AiActivityPageProps {
   /** The log; undefined until it arrives. */
   readonly activity: AiActivity | undefined
+  /** Today's spend and limit; undefined while Juno's agent is not running. */
+  readonly spend?: AiSpendToday | undefined
+  /** A new daily limit in dollars; `NO_LIMIT_USD` for no limit. */
+  readonly onLimit?: (usd: number) => void
   readonly now: number
   /** "Copy details" on a row: the row's details as text go to the clipboard. */
   readonly onCopyDetails: (details: string) => void
@@ -68,6 +88,15 @@ export interface AiActivityPageProps {
 
 /** Rows shown at first, and added by each "Show older calls". */
 const AI_ACTIVITY_PAGE = 100
+
+/** "$0.42": spend and limits. */
+const dollars = (value: number): string => `$${value.toFixed(2)}`
+
+/** A limit typed in the field, committed on blur or Enter, so a field cleared while typing never sets $0. */
+function commitLimit(text: string, current: number, onLimit: (usd: number) => void): void {
+  const value = Number(text)
+  if (text.trim() !== '' && Number.isFinite(value) && value >= 0 && value !== current) onLimit(value)
+}
 
 /** "$0.0031", or "$1.20" from a dollar up. Unknown is "Unknown". */
 const usd = (value: number | null): string => {
@@ -103,7 +132,7 @@ function aiCallDetails(call: AiCallRow): string {
  * opens to show its details and "Copy details". Filters by feature,
  * outcome and model. No prompt or answer text is kept, so none is shown.
  */
-export function AiActivityPage({ activity, now, onCopyDetails }: AiActivityPageProps) {
+export function AiActivityPage({ activity, spend, onLimit, now, onCopyDetails }: AiActivityPageProps) {
   const [feature, setFeature] = useState(ALL)
   const [outcome, setOutcome] = useState(ALL)
   const [model, setModel] = useState(ALL)
@@ -120,16 +149,65 @@ export function AiActivityPage({ activity, now, onCopyDetails }: AiActivityPageP
       <PageHeader title="AI activity" subtitle="Every call Juno made to a model, what it was for, and what it cost. Juno keeps the last 500 here, without what was sent or answered." />
       <Section heading="Today">
         <Surface kind="group" padding="md" sx={styles.card}>
-          <div {...stylex.props(styles.today)} data-ai-activity-today="">
-            <Text variant="heading" numeric data-ai-activity-today-cost="">
-              {usd(activity?.todayUsd ?? 0)}
-            </Text>
-            <Text variant="meta" tone="muted" numeric>
-              {`Estimated, across ${activity?.todayCalls ?? 0} ${activity?.todayCalls === 1 ? 'call' : 'calls'} since midnight`}
-            </Text>
+          <div {...stylex.props(styles.lines)}>
+            <div {...stylex.props(styles.today)} data-ai-activity-today="">
+              <Text variant="heading" numeric data-ai-activity-today-cost="">
+                {spend === undefined ? usd(activity?.todayUsd ?? 0) : unlimited(spend) ? `${dollars(spend.spentUsd)} today` : `${dollars(spend.spentUsd)} of ${dollars(spend.limitUsd)} today`}
+              </Text>
+              <Text variant="meta" tone="muted" numeric>
+                {spend === undefined
+                  ? `Estimated, across ${activity?.todayCalls ?? 0} ${activity?.todayCalls === 1 ? 'call' : 'calls'} since midnight`
+                  : `Resets at midnight. ${activity?.todayCalls ?? 0} ${activity?.todayCalls === 1 ? 'call' : 'calls'} since then.`}
+              </Text>
+            </div>
+            {spend === undefined || unlimited(spend) ? null : spend.spentUsd >= spend.limitUsd ? (
+              <Text variant="meta" tone="muted" data-ai-limit-reached="all">
+                Today’s limit is reached. AI features wait until midnight or until you raise the limit.
+              </Text>
+            ) : spend.backgroundUsd >= spend.backgroundLimitUsd ? (
+              <Text variant="meta" tone="muted" data-ai-limit-reached="background">
+                {`Topic art, titles and Home have used their ${dollars(spend.backgroundLimitUsd)} for today. They wait until midnight or until you raise the limit.`}
+              </Text>
+            ) : null}
           </div>
         </Surface>
       </Section>
+      {spend === undefined || onLimit === undefined ? null : (
+        <Section heading="Daily limit" sub="Topic art, titles and Home can use up to half of it, so Juno chats always have room. Work already under way can finish.">
+          <Surface kind="group">
+            <ListRow
+              trailing={
+                <TextField
+                  size={30}
+                  label="Daily limit in dollars"
+                  leading={
+                    <Text variant="ui" tone="muted" aria-hidden>
+                      $
+                    </Text>
+                  }
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={0.5}
+                  disabled={unlimited(spend)}
+                  key={spend.capUsd}
+                  defaultValue={unlimited(spend) ? '' : spend.capUsd}
+                  onBlur={(event) => commitLimit(event.currentTarget.value, spend.capUsd, onLimit)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitLimit(event.currentTarget.value, spend.capUsd, onLimit)
+                  }}
+                  width="keyword"
+                />
+              }
+            >
+              <Text variant="body">Daily limit</Text>
+            </ListRow>
+            <ListRow divider={false}>
+              <Checkbox size="lg" label="No limit" checked={unlimited(spend)} onChange={(event) => onLimit(event.currentTarget.checked ? NO_LIMIT_USD : DEFAULT_LIMIT_USD)} />
+            </ListRow>
+          </Surface>
+        </Section>
+      )}
       <Section heading="Calls">
         <div {...stylex.props(styles.filters)}>
           <Select size={30} label="Feature" value={feature} onChange={(event) => setFeature(event.currentTarget.value)}
@@ -257,7 +335,14 @@ function Detail({ label, value }: { readonly label: string; readonly value: stri
   )
 }
 
+const unlimited = (spend: AiSpendToday): boolean => spend.capUsd >= NO_LIMIT_USD
+
 const styles = stylex.create({
+  lines: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-1'],
+  },
   // 14px in, as the other settings cards.
   card: {
     paddingInline: spacing['--space-3-5'],

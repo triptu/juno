@@ -43,6 +43,8 @@ export interface ToastContent {
   /** The resolve toast's check. */
   readonly check?: boolean
   readonly onUndo?: () => Promise<boolean>
+  /** A way on from the message, such as "Change limit". Shown when the toast has no Undo. */
+  readonly action?: { readonly label: string; readonly onAction: () => void }
 }
 
 export interface Toast extends ToastContent {

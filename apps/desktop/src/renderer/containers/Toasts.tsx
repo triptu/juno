@@ -9,11 +9,14 @@ export function Toasts() {
   const toast = useAtomValue(toastAtom)
   const key = toast?.key
   const undoable = toast?.undoable === true
+  // A toast with a button to follow stays as long as one with Undo.
+  const lasting = undoable || toast?.action !== undefined
   useEffect(() => {
     if (key === undefined) return
-    const timer = setTimeout(() => dismissToast(registry, key), undoable ? TOAST_LIFE_MS.undo : TOAST_LIFE_MS.info)
+    const timer = setTimeout(() => dismissToast(registry, key), lasting ? TOAST_LIFE_MS.undo : TOAST_LIFE_MS.info)
     return () => clearTimeout(timer)
-  }, [key, undoable])
+  }, [key, lasting])
   if (toast === undefined) return null
-  return <ActionToast key={toast.key} text={toast.text} check={toast.check === true} {...(toast.undoable ? { onUndo: undoFromToast } : {})} />
+  return <ActionToast key={toast.key} text={toast.text} check={toast.check === true} {...(toast.undoable ? { onUndo: undoFromToast } : {})}
+    {...(toast.action === undefined ? {} : { action: { label: toast.action.label, onAction: () => { dismissToast(registry, toast.key); toast.action!.onAction() } } })} />
 }

@@ -5,6 +5,7 @@ export {
   connectionsPageAtom,
   junoPageActions,
   junoSettingsAtom,
+  junoSettingsNow,
   memoryPageAtom,
   remembersPageAtom,
   reviewPageAtom,

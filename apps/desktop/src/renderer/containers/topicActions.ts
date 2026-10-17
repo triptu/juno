@@ -1,4 +1,4 @@
-import { junoNavAtom, watchReply } from '@juno/state/agent'
+import { junoNavAtom, junoSettingsNow, watchReply } from '@juno/state/agent'
 /**
  * The topic actions (SPEC 5 "Row actions", inventory 15.1 and 16), for
  * every place that offers them: a sidebar row's check and menu, the
@@ -55,7 +55,7 @@ import {
   type RenameTarget,
   type ToastContent,
 } from '@juno/state'
-import { openTopic } from './navigation'
+import { openSettings, openTopic } from './navigation'
 import { runViewMenuAction, viewChoices } from './viewActions'
 import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
 
@@ -100,9 +100,9 @@ export function toggleResolved(id: string): void {
 /** Why Redraw art made nothing, said plainly. */
 const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
   off: 'AI assist is off',
-  budget: 'Today’s AI spend cap is reached',
+  budget: 'Today’s AI limit is reached',
   'no-key': 'Add an OpenRouter key in Settings › Juno',
-  'no-agent': 'Juno’s agent did not answer the spend check',
+  'no-agent': 'Juno’s agent did not answer the daily limit check',
   timeout: 'The model took too long',
   provider: 'The model service returned an error',
   invalid: 'The model’s drawing could not be used',
@@ -112,7 +112,23 @@ const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
 /** Redraw art: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
 async function redrawArt(topic: ActionTopic): Promise<void> {
   const problem = await redrawTopic(registry, topic.id, said('Redrawn', topic))
-  if (problem !== undefined) showToast(registry, { text: `Could not redraw · ${REDRAW_PROBLEMS[problem]}` })
+  if (problem === 'budget') showToast(registry, { text: await limitReached(), action: { label: 'Change limit', onAction: () => openSettings('ai-activity') } })
+  else if (problem !== undefined) showToast(registry, { text: `Could not redraw · ${REDRAW_PROBLEMS[problem]}` })
+}
+
+const dollars = (value: number): string => `$${value.toFixed(2)}`
+
+/**
+ * Which limit stopped a call, from the agent's ledger: today's limit, or the
+ * half of it that topic art, titles and Home may use.
+ */
+async function limitReached(): Promise<string> {
+  const page = await junoSettingsNow(registry)
+  if (page === undefined) return `Could not redraw · ${REDRAW_PROBLEMS.budget}`
+  if (page.spentTodayUsd < page.limitTodayUsd && page.backgroundTodayUsd >= page.backgroundLimitUsd) {
+    return `Topic art and titles have used their ${dollars(page.backgroundLimitUsd)} of today’s ${dollars(page.limitTodayUsd)} AI limit`
+  }
+  return `Today’s AI limit of ${dollars(page.limitTodayUsd)} is reached`
 }
 
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */
