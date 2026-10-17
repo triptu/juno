@@ -15,6 +15,7 @@ export default function Switcher({ detail, onClose }: { readonly detail: TopicDe
   const mainId = mainTopicOf(channel)
   const result = useAtomValue(channelTopicsAtom(channel))
   const mainUnread = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? (header.value?.unreadCount ?? 0) : 0))
+  const mainArt = useAtomValue(topicAtom(mainId), (header) => (header._tag === 'Success' ? header.value?.art : undefined))
   const now = useAtomValue(nowAtom)
   const [query, setQuery] = useState('')
   const window = result._tag === 'Success' ? result.value : undefined
@@ -24,7 +25,7 @@ export default function Switcher({ detail, onClose }: { readonly detail: TopicDe
     if (id !== detail.id || event.metaKey) openTopic(id, { newTab: event.metaKey })
   }
   return (
-    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
+    <TopicSwitcherView mainId={mainId} mainUnread={mainUnread} {...(mainArt === undefined ? {} : { mainArt })} currentId={detail.id} threads={threads} now={now} query={query} onQuery={setQuery} onOpen={open} />
   )
 }
 
