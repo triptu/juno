@@ -506,6 +506,11 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     channel_notification_settings: '{}',
     desktop_notification_actions: 'default',
     emoji_mode: 'default',
+    // Slack's notification schedule, the same as Juno's default notification hours (Monday to Friday, 9 to 7). Hours come in both forms live.
+    dnd_enabled: true,
+    dnd_days: 'weekdays',
+    dnd_start_hour: '19:00',
+    dnd_end_hour: '9:00',
   }
 
   for (const seed of CONVERSATIONS) {

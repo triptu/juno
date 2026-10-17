@@ -14,6 +14,8 @@ import {
   GetWebSocketUrlFields,
   UsersPrefsGetArgs,
   UsersPrefsGetFields,
+  UsersPrefsSetArgs,
+  UsersPrefsSetFields,
 } from './boot.ts'
 import {
   ChatDeleteArgs,
@@ -79,6 +81,7 @@ export const Methods = {
     snooze_enabled: S.Boolean,
   }),
   'users.prefs.get': method(UsersPrefsGetArgs, UsersPrefsGetFields),
+  'users.prefs.set': method(UsersPrefsSetArgs, UsersPrefsSetFields),
   'client.getWebSocketURL': method(GetWebSocketUrlArgs, GetWebSocketUrlFields),
   'api.getFlannelHttpUrl': method(GetFlannelHttpUrlArgs, GetFlannelHttpUrlFields),
   'conversations.history': method(ConversationsHistoryArgs, ConversationsHistoryFields),

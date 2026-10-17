@@ -138,8 +138,19 @@ export const ClientCountsFields = {
 
 // users.prefs.get
 
-export const UsersPrefsGetArgs = S.Struct({})
+/** `prefs`: comma-separated names to ask for only those. */
+export const UsersPrefsGetArgs = S.Struct({ prefs: opt(S.String) })
 export const UsersPrefsGetFields = { prefs: UserPrefs } as const
+
+// users.prefs.set
+
+/**
+ * `prefs`: a JSON object of the prefs to set, the form the official client's
+ * settings pages send (research section 7, "Slack's notification schedule").
+ * Whether the answer carries the stored values is unknown, so none are read.
+ */
+export const UsersPrefsSetArgs = S.Struct({ prefs: S.String })
+export const UsersPrefsSetFields = {} as const
 
 // client.getWebSocketURL
 
