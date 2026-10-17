@@ -46,6 +46,10 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
   // The field and its chip stayed where they were when the card filled its room.
   expect(await boxes(composer)).toEqual(before)
 
+  // The first sync still runs: its card leaves the sidebar's foot when it ends, which is not the peek's doing.
+  await juno.expectEngineLive()
+  await sidebar.expectNoSyncStatus()
+
   // Peek: hold ⌥ over a row. The tick moves nothing.
   await expectNoLayoutShift(juno.win, async () => {
     await sidebar.row(RINA).peek()
