@@ -2421,7 +2421,7 @@ export class PrivacyMode {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp'
+export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves'
 
 /** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {
@@ -2484,11 +2484,75 @@ export class HomePane {
     return sheet
   }
 
+  /** Automated's record, which opens its review sheet. */
+  async reviewMoves(): Promise<AutomatedRecordSheet> {
+    await this.item('automatedMoves').locator('[data-home-review]').click()
+    const sheet = new AutomatedRecordSheet(this.win)
+    await expect(sheet.root).toBeVisible()
+    return sheet
+  }
+
   /** Right-clicks a row and chooses `item` in its menu. Returns the menu's labels. */
   async chooseInItemMenu(kind: HomeItemKind, item: string): Promise<string[]> {
     await chooseNextMenuItem(this.win, item)
     await this.item(kind).click({ button: 'right' })
     return (await lastMenu(this.win)).labels
+  }
+}
+
+/** Automated's record (SPEC 12): each channel Juno moved, with the fact that decided it, Move back and Keep. */
+export class AutomatedRecordSheet {
+  constructor(readonly win: Page) {}
+
+  get root(): Locator {
+    return this.win.locator('[data-sheet="automated"]')
+  }
+
+  get title(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  /** A move's row, by its channel label ("#ci-builds"). */
+  row(label: string): Locator {
+    return this.root.locator('[data-settled-row]').filter({ has: this.win.locator('[data-settled-title]', { hasText: label }) })
+  }
+
+  reason(label: string): Locator {
+    return this.row(label).locator('[data-settled-reason]')
+  }
+
+  status(label: string): Promise<string | null> {
+    return this.row(label).getAttribute('data-settled-status')
+  }
+
+  /** Move back, or Move to Automated for a move back out. */
+  moveBack(label: string): Locator {
+    return this.row(label).locator('[data-settled-resolve]')
+  }
+
+  keep(label: string): Locator {
+    return this.row(label).locator('[data-settled-keep]')
+  }
+
+  undo(label: string): Locator {
+    return this.row(label).locator('[data-settled-undo]')
+  }
+
+  /** The text the row shows once acted on: "Moved back to All", "Kept in Automated". */
+  done(label: string): Locator {
+    return this.row(label).locator('[data-settled-done]')
+  }
+
+  get close(): Locator {
+    return this.root.locator('[data-settled-close]')
+  }
+
+  get about(): Locator {
+    return this.root.locator('[data-settled-about]')
+  }
+
+  get explainer(): Locator {
+    return this.root.locator('[data-settled-explainer]')
   }
 }
 

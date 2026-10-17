@@ -17,7 +17,7 @@ const DEPLOYS_MAIN = '#deploys'
 const RELEASES_MAIN = '#releases'
 const POSTGRES = 'Draft plan is in the doc'
 
-/** Half the messages from the deploy bot, half from people: the rules cannot tell, and the fake AI is not sure either. */
+/** More top-level posts from the deploy bot than from people, but not nearly all: the rules cannot tell, and the fake AI is not sure either. */
 function addReleases(fake: FakeSlack): void {
   fake.addChannel({
     id: 'C0RELEASES',
@@ -29,6 +29,7 @@ function addReleases(fake: FakeSlack): void {
       { user: 'U0PRIYA', text: 'Can we hold 2.3 until the icons land?', ago: 45 },
       { user: 'U0DEPLOYBOT', text: 'web 2.3.1 tagged', ago: 40 },
       { user: 'U0SAM', text: 'Sure, Friday then.', ago: 35 },
+      { user: 'U0DEPLOYBOT', text: 'web 2.3.2 tagged', ago: 30 },
     ],
   })
 }
@@ -86,7 +87,7 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await homeAsks(juno)
   await expect(home.title('automated')).toHaveText('Move #releases?')
   // The reason: Juno's, from the fake AI.
-  await expect(home.meta('automated')).toHaveText('To Automated · 3 of 6 messages from apps')
+  await expect(home.meta('automated')).toHaveText('To Automated · 4 of 7 messages from apps')
 
   await home.button('automated', 'Move').click()
   await juno.expectToast('Moved #releases to Automated')
@@ -100,7 +101,7 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await juno.undo()
   await sidebar.row(RELEASES_MAIN).expectAbsent()
   await homeAsks(juno)
-  await expect(home.meta('automated')).toHaveText('To Automated · 3 of 6 messages from apps')
+  await expect(home.meta('automated')).toHaveText('To Automated · 4 of 7 messages from apps')
 
   await home.button('automated', 'Keep in All').click()
   await juno.expectToast('Keeping #releases in All')

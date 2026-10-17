@@ -205,16 +205,16 @@ export class FakeSlack {
 
   /**
    * A public channel self is in, with messages posted `ago` minutes back and
-   * read up to the last. Like the seed, it sends no events: add it before
-   * the app signs in.
+   * read up to the last, each with its thread `replies` if it has any. Like
+   * the seed, it sends no events: add it before the app signs in.
    */
-  addChannel(input: { id: string; name: string; messages: ReadonlyArray<{ user: string; text: string; ago: number }> }): void {
+  addChannel(input: { id: string; name: string; messages: ReadonlyArray<{ user: string; text: string; ago: number; replies?: ReadonlyArray<{ user: string; text: string; ago: number }> }> }): void {
     const now = this.workspace.clock.now()
     this.workspace.addConversation({
       id: input.id,
       name: input.name,
       kind: 'public',
-      members: new Set([this.selfId, ...input.messages.map((message) => message.user)]),
+      members: new Set([this.selfId, ...input.messages.flatMap((message) => [message.user, ...(message.replies ?? []).map((reply) => reply.user)])]),
       created: now - 90 * 24 * 60 * 60_000,
       topic: '',
       purpose: '',
@@ -224,6 +224,10 @@ export class FakeSlack {
     let last: Message | undefined
     for (const message of input.messages.toSorted((a, b) => b.ago - a.ago)) {
       last = this.workspace.post({ channel: input.id, user: message.user, text: message.text, at: now - message.ago * 60_000, silent: true })
+      const root = last.ts
+      for (const reply of (message.replies ?? []).toSorted((a, b) => b.ago - a.ago)) {
+        this.workspace.post({ channel: input.id, user: reply.user, text: reply.text, at: now - reply.ago * 60_000, threadTs: root, silent: true })
+      }
     }
     if (last !== undefined) this.workspace.reads.set(input.id, last.ts)
   }
