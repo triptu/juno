@@ -114,13 +114,17 @@ textarea {
   transition: none !important;
 }
 
+/* Animations still run, for 0.01ms, so they end and fire their events.
+   Transitions are off: the default transition-property is all, so a short
+   duration would turn every style change (a row's fill under the pointer)
+   into a transition that draws the old value for a frame or two. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0s !important;
     scroll-behavior: auto !important;
   }
 }
