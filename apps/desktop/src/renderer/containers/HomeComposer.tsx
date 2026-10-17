@@ -5,6 +5,7 @@ import {
   frequentConversationsAtom,
   homeDraftAtom,
   homeFocusAtom,
+  homeViewAtom,
   junoAvailableAtom,
   pickConversation,
   pickConversationsAtom,
@@ -121,9 +122,11 @@ function useFocusRequest(tabId: string, focusField: () => void, openList: () => 
     if (due.list) openList()
   }
   useEffect(() => {
-    if (taken === undefined || registry.get(homeFocusAtom)?.seq !== taken) return
+    const request = registry.get(homeFocusAtom)
+    if (taken === undefined || request?.seq !== taken) return
     registry.set(homeFocusAtom, undefined)
-    focusField()
+    // The list's search takes focus itself; moving it to the field would close the list.
+    if (!request.list) focusField()
   }, [taken, focusField])
 }
 
@@ -262,7 +265,9 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   return (
     <Composer
       value={draft.draft}
-      {...(toSlack ? { marks: mentions.marks, onCaret: mentions.onCaret, ...(mentions.mention === undefined ? {} : { mention: mentions.mention }) } : {})}
+      // Marks always, empty for Juno: the field keeps one structure, so a change of destination never remounts it and loses focus.
+      marks={toSlack ? mentions.marks : []}
+      {...(toSlack ? { onCaret: mentions.onCaret, ...(mentions.mention === undefined ? {} : { mention: mentions.mention }) } : {})}
       {...(sendToList === undefined ? {} : { mention: sendToList })}
       onChange={(value, caret) => {
         sendTo.typed(value)
@@ -290,6 +295,8 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
 function Recent({ chosen, onPick }: { readonly chosen: string | undefined; readonly onPick: (conversation: PickConversation) => void }) {
   const frequent = useAtomValue(frequentConversationsAtom)
   const recent = frequent._tag === 'Success' ? frequent.value : []
+  // While the first sync runs or the ranking is on its way, Recent keeps its room, so the chip and the field never move.
+  const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready)
   return (
     <HomeRecent
       people={recent.filter(isPeople)}
@@ -297,6 +304,7 @@ function Recent({ chosen, onPick }: { readonly chosen: string | undefined; reado
       chosen={chosen}
       onPick={onPick}
       onOpen={(conversation) => (conversation.mainId === undefined ? onPick(conversation) : openTopic(conversation.mainId, { newTab: true }))}
+      reserve={syncing || frequent._tag !== 'Success'}
     />
   )
 }

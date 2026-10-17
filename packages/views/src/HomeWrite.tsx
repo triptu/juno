@@ -37,6 +37,8 @@ export interface HomeRecentProps {
   readonly onPick: (conversation: PickConversation) => void
   /** ⌘-click or ⌘Enter: opens the conversation instead. */
   readonly onOpen: (conversation: PickConversation) => void
+  /** Keep Recent's space while its rows may still arrive (the first sync), so the chip and the field never move. */
+  readonly reserve?: boolean
 }
 
 /**
@@ -44,21 +46,41 @@ export interface HomeRecentProps {
  * channels on the right; faces against channel art make the split. One
  * Tab stop: ↑ ↓ move within a column, ← → between them, Enter or Space
  * picks, ⌘Enter opens. A press keeps focus where it was, so the field keeps
- * the caret. Below about 400px the columns stack.
+ * the caret. Below about 400px the columns stack. Each column keeps room for
+ * five rows, so rows that arrive later fill it and nothing above moves.
  */
-export function HomeRecent({ people, channels, chosen, onPick, onOpen }: HomeRecentProps) {
-  const columns = [people, channels].filter((column) => column.length > 0)
+export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve = false }: HomeRecentProps) {
+  // Both columns always take their place, so one that fills later moves nothing; the keys skip an empty one.
+  const lists = [people, channels]
+  const filled = lists.flatMap((list, index) => (list.length > 0 ? [index] : []))
   const [at, setAt] = useState<readonly [number, number]>([0, 0])
-  if (columns.length === 0) return null
-  const column = Math.min(at[0], columns.length - 1)
-  const row = Math.min(at[1], columns[column]!.length - 1)
+  if (filled.length === 0 && !reserve) return null
+  // Waiting for its rows: the same box, empty and hidden, so it takes exactly Recent's room.
+  if (filled.length === 0) {
+    return (
+      <div aria-hidden="true" data-home-recent-reserved="" {...stylex.props(styles.recent, styles.hidden)}>
+        <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>
+          Recent
+        </Text>
+        <div {...stylex.props(styles.scope)}>
+          <div {...stylex.props(styles.columns)}>
+            <div {...stylex.props(styles.list)} />
+            <div {...stylex.props(styles.list)} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+  const column = filled.includes(at[0]) ? at[0] : filled[0]!
+  const row = Math.min(at[1], lists[column]!.length - 1)
   const move = (event: KeyboardEvent<HTMLElement>) => {
     const step: Record<string, readonly [number, number]> = { ArrowDown: [0, 1], ArrowUp: [0, -1], ArrowRight: [1, 0], ArrowLeft: [-1, 0] }
     const by = step[event.key]
     if (by === undefined) return
     event.preventDefault()
-    const nextColumn = Math.max(0, Math.min(columns.length - 1, column + by[0]))
-    const nextRow = Math.max(0, Math.min(columns[nextColumn]!.length - 1, by[0] === 0 ? row + by[1] : row))
+    const place = filled.indexOf(column)
+    const nextColumn = filled[Math.max(0, Math.min(filled.length - 1, place + by[0]))]!
+    const nextRow = Math.max(0, Math.min(lists[nextColumn]!.length - 1, by[0] === 0 ? row + by[1] : row))
     setAt([nextColumn, nextRow])
     const list = event.currentTarget.closest('[data-home-recent]')
     list?.querySelector<HTMLElement>(`[data-recent="${nextColumn}-${nextRow}"]`)?.focus()
@@ -70,8 +92,8 @@ export function HomeRecent({ people, channels, chosen, onPick, onOpen }: HomeRec
       </Text>
       <div {...stylex.props(styles.scope)}>
         <div {...stylex.props(styles.columns)}>
-          {columns.map((list, c) => (
-            <ul key={list === people ? 'people' : 'channels'} aria-label={list === people ? 'People' : 'Channels'} {...stylex.props(styles.list)}>
+          {lists.map((list, c) => (
+            <ul key={c === 0 ? 'people' : 'channels'} aria-label={c === 0 ? 'People' : 'Channels'} {...stylex.props(styles.list)}>
               {list.map((conversation, r) => (
                 <li key={conversation.key}>
                   <button
@@ -185,6 +207,8 @@ export function SendToList({ kind, rows, id, activeKey, onActivate, onPick }: Se
 }
 
 const HOVER = '@media (hover: hover)'
+/** Rows per Recent column (`frequentDestinations`). */
+const RECENT_ROWS = 5
 const FOLD = '@container (max-width: 400px)'
 
 const tintRows = stylex.create({
@@ -228,9 +252,13 @@ const styles = stylex.create({
   list: {
     display: 'flex',
     flexDirection: 'column',
+    minHeight: `calc(${RECENT_ROWS} * ${sizes['--control-32']})`,
     margin: 0,
     padding: 0,
     listStyle: 'none',
+  },
+  hidden: {
+    visibility: 'hidden',
   },
   // Recent sits below what needs you: the subtle tone at rest, the default on hover and when chosen.
   row: {
