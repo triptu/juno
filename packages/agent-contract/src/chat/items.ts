@@ -294,6 +294,28 @@ export type NewDividerItem = typeof NewDividerItem.Type
 export const ChatItem = Schema.Union([OwnerMessageItem, JunoBubbleItem, CardItem, EndingItem, StatusItem, NoteItem, GroupLabelItem, DayItem, NewDividerItem])
 export type ChatItem = typeof ChatItem.Type
 
+const endOf: Record<GroupPosition, GroupPosition> = { single: 'single', first: 'single', middle: 'last', last: 'last' }
+const startOf: Record<GroupPosition, GroupPosition> = { single: 'single', first: 'first', middle: 'first', last: 'single' }
+
+/**
+ * The rows with each bubble group ended at a "New" divider: the bubble above
+ * it takes the tail and the line under it, and the bubble below starts a
+ * group. The agent groups across the divider, because the chat shows only
+ * the divider that was there when it opened; ending a group at every read
+ * mark put a gap in the middle of an answer. Returns `items` itself when
+ * there is no divider.
+ */
+export function endGroupsAtDividers(items: ReadonlyArray<ChatItem>): ReadonlyArray<ChatItem> {
+  if (!items.some((item) => item._tag === 'newDivider')) return items
+  return items.map((item, index) => {
+    if (item._tag !== 'owner' && item._tag !== 'juno') return item
+    let group = item.group
+    if (items[index + 1]?._tag === 'newDivider') group = endOf[group]
+    if (items[index - 1]?._tag === 'newDivider') group = startOf[group]
+    return group === item.group ? item : { ...item, group }
+  })
+}
+
 /**
  * The local Remove sheet, opened from a message's context menu. It is not a
  * card: it works in every state (paused, offline, AI off, recovery), and

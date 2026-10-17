@@ -3,7 +3,7 @@
  * and its rows with the "New" divider.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ChatItem, ChatPage, ChatWindow } from '@juno/agent-contract'
+import { endGroupsAtDividers, type ChatItem, type ChatPage, type ChatWindow } from '@juno/agent-contract'
 import { junoAvailableAtom } from '@juno/state'
 import { agentConnectionStateAtom, chatItemsAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
@@ -86,11 +86,12 @@ export function useChatWindow(column: 'page' | 'panel', agent: ReturnType<typeof
 
 /**
  * The page's rows. The "New" divider stays before the bubble it sat over when the chat showed, as a topic's does:
- * an answer that arrives while the chat is open gets none. A hidden tab takes it again when shown.
+ * an answer that arrives while the chat is open gets none. A hidden tab takes it again when shown. The bubble groups
+ * end at the divider shown, and only there: the agent's divider moves with every read mark.
  */
 export function useChatItems(page: ChatPage, current: ChatPage | undefined): ReadonlyArray<ChatItem> {
   const [dividerBefore, setDividerBefore] = useState<string | null | undefined>(undefined)
   if (dividerBefore === undefined && current !== undefined) setDividerBefore(bubbleAfterDivider(current.items) ?? null)
   useEffect(() => () => setDividerBefore(undefined), [])
-  return useMemo(() => page.items.filter((item, i) => item._tag !== 'newDivider' || (dividerBefore != null && nextAnchor(page.items, i) === dividerBefore)), [page.items, dividerBefore])
+  return useMemo(() => endGroupsAtDividers(page.items.filter((item, i) => item._tag !== 'newDivider' || (dividerBefore != null && nextAnchor(page.items, i) === dividerBefore))), [page.items, dividerBefore])
 }
