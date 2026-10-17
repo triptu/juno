@@ -401,8 +401,26 @@ export const chatCopy = {
       moreSteps: (n: number) => `${n} more ${n === 1 ? 'step' : 'steps'}`,
       older: 'Show older runs',
       copyDetails: 'Copy details',
+      /** A message of yours with no words, only files. */
+      files: (count: number) => (count === 1 ? 'An attached file' : `${count} attached files`),
+      /** After the actions a closed row names: "2 more". */
+      moreActions: (count: number) => `${count} more`,
+      /** The owner's decision on an action. */
+      decision: { noClick: 'Ran without asking', approved: 'Approved', dismissed: 'Declined', expired: 'Expired', refused: 'Refused' },
+      /** How an action, a script's read or a step ended. */
+      ended: { done: 'Done', failed: 'Failed', unknown: "Can't tell", pending: 'Pending', cancelled: 'Cancelled', refused: 'Refused', unfinished: 'Did not finish' },
     },
-    memory: { beingUpdated: 'being updated' },
+    memory: {
+      subtitle: 'What Juno keeps of the conversation, as a summary that grows denser with age. The full text stays on this Mac.',
+      empty: { title: 'Nothing summarised yet', body: 'Juno summarises the chat as it grows. Recent messages are kept in full.' },
+      label: 'Memory',
+      beingUpdated: 'being updated',
+      /** "Mon – Wed", and the full times as its title: "Oct 13, 9:02 to Oct 15, 18:40". */
+      span: (from: string, to: string) => `${from} – ${to}`,
+      spanTitle: (from: string, to: string) => `${from} to ${to}`,
+      /** "Messages after Wednesday are not summarised yet." */
+      notYet: (day: string) => `Messages after ${day} are not summarised yet.`,
+    },
     remembers: {
       changed: 'This changed. Check it and save again.',
       full: 'Juno remembers as much as it can. Delete a line to add another.',

@@ -8,31 +8,15 @@ import { fullTime } from '../time'
 const copy = chatCopy.pages.activity
 
 /** The owner's decision on an action, in the owner's words. */
-export const decisionLabel: Record<ActivityAction['decision'], string> = {
-  noClick: 'Ran without asking',
-  approved: 'Approved',
-  dismissed: 'Declined',
-  expired: 'Expired',
-  refused: 'Refused',
-}
+export const decisionLabel: Record<ActivityAction['decision'], string> = copy.decision
 
-const outcomeLabel: Record<ActivityAction['outcome'], string | undefined> = {
-  done: 'Done',
-  failed: 'Failed',
-  unknown: "Can't tell",
-  pending: 'Pending',
-  none: undefined,
-}
+const ended = copy.ended
 
-const scriptOutcomeLabel: Record<ActivityScriptCall['outcome'], string> = {
-  done: 'Done',
-  failed: 'Failed',
-  cancelled: 'Cancelled',
-  refused: 'Refused',
-  unfinished: 'Did not finish',
-}
+const outcomeLabel: Record<ActivityAction['outcome'], string | undefined> = { done: ended.done, failed: ended.failed, unknown: ended.unknown, pending: ended.pending, none: undefined }
 
-const stepOutcomeLabel: Record<ActivityStep['outcome'], string | undefined> = { done: undefined, failed: 'Failed', unfinished: 'Did not finish' }
+const scriptOutcomeLabel: Record<ActivityScriptCall['outcome'], string> = { done: ended.done, failed: ended.failed, cancelled: ended.cancelled, refused: ended.refused, unfinished: ended.unfinished }
+
+const stepOutcomeLabel: Record<ActivityStep['outcome'], string | undefined> = { done: undefined, failed: ended.failed, unfinished: ended.unfinished }
 
 /** "$0.004", "$0.12", "<$0.001": what a run cost, quietly. */
 export function costLabel(usd: number): string {

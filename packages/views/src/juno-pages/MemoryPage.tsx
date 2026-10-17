@@ -10,11 +10,13 @@ export interface MemoryPageProps {
   readonly now: number
 }
 
+const copy = chatCopy.pages.memory
+
 /** The dates one summary line covers: one day, or "Oct 3 – Oct 9". */
 function span(line: MemoryLine, now: number): string {
   const from = dayLabel(line.from, now)
   const to = dayLabel(line.to, now)
-  return from === to ? from : `${from} – ${to}`
+  return from === to ? from : copy.span(from, to)
 }
 
 /**
@@ -25,15 +27,15 @@ function span(line: MemoryLine, now: number): string {
 export function MemoryPage({ page, now }: MemoryPageProps) {
   return (
     <Page>
-      <PageHeader title="Memory of this chat" subtitle="What Juno keeps of the conversation, as a summary that grows denser with age. The full text stays on this Mac." />
+      <PageHeader title={chatCopy.pageTitles.memory} subtitle={copy.subtitle} />
       {page.lines.length === 0 ? (
-        <EmptyState illustration="nothing-here" title="Nothing summarised yet" body="Juno summarises the chat as it grows. Recent messages are kept in full." enter={false} />
+        <EmptyState illustration="nothing-here" title={copy.empty.title} body={copy.empty.body} enter={false} />
       ) : (
-        <Surface kind="group" role="list" aria-label="Memory">
+        <Surface kind="group" role="list" aria-label={copy.label}>
           {page.lines.map((line, index) => (
             <ListRow key={line.id} role="listitem" data-memory-line={line._tag} divider={index < page.lines.length - 1}>
               <span {...stylex.props(cell.lines, styles.entry)}>
-                <Text variant="meta" tone="muted" numeric as="time" title={`${fullTime(line.from)} to ${fullTime(line.to)}`}>
+                <Text variant="meta" tone="muted" numeric as="time" title={copy.spanTitle(fullTime(line.from), fullTime(line.to))}>
                   {span(line, now)}
                 </Text>
                 {line._tag === 'line' ? (
@@ -42,7 +44,7 @@ export function MemoryPage({ page, now }: MemoryPageProps) {
                   </Text>
                 ) : (
                   <Text variant="body" tone="muted" sx={styles.masked}>
-                    {chatCopy.pages.memory.beingUpdated}
+                    {copy.beingUpdated}
                   </Text>
                 )}
               </span>
@@ -52,7 +54,7 @@ export function MemoryPage({ page, now }: MemoryPageProps) {
       )}
       {page.coveredThrough !== undefined ? (
         <Text variant="meta" tone="muted" as="p">
-          Messages after {dayLabel(page.coveredThrough, now)} are not summarised yet.
+          {copy.notYet(dayLabel(page.coveredThrough, now))}
         </Text>
       ) : null}
     </Page>
