@@ -8,8 +8,8 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 41,
-    "oversizedFunctions": 133
+    "oversizedFiles": 40,
+    "oversizedFunctions": 132
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -45,7 +45,6 @@
     "packages/tokens/src/themes.stylex.ts",
     "packages/tokens/src/tokens.stylex.ts",
     "packages/views/src/AllTopics.tsx",
-    "packages/views/src/Home.tsx",
     "packages/views/src/Message.tsx",
     "packages/views/src/Sidebar.tsx",
     "packages/views/src/TopicRow.tsx",
@@ -68,7 +67,6 @@
     "apps/desktop/packaging/smoke.spec.ts:test('packaged app signs in and starts both utility processes @mac')#1",
     "apps/desktop/src/main/ipc.ts:registerIpc#1",
     "apps/desktop/src/main/window.ts:setAppMenu#1",
-    "apps/desktop/src/renderer/containers/NewChat.tsx:NewChatTab/memo/NewChatTab#1",
     "apps/desktop/src/renderer/containers/PaletteContent.tsx:OpenPalette#1",
     "apps/desktop/src/renderer/containers/Peek.tsx:Peek/memo/Peek#1",
     "apps/desktop/src/renderer/containers/Sidebar.tsx:Sidebar#1",
