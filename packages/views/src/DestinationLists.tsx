@@ -219,7 +219,8 @@ export function TopicList({ query, onQuery, conversation, threads, now, selected
   return (
     <>
       <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search topics" onKeyDown={search.onKeyDown} activeId={activeId} />
-      <div {...stylex.props(styles.scroll)}>
+      {/* Not a Tab stop: the rows are driven from the search field, as in the topic switcher. */}
+      <div tabIndex={-1} {...stylex.props(styles.scroll)}>
         <OptionList label="Topics" {...(activeId === undefined ? {} : { activeId })}>
           {main ? (
             <OptionRow
