@@ -140,7 +140,7 @@ function failures(log) {
     ...lines.filter((line) => /^did not run: |against a budget of/.test(line)).map((line) => line.trim()),
     ...lines.filter((line) => /\bFAIL\b/.test(line) && /\.test\.ts/.test(line)).map((line) => line.replace(/^.*?FAIL\s+/, 'FAIL ').trim()),
     ...lines.filter((line) => /^Error: (Quint|Spec check|Missing|A corrected|Agent schedule|No usable)/.test(line)),
-    ...lines.filter((line) => /^remote: (?!.*exited with)/.test(line) && /failed|lost the connection|not reach/.test(line)),
+    ...lines.filter((line) => /^remote: (?!.*exited with)/.test(line) && /failed|lost the connection|not reach|unreachable|Gave up/.test(line)),
   ]
   return [...new Set(found)].slice(0, 20)
 }
