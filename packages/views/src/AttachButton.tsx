@@ -7,7 +7,7 @@ import { IconButton } from '@juno/ui'
 export interface AttachButtonProps {
   /** The files picked in the system's file picker. */
   readonly onFiles: (files: ReadonlyArray<File>) => void
-  /** In the Tab order. New chat leaves it out, so Shift Tab goes from the composer to its pickers (SPEC 9). */
+  /** In the Tab order. Home leaves it out, so Shift Tab goes from the field to the destination chip (SPEC 12). */
   readonly tabbable?: boolean
 }
 

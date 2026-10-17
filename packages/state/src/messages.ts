@@ -9,7 +9,7 @@
  * What a topic tab reads, so the list never shows an empty frame when its
  * window moves (performance 5.3). Both are keyed by a view, `topicView(id,
  * tabId)`, so two tabs on one topic each keep their own window; the topic
- * id alone is the view outside tabs (peek, New chat's preview, and an open
+ * id alone is the view outside tabs (peek, and an open
  * still waiting for its first window, which its tab then takes over).
  * - `messageWindowSpecAtom(view)`: the window the tab wants. The container
  *   writes it (open at the divider, stick to the bottom, prepend).
@@ -128,7 +128,7 @@ export const locateMessage = (registry: Registry, channel: string, ts: string) =
 
 /**
  * A view's window asked for again: its own subscription can start while the
- * topic's first fetch is still writing history (a New chat's first send to
+ * topic's first fetch is still writing history (Home's first send to
  * someone never messaged) and miss the change that covers it.
  */
 export function refreshMessages(registry: Registry, view: string): void {

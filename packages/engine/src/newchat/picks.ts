@@ -1,5 +1,5 @@
 /**
- * A stored conversation as a New chat or ⌘K row (`PickConversation`), and
+ * A stored conversation as a destination list or ⌘K row (`PickConversation`), and
  * a person with no DM yet.
  */
 import type { PickConversation } from '@juno/contract'

@@ -1,6 +1,6 @@
 /**
  * Conversation search (spec section 10), behind ⌘K's Conversations tab and
- * the New chat picker. The text is split into words, ignoring case,
+ * Home's destination list. The text is split into words, ignoring case,
  * accents and punctuation; each typed word must match a word of the
  * conversation, in any order. A conversation's words are its name's, its
  * people's names (display name, real name and handle) and, for a channel,

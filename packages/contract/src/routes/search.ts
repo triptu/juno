@@ -66,7 +66,7 @@ export const SearchPerson = Schema.Struct({
   kind: Schema.Literal('person'),
   id: Schema.String,
   person: Person,
-  /** The Main of your DM with them, when there is one. Without it the result opens a New chat to them. */
+  /** The Main of your DM with them, when there is one. Without it the result opens Home addressed to them. */
   mainId: Schema.optionalKey(Schema.String),
 })
 export type SearchPerson = typeof SearchPerson.Type

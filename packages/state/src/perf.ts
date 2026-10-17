@@ -9,7 +9,7 @@
 
 export type PerfName =
   | 'juno.start'
-  /** New chat has painted with its composer focused. */
+  /** Home has painted with its composer focused. */
   | 'juno.composer-ready'
   | 'juno.shell-paint'
   | 'juno.sidebar-rows'

@@ -324,7 +324,7 @@ export function stampViewed(tabs: Tabs, ids: ReadonlyArray<string | undefined>, 
 /**
  * Closes the tabs not viewed for `maxAge` ms, onto the reopen stack, so ⌘⇧T
  * brings them back. The active tab and a tab with an unsent draft
- * (`hasDraft`: a New chat's, or its topic's) stay. A tab saved before tabs
+ * (`hasDraft`: a Home's, or its topic's) stay. A tab saved before tabs
  * kept a time is stamped `now`, so it gets the full time from here. The
  * timing is coarse: the sweep runs at launch and about hourly.
  */
