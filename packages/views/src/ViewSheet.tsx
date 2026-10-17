@@ -14,6 +14,8 @@ import {
   IconButton,
   OptionList,
   OptionRow,
+  radioItem,
+  radioKeys,
   Swatch,
   Text,
   TextField,
@@ -136,15 +138,15 @@ export function ViewSheet({
     <form aria-label={mode === 'new' ? 'New view' : 'Edit view'} onSubmit={submit} data-view-sheet="" {...stylex.props(styles.sheet)}>
       <TextField size={30} label="Name" placeholder="Name" value={name} maxLength={32} autoFocus onChange={(event) => onNameChange(event.currentTarget.value)} />
 
-      <div role="radiogroup" aria-label="Icon" {...stylex.props(styles.field)}>
+      <div {...stylex.props(styles.field)}>
         <Text variant="meta" tone="muted" weight="medium" as="span">
           Icon
         </Text>
-        <div {...stylex.props(styles.icons)}>
+        {/* One Tab stop: the arrows move and choose. */}
+        <div role="radiogroup" aria-label="Icon" onKeyDown={radioKeys} {...stylex.props(styles.icons)}>
           <IconButton
             type="button"
-            role="radio"
-            aria-checked={icon === undefined}
+            {...radioItem(icon === undefined, icon === undefined)}
             icon={Prohibit}
             label="No icon"
             size={26}
@@ -157,8 +159,7 @@ export function ViewSheet({
             <IconButton
               key={each}
               type="button"
-              role="radio"
-              aria-checked={icon === each}
+              {...radioItem(icon === each, icon === each)}
               icon={viewIcons[each]}
               label={iconLabels[each]}
               size={26}
@@ -177,10 +178,10 @@ export function ViewSheet({
         <Text variant="meta" tone="muted" weight="medium" as="span">
           Colour
         </Text>
-        <div role="radiogroup" aria-label="Colour" data-view-colors="" {...stylex.props(styles.colors)}>
-          <Swatch tint="neutral" label="Neutral" selected={color === undefined} onClick={() => onColorChange(undefined)} />
+        <div role="radiogroup" aria-label="Colour" data-view-colors="" onKeyDown={radioKeys} {...stylex.props(styles.colors)}>
+          <Swatch tint="neutral" label="Neutral" selected={color === undefined} {...radioItem(color === undefined, color === undefined)} onClick={() => onColorChange(undefined)} />
           {accentNames.map((each) => (
-            <Swatch key={each} tint={each} label={accentLabels[each]} selected={color === each} onClick={() => onColorChange(each)} />
+            <Swatch key={each} tint={each} label={accentLabels[each]} selected={color === each} {...radioItem(color === each, color === each)} onClick={() => onColorChange(each)} />
           ))}
         </div>
       </div>
