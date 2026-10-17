@@ -81,7 +81,10 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing['--space-6'],
+    // On a narrow page the control goes under the label, at the start.
+    flexWrap: 'wrap',
+    columnGap: spacing['--space-6'],
+    rowGap: spacing['--space-2'],
     minHeight: spacing['--space-8'],
   },
   rowStacked: {
@@ -100,8 +103,10 @@ const styles = stylex.create({
     alignItems: 'baseline',
     gap: spacing['--space-2'],
   },
+  // On a narrow page the swatches wrap rather than run past the card.
   swatches: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing['--space-2'],
   },

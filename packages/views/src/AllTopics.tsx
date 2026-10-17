@@ -159,7 +159,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
           {row.channel.name}
         </Text>
       </span>
-      <span role="gridcell" {...stylex.props(styles.cell)}>
+      <span role="gridcell" {...stylex.props(styles.cell, styles.status)}>
         <Chip variant={status.variant} size={22}>
           {status.label}
         </Chip>
@@ -274,12 +274,23 @@ export function AllTopics({
           }
         />
         <div data-all-topics-filters="" {...stylex.props(styles.filters)}>
-          <Segmented
-            label="Status"
-            value={filter.status}
-            options={CHIPS.map((chip) => ({ value: chip.id, label: chip.label, count: counts[chip.id] }))}
-            onChange={onStatus}
-          />
+          <span {...stylex.props(styles.statusTabs)}>
+            <Segmented
+              label="Status"
+              value={filter.status}
+              options={CHIPS.map((chip) => ({ value: chip.id, label: chip.label, count: counts[chip.id] }))}
+              onChange={onStatus}
+            />
+          </span>
+          <span {...stylex.props(styles.statusMenu)}>
+            <Select
+              size={28}
+              label="Status"
+              value={filter.status}
+              options={CHIPS.map((chip) => ({ value: chip.id, label: `${chip.label} (${counts[chip.id]})` }))}
+              onChange={(event) => onStatus(event.currentTarget.value as AllTopicsChip)}
+            />
+          </span>
           <div {...stylex.props(styles.controls)}>
             <Segmented label="Kind" value={filter.kind} options={KIND_OPTIONS} onChange={onKind} />
             {place}
@@ -360,7 +371,7 @@ const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRa
           <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.whereHeader}>
             Where
           </Text>
-          <Text variant="tableHeader" tone="muted" role="columnheader">
+          <Text variant="tableHeader" tone="muted" role="columnheader" sx={styles.statusHeader}>
             Status
           </Text>
           <Text variant="tableHeader" tone="muted" role="columnheader" sx={[styles.endText, styles.messagesHeader]}>
@@ -394,31 +405,46 @@ const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRa
   )
 })
 
+// The tiers are measured on the page, so the header and the table change together. Each keeps 16px for a scrollbar
+// beside the table.
 // Where's minimum (72) plus the other columns' minimums (432), four gaps (64), the row's padding (24) and the table's (56):
 // under this the Where column would cut its own header, so it hides and the others keep their room.
-const NARROW = '@container all-topics (width < 648px)'
+const NARROW = '@container all-topics (width < 664px)'
 // The same without Where: the other minimums (432), three gaps (48), the row's padding and the table's (80). Under this
-// Msgs hides too, so the table fits down to --all-topics-table-min and a focused row's ring stays in view.
-const NARROWER = '@container all-topics (width < 560px)'
+// Msgs hides too.
+const NARROWER = '@container all-topics (width < 576px)'
+// Under the narrowest columns' 500px (the minimum window with the sidebar shown is 336): the status tabs become a pop-up
+// button, as Finder's view control does in a narrow window; Status hides from the table, the title takes the rest and
+// the side padding narrows, so the table never scrolls sideways and a focused row's ring stays whole.
+const COMPACT = '@container all-topics (width < 516px)'
+// StyleX does not keep the order of conditions on one property, so the grid's three tiers do not overlap.
+const NARROW_ONLY = '@container all-topics (576px <= width < 664px)'
+const NARROWER_ONLY = '@container all-topics (516px <= width < 576px)'
 
 const rowsHeight = stylex.create({ is: (px: number) => ({ height: px }) }).is
 const slotAt = stylex.create({ at: (px: number) => ({ transform: `translateY(${px}px)` }) }).at
 
 const styles = stylex.create({
+  // Stretched, so its width never comes from its content: the page is a size container.
   page: {
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
+    alignSelf: 'stretch',
+    width: '100%',
     minHeight: 0,
     minWidth: 0,
     backgroundColor: colors['--background'],
+    containerType: 'inline-size',
+    containerName: 'all-topics',
   },
   head: {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-4'],
     paddingBlock: `${spacing['--space-8']} ${spacing['--space-4']}`,
-    paddingInline: spacing['--space-10'],
+    // On the table's text edge: its padding plus the row's.
+    paddingInline: { default: spacing['--space-10'], [COMPACT]: spacing['--space-5'] },
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
@@ -428,11 +454,18 @@ const styles = stylex.create({
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: { default: 'space-between', [COMPACT]: 'flex-start' },
     gap: spacing['--space-2'],
   },
+  statusTabs: {
+    display: { default: 'contents', [COMPACT]: 'none' },
+  },
+  statusMenu: {
+    display: { default: 'none', [COMPACT]: 'contents' },
+  },
+  // In a compact page the controls flow with the status pop-up, so the four take two lines, not three.
   controls: {
-    display: 'flex',
+    display: { default: 'flex', [COMPACT]: 'contents' },
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing['--space-2'],
@@ -447,18 +480,15 @@ const styles = stylex.create({
     overflow: 'auto',
     scrollbarGutter: 'stable',
     overscrollBehavior: 'contain',
-    containerType: 'inline-size',
-    containerName: 'all-topics',
   },
   table: {
-    minWidth: layout['--all-topics-table-min'],
     paddingBlock: `${spacing['--space-1']} ${spacing['--space-10']}`,
-    paddingInline: spacing['--space-7'],
+    paddingInline: { default: spacing['--space-7'], [COMPACT]: spacing['--space-2'] },
     boxSizing: 'border-box',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: { default: layout['--all-topics-columns'], [NARROW]: layout['--all-topics-columns-narrow'], [NARROWER]: layout['--all-topics-columns-narrowest'] },
+    gridTemplateColumns: { default: layout['--all-topics-columns'], [NARROW_ONLY]: layout['--all-topics-columns-narrow'], [NARROWER_ONLY]: layout['--all-topics-columns-narrowest'], [COMPACT]: layout['--all-topics-columns-compact'] },
     columnGap: spacing['--space-4'],
     alignItems: 'center',
     boxSizing: 'border-box',
@@ -539,6 +569,12 @@ const styles = stylex.create({
   },
   endText: {
     textAlign: 'end',
+  },
+  status: {
+    display: { default: 'flex', [COMPACT]: 'none' },
+  },
+  statusHeader: {
+    display: { default: 'block', [COMPACT]: 'none' },
   },
   messages: {
     display: { default: 'flex', [NARROWER]: 'none' },

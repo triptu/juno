@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem } from '@juno/agent-contract'
 import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
-import { ringRoom, Text } from '@juno/ui'
+import { ringRoom, Text, tooltip } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
@@ -19,6 +19,8 @@ export interface JunoBubbleProps {
   readonly enter?: boolean
   /** Laid out in full even off screen, never at the size estimate. */
   readonly eager?: boolean
+  /** A narrow column: the time leaves the row, so the bubble keeps its room, and shows as the bubble's tooltip. */
+  readonly compact?: boolean
 }
 
 /**
@@ -28,7 +30,7 @@ export interface JunoBubbleProps {
  * flow; React and Reply wait beside it. The slot under a group's last
  * bubble is kept, as the owner's is, so the spacing matches.
  */
-export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter = true, eager = false }: JunoBubbleProps) {
+export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter = true, eager = false, compact = false }: JunoBubbleProps) {
   const end = isGroupEnd(item.group)
   const menu = actions.onContextMenu
   const target = { _tag: 'bubble', id: item.id } as const
@@ -44,6 +46,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
       <div {...stylex.props(rowStyles.row, rowStyles.contained, ringRoom.inline, eager && rowStyles.eager)}>
         <div
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
+          {...(compact ? tooltip(fullTime(item.at)) : {})}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
         >
           <Text variant="bodySmall" tone="default" selectable dir="auto" as="div" sx={[rowStyles.bubbleText, styles.blocks]}>
@@ -51,9 +54,11 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
           </Text>
           <ReactionBadge reactions={item.reactions} corner="end" />
         </div>
-        <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
-          {messageTime(item.at, now)}
-        </Text>
+        {compact ? null : (
+          <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
+            {messageTime(item.at, now)}
+          </Text>
+        )}
         <RowActions target={target} actions={actions} />
       </div>
       {end ? <div aria-hidden {...stylex.props(rowStyles.lineSlot)} /> : null}

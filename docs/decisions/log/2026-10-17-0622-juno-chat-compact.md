@@ -1,0 +1,1 @@
+- 10-17 06:22 · narrow-design · Juno's bubbles were 146px at 336 because the time and React and Reply kept about 120px beside them on a 272px column. A chat column under 400px now takes the panel's 16px sides and 85% width, and a Juno bubble's time becomes its tooltip, as in Messages; React and Reply keep their reserved slot so nothing moves on hover.

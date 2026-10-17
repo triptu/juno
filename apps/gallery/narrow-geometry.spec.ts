@@ -14,9 +14,13 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('AllTopics', 'size/where-hidden'), false],
   [route('AllTopics', 'size/narrow'), false],
   [route('AllTopics', 'filters/narrow'), false],
+  [route('AllTopics', 'size/minimum-window-sidebar'), false],
+  [route('AllTopics', 'size/compact'), false],
   [route('Home', 'items/minimum-window'), false],
   [route('CommandPalette', 'states/minimum-window'), false],
   [route('SettingsPage', 'states/notifications-minimum-window'), false],
+  [route('SettingsPage', 'states/general-minimum-window'), false],
+  [route('SettingsPage', 'states/appearance-minimum-window'), false],
   [route('JunoChatList', 'chat/minimum-window'), false],
   [route('JunoHeader', 'banner/recovery-minimum-window'), false],
   [route('JunoHeader', 'banner/paused-minimum-window'), false],
@@ -51,7 +55,7 @@ test.describe('the minimum window', () => {
     expect(where.topicTop).toBeGreaterThanOrEqual(where.pillBottom)
   })
 
-  test('All topics hides Where under 648px, then Msgs under 560px, and the table still fits', async ({ page }) => {
+  test('All topics hides Where under 664px, then Msgs under 576px, and the table still fits', async ({ page }) => {
     const states = [
       ['size/minimum-window', true, true],
       ['size/where-hidden', false, true],
@@ -74,5 +78,63 @@ test.describe('the minimum window', () => {
     const frame = await frameOf(page, at).boundingBox()
     const palette = await frameOf(page, at).getByRole('dialog').boundingBox()
     expect(palette!.y + palette!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
+  })
+})
+
+test.describe('the minimum window with the sidebar shown', () => {
+  test('Settings at 336 narrows its list to a rail of named icons, and the page keeps its controls whole', async ({ page }) => {
+    for (const id of ['states/general-minimum-window', 'states/appearance-minimum-window']) {
+      const at = route('SettingsPage', id)
+      await openState(page, at)
+      const frame = frameOf(page, at)
+      const nav = frame.locator('[data-settings-nav="rail"]')
+      await expect(nav).toBeVisible()
+      expect((await nav.boundingBox())!.width).toBeLessThanOrEqual(41)
+      const items = nav.getByRole('button')
+      await expect(items).toHaveCount(9)
+      await expect(nav.getByRole('button', { name: 'Backup & This Mac' })).toHaveAttribute('data-tooltip', 'Backup & This Mac')
+      // Every card's content stays inside the card: a row's control goes under its label rather than past the edge.
+      const cut = await frame.locator('[data-settings-section] section, [data-settings-section] header').evaluateAll((nodes) =>
+        nodes.flatMap((node) => {
+          const box = node.getBoundingClientRect()
+          return [...node.querySelectorAll('button, [role="radiogroup"], select, input')]
+            .filter((control) => control.getBoundingClientRect().right > box.right + 0.5)
+            .map((control) => control.textContent ?? control.tagName)
+        }),
+      )
+      expect(cut).toEqual([])
+    }
+  })
+
+  test('All topics at 336 shows Status as a pop-up and never scrolls sideways, so a focused row keeps its whole ring', async ({ page }) => {
+    const at = route('AllTopics', 'size/minimum-window-sidebar')
+    await openState(page, at)
+    const frame = frameOf(page, at)
+    await expect(frame.getByRole('combobox', { name: 'Status' })).toBeVisible()
+    await expect(frame.getByRole('radiogroup', { name: 'Status' })).toBeHidden()
+    await expect(frame.getByRole('columnheader', { name: 'Status' })).toBeHidden()
+    const filters = frame.locator('[data-all-topics-filters]')
+    expect(await filters.evaluate((row) => [...row.querySelectorAll('select, [role="radiogroup"], button')].every((node) => node.getBoundingClientRect().right <= row.getBoundingClientRect().right + 0.5))).toBe(true)
+    const table = frame.locator('[data-all-topics-table]')
+    expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+    const row = frame.locator('[data-all-topics-row]').first()
+    await row.focus()
+    const [rowBox, tableBox] = await Promise.all([row.boundingBox(), table.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      return { left: box.left, right: box.left + node.clientWidth }
+    })])
+    expect(rowBox!.x).toBeGreaterThanOrEqual(tableBox.left)
+    expect(rowBox!.x + rowBox!.width).toBeLessThanOrEqual(tableBox.right)
+  })
+
+  test('the Juno chat at 336 gives Juno\'s bubbles the width, with the time as their tooltip', async ({ page }) => {
+    const at = route('JunoChatList', 'chat/minimum-window')
+    await openState(page, at)
+    const frame = frameOf(page, at)
+    const bubbles = frame.locator('[data-chat-juno]')
+    // The widest bubble: before, the time and React and Reply beside it left about 146px.
+    const width = await bubbles.evaluateAll((rows) => Math.max(...rows.flatMap((row) => [...row.querySelectorAll('[data-tooltip]')].map((node) => node.getBoundingClientRect().width))))
+    expect(width).toBeGreaterThanOrEqual(220)
+    await expect(bubbles.locator('time')).toHaveCount(0)
   })
 })

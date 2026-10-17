@@ -42,6 +42,7 @@ export { TextField } from './TextField'
 export { Toast, ToastRegion } from './Toast'
 export { TooltipLayer, tooltip } from './Tooltip'
 export { TopicArt } from './TopicArt'
+export { useNarrowerThan } from './useNarrowerThan'
 export {
   accentLabels,
   accentNames,

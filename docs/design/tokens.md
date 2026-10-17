@@ -435,7 +435,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--list-row-wrap-min` | 200px: the narrowest a wrapping ListRow's text gets before its controls move under it |
-| `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 560px; `--all-topics-table-min` 500px, under which the table scrolls sideways |
+| `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 576px; `--all-topics-columns-compact` (`minmax(0, 1fr) 84px`) drops Status under 516px, so the table never scrolls sideways |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
 | `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 1.2) |
@@ -455,7 +455,6 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--scrollbar` | 10px, thumb `--border-strong` with 3px transparent inset, radius 10. `ScrollArea scrollbar="hover"` keeps the thumb transparent until the area is hovered; the 10px gutter stays |
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
-| `--all-topics-table-min` | 576px: below it the All topics table scrolls sideways (the columns' minimums, 16px gaps, row and table padding) |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
 | `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
 | `--toolbar-height` | 36px. The message hover toolbar's height. It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 223px with More (M6b) |
