@@ -1,0 +1,1 @@
+- 10-17 07:00 · perf-idle-clock · Home open's 50 ms p95 gate takes its opens after 31 s idle with the CPU clock held up, as the scroll gates do, and reports the same opens with the clock not held without gating them; in three runs the held gate passed once, so the clock explains only part of the miss.
