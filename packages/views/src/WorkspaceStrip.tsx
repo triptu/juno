@@ -181,7 +181,14 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
             unread={tab.unread === true}
             onSelect={onSelectTab === undefined ? undefined : (event) => onSelectTab(tab.id, event)}
             onClose={onCloseTab === undefined || tab.pinned === true ? undefined : () => onCloseTab(tab.id)}
-            onContextMenu={onTabContextMenu === undefined ? undefined : (event) => onTabContextMenu(tab.id, event)}
+            onContextMenu={
+              onTabContextMenu === undefined
+                ? undefined
+                : (event) => {
+                    event.preventDefault()
+                    onTabContextMenu(tab.id, event)
+                  }
+            }
           />
         ))}
       </TabStrip>

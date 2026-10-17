@@ -22,6 +22,7 @@ import {
   type ActivateEvent,
   type AvatarStackPerson,
 } from '@juno/ui'
+import { inField } from './fieldMenu'
 import { countLabel, groupInitials, hueFor, initials, kindIcon, stackPerson } from './look'
 import { RenameField } from './RenameField'
 
@@ -203,7 +204,15 @@ export const TopicRow = memo(function TopicRow({
       data-title-source={row.titleSource}
       onPointerEnter={onPrefetch === undefined ? undefined : onPointerEnter}
       onFocus={onFocus}
-      onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
+      onContextMenu={
+        onContextMenu === undefined
+          ? undefined
+          : (event) => {
+              if (inField(event)) return
+              event.preventDefault()
+              onContextMenu(row.id, event)
+            }
+      }
       {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event), { disabled: renaming })}
       data-row-lines={twoLine ? 2 : 3}
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
