@@ -272,7 +272,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
   traceSend('tabs asked', () => ({ ticket, replaceable, ...(topic === undefined ? {} : { view: (topic.view ?? topic.id).replace('\u0000', '@'), fresh: topic.fresh }) }))
   if (topic === undefined) {
     queue = queue.then(() => ready).then(() => {
-      if (ticket === currentTicket) apply(change)
+      if (!replaceable || ticket === currentTicket) apply(change)
       else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
     })
     return
@@ -361,6 +361,7 @@ function openHomeTab(list: boolean, conversation?: PickConversation): void {
   // the field the old tab had focused; they are held, and Home types them into its field or search.
   holdKeys()
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  // A new tab does not replace the current one, so an open still waiting there is not cancelled.
   show((tabs) => {
     const next = openPlace(tabs, homePlace, { newTab: true })
     if (next.active !== undefined) {
@@ -368,7 +369,7 @@ function openHomeTab(list: boolean, conversation?: PickConversation): void {
       requestHomeFocus(registry, next.active, list)
     }
     return next
-  }, undefined)
+  }, undefined, false)
 }
 
 /** ⌘T and the strip's "+": a new tab with Home, ready to write (SPEC 6). */
