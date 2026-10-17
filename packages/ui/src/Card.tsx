@@ -2,14 +2,15 @@ import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { ReactNode } from 'react'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
+import type { DuotoneIcon } from './duotone'
 import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { Surface } from './Surface'
 import { Text } from './Text'
 
 export interface CardProps {
-  /** Header line: kind icon (duotone, the friendly spot) and name, then an optional source. */
-  readonly kindIcon?: PhosphorIcon
+  /** Header line: kind icon (duotone, the friendly spot; from `duotone.ts`) and name, then an optional source. */
+  readonly kindIcon?: DuotoneIcon
   readonly kind?: string
   readonly sourceIcon?: PhosphorIcon
   readonly source?: string
@@ -33,7 +34,7 @@ export function Card({ kindIcon, kind, sourceIcon, source, title, body, children
     <Surface kind="card" as="article" sx={styles.card}>
       {hasHeader ? (
         <div {...stylex.props(styles.header)}>
-          {kindIcon ? <Icon icon={kindIcon} size={14} weight="duotone" /> : null}
+          {kindIcon ? <Icon icon={kindIcon} size={14} /> : null}
           {kind ? (
             <Text variant="meta" weight="medium" tone="subtle">
               {kind}

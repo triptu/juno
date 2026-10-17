@@ -10,6 +10,7 @@ import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
+import { BellDuotone, SparkleDuotone } from './duotone'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
 import { Icon } from './Icon'
@@ -21,7 +22,7 @@ export default defineFixtures(Icon, {
     dim: fixture({ icon: Hash, size: 15, dim: true }),
     labelled: fixture({ icon: CheckCircle, size: 14, label: 'Resolved' }),
     active: fixture({ icon: Bell, size: 18, active: true }),
-    duotone: fixture({ icon: Sparkle, size: 16, weight: 'duotone' }),
+    duotone: fixture({ icon: SparkleDuotone, size: 16 }),
   },
   Overview: {
     'all-sizes': scene(() => (
@@ -59,7 +60,7 @@ export default defineFixtures(Icon, {
         <Icon icon={Bell} size={18} weight="regular" />
         <Icon icon={Bell} size={14} weight="bold" />
         <Icon icon={Bell} size={18} weight="fill" />
-        <Icon icon={Bell} size={18} weight="duotone" />
+        <Icon icon={BellDuotone} size={18} />
       </Row>
     )),
     'outline-and-fill': scene(() => (
@@ -83,7 +84,7 @@ export default defineFixtures(Icon, {
         <Icon icon={PushPin} />
         <Icon icon={Bell} />
         <Icon icon={MagnifyingGlass} />
-        <Icon icon={Sparkle} weight="duotone" />
+        <Icon icon={SparkleDuotone} />
       </Row>
     )),
   },

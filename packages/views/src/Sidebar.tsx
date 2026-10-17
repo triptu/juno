@@ -24,6 +24,7 @@ import {
   NavItem,
   PillRow,
   Popover,
+  SparkleDuotone,
   Text,
   tooltip,
   viewIcons,
@@ -230,8 +231,7 @@ export function Sidebar({
           Home
         </NavItem>
         <NavItem
-          icon={Sparkle}
-          iconWeight={junoBusy ? 'duotone' : undefined}
+          icon={junoBusy ? SparkleDuotone : Sparkle}
           active={activeNav === 'juno'}
           kbd="⌘J"
           onSelect={(event) => onNavigate('juno', event)}

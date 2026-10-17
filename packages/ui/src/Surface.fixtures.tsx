@@ -1,4 +1,4 @@
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
+import { SparkleDuotone } from './duotone'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row } from './fixtures/layout'
 import { Icon } from './Icon'
@@ -9,7 +9,7 @@ function Note() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 480 }}>
       <Row gap="sm">
-        <Icon icon={Sparkle} size={14} weight="duotone" />
+        <Icon icon={SparkleDuotone} size={14} />
         <Text variant="meta" weight="medium" tone="muted">
           Juno
         </Text>

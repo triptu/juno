@@ -1,5 +1,5 @@
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
+import { SparkleDuotone } from './duotone'
 import { Chip } from './Chip'
 import { defineFixtures, scene } from './fixtures/define'
 import { Stack } from './fixtures/layout'
@@ -13,8 +13,7 @@ function Nav({ active = 'all' }: { readonly active?: 'all' | 'juno' }) {
       </NavItem>
       {/* Juno stays duotone whether or not it is active: the one AI surface. */}
       <NavItem
-        icon={Sparkle}
-        iconWeight="duotone"
+        icon={SparkleDuotone}
         active={active === 'juno'}
         kbd="⌘J"
         trailing={

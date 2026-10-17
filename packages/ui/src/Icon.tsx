@@ -7,10 +7,11 @@ export type { PhosphorIcon }
 /**
  * `regular` for chrome at 15px and up, `bold` at 14px and below (regular
  * drops under 1px there and goes faint next to 11–12px text), `fill` for
- * active and selected states only, `duotone` for the few deliberate friendly
- * spots: the Juno nav item, AI sparkles, illustrations.
+ * active and selected states only. Duotone, for the few deliberate friendly
+ * spots (the Juno sparkle), is not a weight here: it comes with the icon,
+ * from `duotone.ts`.
  */
-export type IconWeight = 'regular' | 'bold' | 'fill' | 'duotone'
+export type IconWeight = 'regular' | 'bold' | 'fill'
 export type IconSize = 12 | 13 | 14 | 15 | 16 | 18 | 20
 
 export interface IconProps {
@@ -40,7 +41,7 @@ export function defaultIconWeight(size: IconSize): IconWeight {
 /**
  * A Phosphor icon drawn in the surrounding text colour. Outline by default;
  * fill marks state. The weight comes from the size unless named, so call
- * sites only say `fill` or `duotone`.
+ * sites only say `fill`. A duotone icon (`duotone.ts`) draws duotone whatever the weight.
  */
 export function Icon({ icon: Glyph, size = 16, weight, active = false, dim = false, label }: IconProps) {
   const resolved: PhosphorWeight = weight ?? (active ? 'fill' : defaultIconWeight(size))

@@ -4,7 +4,7 @@ import { DotOutline } from '@phosphor-icons/react/dist/icons/DotOutline'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { SignOut } from '@phosphor-icons/react/dist/icons/SignOut'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
+import { SparkleDuotone } from './duotone'
 import { Avatar } from './Avatar'
 import { defineFixtures, scene } from './fixtures/define'
 import { IconButton } from './IconButton'
@@ -24,7 +24,7 @@ export default defineFixtures(Popover, {
             <OptionRow id="status" leading={<Icon icon={DotOutline} size={16} />} label="Set status" />
             <OptionRow id="notifications" leading={<Icon icon={Bell} size={16} />} label="Notifications" sub="Next digest 3pm" />
             <OptionRow id="prefs" leading={<Icon icon={Gear} size={16} />} label="Preferences" trailing={<Kbd>⌘,</Kbd>} />
-            <OptionRow id="ai" leading={<Icon icon={Sparkle} size={16} weight="duotone" />} label="AI assist" />
+            <OptionRow id="ai" leading={<Icon icon={SparkleDuotone} size={16} />} label="AI assist" />
           </OptionList>
           <OptionSeparator />
           <OptionList role="menu" label="Workspace">
