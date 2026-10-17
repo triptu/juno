@@ -1,4 +1,4 @@
-import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { _electron as electron, test as base, type ElectronApplication, type Page, type TestInfo } from '@playwright/test'
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -82,6 +82,22 @@ export interface LaunchOptions {
   readonly tour?: boolean
   /** A fake of the releases repository's GitHub API, so updates are available (`JUNO_E2E_UPDATE_SERVER`). */
   readonly updateServer?: string
+  /** Record the sidebar's order hold and topic list values in the main window (`sidebarTrace.ts` in `@juno/state`; README, "Sidebar trace"). */
+  readonly sidebarTrace?: boolean
+}
+
+/** Puts an empty sidebar trace on the window, which turns the recording on (`@juno/state`'s `sidebarTrace.ts`). */
+const startSidebarTrace = () => {
+  const g = globalThis as { __junoSidebarTrace?: unknown }
+  g.__junoSidebarTrace ??= { hold: [], list: { values: 0, errors: 0 } }
+}
+
+/** A failing test's sidebar trace: attached, and printed on one line so a remote run's log has it. */
+async function attachSidebarTrace(win: Page, testInfo: TestInfo): Promise<void> {
+  const trace = await win.evaluate(() => (globalThis as { __junoSidebarTrace?: unknown }).__junoSidebarTrace).catch(() => undefined)
+  if (trace === undefined) return
+  await testInfo.attach('sidebar-trace', { body: JSON.stringify(trace, null, 1), contentType: 'application/json' })
+  console.log(`sidebar trace (${testInfo.titlePath.slice(1).join(' › ')}): ${JSON.stringify(trace)}`)
 }
 
 let launches = 0
@@ -151,6 +167,11 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   })
   const win = await app.firstWindow()
   await win.waitForLoadState('domcontentloaded')
+  if (options.sidebarTrace === true) {
+    // On this page now, and on any later load.
+    await app.context().addInitScript(startSidebarTrace)
+    await win.evaluate(startSidebarTrace)
+  }
   return {
     app,
     win,
@@ -196,6 +217,8 @@ export interface Fixtures {
   readonly screenShared: boolean
   /** The fake releases API the `running` app checks for updates (`LaunchOptions.updateServer`); undefined leaves updates unavailable. */
   readonly updateServer: string | undefined
+  /** Record the `running` app's sidebar trace and attach it to a failing test (`LaunchOptions.sidebarTrace`); `test.use({ sidebarTrace: true })` opts a file in. */
+  readonly sidebarTrace: boolean
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -269,13 +292,15 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer }, use) => {
+  sidebarTrace: [false, { option: true }],
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace }, use, testInfo) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-      aiJobs, screenShared, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+      aiJobs, screenShared, sidebarTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })
     await use(running)
+    if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(running.win, testInfo)
     await running.close()
   },
   app: async ({ running }, use) => {
@@ -284,6 +309,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   win: async ({ running }, use) => {
     await use(running.win)
   },
+
   juno: async ({ running }, use) => {
     await use(new Juno(running.app, running.win))
   },

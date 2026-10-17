@@ -8,6 +8,9 @@
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const CI_BUILDS = '#ci-builds'

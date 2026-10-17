@@ -3,6 +3,9 @@ import { expect, hooks, test } from './fixtures'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 60_000, mode: 'parallel' })
 
 const POSTGRES = 'Draft plan is in the doc'

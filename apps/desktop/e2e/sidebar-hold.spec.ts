@@ -6,6 +6,9 @@ import { expect, test } from './fixtures'
 import { pointAt, press, type Juno } from './driver/juno'
 import type { FakeSlack } from '@juno/fake-slack'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 60_000 })
 
 /** The Recent section's topic ids, top to bottom. */
