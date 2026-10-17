@@ -147,11 +147,11 @@ function cleanup() {
 
 function main() {
   if (argv.includes('--help')) {
-    console.log('node scripts/batch-merge.mjs [--dry-run | --push] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push]\nChecks are typecheck, lint and the unit tests. Dry run merges and regenerates locally, runs no checks and cannot push.')
+    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint and the unit tests, on a Namespace machine or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
     return
   }
   if (push && dryRun) throw new Error('--dry-run cannot be combined with --push')
-  const unknown = argv.find((arg) => arg.startsWith('-') && !['--push', '--dry-run', '--continue'].includes(arg))
+  const unknown = argv.find((arg) => arg.startsWith('-') && !['--push', '--dry-run', '--continue', '--local'].includes(arg))
   if (unknown) throw new Error(`Unknown option: ${unknown}`)
   mkdirSync(directory, { recursive: true })
   const lock = resolve(directory, 'active.lock')
@@ -189,7 +189,8 @@ function main() {
     if (!state.dryRun) {
       run('pnpm', ['typecheck'])
       run('pnpm', ['lint'])
-      run('pnpm', ['remote', 'test'])
+      // --local runs the unit tests on this Mac through the machine lock, for when Namespace is down.
+      run('pnpm', argv.includes('--local') ? ['test'] : ['remote', 'test'])
     }
     clean()
     if (git(state.worktree, 'rev-parse', 'HEAD') !== checkedHead) throw new Error('HEAD changed during checks; continue to check again')

@@ -1,0 +1,1 @@
+- 10-17 10:30 · owner · Namespace's EU API was down from 07:12 IST, so the owner allowed tests on this Mac: batch merges take `--local` (unit tests through the machine lock) and agents use `pnpm affected --local`, one heavy run at a time, until Namespace is back.

@@ -102,7 +102,8 @@ decision log, runs `pnpm health:baseline`, and commits generated changes. Review
 the baseline diff: regeneration records the merged tree's current health,
 including any increases. Then it runs `pnpm typecheck`, `pnpm lint` and
 `pnpm remote test` (the unit tests on one machine); the full suites run on main
-afterwards (see "Testing"). A failed command retains the worktree;
+afterwards (see "Testing"). When Namespace is down, `--local` runs `pnpm test`
+on this Mac instead, through the machine lock. A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
