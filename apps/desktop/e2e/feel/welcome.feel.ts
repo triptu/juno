@@ -3,9 +3,12 @@
 // set" with all three, and goes on Done. The card keeps one place: nothing
 // around it moves, it is drawn once, and a tick or a return to Home never
 // plays it in again.
+import type { Page } from '@playwright/test'
+import type { FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp } from '../fixtures'
+import type { Juno } from '../driver/juno'
 import { firstFrameRight, happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, shotOfFrame, staysDrawn, switchesOnce, type Check } from './checks'
-import { test as feelTest } from './feel'
+import { type Feel, test as feelTest } from './feel'
 import type { Probe, ProbeFrame } from './recorder'
 
 const RINA = 'Rina finished the onsite'
@@ -57,7 +60,9 @@ const tickedWhileShown = (probe: string, label: string): Check => (evidence) => 
     : { name, status: 'fail', detail: `ticked at #${shot}, after the ${label} closed: a late answer`, shots: [shot] }
 }
 
-test('the welcome card appears, ticks, says all set and goes without moving Home', async ({ juno, win, fake, feel }) => {
+
+/** The first sign-in: the card fills its room once the first sync has rows. */
+async function appear(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise<void> {
   const { welcome, sidebar, write } = juno
   // The first sync has nothing to show yet: the card keeps its room, empty.
   fake.holdNext({ method: 'client.userBoot', before: true })
@@ -92,6 +97,11 @@ test('the welcome card appears, ticks, says all set and goes without moving Home
       await welcome.expectShown()
     },
   )
+}
+
+/** A peek ticks its hint while Home is open. */
+async function tick(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise<void> {
+  const { welcome, sidebar } = juno
   // The first sync ends before the ticks, so its last rows do not land in them.
   await juno.expectEngineLive()
   await sidebar.expectNoSyncStatus()
@@ -124,7 +134,11 @@ test('the welcome card appears, ticks, says all set and goes without moving Home
       await welcome.expectTicked('peek')
     },
   )
+}
 
+/** Back to Home after ⌘-clicking a topic. */
+async function returnHome(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise<void> {
+  const { welcome, sidebar } = juno
   // A topic in a new tab, then back to Home: the card shows its two ticks in its first frame, without an entrance.
   await sidebar.row(POSTGRES).openInNewTab()
   await juno.tabs.expectCount(2)
@@ -147,7 +161,11 @@ test('the welcome card appears, ticks, says all set and goes without moving Home
       await welcome.expectTicked('peek', 'tab')
     },
   )
+}
 
+/** Back to Home after asking Juno: all three done. */
+async function allSet(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise<void> {
+  const { welcome, write } = juno
   // A question to Juno from Home's field opens the Juno chat; Back comes to a card that is all set.
   await write.write('What did I miss today?')
   await write.send()
@@ -171,7 +189,11 @@ test('the welcome card appears, ticks, says all set and goes without moving Home
       await expect(welcome.heading).toHaveText('You’re all set')
     },
   )
+}
 
+/** Done puts the card away. */
+async function done(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise<void> {
+  const { welcome } = juno
   await feel.run(
     {
       name: 'welcome-done',
@@ -193,4 +215,12 @@ test('the welcome card appears, ticks, says all set and goes without moving Home
       await welcome.expectGone()
     },
   )
+}
+
+test('the welcome card appears, ticks, says all set and goes without moving Home', async ({ juno, win, fake, feel }) => {
+  await appear(juno, win, fake, feel)
+  await tick(juno, win, fake, feel)
+  await returnHome(juno, win, fake, feel)
+  await allSet(juno, win, fake, feel)
+  await done(juno, win, fake, feel)
 })

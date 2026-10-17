@@ -30,7 +30,7 @@ export interface Verdict {
 
 export type Check = (evidence: Evidence) => Verdict
 
-interface Window {
+export interface Window {
   /** Look only at frames after this mark. */
   readonly from?: string
   /** And before this one. */
@@ -47,21 +47,21 @@ const BLANK_SPREAD = 3
 /** A flicker changes at least this share of a region and puts it back within two frames. */
 const FLICKER_SHARE = 0.005
 
-function markFrame(recording: Recording, label: string | undefined, fallback: number): number {
+export function markFrame(recording: Recording, label: string | undefined, fallback: number): number {
   if (label === undefined) return fallback
   const mark = recording.marks.find((m) => m.label === label)
   if (mark === undefined) throw new Error(`No mark "${label}" in the recording`)
   return mark.nextFrame
 }
 
-function markTime(recording: Recording, label: string | undefined, fallback: number): number {
+export function markTime(recording: Recording, label: string | undefined, fallback: number): number {
   if (label === undefined) return fallback
   const mark = recording.marks.find((m) => m.label === label)
   if (mark === undefined) throw new Error(`No mark "${label}" in the recording`)
   return mark.t
 }
 
-function framesIn(recording: Recording, window: Window): ReadonlyArray<ProbeFrame> {
+export function framesIn(recording: Recording, window: Window): ReadonlyArray<ProbeFrame> {
   const from = markFrame(recording, window.from, 0)
   const to = markFrame(recording, window.to, recording.frames.length)
   const frames = recording.frames.slice(from, to)
@@ -81,8 +81,8 @@ export function shotAtTime(evidence: Evidence, t: number): number {
   return frame === undefined ? 0 : shotOfFrame(evidence, frame.index)
 }
 
-const shot = (evidence: Evidence, frame: ProbeFrame) => shotOfFrame(evidence, frame.index)
-const shotsOf = (evidence: Evidence, frames: ReadonlyArray<ProbeFrame>) => [...new Set(frames.map((frame) => shot(evidence, frame)))]
+export const shot = (evidence: Evidence, frame: ProbeFrame) => shotOfFrame(evidence, frame.index)
+export const shotsOf = (evidence: Evidence, frames: ReadonlyArray<ProbeFrame>) => [...new Set(frames.map((frame) => shot(evidence, frame)))]
 
 /** The images between two marks, by their stamped frame. */
 function pixelsIn(evidence: Evidence, window: Window): ReadonlyArray<ShotPixels> {
@@ -91,10 +91,10 @@ function pixelsIn(evidence: Evidence, window: Window): ReadonlyArray<ShotPixels>
   return evidence.pixels.filter((p) => p.frame !== null && p.frame >= from && p.frame < to)
 }
 
-const pass = (name: string, detail: string, shots: ReadonlyArray<number> = []): Verdict => ({ name, status: 'pass', detail, shots })
-const fail = (name: string, detail: string, shots: ReadonlyArray<number>): Verdict => ({ name, status: 'fail', detail, shots })
+export const pass = (name: string, detail: string, shots: ReadonlyArray<number> = []): Verdict => ({ name, status: 'pass', detail, shots })
+export const fail = (name: string, detail: string, shots: ReadonlyArray<number>): Verdict => ({ name, status: 'fail', detail, shots })
 
-const isRect = (value: ProbeValue): value is Rect => typeof value === 'object' && value !== null && 'width' in value
+export const isRect = (value: ProbeValue): value is Rect => typeof value === 'object' && value !== null && 'width' in value
 const isScroll = (value: ProbeValue): value is ScrollValue => typeof value === 'object' && value !== null && 'fromBottom' in value
 const isEdge = (value: ProbeValue): value is EdgeValue => typeof value === 'object' && value !== null && 'key' in value
 
@@ -386,45 +386,3 @@ export function happened(label: string, test: (recording: Recording) => boolean)
   return ({ recording }) => (test(recording) ? pass(name, 'yes') : fail(name, 'did not happen, so the other checks prove nothing', []))
 }
 
-/**
- * The answer to an input shows within `frames` animation frames of it: the
- * probe reaches a value `ready` accepts by then. Within one frame is "in the
- * next frame"; a part that loads its code or data first may take a few.
- * `eventType` "mark" counts from the `from` mark instead of an event.
- */
-export function answersWithin(probe: string, eventType: string, label: string, options: Window & { readonly frames?: number; readonly ready?: (value: ProbeValue | undefined) => boolean } = {}): Check {
-  const frames = options.frames ?? 1
-  const name = `${label} answers within ${frames} frame${frames === 1 ? '' : 's'}`
-  const ready = options.ready ?? ((value) => value !== null && value !== undefined && value !== 0 && value !== '')
-  return (evidence) => {
-    const { recording } = evidence
-    const from = markTime(recording, options.from, -Infinity)
-    const events = recording.events.filter((e) => e.type === eventType && e.t >= from)
-    // `mark`: an input the page gets no event for, such as an app menu item; counted from the `from` mark.
-    const event = eventType === 'mark' ? { nextFrame: markFrame(recording, options.from, 0) } : (events.find((e) => e.within.includes(probe)) ?? events[0])
-    if (event === undefined) return fail(name, `no ${eventType} event`, [])
-    const shown = recording.frames.slice(event.nextFrame).find((frame) => ready(frame.values[probe]))
-    if (shown === undefined) return fail(name, `never answered after the ${eventType}`, [shotOfFrame(evidence, event.nextFrame)])
-    const late = shown.index - event.nextFrame + 1
-    const shots = [...new Set([shotOfFrame(evidence, event.nextFrame), shot(evidence, shown)])]
-    return late <= frames ? pass(name, `answered in frame ${late} after the ${eventType}`, shots) : fail(name, `answered in frame ${late} after the ${eventType}: a late answer`, shots)
-  }
-}
-
-/** Once the probe has a box, its width and height never change, wherever it moves: content that loads into a reserved box. */
-export function keepsSize(probe: string, label: string, options: Window = {}): Check {
-  const name = `${label} keeps its size`
-  return (evidence) => {
-    const frames = framesIn(evidence.recording, options).filter((frame) => isRect(frame.values[probe] ?? null))
-    const first = frames[0]
-    if (first === undefined) return fail(name, `${label} never appeared`, [])
-    const box = first.values[probe] as Rect
-    const changed = frames.filter((frame) => {
-      const now = frame.values[probe] as Rect
-      return Math.abs(now.width - box.width) > 0.5 || Math.abs(now.height - box.height) > 0.5
-    })
-    if (changed.length === 0) return pass(name, `${Math.round(box.width)}x${Math.round(box.height)} from #${shot(evidence, first)}`, [shot(evidence, first)])
-    const last = frames.at(-1)!.values[probe] as Rect
-    return fail(name, `${Math.round(box.width)}x${Math.round(box.height)} at #${shot(evidence, first)}, changed in ${changed.length} frames (first at #${shot(evidence, changed[0]!)}), ends ${Math.round(last.width)}x${Math.round(last.height)}`, shotsOf(evidence, [first, ...changed]).slice(0, 12))
-  }
-}

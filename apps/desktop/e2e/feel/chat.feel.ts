@@ -4,7 +4,8 @@
 import { test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
 import { chart, drop } from '../attach'
-import { firstFrameRight, happened, keepsSize, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
+import { keepsSize } from './answers'
+import { firstFrameRight, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
 import { Feel } from './feel'
 import { Studio } from './studio'
 

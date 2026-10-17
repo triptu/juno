@@ -8,7 +8,8 @@ import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { expect, launchApp } from '../fixtures'
 import { Juno } from '../driver/juno'
-import { answersWithin, happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, staysDrawn } from './checks'
+import { answersWithin } from './answers'
+import { happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, staysDrawn } from './checks'
 import { Feel, test } from './feel'
 import { tag } from './pane'
 
@@ -45,6 +46,178 @@ async function select(field: Locator, words: string): Promise<void> {
   }, words)
 }
 
+/** The peek: hold ⌥ over a row. */
+async function peek(feel: Feel, app: Juno): Promise<void> {
+  const { win, sidebar } = app
+  await sidebar.row(RINA).hover()
+  const PEEK = '[role="dialog"][aria-roledescription="peek"]'
+  await feel.run(
+    {
+      name: 'lazy-peek',
+      title: 'Hold ⌥ over a sidebar row first thing after launch: the peek opens whole within three frames, where it stays',
+      probes: [
+        { kind: 'rect', name: 'peek', selector: PEEK },
+        { kind: 'text', name: 'peekText', selector: PEEK },
+        { kind: 'opacity', name: 'peekOpacity', selector: PEEK },
+      ],
+      checks: [
+        answersWithin('peek', 'keydown', 'the peek', { from: 'key', frames: 3 }),
+        opensWhole('peek', 'peekText', 'the peek', { from: 'key' }),
+        landsAndStays('peek', 'the peek', { from: 'key' }),
+        staysDrawn('peekOpacity', 'the peek'),
+        noLayoutShift(),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('key')
+      await win.keyboard.down('Alt')
+      await app.peek.expectShowing(RINA)
+      await win.waitForTimeout(200)
+    },
+  )
+  await app.peek.release()
+  await app.peek.expectClosed()
+}
+
+/** The @ list: the first key in a reply. */
+async function suggestions(feel: Feel, app: Juno): Promise<void> {
+  const { win, sidebar, topic } = app
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
+  await topic.composer.focus()
+  const LIST = '[data-topic-view] [data-mention-suggestions]'
+  const field = await tag(topic.composerField, 'lazy-field')
+  await feel.run(
+    {
+      name: 'lazy-suggestions',
+      title: 'Type "@" in a reply first thing after launch: the list opens whole in the next frames, and the composer holds still',
+      probes: [
+        { kind: 'rect', name: 'list', selector: LIST },
+        { kind: 'text', name: 'listText', selector: LIST },
+        { kind: 'rect', name: 'field', selector: field },
+      ],
+      checks: [
+        answersWithin('list', 'keydown', 'the @ list', { from: 'key', frames: 2 }),
+        opensWhole('list', 'listText', 'the @ list', { from: 'key' }),
+        landsAndStays('list', 'the @ list', { from: 'key' }),
+        landsAndStays('field', 'the composer'),
+        noLayoutShift(),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('key')
+      await win.keyboard.press('@')
+      await expect(topic.suggestion('Maya')).toBeVisible()
+    },
+  )
+  await win.keyboard.press('Escape')
+  await topic.composer.fill('')
+}
+
+/** The link editor: ⌘K on selected words. */
+async function linkEditor(feel: Feel, app: Juno): Promise<void> {
+  const { win, topic } = app
+  await topic.composer.fill('the plan is ready')
+  await select(topic.composer, 'the plan')
+  const field = await tag(topic.composerField, 'lazy-field')
+  const EDITOR = '[data-link-editor]'
+  await feel.run(
+    {
+      name: 'lazy-link-editor',
+      title: 'Press ⌘K on selected words first thing after launch: the link editor opens whole, where it stays',
+      probes: [
+        { kind: 'rect', name: 'editor', selector: EDITOR },
+        { kind: 'text', name: 'editorText', selector: EDITOR },
+        { kind: 'rect', name: 'field', selector: field },
+      ],
+      checks: [
+        // ⌘K comes from the app menu, so it is counted from the mark, with frames for the menu's message.
+        answersWithin('editor', 'mark', 'the link editor', { from: 'key', frames: 3 }),
+        opensWhole('editor', 'editorText', 'the link editor', { from: 'key' }),
+        landsAndStays('editor', 'the link editor', { from: 'key' }),
+        landsAndStays('field', 'the composer'),
+        noLayoutShift(),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('key')
+      await app.palette.shortcut()
+      await expect(topic.linkEditor.url).toBeFocused()
+    },
+  )
+  await win.keyboard.press('Escape')
+  await topic.composer.fill('')
+}
+
+/** The edit field: ↑ then E on your own message. */
+async function editField(feel: Feel, app: Juno): Promise<void> {
+  const { win, sidebar, topic } = app
+  await sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  await topic.composer.press('ArrowUp')
+  const row = topic.message('Shiping the fix today')
+  await expect(row).toBeFocused()
+  await feel.run(
+    {
+      name: 'lazy-edit-field',
+      title: 'Press E on your message first thing after launch: the edit field replaces its body in the next frames, focused',
+      probes: [
+        { kind: 'rect', name: 'edit', selector: '[data-topic-view] [data-inline-edit]' },
+        { kind: 'count', name: 'editing', within: '[data-topic-view]', selector: '[data-editing] [data-inline-edit]' },
+        { kind: 'rect', name: 'composer', selector: '[data-topic-view] [data-composer-field]' },
+      ],
+      regions: { pane: '[data-topic-view] [data-scroll]' },
+      checks: [
+        answersWithin('edit', 'keydown', 'the edit field', { from: 'key', frames: 2 }),
+        landsAndStays('edit', 'the edit field', { from: 'key' }),
+        landsAndStays('composer', 'the composer'),
+        noFlicker('pane', 'the messages'),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('key')
+      await row.press('e')
+      await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
+    },
+  )
+  await win.keyboard.press('Escape')
+}
+
+/** The send check bar: a reply typed into Main, sent. */
+async function sendCheck(feel: Feel, app: Juno, userData: string, teamId: string): Promise<void> {
+  const { topic } = app
+  const since = Date.now()
+  await topic.composer.fill(BILL_REPLY)
+  await routeAnswered(userData, teamId, since)
+  // The textarea, not the field's box, which grows upwards to hold the bar.
+  const mainField = await tag(topic.composer, 'lazy-main-field')
+  const BAR = '[data-topic-view] [data-send-check]'
+  await feel.run(
+    {
+      name: 'lazy-send-check',
+      title: 'Send a reply typed into Main first thing after launch: the check bar shows whole in the next frames, and the field holds still',
+      probes: [
+        { kind: 'rect', name: 'bar', selector: BAR },
+        { kind: 'text', name: 'barText', selector: BAR },
+        { kind: 'rect', name: 'field', selector: mainField },
+      ],
+      checks: [
+        // The bar waits for the engine's check of the draft: a round trip, within the overlays' 50 ms.
+        answersWithin('bar', 'keydown', 'the check bar', { from: 'key', frames: 3 }),
+        opensWhole('bar', 'barText', 'the check bar', { from: 'key' }),
+        landsAndStays('bar', 'the check bar', { from: 'key' }),
+        // The bar grows the composer upwards; the text stays where it was.
+        landsAndStays('field', 'the field', { tolerance: 0 }),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('key')
+      await topic.composer.press('Enter')
+      await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
+    },
+  )
+}
+
 test('each lazy part opens whole and on time the first time after a launch', async ({ juno, fake, running, userData, slackApp, studio }) => {
   await juno.signIn()
   await juno.waitForSync()
@@ -57,166 +230,14 @@ test('each lazy part opens whole and on time the first time after a launch', asy
   const next = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
     const app = new Juno(next.app, next.win)
-    const win = next.win
-    const feel = new Feel(win, studio, 'lazy parts')
-    const { sidebar, topic } = app
-    await sidebar.expectRows()
+    const feel = new Feel(next.win, studio, 'lazy parts')
+    await app.sidebar.expectRows()
 
-    // The peek: hold ⌥ over a row.
-    await sidebar.row(RINA).hover()
-    const PEEK = '[role="dialog"][aria-roledescription="peek"]'
-    await feel.run(
-      {
-        name: 'lazy-peek',
-        title: 'Hold ⌥ over a sidebar row first thing after launch: the peek opens whole within three frames, where it stays',
-        probes: [
-          { kind: 'rect', name: 'peek', selector: PEEK },
-          { kind: 'text', name: 'peekText', selector: PEEK },
-          { kind: 'opacity', name: 'peekOpacity', selector: PEEK },
-        ],
-        checks: [
-          answersWithin('peek', 'keydown', 'the peek', { from: 'key', frames: 3 }),
-          opensWhole('peek', 'peekText', 'the peek', { from: 'key' }),
-          landsAndStays('peek', 'the peek', { from: 'key' }),
-          staysDrawn('peekOpacity', 'the peek'),
-          noLayoutShift(),
-        ],
-      },
-      async (rec) => {
-        await rec.mark('key')
-        await win.keyboard.down('Alt')
-        await app.peek.expectShowing(RINA)
-        await win.waitForTimeout(200)
-      },
-    )
-    await app.peek.release()
-    await app.peek.expectClosed()
-
-    // The @ list: the first key in a reply.
-    await sidebar.row(POSTGRES).open()
-    await topic.expectTitle(POSTGRES)
-    await topic.composer.focus()
-    const LIST = '[data-topic-view] [data-mention-suggestions]'
-    const field = await tag(topic.composerField, 'lazy-field')
-    await feel.run(
-      {
-        name: 'lazy-suggestions',
-        title: 'Type "@" in a reply first thing after launch: the list opens whole in the next frames, and the composer holds still',
-        probes: [
-          { kind: 'rect', name: 'list', selector: LIST },
-          { kind: 'text', name: 'listText', selector: LIST },
-          { kind: 'rect', name: 'field', selector: field },
-        ],
-        checks: [
-          answersWithin('list', 'keydown', 'the @ list', { from: 'key', frames: 2 }),
-          opensWhole('list', 'listText', 'the @ list', { from: 'key' }),
-          landsAndStays('list', 'the @ list', { from: 'key' }),
-          landsAndStays('field', 'the composer'),
-          noLayoutShift(),
-        ],
-      },
-      async (rec) => {
-        await rec.mark('key')
-        await win.keyboard.press('@')
-        await expect(topic.suggestion('Maya')).toBeVisible()
-      },
-    )
-    await win.keyboard.press('Escape')
-    await topic.composer.fill('')
-
-    // The link editor: ⌘K on selected words.
-    await topic.composer.fill('the plan is ready')
-    await select(topic.composer, 'the plan')
-    const EDITOR = '[data-link-editor]'
-    await feel.run(
-      {
-        name: 'lazy-link-editor',
-        title: 'Press ⌘K on selected words first thing after launch: the link editor opens whole, where it stays',
-        probes: [
-          { kind: 'rect', name: 'editor', selector: EDITOR },
-          { kind: 'text', name: 'editorText', selector: EDITOR },
-          { kind: 'rect', name: 'field', selector: field },
-        ],
-        checks: [
-          // ⌘K comes from the app menu, so it is counted from the mark, with frames for the menu's message.
-          answersWithin('editor', 'mark', 'the link editor', { from: 'key', frames: 3 }),
-          opensWhole('editor', 'editorText', 'the link editor', { from: 'key' }),
-          landsAndStays('editor', 'the link editor', { from: 'key' }),
-          landsAndStays('field', 'the composer'),
-          noLayoutShift(),
-        ],
-      },
-      async (rec) => {
-        await rec.mark('key')
-        await app.palette.shortcut()
-        await expect(topic.linkEditor.url).toBeFocused()
-      },
-    )
-    await win.keyboard.press('Escape')
-    await topic.composer.fill('')
-
-    // The edit field: ↑ then E on your own message.
-    await sidebar.row(ENG_MAIN).open()
-    await topic.expectTitle('Main')
-    await topic.composer.press('ArrowUp')
-    const row = topic.message('Shiping the fix today')
-    await expect(row).toBeFocused()
-    await feel.run(
-      {
-        name: 'lazy-edit-field',
-        title: 'Press E on your message first thing after launch: the edit field replaces its body in the next frames, focused',
-        probes: [
-          { kind: 'rect', name: 'edit', selector: '[data-topic-view] [data-inline-edit]' },
-          { kind: 'count', name: 'editing', within: '[data-topic-view]', selector: '[data-editing] [data-inline-edit]' },
-          { kind: 'rect', name: 'composer', selector: '[data-topic-view] [data-composer-field]' },
-        ],
-        regions: { pane: '[data-topic-view] [data-scroll]' },
-        checks: [
-          answersWithin('edit', 'keydown', 'the edit field', { from: 'key', frames: 2 }),
-          landsAndStays('edit', 'the edit field', { from: 'key' }),
-          landsAndStays('composer', 'the composer'),
-          noFlicker('pane', 'the messages'),
-        ],
-      },
-      async (rec) => {
-        await rec.mark('key')
-        await row.press('e')
-        await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
-      },
-    )
-    await win.keyboard.press('Escape')
-
-    // The send check bar: a reply typed into Main, sent.
-    const since = Date.now()
-    await topic.composer.fill(BILL_REPLY)
-    await routeAnswered(userData, fake.teamId, since)
-    // The textarea, not the field's box, which grows upwards to hold the bar.
-    const mainField = await tag(topic.composer, 'lazy-main-field')
-    const BAR = '[data-topic-view] [data-send-check]'
-    await feel.run(
-      {
-        name: 'lazy-send-check',
-        title: 'Send a reply typed into Main first thing after launch: the check bar shows whole in the next frames, and the field holds still',
-        probes: [
-          { kind: 'rect', name: 'bar', selector: BAR },
-          { kind: 'text', name: 'barText', selector: BAR },
-          { kind: 'rect', name: 'field', selector: mainField },
-        ],
-        checks: [
-          // The bar waits for the engine's check of the draft: a round trip, within the overlays' 50 ms.
-          answersWithin('bar', 'keydown', 'the check bar', { from: 'key', frames: 3 }),
-          opensWhole('bar', 'barText', 'the check bar', { from: 'key' }),
-          landsAndStays('bar', 'the check bar', { from: 'key' }),
-          // The bar grows the composer upwards; the text stays where it was.
-          landsAndStays('field', 'the field', { tolerance: 0 }),
-        ],
-      },
-      async (rec) => {
-        await rec.mark('key')
-        await topic.composer.press('Enter')
-        await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
-      },
-    )
+    await peek(feel, app)
+    await suggestions(feel, app)
+    await linkEditor(feel, app)
+    await editField(feel, app)
+    await sendCheck(feel, app, userData, fake.teamId)
   } finally {
     await next.close()
   }

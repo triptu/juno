@@ -9,7 +9,8 @@ import { join } from 'node:path'
 import { SELF_ID, type FakeSlack } from '@juno/fake-slack'
 import { expect, launchApp } from '../fixtures'
 import { Juno, pointAt, press, ReviewSheetPane, type HomeItemKind } from '../driver/juno'
-import { answersWithin, feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayoutShift, opensWhole, switchesOnce } from './checks'
+import { answersWithin } from './answers'
+import { feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayoutShift, opensWhole, switchesOnce } from './checks'
 import { Feel, test } from './feel'
 import { tag } from './pane'
 
@@ -27,20 +28,39 @@ async function freshHome(juno: Juno): Promise<string[]> {
   return juno.home.kinds()
 }
 
-/**
- * Two scenarios on one card: open its sheet, then act on `row`. `name` is
- * the scenarios' prefix, `sheet` the sheet's `data-sheet`.
- */
-async function reviewSheet(feel: Feel, juno: Juno, card: { readonly name: string; readonly kind: HomeItemKind; readonly sheet: string; readonly row: string }): Promise<void> {
-  const { win } = juno
-  const SHEET = `[data-sheet="${card.sheet}"]`
-  const sheetProbes = [
+/** One card: `name` is its scenarios' prefix, `sheet` its sheet's `data-sheet`, `row` the title of the row acted on. */
+interface Card {
+  readonly name: string
+  readonly kind: HomeItemKind
+  readonly sheet: string
+  readonly row: string
+}
+
+const sheetOf = (card: Card) => `[data-sheet="${card.sheet}"]`
+const what = (card: Card) => card.name.replace('review-', '')
+
+/** The sheet, its rows and its list. */
+function sheetProbes(card: Card) {
+  const SHEET = sheetOf(card)
+  return [
     { kind: 'rect', name: 'sheet', selector: SHEET },
     { kind: 'text', name: 'sheetText', selector: `${SHEET} [data-review-heading]` },
     { kind: 'count', name: 'rows', within: 'body', selector: `${SHEET} li[data-review-row]` },
     { kind: 'boxes', name: 'rowBoxes', selector: `${SHEET} li[data-review-row]`, key: 'data-review-row' },
     { kind: 'rect', name: 'list', selector: `${SHEET} ul[data-review-list]` },
   ] as const
+}
+
+/** Three scenarios on one card: open its sheet, act on a row, and close it with Done. */
+async function reviewSheet(feel: Feel, juno: Juno, card: Card): Promise<void> {
+  await openSheet(feel, juno, card)
+  await actOnRow(feel, juno, card)
+  await closeSheet(feel, juno, card)
+}
+
+async function openSheet(feel: Feel, juno: Juno, card: Card): Promise<void> {
+  const { win } = juno
+  const SHEET = sheetOf(card)
   // The row is the card's hover and press surface; its button opens the sheet.
   const opener = await tag(juno.home.item(card.kind), `${card.name}-opener`)
   await pointAt(win, juno.home.item(card.kind).locator('[data-home-review]'))
@@ -48,8 +68,8 @@ async function reviewSheet(feel: Feel, juno: Juno, card: { readonly name: string
   await feel.run(
     {
       name: `${card.name}-open`,
-      title: `Open the ${card.name.replace('review-', '')} card's sheet from Home: it opens with its rows in its first frame, and they never move`,
-      probes: [...sheetProbes, { kind: 'look', name: 'look', selector: opener }],
+      title: `Open the ${what(card)} card's sheet from Home: it opens with its rows in its first frame, and they never move`,
+      probes: [...sheetProbes(card), { kind: 'look', name: 'look', selector: opener }],
       regions: { sheet: SHEET },
       checks: [
         feedbackInOneFrame('look', 'pointerdown', 'the card press', { from: 'press' }),
@@ -67,7 +87,11 @@ async function reviewSheet(feel: Feel, juno: Juno, card: { readonly name: string
       await expect(win.locator(SHEET)).toBeVisible()
     },
   )
+}
 
+async function actOnRow(feel: Feel, juno: Juno, card: Card): Promise<void> {
+  const { win } = juno
+  const SHEET = sheetOf(card)
   const row = new ReviewSheetPane(win, card.sheet).row(card.row)
   const act = await tag(row.locator('[data-review-act]'), `${card.name}-act`)
   await pointAt(win, win.locator(act))
@@ -75,9 +99,9 @@ async function reviewSheet(feel: Feel, juno: Juno, card: { readonly name: string
   await feel.run(
     {
       name: `${card.name}-act`,
-      title: `Act on a row of the ${card.name.replace('review-', '')} sheet: the press shows at once, the row says what happened in place, and no row moves`,
+      title: `Act on a row of the ${what(card)} sheet: the press shows at once, the row says what happened in place, and no row moves`,
       probes: [
-        ...sheetProbes,
+        ...sheetProbes(card),
         { kind: 'look', name: 'look', selector: act },
         { kind: 'count', name: 'handled', within: 'body', selector: `${SHEET} li[data-review-row]:not([data-review-status="open"])` },
         { kind: 'rect', name: 'outcome', selector: `${SHEET} li[data-review-row]:not([data-review-status="open"]) [data-review-outcome]` },
@@ -101,12 +125,16 @@ async function reviewSheet(feel: Feel, juno: Juno, card: { readonly name: string
       await expect(row).not.toHaveAttribute('data-review-status', 'open')
     },
   )
+}
 
-  // Done: the sheet goes in one step back to Home.
+/** Done: the sheet goes in one step back to Home. */
+async function closeSheet(feel: Feel, juno: Juno, card: Card): Promise<void> {
+  const { win } = juno
+  const SHEET = sheetOf(card)
   await feel.run(
     {
       name: `${card.name}-close`,
-      title: `Close the ${card.name.replace('review-', '')} sheet with Done: it goes in one step, and Home is there under it`,
+      title: `Close the ${what(card)} sheet with Done: it goes in one step, and Home is there under it`,
       probes: [
         { kind: 'count', name: 'sheet', within: 'body', selector: SHEET },
         { kind: 'count', name: 'home', within: 'body', selector: '[data-home] [data-home-item]' },
