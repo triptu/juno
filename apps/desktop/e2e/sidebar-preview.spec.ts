@@ -3,7 +3,7 @@
 // DM has no name, yours read "You:"; a channel shows a first name, with a
 // last initial when two people there share it.
 import { SELF_ID, TEAM } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
