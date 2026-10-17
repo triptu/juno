@@ -1,6 +1,7 @@
 // Second break pass of 10-17: Home's composer, the keys held after ⌘N and
 // ⌘T, and short windows, used fast from the keyboard. Findings are in
 // docs/reviews/2026-10-17-break-pass-b.md.
+import { brief, paste } from './attach'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
@@ -122,4 +123,49 @@ test('text pasted right after ⌘T goes into the new Home, in order with the key
   await expect(write.composer).toHaveValue('Re: the launch brief?')
   await tabs.select(POSTGRES)
   await expect(topic.composer).toHaveValue('')
+})
+
+test('keys typed on the destination chip go into the field; arrows and Space still drive the chip', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs, win } = juno
+
+  await tabs.menu('new-message')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.chip).toBeFocused()
+  await win.keyboard.type('What changed today?')
+  await expect(write.composer).toBeFocused()
+  await expect(write.composer).toHaveValue('What changed today?')
+  await write.expectDestination('Juno')
+
+  await win.keyboard.press('Shift+Tab')
+  await expect(write.chip).toBeFocused()
+  await win.keyboard.press('ArrowDown')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await win.keyboard.press('Space')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.composer).toHaveValue('What changed today?')
+})
+
+test('files attached with Juno chosen say Juno reads text only, until a person or channel is chosen', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write } = juno
+  const note = write.root.locator('[data-attachment-note]')
+
+  await write.write('Brief for the launch')
+  await paste(write.composer, [brief()])
+  await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
+  await expect(note).toHaveText('Juno reads text only. Pick a person or channel to send files.')
+  await write.pickConversation('eng', 'eng')
+  await expect(note).toHaveCount(0)
+  await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
+  // Back to Juno: the files stay, and the line comes back.
+  await write.composer.fill('')
+  await write.composer.press('Backspace')
+  await write.expectDestination('Juno')
+  await expect(note).toBeVisible()
 })

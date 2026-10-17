@@ -1,0 +1,1 @@
+- 10-17 12:23 · break-pass-c · Files attached while Juno is Home's destination keep their chips with one muted line under them, "Juno reads text only. Pick a person or channel to send files."; a send to Juno takes the text and the files stay. ⌘N with the destination list open still empties its search, as decided.

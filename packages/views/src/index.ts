@@ -4,6 +4,7 @@ export { AppInfoView } from './AppInfoView'
 export { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from './CommandPalette'
 export { AttachButton } from './AttachButton'
 export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
+export { AttachmentNote } from './AttachmentNote'
 
 export { AudienceWarning } from './AudienceWarning'
 export { Composer, type ComposerMention, type ComposerPopover } from './Composer'

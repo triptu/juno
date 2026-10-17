@@ -34,6 +34,8 @@ export interface DestinationChipProps {
   /** A conversation, or Juno with `undefined`. */
   readonly onPick: (conversation: PickConversation | undefined) => void
   readonly buttonRef?: Ref<HTMLButtonElement>
+  /** A printable key typed on the closed chip: the owner moves focus to the field and types it there, as a token field does. */
+  readonly onType?: (text: string) => void
 }
 
 /**
@@ -45,7 +47,7 @@ export interface DestinationChipProps {
  * nothing; the new name rises into it once, briefly. It opens the
  * destination list above itself, Juno first.
  */
-export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef }: DestinationChipProps) {
+export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef, onType }: DestinationChipProps) {
   useEffect(() => {
     const idle = requestIdleCallback(() => void loadLists(), { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
@@ -73,6 +75,7 @@ export function DestinationChip({ destination, juno = true, open, onOpen, query,
           wide
           expanded={open}
           onOpen={() => onOpen(!open)}
+          {...(onType === undefined ? {} : { onType })}
           change={destination?.key ?? 'juno'}
         >
           {destination?.name ?? none}
@@ -190,18 +193,25 @@ interface PickerButtonProps {
   readonly wide?: boolean
   readonly expanded: boolean
   readonly onOpen: () => void
+  /** A printable key (not Space, which presses the button) typed while the list is closed. */
+  readonly onType?: (text: string) => void
   readonly children: ReactNode
 }
 
-function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, onType, children }: PickerButtonProps) {
   const subtle = muted ?? tint === undefined
   // The name shown first never rises; any later one does.
   const [first] = useState(change)
   const rises = change !== undefined && change !== first
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== 'ArrowDown' || expanded) return
-    event.preventDefault()
-    onOpen()
+    if (expanded) return
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      onOpen()
+    } else if (onType !== undefined && !event.metaKey && !event.ctrlKey && [...event.key].length === 1 && event.key !== ' ') {
+      event.preventDefault()
+      onType(event.key)
+    }
   }
   return (
     <button

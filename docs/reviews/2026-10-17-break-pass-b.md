@@ -114,3 +114,19 @@ first run failed on a wrong fake call in the test itself (see 5).
 - The lazy edit field, peek, link editor and sync cards draw only once
   loaded (`usePreloaded`) and are preloaded on idle and on first want; no
   lost key found by reading. Not timed against a cold chunk.
+
+## Round C: the taste calls, as decided
+
+The orchestrator decided the three taste calls for the owner, done on
+`break-pass-1017c`:
+
+1. A character typed on the closed destination chip goes into the field,
+   and focus moves there. Space, Enter and the arrows keep the chip's keys.
+   Test: "keys typed on the destination chip go into the field; arrows and
+   Space still drive the chip".
+2. Files attached while Juno is chosen show "Juno reads text only. Pick a
+   person or channel to send files." under their chips (`AttachmentNote`).
+   A send to Juno takes the text and the files stay. Test: "files attached
+   with Juno chosen say Juno reads text only, until a person or channel is
+   chosen".
+3. ⌘N with the list open still empties its search.
