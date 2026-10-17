@@ -51,11 +51,6 @@ export function asks(store: Store): ReadonlyArray<Ask> {
   return (store.db.prepare("SELECT * FROM juno_asks WHERE state != 'covered' ORDER BY at, id").all() as unknown as Row[]).map(askOf)
 }
 
-export function ask(store: Store, id: string): Ask | undefined {
-  const row = store.db.prepare('SELECT * FROM juno_asks WHERE id = ?').get(id) as Row | undefined
-  return row === undefined ? undefined : askOf(row)
-}
-
 /**
  * The setup ask, once ever. `ready` names the context connections already
  * connected: the setup pass reads them, so they get no ask of their own.

@@ -101,55 +101,10 @@ export function createLearning(options: LearningOptions): Learning {
   const limits = { ...learnLimits, ...options.limits }
   const passes = new Map<string, { readonly controller: AbortController; readonly done: Promise<void> }>()
 
-  const run = async (askId: string, signal: AbortSignal): Promise<{ readonly state: 'done' | 'failed' | 'stopped'; readonly result: LearnResult }> => {
-    let written = 0
-    const ref = options.model()
-    const model = ref === undefined ? undefined : options.guard.models.getModel(ref.provider, ref.modelId)
-    if (model === undefined) return { state: 'failed', result: { written, ended: 'noModel' } }
-    const tools = passTools(options, askId, () => {
-      written += 1
-    })
-    const context: Context = {
-      systemPrompt: LEARN_INSTRUCTIONS,
-      tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })),
-      messages: [{ role: 'user', timestamp: 0, content: task(store, options.connections?.()) } as WireContext['messages'][number]],
-    }
-    let spent = 0
-    for (let step = 0; step < limits.steps; step++) {
-      if (signal.aborted) return { state: 'stopped', result: { written } }
-      if (mode(store) !== 'on') return { state: 'stopped', result: { written, ended: 'paused' } }
-      const stamped = options.guard.stamp(readRevision(store), model, context as unknown as WireContext, 'subagent')
-      const message = await options.guard.models.completeSimple(model, stamped, { sessionId: `juno-learn-${askId}`, signal })
-      if (signal.aborted || message.stopReason === 'aborted') return { state: 'stopped', result: { written } }
-      if (message.stopReason === 'error') {
-        const ending = providerFailure(message.errorMessage).ending
-        const ended = ending._tag === 'blocked' && ending.reason === 'budget' ? 'budget' : 'failed'
-        return { state: written > 0 && ended === 'budget' ? 'done' : 'failed', result: { written, ended } }
-      }
-      spent += Number.isFinite(message.usage.cost.total) ? message.usage.cost.total : 0
-      context.messages.push(message as unknown as WireContext['messages'][number])
-      const calls = (message.content as Content).filter((part) => part.type === 'toolCall')
-      if (calls.length === 0) break
-      for (const call of calls) {
-        const tool = tools.find((candidate) => candidate.name === call.name)
-        const output = tool === undefined ? { text: `There is no tool ${call.name}.`, isError: true } : await tool.run(call.arguments ?? {}, call.id ?? '', signal)
-        if (tool !== undefined) progress(store, askId, lineOf(tool.name))
-        options.changed()
-        context.messages.push({
-          role: 'toolResult', toolCallId: call.id, toolName: call.name, timestamp: 0,
-          content: [{ type: 'text', text: cut(output.text, limits.result) }], isError: output.isError === true,
-        } as unknown as WireContext['messages'][number])
-      }
-      // At the pass's own spend line it stops reading and keeps what it wrote.
-      if (spent >= limits.spend) break
-    }
-    return { state: 'done', result: { written } }
-  }
-
   const launch = (askId: string) => {
     const controller = new AbortController()
     const deadline = setTimeout(() => controller.abort(new Error('deadline')), limits.deadlineMs)
-    const done = run(askId, controller.signal)
+    const done = runPass(options, limits, askId, controller.signal)
       .then(
         (outcome) => {
           // The deadline is not a failure: the pass keeps what it wrote.
@@ -199,6 +154,53 @@ export function createLearning(options: LearningOptions): Learning {
       await Promise.all([...passes.values()].map((pass) => pass.done))
     },
   }
+}
+
+/** One pass, until the model stops calling tools or a limit ends it. Resolves with how it ended and what it wrote. */
+async function runPass(options: LearningOptions, limits: typeof learnLimits, askId: string, signal: AbortSignal): Promise<{ readonly state: 'done' | 'failed' | 'stopped'; readonly result: LearnResult }> {
+  const { store } = options
+  let written = 0
+  const ref = options.model()
+  const model = ref === undefined ? undefined : options.guard.models.getModel(ref.provider, ref.modelId)
+  if (model === undefined) return { state: 'failed', result: { written, ended: 'noModel' } }
+  const tools = passTools(options, askId, () => {
+    written += 1
+  })
+  const context: Context = {
+    systemPrompt: LEARN_INSTRUCTIONS,
+    tools: tools.map(({ name, description, parameters }) => ({ name, description, parameters })),
+    messages: [{ role: 'user', timestamp: 0, content: task(store, options.connections?.()) } as WireContext['messages'][number]],
+  }
+  let spent = 0
+  for (let step = 0; step < limits.steps; step++) {
+    if (signal.aborted) return { state: 'stopped', result: { written } }
+    if (mode(store) !== 'on') return { state: 'stopped', result: { written, ended: 'paused' } }
+    const stamped = options.guard.stamp(readRevision(store), model, context as unknown as WireContext, 'subagent')
+    const message = await options.guard.models.completeSimple(model, stamped, { sessionId: `juno-learn-${askId}`, signal })
+    if (signal.aborted || message.stopReason === 'aborted') return { state: 'stopped', result: { written } }
+    if (message.stopReason === 'error') {
+      const ending = providerFailure(message.errorMessage).ending
+      const ended = ending._tag === 'blocked' && ending.reason === 'budget' ? 'budget' : 'failed'
+      return { state: written > 0 && ended === 'budget' ? 'done' : 'failed', result: { written, ended } }
+    }
+    spent += Number.isFinite(message.usage.cost.total) ? message.usage.cost.total : 0
+    context.messages.push(message as unknown as WireContext['messages'][number])
+    const calls = (message.content as Content).filter((part) => part.type === 'toolCall')
+    if (calls.length === 0) break
+    for (const call of calls) {
+      const tool = tools.find((candidate) => candidate.name === call.name)
+      const output = tool === undefined ? { text: `There is no tool ${call.name}.`, isError: true } : await tool.run(call.arguments ?? {}, call.id ?? '', signal)
+      if (tool !== undefined) progress(store, askId, lineOf(tool.name))
+      options.changed()
+      context.messages.push({
+        role: 'toolResult', toolCallId: call.id, toolName: call.name, timestamp: 0,
+        content: [{ type: 'text', text: cut(output.text, limits.result) }], isError: output.isError === true,
+      } as unknown as WireContext['messages'][number])
+    }
+    // At the pass's own spend line it stops reading and keeps what it wrote.
+    if (spent >= limits.spend) break
+  }
+  return { state: 'done', result: { written } }
 }
 
 /** The ask's live line: what the pass does now, naming real things. */

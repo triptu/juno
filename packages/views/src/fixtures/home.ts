@@ -12,6 +12,9 @@ const releases = { id: 'm:C0RELEASES', title: '#releases', place: 'releases' }
 const vendorStatus = { id: 'm:C0VENDORSTATUSUPDATES', title: '#vendor-status-updates', place: 'vendor-status-updates' }
 
 export const homeItems = {
+  // A proactive ask from Juno (SPEC 13.6): the renderer adds it beside the engine's items.
+  ask: { id: 'ask:a1', kind: 'ask', title: 'Let Juno learn how you work', topics: [], at: NOW - 2 * MINUTE, ask: { id: 'a1', sources: ['Littlebird'] } },
+  askConnection: { id: 'ask:a2', kind: 'ask', title: 'Let Juno learn from Notion', topics: [], at: NOW - 2 * MINUTE, ask: { id: 'a2', connection: 'Notion', sources: ['Notion'] } },
   waiting: { id: `waiting:${hiring.id}`, kind: 'waiting', title: 'Elena asked you something', topics: [hiring], at: NOW - 12 * MINUTE },
   resume: { id: `resume:${postgres.id}`, kind: 'resume', title: 'Pick up where you left off', topics: [postgres], at: NOW - 26 * 60 * MINUTE },
   moved: { id: `moved:${proposal.id}`, kind: 'moved', title: 'Moved a lot since you looked', topics: [proposal], newCount: 14 },

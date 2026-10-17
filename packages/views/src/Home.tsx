@@ -5,7 +5,7 @@ import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { metaOf, opensReview, rowButtons, TILE_ICONS } from './homeRows'
+import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -32,6 +32,8 @@ export interface HomeProps {
   readonly onItemMenu: (itemId: string) => void
   /** Dismiss on Automated's record: its moves are not listed again. Without it the card has no button. */
   readonly onDismiss?: (itemId: string) => void
+  /** A proactive ask's Start and Not now, and its row, which opens the ask in the Juno chat. Without it the row has no buttons. */
+  readonly onAsk?: (itemId: string, answer: HomeAskAnswer) => void
   /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
@@ -51,7 +53,7 @@ export interface HomeProps {
  * when a title line is rewritten: a title is one ellipsised line in a 52px
  * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -87,6 +89,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
                   onSort={onSort}
                   onItemMenu={onItemMenu}
                   onDismiss={onDismiss}
+                  onAsk={onAsk}
                 />
               ))}
             </ul>
@@ -100,7 +103,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
 }
 
 /** A row's own props, and the callbacks Home passes down. */
-type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss'>
+type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss' | 'onAsk'>
 
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
@@ -110,7 +113,7 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  * in All and Move, or Dismiss on Automated's record. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss }: HomeRowProps) {
+function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
   const topic = item.topics[0]
   const tileIcon = TILE_ICONS[item.kind]
   const body = (
@@ -133,7 +136,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       </span>
     </>
   )
-  const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort, onDismiss)
+  const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort, onDismiss, onAsk)
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
   const menu =
     item.kind === 'automated' || item.kind === 'mentioned'
@@ -144,8 +147,9 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       : undefined
   return (
     <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
-      {opensReview(item.kind) ? (
-        <button type="button" aria-haspopup="dialog" onClick={() => onReview(item.id)} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
+      {opensReview(item.kind) || item.kind === 'ask' ? (
+        // A review card opens its sheet; a proactive ask opens the Juno chat at it.
+        <button type="button" aria-haspopup={item.kind === 'ask' ? undefined : 'dialog'} onClick={() => (item.kind === 'ask' ? onAsk?.(item.id, 'open') : onReview(item.id))} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
           {body}
           <span {...stylex.props(styles.caret)}>
             <Icon icon={CaretRight} size={13} />
@@ -174,7 +178,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
           {done
             ? null
             : buttons.map((button) => (
-                <Button key={button.label} variant={button.label === 'Move' ? 'raised' : 'ghost'} size="sm" tone={button.label === 'Move' ? 'default' : 'muted'} onClick={button.run}>
+                <Button key={button.label} variant={button.primary ? 'raised' : 'ghost'} size="sm" tone={button.primary ? 'default' : 'muted'} onClick={button.run}>
                   {button.label}
                 </Button>
               ))}

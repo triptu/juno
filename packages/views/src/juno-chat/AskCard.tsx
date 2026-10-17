@@ -17,7 +17,7 @@ export interface AskCardProps {
 const copy = chatCopy.ask.learn
 
 /** The ask's title: "Let Juno learn how you work", or "Let Juno learn from Littlebird". */
-export const askTitle = (ask: ProactiveAsk): string => (ask.reason === 'connection' ? copy.title.connection(ask.connection ?? '') : copy.title.setup)
+const askTitle = (ask: ProactiveAsk): string => (ask.reason === 'connection' ? copy.title.connection(ask.connection ?? '') : copy.title.setup)
 
 /**
  * A proactive ask in the chat (SPEC 13.6, 13.8): what Juno offers to do and

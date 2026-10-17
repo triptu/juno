@@ -52,6 +52,7 @@ import TopicView from './TopicView.fixtures'
 import WelcomeCard from './WelcomeCard.fixtures'
 import Workspace from './Workspace.fixtures'
 import WhyPopover from './WhyPopover.fixtures'
+import AskCard from './juno-chat/AskCard.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
 import NoProvider from './juno-chat/NoProvider.fixtures'
@@ -70,6 +71,7 @@ import ConnectionsPage from './juno-pages/ConnectionsPage.fixtures'
 import ConnectionToolsSheet from './juno-pages/ConnectionToolsSheet.fixtures'
 import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
+import MemoryDocsPage from './juno-pages/MemoryDocsPage.fixtures'
 import ProviderSection from './juno-pages/ProviderSection.fixtures'
 import RemembersPage from './juno-pages/RemembersPage.fixtures'
 import ReviewPage from './juno-pages/ReviewPage.fixtures'
@@ -89,6 +91,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ChannelIconPicker,
   BudgetCard: budgetCard,
   ChangeCard: changeCard,
+  AskCard,
   ChatCard,
   AudienceWarning,
   Composer,
@@ -115,6 +118,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   JunoSettingsPage,
   ProviderSection,
   MemoryPage,
+  MemoryDocsPage,
   Message,
   MessageList,
   CommandPalette,

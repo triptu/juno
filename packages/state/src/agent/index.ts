@@ -3,9 +3,9 @@ export { chatActions, chatItemsAtom, chatSummaryAtom, junoNavAtom, MAX_SEND_BYTE
 export { junoReadsImagesAtom, junoThumbAtom } from './files'
 export {
   activityPageAtom,
-  asksAtom,
   connectionsPageAtom,
   docsPageAtom,
+  homeAsksAtom,
   junoPageActions,
   junoSettingsAtom,
   junoSettingsNow,

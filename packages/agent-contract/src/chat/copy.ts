@@ -308,6 +308,13 @@ export const chatCopy = {
   /** Juno's memory of the owner (SPEC 13.8), on the memory page and in the chat's notes. */
   docs: {
     titles: { you: 'About you', people: 'People', projects: 'Projects', preferences: 'Preferences', style: 'Writing style' },
+    hints: {
+      you: 'Your role and your work.',
+      people: 'People you work with.',
+      projects: 'What you work on.',
+      preferences: 'How you like things done.',
+      style: 'How you write in Slack. Juno uses it when it drafts a message for you.',
+    },
     title: 'What Juno remembers',
     subtitle: 'Short notes Juno keeps about you and updates as it learns. Edit or delete any of them.',
     docEmpty: 'Nothing yet.',
