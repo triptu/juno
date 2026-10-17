@@ -13,6 +13,12 @@
  *   done, found by the job (`job.ts`).
  * - Tidy up (AI assist on): followed topics the settled decision scored at
  *   least `SETTLED_MIN_SCORE`, scored after their latest activity.
+ * - Follow-ups that look done (AI assist on, Settings › Tidy up): promises
+ *   not marked done where a later message of the user's in the topic has a
+ *   file, a link or words that hand it over (`followUpDelivery`). Such a
+ *   promise leaves Follow-up for this card.
+ * - Old drafts (Settings › Tidy up): drafts untouched for two weeks in a
+ *   topic with activity since (`isOldDraft`), not kept as they are.
  * - Automated: the most recently active conversation the rules and Juno
  *   could not place (`ask` in `automated_channels`, by `automated.ts`), in
  *   no view, while the user has not deleted the Automated view.
@@ -26,14 +32,19 @@
  * (`homeTitle` in `ai_cache`) when it was made after the topic's latest
  * activity and was confident.
  */
-import { HOME_ITEM_LIMIT, TIDY_UP_PREF, TIDY_UP_QUIET_MILLIS, tidyUpPrefsOf, type HomeItem, type HomeTopic, type HomeView, type SettledWhy } from '@juno/contract'
+import { HOME_ITEM_LIMIT, TIDY_UP_PREF, TIDY_UP_QUIET_MILLIS, tidyUpPrefsOf, type FollowUpMatch, type HomeItem, type HomeTopic, type HomeView, type OldDraft, type SettledWhy } from '@juno/contract'
 import {
   asksUser,
   automatedReason,
   AUTOMATED_VIEW_ID,
   channelLabel,
   channelLabelBare,
+  draftFirstLine,
   firstName,
+  followUpDelivery,
+  isOldDraft,
+  messagePreviewText,
+  OLD_DRAFT_MILLIS,
   millisToTs,
   MOVED_A_LOT_MIN,
   rankHomeItems,
@@ -47,6 +58,7 @@ import {
 import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
+import type { File as SlackFile } from '@juno/slack-schema'
 import { aiAssistOn } from '../ai'
 import { moveLines, readMoves, type MoveRow } from './moves'
 import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
@@ -76,6 +88,15 @@ const SETTLED_READ = 30
 const SETTLED_SHOWN = 20
 /** Messages read per settled topic: the ones the decision read (`job.ts`). */
 const SETTLED_MESSAGES = 12
+/** Follow-ups that look done: the promises looked at, newest first, the messages read after each, and the most it proposes. */
+const PROMISES_READ = 30
+const DELIVERY_MESSAGES = 50
+const DONE_SHOWN = 20
+/** Old drafts: the drafts looked at, oldest change first, and the most it proposes. */
+const DRAFTS_READ = 40
+const DRAFTS_SHOWN = 20
+/** The messages since an old draft that its row counts; more reads "50+". */
+const DRAFT_SINCE_MAX = 50
 
 interface Statement {
   readonly sql: string
@@ -94,7 +115,7 @@ export const homeStatements = {
     params: [...ids],
   }),
   threadAfter: (channel: string, threadTs: string, after: string, limit = QUESTION_WINDOW): Statement => ({
-    sql: `SELECT ts, user_id, text FROM messages WHERE channel = ? AND thread_ts = ? AND ts > ? AND deleted = 0 ORDER BY ts DESC LIMIT ?`,
+    sql: `SELECT ts, user_id, text, files_json FROM messages WHERE channel = ? AND thread_ts = ? AND ts > ? AND deleted = 0 ORDER BY ts DESC LIMIT ?`,
     params: [channel, threadTs, after, limit],
   }),
   /** The Main of the newest conversation Home asks about for Automated. */
@@ -122,7 +143,7 @@ export const homeStatements = {
     params: [channel],
   }),
   mainAfter: (channel: string, after: string, limit = QUESTION_WINDOW): Statement => ({
-    sql: `SELECT ts, user_id, text FROM messages WHERE channel = ? AND ts > ? AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND deleted = 0
+    sql: `SELECT ts, user_id, text, files_json FROM messages WHERE channel = ? AND ts > ? AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND deleted = 0
       ORDER BY ts DESC LIMIT ?`,
     params: [channel, after, limit],
   }),
@@ -132,6 +153,17 @@ export interface MessageRow {
   readonly ts: string
   readonly user_id: string | null
   readonly text: string
+  readonly files_json: string | null
+}
+
+const filesOf = (json: string | null): ReadonlyArray<SlackFile> => {
+  if (json === null) return []
+  try {
+    const files = JSON.parse(json) as unknown
+    return Array.isArray(files) ? (files as ReadonlyArray<SlackFile>) : []
+  } catch {
+    return []
+  }
 }
 
 /** The messages after `after`, newest first: a thread's replies, or a Main's top-level messages. */
@@ -159,6 +191,14 @@ function waitingQuestion(messages: ReadonlyArray<MessageRow>, selfId: string, di
   return undefined
 }
 
+/** A promise and the later message of the user's that matches it. */
+interface Delivered {
+  readonly promiseTs: string
+  readonly promise: string
+  readonly kind: FollowUpMatch['kind']
+  readonly message: MessageRow
+}
+
 interface Candidate {
   readonly item: Omit<HomeItem, 'topics' | 'aiTitle'>
   readonly rows: ReadonlyArray<HomeRow>
@@ -166,6 +206,10 @@ interface Candidate {
   readonly settled?: ReadonlyMap<string, SettledWhy>
   /** Automated's record: each Main's move, by topic id. */
   readonly moves?: ReadonlyMap<string, MoveRow>
+  /** Follow-ups that look done: the promise and the matching message, by topic id. */
+  readonly delivered?: ReadonlyMap<string, Delivered>
+  /** Old drafts, by topic id. */
+  readonly drafts?: ReadonlyMap<string, OldDraft>
 }
 
 /** What `readHome` returns: the view, and the items whose title line the assistant may rewrite. */
@@ -218,8 +262,9 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const now = yield* Clock.currentTimeMillis
     const unread = yield* run(homeStatements.unread(millisToTs(now - UNREAD_DAYS * DAY)))
     const candidates: Array<HomeCandidate<Candidate>> = []
-    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, extra?: Pick<Candidate, 'settled' | 'moves'>) =>
+    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, extra: Omit<Candidate, 'item' | 'rows'> = {}) =>
       candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...extra } })
+    const tidy = tidyUpPrefsOf(yield* prefs.get<unknown>(TIDY_UP_PREF).pipe(Effect.catch(() => Effect.succeed(undefined))))
     const senders = new Set<string>()
 
     // Waiting on you: the newest topic with a question first.
@@ -246,18 +291,39 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     for (const row of moved) add({ id: `moved:${row.topic_id}`, kind: 'moved', title: 'Moved a lot since you looked', newCount: row.unread_count }, [row])
 
     if (aiAssist) {
-      const promises = yield* sql<{ topic_id: string; message_ts: string; text: string }>`
-        SELECT topic_id, message_ts, text FROM follow_ups WHERE done_at IS NULL ORDER BY message_ts DESC LIMIT 10`
+      const promises = yield* sql<{ topic_id: string; message_ts: string; text: string; match_kept_ts: string | null }>`
+        SELECT topic_id, message_ts, text, match_kept_ts FROM follow_ups WHERE done_at IS NULL ORDER BY message_ts DESC LIMIT ${PROMISES_READ}`
       const promiseRows = promises.length === 0 ? [] : yield* run(homeStatements.topics([...new Set(promises.map((p) => p.topic_id))]))
-      for (const promise of promises) {
+      // Follow-ups that look done (docs/design/settled-suggestions, card 4): one per topic, its newest promise with a match.
+      const delivered = new Map<string, Delivered>()
+      if (tidy.followUps && selfId !== undefined) {
+        for (const promise of promises) {
+          if (delivered.size >= DONE_SHOWN || delivered.has(promise.topic_id)) continue
+          const row = promiseRows.find((r) => r.topic_id === promise.topic_id)
+          if (row === undefined || row.last_activity_ts === null || row.last_activity_ts <= promise.message_ts) continue
+          const later = yield* messagesAfter(row, promise.message_ts, DELIVERY_MESSAGES)
+          const match = followUpDelivery(
+            promise.message_ts,
+            later.map((m) => ({ ts: m.ts, user_id: m.user_id, text: m.text, files: filesOf(m.files_json).length })),
+            selfId,
+            promise.match_kept_ts ?? undefined,
+          )
+          const message = match === undefined ? undefined : later.find((m) => m.ts === match.ts)
+          if (match !== undefined && message !== undefined) delivered.set(promise.topic_id, { promiseTs: promise.message_ts, promise: promise.text, kind: match.kind, message })
+        }
+      }
+      for (const promise of promises.slice(0, 10)) {
         const row = promiseRows.find((r) => r.topic_id === promise.topic_id)
-        if (row === undefined) continue
+        if (row === undefined || delivered.get(row.topic_id)?.promiseTs === promise.message_ts) continue
         add({ id: `followUp:${row.topic_id}:${promise.message_ts}`, kind: 'followUp', title: promise.text, at: tsToMillis(promise.message_ts as Ts), messageTs: promise.message_ts }, [row])
+      }
+      if (delivered.size > 0) {
+        const rows = [...delivered.keys()].flatMap((id) => promiseRows.filter((row) => row.topic_id === id))
+        add({ id: 'doneFollowUps', kind: 'doneFollowUps', title: '' }, rows, { delivered })
       }
 
       // Tidy up (docs/design/settled-suggestions): scored high after the latest activity, quiet for the time
       // Settings › Tidy up chooses, of a kind it includes, not kept open since, and nothing waiting on the user.
-      const tidy = tidyUpPrefsOf(yield* prefs.get<unknown>(TIDY_UP_PREF).pipe(Effect.catch(() => Effect.succeed(undefined))))
       const scored = yield* sql<{ key: string; output_json: string; created_at: string }>`
         SELECT key, output_json, created_at FROM ai_cache WHERE task = 'settledScore'`
       const high = scored.filter((entry) => (parseScore(entry.output_json) ?? 0) >= SETTLED_MIN_SCORE)
@@ -290,6 +356,29 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         }
         add({ id: 'tidyUp', kind: 'tidyUp', title: `${settled.length} topics look settled` }, settled, { settled: why })
       }
+    }
+
+    // Old drafts (card 5): untouched for two weeks, in a topic that moved on since, not kept as they are. With AI on or off.
+    if (tidy.drafts) {
+      const stored = yield* sql<{ topic_id: string; text: string; updated_at: string; kept_at: string | null }>`
+        SELECT topic_id, text, updated_at, kept_at FROM drafts WHERE CAST(updated_at AS INTEGER) <= ${now - OLD_DRAFT_MILLIS}
+        ORDER BY CAST(updated_at AS INTEGER) LIMIT ${DRAFTS_READ}`
+      const rows = stored.length === 0 ? [] : yield* run(homeStatements.topics(stored.map((draft) => draft.topic_id)))
+      const drafts = new Map<string, OldDraft>()
+      const shown: Array<HomeRow> = []
+      for (const draft of stored) {
+        if (shown.length >= DRAFTS_SHOWN) break
+        const row = rows.find((r) => r.topic_id === draft.topic_id)
+        const updatedAt = Number(draft.updated_at)
+        const text = draftFirstLine(draft.text)
+        if (row === undefined || text === '') continue
+        const activity = row.last_activity_ts === null ? undefined : tsToMillis(row.last_activity_ts as Ts)
+        if (!isOldDraft({ updatedAt, ...(draft.kept_at === null ? {} : { keptAt: Number(draft.kept_at) }) }, activity, now)) continue
+        const since = (yield* messagesAfter(row, millisToTs(updatedAt), DRAFT_SINCE_MAX + 1)).filter((m) => m.user_id !== null).length
+        drafts.set(row.topic_id, { text, at: updatedAt, since: Math.min(since, DRAFT_SINCE_MAX), ...(since > DRAFT_SINCE_MAX ? { more: true as const } : {}) })
+        shown.push(row)
+      }
+      if (shown.length > 0) add({ id: 'oldDrafts', kind: 'oldDrafts', title: '' }, shown, { drafts })
     }
 
     // Automated: a conversation the rules and Juno could not place. Asked with AI on or off.
@@ -362,6 +451,10 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
           ? `${firstName(nameOf(base.title))} asked you something`
           : base.kind === 'tidyUp'
             ? `${rows.length} topics look settled`
+            : base.kind === 'doneFollowUps'
+              ? rows.length === 1 ? '1 follow-up looks done' : `${rows.length} follow-ups look done`
+              : base.kind === 'oldDrafts'
+                ? rows.length === 1 ? '1 old draft' : `${rows.length} old drafts`
             : channel !== undefined
               ? `Move ${channel.label}?`
               : base.title
@@ -381,7 +474,19 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         const ref = automatedChannelOf(row)
         return { ...topic, at: Number(move.at), moved: { channel: ref, change: move.change, ...moveLines(move) } }
       }
-      const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : topicOf
+      const deliveredOf = (row: HomeRow): HomeTopic => {
+        const match = candidate.value.delivered?.get(row.topic_id)
+        const topic = topicOf(row)
+        if (match === undefined) return topic
+        const files = filesOf(match.message.files_json)
+        const text = messagePreviewText({ text: match.message.text, ...(files.length === 0 ? {} : { files }) }, { ...(selfId === undefined ? {} : { me: selfId }), user: nameOf })
+        return { ...topic, at: tsToMillis(match.promiseTs as Ts), followUp: { promiseTs: match.promiseTs, promise: match.promise, ts: match.message.ts, kind: match.kind, text } }
+      }
+      const draftOf = (row: HomeRow): HomeTopic => {
+        const draft = candidate.value.drafts?.get(row.topic_id)
+        return draft === undefined ? topicOf(row) : { ...topicOf(row), draft }
+      }
+      const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : base.kind === 'doneFollowUps' ? deliveredOf : base.kind === 'oldDrafts' ? draftOf : topicOf
       const item: HomeItem = { ...base, title, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item

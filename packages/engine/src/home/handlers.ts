@@ -9,10 +9,12 @@
  * So rewrites are asked for only while Home is on screen, and only after
  * the first sync, when the people they name are known.
  *
- * `home.visit`, `home.markDone` and `home.movesSeen` are small local writes.
+ * `home.visit`, `home.markDone` and `home.movesSeen` are small local
+ * writes, as are the reviews' commands on follow-ups and drafts; each of
+ * those returns the undo that puts the row back as it was stored.
  */
 import { AiProvider, tasks } from '@juno/ai'
-import { HomeRoutes, NotSignedIn } from '@juno/contract'
+import { HomeRoutes, NotSignedIn, type CommandResult, type UndoCommand } from '@juno/contract'
 import { Invalidation, keys, liveQuery, prefs, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
@@ -22,6 +24,9 @@ import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
 import { MOVES_SEEN_PREF } from './moves'
 import { readHome, type HomeRun } from './query'
+
+/** Invalidated when a review deletes, keeps or restores a draft. */
+const DRAFT_REVIEWS = 'draft_reviews'
 
 const KEYS: InvalidationKeys = [
   'topics',
@@ -41,7 +46,12 @@ const KEYS: InvalidationKeys = [
   'automated_channels',
   'automated_moves',
   'sidebar_views',
+  // Old drafts: the reviews' own writes. A draft being typed changes nothing Home shows: a draft that new is never old.
+  DRAFT_REVIEWS,
 ]
+
+type FollowUpRow = { done_at: string | null; match_kept_ts: string | null }
+type DraftRow = { text: string; updated_at: string; kept_at: string | null }
 
 /** Visits kept; Home reads only the newest. */
 const VISITS_KEPT = 20
@@ -117,6 +127,29 @@ export const HomeHandlers = HomeRoutes.toLayer(
         yield* transaction(effect).pipe(Effect.provide(open.context), Effect.orDie)
       })
 
+    /** Runs a write that returns its undo. */
+    const command = (effect: Effect.Effect<UndoCommand | undefined, SqlError, StoreWriter | Invalidation>): Effect.Effect<CommandResult, NotSignedIn> =>
+      Effect.gen(function* () {
+        const open = yield* workspace.current
+        if (open === undefined) return yield* new NotSignedIn()
+        const undo = yield* transaction(effect).pipe(Effect.provide(open.context), Effect.orDie)
+        return undo === undefined ? {} : { undo }
+      })
+
+    const followUp = (topicId: string, messageTs: string) =>
+      Effect.gen(function* () {
+        const sql = yield* StoreWriter
+        return (yield* sql<FollowUpRow>`SELECT done_at, match_kept_ts FROM follow_ups WHERE topic_id = ${topicId} AND message_ts = ${messageTs}`)[0]
+      })
+    const followUpUndo = (topicId: string, messageTs: string, row: FollowUpRow): UndoCommand => ({ _tag: 'followUps.restore', topicId, messageTs, doneAt: row.done_at, matchKeptTs: row.match_kept_ts })
+    const draft = (topicId: string) =>
+      Effect.gen(function* () {
+        const sql = yield* StoreWriter
+        return (yield* sql<DraftRow>`SELECT text, updated_at, kept_at FROM drafts WHERE topic_id = ${topicId}`)[0]
+      })
+    const draftUndo = (topicId: string, row: DraftRow): UndoCommand => ({ _tag: 'drafts.restore', topicId, text: row.text, updatedAt: row.updated_at, keptAt: row.kept_at })
+    const draftsChanged = (topicId: string) => Invalidation.use((i) => i.invalidate({ drafts: [topicId], [DRAFT_REVIEWS]: [] }))
+
     return {
       'home.view': () => view(),
       'home.visit': ({ id }) =>
@@ -146,6 +179,73 @@ export const HomeHandlers = HomeRoutes.toLayer(
             if (channels.length > 0) yield* sql`UPDATE automated_moves SET seen_at = ${String(now)} WHERE channel IN ${sql.in(channels)} AND seen_at IS NULL`
             yield* prefs.set(MOVES_SEEN_PREF, now)
             yield* (yield* Invalidation).invalidate(keys.automatedMoves)
+          }),
+        ),
+      'followUps.markDone': ({ topicId, messageTs }) =>
+        command(
+          Effect.gen(function* () {
+            const row = yield* followUp(topicId, messageTs)
+            if (row === undefined || row.done_at !== null) return undefined
+            const sql = yield* StoreWriter
+            const now = String(yield* Clock.currentTimeMillis)
+            yield* sql`UPDATE follow_ups SET done_at = ${now} WHERE topic_id = ${topicId} AND message_ts = ${messageTs}`
+            yield* (yield* Invalidation).invalidate(keys.followUps)
+            return followUpUndo(topicId, messageTs, row)
+          }),
+        ),
+      'followUps.notDone': ({ topicId, messageTs, matchTs }) =>
+        command(
+          Effect.gen(function* () {
+            const row = yield* followUp(topicId, messageTs)
+            if (row === undefined || (row.match_kept_ts !== null && row.match_kept_ts >= matchTs)) return undefined
+            const sql = yield* StoreWriter
+            yield* sql`UPDATE follow_ups SET match_kept_ts = ${matchTs} WHERE topic_id = ${topicId} AND message_ts = ${messageTs}`
+            yield* (yield* Invalidation).invalidate(keys.followUps)
+            return followUpUndo(topicId, messageTs, row)
+          }),
+        ),
+      'followUps.restore': ({ topicId, messageTs, doneAt, matchKeptTs }) =>
+        command(
+          Effect.gen(function* () {
+            const sql = yield* StoreWriter
+            yield* sql`UPDATE follow_ups SET done_at = ${doneAt}, match_kept_ts = ${matchKeptTs} WHERE topic_id = ${topicId} AND message_ts = ${messageTs}`
+            yield* (yield* Invalidation).invalidate(keys.followUps)
+            return undefined
+          }),
+        ),
+      'drafts.discard': ({ topicId, updatedAt }) =>
+        command(
+          Effect.gen(function* () {
+            const row = yield* draft(topicId)
+            if (row === undefined || row.updated_at !== updatedAt) return undefined
+            const sql = yield* StoreWriter
+            yield* sql`DELETE FROM drafts WHERE topic_id = ${topicId}`
+            yield* draftsChanged(topicId)
+            return draftUndo(topicId, row)
+          }),
+        ),
+      'drafts.keep': ({ topicId, updatedAt }) =>
+        command(
+          Effect.gen(function* () {
+            const row = yield* draft(topicId)
+            if (row === undefined || row.updated_at !== updatedAt || row.kept_at === updatedAt) return undefined
+            const sql = yield* StoreWriter
+            yield* sql`UPDATE drafts SET kept_at = ${updatedAt} WHERE topic_id = ${topicId}`
+            yield* draftsChanged(topicId)
+            return draftUndo(topicId, row)
+          }),
+        ),
+      'drafts.restore': ({ topicId, text, updatedAt, keptAt }) =>
+        command(
+          Effect.gen(function* () {
+            const sql = yield* StoreWriter
+            // A draft typed in the topic since the review acted wins over the one put back.
+            const current = yield* draft(topicId)
+            if (current === undefined || current.updated_at === updatedAt)
+              yield* sql`INSERT INTO drafts (topic_id, text, updated_at, kept_at) VALUES (${topicId}, ${text}, ${updatedAt}, ${keptAt})
+                ON CONFLICT (topic_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at, kept_at = excluded.kept_at`
+            yield* draftsChanged(topicId)
+            return undefined
           }),
         ),
     }
