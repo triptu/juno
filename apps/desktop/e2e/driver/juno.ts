@@ -55,6 +55,48 @@ export async function pointAt(win: Page, target: Locator, position?: { readonly 
   throw new Error(`Pointing did not hover the element; hovered: ${deepest}`)
 }
 
+type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+
+/** The element's box once it is the same on two frames in a row (up to two seconds), or null when it is not shown. */
+function settledBox(target: Locator): Promise<Box | null> {
+  return target.evaluate(
+    (node) =>
+      new Promise<Box | null>((resolve) => {
+        const read = () => {
+          const { x, y, width, height } = node.getBoundingClientRect()
+          return node.isConnected && width > 0 ? { x, y, width, height } : null
+        }
+        const until = performance.now() + 2_000
+        let last = read()
+        const frame = () => {
+          const next = read()
+          if (next === null || (last !== null && next.x === last.x && next.y === last.y && next.height === last.height) || performance.now() > until) resolve(next)
+          else {
+            last = next
+            requestAnimationFrame(frame)
+          }
+        }
+        requestAnimationFrame(frame)
+      }),
+  )
+}
+
+/** Whether the element is still at `box` two frames after the pointer moved onto it. */
+function keptBox(target: Locator, box: Box): Promise<boolean> {
+  return target.evaluate(
+    (node, box) =>
+      new Promise<boolean>((resolve) =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            const { x, y, height } = node.getBoundingClientRect()
+            resolve(node.isConnected && x === box.x && y === box.y && height === box.height)
+          }),
+        ),
+      ),
+    box,
+  )
+}
+
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -97,12 +139,21 @@ export class SidebarRow {
     return this.root.focus()
   }
 
-  /** Selects the row with the mouse (it activates on mouse down). */
+  /**
+   * Selects the row with the mouse (it activates on mouse down). Rows move
+   * while the list fills and when a topic gets activity, so the press waits
+   * until the row has kept its box for two frames, and points again if it
+   * moved once the pointer was over it. It cannot see a move that starts
+   * after the press: a test that just caused one waits for it first.
+   */
   async select(): Promise<void> {
     await this.root.scrollIntoViewIfNeeded()
-    const box = await this.root.boundingBox()
-    if (!box) throw new Error(`Row "${this.title}" is not on screen`)
-    await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const box = await settledBox(this.root)
+      if (!box) throw new Error(`Row "${this.title}" is not on screen`)
+      await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
+      if (await keptBox(this.root, box)) break
+    }
     await press(this.win)
   }
 
@@ -258,6 +309,14 @@ export class Sidebar {
 
   async expectVisible(): Promise<void> {
     await expect(this.root).toBeVisible({ timeout: 15_000 })
+  }
+
+  /**
+   * Waits until `title` is the first row of Recent. A message a test injects moves its topic to the top when the
+   * engine stores it, so a test that then clicks a row waits for that move first.
+   */
+  async expectFirst(title: string): Promise<void> {
+    await expect.poll(() => this.titles('Recent').then((titles) => titles[0])).toBe(title)
   }
 
   /** Waits until at least one row has arrived from the engine. */
