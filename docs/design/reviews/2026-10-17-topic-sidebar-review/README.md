@@ -180,4 +180,8 @@ Not done here: 17 other views still write their focus ring by hand, mostly in Ho
   - Gallery failed on the top-gap version described above: `toolbar-geometry.spec.ts` three times, and `roving.spec.ts`'s Esc test, which looked for the hidden toolbar by role.
   - Desktop failed on `peek.spec.ts:120`, the 28px shift above. 420 passed.
   - All four failures were fixed in `cadcd590`.
-- **`pnpm affected`, second run:** run once to check those fixes; its result is in the report.
+- **`pnpm affected`, second run** (on `1ba061da`).
+  - Everything passed except one gallery test: `roving.spec.ts`'s Esc test. Looking into it found the keyboard bug in item 3.
+  - Two runs of that one spec were used to find it; it was then diagnosed locally against the built gallery.
+- **`pnpm affected`, third run** (on `08eee002`).
+  - Passed: typecheck, lint, gallery (278 passed) and desktop e2e (420 passed).
