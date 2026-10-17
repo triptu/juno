@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
 import { countLabel } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
@@ -42,7 +42,7 @@ const rowId = (id: string) => `switch-${id}`
  * shows as in the sidebar, a bold title and a count; the topic on screen is
  * the selected row. Typing filters, ↑ ↓ move, Enter opens and ⌘Enter opens
  * in a new tab. Esc is the popover's: it closes and gives focus back to
- * the title. New chat's thread picker is the same list.
+ * the title.
  */
 export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, query, onQuery, onOpen }: TopicSwitcherProps) {
   const main = matches('Main', query)
@@ -113,7 +113,7 @@ interface RowProps {
   readonly onActivate: (rowId: string) => void
 }
 
-/** Main: first, with the line New chat's thread picker gives it, and no icon, so its title starts on the threads' edge. */
+/** Main: first, with its line, and no icon, so its title starts on the threads' edge. */
 function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowProps & { readonly mainId: string; readonly unread: number }) {
   const id = rowId(mainId)
   return (
@@ -181,16 +181,14 @@ function Badges({ unread, exact, mentionsMe }: { readonly unread: number; readon
 
 const reveal = (id: string) => document.getElementById(id)?.scrollIntoView({ block: 'nearest' })
 
-/** The list's height before it scrolls, as New chat's pickers. */
-const LIST_MAX_HEIGHT = '360px'
-
 const styles = stylex.create({
   // The row's 20px title line (OptionRow 44), not the body's 1.6.
   title: {
     lineHeight: 'inherit',
   },
   scroll: {
-    maxHeight: LIST_MAX_HEIGHT,
+    // The list's height before it scrolls, as the destination list's.
+    maxHeight: layout['--destination-list-max-height'],
     overflowY: 'auto',
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
