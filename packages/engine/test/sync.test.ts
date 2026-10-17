@@ -243,7 +243,7 @@ describe('cold boot', () => {
     await engine.phase('live')
   })
 
-  it('reads DMs, mentions and unread followed threads before the bulk of channels', async () => {
+  it('reads unread DMs, then mentions, then other unread channels, before the read DMs and the bulk of channels', async () => {
     // Live in 2 to 5 s on a quiet machine, 7 to 23 s at four busy processes per core and 14 to 75 s at ten.
     const engine = await bootedEngine(
       { fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } },
@@ -252,25 +252,24 @@ describe('cold boot', () => {
     const ws = engine.fake.workspace
     const threads = ws.threadCounts()
     const members = [...ws.conversations.values()].filter((c) => c.members.has(SELF_ID))
-    const direct = new Set(members.filter((c) => c.kind === 'im' || c.kind === 'mpim').map((c) => c.id))
+    const isDirect = (c: (typeof members)[number]) => c.kind === 'im' || c.kind === 'mpim'
+    const unreadDms = new Set(members.filter((c) => isDirect(c) && ws.countEntry(c).has_unreads).map((c) => c.id))
+    const readDms = new Set(members.filter((c) => isDirect(c) && !ws.countEntry(c).has_unreads).map((c) => c.id))
     const mentioned = new Set(members.filter((c) => {
       const entry = ws.countEntry(c)
-      return !direct.has(c.id) && ((entry.has_unreads && entry.mention_count > 0) || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0)
+      return !isDirect(c) && ((entry.has_unreads && entry.mention_count > 0) || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0)
     }).map((c) => c.id))
-    // Channels with nothing for the user: no unread mention or followed reply, and no message of their own.
+    const unread = new Set(members.filter((c) => !isDirect(c) && !mentioned.has(c.id) && ws.countEntry(c).has_unreads).map((c) => c.id))
+    // Channels with nothing for the user: nothing unread, no followed reply, no message of their own.
     const bulk = new Set(members.filter((c) =>
-      !direct.has(c.id) && !mentioned.has(c.id) && (threads.unread_count_by_channel?.[c.id] ?? 0) === 0 && !ws.main(c.id).some((m) => m.user === SELF_ID),
+      !isDirect(c) && !mentioned.has(c.id) && !unread.has(c.id) && (threads.unread_count_by_channel?.[c.id] ?? 0) === 0 && !ws.main(c.id).some((m) => m.user === SELF_ID),
     ).map((c) => c.id))
     const order = apiCalls(engine, 'conversations.history').map((call) => call.args['channel']!)
     const positions = (ids: ReadonlySet<string>) => order.flatMap((id, i) => (ids.has(id) ? [i] : []))
-    const firstBulk = Math.min(...positions(bulk))
-    expect(positions(direct).length).toBeGreaterThan(0)
-    expect(positions(mentioned).length).toBeGreaterThan(0)
-    expect(positions(bulk).length).toBeGreaterThan(0)
-    expect(Math.max(...positions(direct))).toBeLessThan(firstBulk)
-    expect(Math.max(...positions(mentioned))).toBeLessThan(firstBulk)
-    // DMs come before mentions.
-    expect(Math.max(...positions(direct))).toBeLessThan(Math.min(...positions(mentioned)))
+    const groups = [unreadDms, mentioned, unread, readDms, bulk]
+    for (const group of groups) expect(positions(group).length).toBeGreaterThan(0)
+    // Each group is read before the next one starts.
+    for (let i = 0; i + 1 < groups.length; i++) expect(Math.max(...positions(groups[i]!))).toBeLessThan(Math.min(...positions(groups[i + 1]!)))
   }, 150_000)
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
