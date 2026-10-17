@@ -72,7 +72,7 @@ export function FilterPill({ mark, dot = false, children }: FilterPillProps) {
 }
 
 /** The drop caret: a one-off width, named here (tokens.md section 3). */
-const CARET_WIDTH = '2px'
+const CARET_WIDTH = '2px' // tokens-allow: the drop caret's stroke
 const SCROLLS_START = '@container scroll-state(scrollable: inline-start)'
 const SCROLLS_END = '@container scroll-state(scrollable: inline-end)'
 

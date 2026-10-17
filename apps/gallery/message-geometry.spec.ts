@@ -104,3 +104,26 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   // The custom emoji on a line is an image too.
   await expect(page.locator('[data-msg-text] img[alt=":makes-sense:"]')).toHaveCount(1)
 })
+
+test('at scroll top the first row sits the toolbar’s room below the header band, and “Loading older messages” takes no space', async ({ page }) => {
+  const firstRow = () =>
+    page.evaluate(() => {
+      const row = document.querySelector('[data-message-row]')!
+      const scroller = row.closest('[data-scroll-area]')!
+      const band = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
+      const toolbar = Number.parseFloat(getComputedStyle(row).getPropertyValue('--toolbar-height'))
+      const padding = Number.parseFloat(getComputedStyle(row).paddingTop)
+      const line = document.querySelector('[data-older-line]')?.getBoundingClientRect()
+      return { below: row.getBoundingClientRect().top - band, room: toolbar - padding + 2, lineBottom: line?.bottom ?? 0, rowTop: row.getBoundingClientRect().top }
+    })
+  await open(page, 'MessageList', 'thread/long')
+  const none = await firstRow()
+  expect(none.below).toBe(none.room)
+  await open(page, 'MessageList', 'thread/more-above')
+  expect((await firstRow()).below).toBe(none.below)
+  await open(page, 'MessageList', 'thread/loading-older')
+  await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')
+  const loading = await firstRow()
+  expect(loading.below).toBe(none.below)
+  expect(loading.lineBottom).toBeLessThanOrEqual(loading.rowTop)
+})

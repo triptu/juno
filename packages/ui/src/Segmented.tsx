@@ -2,12 +2,13 @@ import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent } from 'react'
 import { colors, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers } from './internal/activate'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { numeric, variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
 // Segment side padding. A one-off between the 8px and 10px spacing steps.
-const SEGMENT_PADDING_INLINE = '9px'
+const SEGMENT_PADDING_INLINE = '9px' // tokens-allow: between the 8 and 10 steps
 
 export interface SegmentedOption<T extends string> {
   readonly value: T
@@ -63,7 +64,7 @@ export function Segmented<T extends string>({ options, value, onChange, label, d
               interactive.reset,
               interactive.feedback,
               interactive.press,
-              interactive.focusRingInset,
+              focusRing.inset,
               typeVariants.meta,
               styles.segment,
               selected && styles.selected,

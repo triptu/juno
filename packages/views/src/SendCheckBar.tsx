@@ -69,7 +69,7 @@ export function SendCheckBar({ finding, onPrimary, onSecondary }: SendCheckBarPr
  * topic column) the choices move to a line of their own, at the end, rather
  * than squeezing the text to a word per line.
  */
-const TEXT_MIN_WIDTH = 'min(200px, 100%)'
+const TEXT_MIN_WIDTH = 'min(200px, 100%)' // tokens-allow: the finding's narrowest beside its choices
 
 const styles = stylex.create({
   bar: {

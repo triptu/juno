@@ -2,8 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import type { ThreadLink as ThreadLinkModel } from '@juno/contract'
-import { accent, colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Icon, Text, type ActivateEvent } from '@juno/ui'
+import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { activateHandlers, focusRing, Icon, Text, type ActivateEvent } from '@juno/ui'
 
 export interface ThreadLinkProps {
   readonly link: ThreadLinkModel
@@ -26,7 +26,7 @@ export function ThreadLink({ link, onOpen, tabIndex = 0 }: ThreadLinkProps) {
       aria-label={`${link.label}: ${link.title}`}
       data-thread-link={link.id}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(link.id, event))}
-      {...stylex.props(styles.link)}
+      {...stylex.props(styles.link, focusRing.outside)}
     >
       <Icon icon={ChatsCircle} size={13} />
       <span {...stylex.props(styles.count)}>{link.label}</span>
@@ -64,14 +64,6 @@ const styles = stylex.create({
     lineHeight: 1,
     userSelect: 'none',
     cursor: 'default',
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
   count: {
     flexShrink: 0,

@@ -88,7 +88,12 @@ export function countLabel(count: number, exact = true): string {
   return exact ? String(count) : `${count}+`
 }
 
-/** The icon for a kind of conversation, where a list names one without its tile: a scope chip, the view sheet. */
+/**
+ * The icon for a kind of conversation, wherever a place is named without its
+ * tile: # for a public channel, a lock for a private one, a person for a DM
+ * and two for a group DM. The header's pill, a row's meta line, the scope
+ * chip and the view sheet all use it.
+ */
 export function kindIcon(kind: ConversationKind): PhosphorIcon {
   switch (kind) {
     case 'private':

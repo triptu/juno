@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
-import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { density, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
 import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
@@ -23,7 +23,11 @@ export interface MessageListItem {
  */
 export type MessageListStatus = 'ready' | 'pending' | 'loading' | 'offline'
 
-/** Whether older messages exist above the window, and whether a page is on its way. */
+/**
+ * Whether older messages can come above the window: `more`, `loading` (a
+ * page is on its way, and "Loading older messages" shows) or `none` (the
+ * topic's first message is in the window).
+ */
 export type OlderStatus = 'none' | 'more' | 'loading'
 
 export interface MessageListProps {
@@ -51,10 +55,7 @@ export interface MessageListProps {
   readonly scrollRef?: Ref<HTMLElement>
   /** The list runs under the topic's floating header (default). False where nothing floats over it, as in peek. */
   readonly underHeader?: boolean
-  /**
-   * In a popover (peek): a tighter column, as tall as its rows, and no slot
-   * above the first row while nothing older can load.
-   */
+  /** In a popover (peek): a tighter column, as tall as its rows. */
   readonly popover?: boolean
   /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
@@ -241,7 +242,7 @@ export function MessageList({
         {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >
         {items.length > 0 && !(popover && older === 'none') ? (
-          <div aria-live="polite" {...stylex.props(styles.olderLine)}>
+          <div aria-live="polite" data-older-line={older} {...stylex.props(styles.olderLine, !popover && styles.olderInRoom)}>
             {older === 'loading' ? (
               <Text variant="meta" tone="muted">
                 Loading older messages
@@ -328,6 +329,9 @@ function Empty({ main, status }: { readonly main: boolean; readonly status: Mess
   )
 }
 
+/** The room a first row's toolbar needs above it: its height less the straddle (Message.tsx `placeToolbar`). */
+const TOOLBAR_ROOM = `calc(${layout['--toolbar-height']} - ${density['--density-message-padding-block']} + ${spacing['--space-0-5']})`
+
 const styles = stylex.create({
   scroller: {
     flexGrow: 1,
@@ -340,7 +344,14 @@ const styles = stylex.create({
     maxWidth: layout['--reading-width'],
     minHeight: '100%',
     marginInline: 'auto',
-    paddingTop: spacing['--space-5'],
+    // At scroll top the first row starts the toolbar's room below the header
+    // band: its hover toolbar straddles its top edge (Message.tsx), so it
+    // needs the toolbar's height less the row's top padding (less 2) above
+    // the row to show above it, not flipped over the next row. "Loading
+    // older messages" shows in that room too (olderInRoom), so nothing is
+    // ever kept for it.
+    position: 'relative',
+    paddingTop: `calc(${layout['--header-band']} - ${layout['--header-inset']} + ${TOOLBAR_ROOM})`,
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-4'],
     boxSizing: 'border-box',
@@ -353,8 +364,8 @@ const styles = stylex.create({
     paddingInline: sizes['--focus-ring-room'],
     paddingBottom: spacing['--space-2'],
   },
-  // A fixed slot above the first row, so "Loading older messages" appearing
-  // or going away never moves the rows below it.
+  // "Loading older messages". In peek, a slot above the first row while
+  // older messages may come, so the line moves nothing.
   olderLine: {
     display: 'flex',
     alignItems: 'center',
@@ -362,6 +373,15 @@ const styles = stylex.create({
     height: sizes['--control-28'],
     flexShrink: 0,
     userSelect: 'none',
+  },
+  // Under the header: in the toolbar's room above the first row, out of the
+  // flow, so the line appearing or going moves nothing and no space is kept for it.
+  olderInRoom: {
+    position: 'absolute',
+    top: `calc(${layout['--header-band']} - ${layout['--header-inset']})`,
+    insetInline: 0,
+    height: TOOLBAR_ROOM,
+    pointerEvents: 'none',
   },
   notDrawn: (rows: number) => ({
     flexShrink: 0,

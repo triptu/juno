@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { colors, layout, motion, radii, sizes, spacing, weights, z } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 import { Surface } from './Surface'
@@ -41,7 +42,7 @@ export function Toast({ text, icon, action }: ToastProps) {
         <button
           type="button"
           onClick={action.onAction}
-          {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, typeVariants.buttonSmall, styles.action)}
+          {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, typeVariants.buttonSmall, styles.action)}
         >
           {action.label}
           {action.kbd ? <Kbd inherit>{action.kbd}</Kbd> : null}

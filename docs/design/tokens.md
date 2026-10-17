@@ -52,6 +52,8 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the media viewer: the page at 94%, so only the picture reads |
 | `--media-scrim` | `rgba(20, 19, 16, 0.5)` | | media viewer 10-16 | Over a picture: the "+N" on the last tile of a message's grid, and a video's play badge. Not themed: it sits on the picture |
 | `--media-scrim-foreground` | `hsla(48, 20%, 98%, 1)` | | media viewer 10-16 | The "+N" and the play glyph on `--media-scrim` |
+| `--link-underline` | `color-mix(in oklch, currentColor 35%, transparent)` | | review 10-17 | A link's underline in message text and the composer, from the link's own colour. Not themed |
+| `--quote-fill` | `color-mix(in oklch, currentColor 6%, transparent)` | | review 10-17 | A quote's fill in message text, from the text colour. Not themed |
 
 ### 1.2 Base palette, dark
 
@@ -428,6 +430,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--header-island-height` | 36px: a 28px control plus 3px padding and the 1px transparent border |
 | `--header-band` | 68px: the band behind the islands, solid `--background` to `--header-band-solid` 44px (the islands' bottom), then fading to transparent. Also the list's `scroll-padding-top` and the scrollbar track's top margin |
 | `--header-inset` | 56px top padding of a list that runs under the header (`ScrollArea underHeader`), so at scroll top its first row starts below the band. Replaced `--topic-header-height` (100px) |
+| `--header-pill-max-width` | 160px: the header's place pill at its widest; the name takes an ellipsis past it. Under 480px the pill is its icon alone |
+| `--header-title-min-width` | 72px: the header title's floor, and the rename field's; the pill gives way after it |
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |

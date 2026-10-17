@@ -80,8 +80,8 @@ test('a view icon keeps the colour picked for it, on the selected pill and acros
     // Edit shows the colour chosen; Neutral takes it off again.
     await restarted.sidebar.viewMenu('Bots', 'view-edit')
     const colours = restarted.sidebar.viewSheet.getByRole('radiogroup', { name: 'Colour' })
-    await expect(colours.getByRole('button', { name: 'Teal', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await colours.getByRole('button', { name: 'Neutral', exact: true }).click()
+    await expect(colours.getByRole('radio', { name: 'Teal', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await colours.getByRole('radio', { name: 'Neutral', exact: true }).click()
     await restarted.sidebar.viewSheet.getByRole('button', { name: 'Save' }).click()
     await expect(restarted.sidebar.viewPill('Bots').locator('[data-icon-tint]')).toHaveCount(0)
   } finally {

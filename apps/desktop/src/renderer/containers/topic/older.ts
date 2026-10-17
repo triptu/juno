@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MESSAGE_WINDOW_MAX } from '@juno/contract'
-import { loadOlderMessages, messageWindowSpecAtom, registry, type MessageWindow } from '@juno/state'
+import { loadOlderMessages, messageWindowSpecAtom, registry, topicStartKnownAtom, type MessageWindow } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
 import type { OlderStatus } from '@juno/views'
 import type { Position } from './position'
 import { rowInView, rowSelector } from './scroll'
@@ -12,14 +13,16 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
 
 /**
  * Older pages: near the top, the next older page is fetched, one request at a time, and the window
- * widens; scroll anchoring keeps the rows in view still. A thread whose root is in the window has nothing older.
+ * widens; scroll anchoring keeps the rows in view still. A thread whose root is in the window has nothing older,
+ * and neither has a topic whose start an earlier page reached this run (`topicStartKnownAtom`), so opening it
+ * again asks for nothing.
  * Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
 export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow): OlderStatus {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, drawnAll, setHeldAt } = position
   const first = list.order[0]
-  const [complete, setComplete] = useState(false)
+  const complete = useAtomValue(topicStartKnownAtom(id))
   const [loadingOlder, setLoadingOlder] = useState(false)
   const rootShown = first !== undefined && list.rows.get(first)?.root === true
   const windowFull = list.order.length >= list.spec.limit
@@ -35,7 +38,7 @@ export function useOlderPages(position: Position, id: string, view: string, list
         observer.disconnect()
         setLoadingOlder(true)
         void loadOlderMessages(registry, id, first).then((exit) => {
-          if (exit._tag === 'Success' && exit.value.complete) setComplete(true)
+          if (exit._tag === 'Success' && exit.value.complete) registry.set(topicStartKnownAtom(id), true)
           const spec = registry.get(messageWindowSpecAtom(view))
           // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
           const next =
@@ -61,3 +64,4 @@ export function useOlderPages(position: Position, id: string, view: string, list
   }, [id, view, drawnAll, older, first, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return older
 }
+

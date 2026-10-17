@@ -1,0 +1,1 @@
+- 10-17 15:24 · topic-sidebar-review-2 · The view sheet's and the channel icon picker's icon and colour choices are real radio groups: one Tab stop on the chosen one, arrows move and choose, `aria-checked` in place of `aria-pressed` (`radioItem`, `radioKeys` in `@juno/ui`).

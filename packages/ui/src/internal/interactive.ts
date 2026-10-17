@@ -1,11 +1,11 @@
 /**
  * Styles every interactive primitive shares: the element reset, the 150ms
- * feedback transition, the press scale (never when disabled) and the focus
- * ring (keyboard only). Hover colours live in each primitive and must sit
- * under the `hover` media query from here.
+ * feedback transition and the press scale (never when disabled). The focus
+ * ring is `focusRing` (../focusRing.ts), which views use too. Hover colours
+ * live in each primitive and must sit under the `hover` media query from here.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, motion, opacity, sizes } from '@juno/tokens/tokens.stylex'
+import { motion, opacity } from '@juno/tokens/tokens.stylex'
 
 export const interactive = stylex.create({
   reset: {
@@ -48,27 +48,6 @@ export const interactive = stylex.create({
       default: 'auto',
       ':disabled': 'none',
     },
-  },
-  focusRing: {
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
-  },
-  // A tighter ring for controls that sit flush against others (tabs,
-  // segments) where a 2px offset would clip.
-  focusRingInset: {
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
-    outlineColor: accent['--focus-ring'],
   },
   // The disabled look, also used by `dimmed` controls that look disabled but
   // stay focusable (Send with an empty draft).

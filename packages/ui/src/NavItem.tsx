@@ -5,7 +5,7 @@ import { Icon, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { tooltip } from './Tooltip'
-import { interactive } from './internal/interactive'
+import { focusRing } from './focusRing'
 import { variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
@@ -56,7 +56,7 @@ export function NavItem({ icon, children, active = false, trailing, kbd, onSelec
       onPointerEnter={onPrefetch}
       onFocus={onPrefetch}
       {...activateHandlers<HTMLDivElement>(onSelect)}
-      {...stylex.props(interactive.focusRing, typeVariants.ui, styles.item, compact && styles.compact, active && styles.active)}
+      {...stylex.props(focusRing.outside, typeVariants.ui, styles.item, compact && styles.compact, active && styles.active)}
     >
       <Icon icon={icon} size={16} active={active} />
       {compact ? null : (

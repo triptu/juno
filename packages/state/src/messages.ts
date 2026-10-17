@@ -88,6 +88,13 @@ export const topicOfView = (view: string): string => {
 /** The window a topic view wants. Kept while the app runs, so a hidden tab comes back where it was. */
 export const messageWindowSpecAtom = Atom.family((_view: string) => Atom.make<MessageWindowSpec>(bottomWindow).pipe(Atom.keepAlive))
 
+/**
+ * Topics whose first message the store holds, as `messages.loadOlder` said
+ * this run. A topic opened again knows it from its first frame, so it asks
+ * for no older page and shows no "Loading older messages".
+ */
+export const topicStartKnownAtom = Atom.family((_id: string) => Atom.make(false).pipe(Atom.keepAlive))
+
 /** The window a topic tab shows, and the spec it belongs to. */
 export interface MessageWindow extends ListWindow<MessageView> {
   /** The spec of these rows. It lags `messageWindowSpecAtom` until the new window's first snapshot arrives. */

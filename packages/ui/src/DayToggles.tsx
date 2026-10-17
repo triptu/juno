@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 
@@ -46,7 +47,7 @@ export function DayToggles({ days, onChange, label }: DayTogglesProps) {
             aria-label={name}
             title={name}
             onClick={() => toggle(day)}
-            {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, typeVariants.tagSmall, styles.day, on && styles.on)}
+            {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, typeVariants.tagSmall, styles.day, on && styles.on)}
           >
             {letter}
           </button>

@@ -24,7 +24,7 @@ export default defineFixtures(
     Interaction: {
       'icon-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Bug"]' }),
       'icon-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Bug"]' }),
-      'icon-focus': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { focus: '[aria-label="Bug"]' }),
+      'icon-focus': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { focus: '[role="radiogroup"][aria-label="Icon"] [aria-checked="true"]' }),
       'color-hover': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { hover: '[aria-label="Claret"]' }),
       'color-press': fixture({ name: 'eng', icon: 'rocket', color: 'cyan', onIconChange: noop, onColorChange: noop }, { press: '[aria-label="Claret"]' }),
     },

@@ -361,7 +361,7 @@ export class Sidebar {
     const sheet = this.viewSheet
     if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
     if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
-    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('button', { name: view.color, exact: true }).click()
+    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('radio', { name: view.color, exact: true }).click()
     for (const conversation of view.conversations ?? []) {
       await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
       await sheet.getByRole('option', { name: conversation, exact: true }).click()

@@ -93,6 +93,10 @@ export const colors = stylex.defineVars({
   // video's play badge. The same in both themes, since it sits on the picture.
   '--media-scrim': 'rgba(20, 19, 16, 0.5)',
   '--media-scrim-foreground': 'hsla(48, 20%, 98%, 1)',
+  // Mixed with the text colour where they are used, so one value serves
+  // every theme and every accent: a link's underline, a quote's fill.
+  '--link-underline': 'color-mix(in oklch, currentColor 35%, transparent)',
+  '--quote-fill': 'color-mix(in oklch, currentColor 6%, transparent)',
 
   // Status. Warning and info are only ever mixed into tints, never used as
   // text on their own (2.1:1 and 3.9:1).
@@ -786,6 +790,9 @@ export const layout = stylex.defineVars({
   '--header-band-solid': '44px',
   '--header-band': '68px',
   '--header-inset': '56px',
+  // The header's place pill at its widest, and the floor the title shortens to before the pill gives way.
+  '--header-pill-max-width': '160px',
+  '--header-title-min-width': '72px',
   '--reading-width': '800px',
   // The Juno panel beside a topic: a floating inspector, inset from the
   // tab strip, the window edge and the topic by the header islands' gap.

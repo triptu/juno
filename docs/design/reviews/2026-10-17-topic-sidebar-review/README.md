@@ -108,3 +108,80 @@ A milestone review of the sidebar (title bar with All topics, nav, quick filters
     - `layout-shift.spec.ts:183` (sidebar rows while sync fills): the anchor row was removed as rows landed.
     - `tour.spec.ts:24`: the Topics group grew 77px, one more row, while the tour stepped.
   - This branch changes no row's height and no list order (rows have a fixed height, and the place line fits in it), so these go to the CI keeper. A row that moves under the pointer during sync is still worth a look: Home holds its rows still for the same reason.
+
+## Round 2: the decisions on the owner's items
+
+Decided by the orchestrator for the owner, on `topic-sidebar-review-2` from `41ad6fe9`.
+
+**1. No space kept for older messages.** The "Loading older messages" slot is gone. The line now shows only while an older page loads, out of the flow, in the room above the first message, so it never moves anything (`olderInRoom`). A topic whose start a page reached this run asks for no older page when it opens again (`topicStartKnownAtom`). Peek keeps its small in-flow slot, as before.
+
+**The gap that remains is the hover toolbar's room, so it barely changed (60px → 58px).** A first version made the gap 24px, matching the gap above the composer. `pnpm affected` then showed what the 28px slot had been doing: it was also the room the first message's hover toolbar needs to show above it at scroll top. With 24px, that toolbar flips below the first message and covers the next message's name. `toolbar-geometry.spec.ts` treats that as a failure, and the decision behind it (5629badc) is that the toolbar always straddles its own row's top edge.
+
+So the gap is now measured from that need: the toolbar's height less the row's top padding, plus 2, which is 34px under the header band (36px in Compact). The first message sits 58px under the islands, not 24px, and top and bottom are not symmetric. `message-geometry.spec.ts` checks the room and that the loading line takes none of it.
+
+The 24px gap is a choice for the owner. It costs the first message's toolbar flipping below at scroll top, as it already does for a message under the header band. Shots of that option: `shots/r2-top-gap-24px-option-light.jpg`, `shots/r2-top-gap-minimum-24px-option-dark.jpg`.
+
+That first version also showed a real shift. In a short Main, the start became known while the slot was on screen. Committing the "keep the slot" state and the store's change in two renders let one frame drop the slot, and the messages moved up 28px (`peek.spec.ts:120`). The shipped version keeps no slot, so this cannot happen.
+
+| | Before | After |
+| --- | --- | --- |
+| Thread at its top, light | ![](shots/r2-top-gap-before-light.jpg) | ![](shots/r2-top-gap-after-light.jpg) |
+| Thread at its top, dark | ![](shots/r2-top-gap-before-dark.jpg) | ![](shots/r2-top-gap-after-dark.jpg) |
+| Minimum window, light | ![](shots/r2-top-gap-minimum-before-light.jpg) | ![](shots/r2-top-gap-minimum-after-light.jpg) |
+| Minimum window, dark | ![](shots/r2-top-gap-minimum-before-dark.jpg) | ![](shots/r2-top-gap-minimum-after-dark.jpg) |
+| Loading an older page, dark | | ![](shots/r2-loading-older-after-dark.jpg) |
+
+**2. The place pill gives way first in a narrow header.** Under the header's 480px width, a thread's place pill is its icon alone: a 24px circle in its tint (`ContextPill iconWhenNarrow`). It keeps the same accessible name, and its tooltip names the place and its kind ("hiring · Private channel"). The title takes the room. One refinement: a Main keeps its channel's name, because its title is the one word "Main" and needs no more room (`shots/r2-narrow-main-after-light.jpg`). `narrow-geometry.spec.ts` checks all three forms.
+
+| | Before | After |
+| --- | --- | --- |
+| DM thread, light | ![](shots/r2-narrow-dm-before-light.jpg) | ![](shots/r2-narrow-dm-after-light.jpg) |
+| DM thread, dark | ![](shots/r2-narrow-dm-before-dark.jpg) | ![](shots/r2-narrow-dm-after-dark.jpg) |
+| Private thread, light | ![](shots/r2-narrow-thread-before-light.jpg) | ![](shots/r2-narrow-thread-after-light.jpg) |
+| Private thread, dark | ![](shots/r2-narrow-thread-before-dark.jpg) | ![](shots/r2-narrow-thread-after-dark.jpg) |
+
+A first version wrote the narrow styles with `default: null`. In StyleX that removes the wide value, so every header shot lost its pill's padding. The stylex skill now lists this pitfall.
+
+**3. The hover toolbar is one Tab stop.** Tab reaches one button on the focused message's toolbar: the one last focused, or the first reaction. ← and → move along the visible buttons and wrap, Home and End go to the ends, and Esc returns focus to the message. This uses `moveFocus` from `@juno/ui` and is covered by `roving.spec.ts`.
+
+Writing that test turned up a keyboard bug that is on main too: Tab from a focused message could not reach its toolbar at all. The toolbar is out of the layout unless something in its row has keyboard focus. As the row let go of focus, the toolbar hid before its button could take focus, and focus fell to the page. The arrows had the same problem. The row now keeps the toolbar laid out for the one key press that moves focus into or along it (`holdToolbarForMove` in `Message.tsx`), and lets go once focus lands. Checked against the built gallery, on this branch and on `41ad6fe9`.
+
+**4. The icon and colour pickers are radio groups.** In the view sheet and the channel icon picker, each group is one Tab stop on its chosen item. Every arrow moves to the next or previous choice and chooses it, and Home and End go to the ends. The items say `aria-checked`, not `aria-pressed`. This uses `radioItem` and `radioKeys` from `@juno/ui`. The e2e driver's colour query and `views.spec.ts` now ask for radios. The channel picker's focus shot now shows the ring on the chosen icon, where Tab lands.
+
+| | Before | After |
+| --- | --- | --- |
+| Light | ![](shots/r2-icon-focus-before-light.jpg) | ![](shots/r2-icon-focus-after-light.jpg) |
+| Dark | ![](shots/r2-icon-focus-before-dark.jpg) | ![](shots/r2-icon-focus-after-dark.jpg) |
+
+**5. Code follow-ups.**
+
+- **Focus ring.** `focusRing` (`outside`, `inset`) is exported from `@juno/ui`, and every primitive uses it. The six topic views (`ThreadLink`, `MessageBody`, `MediaGrid`, `HeaderControls`, `TopicRow`, `Message`) no longer write the outline by hand.
+- **Kind icon.** `kindIcon` in `look.ts` is the one kind-to-icon map. The header pill and the row's meta line use it, as the scope chip and the view sheet already did.
+- **Token lint, new rules.**
+  - A module constant used in a style is checked as its value. A number used as a factor in a `calc()` is not counted as a length.
+  - A `color-mix(` with a literal share is a raw colour.
+  - Rule tests are in `check-tokens.test.mjs`.
+- **What the new rules found.**
+  - New tokens replace values in the topic views: `--link-underline`, `--quote-fill`, `--header-pill-max-width` and `--header-title-min-width`. The reaction chip's emoji uses `--icon-14`.
+  - 18 documented one-offs elsewhere now carry a `tokens-allow` reason.
+
+Not done here: 17 other views still write their focus ring by hand, mostly in Home, the Juno chat and the tour. Those areas belong to other work, so they should move to `focusRing` when next touched (`docs/design/primitives.md` says so).
+
+**Verification, round 2.**
+
+- **Gallery shots.** Regenerated for `TopicView`, `TopicHeader`, `MessageList`, `HoverToolbar`, `Sidebar`, `ChannelIconPicker` and `PeekView`. They changed only as intended:
+  - the topic lists moved up 2px, to the toolbar's room;
+  - the 336px headers show the icon pill;
+  - the channel picker's focus shot moved to the chosen icon.
+  - The few other differences are one-pixel anti-aliasing and the random topic art.
+- **Typecheck and lint.** Local typecheck of `ui`, `views`, `state`, `gallery` and `desktop`; `pnpm lint` passed (10 of 10). `node --test scripts/check-tokens.test.mjs`: 7 of 7.
+- **`pnpm affected`, first run** (on `6e8bb88e`).
+  - Typecheck, lint, unit tests and spec conformance passed.
+  - Gallery failed on the top-gap version described above: `toolbar-geometry.spec.ts` three times, and `roving.spec.ts`'s Esc test, which looked for the hidden toolbar by role.
+  - Desktop failed on `peek.spec.ts:120`, the 28px shift above. 420 passed.
+  - All four failures were fixed in `cadcd590`.
+- **`pnpm affected`, second run** (on `1ba061da`).
+  - Everything passed except one gallery test: `roving.spec.ts`'s Esc test. Looking into it found the keyboard bug in item 3.
+  - Two runs of that one spec were used to find it; it was then diagnosed locally against the built gallery.
+- **`pnpm affected`, third run** (on `08eee002`).
+  - Passed: typecheck, lint, gallery (278 passed) and desktop e2e (420 passed).

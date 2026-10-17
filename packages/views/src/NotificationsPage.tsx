@@ -321,9 +321,9 @@ function Today({ interrupted, held, rows, initiallyOpen }: { readonly interrupte
 }
 
 /** The label column of a row: 260px (inventory 13). */
-const LABEL_WIDTH = 260
+const LABEL_WIDTH = 260 // tokens-allow: the row's label column
 /** What matters to you: at most 620px wide. */
-const MATTERS_WIDTH = 620
+const MATTERS_WIDTH = 620 // tokens-allow: the What matters field's widest
 
 const styles = stylex.create({
   label: {

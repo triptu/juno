@@ -138,3 +138,16 @@ test.describe('the minimum window with the sidebar shown', () => {
     await expect(bubbles.locator('time')).toHaveCount(0)
   })
 })
+
+test('under 480px a thread header shows the place pill as its icon and gives the title the room; a Main keeps its name', async ({ page }) => {
+  const pill = page.locator('[data-island="left"] button[aria-label$="Show in sidebar."]')
+  await openState(page, route('TopicHeader', 'narrow/thread-336'))
+  const narrow = (await pill.boundingBox())!
+  expect(narrow.width).toBe(narrow.height)
+  await expect(pill).toHaveAttribute('aria-label', /^hiring, private channel\./)
+  await expect(pill).toHaveAttribute('data-tooltip', 'hiring · Private channel')
+  await openState(page, route('TopicHeader', 'narrow/main-336'))
+  expect((await pill.boundingBox())!.width).toBeGreaterThan((await pill.boundingBox())!.height)
+  await openState(page, route('TopicHeader', 'thread/private'))
+  expect((await pill.boundingBox())!.width).toBeGreaterThan((await pill.boundingBox())!.height)
+})

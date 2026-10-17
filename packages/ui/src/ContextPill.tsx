@@ -1,12 +1,16 @@
 import * as stylex from '@stylexjs/stylex'
 import { radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
+import { tooltip } from './Tooltip'
 import { variants as typeVariants } from './internal/type'
 
 // Hover styles only apply on devices with a real pointer. Local because
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
+// A page header's narrow form (HeaderIslands is the size container).
+const NARROW = '@container (width < 480px)'
 
 /** The three context tints from the tokens: neutral, amber and blue. */
 export type ContextTint = 'public' | 'private' | 'dm'
@@ -28,6 +32,13 @@ export interface ContextPillProps {
   readonly onClick?: () => void
   /** The button's accessible name, which carries the kind when it is not shown ("eng, public channel. Show in sidebar."). */
   readonly label?: string
+  /**
+   * In a page header: under the header's 480px width the pill is its icon
+   * alone, a round control as tall as the pill, and the title takes the
+   * room. The name stays in the accessible name and the tooltip says the
+   * name and the kind in both forms.
+   */
+  readonly iconWhenNarrow?: boolean
 }
 
 const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 28: 14 }
@@ -39,12 +50,14 @@ const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 
  * name takes an ellipsis, the icon and the kind keep their size, and the
  * pill never gets narrower than those two, so nothing spills out of it.
  */
-export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label }: ContextPillProps) {
+export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label, iconWhenNarrow = false }: ContextPillProps) {
   const kind = showKind && kindLabel ? kindLabel : undefined
+  // The tooltip names the place too when the name can be hidden; otherwise the native title says the kind, as before.
+  const hint = iconWhenNarrow ? tooltip(kindLabel === undefined ? name : `${name} · ${kindLabel}`) : { title: kindLabel }
   const content = (
     <>
       <Icon icon={icon} size={iconBySize[size]} />
-      <span {...stylex.props(styles.name)}>{name}</span>
+      <span {...stylex.props(styles.name, iconWhenNarrow && kind === undefined && styles.nameNarrow)}>{name}</span>
       {kind !== undefined ? (
         <span {...stylex.props(styles.kind)}>
           <span aria-hidden>{' · '}</span>
@@ -57,17 +70,17 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
     return (
       <button
         type="button"
-        title={kindLabel}
+        {...hint}
         aria-label={label}
         onClick={onClick}
-        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint], iconWhenNarrow && kind === undefined && narrowStyles[size])}
       >
         {content}
       </button>
     )
   }
   return (
-    <span title={kindLabel} {...stylex.props(styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint])}>
+    <span {...hint} {...stylex.props(styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], iconWhenNarrow && kind === undefined && narrowStyles[size])}>
       {content}
     </span>
   )
@@ -101,6 +114,30 @@ const styles = stylex.create({
   kind: {
     fontWeight: weights['--weight-regular'],
   },
+  // Out of sight in the narrow form but still read, so a pill that is not a
+  // button keeps its name. Every property states its wide value too: a
+  // `null` default would drop the value set before it.
+  nameNarrow: {
+    position: { default: 'static', [NARROW]: 'absolute' },
+    width: {
+      default: 'auto',
+      [NARROW]: '1px', // tokens-allow: the standard visually hidden box
+    },
+    height: {
+      default: 'auto',
+      [NARROW]: '1px', // tokens-allow: the standard visually hidden box
+    },
+    clipPath: { default: 'none', [NARROW]: 'inset(50%)' },
+  },
+})
+
+// The narrow form: the icon centred in a circle as tall as the pill. Not
+// with `showKind`, whose grid has a third column.
+const narrowStyles = stylex.create({
+  22: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-22'] }, paddingInline: { default: spacing['--space-2'], [NARROW]: 0 } },
+  24: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-24'] }, paddingInline: { default: spacing['--space-2'], [NARROW]: 0 } },
+  26: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-26'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
+  28: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-28'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
 })
 
 const sizeStyles = stylex.create({

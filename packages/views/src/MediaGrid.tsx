@@ -10,8 +10,8 @@ import { Image } from '@phosphor-icons/react/dist/icons/Image'
 import { Play } from '@phosphor-icons/react/dist/icons/Play'
 import { useState } from 'react'
 import type { FileThumb, FileView } from '@juno/contract'
-import { accent, colors, layout, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Icon, IconButton, Text } from '@juno/ui'
+import { colors, layout, motion, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { focusRing, Icon, IconButton, Text } from '@juno/ui'
 
 /** Tiles a message's grid shows; the last says "+N" for the rest. */
 const GRID_TILES = 4
@@ -117,7 +117,7 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, 
   const [failed, setFailed] = useState<string | undefined>(undefined)
   const box = thumbnailBox(thumb.width, thumb.height)
   const broken = failed === thumb.src
-  const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), tall && styles.tall, onOpen !== undefined && styles.thumbButton)
+  const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), tall && styles.tall, onOpen !== undefined && styles.thumbButton, onOpen !== undefined && focusRing.outside)
   const label = more === undefined ? file.name : `${file.name}, and ${more} more`
   // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
   const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
@@ -184,14 +184,6 @@ const styles = stylex.create({
     color: 'inherit',
     textAlign: 'start',
     cursor: 'default',
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
   // The grid of a message's pictures: always the thumbnail box, two columns,
   // so it is sized before any bytes arrive whatever the pictures. The viewer

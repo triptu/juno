@@ -6,7 +6,7 @@ import { Icon, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import { tooltip } from './Tooltip'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
-import { interactive } from './internal/interactive'
+import { focusRing } from './focusRing'
 import { variants as typeVariants } from './internal/type'
 
 const HOVER = '@media (hover: hover)'
@@ -20,8 +20,8 @@ const NARROW_TAB = '@container tab (max-width: 140px)'
 
 // The pinned tab's unread dot sits over the icon's top-right corner with a
 // 1.5px ring in the strip's colour (inventory 4). One-off sizes.
-const PINNED_DOT_RING = '1.5px'
-const PINNED_DOT_OFFSET = '-2px'
+const PINNED_DOT_RING = '1.5px' // tokens-allow: the pinned dot's ring
+const PINNED_DOT_OFFSET = '-2px' // tokens-allow: the pinned dot over the icon's corner
 
 export interface TabProps {
   readonly icon: PhosphorIcon
@@ -136,7 +136,7 @@ export function Tab({ icon, leading, label, active = false, pinned = false, unre
         onClick={activate.onClick}
         onKeyDown={onKeyDown}
         {...stylex.props(
-          interactive.focusRingInset,
+          focusRing.inset,
           styles.tab,
           typeVariants.ui,
           active ? styles.tabActive : styles.tabInactive,

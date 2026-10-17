@@ -15,8 +15,10 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    heights, fonts, shadows, durations, easing and layout sizes. `pnpm lint` runs `scripts/check-tokens.mjs` on UI, views and renderer StyleX calls.
    It rejects literal colours and lengths, including nested conditions and templates.
    Zero, percentages and 1px border/outline hairlines pass. For geometry exceptions,
-   add a trailing `// tokens-allow: reason` on the declaration line. Constants and
-   runtime parameters are not evaluated; review those for token use.
+   add a trailing `// tokens-allow: reason` on the declaration line. A module constant used in
+   a style is checked as its value, and takes the allow comment on its own line. A `color-mix(`
+   with a literal share ("currentColor 6%") is a raw colour. Runtime parameters are not
+   evaluated; review those for token use.
    - Allowed raw values: `0`, `none`, `auto`, `transparent`, `1px` hairlines. Before writing any
      other number, search `tokens.stylex.ts` for it (focus ring, press scale, disabled opacity and
      font weights have tokens or are being added). A one-off size that no other component will
@@ -95,6 +97,11 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 - **`.stylex` subpaths.** A file with `defineVars` or `createTheme` must be named `*.stylex.ts` and
   imported through a package subpath that also ends in `.stylex`. Re-exporting from `index.ts`
   fails with "Could not resolve the path to the imported file".
+- **A top-level `default: null` removes the property, it does not keep it.** In a style applied after
+  another (`stylex.props(styles.base, narrow)`), `width: { default: null, [NARROW]: '24px' }` drops
+  `base`'s width at every size, not only under the query. State the wide value as the default
+  (`ContextPill`'s narrow form, 10-17). `null` nested inside a condition (`':hover': { default: null, … }`)
+  is fine: it means no hover value outside the media query.
 - **Pseudo-class order is fixed by StyleX, not by your key order.** Priority, low to high:
   `:disabled` 92, `:hover` 130, `:focus-visible` 160, `:active` 170 (read from
   `@stylexjs/shared`). So `:hover` and `:active` beat `:disabled`. Set the disabled colour

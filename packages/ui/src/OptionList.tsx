@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useState, type HTMLAttributes, 
 import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
-import { interactive } from './internal/interactive'
+import { focusRing } from './focusRing'
 import { variants as typeVariants } from './internal/type'
 import { Text } from './Text'
 
@@ -44,7 +44,7 @@ export function OptionList({ role = 'listbox', label, activeId, focusable = fals
         tabIndex={focusable ? 0 : undefined}
         onKeyDown={onKeyDown}
         {...rest}
-        {...stylex.props(styles.list, focusable && interactive.focusRing)}
+        {...stylex.props(styles.list, focusable && focusRing.outside)}
       >
         {children}
       </div>

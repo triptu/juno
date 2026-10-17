@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { HTMLAttributes, ReactNode } from 'react'
 import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
-import { interactive } from './internal/interactive'
+import { focusRing } from './focusRing'
 
 const HOVER = '@media (hover: hover)'
 
@@ -67,7 +67,7 @@ export function ListRow({
         heights[minHeight],
         paddings[padding],
         divider && styles.divider,
-        isButton && interactive.focusRingInset,
+        isButton && focusRing.inset,
         isButton && styles.button,
         selected && styles.selected,
         padding === 'navigation' && styles.navigation,

@@ -3,8 +3,8 @@ import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
 import { menuKeys } from '@juno/contract/channels'
-import { accent, colors, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { Icon, IconButton, SparkleDuotone, tooltip, type PhosphorIcon } from '@juno/ui'
+import { colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { focusRing, Icon, IconButton, SparkleDuotone, tooltip, type PhosphorIcon } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -20,8 +20,6 @@ const HOVER = '@media (hover: hover)'
 const NARROW = '@container (width < 480px)'
 /** The menu opens this far under the left island, left-aligned with it. */
 const MENU_GAP = 6
-/** The title never shortens past this; the pill gives way after it. */
-const TITLE_MIN_WIDTH = '72px'
 /** Far above the pill's 1, so the title takes all the shortening until it reaches its floor. */
 const TITLE_SHRINK = 1000
 
@@ -71,7 +69,7 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
         onClick={(event) => open(event.currentTarget)}
         onKeyDown={onKeyDown}
         onContextMenu={onContextMenu}
-        {...stylex.props(styles.reset, styles.title, expanded && styles.titleOpen)}
+        {...stylex.props(styles.reset, focusRing.outside, styles.title, expanded && styles.titleOpen)}
       >
         {leading}
         <span dir="auto" {...stylex.props(styles.titleText)}>
@@ -107,7 +105,7 @@ export function IslandButton({ icon, label, reserve, onClick }: IslandButtonProp
       aria-label={label}
       {...tooltip(label)}
       onClick={(event) => onClick(underRightIsland(event.currentTarget))}
-      {...stylex.props(styles.reset, styles.island, styles.iconOnlyWhenNarrow)}
+      {...stylex.props(styles.reset, focusRing.outside, styles.island, styles.iconOnlyWhenNarrow)}
     >
       <span {...stylex.props(styles.islandIcon)}>
         <Icon icon={icon} size={14} />
@@ -173,12 +171,12 @@ const styles = stylex.create({
     display: 'flex',
     flexGrow: 0,
     flexShrink: TITLE_SHRINK,
-    minWidth: TITLE_MIN_WIDTH,
+    minWidth: layout['--header-title-min-width'],
     margin: 0,
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
-  // The element reset and the shared feedback (ui's `interactive`, which is internal to it).
+  // The element reset and the shared feedback (ui's `interactive`, which is internal to it); the ring is ui's `focusRing`.
   reset: {
     appearance: 'none',
     margin: 0,
@@ -194,11 +192,6 @@ const styles = stylex.create({
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
     transitionTimingFunction: motion['--ease-out'],
     scale: { default: '1', ':active': motion['--press-scale'] },
-    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
   title: {
     display: 'inline-flex',

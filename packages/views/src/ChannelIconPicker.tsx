@@ -7,6 +7,8 @@ import {
   channelIconNames,
   channelIcons,
   IconButton,
+  radioItem,
+  radioKeys,
   Swatch,
   Text,
   type ChannelColorName,
@@ -80,9 +82,9 @@ export function ChannelIconPicker({ name, icon, color, onIconChange, onColorChan
         <Text variant="sectionLabel" tone="muted">
           Colour
         </Text>
-        <div {...stylex.props(styles.colors)} role="radiogroup" aria-label="Colour">
+        <div {...stylex.props(styles.colors)} role="radiogroup" aria-label="Colour" onKeyDown={radioKeys}>
           {channelColorNames.map((option) => (
-            <Swatch key={option} hue={option} label={colorLabels[option]} selected={option === color} onClick={() => onColorChange(option)} />
+            <Swatch key={option} hue={option} label={colorLabels[option]} selected={option === color} {...radioItem(option === color, option === color)} onClick={() => onColorChange(option)} />
           ))}
         </div>
       </div>
@@ -90,8 +92,8 @@ export function ChannelIconPicker({ name, icon, color, onIconChange, onColorChan
         <Text variant="sectionLabel" tone="muted">
           Icon
         </Text>
-        <div {...stylex.props(styles.icons)} role="radiogroup" aria-label="Icon">
-          <Button variant="ghost" size="lg" pressed={icon === undefined} aria-label="First letter" title="First letter" onClick={() => onIconChange(undefined)}>
+        <div {...stylex.props(styles.icons)} role="radiogroup" aria-label="Icon" onKeyDown={radioKeys}>
+          <Button variant="ghost" size="lg" pressed={icon === undefined} {...radioItem(icon === undefined, icon === undefined)} aria-label="First letter" title="First letter" onClick={() => onIconChange(undefined)}>
             {name.slice(0, 1).toUpperCase()}
           </Button>
           {channelIconNames.map((option) => (
@@ -101,6 +103,7 @@ export function ChannelIconPicker({ name, icon, color, onIconChange, onColorChan
               label={iconLabels[option]}
               size={32}
               pressed={option === icon}
+              {...radioItem(option === icon, option === icon)}
               onClick={() => onIconChange(option)}
             />
           ))}

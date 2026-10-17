@@ -24,6 +24,8 @@ function rawString(value, property) {
   // Variable names and URLs are not colour names or literal lengths.
   const css = value.replace(/url\([^)]*\)|--[\w-]+/g, '')
   if (/#(?:[\da-f]{3,8})\b|\b(?:rgba?|hsla?|hwb|oklch|oklab|lab|lch|color)\(/i.test(css)) return true
+  // A mix whose share is a literal ("currentColor 6%") is a colour no token holds; a token share is fine.
+  if (/\bcolor-mix\(/i.test(css) && /\d%/.test(css)) return true
   if ((css.match(/[a-z]+/gi) ?? []).some((word) => colors.has(word.toLowerCase()))) return true
   return [...css.matchAll(/(-?(?:\d*\.)?\d+)(px|rem|em)\b/gi)].some(([, n, unit]) =>
     Number(n) !== 0 && !(Number(n) === 1 && unit === 'px' && (hairline.test(property) || /^(?:border(?:Top|Right|Bottom|Left|Block|Inline|BlockStart|BlockEnd|InlineStart|InlineEnd)?|outline)$/.test(property))))
@@ -43,12 +45,22 @@ export function checkSource(source, file = 'component.tsx') {
       if ((item.propertyName ?? item.name).text === 'create') creates.add(item.name.text)
     }
   }
+  // Module-level constants, so a value named outside the styles ("const PILL_MAX_WIDTH = '160px'") is checked where it is used.
+  const constants = new Map()
+  for (const statement of tree.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer) constants.set(declaration.name.text, declaration.initializer)
+    }
+  }
+  const followed = new Set()
   const hits = []
   function report(node, property) {
     const start = node.getStart(tree)
     const line = tree.getLineAndCharacterOfPosition(start).line + 1
     let declaration = node
-    while (declaration.parent && !ts.isPropertyAssignment(declaration)) declaration = declaration.parent
+    while (declaration.parent && !ts.isPropertyAssignment(declaration) && !ts.isVariableStatement(declaration)) declaration = declaration.parent
+    if (hits.some((hit) => hit.start === start)) return
     const end = source.indexOf('\n', declaration.end)
     const trailing = source.slice(declaration.end, end < 0 ? source.length : end)
     if (/^[,; \t]*\/\/\s*tokens-allow:\s*\S.*$/.test(trailing)) return
@@ -71,6 +83,16 @@ export function checkSource(source, file = 'component.tsx') {
     }
     // Token member keys are data, not CSS values.
     if (ts.isElementAccessExpression(node) || ts.isPropertyAccessExpression(node)) return
+    if (ts.isIdentifier(node)) {
+      const initializer = constants.get(node.text)
+      if (initializer === undefined || followed.has(node.text)) return
+      // A number inside a template is a factor in a calc() ("5 rows"), not a length.
+      if (ts.isNumericLiteral(initializer) && ts.isTemplateSpan(node.parent)) return
+      followed.add(node.text)
+      value(initializer, property)
+      followed.delete(node.text)
+      return
+    }
     ts.forEachChild(node, (child) => value(child, property))
   }
   function visit(node) {

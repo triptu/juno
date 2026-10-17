@@ -1,0 +1,1 @@
+- 10-17 15:24 · topic-sidebar-review-2 · Under the header's 480px width the place pill on a thread is its icon alone (name in its accessible name and tooltip), so the title takes the room; a Main keeps the name beside its one-word title; at 336px it had read "Maya Ch… Offs…".

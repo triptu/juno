@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo, type FocusEvent, type ReactNode } from 'react'
+import { memo, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
-import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
+import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, Button, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, Button, focusRing, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import { mediaOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
@@ -101,6 +101,22 @@ const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 // and never covers the name, the time or the first line of a grouped row.
 const STRADDLE = `(${density['--density-message-padding-block']} - ${spacing['--space-0-5']})`
 
+const TOOLBAR_MOVES = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End'])
+
+/**
+ * Tab from a focused row into its toolbar, and the arrows inside it. The
+ * toolbar shows only while something in the row has keyboard focus, so as
+ * focus lets go of one element it would leave the layout before the next
+ * button could take focus, and focus would fall to the page. For that key
+ * press it stays laid out; the row lets go once focus is inside it again,
+ * or has left the row. On the capture phase, before the toolbar's own keys.
+ */
+function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
+  const fromRow = event.key === 'Tab' && !event.shiftKey && event.target === event.currentTarget
+  const inToolbar = TOOLBAR_MOVES.has(event.key) && event.target instanceof Element && event.target.closest('[role="toolbar"]') !== null
+  if (fromRow || inToolbar) event.currentTarget.style.setProperty('--row-toolbar-display', 'block')
+}
+
 /**
  * Where the toolbar goes, decided as the row is pointed at or focused, again
  * as the pointer moves over it, and when the list stops scrolling (never per
@@ -182,6 +198,7 @@ export const Message = memo(function Message({
   const focus = (event: FocusEvent<HTMLDivElement>) => {
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
+    else event.currentTarget.style.removeProperty('--row-toolbar-display')
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const { pending, clientMsgId } = message
@@ -211,11 +228,14 @@ export const Message = memo(function Message({
       data-pending={pending}
       data-popover-active={active ? '' : undefined}
       onFocus={focus}
+      onKeyDownCapture={actions === undefined ? undefined : holdToolbarForMove}
+      onBlur={actions === undefined ? undefined : (event) => event.currentTarget.contains(event.relatedTarget) || event.currentTarget.style.removeProperty('--row-toolbar-display')}
       onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       onPointerMove={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
+        focusRing.inset,
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
@@ -389,13 +409,6 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
-    outlineColor: accent['--focus-ring'],
     // The toolbar and the gutter time read these: hidden until the pointer is
     // over the row, or keyboard focus is on the row or inside it. Only
     // opacity and display change on an absolutely placed toolbar, so nothing

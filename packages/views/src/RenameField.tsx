@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
-import { accent, colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 
 export interface RenameFieldProps {
   /** The title it starts with, preselected. */
@@ -14,9 +14,7 @@ export interface RenameFieldProps {
 }
 
 /** A one-off size: the row field sits 2px into the line above and below, so the row keeps its height (inventory 3.2). */
-const ROW_FIELD_MARGIN = '-2px'
-/** The header title's floor (`HeaderTitleButton`), so the field never makes the island narrower than the title was allowed to be. */
-const HEADER_FIELD_MIN_WIDTH = '72px'
+const ROW_FIELD_MARGIN = '-2px' // tokens-allow: the row field reaching into the lines around it
 
 /**
  * The title as a field, in place, for Rename (SPEC 5, inventory 3.2 and 5).
@@ -103,7 +101,7 @@ const styles = stylex.create({
     // As wide as its text, like the title it replaces, within the island.
     fieldSizing: 'content',
     flexShrink: 1,
-    minWidth: HEADER_FIELD_MIN_WIDTH,
+    minWidth: layout['--header-title-min-width'],
     maxWidth: '100%',
     height: sizes['--control-28'],
     paddingBlock: 0,
