@@ -5,8 +5,8 @@ import type { Doc, DocEntry } from '../src/index.ts';
 
 const entry = (id: string, doc: Doc, text: string): DocEntry => ({ id, doc, text });
 const doc = fc.constantFrom(...DOCS);
-const text = fc.string({ minLength: 1, maxLength: 400 }).filter((s) => s.trim() !== '');
-const entries = fc.array(fc.tuple(doc, text), { maxLength: 120 }).map((rows) => rows.map(([d, t], i) => entry(`e${i}`, d, t)));
+const note = fc.string({ minLength: 1, maxLength: 400 }).filter((s) => s.trim() !== '');
+const entries = fc.array(fc.tuple(doc, note), { maxLength: 120 }).map((rows) => rows.map(([d, t], i) => entry(`e${i}`, d, t)));
 
 describe('the outline', () => {
   test('stays within its budget and names every doc, whatever the docs hold', () => {

@@ -116,7 +116,7 @@ export function searchDocs(entries: ReadonlyArray<DocEntry>, query: string, limi
     const hits = asked.filter((word) => has.has(word) || [...has].some((other) => other.startsWith(word))).length;
     return hits === 0 ? [] : [{ entry, score: hits / asked.length, index }];
   });
-  return scored.sort((a, b) => b.score - a.score || b.index - a.index).slice(0, limit).map((hit) => hit.entry);
+  return scored.toSorted((a, b) => b.score - a.score || b.index - a.index).slice(0, limit).map((hit) => hit.entry);
 }
 
 /** The first line of an entry, cut at a word to `max` bytes with an ellipsis. */
