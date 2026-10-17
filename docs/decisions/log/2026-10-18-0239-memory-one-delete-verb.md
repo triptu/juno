@@ -1,0 +1,1 @@
+- 10-18 02:39 · memory-one-delete-verb · What Juno remembers uses Delete for notes and pins alike, and an empty Pinned section is one quiet row, as an empty doc is. Why: Remove there named a different action (the Remove sheet), and a full empty state inside one section was blank space.
