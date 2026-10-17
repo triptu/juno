@@ -36,6 +36,8 @@ export interface HomeProps {
   readonly reservedItems?: number
   /** Pinned at the bottom, where a topic's composer is: Recent, the destination and the field (`HomeWrite` and a `Composer`). */
   readonly composer?: ReactNode
+  /** Nothing to show yet (a few milliseconds): the column is empty, the composer is already in its place. */
+  readonly waiting?: boolean
 }
 
 /**
@@ -45,14 +47,14 @@ export interface HomeProps {
  * when a title line is rewritten: a title is one ellipsised line in a 52px
  * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, loading = false, reservedItems = 0, composer }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   return (
-    <div data-home="" data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
+    <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
-        <div {...stylex.props(styles.column)}>
+        {waiting ? null : <div {...stylex.props(styles.column)}>
           <div {...stylex.props(...part())}>
             <HomeScene name={scene} />
           </div>
@@ -83,7 +85,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               ))}
             </ul>
           )}
-        </div>
+        </div>}
       </div>
       {composer}
     </div>

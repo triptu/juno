@@ -282,6 +282,8 @@ const styles = stylex.create({
     bottom: 'anchor(--composer-box top)',
     left: 'anchor(--composer-box left)',
     marginBottom: spacing['--space-1-5'],
+    // In a short window the list can rise over a title bar's drag strip.
+    WebkitAppRegion: 'no-drag',
   },
   foot: {
     display: 'flex',

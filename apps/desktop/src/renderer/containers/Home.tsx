@@ -7,6 +7,8 @@ import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
 
+const noop = () => {}
+
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
 }
@@ -31,8 +33,7 @@ function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
  * from a hidden tab, and once more when the first value arrives); later
  * values change only a row's title line (`freezeHome`). Until the first
  * sync is done it shows the scene and the greeting with "Syncing with
- * Slack.", and rows fill reserved slots as they land (`fillHome`). Until there is any value (a few milliseconds) the
- * page is blank, never a spinner, so it paints whole.
+ * Slack.", and rows fill reserved slots as they land (`fillHome`).
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
@@ -44,7 +45,8 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
   useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
 
-  if (shown === undefined) return <div data-home="" data-home-waiting="" />
+  // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
+  if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
   const itemOf = (itemId: string) => view.items.find((candidate) => candidate.id === itemId)
