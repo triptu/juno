@@ -353,6 +353,9 @@ test('Unread keeps read topics until no tab shows them', async ({ juno, win }) =
   await roadmap.open()
   await roadmap.expectRead()
   await roadmap.expectSelected()
+  // Rina's row leaves once the pointer leaves the list, which holds its rows meanwhile (SPEC 5, "Holding the order").
+  await expect(rina.root).toHaveCount(1)
+  await sidebar.leave()
   await expect(rina.root).toHaveCount(0)
 
   // Two tabs show the same read topic. Closing one must leave its row.
@@ -363,5 +366,6 @@ test('Unread keeps read topics until no tab shows them', async ({ juno, win }) =
   await roadmap.expectRead()
   await roadmap.expectSelected()
   await tabs.menu('close-tab')
+  await sidebar.leave()
   await expect(roadmap.root).toHaveCount(0)
 })

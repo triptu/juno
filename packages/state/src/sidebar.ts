@@ -27,6 +27,8 @@ import { tabsAtom, tabTopic, type Tabs } from './tabs'
 import { engineStatusAtom } from './engine'
 import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
+import { holdOrder } from './holdOrder'
+import type { Registry } from './client'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
 /** The quick filters (All, Channels, DMs, Unread) and the scope chip. */
@@ -70,6 +72,8 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
   readonly retained?: ReadonlySet<string>
   /** Painted during the first sync, which is still running: rows take their places by recency as they land. */
   readonly building?: boolean
+  /** Shown in a held order (`sidebarListAtom`). */
+  readonly held?: boolean
 }
 
 /**
@@ -187,7 +191,7 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
 })
 
 /** The source window plus previously visible topics still shown by a tab. */
-export const sidebarListAtom = Atom.make((get): SidebarWindow => {
+const sidebarLiveAtom = Atom.make((get): SidebarWindow => {
   const next = get(sidebarSourceAtom)
   const tabs = get(tabsAtom)
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
@@ -206,6 +210,65 @@ export const sidebarListAtom = Atom.make((get): SidebarWindow => {
     }
   }
   return retainOpenTopics(shown, next, tabs, details)
+})
+
+/**
+ * Whether the pointer or keyboard focus is in the topic list. The list
+ * container sets it, and clears it a moment after both have left.
+ */
+const sidebarEngagedAtom = Atom.make(false).pipe(Atom.keepAlive)
+
+/**
+ * An explicit action (opening a topic from elsewhere, Undo, ignoring a
+ * channel) showed the live order while the list was engaged. The hold
+ * starts again from there on the next pointer move or focus in the list.
+ */
+const sidebarPausedAtom = Atom.make(false).pipe(Atom.keepAlive)
+
+/** Topics the user acted on while the list is engaged (a send, resolve, rename, follow): they take their live place at once. */
+const sidebarReleasedAtom = Atom.make<ReadonlyArray<string>>([]).pipe(Atom.keepAlive)
+
+/** Whether the list holds its order now (SPEC 5, "Holding the order"). */
+const sidebarHoldAtom = Atom.make((get) => get(sidebarEngagedAtom) && !get(sidebarPausedAtom))
+
+/** The pointer or keyboard focus came into the list, or both have left it. Leaving shows the held changes in one step. */
+export function setSidebarEngaged(registry: Registry, engaged: boolean): void {
+  if (registry.get(sidebarEngagedAtom) === engaged) return
+  registry.set(sidebarEngagedAtom, engaged)
+  if (engaged) return
+  registry.set(sidebarPausedAtom, false)
+  if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+}
+
+/** The pointer moved, or focus moved, in the list: a paused hold starts again from the order shown. */
+export function resumeSidebarHold(registry: Registry): void {
+  if (registry.get(sidebarPausedAtom)) registry.set(sidebarPausedAtom, false)
+}
+
+/** The user acted on this topic: its move, arrival or departure shows at once, even while the list holds. */
+export function releaseSidebarTopic(registry: Registry, id: string): void {
+  if (!registry.get(sidebarEngagedAtom)) return
+  const released = registry.get(sidebarReleasedAtom)
+  if (!released.includes(id)) registry.set(sidebarReleasedAtom, [...released, id])
+}
+
+/** An explicit action elsewhere: show the live order now, and keep showing it until the list is touched again. */
+export function flushSidebar(registry: Registry): void {
+  if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
+}
+
+/**
+ * The window the sidebar shows: the live one, or while the list holds, the
+ * held order with live contents (`holdOrder`). A hold starts from the live
+ * window of that moment. A filter change, a pause and the end of the hold
+ * show the live window. An empty or unready list never holds.
+ */
+export const sidebarListAtom = Atom.make((get): SidebarWindow => {
+  const live = get(sidebarLiveAtom)
+  if (!get(sidebarHoldAtom)) return live
+  const shown = Option.getOrUndefined(get.self<SidebarWindow>())
+  if (shown === undefined || shown.held !== true || shown.filter !== live.filter || shown.order.length === 0) return { ...live, held: true }
+  return { ...holdOrder(shown, live, new Set(get(sidebarReleasedAtom))), held: true }
 })
 
 /** One row of the sidebar, by id across every filter. Notifies only when the row's object changes, which is when its `rev` does. */

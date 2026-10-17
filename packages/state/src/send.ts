@@ -30,6 +30,7 @@ import {
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { watchSentMessage } from './sentSuggestions'
+import { releaseSidebarTopic } from './sidebar'
 
 /**
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
@@ -43,6 +44,8 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })
+  // Your own send moves its row at once, even while the sidebar holds its order.
+  if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
   if (exit._tag === 'Success' && sendChecksApply(text)) {
     const receive = watchSentMessage(registry, { clientMsgId, topicId: exit.value.topicId, original: text, sentAt })
     void runCommand(registry, messagesPostcheck, { clientMsgId }).then((checked) => receive(checked._tag === 'Success' ? checked.value.clarity : undefined))

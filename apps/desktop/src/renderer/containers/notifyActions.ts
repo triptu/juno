@@ -20,12 +20,14 @@ import {
   type NotifyTargetView,
   type Why,
 } from '@juno/contract'
-import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, whyPopoverAtom } from '@juno/state'
+import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction, whyPopoverAtom } from '@juno/state'
 import { askJunoAbout } from './juno/actions'
 import { openSettings } from './navigation'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
+  // Following or unfollowing a thread adds or removes its row at once, even while the sidebar holds its order (SPEC 5).
+  if (target.kind === 'thread') releaseSidebarTopic(registry, target.id)
   void runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` })
 }
 
