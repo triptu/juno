@@ -312,11 +312,11 @@ export class Sidebar {
   }
 
   /**
-   * Waits until `title` is the first row of Recent. A message a test injects moves its topic to the top when the
-   * engine stores it, so a test that then clicks a row waits for that move first.
+   * Waits until Recent starts with these rows, in this order. A message a test injects moves its topic to the top
+   * when the engine stores it, so a test that then clicks a row waits for that move first.
    */
-  async expectFirst(title: string): Promise<void> {
-    await expect.poll(() => this.titles('Recent').then((titles) => titles[0])).toBe(title)
+  async expectTop(...titles: ReadonlyArray<string>): Promise<void> {
+    await expect.poll(() => this.titles('Recent').then((shown) => shown.slice(0, titles.length))).toEqual(titles)
   }
 
   /** Waits until at least one row has arrived from the engine. */
