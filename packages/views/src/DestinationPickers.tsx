@@ -1,20 +1,22 @@
 import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
+import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { At } from '@phosphor-icons/react/dist/icons/At'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
+import type { ConversationKind, PickConversation, PickConversations, ThreadSummary } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Avatar, chunk, Icon, Popover, SparkleDuotone, type PhosphorIcon } from '@juno/ui'
+import { Avatar, chunk, Icon, Popover, SparkleDuotone, TopicArt, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 
 const lists = chunk(() => import('./DestinationLists'))
 const loadLists = lists.load
 const ConversationList = lists.component((module) => module.ConversationList)
+const TopicList = lists.component((module) => module.TopicList)
 
 const kindIcons: Record<ConversationKind, PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
 
@@ -94,6 +96,78 @@ export function DestinationChip({ destination, juno = true, open, onOpen, query,
           selected={destination?.key ?? JUNO_KEY}
         />
       ) : null}
+    </Popover>
+  )
+}
+
+/** A thread as the topic chip names it. */
+export interface TopicPick {
+  /** The thread's topic id. */
+  readonly id: string
+  readonly title: string
+  readonly art?: string | undefined
+}
+
+export interface TopicChipProps {
+  /** The chosen person or channel; undefined while the chip leaves. */
+  readonly conversation: PickConversation | undefined
+  /** The thread a send replies in; none is Main. */
+  readonly thread: TopicPick | undefined
+  readonly open: boolean
+  readonly onOpen: (open: boolean) => void
+  readonly query: string
+  readonly onQuery: (query: string) => void
+  /** The conversation's threads; undefined while they load. */
+  readonly threads: ReadonlyArray<ThreadSummary> | undefined
+  readonly now: number
+  /** A thread, or Main with `undefined`. */
+  readonly onPick: (thread: ThreadSummary | undefined) => void
+  /** Pointer or focus on the chip: the owner may start reading the threads, so the list opens with its rows. */
+  readonly onWarm?: () => void
+  readonly buttonRef?: Ref<HTMLButtonElement>
+  /** A printable key typed on the closed chip, as on the destination chip. */
+  readonly onType?: (text: string) => void
+}
+
+/**
+ * Home's topic chip (SPEC section 12, "Writing"), right of the destination
+ * chip while a person or channel is chosen: where in it the message goes.
+ * It says Main, a new message, until a thread is chosen, then the thread's
+ * art and title; a send then replies in that thread. Neutral, as Main is
+ * the default, so the destination chip keeps the tint. It opens the topic
+ * list above itself, with the destination chip's keys.
+ */
+export function TopicChip({ conversation, thread, open, onOpen, query, onQuery, threads, now, onPick, onWarm, buttonRef, onType }: TopicChipProps) {
+  const label = thread?.title ?? 'Main'
+  return (
+    <Popover
+      open={open}
+      onClose={() => onOpen(false)}
+      placement="top-start"
+      width="picker"
+      maxHeight="none"
+      layer="picker"
+      padding="none"
+      label="Pick a topic"
+      anchor={
+        <PickerButton
+          ref={buttonRef}
+          label={`Topic: ${label}`}
+          icon={ChatText}
+          {...(thread === undefined ? {} : { leading: <TopicArt topicId={thread.id} {...(thread.art === undefined ? {} : { recipe: thread.art })} size={16} /> })}
+          muted={thread === undefined}
+          wide
+          expanded={open}
+          onOpen={() => onOpen(!open)}
+          {...(onWarm === undefined ? {} : { onWarm })}
+          {...(onType === undefined ? {} : { onType })}
+          change={thread?.id ?? 'main'}
+        >
+          {label}
+        </PickerButton>
+      }
+    >
+      {open && conversation !== undefined ? <TopicList query={query} onQuery={onQuery} conversation={conversation} threads={threads} now={now} selected={thread?.id} onPick={onPick} onClose={() => onOpen(false)} /> : null}
     </Popover>
   )
 }
@@ -195,10 +269,16 @@ interface PickerButtonProps {
   readonly onOpen: () => void
   /** A printable key (not Space, which presses the button) typed while the list is closed. */
   readonly onType?: (text: string) => void
+  /** Pointer or focus on the button, with the list's code loading. */
+  readonly onWarm?: () => void
   readonly children: ReactNode
 }
 
-function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, onType, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, onType, onWarm, children }: PickerButtonProps) {
+  const warm = () => {
+    void loadLists()
+    onWarm?.()
+  }
   const subtle = muted ?? tint === undefined
   // The name shown first never rises; any later one does.
   const [first] = useState(change)
@@ -220,8 +300,8 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
       aria-label={label}
       aria-haspopup="dialog"
       aria-expanded={expanded}
-      onPointerEnter={() => void loadLists()}
-      onFocus={() => void loadLists()}
+      onPointerEnter={warm}
+      onFocus={warm}
       onClick={onOpen}
       onKeyDown={onKeyDown}
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}

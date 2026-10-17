@@ -101,3 +101,11 @@ export function kindIcon(kind: ConversationKind): PhosphorIcon {
       return Hash
   }
 }
+
+/** A title matches when each word of the query starts a word in it, in any order (the topic switcher, Home's topic list). */
+export function titleMatches(title: string, query: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter((word) => word !== '')
+  if (words.length === 0) return true
+  const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u)
+  return words.every((word) => titleWords.some((each) => each.startsWith(word)))
+}

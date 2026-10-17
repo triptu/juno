@@ -1,18 +1,20 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import type { PickConversation } from '@juno/contract'
+import type { PickConversation, ThreadSummary } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { Composer } from './Composer'
-import { DestinationChip } from './DestinationPickers'
+import { DestinationChip, TopicChip } from './DestinationPickers'
 import { homeItems, rewritten } from './fixtures/home'
+import { engTopics } from './fixtures/messages'
 import { recentConversations } from './fixtures/newChat'
 import { PrivacyOn } from './fixtures/privacy'
 import { atMa, DRAFT, eng, hashEn, maya, MULTILINE, recentChannels, recentPeople } from './fixtures/recents'
-import { NOW } from './fixtures/topics'
+import { art, NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { destinationLabel, HomeRecent, HomeWriteTop, SendToList, sendToRowId } from './HomeWrite'
+import { destinationLabel, HomeRecent, SendToList, sendToRowId } from './HomeWrite'
+import { HomeWriteTop } from './HomeWriteTop'
 
 const noop = () => {}
 
@@ -31,11 +33,24 @@ interface Write {
   readonly syncing?: boolean
   /** A running job's state line in place of the placeholder (SPEC 13.4). */
   readonly jobLine?: string
+  /** The thread chosen in the topic chip; none is Main. */
+  readonly thread?: ThreadSummary
+  /** The topic chip's list. */
+  readonly topicsOpen?: boolean
 }
 
+/** #eng's threads as Home's topic list shows them, the first few drawn. */
+const engHomeTopics: ReadonlyArray<ThreadSummary> = engTopics.map((thread, index) => {
+  const drawn = [art.database, art.bell, art.coins, art.people][index]
+  return drawn === undefined ? thread : { ...thread, art: drawn }
+})
+const migration = engHomeTopics[0]!
+const secrets = engHomeTopics[4]!
+
 /** The composer as the container builds it: Recent, the chip, then the field. */
-function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, syncing = false, jobLine }: Write = {}): ReactNode {
+function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, syncing = false, jobLine, thread, topicsOpen = false }: Write = {}): ReactNode {
   const chip = <DestinationChip destination={destination} open={listOpen} onOpen={noop} query="" onQuery={noop} conversations={listOpen ? recentConversations : undefined} onPick={noop} />
+  const topic = <TopicChip conversation={destination} thread={thread} open={topicsOpen} onOpen={noop} query="" onQuery={noop} threads={destination?.channelId === 'C0ENG' ? engHomeTopics : []} now={NOW} onPick={noop} />
   const recent = noRecent ? null : <HomeRecent people={recentPeople.slice(0, fewRecent)} channels={recentChannels.slice(0, fewRecent)} chosen={destination?.key} onPick={noop} onOpen={noop} reserve={syncing} />
   const active = sendTo?.rows[0]?.key
   return (
@@ -43,8 +58,8 @@ function write({ destination, draft = '', sendTo, listOpen = false, noRecent = f
       value={draft}
       onChange={noop}
       onSend={noop}
-      placeholder={destination === undefined ? (jobLine ?? 'Ask Juno, or start with @ or #') : `Message ${destinationLabel(destination)}`}
-      above={<HomeWriteTop recent={recent} chip={chip} />}
+      placeholder={destination === undefined ? (jobLine ?? 'Ask Juno, or start with @ or #') : thread === undefined ? `Message ${destinationLabel(destination)}` : `Reply in ${thread.title}`}
+      above={<HomeWriteTop recent={recent} chip={chip} topic={topic} topicShown={destination !== undefined} />}
       {...(sendTo === undefined
         ? {}
         : {
@@ -122,6 +137,13 @@ export default defineFixtures(
       // Space kept the text: a question for Juno that starts with a channel's name.
       'juno-hash': state({ items: two, composer: write({ draft: '#eng what happened today?' }) }),
       'destination-list': state({ items: two, composer: write({ listOpen: true }) }),
+      // The topic chip (SPEC 12): Main for a person or channel, hidden for Juno (the juno state above).
+      'topic-main': state({ items: two, composer: write({ destination: maya, draft: DRAFT }) }),
+      'topic-thread': state({ items: two, composer: write({ destination: eng, thread: migration, draft: DRAFT }) }),
+      // Main first, then #eng's threads with their art and last activity, the resolved ones last.
+      'topic-list': state({ items: two, composer: write({ destination: eng, thread: migration, topicsOpen: true }) }),
+      // A long thread title and a narrow page: the topic chip shortens first, then the destination chip.
+      'topic-narrow': state({ items: two, composer: write({ destination: eng, thread: secrets, draft: DRAFT }) }, { width: 400, height: 720, padded: false }),
       // Two of each: Recent is as tall as its rows, so the chip stays 12 below the last one.
       'few-recent': state({ items: two, composer: write({ fewRecent: 2 }) }),
       'first-run': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], composer: write({ noRecent: true }) }),
@@ -148,6 +170,7 @@ export default defineFixtures(
       'hover-recent': state({ items: two }, { hover: '[data-recent="0-1"]' }),
       'focus-recent': state({ items: two }, { focus: '[data-recent="0-0"]' }),
       'hover-chip': state({ items: two }, { hover: 'button[aria-label="Send to: Juno"]' }),
+      'focus-topic-chip': state({ items: two, composer: write({ destination: eng, thread: migration }) }, { focus: 'button[aria-label^="Topic:"]' }),
       entrance: state({ enter: true }),
     },
     Overview: {

@@ -1,0 +1,1 @@
+- 10-17 15:50 · home-topic-chip · Home's composer gets back New chat's thread picker as a topic chip right of the destination chip, shown only for a person or channel: Main by default, or a thread to reply in. Its list reuses `channel.threads` (now with art) rather than restoring `newChat.threads`, and a reply keeps Home in place with a "Replied in" toast, as a Main send does.

@@ -73,3 +73,36 @@ test.describe('Home writing geometry', () => {
     expect(fills[2]).toBe('rgba(0, 0, 0, 0)')
   })
 })
+
+// The topic chip (SPEC 12): on the destination chip's row, right of it, the same height; on a narrow page it shortens first.
+test.describe('Home topic chip geometry', () => {
+  for (const state of ['topic-main', 'topic-thread', 'topic-narrow'] as const) {
+    test(`${state}: the topic chip sits right of the destination chip and inside the field's width`, async ({ page }) => {
+      const id = `write/${state}`
+      await openState(page, { component: 'Home', id, route: `Home/${id}`, group: '', groupId: '', state, frame: {} }, 'light')
+      const at = await page.evaluate(() => {
+        const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+        const truncated = (selector: string) => {
+          const label = document.querySelector(selector)!.querySelector(':scope > span:first-child > span:last-child')!
+          return label.scrollWidth > label.clientWidth
+        }
+        const field = box('[data-composer-field]')
+        const chip = box('[aria-label^="Send to:"]')
+        const topic = box('[aria-label^="Topic:"]')
+        return {
+          field: { left: field.left, right: field.right },
+          chip: { top: chip.top, height: chip.height, right: chip.right },
+          topic: { top: topic.top, height: topic.height, left: topic.left, right: topic.right },
+          chipTruncated: truncated('[aria-label^="Send to:"]'),
+          topicTruncated: truncated('[aria-label^="Topic:"]'),
+        }
+      })
+      expect(at.topic.top).toBe(at.chip.top)
+      expect(at.topic.height).toBe(at.chip.height)
+      expect(at.topic.left).toBeGreaterThan(at.chip.right)
+      expect(at.topic.right).toBeLessThanOrEqual(at.field.right)
+      expect(at.chipTruncated).toBe(false)
+      expect(at.topicTruncated).toBe(state === 'topic-narrow')
+    })
+  }
+})

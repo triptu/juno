@@ -20,7 +20,9 @@ test('Home works from the keyboard alone: ⌘N, pick with Enter, write, Shift Ta
   await juno.write.expectDestination('#eng')
   await expect(juno.write.composer).toBeFocused()
   await juno.win.keyboard.type('Keyboard only')
-  // Shift Tab reaches the chip (Attach files is out of the Tab order); Enter opens its list, Esc goes back to the chip without a change.
+  // Shift Tab reaches the topic chip, then the destination chip (Attach files is out of the Tab order); Enter opens its list, Esc goes back to the chip without a change.
+  await juno.win.keyboard.press('Shift+Tab')
+  await expect(juno.write.topicChip).toBeFocused()
   await juno.win.keyboard.press('Shift+Tab')
   await expect(juno.write.chip).toBeFocused()
   await juno.win.keyboard.press('Enter')

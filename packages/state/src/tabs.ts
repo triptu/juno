@@ -449,14 +449,16 @@ export function parseTabs(value: unknown): Tabs {
 }
 
 /**
- * A Home tab's draft and destination as a tab saves them. A New chat saved
- * before Home took its place reads the same way; its thread is dropped. One
- * that no longer reads is dropped, not the tab.
+ * A Home tab's draft and destination as a tab saves them, with the thread
+ * chosen in it. A New chat saved before Home took its place reads the same
+ * way; its thread is dropped. One that no longer reads is dropped, not the
+ * tab.
  */
 const HomeDraftJson = Schema.Struct({
   draft: Schema.String,
   mentions: Schema.Array(Schema.Struct({ kind: Schema.Literals(['person', 'channel']), id: Schema.String, name: Schema.String })),
   conversation: Schema.optionalKey(PickConversation),
+  thread: Schema.optionalKey(Schema.Struct({ id: Schema.String, rootTs: Schema.String, title: Schema.String, art: Schema.optionalKey(Schema.String) })),
 })
 const decodeHomeDraft = Schema.decodeUnknownOption(HomeDraftJson)
 
@@ -468,7 +470,9 @@ function parseHomeDrafts(value: unknown): ReadonlyMap<string, HomeDraft> {
       if (!('place' in tab)) continue
       const json = tab.homeDraft ?? tab.newChat
       if (json === undefined) continue
-      Option.map(decodeHomeDraft(json), (draft) => drafts.set(tab.id, { draft: draft.draft, mentions: draft.mentions, conversation: draft.conversation }))
+      Option.map(decodeHomeDraft(json), (draft) =>
+        drafts.set(tab.id, { draft: draft.draft, mentions: draft.mentions, conversation: draft.conversation, ...(tab.homeDraft === undefined || draft.thread === undefined || draft.conversation === undefined ? {} : { thread: draft.thread }) }),
+      )
     }
   })
   return drafts
@@ -498,6 +502,7 @@ const savedHomeDraft = (draft: HomeDraft) => ({
   draft: draft.draft,
   mentions: draft.mentions,
   ...(draft.conversation === undefined ? {} : { conversation: draft.conversation }),
+  ...(draft.thread === undefined ? {} : { thread: draft.thread }),
 })
 
 const savedTabsAtom = liveQuery(prefsGet)({ key: TABS_PREF })

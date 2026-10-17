@@ -1366,6 +1366,38 @@ export class HomeWritePane {
   async expectDestination(label: string): Promise<void> {
     await expect(this.chip).toHaveAccessibleName(new RegExp(`^Send to: ${escapeRegExp(label)}`))
   }
+
+  /** The topic chip right of the destination chip, while a person or channel is chosen: "Topic: Main", "Topic: <thread title>". */
+  get topicChip(): Locator {
+    return this.root.getByRole('button', { name: /^Topic: / })
+  }
+
+  /** The topic chip's list: Main, then the conversation's threads. */
+  get topicList(): Locator {
+    return this.root.getByRole('dialog', { name: 'Pick a topic' }).getByRole('listbox')
+  }
+
+  get topicSearch(): Locator {
+    return this.root.getByRole('dialog', { name: 'Pick a topic' }).getByRole('textbox')
+  }
+
+  /** The row in the topic list whose title starts with `title`. */
+  topicOption(title: string): Locator {
+    return this.topicList.getByRole('option', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** Opens the topic list, searches it, and picks the row that starts with `title`. */
+  async pickTopic(query: string, title: string): Promise<void> {
+    if (!(await this.topicSearch.isVisible())) await this.topicChip.click()
+    await this.topicSearch.fill(query)
+    await this.topicOption(title).click()
+    await expect(this.topicList).toBeHidden()
+  }
+
+  /** The topic chip names `label`: "Main", or the start of a thread's title. */
+  async expectTopic(label: string): Promise<void> {
+    await expect(this.topicChip).toHaveAccessibleName(new RegExp(`^Topic: ${escapeRegExp(label)}`))
+  }
 }
 
 export class TopicPane {
