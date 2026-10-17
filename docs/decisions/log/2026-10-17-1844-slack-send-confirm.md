@@ -1,0 +1,1 @@
+- 10-17 18:44 · owner · Juno's Slack sends to other people always need a click on their card; they never go through auto-review, since Slack messages cannot be unsent.
