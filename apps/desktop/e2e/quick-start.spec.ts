@@ -121,22 +121,22 @@ mediumQuick('Home is ready once DMs, mentions and unread threads have history, b
   await juno.signIn()
   await juno.home.navItem.click()
 
-  // Home is ready: the greeting with no syncing line and the rows that wait, while the sidebar still syncs.
+  // Home is ready: the greeting with no syncing line, and not caught up while DMs are unread, as the sidebar still syncs.
   await expect(juno.home.greeting).toBeVisible({ timeout: 60_000 })
   await expect(juno.home.root.locator('h2 + p')).toHaveCount(0)
   await expect(juno.home.root.getByText('All caught up.')).toHaveCount(0)
-  await expect(juno.home.root.locator('[data-home-item]').first()).toBeVisible()
   await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack')
   expect(fake.gated().filter((call) => call.method === 'conversations.history')).toHaveLength(1)
   const read = new Set(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
   expect([...forHome].filter((id) => !read.has(id))).toEqual([])
+  // Where the greeting and each row shown are, from the top of the window.
+  const places = () => win.locator('[data-home] h2, [data-home] [data-home-item]').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top))
   const early = await juno.home.kinds()
-  const firstRow = win.locator('[data-home] [data-home-item]').first()
-  const top = (await firstRow.boundingBox())!.y
+  const at = await places()
 
-  // The rest of history lands: the rows shown stay first and in place; what lands later goes below them.
+  // The rest of history lands: the greeting and the rows shown stay in place; what lands later goes below them.
   fake.gate()
   await juno.waitForSync()
   expect((await juno.home.kinds()).slice(0, early.length)).toEqual(early)
-  expect((await firstRow.boundingBox())!.y).toBe(top)
+  expect((await places()).slice(0, at.length)).toEqual(at)
 })
