@@ -46,8 +46,9 @@ export interface HomeRecentProps {
  * channels on the right; faces against channel art make the split. One
  * Tab stop: ↑ ↓ move within a column, ← → between them, Enter or Space
  * picks, ⌘Enter opens. A press keeps focus where it was, so the field keeps
- * the caret. Below about 400px the columns stack. Each column keeps room for
- * five rows, so rows that arrive later fill it and nothing above moves.
+ * the caret. Below about 400px the columns stack. Recent always keeps room
+ * for five rows in each column, so rows that arrive later move nothing above;
+ * the rows sit at the bottom of that room, so the chip stays close under them.
  */
 export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve = false }: HomeRecentProps) {
   // Both columns always take their place, so one that fills later moves nothing; the keys skip an empty one.
@@ -72,37 +73,49 @@ export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve =
   }
   return (
     <section aria-labelledby="home-recent" data-home-recent="" {...stylex.props(styles.recent)}>
-      <Text id="home-recent" variant="sectionLabel" tone="muted" as="h3" sx={styles.label}>
-        Recent
-      </Text>
-      <div {...stylex.props(styles.scope)}>
-        <div {...stylex.props(styles.columns)}>
-          {lists.map((list, c) => (
-            <ul key={c === 0 ? 'people' : 'channels'} aria-label={c === 0 ? 'People' : 'Channels'} {...stylex.props(styles.list)}>
-              {list.map((conversation, r) => (
-                <li key={conversation.key}>
-                  <RecentRow conversation={conversation} place={`${c}-${r}`} chosen={conversation.key === chosen} tabbable={c === column && r === row} onPick={onPick} onOpen={onOpen} onMove={move} onFocus={() => setAt([c, r])} />
-                </li>
-              ))}
-            </ul>
-          ))}
+      <RecentRoom />
+      <div {...stylex.props(styles.content)}>
+        <Text id="home-recent" variant="sectionLabel" tone="muted" as="h3" sx={styles.label}>
+          Recent
+        </Text>
+        <div {...stylex.props(styles.scope)}>
+          <div {...stylex.props(styles.columns)}>
+            {lists.map((list, c) => (
+              <ul key={c === 0 ? 'people' : 'channels'} aria-label={c === 0 ? 'People' : 'Channels'} {...stylex.props(styles.list)}>
+                {list.map((conversation, r) => (
+                  <li key={conversation.key}>
+                    <RecentRow conversation={conversation} place={`${c}-${r}`} chosen={conversation.key === chosen} tabbable={c === column && r === row} onPick={onPick} onOpen={onOpen} onMove={move} onFocus={() => setAt([c, r])} />
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
-/** Recent's box while its rows are on their way: the same structure, empty and hidden, so it takes exactly Recent's room. */
+/** Recent's box while its rows are on their way: its room alone, so it takes exactly Recent's space. */
 function RecentReserved() {
   return (
-    <div aria-hidden="true" data-home-recent-reserved="" {...stylex.props(styles.recent, styles.hidden)}>
+    <div data-home-recent-reserved="" {...stylex.props(styles.recent)}>
+      <RecentRoom />
+    </div>
+  )
+}
+
+/** Room for the label and five rows in each column, empty and hidden: the space Recent always takes. */
+function RecentRoom() {
+  return (
+    <div aria-hidden="true" {...stylex.props(styles.room)}>
       <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>
         Recent
       </Text>
       <div {...stylex.props(styles.scope)}>
         <div {...stylex.props(styles.columns)}>
-          <div {...stylex.props(styles.list)} />
-          <div {...stylex.props(styles.list)} />
+          <div {...stylex.props(styles.list, styles.roomList)} />
+          <div {...stylex.props(styles.list, styles.roomList)} />
         </div>
       </div>
     </div>
@@ -256,9 +269,19 @@ const styles = stylex.create({
   // As wide as Home's column; it starts on the field's edge.
   // A window too short for Recent and Home's rows keeps the rows; the chip's list still has every conversation.
   recent: {
-    display: { default: 'block', [SHORT]: 'none' },
+    display: { default: 'grid', [SHORT]: 'none' },
     width: '100%',
     maxWidth: layout['--home-width'],
+  },
+  // The room and the rows share one cell (`recent` is a grid); the rows sit at its bottom, on the chip.
+  room: {
+    gridArea: '1 / 1',
+    visibility: 'hidden',
+  },
+  content: {
+    gridArea: '1 / 1',
+    alignSelf: 'end',
+    minWidth: 0,
   },
   // On the edge of the rows' marks.
   label: {
@@ -277,13 +300,12 @@ const styles = stylex.create({
   list: {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: `calc(${RECENT_ROWS} * ${sizes['--control-32']})`,
     margin: 0,
     padding: 0,
     listStyle: 'none',
   },
-  hidden: {
-    visibility: 'hidden',
+  roomList: {
+    minHeight: `calc(${RECENT_ROWS} * ${sizes['--control-32']})`,
   },
   // Recent sits below what needs you: the subtle tone at rest, the default on hover and when chosen.
   row: {

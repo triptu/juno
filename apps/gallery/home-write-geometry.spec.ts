@@ -10,7 +10,7 @@ import { openState } from './support'
  */
 test.describe('Home writing geometry', () => {
   for (const theme of ['light', 'dark'] as const) {
-    for (const state of ['juno', 'maya-chosen', 'multiline'] as const) {
+    for (const state of ['juno', 'maya-chosen', 'multiline', 'few-recent'] as const) {
       test(`${state}, ${theme}: Recent, the chip and the field line up`, async ({ page }) => {
         const id = `write/${state}`
         await openState(page, { component: 'Home', id, route: `Home/${id}`, group: '', groupId: '', state, frame: {} }, theme)
@@ -43,7 +43,7 @@ test.describe('Home writing geometry', () => {
         })
         expect(at.columns).toHaveLength(2)
         for (const column of at.columns) {
-          expect(column).toHaveLength(5)
+          expect(column).toHaveLength(state === 'few-recent' ? 2 : 5)
           expect(new Set(column.map((row) => row.name)).size).toBe(1)
           for (const row of column) expect(row.height).toBe(32)
         }
@@ -55,6 +55,8 @@ test.describe('Home writing geometry', () => {
         const chipToField = at.fieldTop - at.chipBottom
         expect(chipToField).toBeGreaterThan(0)
         expect(recentToChip).toBeGreaterThan(chipToField)
+        // The last row sits on the chip, 12 above it, however many rows Recent has.
+        expect(recentToChip).toBe(12)
         console.log(`Home write ${state} ${theme}: ${JSON.stringify({ recentToChip, chipToField })}`)
       })
     }
