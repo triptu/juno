@@ -1,6 +1,6 @@
 // What a Change card calls a connection call (SPEC 13.3, 17): the action by what it does, and a short verb.
 import { expect, it } from 'vitest'
-import { actionName } from '../src/mcp/naming'
+import { actionName, actionStatus } from '../src/mcp/naming'
 
 it.each([
   ['Littlebird', 'search_user_context', undefined, { title: 'Search Littlebird', verb: 'Search' }],
@@ -14,4 +14,18 @@ it.each([
   ['Docs', 'create_page_from_template_draft', undefined, { title: 'Create page from template draft in Docs', verb: 'Create' }],
 ])('names %s %s', (server, tool, description, name) => {
   expect(actionName(server, tool, description)).toEqual(name)
+})
+
+it.each([
+  ['Littlebird', 'search_user_context', undefined, 'Searching Littlebird'],
+  ['Notion', 'notion-create-pages', undefined, 'Creating pages in Notion'],
+  ['Notion', 'notion-update-page', undefined, 'Updating a page in Notion'],
+  ['Slack', 'send_message', undefined, 'Sending a message in Slack'],
+  ['Littlebird', 'getMeeting', undefined, 'Getting a meeting from Littlebird'],
+  ['Docs', 'note', 'Create a note in the handbook.', 'Creating a note in Docs'],
+  ['Docs', 'handbook_page_details', 'Everything about one page.', 'Checking with Docs'],
+  ['PostHog', 'exec', undefined, 'Running a command in PostHog'],
+  ['Notion', 'notion-add-item', undefined, 'Adding an item in Notion'],
+])('the status for %s %s', (server, tool, description, line) => {
+  expect(actionStatus(server, tool, description)).toBe(line)
 })

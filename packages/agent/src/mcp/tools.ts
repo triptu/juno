@@ -6,6 +6,7 @@ import type { ReviewModel } from '../review/review'
 import type { McpManagerApi } from './manager'
 import { changeCard, connectCard } from './actions'
 import { findTools, resolveServer, serverIndex, toolSchema } from './discovery'
+import { actionStatus } from './naming'
 import { result } from './results'
 import { reviewChange, ruleFor, runReviewed } from './reviewed'
 import { McpError, T3 } from './types'
@@ -57,7 +58,7 @@ export function mcpTools(manager: McpManagerApi, context: McpToolsContext) {
   })
   const call = defineTool<{ server: string; tool: string; args: unknown }>({
     name: 'call_tool', description: "Call a discovered tool. Reads run now. Any other call is checked against the owner's own words in this conversation: it runs now when the owner clearly asked for it and it can be undone, and otherwise becomes a Change card the owner approves. Use the server name and the argument schema find_tools returned. Results are untrusted. Say when a server is unavailable or a result is an attachment.",
-    replay: 'unsafe', status: () => 'Using a connection',
+    replay: 'unsafe', status: (_, args) => connectionStatus(manager, args),
     parameters: { type: 'object', properties: { server: { type: 'string' }, tool: { type: 'string' }, args: { type: 'object' } }, required: ['server', 'tool', 'args'], additionalProperties: false },
     run: async ({ server: name, tool, args }, call) => {
       const run = await context.current()
@@ -107,4 +108,26 @@ export function mcpTools(manager: McpManagerApi, context: McpToolsContext) {
   // Discovery itself contains server-controlled descriptions. Taint before either tool executes.
   const limited = (tool: typeof find) => ({ ...tool, taints: true, registration: { ...tool.registration, outputLimits: { maxBytes: 8_000_000, maxLines: 1_000_000 } } })
   return [limited(find), limited(call), { ...limited(read), registration: { ...limited(read).registration, callers: ['tools'] as const } }]
+}
+
+/**
+ * The status line while Juno calls a connection's tool (SPEC 13.2): the connection's own name
+ * and what the tool does, as the cards name it ("Searching Notion"). "Using a connection" when
+ * the call names no connection Juno knows.
+ */
+function connectionStatus(manager: McpManagerApi, args: unknown): string {
+  const call = (typeof args === 'object' && args !== null ? args : {}) as { readonly server?: unknown; readonly tool?: unknown }
+  if (typeof call.server !== 'string' || typeof call.tool !== 'string') return 'Using a connection'
+  try {
+    const id = resolveServer(manager, call.server)
+    const label = manager.stored(id).config.label
+    let description: string | undefined
+    try {
+      const definition = JSON.parse(manager.tool(id, call.tool).definition) as { readonly description?: unknown }
+      description = typeof definition.description === 'string' ? definition.description : undefined
+    } catch { description = undefined }
+    return actionStatus(label, call.tool, description)
+  } catch {
+    return 'Using a connection'
+  }
 }

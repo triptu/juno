@@ -409,14 +409,14 @@ class Router {
     })
   }
 
-  private toolStarted = (name: string) => {
+  private toolStarted = (name: string, args: unknown) => {
     const run = this.current
     if (run === undefined) return
     const tool = this.options.tools().find((t) => t.name === name)
     const count = (run.calls.get(name) ?? 0) + 1
     run.calls.set(name, count)
     if (tool?.taints) this.taint(run)
-    this.showStatus(run, tool?.status(count) ?? 'Working')
+    this.showStatus(run, tool?.status(count, args) ?? 'Working')
   }
 
   /** Delivers held input into the live run at a boundary, oldest first. */
@@ -488,8 +488,8 @@ class Router {
       },
     },
     tool: {
-      beforeTool: (call: { readonly name: string }) => {
-        this.toolStarted(call.name)
+      beforeTool: (call: { readonly name: string; readonly arguments?: unknown }) => {
+        this.toolStarted(call.name, call.arguments)
         return undefined
       },
     },

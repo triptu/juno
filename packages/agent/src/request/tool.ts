@@ -66,9 +66,9 @@ export interface ToolDefinition<Args> {
   /**
    * The status bubble's line while the run uses this tool, counting real
    * things: `count` is how many calls of it the run has made ("Reading 3
-   * conversations").
+   * conversations"), and `args` this call's arguments, as the model wrote them.
    */
-  readonly status: (count: number) => string
+  readonly status: (count: number, args: unknown) => string
   /** The text the model sees. A thrown error is shown to the model as the tool's error. */
   readonly run: (args: Args, call: ToolCall) => Promise<ToolOutput>
 }
@@ -77,7 +77,7 @@ export interface ToolDefinition<Args> {
 export interface JunoTool {
   readonly name: string
   readonly registration: ToolRegistration
-  readonly status: (count: number) => string
+  readonly status: (count: number, args: unknown) => string
 }
 
 export type ToolOutput = { readonly text: string; readonly isError?: boolean }
