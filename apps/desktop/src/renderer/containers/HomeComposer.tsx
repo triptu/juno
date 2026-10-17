@@ -21,7 +21,7 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { Composer, DestinationChip, destinationLabel, holdKeys, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { AttachmentNote, Composer, DestinationChip, destinationLabel, holdKeys, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { junoCommands } from './juno/actions'
@@ -29,6 +29,9 @@ import { useMentions } from './mentions'
 import { openJuno, openTopic } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
+
+/** Under files attached while Juno is chosen (SPEC 12): Juno's send takes the text, and the files stay. */
+const JUNO_FILES_NOTE = 'Juno reads text only. Pick a person or channel to send files.'
 
 /** A key typed on the chip goes into the field, as a token field does, and focus stays there. */
 function typeIn(field: HTMLTextAreaElement | null, text: string): void {
@@ -337,7 +340,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       onEscape={checks.clear}
       inputRef={inputRef}
       {...(toSlack ? { leading: files.leading } : {})}
-      attachments={files.chips}
+      attachments={files.chips !== undefined && !toSlack && junoOn ? <AttachmentNote chips={files.chips} note={JUNO_FILES_NOTE} /> : files.chips}
       onFiles={files.onFiles}
       above={<HomeWriteTop recent={<Recent chosen={draft.conversation?.key} onPick={destination.choose} />} chip={<Chip destination={draft.conversation} junoOn={junoOn} onType={(text) => typeIn(inputRef.current, text)} {...destination.chip} />} />}
     />

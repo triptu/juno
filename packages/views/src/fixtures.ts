@@ -9,6 +9,7 @@ import AppearanceSettings from './AppearanceSettings.fixtures'
 import AppInfoView from './AppInfoView.fixtures'
 import AttachmentCard from './AttachmentCard.fixtures'
 import AttachmentChips from './AttachmentChips.fixtures'
+import AttachmentNote from './AttachmentNote.fixtures'
 import AudienceWarning from './AudienceWarning.fixtures'
 import ChannelIconPicker from './ChannelIconPicker.fixtures'
 import Composer from './Composer.fixtures'
@@ -79,6 +80,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AppearanceSettings,
   AppInfoView,
   AttachmentChips,
+  AttachmentNote,
   AttachmentCard,
   BackupSection,
   ChannelIconPicker,
