@@ -166,6 +166,7 @@ Scroll container, padding `0 8 16`, contained scroll.
 
 - Sections: **Pinned** then **Recent**. Section label 11/500 muted, sentence case, padding `14 12 6`. "Recent" label only shows when a Pinned section exists.
 - Sort: latest activity first within each section.
+- Hold (SPEC §5, "Holding the order"): while the pointer is over the list or keyboard focus (`:focus-visible`) is in it, the order, the sections and the set of rows stay as shown; row contents update in place. The held changes apply in one frame 400 ms after both have left (`HOLD_GRACE_MS`), with no animation. Your own action on a row applies to that row at once; opening a topic from elsewhere, Undo and Ignore channel apply everything and the hold resumes on the next pointer move or keyboard focus in the list. [built]
 - Row gap 2px.
 - Visibility rules (SPEC §5): hide when quiet (no activity in 7 days and no unread), resolved, a thread set to Never (unless it mentions you), or in an ignored channel. Pinned rows are always shown. Mark-as-unread brings a quiet row back.
 - Prototype difference: a pinned row that is resolved stays visible with a green `circle-check` 14 before its title and no hover Resolve button. **[spec]** says resolving hides the row; decision needed (see summary).
