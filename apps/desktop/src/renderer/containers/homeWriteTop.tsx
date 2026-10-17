@@ -105,7 +105,7 @@ function Recent({ chosen, onPick }: { readonly chosen: string | undefined; reado
   const frequent = useAtomValue(frequentConversationsAtom)
   const recent = frequent._tag === 'Success' ? frequent.value : []
   // Until the first sync ends and the ranking is here, Recent keeps its room empty: rows landing mid-sync re-rank under the pointer.
-  const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready)
+  const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready || result.value.firstSync)
   return (
     <HomeRecent
       people={recent.filter(isPeople)}

@@ -28,6 +28,7 @@ import { engineStatusAtom } from './engine'
 import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { holdOrder } from './holdOrder'
+import { traceHold, traceList } from './sidebarTrace'
 import type { Registry } from './client'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 
@@ -165,6 +166,7 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
   if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, quietDays }
+  traceList(result.value.meta, result.value.order.length, filter)
   const status = get(engineStatusAtom)
   const syncing = status._tag !== 'Success' || status.value.syncing || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
   // An empty cache's list waits for the quick start (membership, DM names, the first followed threads); then rows fill in as they land.
@@ -235,6 +237,10 @@ const sidebarReleasedAtom = Atom.make<ReadonlyArray<string>>([]).pipe(Atom.keepA
  */
 const sidebarSheetsAtom = Atom.make(0).pipe(Atom.keepAlive)
 
+/** Tests only: records a change of the hold's inputs (`sidebarTrace.ts`); nothing while the harness has not asked. */
+export const traceSidebarHold = (registry: Registry, what: string | (() => string)): void =>
+  traceHold(what, () => ({ engaged: registry.get(sidebarEngagedAtom), paused: registry.get(sidebarPausedAtom), sheets: registry.get(sidebarSheetsAtom), released: registry.get(sidebarReleasedAtom).length }))
+
 /** Whether the list holds its order now (SPEC 5, "Holding the order"). */
 const sidebarHoldAtom = Atom.make((get) => (get(sidebarEngagedAtom) || get(sidebarSheetsAtom) > 0) && !get(sidebarPausedAtom))
 
@@ -242,9 +248,11 @@ const sidebarHoldAtom = Atom.make((get) => (get(sidebarEngagedAtom) || get(sideb
 export function setSidebarEngaged(registry: Registry, engaged: boolean): void {
   if (registry.get(sidebarEngagedAtom) === engaged) return
   registry.set(sidebarEngagedAtom, engaged)
-  if (engaged) return
-  registry.set(sidebarPausedAtom, false)
-  if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+  if (!engaged) {
+    registry.set(sidebarPausedAtom, false)
+    if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+  }
+  traceSidebarHold(registry, engaged ? 'engaged' : 'left')
 }
 
 /** A sheet opened over the window: the list holds from the order shown, paused or not. */
@@ -252,6 +260,7 @@ export function openSidebarSheet(registry: Registry): void {
   const open = registry.get(sidebarSheetsAtom)
   if (open === 0 && registry.get(sidebarPausedAtom)) registry.set(sidebarPausedAtom, false)
   registry.set(sidebarSheetsAtom, open + 1)
+  traceSidebarHold(registry, 'sheet opened')
 }
 
 /**
@@ -263,26 +272,34 @@ export function openSidebarSheet(registry: Registry): void {
 export function closeSidebarSheet(registry: Registry): void {
   const open = Math.max(0, registry.get(sidebarSheetsAtom) - 1)
   registry.set(sidebarSheetsAtom, open)
-  if (open > 0) return
-  if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
-  else if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+  if (open === 0) {
+    if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
+    else if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+  }
+  traceSidebarHold(registry, 'sheet closed')
 }
 
 /** The pointer moved, or focus moved, in the list: a paused hold starts again from the order shown. */
 export function resumeSidebarHold(registry: Registry): void {
-  if (registry.get(sidebarPausedAtom)) registry.set(sidebarPausedAtom, false)
+  if (!registry.get(sidebarPausedAtom)) return
+  registry.set(sidebarPausedAtom, false)
+  traceSidebarHold(registry, 'resumed')
 }
 
 /** The user acted on this topic: its move, arrival or departure shows at once, even while the list holds, except behind a sheet. */
 export function releaseSidebarTopic(registry: Registry, id: string): void {
   if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
   const released = registry.get(sidebarReleasedAtom)
-  if (!released.includes(id)) registry.set(sidebarReleasedAtom, [...released, id])
+  if (released.includes(id)) return
+  registry.set(sidebarReleasedAtom, [...released, id])
+  traceSidebarHold(registry, 'released a topic')
 }
 
 /** An explicit action elsewhere: show the live order now, and keep showing it until the list is touched again. Behind a sheet it waits for the sheet to close. */
 export function flushSidebar(registry: Registry): void {
-  if (registry.get(sidebarEngagedAtom) && registry.get(sidebarSheetsAtom) === 0) registry.set(sidebarPausedAtom, true)
+  if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
+  registry.set(sidebarPausedAtom, true)
+  traceSidebarHold(registry, 'flushed')
 }
 
 /**

@@ -8,6 +8,9 @@
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const CI_BUILDS = '#ci-builds'
@@ -49,6 +52,9 @@ test('a bot channel joined later moves by itself, the card says why, and Move ba
   await homeShowsRecord(juno)
   await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel to Automated')
   await expect(home.meta('automatedMoves')).toHaveText('ci-builds')
+  // Home's card can come before the sidebar's list says the channel left, and opening a row to read Home afresh held
+  // the list: wait until the sidebar shows the move, so the sheet's hold starts from it.
+  await sidebar.row(CI_BUILDS).expectAbsent()
 
   const sheet = await home.reviewOf('automatedMoves', 'automated')
   await expect(sheet.title).toHaveText('Juno moved 1 channel to Automated')

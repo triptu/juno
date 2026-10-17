@@ -5,6 +5,9 @@
 import { SELF_ID, TEAM } from '@juno/fake-slack'
 import { test } from './fixtures'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 test('previews name people by first name, drop the other side of a DM, and label an image', async ({ juno, fake }) => {

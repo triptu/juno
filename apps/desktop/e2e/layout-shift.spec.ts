@@ -3,6 +3,9 @@ import { expect, hooks, test } from './fixtures'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 60_000, mode: 'parallel' })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -255,10 +258,12 @@ test('Home rows painted during the first sync stay fixed as later history pages 
   fake.holdNext({ method: 'conversations.replies', times: 1000 })
   // The sidebar's list is still being built: its rows take their places by recency, and #alerts-prod and #deploys
   // leave for Automated, as their pages land (sidebar.spec.ts, "during the first sync"). Only those moves are skipped.
+  // Home becomes ready once the DMs, mentions and unread followed threads have history, while the sync goes on
+  // (owner, 10-18), so that step is inside the probe too and must move nothing either.
   await expectStableAnchor(win, '[data-home-item]', async () => {
     fake.release({ method })
     await expect.poll(() => fake.heldCount({ method: 'conversations.replies' }), { timeout: 30_000 }).toBeGreaterThan(0)
-    await expect(syncing).toBeVisible()
+    await expect(juno.sidebar.syncStatus).toBeVisible()
   }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   expect((await boxes()).slice(0, painted.length)).toEqual(painted)
   // The sync ends: the rows painted are still where they were.

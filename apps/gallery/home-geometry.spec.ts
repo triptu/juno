@@ -60,3 +60,22 @@ test('Home keeps the syncing line under the greeting as its copy changes', async
   for (const start of starts) expect(start.line).toBe(start.greeting)
   expect(starts[1]!.first).toBe(starts[0]!.first)
 })
+
+/**
+ * Home becomes ready while the first sync still reads history (owner,
+ * 10-18): the syncing line goes and the reserved slots stay, so the
+ * greeting and the rows shown keep their places.
+ */
+test('Home moves nothing when it becomes ready before the first sync ends', async ({ page }) => {
+  const places: Array<{ readonly greeting: number; readonly row: number; readonly items: number }> = []
+  for (const state of ['empty/syncing-rows', 'empty/ready-filling']) {
+    await open(page, 'Home', state)
+    places.push(await page.locator('[data-home]').evaluate((node) => ({
+      greeting: node.querySelector('h2')!.getBoundingClientRect().top,
+      row: node.querySelector('[data-home-item]')!.getBoundingClientRect().top,
+      items: node.querySelector('ul')!.getBoundingClientRect().height,
+    })))
+  }
+  await expect(page.locator('[data-home] h2 + p')).toHaveCount(0)
+  expect(places[1]).toEqual(places[0])
+})

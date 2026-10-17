@@ -43,7 +43,8 @@ export interface TopicListProps {
    * Focus from a mouse press does not count: the pointer already does. The
    * owner holds the list's order while it is engaged.
    */
-  readonly onEngagedChange?: (engaged: boolean) => void
+  /** With where the pointer and keyboard focus are, for the sidebar trace. */
+  readonly onEngagedChange?: (engaged: boolean, inside: { readonly pointer: boolean; readonly keyboard: boolean }) => void
   /** The pointer moved, or keyboard focus moved, inside the list. */
   readonly onTouch?: () => void
 }
@@ -79,7 +80,7 @@ export function TopicList({
     const was = inside.current.pointer || inside.current.keyboard
     inside.current[part] = now
     const is = inside.current.pointer || inside.current.keyboard
-    if (is !== was) onEngagedChange?.(is)
+    if (is !== was) onEngagedChange?.(is, inside.current)
   }
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     const target = event.target

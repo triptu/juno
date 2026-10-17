@@ -8,6 +8,9 @@
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 const ALERTS_MAIN = '#alerts-prod'

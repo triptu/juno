@@ -35,6 +35,7 @@ export {
   sidebarRowAtom,
   sidebarSectionsAtom,
   setSidebarEngaged,
+  traceSidebarHold,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
@@ -223,7 +224,6 @@ export { closeWebPanel, followWebPanel, openWebPanel, webPanelAtom, webPanelStat
 export {
   fillHome,
   freezeHome,
-  homeGreeting,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
@@ -241,6 +241,7 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
+export { homeGreeting } from './homeScene'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,

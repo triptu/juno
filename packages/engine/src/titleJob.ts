@@ -1,6 +1,6 @@
 /**
- * AI titles for recent sidebar threads (SPEC 2, "Titles"; 13.10), after the
- * first sync and without opening them. It reads the local cache only, so it
+ * AI titles for recent sidebar threads (SPEC 2, "Titles"; 13.10), once Home
+ * is ready in the first sync (`homeStage`) and without opening them. It reads the local cache only, so it
  * makes no Slack call; the threads' replies arrive through sync's follow pass
  * on the background lane.
  *
@@ -26,14 +26,14 @@
 import { AiProvider, cacheKeyOf, isFinal, tasks, type AiCallMeta, type TitleTopicInput } from '@juno/ai'
 import { quietDaysOf, type TopicId } from '@juno/domain'
 import { unescapeMrkdwn } from '@juno/richtext'
-import { Invalidation, liveQuery, StoreReader, StoreWriter, syncState, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
-import { BOOT_KEY } from '@juno/sync'
+import { Invalidation, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn, aiJobsOn } from './ai'
 import type { EngineConfig } from './config'
 import { AiCredentials, aiWakes } from './aiCredentials'
 import { AiSpend } from './aiSpend'
 import { Workspace, type StoreServices } from './workspace'
+import { homeStage } from './home/ready'
 
 /** Calls per workspace per day, counted from stored titles and this process's unfinished calls. */
 export const TITLE_DAILY_BUDGET = 200
@@ -78,7 +78,7 @@ const storeTitle = (topicId: string, input: TitleTopicInput, title: string, meta
 })
 
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> => Effect.gen(function* () {
-  if (!(yield* aiAssistOn) || (yield* syncState.get(BOOT_KEY)) === undefined) return
+  if (!(yield* aiAssistOn) || !(yield* homeStage).ready) return
   const sql = yield* StoreReader
   const now = yield* Clock.currentTimeMillis
   const day = now - (now % DAY)
