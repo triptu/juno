@@ -72,7 +72,8 @@ export function toolSchema(manager: McpManagerApi, server: string, name: string)
     server: handleOf(manager, id), tool: name, ...(about ? { about } : {}), ...(tool.tier === 0 ? { read: true } : {}),
     inputSchema: definition.inputSchema ?? { type: 'object' },
   })
-  const bytes = Buffer.byteLength(text)
+  // Measured as the archive keeps it, after the tool's name, which is what the builder pages.
+  const bytes = Buffer.byteLength(`find_tools: ${text}`)
   if (bytes > SCHEMA_LIMIT) return { text: `Juno can't use this tool: its description and argument schema are ${Math.ceil(bytes / 1024)} KB, more than the ${SCHEMA_LIMIT / 1024} KB Juno can read.`, isError: true }
   return { text }
 }
