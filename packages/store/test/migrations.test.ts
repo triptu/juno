@@ -22,7 +22,7 @@ const tableNames = (schema: 'main' | 'cache') =>
     return rows.map((r) => r.name)
   })
 
-it.effect('removes retired cards and summary scheduling while keeping messages and preferences', () =>
+it.effect('removes retired cards, summary scheduling and the AI title version while keeping messages and preferences', () =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`CREATE TABLE for_you_cards (id TEXT PRIMARY KEY)`
@@ -37,6 +37,8 @@ it.effect('removes retired cards and summary scheduling while keeping messages a
     assert.notInclude(yield* tableNames('main'), 'for_you_cards')
     const columns = yield* sql<{ name: string }>`PRAGMA table_info(notification_log)`
     assert.notInclude(columns.map((column) => column.name), 'summary_due_at')
+    const overlay = yield* sql<{ name: string }>`PRAGMA table_info(topic_overlay)`
+    assert.notInclude(overlay.map((column) => column.name), 'ai_title_version')
     const held = yield* sql<{ outcome: string }>`SELECT outcome FROM notification_log WHERE channel = 'C1'`
     assert.deepStrictEqual(held, [{ outcome: 'hold' }])
     const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'theme'`
