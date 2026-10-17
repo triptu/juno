@@ -2,10 +2,9 @@
  * Titles: manual, then AI, then the first six or so words of the first
  * message. Main rows show the channel label instead.
  *
- * A title is `sensitive` when it is message text nobody checked for a
- * shared screen: the first words of the first message, or an AI title made
- * before titles left out sensitive details. Privacy mode blurs those
- * (SPEC section 5, Privacy mode). Your own rename and the channel are not.
+ * A title is `sensitive` when it is the first words of the first message:
+ * raw message text, which privacy mode blurs (SPEC section 5, Privacy mode).
+ * AI titles, your own rename and the channel are not.
  */
 import { bodyFromMrkdwn, previewText, type Lookups } from '@juno/richtext'
 import { channelLabel } from './channel'
@@ -69,7 +68,7 @@ export function resolveTitle(topic: Topic, lookups: Lookups = {}): ResolvedTitle
   const manual = topic.overlay.manualTitle?.trim()
   if (manual) return { text: manual, source: 'manual', sensitive: false }
   const ai = topic.overlay.aiTitle?.trim()
-  if (ai) return { text: ai, source: 'ai', sensitive: topic.overlay.aiTitleOld === true }
+  if (ai) return { text: ai, source: 'ai', sensitive: false }
   const fallback = firstWords(topic.firstMessageText ?? '', FALLBACK_TITLE_WORDS, lookups)
   if (fallback) return { text: fallback, source: 'fallback', sensitive: true }
   // A thread whose root has no text (a file, say) falls back to where it lives.
