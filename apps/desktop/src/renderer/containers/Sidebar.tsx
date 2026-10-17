@@ -175,6 +175,7 @@ export function Sidebar() {
       views={views}
       onFilterView={selectView}
       onNewView={newView}
+      newViewOpen={sheet?.mode === 'new'}
       onViewMenu={(id) => void showViewPillMenu(id)}
       onMoveView={moveView}
       {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
