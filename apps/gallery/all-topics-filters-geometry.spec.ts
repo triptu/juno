@@ -89,10 +89,10 @@ test.describe('All topics place picker', () => {
       await expect(dialog.getByRole('textbox')).toHaveValue('ma')
       await expect(dialog.getByRole('option')).toHaveCount(3)
       await expect(dialog.getByRole('option', { name: /^Anywhere/ })).toHaveCount(0)
-      // Recent's marks: Maya's face, the group DM's initials, the channel's tile; each 20px, so the names start on one edge.
+      // Recent's marks: Maya's face, the group DM's pair of faces, the channel's tile; each 20px, so the names start on one edge.
       const options = dialog.getByRole('option')
       await expect(options.nth(0).locator('[data-kind="person"]')).toBeVisible()
-      await expect(options.nth(1).locator('[data-kind="group"]')).toBeVisible()
+      await expect(options.nth(1).locator('[data-group-avatar]')).toBeVisible()
       await expect(options.nth(2).locator('[data-kind]')).toHaveCount(0)
       for (let i = 0; i < 3; i++) expect((await options.nth(i).locator('span').first().boundingBox())!.width).toBe(20)
       const [button, panel] = await Promise.all([page.getByRole('button', { name: /^Where: / }).boundingBox(), dialog.boundingBox()])
