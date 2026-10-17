@@ -1,10 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, useOptionListKeys } from '@juno/ui'
+import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, SparkleDuotone, useOptionListKeys } from '@juno/ui'
 import { Highlighted } from './Highlighted'
 import { hueFor, initials, kindIcon } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
@@ -146,7 +145,7 @@ function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly i
       size={36}
       active={activeId === id}
       selected={selected}
-      leading={juno ? <Icon icon={Sparkle} size={15} weight="duotone" /> : <Icon icon={Globe} size={15} />}
+      leading={juno ? <Icon icon={SparkleDuotone} size={15} /> : <Icon icon={Globe} size={15} />}
       label={juno ? 'Juno' : 'Anywhere'}
       {...(juno ? { sub: 'Ask Juno' } : {})}
       onSelect={onSelect}

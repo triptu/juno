@@ -17,16 +17,20 @@
  * list shows it from the engine's next window. The edit field stays until
  * that window has the new text, so the old text never flashes back.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { editMessage, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { InlineEdit, type InlineEditProps, type MessageActions } from '@juno/views'
-import { useEmojiSuggestions } from './emojiSuggestions'
+import type { MessageActions } from '@juno/views'
+import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
 import { useSentSuggestion } from './topic/sentSuggestion'
 import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
+
+// The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
+const editField = chunk(() => import('./EditFieldPanel'))
+const EditField = editField.component((module) => module.EditField)
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
 export interface ComposerHandle {
@@ -115,60 +119,51 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)
   usePickerDismiss(picker, setPicker)
+  const editReady = usePreloaded(editField, editing !== undefined)
 
-  // The edit field in place of the row's body. Saving keeps it until the window has the new text.
+  // The edit field in place of the row's body, once its chunk is here. Saving keeps it until the window has the new text.
   const editingRow =
-    editing === undefined
+    editing === undefined || !editReady
       ? undefined
       : {
           ts: editing.ts,
           editor: (
-            <EditField
-              value={editing.text}
-              onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
-              onCancel={() => {
-                setEditing(undefined)
-                composer.current?.focus()
-              }}
-              onSave={() => {
-                const message = rowMessage(editing.ts)
-                if (message === undefined || editing.savedRev !== undefined || editing.text.trim() === '') return
-                composer.current?.focus()
-                if (editing.text === message.editText) return setEditing(undefined)
-                setEditing({ ...editing, savedRev: message.rev })
-                void editMessage(registry, refOf(channel, message), editing.text).then((exit) => {
-                  if (exit._tag === 'Failure') setEditing(undefined)
-                })
-              }}
-            />
+            <Suspense fallback={null}>
+              <EditField
+                value={editing.text}
+                onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
+                onCancel={() => {
+                  setEditing(undefined)
+                  composer.current?.focus()
+                }}
+                onSave={() => {
+                  const message = rowMessage(editing.ts)
+                  if (message === undefined || editing.savedRev !== undefined || editing.text.trim() === '') return
+                  composer.current?.focus()
+                  if (editing.text === message.editText) return setEditing(undefined)
+                  setEditing({ ...editing, savedRev: message.rev })
+                  void editMessage(registry, refOf(channel, message), editing.text).then((exit) => {
+                    if (exit._tag === 'Failure') setEditing(undefined)
+                  })
+                }}
+              />
+            </Suspense>
           ),
         }
 
+  const handlers = rowHandlers(actions, rowMessage, latest, scrollRef, composer)
   return {
     actions,
     suggestion,
-    ...rowHandlers(actions, rowMessage, latest, scrollRef, composer),
+    ...handlers,
+    // ↑ selects a message, which E then edits: the field's chunk comes now if the idle preload has not run.
+    selectNewest: () => {
+      void editField.load()
+      handlers.selectNewest()
+    },
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
     floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, quick),
   }
-}
-
-/** The inline edit field with the composer's `:emoji:` suggestions (SPEC 8). */
-function EditField({ value, onChange, onSave, onCancel }: Pick<InlineEditProps, 'value' | 'onSave' | 'onCancel'> & { readonly onChange: (value: string) => void }) {
-  const field = useRef<HTMLTextAreaElement>(null)
-  const emoji = useEmojiSuggestions({ text: value, onChange, field })
-  return (
-    <InlineEdit
-      value={value}
-      onChange={emoji.onChange}
-      onSave={onSave}
-      onCancel={onCancel}
-      fieldRef={field}
-      onFieldKey={emoji.onFieldKey}
-      onCaret={emoji.onCaret}
-      {...(emoji.mention === undefined ? {} : { mention: emoji.mention })}
-    />
-  )
 }

@@ -1,8 +1,6 @@
-import { CalendarCheck } from '@phosphor-icons/react/dist/icons/CalendarCheck'
-import { ChatCircleDots } from '@phosphor-icons/react/dist/icons/ChatCircleDots'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { Terminal } from '@phosphor-icons/react/dist/icons/Terminal'
+import { CalendarCheckDuotone, ChatCircleDotsDuotone, TerminalDuotone } from './duotone'
 import { Button } from './Button'
 import { Card } from './Card'
 import { CodeBlock } from './CodeBlock'
@@ -17,7 +15,7 @@ export default defineFixtures(
   {
     Kind: {
       'coding-agent': fixture({
-        kindIcon: Terminal,
+        kindIcon: TerminalDuotone,
         kind: 'Coding agent',
         sourceIcon: Hash,
         source: 'Staging bill doubled since August',
@@ -40,7 +38,7 @@ export default defineFixtures(
         onDismiss: () => {},
       }),
       'waiting-on-you': fixture({
-        kindIcon: ChatCircleDots,
+        kindIcon: ChatCircleDotsDuotone,
         kind: 'Waiting on you',
         sourceIcon: Lock,
         source: 'Rina Sato · Staff backend',
@@ -59,7 +57,7 @@ export default defineFixtures(
         onDismiss: () => {},
       }),
       'follow-up': fixture({
-        kindIcon: CalendarCheck,
+        kindIcon: CalendarCheckDuotone,
         kind: 'Follow-up',
         sourceIcon: Hash,
         source: 'Q4 roadmap cuts',
@@ -81,7 +79,7 @@ export default defineFixtures(
     Interaction: {
       'dismiss-hover': fixture(
         {
-          kindIcon: CalendarCheck,
+          kindIcon: CalendarCheckDuotone,
           kind: 'Follow-up',
           sourceIcon: Hash,
           source: 'Q4 roadmap cuts',

@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { MouseEvent, ReactNode } from 'react'
 import { accent, colors, radii, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
-import { Icon, type IconWeight, type PhosphorIcon } from './Icon'
+import { Icon, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { tooltip } from './Tooltip'
@@ -11,12 +11,11 @@ import { variants as typeVariants } from './internal/type'
 const HOVER = '@media (hover: hover)'
 
 export interface NavItemProps {
-  readonly icon: PhosphorIcon
   /**
-   * Icon weight. Default: regular, and fill when `active`. The Juno item
-   * passes `duotone` so it stays marked as the one AI surface.
+   * Drawn regular, and fill when `active`. The Juno item passes a duotone
+   * icon (`duotone.ts`) while a job runs, which stays duotone either way.
    */
-  readonly iconWeight?: IconWeight
+  readonly icon: PhosphorIcon
   /** The label. */
   readonly children: ReactNode
   /** This item is the open page. Sets aria-current and fills the icon. */
@@ -42,7 +41,7 @@ export interface NavItemProps {
  * tint, accent text, 600 and a filled icon. Navigates on mouse down like
  * rows and tabs, and never animates.
  */
-export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu, compact = false }: NavItemProps) {
+export function NavItem({ icon, children, active = false, trailing, kbd, onSelect, onContextMenu, compact = false }: NavItemProps) {
   const name = compact && typeof children === 'string' ? children : undefined
   return (
     <div
@@ -55,7 +54,7 @@ export function NavItem({ icon, iconWeight, children, active = false, trailing, 
       {...activateHandlers<HTMLDivElement>(onSelect)}
       {...stylex.props(interactive.focusRing, typeVariants.ui, styles.item, compact && styles.compact, active && styles.active)}
     >
-      {iconWeight === undefined ? <Icon icon={icon} size={16} active={active} /> : <Icon icon={icon} size={16} weight={iconWeight} />}
+      <Icon icon={icon} size={16} active={active} />
       {compact ? null : (
         <>
           <span {...stylex.props(styles.label)}>{children}</span>

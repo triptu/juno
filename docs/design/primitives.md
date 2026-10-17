@@ -6,7 +6,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
 - Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
-- Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, `duotone` only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations).
+- Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, duotone only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations), through the icons in `packages/ui/src/duotone.ts`.
 - Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`. It must show whole: a box that clips (overflow other than visible, or paint containment) gives the controls at its edge `ringRoom` (`--focus-ring-room` of padding taken back by a negative margin; a fixed size adds the room), and a scroller passes `revealFocus` as its `onFocus` so a control half under its edge scrolls in whole when it takes keyboard focus (`PillRow`, `TabStrip`, `ScrollArea` and `Page` do). Items that fill a scroller edge to edge take the inset ring instead. A scroller that is not a Tab stop of its own (its rows are driven from a field) sets `tabIndex={-1}`, since Chromium makes a scroller with no focusable children a Tab stop.
 - Icon-only controls require an accessible name (`label`).
 - Sizes, colours, radii and durations come from tokens; no literal values in components.
@@ -17,7 +17,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 ## 1. Icon
 
-Phosphor wrapper. Takes the icon component (`icon={Hash}`, imported from `@phosphor-icons/react/dist/icons/Hash`), not a name, so only used icons are bundled. `size` 12 | 13 | 14 | 15 | 16 | 18 | 20 (default 16); `weight` `regular` | `bold` | `fill` | `duotone`, defaulting to bold at 14 and below and regular at 15 and above, so call sites only name `fill` and `duotone`; `active` is shorthand for `weight="fill"` (the outline/fill pair of a toggle); `dim` for the 0.75 tab icon; optional `label` (otherwise hidden from assistive technology). Drawn in `currentColor`. The Lucide name mapping is in `friendly-layer.md` §2.3.
+Phosphor wrapper. Takes the icon component (`icon={Hash}`, imported from `@phosphor-icons/react/dist/icons/Hash`), not a name, so only used icons are bundled. `size` 12 | 13 | 14 | 15 | 16 | 18 | 20 (default 16); `weight` `regular` | `bold` | `fill`, defaulting to bold at 14 and below and regular at 15 and above, so call sites only name `fill`; duotone is not a weight but an icon from `duotone.ts` (`SparkleDuotone`), the only icons the desktop build keeps that weight for (`scripts/check-duotone.mjs` fails on it anywhere else); `active` is shorthand for `weight="fill"` (the outline/fill pair of a toggle); `dim` for the 0.75 tab icon; optional `label` (otherwise hidden from assistive technology). Drawn in `currentColor`. The Lucide name mapping is in `friendly-layer.md` §2.3.
 
 ## 2. Button
 
@@ -39,7 +39,7 @@ Covers: quick filters, status chips, Resolve (row and header), Not yet, Discard/
 
 ## 2a. NavItem
 
-The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). `iconWeight` overrides the outline/fill pair; the Juno item passes `duotone` so it stays marked as the one AI surface whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. `compact` draws the icon alone in a 32px square, with a string label as its accessible name and tooltip and no `trailing` or `kbd` (Settings' rail). Never animates.
+The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). While a job runs the Juno item passes `SparkleDuotone`, which stays duotone whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button. `compact` draws the icon alone in a 32px square, with a string label as its accessible name and tooltip and no `trailing` or `kbd` (Settings' rail). Never animates.
 
 ## 3. IconButton
 

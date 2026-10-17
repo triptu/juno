@@ -12,6 +12,7 @@ const checks = [
   ['cache epoch', node('check-cache-epoch.mjs')],
   ['migration order', node('check-migration-order.mjs')],
   ['cursor rule', node('check-no-pointer-cursor.mjs')],
+  ['duotone icons', node('check-duotone.mjs')],
   ['tokens', node('check-tokens.mjs')],
   ['dependencies', node('check-deps.mjs')],
   ['fixtures redacted', node('check-fixtures-redacted.mjs')],

@@ -1,0 +1,1 @@
+- 10-17 12:45 · bundle-split · A part that shows only after input (peek, suggestion list, sync cards, edit field, link editor) is a chunk preloaded when idle and drawn only once loaded (`usePreloaded`), so it never suspends; initial JS 1,054.6 KB to 1,027.6 KB after the unified Home merge.

@@ -1,9 +1,12 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useRef, useState } from 'react'
 import { isPeekKey, messageListAtom, openTopic, peekKeyAtom, refreshMessages, registry, topicAtom } from '@juno/state'
-import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { PeekView, TopicArt, type PeekPlacement } from '@juno/views'
-import { hasArt, TopicPreview } from './TopicView'
+import type { PeekPlacement } from '@juno/views'
+import { chunk } from './chunks'
+
+// The peeked topic shows only while a key is held, so it loads when idle, after the first paint.
+const peekTopic = chunk(() => import('./PeekTopic'))
+const PeekTopic = peekTopic.component((module) => module.PeekTopic)
 
 const ROW = '[data-topic-row]'
 /** The sidebar's sections: the rows and the gaps and labels between them. Moving through them keeps a peek open. */
@@ -87,6 +90,10 @@ function toPeek(key: string, at: number): Peeking | undefined {
  */
 export const Peek = memo(function Peek() {
   const peekKey = useAtomValue(peekKeyAtom)
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void peekTopic.load(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
   const [peeking, setPeeking] = useState<Peeking | undefined>(undefined)
   // The key that holds the peek open.
   const held = useRef<string | undefined>(undefined)
@@ -180,7 +187,12 @@ export const Peek = memo(function Peek() {
 
   const shown = useWhenReady(peeking)
   if (peeking === undefined || shown === undefined) return null
-  return <PeekTopic key={shown.id} id={shown.id} at={shown.at} placement={shown.placement} />
+  // Shown only once the chunk has loaded, so this never suspends; the boundary keeps it that way.
+  return (
+    <Suspense fallback={null}>
+      <PeekTopic key={shown.id} id={shown.id} at={shown.at} placement={shown.placement} />
+    </Suspense>
+  )
 })
 
 /**
@@ -198,18 +210,23 @@ function canPaint(id: string): boolean {
 }
 
 /**
- * The peek to draw: `peeking` once its topic can paint. Until then the
- * previous one stays, so moving from row to row never flashes an empty
- * popover. A topic the row's hover warmed can paint at once, before the
- * first frame.
+ * The peek to draw: `peeking` once its topic can paint and its chunk has
+ * loaded. Until then the previous one stays, so moving from row to row
+ * never flashes an empty popover. A topic the row's hover warmed can paint
+ * at once, before the first frame.
  */
 function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
   const [shown, setShown] = useState<Peeking | undefined>(undefined)
   // The peek whose topic arrived after it was asked for.
   const [arrived, setArrived] = useState<Peeking | undefined>(undefined)
+  const loaded = peekTopic.useReady()
   const ready = peeking !== undefined && (arrived === peeking || canPaint(peeking.id))
-  const next = peeking === undefined ? undefined : ready ? peeking : shown
+  const next = peeking === undefined ? undefined : ready && loaded ? peeking : shown
   if (next !== shown) setShown(next)
+  // A peek before the idle preload: the chunk comes now.
+  useEffect(() => {
+    if (peeking !== undefined && !loaded) void peekTopic.load()
+  }, [peeking, loaded])
   useEffect(() => {
     if (peeking === undefined || ready) return
     // After the fetch: the window update it brings, whether or not that covers the window.
@@ -239,32 +256,3 @@ function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
   }, [peeking, ready])
   return next
 }
-
-/**
- * One peeked topic: its title over `TopicPreview`, the read-only list New
- * chat uses too (newest messages, no divider, no actions, nothing marked
- * read). `Peek` shows it only once the topic can paint, so its first frame
- * has the messages.
- */
-function PeekTopic({ id, at, placement }: { readonly id: string; readonly at: number; readonly placement: PeekPlacement }) {
-  const result = useAtomValue(topicAtom(id))
-  const detail = result._tag === 'Success' ? result.value : undefined
-  const shown = detail != null
-  // `juno.peek-open`: from the key or the pointer to the first frame with the topic's messages.
-  useLayoutEffect(() => {
-    if (shown) afterPaint(() => measure('juno.peek-open', at, { detail: { id } }))
-  }, [shown, at, id])
-  if (detail == null) return null
-  const main = detail.kind === 'main'
-  return (
-    <PeekView
-      title={main ? detail.channel.label : detail.title}
-      {...(main ? {} : { where: detail.channel.label })}
-      {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
-      placement={placement}
-    >
-      <TopicPreview id={id} peek />
-    </PeekView>
-  )
-}
-

@@ -3,7 +3,7 @@ import { audienceCheck, type PickConversation, type SendTarget } from '@juno/con
 import { aiAssistOnAtom, checkMessage, precheckMessage, registry, sendCheckPrefsAtom, stopPrecheck } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning } from '@juno/views'
-import SendCheckPanel from './SendCheckPanel'
+import { preloadBar, sendCheck, SendCheckPanel } from './sendCheckChunk'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 
 /** Home's send checks (SPEC 8): only on a channel already chosen. Enter reads cached findings, never a model. */
@@ -25,6 +25,7 @@ export function useHomeSendChecks(text: string, target: SendTarget | undefined, 
     setWaiting(false)
     setBar(undefined)
   }
+  useEffect(preloadBar, [])
   useLayoutEffect(() => {
     checking.current = undefined
     return () => { checking.current = undefined }
@@ -65,11 +66,14 @@ export function useHomeSendChecks(text: string, target: SendTarget | undefined, 
     const token = {}
     checking.current = token
     setWaiting(true)
-    void checkMessage(registry, { channelId, ...(threadTs === undefined ? {} : { threadTs }) }, text).then(found => {
+    void checkMessage(registry, { channelId, ...(threadTs === undefined ? {} : { threadTs }) }, text).then(async found => {
+      const outcome = afterCheck(text, found)
+      // Publish the bar with its final geometry, even when Enter beats the idle preload.
+      if (outcome.kind === 'bar') await sendCheck.load()
       if (checking.current !== token) return
       checking.current = undefined
       setWaiting(false)
-      follow(afterCheck(text, found))
+      follow(outcome)
     })
   }
   const notices = <>

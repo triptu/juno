@@ -27,7 +27,7 @@ import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { chunk } from './chunks'
-import { SyncNotice } from './EngineStatus'
+import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openSettings } from './navigation'
@@ -113,7 +113,7 @@ export function Sidebar() {
   // Whether the footer's status card shows; the card reads the progress itself, so a count tick re-renders only the card.
   const noticeShown = useAtomValue(syncNoticeAtom, (kind) => kind !== undefined)
   const progressShown = useAtomValue(syncProgressAtom, (progress) => progress !== undefined)
-  const syncStatus = noticeShown || progressShown
+  const syncStatus = useSyncNoticeReady(noticeShown || progressShown) && (noticeShown || progressShown)
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 

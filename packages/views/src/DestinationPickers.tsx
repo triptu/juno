@@ -4,13 +4,12 @@ import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { At } from '@phosphor-icons/react/dist/icons/At'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Avatar, chunk, Icon, Popover, type PhosphorIcon } from '@juno/ui'
+import { Avatar, chunk, Icon, Popover, SparkleDuotone, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 
 const lists = chunk(() => import('./DestinationLists'))
@@ -67,8 +66,7 @@ export function DestinationChip({ destination, juno = true, open, onOpen, query,
         <PickerButton
           ref={buttonRef}
           label={`Send to: ${label}`}
-          icon={destination === undefined ? (juno ? Sparkle : At) : kindIcons[destination.kind]}
-          iconWeight={destination === undefined && juno ? 'duotone' : undefined}
+          icon={destination === undefined ? (juno ? SparkleDuotone : At) : kindIcons[destination.kind]}
           {...(destination?.person === undefined ? {} : { leading: <PersonMark person={destination.person} /> })}
           tint={destination?.tint}
           muted={destination === undefined && !juno}
@@ -180,7 +178,6 @@ interface PickerButtonProps {
   readonly ref?: Ref<HTMLButtonElement> | undefined
   readonly label: string
   readonly icon: PhosphorIcon
-  readonly iconWeight?: 'duotone' | undefined
   /** In place of the icon: a person's face. */
   readonly leading?: ReactNode
   /** A key that changes with what the button names: the name rises in once when it changes (not on first paint). */
@@ -196,7 +193,7 @@ interface PickerButtonProps {
   readonly children: ReactNode
 }
 
-function PickerButton({ ref, label, icon, iconWeight, leading, change, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
   const subtle = muted ?? tint === undefined
   // The name shown first never rises; any later one does.
   const [first] = useState(change)
@@ -220,7 +217,7 @@ function PickerButton({ ref, label, icon, iconWeight, leading, change, tint, mut
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}
     >
       <span key={change} {...stylex.props(styles.face, rises && styles.rise)}>
-        {leading ?? (iconWeight === undefined ? <Icon icon={icon} size={13} /> : <Icon icon={icon} size={13} weight={iconWeight} />)}
+        {leading ?? <Icon icon={icon} size={13} />}
         <span {...stylex.props(styles.buttonLabel, wide && styles.buttonLabelWide)}>{children}</span>
       </span>
       <span {...stylex.props(styles.caret)}>

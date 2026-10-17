@@ -6,6 +6,7 @@ import type { MentionChannel, MentionGroup, MentionPerson } from '@juno/contract
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, Text, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
 import { hueFor, initials } from './look'
+import { mentionRowId } from './mentionRowId'
 
 // StyleX reads only static values, so the anchor names are written here as
 // well: the composer's field box (`Composer`) and the "@" or "#" being typed
@@ -47,9 +48,6 @@ export type MentionSuggestionsProps =
       readonly onActivate: (rowId: string) => void
       readonly onPick: (rowId: string) => void
     }
-
-/** The row id of a suggestion, for `activeId` and `aria-activedescendant`. */
-export const mentionRowId = (listId: string, id: string) => `${listId}-${id}`
 
 /**
  * The @ and # suggestions (inventory 7.1): a small list above the
