@@ -90,6 +90,15 @@ const bridge: JunoBridge = {
       }
     },
   },
+  window: {
+    onFullScreen: (listener) => {
+      const forward = (_event: unknown, fullScreen: unknown) => listener(fullScreen)
+      ipcRenderer.on(Events.windowFullScreen, forward)
+      return () => {
+        ipcRenderer.off(Events.windowFullScreen, forward)
+      }
+    },
+  },
   sharing: {
     get: () => ipcRenderer.invoke(Channels.sharingGet),
     set: (hide) => ipcRenderer.invoke(Channels.sharingSet, { hide }),

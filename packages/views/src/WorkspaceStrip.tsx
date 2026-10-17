@@ -62,6 +62,8 @@ export interface WorkspaceStripProps {
   readonly onTabContextMenu?: ((id: string, event: MouseEvent<HTMLDivElement>) => void) | undefined
   /** Before the tabs while the sidebar is hidden: Show sidebar, Back and Forward. */
   readonly leading?: ReactNode
+  /** The window is in full screen, so `leading` needs no room for the traffic lights. */
+  readonly fullScreen?: boolean
 }
 
 const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
@@ -124,7 +126,7 @@ function stepIndex(key: string, index: number, count: number): number | undefine
  * it, and ⌃⇧← and ⌃⇧→ move it, which a screen reader hears as its new
  * position. A tab also drags to a new place.
  */
-export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading }: WorkspaceStripProps) {
+export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, fullScreen }: WorkspaceStripProps) {
   const status = useRef<HTMLSpanElement>(null)
   // The tab a move asked for and how many moves there were, so the same position is read again after a second move.
   const [moved, setMoved] = useState<{ readonly id: string; readonly count: number } | undefined>(undefined)
@@ -170,7 +172,7 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
   }
   return (
     <>
-      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
