@@ -172,7 +172,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
         onLink?.(inline.url)
       }
       return (
-        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
+        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, styles.focusRing)}>
           {styled(inline.text, inline.style)}
         </a>
       )
@@ -201,7 +201,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
           tabIndex={tabIndex}
           data-channel={inline.id}
           data-channel-name={inline.name}
-          {...stylex.props(styles.channelButton)}
+          {...stylex.props(styles.channelButton, styles.focusRing)}
         >
           <Chip variant="filled" size="inline">
             <bdi>#{inline.name}</bdi>
@@ -236,7 +236,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
         onLink?.(inline.url ?? '')
       }
       return (
-        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link)}>
+        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, styles.focusRing)}>
           {time}
         </a>
       )
@@ -351,14 +351,6 @@ const styles = stylex.create({
     textUnderlineOffset: sizes['--link-underline-offset'],
     cursor: 'pointer', // external-link-cursor
     borderRadius: radii['--radius-xs'],
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
   },
   bold: {
     fontWeight: weights['--weight-semibold'],
@@ -390,10 +382,9 @@ const styles = stylex.create({
     font: 'inherit',
     cursor: 'default',
     borderRadius: radii['--radius-tag'],
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
+  },
+  focusRing: {
+    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
     scrollMargin: sizes['--focus-ring-room'],
