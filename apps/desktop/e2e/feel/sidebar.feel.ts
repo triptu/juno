@@ -12,6 +12,7 @@ const BOT_CHANNELS = ['C0ALERTSPROD', 'C0DEPLOYS']
  */
 const paintedRowsHold: Check = (evidence) => {
   const painted = new Map<string, number>()
+  const seen = new Set<string>()
   const bad: number[] = []
   let pushedDown = 0
   for (const frame of evidence.recording.frames) {
@@ -20,16 +21,32 @@ const paintedRowsHold: Check = (evidence) => {
     const now = new Map(items.map((item) => [item.key, item.y]))
     for (const [key, y] of painted) {
       const next = now.get(key)
+      // Each loss or lift is named once, at the frame it happened.
+      if (next === undefined) painted.delete(key)
       if (next === undefined || next < y - 0.5) bad.push(frame.index)
       else if (next > y + 0.5) pushedDown += 1
     }
-    for (const [key, y] of now) painted.set(key, y)
+    for (const [key, y] of now) {
+      painted.set(key, y)
+      seen.add(key)
+    }
   }
   return {
     name: 'a painted row stays in All and never moves up',
-    status: painted.size > 0 && bad.length === 0 ? 'pass' : 'fail',
-    detail: `${painted.size} rows checked; ${new Set(bad).size} frames lost a painted row or moved one up; ${pushedDown} row moves down from rows added above`,
+    status: seen.size > 0 && bad.length === 0 ? 'pass' : 'fail',
+    detail: `${seen.size} rows checked; ${new Set(bad).size} frames lost a painted row or moved one up; ${pushedDown} row moves down from rows added above`,
     shots: [...new Set(bad)].slice(0, 12).map((frame) => shotOfFrame(evidence, frame)),
+  }
+}
+
+/** The rules move the bot channels to Automated before All shows them, so no frame has one. */
+const botsStayOut: Check = (evidence) => {
+  const shown = evidence.recording.frames.filter((frame) => Number(frame.values['bots']) > 0).map((frame) => frame.index)
+  return {
+    name: 'a bot channel never shows in All',
+    status: shown.length === 0 ? 'pass' : 'fail',
+    detail: `${shown.length} frames showed a row of ${BOT_CHANNELS.join(' or ')} in All`,
+    shots: [...new Set(shown.map((frame) => shotOfFrame(evidence, frame)))].slice(0, 12),
   }
 }
 
@@ -64,7 +81,7 @@ test('the sidebar fills during the first sync without dropping or lifting a pain
         const last = r.frames.at(-1)?.values
         return last !== undefined && Array.isArray(last['rows']) && last['rows'].length > 0 && last['busy'] === 0
       }),
-      happened('a bot channel never shows in All', (r) => r.frames.every((f) => Number(f.values['bots']) === 0)),
+      botsStayOut,
       paintedRowsHold,
       // Rows that land above painted ones push them down as the first sync fills All (SPEC 5); that is a warning here.
       // What this scenario guards is a row leaving, which `paintedRowsHold` fails on.
