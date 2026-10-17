@@ -24,6 +24,7 @@ export { InlineEdit, type InlineEditProps } from './InlineEdit'
 export { Floating, SelectionQuote } from './Floating'
 
 export { MessageList, type MessageListItem, type MessageListStatus, type OlderStatus } from './MessageList'
+export type { LinkInfo } from './MessageBody'
 
 export { NewMessagesPill } from './NewMessagesPill'
 export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'

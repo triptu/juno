@@ -5,6 +5,7 @@ import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
 import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
+import type { LinkInfo } from './MessageBody'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -78,7 +79,9 @@ export interface MessageListProps {
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void
   readonly onChannel?: (id: string) => void
-  readonly onLink?: (url: string) => void
+  readonly onLink?: (url: string, event: ActivateEvent) => void
+  /** Which links open inside Juno, and where they go (`MessageBody`). */
+  readonly linkInfo?: LinkInfo
   readonly onToggleReaction?: (ts: string, name: string) => void
   /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
   readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
@@ -190,6 +193,7 @@ export function MessageList({
   onPrefetchThread,
   onChannel,
   onLink,
+  linkInfo,
   onToggleReaction,
   onSetReaction,
   onRetry,
@@ -279,6 +283,7 @@ export function MessageList({
                 onOpenThread={onOpenThread}
                 onChannel={onChannel}
                 onLink={onLink}
+                linkInfo={linkInfo}
                 onToggleReaction={onToggleReaction}
                 onSetReaction={onSetReaction}
                 onRetry={onRetry}
