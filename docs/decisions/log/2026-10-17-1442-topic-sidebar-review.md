@@ -1,0 +1,1 @@
+- 10-17 14:42 · topic-sidebar-review · A sidebar row's place line is as tall as Resolve on every row, so rows without Resolve (resolved, renaming) keep one rhythm; my reaction chip keeps its ring on hover and its fill steps up to `--hl-bubble`; the audience line starts its icon and text on the check bar's edge.
