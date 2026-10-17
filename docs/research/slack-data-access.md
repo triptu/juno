@@ -217,6 +217,7 @@ Search (`shared`, `createThunkSearchModules` area: `` `search.modules.${module}`
 
 Permalinks
 - No API call. `constructMsgPermalink(channel, ts, threadTs)` → `/archives/<C>/p<ts without dot>` plus `?thread_ts=<root>&cid=<C>` for replies; absolute form `https://<team domain>.slack.com/archives/...` (`shared`, `constructAbsoluteMsgPermalink`). `chat.getPermalink` is never called.
+- Other link forms Juno reads in message text (`parseSlackLink`, `@juno/state`): `/archives/<C>` for a channel, `/team/<U>` for a profile, `https://app.slack.com/client/<T>/<C>` with `/thread/<C>-<ts>` or `/p<ts>` after it and `/client/<T>/user_profile/<U>`, and `slack://channel?team=<T>&id=<C>&message=<ts>` (`thread_ts` optional) and `slack://user?team=<T>&id=<U>`. The `p` form is the ts with the dot dropped, so its last six digits are the fraction. Unknown: whether the app.slack.com `/p<ts>` form occurs in practice, and whether `message=` in a deep link is ever given in the `p` form; Juno accepts both.
 
 Presence
 - Subscribe over the socket: `{ type: "presence_sub", ids: [userIds] }` (`client-boot`, `sendPresenceSubEvent`). Updates arrive as `presence_change` events (section 4). `presence.set` exists for the self user. No `users.getPresence`.
