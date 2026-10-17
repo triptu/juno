@@ -19,7 +19,7 @@
 export interface FakeReviewRequest {
   readonly state: {
     readonly owner: ReadonlyArray<string>
-    readonly call: { readonly server: string; readonly tool: string; readonly args: string }
+    readonly call: { readonly server: string; readonly tool: string; readonly args: string; readonly about?: string; readonly readOnly?: true }
   }
 }
 
@@ -42,7 +42,7 @@ function callWords(call: FakeReviewRequest['state']['call']): { readonly words: 
   try { command = (JSON.parse(call.args) as { command?: unknown }).command } catch { command = undefined }
   const split = (text: string) => text.toLowerCase().split(/[^a-z]+/).filter(Boolean)
   const tool = split(call.tool)
-  if (typeof command !== 'string') return { words: tool, lookup: tool.some((w) => READS.includes(w)) }
+  if (typeof command !== 'string') return { words: tool, lookup: call.readOnly === true || tool.some((w) => READS.includes(w)) }
   const [verb = '', target = ''] = command.trim().toLowerCase().split(/\s+/)
   // `call <tool> …` does what that tool does; any other command is its verb.
   const words = verb === 'call' ? split(target) : split(verb)

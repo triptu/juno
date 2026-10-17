@@ -17,7 +17,8 @@ import { createSpend } from '../spend'
 import { authorize, recordAttempt, recordReceipt, settleAuthorization } from '../store/ledger'
 import { uuidv7 } from '../store/store'
 import { looksDestructive, mcpExecutors, runWrite } from './actions'
-import type { McpManagerApi } from './manager'
+import { hintOf, type McpManagerApi } from './manager'
+import { parseObject } from './catalogue'
 import { result } from './results'
 import type { McpToolsContext } from './tools'
 import { T3, destructiveArguments } from './types'
@@ -33,6 +34,14 @@ export function ruleFor(manager: McpManagerApi, server: string, tool: string, ar
   // T3 Code can start and steer sessions under many names, and a session always takes a click (SPEC 13.4).
   if (server === T3.id || destructiveArguments(args)) return 'always'
   return manager.rule(server, tool)
+}
+
+/** The server's one-line description of a tool and its read-only mark, for the review. */
+function toolFacts(manager: McpManagerApi, server: string, tool: string): { readonly about?: string; readonly readOnly?: boolean } {
+  const definition = manager.tool(server, tool).definition
+  const { hint } = hintOf(definition)
+  const annotations = parseObject(parseObject(JSON.parse(definition)).annotations ?? {})
+  return { ...(hint === undefined ? {} : { about: hint }), ...(annotations.readOnlyHint === true ? { readOnly: true } : {}) }
 }
 
 const withReview = (proposed: Change, rule: ReviewRule, review: Review, line: ReviewLine) => {
@@ -58,7 +67,7 @@ export async function reviewChange(manager: McpManagerApi, context: McpToolsCont
       model: context.review,
       spend: createSpend(manager.store, () => capOf(manager.store)),
       ...(context.reviewTimeoutMs === undefined ? {} : { timeoutMs: context.reviewTimeoutMs }),
-      request: reviewRequest(ownerWordsInRun(manager.store, run.runId), { server: proposed.server, tool, args }),
+      request: reviewRequest(ownerWordsInRun(manager.store, run.runId), { server: proposed.server, tool, args, ...toolFacts(manager, server, tool) }),
     })
     : { _tag: 'skipped' as const }
   const destructive = looksDestructive(manager, server, tool, args)
