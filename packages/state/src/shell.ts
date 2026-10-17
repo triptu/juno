@@ -83,7 +83,7 @@ export const densityAtom = Atom.make<Density>(savedDensity())
  * Privacy mode (SPEC section 5): message text is blurred, for screen sharing.
  * Starts as saved (`?privacy=on`, or `sharing`), so a relaunch mid-share never shows text.
  */
-/** The tour opens by itself (SPEC 4, "The tour"); main turns that off for tests that do not ask for it. */
+/** The welcome card shows by itself (SPEC 4, "The welcome"); main turns that off for tests that do not ask for it. */
 export const tourOpensItself = launchParam('tour') !== 'manual'
 
 export const privacyAtom = Atom.make<boolean>(launchParam('privacy') === 'on' || launchParam('privacy') === 'sharing')
@@ -200,28 +200,9 @@ export function openExternal(url: string): void {
   window.juno.shell.openExternal(url).catch(() => {})
 }
 
-/** While a modal sheet holds the menu (the tour), its handler; the other listeners hear nothing. */
-let menuHolder: ((command: MenuCommand) => void) | undefined
-
 /** Calls `listener` for each app-menu command (the tab keys, Back and Forward, Hide Sidebar). Returns the unsubscribe. */
 export function onMenuCommand(listener: (command: MenuCommand) => void): () => void {
-  return window.juno.menu.onCommand((command) => {
-    if (menuHolder === undefined) listener(command)
-  })
-}
-
-/**
- * Sends every app-menu command to `handler` alone until the returned
- * release is called, so a shortcut acts on a modal sheet and not on the
- * window under it: the tour takes ⌘[ and ⌘] as its own Back and Next.
- */
-export function holdMenuCommands(handler: (command: MenuCommand) => void): () => void {
-  menuHolder = handler
-  const unsubscribe = window.juno.menu.onCommand((command) => menuHolder?.(command))
-  return () => {
-    unsubscribe()
-    if (menuHolder === handler) menuHolder = undefined
-  }
+  return window.juno.menu.onCommand(listener)
 }
 
 /** Tells main which topic the window shows, or null. Main adds the window's focus; a notification for it is not shown. */

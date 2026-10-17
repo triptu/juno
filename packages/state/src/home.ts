@@ -36,14 +36,15 @@ export function prefetchHome(registry: Registry): void {
 /** The scenes in `docs/design/home/scenes.png`. */
 export type HomeScene = 'morning' | 'midday' | 'evening' | 'night' | 'friday' | 'winter' | 'autumn' | 'caughtUp'
 
-/** At most this many rows; two on a window shorter than `SHORT_WINDOW` px. */
+/** At most this many rows; two on a window shorter than `SHORT_WINDOW` px, one there while the welcome card shows. */
 const ITEM_LIMIT = 3
 const SHORT_LIMIT = 2
+const SHORT_WELCOME_LIMIT = 1
 const SHORT_WINDOW = 600
 /** A topic counts as visited after this long on screen (the domain's `VISIT_MIN_MILLIS`). */
 export const VISIT_MILLIS = 60_000
 
-export const homeItemLimit = (windowHeight: number): number => (windowHeight < SHORT_WINDOW ? SHORT_LIMIT : ITEM_LIMIT)
+export const homeItemLimit = (windowHeight: number, welcome = false): number => (windowHeight >= SHORT_WINDOW ? ITEM_LIMIT : welcome ? SHORT_WELCOME_LIMIT : SHORT_LIMIT)
 
 /** No items and no unread messages in followed topics. */
 export const caughtUp = (view: HomeView): boolean => view.items.length === 0 && !view.unread
@@ -188,12 +189,12 @@ export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown |
  * When the sync ends, the rows already shown stay where they are, the
  * free slots take the next items, and the scene stays.
  */
-export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean }): void {
+export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean; readonly welcome?: boolean }): void {
   const result = registry.get(homeViewAtom)
   if (result._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
   const now = new Date()
   const previous = registry.get(homeShownAtom(key))
-  const limit = homeItemLimit(options.windowHeight)
+  const limit = homeItemLimit(options.windowHeight, options.welcome)
   const syncing = previous?.loading === true
   if (!result.value.ready) {
     const greeting = homeGreeting({ now, firstName: result.value.firstName, caughtUp: false })
