@@ -19,7 +19,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → channel previews | 10 s after the quick start | Same setup. One or two newest-first searches after the quick start (`searchPreviews`, `@juno/sync` discovery) give the busiest channels a preview before their history is read. Asserted by `quick-start.spec.ts` with history held. |
 | First sign-in → every active conversation in the sidebar | 30 s | Every member conversation with activity in the window has its row, from `client.counts` (a provisional Main until its history lands). Live 23 to 25 s on 147 conversations (10-17). Measured by `pnpm sync:timeline`, live; not asserted in CI. |
 | First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, DMs, mentions and unread followed threads first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
-| Last history page → first sync ended | 20 s | The boot is recorded (Home ready, AI titles and Home's checks may start) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (about 13 s live) and the last users remain. Live 13 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
+| Last history page → first sync ended | 30 s | The boot is recorded (Home ready, AI titles and Home's checks may start) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Home open (the sidebar's Home button, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts` over the opens that follow 300 ms after the last action. |
@@ -1276,39 +1276,39 @@ All topics holds its first cold rows until the quick start is stored, and reserv
 
 ### First sync timeline (2026-10-17)
 
-`JUNO_LIVE=1 pnpm sync:timeline` on the owner's workspace: the whole engine signed in from an empty data folder, read-only, no AI key. 147 conversations active in the 7-day window, 146 with history, 842 thread rows, 33 `getView` pages. One run before the fixes and one after, on the same afternoon; single runs, not a distribution.
+`JUNO_LIVE=1 pnpm sync:timeline` on the owner's workspace: the whole engine signed in from an empty data folder, read-only, no AI key. 147 conversations active in the 7-day window, 146 with history, 842 thread rows, 33 `getView` pages. One run before the fixes and one with the final code, the same evening; single runs, not a distribution. (A run between them, with previews starting before the `getView` pages were stored, ended at 237 s.)
 
 | Seconds from start | Before | After |
 | --- | --- | --- |
-| First sidebar rows (quick start) | 2.4 | 2.5 |
-| Every active conversation listed | 23.4 | 24.8 |
-| No unread count left as a dot | 170.7 | 173.0 |
-| Last history page | 221.7 | 223.6 |
-| Boot recorded: Home ready, AI jobs may start | 305.1 | 236.5 |
-| Sync cycle ended: the sidebar not busy, the Syncing card gone | 395.7 | 236.5 |
-| Last Slack call | 395.5 | 241.5 |
+| First sidebar rows (quick start) | 2.4 | 2.8 |
+| Every active conversation listed | 23.4 | 23.4 |
+| No unread count left as a dot | 170.7 | 170.7 |
+| Last history page | 221.7 | 221.8 |
+| Boot recorded: Home ready, AI jobs may start | 305.1 | 242.7 |
+| Sync cycle ended: the sidebar not busy, the Syncing card gone | 395.7 | 242.9 |
+| Last Slack call | 395.5 | 247.6 |
 
-Calls before (367) and after (368), by method, with the time each was busy:
+Calls before (367) and after (366), by method, with the time each was busy:
 
 | Method | Calls | Before | After |
 | --- | --- | --- | --- |
-| `conversations.history` | 146 | 3 to 222 s | 3 to 224 s |
-| `conversations.replies` (65 root lookups, 50 thread previews) | 115 | 7 to 305 s; previews 222 to 305 s | 2 to 241 s, beside history |
-| edge `emojis/list` | 31 | 305 to 396 s | 2 to 94 s, beside history |
-| `subscriptions.thread.getView` | 33 | 3 to 27 s | 4 to 28 s |
-| edge `users/info` | 30 | 3 to 208 s | 3 to 210 s |
-| `search.modules.messages` (2 previews, 3 discovery) | 5 | discovery 222 to 235 s | discovery 224 to 236 s |
+| `conversations.history` | 146 | 3 to 222 s | 3 to 222 s |
+| `conversations.replies` (65 root lookups, 50 thread previews) | 115 | 7 to 305 s; previews 222 to 305 s | 24 to 248 s, beside history |
+| edge `emojis/list` | 31 | 305 to 396 s | 3 to 93 s, beside history |
+| `subscriptions.thread.getView` | 33 | 3 to 27 s | 3 to 27 s |
+| edge `users/info` | 30, 29 | 3 to 208 s | 3 to 208 s |
+| `search.modules.messages` (2 previews, 3 discovery) | 5 | discovery 222 to 235 s | discovery 222 to 242 s |
 | everything else | 7 | before 3 s | before 3 s |
 
-No call was rate limited in either run (0 HTTP 429, no `ratelimited` answer, no retry), so no `Retry-After` was seen. Local work is small: 18.6 s of CPU before and 14.1 s after over the whole run, the event loop 4 to 6 % busy, and SQLite statements 4.7 s and 5.0 s in total (3.0 s of it the `SELECT`s of merges and re-indexing, 0.8 s inserts).
+No call was rate limited in either run (0 HTTP 429, no `ratelimited` answer, no retry), so no `Retry-After` was seen. Local work is small: 18.6 s of CPU before and 13.1 s after over the whole run, the event loop 4 to 6 % busy, and SQLite statements 4.7 s and 6.7 s in total (3.0 and 4.4 s of it the `SELECT`s of merges and re-indexing, under 0.9 s inserts).
 
 Where the 398 s went, largest first:
 
 1. **History pacing, 219 s.** 146 pages, started 1.50 s apart (median and p90): the 40-a-minute background spacing of research section 6, not latency (66 s of the calls' own time) and not 429s. It is the critical path before and after.
 2. **Emoji after the boot, 91 s.** 31 edge pages at 20 a minute ran after the boot was recorded and held the sync cycle, so the sidebar stayed busy. Fixed: they load beside the boot.
-3. **Thread previews after history, 83 s.** 50 latest-reply fetches waited for history to end, although `replies` has its own clock. The boot, and so Home and AI titles, waited for them. Fixed: they run beside history, woken by each history page.
-4. **Discovery search after history, 13 s.** Three pages at 10 a minute; they need history's roots, so they stay after it. This is most of what remains between the last history page and the end.
-5. **Not causes.** Rate limits (none hit), AI jobs (the sync does not wait for them; titles, Home's checks and the Automated check wait for the boot record, now 69 s sooner), repeated re-indexing and database writes (5 s of SQLite over the run), and `getView` (beside history, done by 28 s).
+3. **Thread previews after history, 83 s.** 50 latest-reply fetches waited for history to end, although `replies` has its own clock. The boot, and so Home and AI titles, waited for them. Fixed: they run beside history once the `getView` pages are stored, woken by each history page.
+4. **Discovery search after history, 13 to 21 s.** Three pages at 10 a minute; they need history's roots, so they stay after it. This is most of what remains between the last history page and the end.
+5. **Not causes.** Rate limits (none hit), AI jobs (the sync does not wait for them; titles, Home's checks and the Automated check wait for the boot record, now 62 s sooner), repeated re-indexing and database writes (5 s of SQLite over the run), and `getView` (beside history, done by 28 s).
 
 What is left is history at 40 a minute. Three ways to shorten it, each a product or policy choice rather than a safe fix: read history at the published Tier 3 rate of 50 a minute (about 44 s less here, less room for the official client on the same token; research section 6); record the boot, so Home is ready, once DMs, mentions and unread followed threads have their history rather than every conversation (SPEC 1 says Home comes after the first sync); or read history for quiet channels with nothing unread only when they are opened, which changes what the sidebar's previews and Automated's sorting have at first.
 
