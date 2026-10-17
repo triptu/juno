@@ -17,31 +17,81 @@ function visibleTopicView(): HTMLElement | undefined {
   return [...document.querySelectorAll<HTMLElement>('[data-topic-view]')].find((view) => view.offsetParent !== null)
 }
 
-/** The sender of the message `row` shows: its own header, or the header of the group it belongs to. */
+/** The sender of the message `row` shows: its own header, or the header of the group it belongs to. Never a mention in its text. */
 function senderOf(row: Element): string | undefined {
   for (let at: Element | null = row; at !== null; at = at.previousElementSibling) {
     if (!at.matches(ROW)) continue
-    const name = at.querySelector('[data-person-name]')?.getAttribute('data-person-name')
+    const name = at.querySelector('[data-sender][data-person-name]')?.getAttribute('data-person-name')
     if (name) return name
   }
   return undefined
 }
 
+/** A selection's text with its source: the sender and `ts` of the first message in it, and how many messages it spans. */
+function selectionOf(text: string, rows: readonly [HTMLElement, ...HTMLElement[]]): Selection {
+  const first = rows[0]
+  const sender = senderOf(first)
+  const ts = first.dataset['messageRow']
+  return {
+    text: text.slice(0, MAX_SELECTION_CHARS),
+    ...(sender === undefined ? {} : { sender }),
+    ...(ts === undefined || ts === '' ? {} : { ts }),
+    ...(rows.length > 1 ? { messages: rows.length } : {}),
+  }
+}
+
 /** The whole of one message in the visible topic, with its sender, as a quote: Tell Juno in the why popover (SPEC 14). */
 export function messageQuote(ts: string): Selection | undefined {
-  const row = visibleTopicView()?.querySelector(`${ROW}[data-message-row="${CSS.escape(ts)}"]`)
-  const text = row?.querySelector('[data-msg-text]')?.textContent?.trim().slice(0, MAX_SELECTION_CHARS)
+  const row = visibleTopicView()?.querySelector<HTMLElement>(`${ROW}[data-message-row="${CSS.escape(ts)}"]`)
+  const text = row?.querySelector('[data-msg-text]')?.textContent?.trim()
   if (row === null || row === undefined || text === undefined || text === '') return undefined
-  const sender = senderOf(row)
-  return { text, ...(sender === undefined ? {} : { sender }) }
+  return selectionOf(text, [row])
 }
+
+const rowOf = (node: Node): HTMLElement | null => (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ROW) ?? null
+
+/**
+ * The messages a selection takes text from, in order: the rows from the one
+ * it starts in to the one it ends in whose text it touches. A triple click
+ * ends at the start of the next row, which it does not touch.
+ */
+function rowsIn(range: Range, view: HTMLElement, first: HTMLElement): readonly [HTMLElement, ...HTMLElement[]] {
+  const last = rowOf(range.endContainer)
+  if (last === null || last === first || !view.contains(last)) return [first]
+  const all = [...view.querySelectorAll<HTMLElement>(ROW)]
+  const touched = all.slice(all.indexOf(first), all.indexOf(last) + 1).filter((row) => range.intersectsNode(row.querySelector('[data-msg-text]') ?? row))
+  const [head, ...rest] = touched
+  return head === undefined ? [first] : [head, ...rest]
+}
+
+/** The owner's text selection in the visible topic's messages, if there is one: what Ask Juno and the panel's chip take. */
+export function topicSelection(): Selection | undefined {
+  const current = document.getSelection()
+  if (current === null || current.isCollapsed || current.rangeCount === 0) return undefined
+  const range = current.getRangeAt(0)
+  const first = rowOf(range.startContainer)
+  const view = visibleTopicView()
+  if (first === null || view === undefined || first.closest('[data-topic-view]') !== view) return undefined
+  const text = current.toString().trim()
+  if (text === '') return undefined
+  return selectionOf(text, rowsIn(range, view, first))
+}
+
+/** Clears the highlight once Ask Juno has taken it, as Quote does. */
+export function clearTopicSelection(): void {
+  document.getSelection()?.removeAllRanges()
+}
+
+const sameSelection = (a: Selection, b: Selection) => a.text === b.text && a.sender === b.sender && a.ts === b.ts && a.messages === b.messages
 
 /**
  * The owner's selection in the topic's messages. A new selection replaces
- * the last; a selection that collapses (a click into the panel's composer)
- * keeps it, so it stays until sent or removed. A selection made before the
- * panel opened is taken when it opens. A new topic starts empty. Tell Juno's
- * quote of a message in this topic (`junoQuoteAtom`) replaces it the same way.
+ * the last, so the chip shows what is highlighted now; a selection that
+ * collapses (a click into the panel's composer) keeps it, so it stays
+ * until sent or removed. A selection made before the panel opened is taken
+ * when it opens. A new topic starts empty. Ask Juno on the selection, and
+ * Tell Juno's quote of a message in this topic (`junoQuoteAtom`), replace
+ * it the same way.
  */
 export function useTopicSelection(topicId: string | undefined): readonly [Selection | undefined, () => void] {
   // Kept with the topic it came from, so another topic starts with none.
@@ -57,17 +107,9 @@ export function useTopicSelection(topicId: string | undefined): readonly [Select
   useEffect(() => {
     if (topicId === undefined) return
     const onChange = () => {
-      const current = document.getSelection()
-      if (current === null || current.isCollapsed || current.rangeCount === 0) return
-      const start = current.getRangeAt(0).startContainer
-      const row = (start instanceof Element ? start : start.parentElement)?.closest(ROW)
-      if (row === null || row === undefined || row.closest('[data-topic-view]') !== visibleTopicView()) return
-      const text = current.toString().trim().slice(0, MAX_SELECTION_CHARS)
-      if (text === '') return
-      const sender = senderOf(row)
-      setHeld((before) =>
-        before?.topicId === topicId && before.selection.text === text && before.selection.sender === sender ? before : { topicId, selection: { text, ...(sender === undefined ? {} : { sender }) } },
-      )
+      const selection = topicSelection()
+      if (selection === undefined) return
+      setHeld((before) => (before?.topicId === topicId && sameSelection(before.selection, selection) ? before : { topicId, selection }))
     }
     // Text selected before the panel opened counts too.
     onChange()

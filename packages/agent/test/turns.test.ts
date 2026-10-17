@@ -237,12 +237,12 @@ it('a message sent beside a topic names the topic and the selection, taints its 
   h.fake.script([reply(say('It is settled.')), reply(say('Maya runs it.'))])
   const eng = { channelId: 'C1', name: 'eng', kindLabel: 'Public channel', tint: 'public' } as const
   const panel = h.send('is this settled?', {
-    context: { _tag: 'topic', topicId: 'T1', title: 'Postgres "16" plan', place: eng, kind: 'thread', visible: { from: '1.1', to: '1.9' }, selection: { text: 'ship <it> Monday', sender: 'Maya Chen' } },
+    context: { _tag: 'topic', topicId: 'T1', title: 'Postgres "16" plan', place: eng, kind: 'thread', visible: { from: '1.1', to: '1.9' }, selection: { text: 'ship <it> Monday', sender: 'Maya Chen', ts: '1.4', messages: 2 } },
   })
   await h.ended(panel)
   expect(h.chatRequests()[0]!.context.messages.map(textOf).at(-1)).toBe(
     '<message id="n1"><about topic="T1" title="Postgres &quot;16&quot; plan" channel="#eng" channel-id="C1" kind="thread" visible="1.1..1.9">' +
-      '<selection from="Maya Chen">ship &lt;it&gt; Monday</selection></about>is this settled?</message>',
+      '<selection from="Maya Chen" ts="1.4" messages="2">ship &lt;it&gt; Monday</selection></about>is this settled?</message>',
   )
   const person = h.send('who is she?', { context: { _tag: 'person', userId: 'U7', name: 'Maya Chen' } })
   await h.ended(person)

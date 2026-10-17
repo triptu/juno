@@ -171,15 +171,15 @@ test('a message sent from the panel is about the topic, with the selection, and 
   })
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
-  // The composer adds a Selection chip, with the words and their sender as its tooltip.
-  await expect(juno.win.locator('[data-panel-selection]')).toContainText('Selection')
-  await expect(juno.win.locator('[data-panel-selection]')).toHaveAttribute('title', 'Leo: logical replication')
+  // The composer adds the selection, quoted with its sender, with the whole of it as its tooltip.
+  await expect(juno.win.locator('[data-panel-selection]')).toHaveText('Leo: “logical replication”')
+  await expect(juno.win.locator('[data-panel-selection]')).toHaveAttribute('data-tooltip', 'Leo: logical replication')
 
   await panel.send('is this settled?')
   await expect(panel.ownerBubble('is this settled?').locator('[data-about]')).toHaveText(/^About Draft plan is in the doc/)
   await panel.expectJuno('You said: is this settled?')
   const input = model.inputs().at(-1)!
-  expect(input).toMatch(/^<message id="n1"><about topic="t:[^"]+" title="Draft plan is in the doc[^"]*" channel="#eng" channel-id="[^"]+" kind="thread" visible="[^"]+"><selection from="Leo">logical replication<\/selection><\/about>is this settled\?<\/message>$/)
+  expect(input).toMatch(/^<message id="n1"><about topic="t:[^"]+" title="Draft plan is in the doc[^"]*" channel="#eng" channel-id="[^"]+" kind="thread" visible="[^"]+"><selection from="Leo" ts="[^"]+">logical replication<\/selection><\/about>is this settled\?<\/message>$/)
   await expect(juno.win.locator('[data-panel-selection]')).toHaveCount(0)
 
   // The same chat in the Juno tab shows the About line, and it opens the topic.

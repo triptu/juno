@@ -54,7 +54,7 @@ test("a channel in Home's Recent shows the art its Main row shows in the sidebar
   expect(ink(await tile.innerHTML())).toBe(ink(markup))
 })
 
-test('with AI assist off, the topic menu has no Redraw art', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await running.close()
@@ -64,10 +64,27 @@ test('with AI assist off, the topic menu has no Redraw art', async ({ juno, fake
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
   try {
-    const { sidebar } = new Juno(again.app, again.win)
+    const { sidebar, topic } = new Juno(again.app, again.win)
     const row = sidebar.row(POSTGRES)
     await row.expectVisible()
     await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
+
+    // Text selected in a message: the toolbar has Quote and no Ask Juno.
+    await row.open()
+    const text = topic.message(POSTGRES).locator('[data-msg-text] p').first()
+    const box = (await text.boundingBox())!
+    await text.evaluate((node) => {
+      const range = document.createRange()
+      range.setStart(node.firstChild!, 0)
+      range.setEnd(node.firstChild!, 'Draft plan'.length)
+      document.getSelection()!.removeAllRanges()
+      document.getSelection()!.addRange(range)
+    })
+    await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
+    const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
+    await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
+
     const { labels } = await row.chooseInMenu('pin')
     expect(labels).toContain('Pin')
     expect(labels).not.toContain('Redraw art')

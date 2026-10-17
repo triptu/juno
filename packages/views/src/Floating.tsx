@@ -1,8 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
+import { chatCopy } from '@juno/agent-contract'
+import { menuKeys } from '@juno/contract/channels'
 import { spacing, z } from '@juno/tokens/tokens.stylex'
-import { Button } from '@juno/ui'
+import { Button, SparkleDuotone, Surface, tooltip } from '@juno/ui'
 
 /**
  * Where a floating element sits, in CSS pixels from the top left of the
@@ -14,7 +16,7 @@ import { Button } from '@juno/ui'
  * - `above-end`: over `y`, its right edge at `x` (the picker near the
  *   bottom of the list).
  * - `above-center`: centred on `x`, its bottom `--space-2` over `y` (the
- *   selection's Quote button).
+ *   selection's toolbar).
  */
 export type FloatingPlacement = 'below-end' | 'above-end' | 'above-center'
 
@@ -39,35 +41,47 @@ export function Floating({ x, y, placement, layer, children }: FloatingProps) {
   )
 }
 
-export interface SelectionQuoteProps {
-  /** Quotes the selected text. Runs on mouse down, so the selection is still there. */
+export interface SelectionToolbarProps {
+  /** Quotes the selected text in the topic's composer. Runs on mouse down, so the selection is still there. */
   readonly onQuote: () => void
+  /** Asks Juno about the selected text in the panel beside the topic. Absent while AI assist is off. */
+  readonly onAskJuno?: () => void
 }
 
-/** The floating Quote button over a text selection in a message (inventory 6.6). */
-export function SelectionQuote({ onQuote }: SelectionQuoteProps) {
+/** Mouse down acts, so the selection is still there; a keyboard activation has no mouse down and acts on click. */
+const pressProps = (action: () => void) => ({
+  onMouseDown: (event: MouseEvent<HTMLButtonElement>) => {
+    // Keep the selection: the action takes it.
+    event.preventDefault()
+    if (event.button === 0) action()
+  },
+  onClick: (event: MouseEvent<HTMLButtonElement>) => {
+    if (event.detail === 0) action()
+  },
+})
+
+/** The floating toolbar over a text selection in a message (inventory 6.6): Quote, and Ask Juno while AI assist is on. */
+export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) {
   return (
-    <Button
-      variant="raised"
-      size="sm"
-      iconStart={Quotes}
-      data-selection-quote=""
-      onMouseDown={(event) => {
-        // Keep the selection: the quote is taken from it.
-        event.preventDefault()
-        if (event.button === 0) onQuote()
-      }}
-      onClick={(event) => {
-        // A keyboard activation has no mouse down.
-        if (event.detail === 0) onQuote()
-      }}
-    >
-      Quote
-    </Button>
+    <Surface kind="toolbar" padding="xs" role="toolbar" aria-label="Selection" data-selection-toolbar="" sx={styles.toolbar}>
+      <Button variant="ghost" size="sm" tone="subtle" iconStart={Quotes} data-selection-quote="" {...pressProps(onQuote)}>
+        Quote
+      </Button>
+      {onAskJuno === undefined ? null : (
+        <Button variant="ghost" size="sm" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(chatCopy.panel.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
+          {chatCopy.panel.askJuno}
+        </Button>
+      )}
+    </Surface>
   )
 }
 
 const styles = stylex.create({
+  toolbar: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-0-5'],
+  },
   base: {
     position: 'absolute',
     display: 'inline-flex',

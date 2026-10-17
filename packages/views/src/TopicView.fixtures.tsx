@@ -8,7 +8,7 @@ import { NOW } from './fixtures/topics'
 import type { EmojiCategory } from '@juno/contract'
 import { EmojiPicker } from './EmojiPicker'
 import { noopActions } from './fixtures/actions'
-import { Floating, SelectionQuote } from './Floating'
+import { Floating, SelectionToolbar } from './Floating'
 import { MessageList, type MessageListProps } from './MessageList'
 import { NewMessagesPill } from './NewMessagesPill'
 import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
@@ -119,11 +119,12 @@ const pickerCatalog: ReadonlyArray<EmojiCategory> = [
 ]
 
 /**
- * Text selected in a message shows the floating Quote button centred over
- * the selection. The scene selects a message's text the way a drag would
- * and places the button from the selection's box, as the container does.
+ * Text selected in a message shows the floating toolbar centred over the
+ * selection: Quote, and Ask Juno unless AI assist is off. The scene selects
+ * a message's text the way a drag would and places the toolbar from the
+ * selection's box, as the container does.
  */
-function SelectionScene() {
+function SelectionScene({ ai = true }: { readonly ai?: boolean }) {
   const [at, setAt] = useState<{ x: number; y: number } | undefined>(undefined)
   useEffect(() => {
     // Once the fonts are in and the list has drawn, as a drag would end on a settled list.
@@ -158,7 +159,7 @@ function SelectionScene() {
       list={{ actions: noopActions }}
       floating={at === undefined ? undefined : (
         <Floating x={at.x} y={at.y} placement="above-center" layer="selection">
-          <SelectionQuote onQuote={noop} />
+          <SelectionToolbar onQuote={noop} {...(ai ? { onAskJuno: noop } : {})} />
         </Floating>
       )}
     />
@@ -207,6 +208,8 @@ export default defineFixtures(
     Interaction: {
       'hover-message': topic({ detail: details.postgres, items: thread, list: { actions: noopActions } }, { hover: '[data-message-row]:nth-of-type(3)' }),
       'selection-quote': scene(() => <SelectionScene />),
+      // AI assist off: Quote alone.
+      'selection-quote-ai-off': scene(() => <SelectionScene ai={false} />),
       // More reactions opens the picker under the toolbar, floated over the list so the row's paint containment does not clip it.
       'emoji-picker': topic({
         detail: details.postgres,

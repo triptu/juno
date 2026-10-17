@@ -7,7 +7,8 @@
  *   <message id="n13"><quote from="juno">The deploy is green on staging.</quote>which deploy?</message>
  *   <reaction id="n14" emoji="🎉"><quote from="juno">The deploy is green on staging.</quote></reaction>
  *   <message id="n15"><about topic="T1" title="Postgres 16 plan" channel="#eng" kind="thread"/>is this settled?</message>
- *   <message id="n16"><image n="0" name="chart.png" width="1200" height="800"/><file name="notes.md">…</file>what changed?</message>
+ *   <message id="n16"><about topic="T1" …><selection from="Maya" ts="1760500000.000004">ship it Monday</selection></about>sure?</message>
+ *   <message id="n17"><image n="0" name="chart.png" width="1200" height="800"/><file name="notes.md">…</file>what changed?</message>
  *
  * A reply or reaction carries the item it points at in full, so "this one"
  * is never a guess. The archive keeps what the model read, so memory sees
@@ -120,9 +121,15 @@ export function aboutElement(context: SendContext): string {
         ...(context.visible ? [`visible="${escape(context.visible.from)}..${escape(context.visible.to)}"`] : []),
         ...(context.newFrom ? [`new-from="${escape(context.newFrom)}"`] : []),
       ].join(' ')
-      if (context.selection === undefined) return `<about ${attributes}/>`
-      const from = context.selection.sender === undefined ? '' : ` from="${escape(context.selection.sender)}"`
-      return `<about ${attributes}><selection${from}>${escape(context.selection.text)}</selection></about>`
+      const selection = context.selection
+      if (selection === undefined) return `<about ${attributes}/>`
+      // Where the selection starts: its sender and message, and how many messages it spans.
+      const source = [
+        ...(selection.sender === undefined ? [] : [` from="${escape(selection.sender)}"`]),
+        ...(selection.ts === undefined ? [] : [` ts="${escape(selection.ts)}"`]),
+        ...(selection.messages === undefined ? [] : [` messages="${selection.messages}"`]),
+      ].join('')
+      return `<about ${attributes}><selection${source}>${escape(selection.text)}</selection></about>`
     }
   }
 }
