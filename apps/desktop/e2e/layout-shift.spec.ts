@@ -82,6 +82,7 @@ test('a late reaction above the view moves no row in view, and one on the last m
   const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
   const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
   const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
+  await juno.sidebar.expectFirst('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
   await juno.topic.expectMessage('Latest reply under the view check')
@@ -109,6 +110,8 @@ for (const divider of [false, true]) {
     const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user, threadTs: root.ts, text: `Earlier reply ${i}`, silent: true }))
     const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest delayed reply' })
     if (divider) fake.markThreadRead({ channel, threadTs: root.ts, ts: replies[24]!.ts })
+    // The new root moves #eng to the top of the list; open it once it is there.
+    await juno.sidebar.expectFirst('#eng')
     await juno.sidebar.row('#eng').open()
     const link = juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)
     await expect(link).toBeVisible()
@@ -132,6 +135,7 @@ test('a sender name resolves without moving the message', async ({ juno, win, sl
   fake.workspace.users.set(person.id, person)
   fake.holdNext({ method: 'edge:users/info' })
   const message = fake.injectMessage({ channel: slack.channel('eng'), user: person.id, text: 'A message before its sender resolves' })
+  await juno.sidebar.expectFirst('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('A message before its sender resolves')
   await expect.poll(() => fake.heldCount({ method: 'edge:users/info' })).toBe(1)
@@ -180,6 +184,10 @@ test('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, 
 })
 
 
+// The quick start paints rows before history lands, and a clear bot channel leaves for Automated when its history
+// does (decision 10-16 16:56, sidebar.spec.ts "during the first sync"): #alerts-prod and #deploys were in 2 of 20
+// first paints at 16 workers, and left 150 to 330 ms later. Once they have left, the rest of the sync fills in the
+// remaining topics below and the card at the foot goes, and no row on screen moves.
 test('sidebar rows stay fixed while sync fills the remaining topics', async ({ juno, win, fake }) => {
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
@@ -187,13 +195,16 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
   // A launch opens Home; its sidebar item opens it afresh, which this waits on.
   await juno.home.navItem.click()
   await expect(win.locator('[data-topic-row]')).toHaveCount(0)
+  fake.release({ method: 'subscriptions.thread.getView' })
+  await juno.home.expectShown()
+  await juno.sidebar.expectRows()
+  await expect(win.getByRole('button', { name: 'Automated', exact: true })).toBeVisible()
+  for (const bot of ['#alerts-prod', '#deploys']) await expect(juno.sidebar.row(bot, { exact: true }).root).toHaveCount(0)
   await expectStableAnchor(win, '[data-topic-row]', async () => {
-    fake.release({ method: 'subscriptions.thread.getView' })
-    await juno.home.expectShown()
-    await expect(win.locator('[data-topic-row]').first()).toBeVisible()
+    await juno.expectEngineLive()
+    await juno.sidebar.expectNoSyncStatus()
   })
 })
-
 
 for (const destination of ['Home', 'All topics'] as const) {
   test(`cold sync fills ${destination} without moving painted rows`, async ({ juno, win, fake }) => {
