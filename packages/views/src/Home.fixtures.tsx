@@ -25,14 +25,16 @@ interface Write {
   readonly listOpen?: boolean
   /** No Recent: a first run. */
   readonly noRecent?: boolean
+  /** Only the first few of each column: a new account. */
+  readonly fewRecent?: number
   /** A running job's state line in place of the placeholder (SPEC 13.4). */
   readonly jobLine?: string
 }
 
 /** The composer as the container builds it: Recent, the chip, then the field. */
-function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, jobLine }: Write = {}): ReactNode {
+function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, jobLine }: Write = {}): ReactNode {
   const chip = <DestinationChip destination={destination} open={listOpen} onOpen={noop} query="" onQuery={noop} conversations={listOpen ? recentConversations : undefined} onPick={noop} />
-  const recent = noRecent ? null : <HomeRecent people={recentPeople} channels={recentChannels} chosen={destination?.key} onPick={noop} onOpen={noop} />
+  const recent = noRecent ? null : <HomeRecent people={recentPeople.slice(0, fewRecent)} channels={recentChannels.slice(0, fewRecent)} chosen={destination?.key} onPick={noop} onOpen={noop} />
   const active = sendTo?.rows[0]?.key
   return (
     <Composer
@@ -118,6 +120,8 @@ export default defineFixtures(
       // Space kept the text: a question for Juno that starts with a channel's name.
       'juno-hash': state({ items: two, composer: write({ draft: '#eng what happened today?' }) }),
       'destination-list': state({ items: two, composer: write({ listOpen: true }) }),
+      // Two of each: Recent is as tall as its rows, so the chip stays 12 below the last one.
+      'few-recent': state({ items: two, composer: write({ fewRecent: 2 }) }),
       'first-run': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], composer: write({ noRecent: true }) }),
       // A running job's state line in place of the placeholder (SPEC 13.4); a long one takes an ellipsis.
       'job-line': state({ composer: write({ jobLine: 'T3 Code · tests running, 2 of 5' }) }),

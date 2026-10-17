@@ -88,14 +88,13 @@ export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
   return <Topic id={id} view={topicView(id, tabId)} detail={detail} />
 })
 
-/** Thread links in a preview open in a new tab, so the New chat and its draft stay. */
+/** Thread links in a peek open in a new tab, so the tab under it stays. */
 function openThreadInNewTab(id: string): void {
   openTopic(id, { newTab: true })
 }
 
 /**
- * A topic's latest messages, read-only: New chat's preview (spec section 9),
- * and the same for peek (section 5). The list alone, with no header or
+ * A topic's latest messages, read-only, for peek (spec section 5). The list alone, with no header or
  * composer, in `readOnly` mode (see `TopicProps`).
  */
 export const TopicPreview = memo(function TopicPreview({ id, peek = false }: { readonly id: string; readonly peek?: boolean }) {

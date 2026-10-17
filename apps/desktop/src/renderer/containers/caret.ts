@@ -3,7 +3,7 @@
  * something that is not a text field (performance.md 8, "stale caret").
  *
  * Blink keeps the page's caret in a text field after focus leaves it, and
- * when the field is removed (a New chat that becomes a page, the palette
+ * when the field is removed (a Home that opens the Juno chat, the palette
  * closing) it moves the caret to where the field was. Chromium then makes
  * that caret canonical before every frame (`WidgetBase::UpdateSelectionBounds`),
  * walking back through the DOM to the nearest editable position: about 4 ms

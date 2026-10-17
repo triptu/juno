@@ -84,7 +84,7 @@ function narrowTo(sections: PickConversations, places: ReadonlySet<string>): Pic
 }
 
 /**
- * The place filter: New chat's searchable conversation list (spec section
+ * The place filter: Home's searchable destination list (spec section
  * 10's word search), narrowed to the places that have topics of the kind,
  * with Anywhere first. Its rows are a live query only while it is open.
  */

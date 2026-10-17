@@ -2,7 +2,7 @@ import { isDm, type ConversationKind } from './channel'
 
 const DAY = 86_400_000
 
-/** Local destinations eligible for New chat, with activity in epoch milliseconds. */
+/** Local destinations eligible for Home's Recent, with activity in epoch milliseconds. */
 interface Destination {
   readonly id: string
   readonly kind: ConversationKind

@@ -1,6 +1,6 @@
 /**
  * Handlers for the @ and # suggestions (`contract/src/routes/mentions.ts`).
- * Each follows the open workspace like New chat's pickers
+ * Each follows the open workspace like Home's destination pickers
  * (`newchat/handlers.ts`) and never call Slack. They re-run when people or
  * conversations change; who posted lately is read again on the next query.
  */

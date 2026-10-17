@@ -1,6 +1,6 @@
 /**
  * Text with the parts a search matched in semibold (spec section 10): a
- * ⌘K conversation row and a New chat picker row. Ranges are [start, end)
+ * ⌘K conversation row and a destination list row. Ranges are [start, end)
  * offsets into `text`, in order and not overlapping; a range that does not
  * fit is left plain.
  */

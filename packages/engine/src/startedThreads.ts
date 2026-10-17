@@ -1,4 +1,4 @@
-/** Resolve a New chat thread without changing the subscription or its view identity. */
+/** Resolve a thread started from Home without changing the subscription or its view identity. */
 import { Effect } from 'effect'
 import { StoreReader } from '@juno/store'
 

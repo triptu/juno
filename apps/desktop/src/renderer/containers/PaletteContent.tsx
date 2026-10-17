@@ -17,7 +17,7 @@
  * command reading is asked for after a pause in typing and shows as
  * "Juno": above the Messages results, under the conversations. Rows open
  * topics (at a message, which then flashes), a channel's Main or a
- * person's DM, narrow the sidebar, start a New chat to someone never
+ * person's DM, narrow the sidebar, open Home addressed to someone never
  * messaged, or run a command. Its own chunk: `Palette.tsx` loads it on
  * idle after the first paint.
  */
@@ -71,7 +71,7 @@ async function openMessage(message: SearchMessage, options: OpenOptions): Promis
   openTopicAt(message.topicId, message.ts, { ...options, flash: true })
 }
 
-/** A person's result: your Main with them, or a New chat addressed to them when you have never messaged (spec section 10). */
+/** A person's result: your Main with them, or Home addressed to them when you have never messaged (spec section 10). */
 function openPerson(person: Pick<SearchPerson, 'person' | 'mainId'>, options: OpenOptions): void {
   if (person.mainId !== undefined) return openTopic(person.mainId, options)
   newMessage({ key: `u:${person.person.id}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
@@ -169,7 +169,7 @@ function rowsOf(result: SearchResult): ReadonlyArray<Row> {
   }
 }
 
-/** A Conversations row: its Main, or a New chat to a person never messaged. */
+/** A Conversations row: its Main, or Home addressed to a person never messaged. */
 const conversationRow = (pick: PickConversation): Row => {
   const mainId = pick.mainId
   return {

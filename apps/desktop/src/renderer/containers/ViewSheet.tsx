@@ -15,7 +15,7 @@ function conversationsOf(list: ReadonlyArray<PickConversation>): ReadonlyArray<V
 /**
  * The view sheet's draft (inventory 2.3): it starts from the view being
  * edited, or from the conversation New view… was chosen on, and changes
- * nothing until Save. The search reads the New chat picker's local query,
+ * nothing until Save. The search reads the destination list's local query,
  * with no debounce (performance rule 12): matches while typing, recent
  * conversations while the field is empty.
  */

@@ -66,7 +66,7 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTab
           <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
         </Surface>
       </Section>
-      <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open, and when tabs you left close. Tabs with a draft stay; ⌘⇧T reopens one.">
+      <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one.">
         <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
           <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
         </Surface>

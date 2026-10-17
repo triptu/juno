@@ -6,8 +6,8 @@ import { PeekView, TopicArt, type PeekPlacement } from '@juno/views'
 import { hasArt, TopicPreview } from './TopicView'
 
 /**
- * One peeked topic: its title over `TopicPreview`, the read-only list New
- * chat uses too (newest messages, no divider, no actions, nothing marked
+ * One peeked topic: its title over `TopicPreview`, the topic's list
+ * read-only (newest messages, no divider, no actions, nothing marked
  * read). `Peek` shows it only once the topic can paint, so its first frame
  * has the messages.
  */

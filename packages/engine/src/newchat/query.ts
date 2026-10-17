@@ -158,8 +158,8 @@ const usesOf = (sql: SqlClient.SqlClient, selfId: string | undefined, now: numbe
 /**
  * The ⌘K Conversations tab (spec section 10): DMs, group DMs and channels
  * by how much you use them, own sends and topic visits decaying by half
- * each week, then by activity. With text, the conversations the New chat
- * picker finds for it, by how well they match, then ranked the same way
+ * each week, then by activity. With text, the conversations the destination
+ * list finds for it, by how well they match, then ranked the same way
  * (`rankSearchResults`). Local only.
  */
 export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (text: string) {

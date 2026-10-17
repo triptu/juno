@@ -2,8 +2,8 @@
  * Attachments in the composer (spec section 8; architecture 9).
  *
  * A composer's files live in `attachmentsAtom(key)`, keyed by what owns
- * the draft: a topic's id, or a New chat tab's id. They are memory only,
- * so they survive tab switches and New chat's changes of destination but
+ * the draft: a topic's id, or a Home tab's id. They are memory only,
+ * so they survive tab switches and Home's changes of destination but
  * not a restart. Each file is staged in the engine as soon as it is
  * attached (`staging.ts`), and `messages.send` names the staged ones.
  */

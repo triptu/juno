@@ -29,13 +29,13 @@ export interface ComposerProps {
   readonly value: string
   /** With the caret's offset after the change. */
   readonly onChange: (value: string, caret: number) => void
-  /** Enter, or the send button. Called with an empty draft too: the owner decides (New chat opens the picker). */
+  /** Enter, or the send button. Called with an empty draft too: the owner decides (Home with nothing chosen opens the destination list). */
   readonly onSend: () => void
   /** "Message", "Message #eng", "Reply". */
   readonly placeholder: string
   /** A send is in flight: the field stays editable, the button does not send twice. */
   readonly sending?: boolean
-  /** Above the field, inside its column: New chat's pickers. */
+  /** Above the field, inside its column: Home's Recent and destination chip. */
   readonly above?: ReactNode
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */

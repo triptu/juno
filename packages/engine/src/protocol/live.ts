@@ -263,7 +263,7 @@ export const retryFirstRun =
     )
 
 /**
- * A live value that follows the open workspace, as New chat's pickers and
+ * A live value that follows the open workspace, as Home's destination pickers and
  * the mention suggestions do: `query` re-runs on `keys` in whichever
  * workspace is open, and nothing is sent while none is. A failed first run
  * is retried (`retryFirstRun`).
