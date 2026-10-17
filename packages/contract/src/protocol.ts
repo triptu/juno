@@ -26,6 +26,8 @@ export const EngineConfig = Schema.Struct({
   fakeSlackUrl: Schema.optionalKey(Schema.String),
   /** Tests only: keep the production request pacing against the fake, to measure a first sync as a user meets it. */
   fakeSlackPaced: Schema.optionalKey(Schema.Boolean),
+  /** Tests only: with `fakeSlackPaced`, every spacing divided by this (`scaledPacing`), so a paced first sync runs in seconds. */
+  fakeSlackPaceScale: Schema.optionalKey(Schema.Number),
   /** Which AI provider the engine builds: the deterministic fake (tests, `JUNO_AI=fake`) or pi-ai over OpenRouter. */
   ai: Schema.optionalKey(Schema.Literals(['fake', 'live'])),
   /** Tests only: how long the fake AI takes to answer, to watch a slow model hit a task's timeout. */
