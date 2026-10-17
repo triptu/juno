@@ -199,7 +199,7 @@ export function webPanelCanShow(url: string): boolean {
   const match = /^(https?):\/\/([a-z0-9.-]+)(?::\d+)?(?:[/?#]|$)/i.exec(url)
   if (match === null) return false
   const [, scheme, host] = match as unknown as [string, string, string]
-  const hostname = host.toLowerCase()
+  const hostname = host.toLowerCase().replace(/\.$/, '')
   const local = hostname === 'localhost' || hostname === '127.0.0.1'
   if (scheme.toLowerCase() !== 'https' && !local) return false
   return !BROWSER_ONLY_HOSTS.includes(hostname)

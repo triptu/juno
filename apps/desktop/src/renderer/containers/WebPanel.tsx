@@ -34,7 +34,8 @@ export function WebPanel({ url }: { readonly url: string }) {
   const paletteOpen = useAtomValue(paletteOpenAtom)
   const page = useRef<HTMLDivElement>(null)
   // The page as it is now, so coming back to the tab shows where it was, not the link it opened with.
-  const current = state?.url ?? url
+  // Before the first page commits, main reports an empty url.
+  const current = state?.url ? state.url : url
   const currentRef = useRef(current)
   useLayoutEffect(() => {
     currentRef.current = current

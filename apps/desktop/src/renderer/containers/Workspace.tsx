@@ -302,7 +302,7 @@ export function Workspace() {
       empty={null}
       side={
         webShown ? (
-          <WebPanel key={webPanel.url} url={webPanel.url} />
+          <WebPanel key={webPanel.opened} url={webPanel.url} />
         ) : agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>
             <JunoPanel tabId={state.active} topicId={panelTopic} />

@@ -142,6 +142,8 @@ function create(window: BrowserWindow): Panel {
     })
   })
   contents.on('did-navigate', () => {
+    // A later open of the link it started from must load it again.
+    panel.requested = contents.getURL()
     panel.favicon = null
     sendState()
   })

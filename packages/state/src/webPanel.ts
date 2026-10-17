@@ -27,6 +27,8 @@ declare const window: { readonly juno: JunoBridge; readonly innerWidth: number }
 export interface WebPanel {
   readonly tabId: string
   readonly url: string
+  /** Counts opens, so opening the same link again loads it again. */
+  readonly opened: number
 }
 
 export const webPanelAtom = Atom.make<WebPanel | undefined>(undefined).pipe(Atom.keepAlive)
@@ -63,7 +65,7 @@ export function openWebPanel(registry: Registry, url: string): void {
   }
   setJunoPanelOpen(registry, false)
   registry.set(webPanelStateAtom, undefined)
-  registry.set(webPanelAtom, { tabId: tab.id, url })
+  registry.set(webPanelAtom, { tabId: tab.id, url, opened: (registry.get(webPanelAtom)?.opened ?? 0) + 1 })
 }
 
 export function closeWebPanel(registry: Registry): void {
