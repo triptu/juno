@@ -13,8 +13,8 @@ export interface HomeProps {
   readonly scene: HomeSceneName
   /** "Morning, Tushar.", or "All caught up." */
   readonly title: string
-  /** Under the greeting only while the first sync runs: "Syncing with Slack." Never a count. */
-  readonly line?: string | undefined
+  /** Under the greeting only while the first sync runs: `HomeSyncLine`, "Syncing with Slack." or "Syncing 30 of 143 conversations." */
+  readonly line?: ReactNode
   /** Already ranked and capped. */
   readonly items: ReadonlyArray<HomeItem>
   /** Items whose button was used: the button is gone, its slot stays. */
@@ -67,7 +67,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               {title}
             </h2>
             {line === undefined ? null : (
-              <Text variant="body" tone="muted" as="p" sx={styles.line}>
+              <Text variant="body" tone="muted" as="p" numeric truncate sx={styles.line}>
                 {line}
               </Text>
             )}
@@ -245,6 +245,7 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    alignSelf: 'stretch',
     maxWidth: '100%',
     minWidth: 0,
     marginTop: spacing['--space-3-5'],
@@ -265,13 +266,11 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
-  // The syncing line sits in the gap above the rows, so the rows stay where they are when it goes.
+  // In the gap above the rows, so they stay put when it goes; as wide as the column, so a new count moves nothing.
   line: {
     position: 'absolute',
     top: `calc(100% + ${spacing['--space-1-5']})`,
-    insetInlineStart: '50%',
-    transform: 'translateX(-50%)',
-    whiteSpace: 'nowrap',
+    insetInline: 0,
     margin: 0,
   },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),

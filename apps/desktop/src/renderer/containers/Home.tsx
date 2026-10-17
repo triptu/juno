@@ -1,8 +1,8 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { Home, WelcomeCard, type ActivateEvent } from '@juno/views'
+import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
 import { TidyUpReview } from './TidyUpReview'
@@ -85,6 +85,11 @@ function useWelcome(appearedAt: number | undefined) {
   return <WelcomeCard done={last.done} peekKey={peekKey} onClose={closeCard} hidden={welcome === undefined || !welcome.ready} />
 }
 
+/** The syncing line with the first sync's count. Its own component, so a new count redraws the line and not Home. */
+function SyncLine({ line }: { readonly line: string }) {
+  return <HomeSyncLine line={line} progress={useAtomValue(syncProgressAtom)} />
+}
+
 /**
  * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
  * at the bottom. It shows the items `home.view` had when Home appeared
@@ -92,7 +97,7 @@ function useWelcome(appearedAt: number | undefined) {
  * from a hidden tab, and once more when the first value arrives); later
  * values change only a row's title line (`freezeHome`). Until the first
  * sync is done it shows the scene and the greeting with "Syncing with
- * Slack.", and rows fill reserved slots as they land (`fillHome`).
+ * Slack.", then the sync's count, and rows fill reserved slots as they land (`fillHome`).
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
@@ -121,7 +126,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       scene={shown.scene}
       // While syncing there are no rows to hold still, so the greeting takes the name once the boot has stored it.
       title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, caughtUp: false }).title : shown.title}
-      line={shown.line}
+      line={shown.line === undefined ? undefined : <SyncLine line={shown.line} />}
       items={view.items}
       done={shown.used}
       now={shown.now}

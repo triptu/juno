@@ -27,7 +27,7 @@ import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
 import { leaveComposer, takeForJuno, useJunoFiles } from './juno/junoFiles'
 import { useMentions } from './mentions'
-import { openJuno } from './navigation'
+import { openJuno, openTopicInBackground } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
 
@@ -182,7 +182,8 @@ function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefi
 /**
  * Sends the draft where it goes: Juno opens its chat with the question and
  * the files it reads (the rest stay, SPEC 12); a person or channel gets it
- * in its Main or the thread chosen, and Home stays.
+ * in its Main or the thread chosen, and Home stays, with the topic in a
+ * tab behind it.
  */
 async function deliver(tabId: string, body: string, to: Destination, junoOn: boolean, openList: () => void): Promise<boolean> {
   const current = registry.get(homeDraftAtom(tabId))
@@ -220,6 +221,8 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
   setHomeDraft(registry, tabId, emptyHomeDraft)
   const exit = await sendMessage(registry, target, encodeMentions(body, current.mentions), undefined, attached.ids, startsThread)
   if (exit._tag === 'Success') {
+    // The topic opens in a tab behind Home, right after it, unless a tab shows it already; Home stays active (SPEC 12).
+    openTopicInBackground(exit.value.topicId, { after: tabId, unlessShown: true })
     if (current.thread !== undefined && target.kind === 'channel' && target.threadTs === current.thread.rootTs) showToast(registry, { text: `Replied in ${current.thread.title}` })
     else if (current.conversation !== undefined) showToast(registry, { text: `Sent to ${destinationLabel(current.conversation)}` })
     return true

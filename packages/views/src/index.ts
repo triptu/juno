@@ -77,6 +77,7 @@ export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } f
 export { QuickReactionsSetting } from './QuickReactionsSetting'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
+export { HomeSyncLine } from './HomeSyncLine'
 export { SettingsTidyUp } from './TidyUpSettings'
 export { SettledReview } from './SettledReview'
 export { type SettledStatus } from './settled'

@@ -305,12 +305,15 @@ export function openTopicFromList(id: string, options: OpenOptions = {}): void {
  * ⌘-click on Start thread or Open thread (SPEC 6 and 7): the topic in a new
  * tab after the current one, which stays active with its scroll and focus.
  * The new tab gets a fresh open's window once the topic is local, so it
- * opens at the divider or the bottom when it is chosen.
+ * opens at the divider or the bottom when it is chosen. A send from Home
+ * passes its tab as `after`, and `unlessShown` so a tab that already shows
+ * the topic is enough (SPEC 12).
  */
-export function openTopicInBackground(id: string): void {
+export function openTopicInBackground(id: string, { after, unlessShown = false }: { readonly after?: string; readonly unlessShown?: boolean } = {}): void {
   queue = queue.then(() => {
+    if (unlessShown && tabShowing(registry.get(tabsAtom), id) !== undefined) return
     const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
-    const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true }))
+    const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true, ...(after === undefined ? {} : { after }) }))
     const tab = next.tabs.find((each) => !before.has(each.id))
     if (tab === undefined) return
     void whenReady(id, true).then(() => registry.set(messageWindowSpecAtom(topicView(id, tab.id)), registry.get(messageWindowSpecAtom(id))))
