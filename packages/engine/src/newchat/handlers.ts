@@ -11,8 +11,9 @@ import { serveWorkspaceValue } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { queryConversations, queryFrequent, queryPaletteConversations } from './query'
 
-const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'team', 'messages']
-const RANKED_KEYS: InvalidationKeys = ['conversations', 'users', 'ignored_channels', 'team', 'topic_visits']
+// `topic_art` and `prefs` (AI assist) change a channel's tile.
+const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'team', 'messages', 'topic_art', 'prefs']
+const RANKED_KEYS: InvalidationKeys = ['conversations', 'users', 'ignored_channels', 'team', 'topic_visits', 'topic_art', 'prefs']
 
 export const NewChatHandlers = NewChatRoutes.toLayer(
   Effect.gen(function* () {

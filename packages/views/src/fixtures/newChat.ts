@@ -1,18 +1,17 @@
 /** Destinations for the fixtures: the conversations Home's destination list and ⌘K offer. */
 import type { Person, PickConversation, PickConversations } from '@juno/contract'
-import { people } from './topics'
+import { studyArt } from './artRows'
+import { art, people } from './topics'
 
-type Art = { readonly icon: NonNullable<PickConversation['icon']>; readonly color: NonNullable<PickConversation['color']> }
-
-/** A channel, with the art the engine gives it when it has some (as Recent shows it). */
-const channel = (key: string, name: string, kind: 'public' | 'private' = 'public', art?: Art): PickConversation => ({
+/** A channel, with its Main's art when it has some (as its sidebar Main row draws it). */
+const channel = (key: string, name: string, kind: 'public' | 'private' = 'public', recipe?: string): PickConversation => ({
   key,
   name,
   kind,
   tint: kind,
   channelId: key,
   mainId: `m:${key}`,
-  ...art,
+  ...(recipe === undefined ? {} : { art: recipe }),
   empty: false,
 })
 
@@ -28,9 +27,9 @@ const dm = (key: string, person: Person): PickConversation => ({
 })
 
 export const conversations = {
-  eng: channel('C0ENG', 'eng', 'public', { icon: 'code', color: 'emerald' }),
-  billing: channel('C0BILLING', 'billing-ops', 'public', { icon: 'globe', color: 'claret' }),
-  hiring: channel('C0HIRING', 'hiring', 'private', { icon: 'shield', color: 'midnight' }),
+  eng: channel('C0ENG', 'eng', 'public', studyArt.mainEng),
+  billing: channel('C0BILLING', 'billing-ops', 'public', art.coins),
+  hiring: channel('C0HIRING', 'hiring', 'private', art.people),
   onboarding: channel('C0JONAS', 'jonas-onboarding', 'private'),
   maya: dm('D0MAYA', people.maya),
   sam: dm('D0SAM', people.sam),

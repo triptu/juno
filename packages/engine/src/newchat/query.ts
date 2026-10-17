@@ -10,6 +10,7 @@ import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConve
 import { frequentDestinations, parseTopicId, rankConversations, rankSearchResults, searchWords } from '@juno/domain'
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
+import { aiAssistOn } from '../ai'
 import type { UserRow } from '../topicRows'
 import { CONVERSATION_COLUMNS, peopleOf, pickOf, type ConversationRow } from './picks'
 import { searchEntries, type Found } from './searchIndex'
@@ -53,6 +54,24 @@ const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
     return users
   })
 
+/**
+ * `picks` with each channel's Main art (`PickConversation.art`), so a tile
+ * matches the channel's Main row in the sidebar. Read per query, like
+ * `empty`, so a new drawing shows at once; nothing while AI assist is off.
+ */
+const withMainArt = (sql: SqlClient.SqlClient, picks: ReadonlyArray<PickConversation>) =>
+  Effect.gen(function* () {
+    const mains = picks.flatMap((pick) => (pick.mainId !== undefined && (pick.kind === 'public' || pick.kind === 'private') ? [pick.mainId] : []))
+    if (mains.length === 0 || !(yield* aiAssistOn)) return picks
+    const rows = yield* sql<{ topic_id: string; recipe: string }>`SELECT topic_id, recipe FROM topic_art WHERE status = 'ok' AND recipe != '' AND topic_id IN ${sql.in(mains)}`
+    if (rows.length === 0) return picks
+    const art = new Map(rows.map((row) => [row.topic_id, row.recipe]))
+    return picks.map((pick) => {
+      const recipe = pick.mainId === undefined ? undefined : art.get(pick.mainId)
+      return recipe === undefined ? pick : { ...pick, art: recipe }
+    })
+  })
+
 const selfIdOf = (sql: SqlClient.SqlClient) =>
   Effect.map(sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`, (rows) => rows[0]?.self_user_id ?? undefined)
 
@@ -65,13 +84,14 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
     const { recent } = pickerStatements(cutoffTs(now))
     const rows = yield* sql.unsafe<ConversationRow>(recent.sql, recent.params)
     const users = yield* readUsers(sql, peopleOf(rows))
-    return { recent: rows.map((row) => pickOf(row, users, selfId)), people: [], channels: [] } satisfies PickConversations
+    return { recent: yield* withMainArt(sql, rows.map((row) => pickOf(row, users, selfId))), people: [], channels: [] } satisfies PickConversations
   }
-  const ranked = yield* rankFound(sql, yield* searchEntries(text), yield* usesOf(sql, selfId, now), now)
+  const found = yield* rankFound(sql, yield* searchEntries(text), yield* usesOf(sql, selfId, now), now)
+  const ranked = yield* withMainArt(sql, [...found.filter((pick) => pick.kind === 'im').slice(0, PICK_LIMIT), ...found.filter((pick) => pick.kind !== 'im').slice(0, PICK_LIMIT)])
   return {
     recent: [],
-    people: ranked.filter((pick) => pick.kind === 'im').slice(0, PICK_LIMIT),
-    channels: ranked.filter((pick) => pick.kind !== 'im').slice(0, PICK_LIMIT),
+    people: ranked.filter((pick) => pick.kind === 'im'),
+    channels: ranked.filter((pick) => pick.kind !== 'im'),
   } satisfies PickConversations
 })
 
@@ -103,7 +123,7 @@ export const queryFrequent = Effect.fn('newChat.frequent')(function* () {
   const byId = new Map(rows.map(row => [row.id, row]))
   const chosen = ids.flatMap(id => { const row = byId.get(id); return row === undefined ? [] : [row] })
   const users = yield* readUsers(sql, peopleOf(chosen))
-  return chosen.map(row => pickOf(row, users, selfId))
+  return yield* withMainArt(sql, chosen.map(row => pickOf(row, users, selfId)))
 })
 
 /** The latest activity of each of `ids`, read through the channel index. A conversation with no row has no topics. */
@@ -173,8 +193,8 @@ export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (
     const byId = new Map(rows.map((row) => [row.id, row]))
     const chosen = ids.flatMap((id) => byId.get(id) ?? [])
     const users = yield* readUsers(sql, peopleOf(chosen))
-    return chosen.map((row) => pickOf(row, users, selfId))
+    return yield* withMainArt(sql, chosen.map((row) => pickOf(row, users, selfId)))
   }
   const ranked = yield* rankFound(sql, yield* searchEntries(text), uses, now)
-  return ranked.slice(0, PALETTE_CONVERSATIONS)
+  return yield* withMainArt(sql, ranked.slice(0, PALETTE_CONVERSATIONS))
 })

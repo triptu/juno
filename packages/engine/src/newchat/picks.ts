@@ -3,7 +3,7 @@
  * a person with no DM yet.
  */
 import type { PickConversation } from '@juno/contract'
-import { channelLabelBare, contextTint, defaultChannelStyle, mainTopicId, type ChannelId, type ConversationKind } from '@juno/domain'
+import { channelLabelBare, contextTint, mainTopicId, type ChannelId, type ConversationKind } from '@juno/domain'
 import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
 
 /** A conversation row with whether Juno holds any of its messages. */
@@ -43,10 +43,8 @@ export function pickOf(row: ConversationRow, users: ReadonlyMap<string, UserRow>
         .map((id) => userName(id, users.get(id)))
       return { ...base, name: channelLabelBare({ kind: 'mpim', name: row.name ?? row.id, memberNames }) }
     }
-    default: {
-      const style = defaultChannelStyle(row.id, row.kind)
-      return { ...base, name: row.name ?? row.id, icon: style.icon, color: style.color }
-    }
+    default:
+      return { ...base, name: row.name ?? row.id }
   }
 }
 
