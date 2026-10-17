@@ -1321,9 +1321,9 @@ export class HomeWritePane {
     return this.root.locator('[data-home-recent]')
   }
 
-  /** The Recent row named `name`. */
+  /** The Recent row named `name`; a private channel's name goes on with "Private". */
   recentRow(name: string): Locator {
-    return this.recent.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}`) })
+    return this.recent.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}( Private)?$`) })
   }
 
   /** The chip's destination list. */

@@ -74,13 +74,13 @@ test('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an
   await expect(write.composer).toHaveValue('@ma')
 
   await write.composer.fill('')
-  await write.recentRow('Maya Chen').click()
+  await write.recentRow('Maya').click()
   await write.expectDestination('Maya')
-  await expect(write.recentRow('Maya Chen')).toHaveAttribute('aria-pressed', 'true')
+  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
   await expect(write.composer).toBeFocused()
   await write.composer.press('Backspace')
   await write.expectDestination('Juno')
-  await expect(write.recentRow('Maya Chen')).toHaveAttribute('aria-pressed', 'false')
+  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', async ({ juno, fake }) => {
@@ -99,8 +99,11 @@ test('a send to a channel starts a thread there, shows it in the sidebar, and Ho
   await expect(sidebar.row(DRAFT).root).toBeVisible()
   await expect.poll(() => fake.messages('C0ENG').some((message) => message.text === DRAFT)).toBe(true)
 
-  await sidebar.row(DRAFT).open()
-  await topic.expectMessage(DRAFT)
+  // The row takes Slack's id once the send is confirmed and mounts again, so the open retries until it lands on the settled row.
+  await expect(async () => {
+    await sidebar.row(DRAFT).open()
+    await topic.expectMessage(DRAFT)
+  }).toPass({ timeout: 30_000 })
   await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
   await topic.send('second')
   await topic.expectSent('second')
@@ -153,7 +156,7 @@ test('Home keeps its draft and destination when a topic opens over it, and Back 
   await juno.waitForSync()
   const { write, topic, sidebar, nav } = juno
 
-  await write.recentRow('Maya Chen').click()
+  await write.recentRow('Maya').click()
   await write.write('A long thought I do not want to lose')
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -169,9 +172,10 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
 
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
+  // No Home tab is open, so ⌘N opens one and leaves the topic in its tab.
   await tabs.menu('new-message')
-  await tabs.expectActive('Home')
-  await tabs.expectCount(1)
+  await tabs.expectCount(2)
+  await tabs.expectActiveAt('Home', 1)
   await expect(write.search).toBeFocused()
   // Esc closes the list and returns focus to the chip that owns it.
   await write.search.press('Escape')
@@ -179,15 +183,15 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
 
   await write.write('Half a thought')
   await tabs.menu('new-message')
-  await tabs.expectCount(2)
-  await tabs.expectActiveAt('Home', 1)
+  await tabs.expectCount(3)
+  await tabs.expectActiveAt('Home', 2)
   await expect(write.search).toBeFocused()
   await write.search.press('Escape')
   await expect(write.composer).toHaveValue('')
 
   await tabs.newTabButton.click()
-  await tabs.expectCount(3)
-  await tabs.expectActiveAt('Home', 2)
+  await tabs.expectCount(4)
+  await tabs.expectActiveAt('Home', 3)
   await expect(write.composer).toBeFocused()
   await write.expectDestination('Juno')
 })
