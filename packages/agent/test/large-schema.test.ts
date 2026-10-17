@@ -1,6 +1,8 @@
 // A connection tool with a large argument schema (about 30 KB, nested, with $defs), as PostHog's
 // MCP server has: the model loads the whole schema with find_tools, calls the tool with valid
-// arguments, the call follows the auto-review, and the ledger counts the schema's tokens.
+// arguments, the call follows the auto-review, and the ledger counts the schema's tokens. Then the
+// same in PostHog's own shape, one `exec` tool that takes a command line (docs/research/posthog-mcp.md):
+// its lookups run with no card under Auto, and a write through it still asks.
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -79,6 +81,25 @@ function flagSchema() {
   }
 }
 
+/** PostHog's `exec`: one command string, its reference (about 30 KB) in the field's description. */
+const REFERENCE = 'CLI-style command string. help; tools; search <words>; info <tool>; schema <tool> <field>; call <tool> <json>. ' +
+  'One command per call. Run info before call, and never guess a schema. '.repeat(420)
+
+function exec() {
+  return {
+    name: 'exec', description: 'PostHog analytics, dashboards, insights and feature flags. Pass CLI-style commands in `command`.',
+    inputSchema: { type: 'object', properties: { command: { type: 'string', description: REFERENCE } }, required: ['command'], additionalProperties: false } as never,
+    call: (args: Record<string, unknown>) => {
+      const [verb, rest = ''] = String(args.command).split(/ (.*)/s)
+      if (verb === 'help') return 'tools, search, info, schema, call'
+      // As PostHog's does, `info` summarizes a large schema with a hint per field to drill into.
+      if (verb === 'info' && rest === 'update-feature-flag') return JSON.stringify({ name: 'update-feature-flag', fields: { key: 'string', active: 'boolean', filters: { hint: 'schema update-feature-flag filters' } } })
+      if (verb === 'call' && rest.startsWith('update-feature-flag ')) return json({ updated: (JSON.parse(rest.slice('update-feature-flag '.length)) as { key: string }).key })
+      throw new Error(`Unknown command: ${verb}`)
+    },
+  }
+}
+
 const ARGS = {
   key: 'actions-cards-feed', active: true,
   filters: { groups: [{ properties: [{ type: 'person', key: 'email', value: 'maya@example.com', operator: 'exact' }], rollout_percentage: 100 }] },
@@ -88,6 +109,7 @@ async function fixture() {
   const schema = flagSchema()
   const server = await startFakeMcpServer({ name: 'posthog', tools: [
     { name: 'update-feature-flag', description: 'Update a feature flag: its release conditions, rollout and variants.', inputSchema: schema as never, call: (args) => json({ updated: args.key }) },
+    exec(),
   ] })
   cleanup.push(() => server.close())
   const dir = await mkdtemp(join(tmpdir(), 'juno-large-schema-'))
@@ -206,4 +228,52 @@ it('says in one line when a schema is too large or not one Juno can check, and n
   expect(results[0]).toMatch(/^Juno can't use this tool: its description and argument schema are \d+ KB, more than the 48 KB Juno can read\.$/)
   expect(results[1]).toMatch(/^Juno can't use this tool: its argument schema is not one Juno can check/)
   expect(results.join('')).not.toContain('x'.repeat(1000))
+})
+
+/** One owner message whose run loads `exec`'s schema, runs `commands` through it in order, then says one bubble. */
+function commands(fake: ReturnType<typeof fakeProvider>, n: number, ...list: ReadonlyArray<string>) {
+  fake.script([
+    reply({ type: 'toolCall', id: `find-${n}`, name: 'find_tools', arguments: { server: 'posthog', tool: 'exec' } }),
+    ...list.map((command, i) => reply({ type: 'toolCall', id: `exec-${n}-${i}`, name: 'call_tool', arguments: { server: 'posthog', tool: 'exec', args: { command } } })),
+    reply('<say>Done.</say>'),
+  ])
+}
+
+it("runs a command tool's lookups with no card under Auto, judged by the command, and asks for a write through it", async () => {
+  const { server, turns, fake, reviewer } = await fixture()
+  const write = `call update-feature-flag ${JSON.stringify(ARGS)}`
+  commands(fake, 1, 'help', 'info update-feature-flag', write)
+  turns.accept({ opId: 'owner-1', kind: 'send', text: 'Turn on the actions-cards-feed flag for maya@example.com.' })
+  await turns.idle()
+
+  // The 30 KB reference reached the model whole.
+  expect(toolResults(fake.requests[1])[0]).toContain(REFERENCE)
+  // Each call was reviewed on its arguments; the lookups ran, the write did not.
+  expect(reviewer.requests.map((request) => JSON.parse(request.state.call.args) as unknown)).toEqual([{ command: 'help' }, { command: 'info update-feature-flag' }, { command: write }])
+  expect(server.calls.filter((call) => call.name === 'exec').map((call) => call.args.command)).toEqual(['help', 'info update-feature-flag'])
+  const info = toolResults(fake.requests[3]).at(-1)!
+  expect(info).toContain('schema update-feature-flag filters')
+  // The write shows its card: the owner did not ask to update in so many words.
+  const views = turns.actions.views()
+  expect(views).toHaveLength(1)
+  expect(views[0]?.card).toMatchObject({ _tag: 'change', review: { rule: 'auto', intent: 'implied', risk: 'reversible' } })
+  if (!views[0]?.binding) throw new Error('No card')
+  turns.actions.approve('click', views[0].binding.identity, views[0].binding.children)
+  await turns.actions.idle()
+  expect(server.calls.filter((call) => call.name === 'exec').map((call) => call.args.command)).toEqual(['help', 'info update-feature-flag', write])
+})
+
+it('keeps a schema an earlier run loaded out of the next run, as one line naming it', async () => {
+  const { turns, fake, schema } = await fixture()
+  commands(fake, 1, 'help')
+  turns.accept({ opId: 'owner-1', kind: 'send', text: 'What can PostHog do?' })
+  await turns.idle()
+  const before = fake.requests.length
+  fake.script([reply('<say>Hello.</say>')])
+  turns.accept({ opId: 'owner-2', kind: 'send', text: 'Thanks.' })
+  await turns.idle()
+  const next = JSON.stringify(fake.requests[before]?.context.messages)
+  expect(next).toContain('find_tools: loaded the schema for exec on posthog. Load it again with find_tools before calling it.')
+  expect(next).not.toContain(REFERENCE.slice(0, 2000))
+  expect(next).not.toContain(JSON.stringify(schema).slice(0, 200))
 })
