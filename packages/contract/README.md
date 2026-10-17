@@ -44,7 +44,7 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 - `reads.markRead { id, upTo? }` and `reads.markUnread { id, from? }` change Juno's read pointer and return the undo (`UndoCommand` gains both); they fail only with `NotSignedIn` or `NotFound`, never because Slack could not be reached. `reads.mirror` is the live mirror setting `{ on, explicit }`; the preference behind it is `MIRROR_READS_PREF` (`reads.mirror`), written with `prefs.set`.
 - `prefs.get { key }` is a live JSON value from the open workspace's user.db; an absent key returns null. `prefs.set { key, value }` writes one JSON value and invalidates prefs. It fails with `NotSignedIn` without an open workspace. WP5 uses the key `tabs`.
 
-The shell update routes (`updates.get`, `updates.set`, `updates.restart`) and `UpdateState` keep release handling in main. `updates.changed` forwards changes to the renderer.
+The shell update routes (`updates.get`, `updates.set`, `updates.restart`, `updates.download`, `updates.notes`), `UpdateState` and `ReleaseNotes` keep release handling, and the releases repository's token, in main. `updates.changed` forwards changes to the renderer.
 
 - `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.
 

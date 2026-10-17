@@ -1010,8 +1010,8 @@ Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes.
 
 The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
 native dependencies for Electron, and writes the DMG, ZIP, block maps and
-update metadata (when a feed is configured) to `apps/desktop/release/`. It never
-publishes. Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
+update metadata (`latest-mac.yml`) to `apps/desktop/release/`. It never
+publishes; `pnpm release:publish` does (below). Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
 the build prints one unsigned-build line and disables identity discovery.
 On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
 flipping fuses. This uses no certificate or credentials and does not grant
@@ -1042,16 +1042,21 @@ its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it
   and `APPLE_API_ISSUER`. In Actions, store the file as the
   `APPLE_API_KEY_BASE64` secret; the workflow writes it to a temporary file and
   deletes it after the build. Supply one authentication method at a time.
-- A public update feed URL, supplied at build time as `JUNO_UPDATE_FEED_URL`
-  (Actions variable `UPDATE_FEED_URL`). For GitHub Releases, use
-  `https://github.com/<owner>/<repo>/releases/latest/download`. There is no default
-  repository or feed. Without a feed, updates remain unavailable.
-- A release destination (`RELEASE_REPOSITORY=owner/repo` in Actions) and a GitHub
-  token with **Contents: write** access to it (`RELEASE_GITHUB_TOKEN`). A local
-  upload uses `GH_TOKEN`. The workflow can use its scoped `github.token` when
-  publishing to its own repository. Without a destination, CI only uploads
-  Actions artifacts. The installed app contains no GitHub token; update assets
-  must be publicly readable.
+- The updater's read token, `JUNO_UPDATE_TOKEN` at package time (Actions secret
+  `UPDATE_READ_TOKEN`). It is a **fine-grained personal access token** with
+  resource owner `triptu`, repository access **Only select repositories:
+  `triptu/juno-releases`**, and repository permissions **Contents: Read-only**
+  and **Metadata: Read-only** (Metadata is added automatically); nothing else,
+  no account permissions. Give it no expiry, or a long one: installs carrying
+  an expired token stop updating. `build/package.cjs` refuses a classic token,
+  writes the token into the app's `update.json` and never prints it. Without it
+  the app is built with updates unavailable. Keep it in a password manager or
+  the Actions secret, never in a file in the repository. `JUNO_UPDATE_REPOSITORY`
+  overrides the repository (default `triptu/juno-releases`).
+- For CI uploads only: a release destination (`RELEASE_REPOSITORY=triptu/juno-releases`
+  in Actions) and a token with **Contents: write** on it (`RELEASE_GITHUB_TOKEN`).
+  Without a destination, CI only uploads Actions artifacts. Local publishing
+  uses your own `gh` login instead.
 
 Keep all credentials in the environment or repository Actions secrets. Never
 commit certificates, keys, passwords or tokens. No secrets are needed for PR
@@ -1061,7 +1066,7 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
 
 1. Install Node 26, pnpm 12.11.2 and Xcode (including its command-line tools).
    Run `pnpm install --frozen-lockfile` and `pnpm affected`.
-2. Set the desktop version in `apps/desktop/package.json`. Build and smoke the
+2. Set the version with `pnpm release:version` ("Versions" below). Build and smoke the
    local package with `pnpm package` and `pnpm test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
    starts the agent against fake OpenRouter, and relaunches the cached account.
@@ -1070,32 +1075,129 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
    measures five cached-account launches from process spawn to the renderer's
    first sidebar-row paint marker, reporting median and range. These are warm
    filesystem-cache runs with CDP attached, not a cold-disk benchmark.
-3. For a local signed release, provide the variables above (including the public
-   feed URL), then run
-   `JUNO_RELEASE=1 pnpm package`. electron-builder uses `notarytool` and staples
-   the ticket. Partial release credentials fail the build. Verify with
+3. For a local signed release, provide the variables above, then run
+   `JUNO_RELEASE=1 JUNO_UPDATE_TOKEN=… pnpm package` (read the token from your
+   password manager into the variable; do not type it into a file). electron-builder
+   uses `notarytool` and staples the ticket. Partial release credentials fail the
+   build. Verify with
    `codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app`
    and `xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app`, then
-   run `pnpm test:package` again.
-4. For CI, configure those repository secrets, commit the version, and create
+   run `pnpm test:package` again. An unsigned release is the same without
+   `JUNO_RELEASE=1`.
+4. Publish with `pnpm release:publish --notes <file>` (below).
+5. For CI, configure those repository secrets, commit the version, and create
    and push the matching `v<version>` tag. `.github/workflows/release.yml` runs
    on `macos-26`. Complete credentials enable signing and notarization;
    otherwise it builds unsigned artifacts. It uploads artifacts to a **draft**
    GitHub release in the configured distribution repository and will not modify
-   an already published release. In a separate distribution repository, GitHub
-   creates the version tag there; the build still comes from the source tag.
-5. Review the artifacts and signing/notarization results before publishing the
-   draft. Never publish the unsigned fallback as an update. On another Mac,
-   install the prior signed build, opt into updates in Settings › About,
-   publish the newer signed release, and check **Restart to update**. This
-   cross-version signature and installation check requires the owner's ID and
+   an already published release. A CI draft has no changelog entry; add it to
+   `CHANGELOG.md` in the releases repository before publishing the draft.
+6. With a signed build, on another Mac install the prior signed build, opt into
+   updates in Settings › About, publish the newer signed release, and check
+   **Restart to update**. This cross-version check requires the owner's ID and
    cannot be verified by the unsigned smoke.
 
-Updates are off by default and unavailable without a configured feed, in
-development, and in tests. An enabled install checks 30 seconds after launch and every six hours, quietly downloads,
-and shows a single ready line in Settings › About. Closing the app does not
-install the update; only **Restart to update** does. Turning the setting off
-cancels a download and suppresses the ready line. Errors retry quietly later.
+### The releases repository
+
+`triptu/juno-releases` is private and holds only what the app may read: one
+GitHub Release `v<version>` per version with the DMG, ZIP, block maps and
+`latest-mac.yml`, and `CHANGELOG.md`. The app reads it with the shipped
+read-only token, so anyone with the app can read this repository; put nothing
+else in it (ADR 0016).
+
+`CHANGELOG.md` has one section per version, newest first:
+
+```
+## 0.2.0 - 2026-10-20
+
+- Peek shows the last reply.
+- Fixed a crash on sign out.
+```
+
+The app shows these lines as plain text under "What's new"
+(`apps/desktop/src/main/releaseNotes.ts` parses them). Write them for the person
+using Juno, in the style of SPEC section 17.
+
+### Versions
+
+Versions are semver, kept in `apps/desktop/package.json` and tagged `v<version>`
+in the releases repository. Set the next one with
+`pnpm release:version patch|minor|major` (or an exact `x.y.z`) and commit it.
+Before 1.0: **patch** for fixes only, **minor** for anything new or changed
+that a user would notice. From 1.0, **major** for changes that drop data or
+settings, or need a newer macOS. A pre-release (`0.3.0-beta.1`) is for testing
+a build and is never offered to installs. Versions only go up: the updater
+offers a release only when it is newer than the installed version, and
+`release:publish` refuses a version that is not newer than every published one.
+
+### Publishing
+
+`pnpm release:publish --notes <file>` publishes the build in
+`apps/desktop/release/` to the releases repository, with your own `gh` login
+(`gh auth login`, with write access to the repository). No token is read or
+written by the script. `<file>` holds this version's changelog lines, one per
+line. The script:
+
+1. checks `latest-mac.yml` is for the version in `apps/desktop/package.json`,
+   that every file it names is there, and that the app contains `update.json`
+   (a build without `JUNO_UPDATE_TOKEN` would never update again);
+2. checks the version is newer than every published release and not already
+   tagged;
+3. creates a draft release `v<version>` with the DMG, ZIP, block maps and
+   `latest-mac.yml`;
+4. adds the section to `CHANGELOG.md` with today's date;
+5. publishes the draft and marks it latest. Installs see it from now on.
+
+`--dry-run` checks and prints the plan without changing anything.
+`--prerelease` publishes a pre-release, which the updater never offers, and
+leaves `CHANGELOG.md` alone; use it to test the upload, then delete it with
+`gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
+
+### Updates in the app
+
+Updates are off by default and unavailable in a build without the token, in
+development, and in tests (a test can point the app at a local fake with
+`JUNO_E2E_UPDATE_SERVER`; see `apps/desktop/e2e/updates.spec.ts`). An enabled
+install checks 30 seconds after launch and every six hours. Closing the app
+does not install an update; only **Restart to update** does. Turning the setting
+off cancels a download and hides the update line. Errors retry quietly later.
+"What's new" fetches `CHANGELOG.md` only when asked and keeps it for an hour.
+
+The token is used only in main (`apps/desktop/src/main/releaseFeed.ts`). It is
+sent only to the API's origin: asset downloads redirect to a signed URL on
+another host, and that request carries no token. electron-updater's logger is
+off, update errors are swallowed without logging, and Juno has no crash
+reporter, so the token cannot reach a log or report. A `GH_TOKEN` in the
+environment is never used.
+
+### Signing and what happens without it
+
+macOS installs an update in place through Squirrel.Mac, which checks that the
+new app has the same code-signing identity as the running one. An app with only
+the local ad-hoc signature has no stable identity, so Squirrel.Mac rejects every
+update: electron-updater can download the ZIP, but the update can never be
+installed. Unsigned builds therefore do not try. When a newer version is
+published, Settings › About says "Juno {version} is available" with
+**Download the new version**, which downloads the DMG with the token into
+Downloads and opens it. The owner drags Juno to Applications, replacing the old
+copy; the data in `~/Library/Application Support/Juno` stays. macOS then asks
+once for the "Juno Safe Storage" keychain item, and Gatekeeper asks before the
+first launch of an app downloaded this way. A signed build falls back to the
+same line if its in-place download fails.
+
+Signed in-place updates need, all from the owner, all supplied privately:
+
+- a **Developer ID Application** certificate with its private key, exported as
+  a `.p12`, and the export password (`CSC_LINK`, `CSC_KEY_PASSWORD`);
+- the Apple Developer **Team ID** (`APPLE_TEAM_ID`);
+- for notarization, either the Apple ID with an **app-specific password**
+  (`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`) or an **App Store Connect API
+  key**: the `.p8` file, its key ID and issuer ID (`APPLE_API_KEY`,
+  `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`).
+
+The first signed release must still be installed by hand from its DMG, since
+the unsigned build before it cannot install it in place. From then on, signed
+updates install with **Restart to update**.
 
 The hardened runtime entitlements grant JIT for Electron's V8 and network client
 access. There is no application sandbox entitlement or disabled library

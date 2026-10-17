@@ -1,0 +1,1 @@
+- 10-17 18:55 · auto-update · Updates and the changelog come from the private repository triptu/juno-releases, read with a fine-grained read-only token written into the app at package time; unsigned builds offer the DMG instead of installing in place; versions are semver, published with `pnpm release:publish` through the owner's `gh` login (ADR 0016).
