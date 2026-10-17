@@ -21,14 +21,19 @@ export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
   currentRowAtom,
+  flushSidebar,
   focusedTopicAtom,
   nowAtom,
+  releaseSidebarTopic,
+  resumeSidebarHold,
   selectedTopicAtom,
   sidebarDotAtom,
   sidebarFilterAtom,
+  sidebarHoldAtom,
   sidebarListAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
+  setSidebarEngaged,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
