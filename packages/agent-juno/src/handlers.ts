@@ -87,6 +87,7 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.spend.answer': (answer) => host.spend?.answer(answer) ?? Effect.void,
         'host.spend.room': () => host.spend?.room ?? Effect.void,
         'host.ai.record': ({ call }) => host.ai?.record(call) ?? Effect.void,
+        'host.ai.fallback': ({ model }) => host.ai?.fallback?.(model) ?? Effect.void,
       })
     }),
   )

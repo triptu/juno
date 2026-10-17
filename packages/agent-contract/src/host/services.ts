@@ -164,6 +164,12 @@ export const HostAiCall = Schema.Struct({
 })
 export type HostAiCall = typeof HostAiCall.Type
 export const hostAiRecord = Rpc.make('host.ai.record', { payload: { call: HostAiCall }, success: Schema.Void })
-export const HostAiRpcs = RpcGroup.make(hostAiRecord)
+/**
+ * The fallback model the owner chose in Settings › Juno, as an OpenRouter
+ * slug, or '' for none. The agent sends it on every link and every change;
+ * the engine's calls ask it once when their model refuses or is unavailable.
+ */
+export const hostAiFallback = Rpc.make('host.ai.fallback', { payload: { model: Schema.String.check(Schema.isMaxLength(256)) }, success: Schema.Void })
+export const HostAiRpcs = RpcGroup.make(hostAiRecord, hostAiFallback)
 
 export const AgentHostRpcs = HostHelloRpcs.merge(HostReadRpcs, HostActionRpcs, HostPresenceRpcs, HostNotificationRpcs, HostScheduleRpcs, HostViewRpcs, HostSpendRpcs, HostAiRpcs)
