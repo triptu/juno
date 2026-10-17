@@ -127,7 +127,7 @@ test('after reading a hostile Slack message, a task becomes a card with a Becaus
 
   const page = await openPage(juno, 'Activity')
   // The run says, in plain words, what it read and that it asked before acting.
-  const run = page.locator('[data-activity-run="replied"]').filter({ has: page.locator('[data-activity-summary]', { hasText: /^Read .*#eng/ }) })
+  const run = page.locator('[data-activity-run="replied"]').filter({ has: juno.win.locator('[data-activity-summary]', { hasText: /^Read .*#eng/ }) })
   await expect(run).toHaveCount(1)
   await openRuns(page)
   await expect(run.locator('[data-activity-tainted]')).toBeVisible()

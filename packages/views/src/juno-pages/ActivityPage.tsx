@@ -130,13 +130,13 @@ const Run = memo(function Run({ run, open, last, onToggle, onCopyDetails }: RunP
   const detailId = `activity-run-${run.id}`
   const usage = [run.model, run.costUsd === undefined ? undefined : costLabel(run.costUsd)].filter((part) => part !== undefined).join(' · ')
   return (
-    <div role="listitem" data-activity-run={run.outcome} data-activity-open={open ? '' : undefined} {...stylex.props(styles.run, !last && styles.divider, !open && styles.closed)}>
+    <div role="listitem" data-expands-in-place="" data-activity-run={run.outcome} data-activity-open={open ? '' : undefined} {...stylex.props(styles.run, !last && styles.divider, !open && styles.closed)}>
       <button type="button" aria-expanded={open} aria-controls={detailId} onClick={() => onToggle(run.id)} {...stylex.props(styles.head, focusRing.inset)}>
         <span {...stylex.props(styles.caret, open && styles.caretOpen)}>
           <Icon icon={CaretRight} size={12} weight="bold" />
         </span>
         <span {...stylex.props(styles.lines)}>
-          <span {...stylex.props(styles.line)}>
+          <span {...stylex.props(styles.line, styles.lineTop)}>
             {started.kind === undefined ? null : (
               <Text variant="ui" tone="muted" sx={styles.fixed}>
                 {started.kind}
@@ -149,7 +149,7 @@ const Run = memo(function Run({ run, open, last, onToggle, onCopyDetails }: RunP
               {clockLabel(run.at)}
             </Text>
           </span>
-          <span {...stylex.props(styles.line)}>
+          <span {...stylex.props(styles.line, styles.lineBottom)}>
             <Text variant="meta" tone="muted" truncate dir="auto" sx={styles.grow} data-activity-summary="">
               {summary(run)}
             </Text>
@@ -169,8 +169,8 @@ const Run = memo(function Run({ run, open, last, onToggle, onCopyDetails }: RunP
 /** The page's own width (`Page`'s container) under which a closed row leaves out the model and cost. */
 const NARROW = '@container page (width < 520px)'
 
-/** A closed row's height before it is drawn: two lines and the row's padding. */
-const RUN_ESTIMATE = `auto ${sizes['--row-52']}`
+/** A closed row's height, exact, before it is drawn: the padding and the two lines, which have fixed heights. */
+const RUN_ESTIMATE = `auto calc(2 * ${spacing['--space-2']} + ${sizes['--control-20']} + ${spacing['--space-0-5']} + ${sizes['--control-18']})`
 
 const styles = stylex.create({
   days: {
@@ -254,6 +254,13 @@ const styles = stylex.create({
     alignItems: 'baseline',
     gap: spacing['--space-2'],
     minWidth: 0,
+  },
+  // Fixed line heights keep every closed row a whole number of pixels, the height its estimate says.
+  lineTop: {
+    height: sizes['--control-20'],
+  },
+  lineBottom: {
+    height: sizes['--control-18'],
   },
   grow: {
     flexGrow: 1,
