@@ -115,19 +115,23 @@ export function SettledRow({ topic, status, now, active, compact = false, copy =
           </Button>
         </span>
         <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
-          {handled ? (
-            <>
-              <span {...stylex.props(styles.done)} data-settled-done="">
-                {status === 'resolved' ? <Icon icon={Check} size={13} /> : null}
-                <Text variant="bodySmall" tone="subtle">
-                  {status === 'resolved' ? copy.acted : copy.kept}
-                </Text>
-              </span>
-              <Button variant="ghost" tone="muted" size="sm" tabIndex={active ? 0 : -1} onClick={() => onUndo(topic.id)} data-settled-undo="">
-                {settledCopy.undo}
-              </Button>
-            </>
-          ) : null}
+          {/* Both words are always laid out, one hidden, so the slot is as wide as the wider whatever happens. */}
+          <span {...stylex.props(styles.done)} data-settled-done={handled ? '' : undefined}>
+            <span {...stylex.props(status !== 'resolved' && styles.hidden)}>
+              <Icon icon={Check} size={13} />
+            </span>
+            <span {...stylex.props(styles.words)}>
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'resolved' && styles.hidden]}>
+                {copy.acted}
+              </Text>
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'kept' && styles.hidden]}>
+                {copy.kept}
+              </Text>
+            </span>
+          </span>
+          <Button variant="ghost" tone="muted" size="sm" tabIndex={handled && active ? 0 : -1} onClick={() => onUndo(topic.id)} data-settled-undo="">
+            {settledCopy.undo}
+          </Button>
         </span>
       </span>
     </li>
@@ -300,6 +304,13 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     paddingInline: spacing['--space-2'],
     color: colors['--foreground-subtle'],
+  },
+  words: {
+    display: 'grid',
+    justifyItems: 'end',
+  },
+  word: {
+    gridArea: '1 / 1',
   },
   hidden: {
     visibility: 'hidden',

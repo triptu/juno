@@ -63,7 +63,8 @@ export function ReviewSheet({ sheet, title, lead, aboutLabel, about, initialAbou
   const [open, setOpen] = useState(initialAbout)
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal padding="none" sx={styles.sheet} data-sheet={sheet}>
-      <div {...stylex.props(styles.head)}>
+      {/* The info button opens its panel in place and the sheet grows with it, on purpose. */}
+      <div data-expands-in-place="" {...stylex.props(styles.head)}>
         <span {...stylex.props(styles.titleLine)}>
           <Text variant="heading" as="h2" id={titleId} truncate>
             {title}
@@ -73,7 +74,7 @@ export function ReviewSheet({ sheet, title, lead, aboutLabel, about, initialAbou
         <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
           {lead}
         </Text>
-        <div id={aboutId}>{open ? about : null}</div>
+        <div id={aboutId} {...stylex.props(styles.about)}>{open ? about : null}</div>
       </div>
       <div {...stylex.props(styles.scroll, ringRoom.inline)}>{children}</div>
       <div {...stylex.props(styles.foot)}>
@@ -110,6 +111,9 @@ const styles = stylex.create({
   head: {
     display: 'flex',
     flexDirection: 'column',
+    // On a short window the info panel scrolls, so the rows and the buttons keep their place in the sheet.
+    minHeight: 0,
+    flexShrink: 1,
     gap: spacing['--space-1'],
     paddingTop: spacing['--space-5'],
     paddingInline: spacing['--space-5'],
@@ -124,6 +128,10 @@ const styles = stylex.create({
   },
   lead: {
     margin: 0,
+  },
+  about: {
+    minHeight: 0,
+    overflowY: 'auto',
   },
   explainer: {
     display: 'flex',
@@ -143,6 +151,7 @@ const styles = stylex.create({
   },
   scroll: {
     flexGrow: 1,
+    flexShrink: 2,
     minHeight: 0,
     overflowY: 'auto',
     paddingInline: spacing['--space-2'],

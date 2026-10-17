@@ -32,11 +32,11 @@ export interface MoveRow {
 /** The statement, so the plan test can check it uses an index. */
 export const movesStatements = {
   unseen: () => ({
-    sql: `SELECT m.channel, m.change, m.by, m.at, m.apps, m.people, m.you, m.sampled, m.reason FROM automated_moves m
-      WHERE m.seen_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM automated_channels a WHERE a.channel = m.channel AND a.by = 'you')
-        AND (m.change = 'in') = EXISTS (SELECT 1 FROM sidebar_view_channels vc WHERE vc.channel = m.channel AND vc.view_id = ?)
-      ORDER BY m.at DESC LIMIT ?`,
+    sql: `SELECT mv.channel, mv.change, mv.by, mv.at, mv.apps, mv.people, mv.you, mv.sampled, mv.reason FROM automated_moves mv
+      WHERE mv.seen_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM automated_channels a WHERE a.channel = mv.channel AND a.by = 'you')
+        AND (mv.change = 'in') = EXISTS (SELECT 1 FROM sidebar_view_channels vc WHERE vc.channel = mv.channel AND vc.view_id = ?)
+      ORDER BY mv.at DESC LIMIT ?`,
     params: [AUTOMATED_VIEW_ID, MOVES_SHOWN] as ReadonlyArray<string | number>,
   }),
 }
