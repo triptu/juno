@@ -2,7 +2,7 @@
  * What a Change card calls a connection call (SPEC 13.3, 17): the action by
  * what it does ("Search Littlebird", "Create page in Notion") and a short verb
  * for its button ("Search", "Create page"). Made from the tool's name, then
- * its description's first word. Display only: whether a call reads, and its
+ * its description's first words, never shown as the tool's own name. Display only: whether a call reads, and its
  * tier and rule, never come from here (the auto-review, `catalogue.ts`, `policy/`).
  */
 
@@ -41,14 +41,54 @@ const VERBS: Readonly<Record<string, Verb>> = {
 /** "notion-update-page", "createNote", "search_user_context" as lower-case words. */
 const words = (text: string) => text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
 
-/** The tool's verb, from its name, else its description's first word, and the rest of its name without the server's. */
-function parse(server: string, tool: string, description: string | undefined): { readonly found: Verb | undefined; readonly object: string } {
+/** A description's verb: "Create", "Creates", "Searches", "Executes". */
+function verbOf(word: string | undefined): Verb | undefined {
+  if (word === undefined) return undefined
+  return VERBS[word] ?? (word.endsWith('s') ? (VERBS[word.slice(0, -1)] ?? (word.endsWith('es') ? VERBS[word.slice(0, -2)] : undefined)) : undefined)
+}
+
+/** A word of a tool's name that is code, not English: "v2", "hql", "kv". */
+const codeLike = (word: string) => /\d/.test(word) || !/[aeiouy]/.test(word)
+
+/** Where a description's object ends: "a HogQL query | against the project". */
+const STOP = new Set(['in', 'into', 'on', 'from', 'for', 'against', 'to', 'with', 'by', 'using', 'and', 'or', 'that', 'which', 'as', 'at', 'of'])
+
+/** The object after a description's verb, in its own words: "Executes a HogQL query against…" → "a HogQL query". At most four words. */
+function describedObject(description: string): string {
+  const object: string[] = []
+  for (const raw of description.trim().split(/\s+/).slice(1)) {
+    const word = raw.replace(/[.,;:!?)]+$/, '')
+    if (word === '' || STOP.has(word.toLowerCase())) break
+    object.push(word)
+    if (word !== raw || object.length === 4) break
+  }
+  return object.length === 1 && /^(a|an|the)$/i.test(object[0]!) ? '' : object.join(' ')
+}
+
+interface Parsed {
+  readonly found: Verb | undefined
+  /** What the call acts on, lower-case words from the name ("page"), or the description's own words ("a HogQL query"). */
+  readonly object: string
+  /** `object` came from the description and carries its own article. */
+  readonly described: boolean
+}
+
+/**
+ * The tool's verb, from its name, else its description's first word, and
+ * what it acts on: the rest of its name without the server's, or, when that
+ * is empty or code ("exec", "q_v2"), the words after the description's verb.
+ */
+function parse(server: string, tool: string, description: string | undefined): Parsed {
   const own = new Set(words(server))
   const named = words(tool).filter((word) => !own.has(word))
   const at = named.findIndex((word) => VERBS[word] !== undefined)
-  const first = words(description ?? '')[0]
-  const found = at >= 0 ? VERBS[named[at]!] : first !== undefined ? VERBS[first] : undefined
-  return { found, object: (at >= 0 ? named.filter((_, i) => i !== at) : named).join(' ') }
+  const rest = at >= 0 ? named.filter((_, i) => i !== at) : named
+  const said = verbOf(words(description ?? '')[0])
+  const found = at >= 0 ? VERBS[named[at]!] : said
+  if (rest.length > 0 && !rest.some(codeLike)) return { found, object: rest.join(' '), described: false }
+  // The name says nothing a person reads: take the description's words when it starts with the same kind of verb.
+  const object = found !== undefined && said?.verb === found.verb && description !== undefined ? describedObject(description) : ''
+  return { found, object, described: object !== '' }
 }
 
 export interface ActionName {
@@ -58,14 +98,18 @@ export interface ActionName {
   readonly verb: string
 }
 
-/** The card's name for calling `tool` on `server` (the connection's label). */
+/**
+ * The card's name for calling `tool` on `server` (the connection's label).
+ * It never shows the tool's own name: a call whose name and description
+ * give no verb is "Check with PostHog", and a bare run "Run a command in PostHog".
+ */
 export function actionName(server: string, tool: string, description: string | undefined): ActionName {
-  const { found, object } = parse(server, tool, description)
-  if (found === undefined) return { title: `Run ${tool} in ${server}`, verb: 'Run' }
+  const { found, object, described } = parse(server, tool, description)
+  if (found === undefined) return { title: `Check with ${server}`, verb: 'Run' }
   // Searching a connection is searching what it holds; the rest name their object.
   if (found.server) return { title: `${found.verb} ${server}`, verb: found.verb }
-  const title = object !== '' ? `${found.verb} ${object} in ${server}` : found.verb === 'Run' ? `Run ${tool} in ${server}` : `${found.verb} in ${server}`
-  const short = !found.alone && object !== '' && object.split(' ').length <= 2
+  const title = object !== '' ? `${found.verb} ${object} in ${server}` : found.verb === 'Run' ? `Run a command in ${server}` : `${found.verb} in ${server}`
+  const short = !found.alone && !described && object !== '' && object.split(' ').length <= 2
   return { title, verb: short ? `${found.verb} ${object}` : found.verb }
 }
 
@@ -82,9 +126,9 @@ const counted = (object: string) => {
  * Littlebird" when the tool's name gives no clear verb.
  */
 export function actionStatus(server: string, tool: string, description: string | undefined): string {
-  const { found, object } = parse(server, tool, description)
+  const { found, object, described } = parse(server, tool, description)
   if (found?.ing === undefined) return `Checking with ${server}`
   if (found.server) return `${found.ing} ${server}`
   if (object === '') return found.verb === 'Run' ? `Running a command in ${server}` : `${found.ing} in ${server}`
-  return `${found.ing} ${counted(object)} ${found.from ? 'from' : 'in'} ${server}`
+  return `${found.ing} ${described ? object : counted(object)} ${found.from ? 'from' : 'in'} ${server}`
 }
