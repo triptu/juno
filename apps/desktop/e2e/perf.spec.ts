@@ -708,7 +708,8 @@ test.describe('large workspace', () => {
       const box = (await nav.boundingBox())!
       for (let i = 0; i < 12; i++) {
         const before = (await juno.measures('juno.all-topics-open')).length
-        await win.mouse.move(box.x + 40, box.y + box.height / 2)
+        // The title bar's icon button: its centre, as Home's open presses.
+        await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
         await press(win)
         await expect.poll(async () => (await juno.measures('juno.all-topics-open')).length).toBe(before + 1)
         await juno.tabs.close('All topics')
@@ -838,11 +839,32 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
       await juno.waitForSync()
       await juno.sidebar.row('#eng').open()
       const switcher = await juno.topic.openSwitcher()
+      // When the topic's live queries answered, after the press: an engine wait shows here, renderer work does not.
+      await running.win.evaluate(() => {
+        const w = window as unknown as { __answers: Array<{ route: unknown; at: number; queryMs: unknown }> }
+        w.__answers = []
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as Array<PerformanceEntry & { detail?: { devtools?: { properties?: ReadonlyArray<readonly [string, unknown]> } } }>) {
+            const properties = new Map(entry.detail?.devtools?.properties ?? [])
+            if (entry.name === 'juno.live-update') w.__answers.push({ route: properties.get('route'), at: entry.startTime, queryMs: properties.get('queryMs') })
+          }
+        }).observe({ type: 'measure' })
+      })
       // Not followed, so the boot never fetched its replies.
       const before = (await juno.measures('juno.topic-open')).length
-      await switcher.open('checkout.spec failed again')
-      await expect.poll(async () => (await juno.measures('juno.topic-open')).length).toBeGreaterThan(before)
+      const measureOpen = async () => {
+        await switcher.open('checkout.spec failed again')
+        await expect.poll(async () => (await juno.measures('juno.topic-open')).length).toBeGreaterThan(before)
+      }
+      if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(running.win, `topic-open-uncached-${i}`, measureOpen)
+      else await measureOpen()
       samples.push((await juno.measures('juno.topic-open')).at(-1)!)
+      const answers = await running.win.evaluate(() => {
+        const open = performance.getEntriesByName('juno.topic-open', 'measure').at(-1)!
+        const w = window as unknown as { __answers: Array<{ route: unknown; at: number; queryMs: unknown }> }
+        return w.__answers.filter((a) => a.at >= open.startTime - 50 && a.at <= open.startTime + open.duration).map((a) => `${String(a.route)} +${(a.at - open.startTime).toFixed(1)} (query ${String(a.queryMs)})`)
+      })
+      console.log(`topic open uncached ${i}: ${samples.at(-1)!.toFixed(1)} ms; answers ${answers.join(', ') || 'none in the measure'}`)
       await juno.topic.expectMessage('Can you add a wait')
     } finally {
       await running.close()
