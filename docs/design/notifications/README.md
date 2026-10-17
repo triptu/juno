@@ -29,7 +29,7 @@ Every row on the page is a control, and the page needs a scroll before the log s
 Two sets of hours, one paragraph of plain words, two short lists, and Juno's judgement for everything else.
 
 1. **Hours.** Two rows, each with days and a from and to time. Both default to weekdays, 9am to 7pm. They can differ: active until 8pm, notifications until 6pm.
-   - **Notifications.** Outside them your Mac does not notify, and once Slack's own schedule is verified (open items), Juno writes the same hours to Slack so your phone goes quiet too, with no extra switch. Held messages stay in Juno without a summary at hours start or next launch.
+   - **Notifications.** Outside them your Mac does not notify, and Juno writes the same hours to Slack's own schedule so your phone goes quiet too, behind a switch that is on by default (SPEC 14, "Slack's notification schedule"). Held messages stay in Juno without a summary at hours start or next launch.
    - **Active in Slack.** Inside them Slack shows you as active; outside, away.
 2. **Inside notification hours, Juno decides** each message: notify now, or hold. Held means no notification; the message is in the sidebar as always. There is no threshold. The decision model's cutoff is calibrated by us and checked by the gate eval, not set by the owner.
 3. **What matters to you.** A short text the owner writes ("The launch and hiring. Anything from my reports that needs a decision today."). Juno's gate reads it with every message. It replaces keyword rules and most person and channel rules. The owner can edit it on the page or tell Juno in chat.
@@ -59,7 +59,7 @@ What Juno decides: whether a message needs you now, given what matters to you, w
 2. **Hours.** One group card, two rows. Each row: a label (14/500) with a 12px muted sub, seven day toggles (28px round, on is `--secondary-default`), then the from and to selects.
    - "Notifications", sub "Outside these hours, messages stay in Juno without notifying you."
    - "Active in Slack", sub "Outside these hours you show as away."
-   Below a hairline, one 12px muted line: "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it." Once Slack's own schedule is verified and written, the Notifications sub adds "Slack on your phone pauses too."
+   Below a hairline, one 12px muted line: "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it." Slack's own schedule has its own card below Hours, "Slack on your phone" (inventory 13).
 3. **What matters to you.** Sub: "Juno reads this for every message. You can also just tell Juno." A plain text field, max-width 620, at least three lines, saved on blur.
 4. **People and channels.** One group card, two rows: "Every message" (sub "Even outside notification hours") and "Never" (sub "Still in Juno, no alerts"). Each row holds removable tags (channel icon or avatar, name, `x`). Hint below: "Right-click a channel or person to change how it notifies you." With both lists empty, the card is one muted row: "Every channel and person is set to When it matters."
 5. **Today.** One line: "4 messages interrupted you. Juno held 23." and a ghost button Show why. Show why expands the interrupted messages only (time, place, sender and text, and the reason under them in 12px muted). Held messages are not listed; the per-message menu answers for them.
@@ -107,16 +107,16 @@ Changing notification settings from the chat is a Local action (SPEC 13.9): no c
 
 Not changed: no Quint spec, since presence and notification settings are owner-set values, not a sync protocol.
 
-The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The page, Preferences' Appearance group, the Notify me menus, the why popover, Set yourself away or active, main's OS notifier and the dock badge are built (`NotificationsPage`, `PreferencesPage`, `WhyPopover` and `AccountMenu` in `@juno/views`, `engine/src/notifications/handlers.ts`, `apps/desktop/src/main/notifier.ts`); inventory 2.1, 13, 14 and 15 say what differs. Writing the hours into Slack's schedule waits for the owner's approval. The remaining work is in `docs/backlog.md`.
+The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The page, Preferences' Appearance group, the Notify me menus, the why popover, Set yourself away or active, main's OS notifier and the dock badge are built (`NotificationsPage`, `PreferencesPage`, `WhyPopover` and `AccountMenu` in `@juno/views`, `engine/src/notifications/handlers.ts`, `apps/desktop/src/main/notifier.ts`); inventory 2.1, 13, 14 and 15 say what differs. Writing the hours into Slack's schedule is built (`engine/src/slackSchedule.ts`, 10-17). The remaining work is in `docs/backlog.md`.
 
 ## Open items
 
-- **Slack's own notification schedule.** The research shows a `dnd` object in `client.userBoot`, `dnd_updated` events, and `users.prefs.set`, but no `dnd.*` call site and no schedule pref keys. Slack's public API has `dnd.setSnooze` and `dnd.endSnooze`, and the schedule appears to be prefs (`dnd_enabled`, `dnd_start_hour`, `dnd_end_hour`, and possibly per-day keys). Unverified. Find the pref or endpoint read-only (`users.prefs.get`, the boot `dnd` object, the official client's bundle), never by writing. Until then the page does not say "on your phone".
-- **Every message on the phone.** Slack's schedule may not let #incidents through at night the way Juno's Every message does (Slack has VIPs for people, not channels). If so, the page says Every message reaches only the Mac outside notification hours.
+- **Slack's own notification schedule.** Resolved: it is the `dnd_*` user prefs (`docs/research/slack-data-access.md` section 7), and Juno writes them (SPEC 14).
+- **Every message on the phone.** Resolved: Slack lets only VIP people through a pause, so the switch's description says Every message on a channel reaches only the Mac outside notification hours.
 
 ## Owner decisions (10-14)
 
 1. Apply the proposal.
 2. Automatic summaries are removed (owner 10-16 reverses 10-14); requested digests remain Juno schedules.
 3. Presence and notifications have separate hours, two rows in one section, the same hours by default.
-4. Once verified read-only, notification hours also set Slack's own notification schedule, with no extra switch.
+4. Once verified read-only, notification hours also set Slack's own notification schedule, with no extra switch. Revised 10-17: a switch, on by default, so Restore can hand the schedule back to Slack.
