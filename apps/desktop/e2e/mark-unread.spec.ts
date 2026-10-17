@@ -10,7 +10,7 @@ test.describe.configure({ timeout: 90_000 })
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
 const RINA = 'Rina finished the onsite'
 const POSTGRES = 'Draft plan is in the doc'
-const ALERTS_MAIN = '#alerts-prod'
+const ENG_MAIN = '#eng'
 
 // Longer than every read timer and observer in the topic view.
 const STAY_MS = 3_000
@@ -64,9 +64,9 @@ test('a thread marked unread while open stays unread until you leave it', async 
 test('a Main marked unread from the palette stays unread until you send in it', async ({ juno, slack, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const alerts = juno.sidebar.row(ALERTS_MAIN)
-  await alerts.open()
-  await alerts.expectRead()
+  const eng = juno.sidebar.row(ENG_MAIN)
+  await eng.open()
+  await eng.expectRead()
   await expect.poll(() => lastMark(slack.fake.calls)?.ts).toBeDefined()
   const read = lastMark(slack.fake.calls)?.ts
 
@@ -74,17 +74,17 @@ test('a Main marked unread from the palette stays unread until you send in it', 
   await palette.open()
   await palette.type('Mark as unread')
   await palette.choose('Mark as unread')
-  await alerts.expectUnread(1)
+  await eng.expectUnread(1)
   // The pointer moves back to the message before the latest.
   await expect.poll(() => lastMark(slack.fake.calls)?.ts).not.toBe(read)
   const unread = lastMark(slack.fake.calls)?.ts ?? ''
   expect(unread < (read ?? '')).toBe(true)
   await win.waitForTimeout(STAY_MS)
-  await alerts.expectUnread(1)
+  await eng.expectUnread(1)
   expect(lastMark(slack.fake.calls)?.ts).toBe(unread)
 
   // Your own message marks it read.
-  await juno.topic.send('Looking into the alerts now')
-  await alerts.expectRead()
+  await juno.topic.send('Looking into the migration now')
+  await eng.expectRead()
   await expect.poll(() => (lastMark(slack.fake.calls)?.ts ?? '') > unread).toBe(true)
 })
