@@ -17,16 +17,17 @@ import {
   pendingFile,
   rtl,
   sending,
-  tallLast,
   thread,
   threadDividerBefore,
   uploadFailed,
   uploading,
   withDownloads,
+  window as messageWindow,
+  p,
   withFiles,
 } from './fixtures/messages'
 import { albumOf, mediaAndPdf, mixedMedia, singleImage, singleVideo } from './fixtures/media'
-import { NOW } from './fixtures/topics'
+import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { sevenQuickReactions } from './fixtures/quickReactions'
 import { InlineEdit } from './InlineEdit'
@@ -91,6 +92,13 @@ function ScrolledUnderBand() {
   }, [])
   return <MessageList {...base} items={thread} main={false} actions={noopActions} scrollRef={scrollRef} />
 }
+
+/** A long report last, taller than its frame, as a feedback channel's newest message often is. */
+const tallLast = messageWindow([
+  { ago: 40, from: people.maya, text: 'Posting the weekly report below.' },
+  { ago: 39, from: people.leo, text: 'Thanks.' },
+  { ago: 30, from: people.jonas, blocks: Array.from({ length: 40 }, (_, index) => p(`Point ${index + 1} of the report: what changed this week and what we try next.`)) },
+])
 
 /**
  * The list at its end, as a topic opens, with a last message taller than the
