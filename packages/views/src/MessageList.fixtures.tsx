@@ -232,7 +232,8 @@ export default defineFixtures(
       'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
-      'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-thread-link]' }),
+      // The tabbable row's link: the shot tabs back and forth, and only that row's link is in the Tab order.
+      'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-message-row][tabindex="0"] [data-thread-link]' }),
     },
     // A 336px column, a topic in the 720px window: the toolbar straddles the
     // row's top edge as in a wide one, and drops reactions that do not fit.
