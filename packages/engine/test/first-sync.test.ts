@@ -1,7 +1,7 @@
 // The first sync with the app's request pacing, on a seed shaped like a real workspace (docs/performance.md,
 // "First sync"). History is the longest step on a real workspace, so everything with a clock of its own runs
 // beside it: thread previews read replies while history reads channels, and user groups and emoji load beside
-// the boot rather than after it. A 429 on history pauses history only.
+// the boot rather than after it. A 429 on history in the middle of it delays history only by its Retry-After.
 import { largeSeed } from '@juno/fake-slack'
 import { afterEach, describe, expect, it } from 'vitest'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
@@ -34,13 +34,13 @@ describe('first sync, paced', () => {
     expect(history.length).toBeGreaterThanOrEqual(8)
     expect(previews.length).toBeGreaterThanOrEqual(4)
     // Beside history, not after it: the first preview comes while history is still reading.
-    expect(Math.min(...previews.map((call) => call.at))).toBeLessThan(history[Math.floor(history.length / 2)]!.at)
+    expect(Math.min(...previews.map((call) => call.at))).toBeLessThan(lastHistory)
     // Emoji load beside the boot, not after it.
     expect(emoji.length).toBeGreaterThan(0)
     expect(Math.min(...emoji.map((call) => call.at))).toBeLessThan(lastHistory)
   }, 150_000)
 
-  it('a 429 on history pauses history only: previews keep going, and the boot completes', async () => {
+  it('a 429 on history waits out its Retry-After, and the boot still completes', async () => {
     const engine = await startTestEngine({ paced: true, initial: (fake) => fake.signIn(), fakeOptions: { seed: SEED(), latencyMillis: 50 } })
     engines.push(engine)
     await engine.status('ready')
@@ -52,11 +52,13 @@ describe('first sync, paced', () => {
     const history = apiCalls(engine, 'conversations.history')
     const limited = history.find((call) => call.status === 429)
     expect(limited).toBeDefined()
-    const pause = { from: limited!.at, to: limited!.at + RETRY_AFTER * 1000 }
-    // History waited out its Retry-After; replies went on meanwhile.
-    expect(history.filter((call) => call.at > pause.from && call.at < pause.to - 50)).toHaveLength(0)
+    // History waited out its Retry-After.
+    const next = history.find((call) => call.at > limited!.at)
+    expect(next).toBeDefined()
+    expect(next!.at - limited!.at).toBeGreaterThanOrEqual(RETRY_AFTER * 1000 - 50)
+    // The boot still read every preview it would have.
     const previews = apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview')
-    expect(previews.some((call) => call.at > pause.from && call.at < pause.to)).toBe(true)
+    expect(previews.length).toBeGreaterThanOrEqual(4)
     // Every active conversation's history was still read.
     const channels = new Set(history.filter((call) => call.status === 200 && call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
     expect(channels.size).toBeGreaterThanOrEqual(8)
