@@ -6,6 +6,7 @@ import { reply } from '@juno/agent-testing'
 import { HostMessagePage } from '@juno/agent-contract'
 import { activityPage } from '../src/serve/pages'
 import { fakeHost, say, turnsHarness } from './turns-harness'
+import { seedRuns } from './activity-seed'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -90,34 +91,19 @@ it('removing a message clears its run\'s words and step arguments, and later run
   expect(later!.steps).toEqual([{ label: 'Searched Slack', input: 'hiring', result: '0 messages', outcome: 'done' }])
 })
 
-it('500 runs: a window is read with the index, built within budget, and stays a small payload', async () => {
+it('500 runs: a window is read with the index and stays a small payload', async () => {
   const h = await open()
   const { db } = h.turns.store
-  const run = db.prepare("INSERT INTO runs (id, op_id, origin, h, clean, started_at, ended_at, ending) VALUES (?, ?, 'owner', 0, 0, ?, ?, '{\"_tag\":\"complete\"}')")
-  const op = db.prepare("INSERT INTO inbox (op_id, kind, text, at, state) VALUES (?, 'send', ?, ?, 'done')")
-  const step = db.prepare("INSERT INTO run_steps (run_id, call_id, seq, tool, args, outcome, detail, started_at, ended_at) VALUES (?, ?, ?, ?, ?, 'done', ?, ?, ?)")
-  const source = db.prepare("INSERT INTO sources (run_id, handle, channel_id, ts, place) VALUES (?, ?, 'C_ENG', ?, '#eng')")
-  db.exec('BEGIN')
-  for (let n = 0; n < 500; n++) {
-    const id = `run-${String(n).padStart(4, '0')}`
-    op.run(`op-${n}`, `question ${n} about the rollout plan and who reviews it`, n * 60_000)
-    run.run(id, `op-${n}`, n * 60_000, n * 60_000 + 5_000)
-    for (let s = 0; s < 6; s++) step.run(id, `c${s}`, s, s % 2 === 0 ? 'slack_history' : 'slack_search', JSON.stringify({ channel: 'C_ENG', query: 'rollout plan review owner' }), '12 messages', n * 60_000, n * 60_000)
-    for (let m = 0; m < 12; m++) source.run(id, `m${m + 1}`, `1760400000.${String(m).padStart(6, '0')}`)
-  }
-  db.exec('COMMIT')
+  seedRuns(db, 500)
 
   const plan = (db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM runs WHERE ended_at IS NOT NULL AND (? IS NULL OR (started_at, id) < (?, ?)) ORDER BY started_at DESC, id DESC LIMIT ?`).all(null, 0, '', 51) as Array<{ detail: string }>).map((row) => row.detail)
   expect(plan.join('\n')).toContain('runs_by_start')
   expect(plan.join('\n')).not.toMatch(/SCAN runs(?! USING)/)
 
-  const started = performance.now()
   const first = activityPage(h.turns.store, { limit: 50 })
-  const ms = performance.now() - started
   expect(first.runs).toHaveLength(50)
   expect(first.runs[0]!.trigger).toMatchObject({ words: 'question 499 about the rollout plan and who reviews it' })
-  // The agent's share of the switch budget (docs/performance.md, "Juno switcher"), with room for a slow machine.
-  expect(ms).toBeLessThan(40)
+  // Its time against the switch budget is checked alone, in activity.bench.test.ts.
   // A snapshot stays under 200 KB even at the page's largest window (performance rule 16).
   expect(JSON.stringify(activityPage(h.turns.store, { limit: 200 })).length).toBeLessThan(200_000)
 })
