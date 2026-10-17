@@ -238,6 +238,9 @@ export const chat = stylex.defineVars({
   },
   // How far a reaction badge sits out over its bubble's top corner.
   '--reaction-offset': '10px',
+  // How far a bubble row may paint outside its box: the badge's offset and
+  // its shadow. A plain length: Chromium ignores calc() in overflow-clip-margin.
+  '--reaction-clip-margin': '16px',
   // The Juno panel's material (`--panel-surface`). Beside a topic it sits
   // on the page colour alone, so it is drawn opaque and costs nothing to
   // composite. Over the topic (a narrow window) it is the same fill, let

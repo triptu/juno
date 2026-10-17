@@ -39,6 +39,8 @@ export const rowStyles = stylex.create({
     contain: 'content',
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-bubble-estimate']}`,
+    // Paint containment clips at the row's edge; a reaction badge sits out over the bubble's top corner.
+    overflowClipMargin: chat['--reaction-clip-margin'],
   },
   // The last screenful: laid out in full, so the bottom set before the first paint is where the list stays.
   eager: {
