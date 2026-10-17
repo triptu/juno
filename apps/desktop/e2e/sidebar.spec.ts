@@ -198,12 +198,13 @@ test('during the first sync the list says Juno is getting the topics, then shows
   fake.holdNext({ method: 'search.modules.messages', before: true })
   fake.release({ method: 'conversations.history' })
   await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
-  // The card goes when the sync ends; nothing above the list moves.
+  // The card goes when the sync ends; nothing above the list moves. The list's own rows still take their places and
+  // bot channels leave for Automated as the last pages land (checked above), so only moves inside it are skipped.
   await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
     fake.release({ method: 'search.modules.messages' })
     await juno.waitForSync()
     await sidebar.row(POSTGRES).expectVisible()
-  })
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   await sidebar.expectNoSyncStatus()
   expect(await header.boundingBox()).toEqual(headerBox)
 })
