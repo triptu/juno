@@ -34,6 +34,13 @@ export interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, 'styl
    * with days and times).
    */
   readonly wrap?: boolean
+  /**
+   * The trailing controls show only while the pointer is on the row or
+   * focus is inside it, by opacity alone, so nothing moves. They stay in
+   * place and in the accessibility tree, and show at all times on a
+   * pointer that cannot hover.
+   */
+  readonly revealTrailing?: boolean
   readonly children?: ReactNode
 }
 
@@ -50,6 +57,7 @@ export function ListRow({
   divider = true,
   padding = 'settings',
   wrap = false,
+  revealTrailing = false,
   children,
   ...rest
 }: ListRowProps) {
@@ -74,11 +82,12 @@ export function ListRow({
         padding === 'navigation' && styles.navigation,
         padding === 'navigation' && selected && styles.navigationSelected,
         wrap && styles.wrap,
+        revealTrailing && styles.reveal,
       )}
     >
       {leading !== undefined ? <span {...stylex.props(styles.leading, padding === 'navigation' && styles.navigationLeading)}>{leading}</span> : null}
       <span {...stylex.props(styles.body, padding === 'navigation' && styles.navigationBody, wrap && styles.wrapBody)}>{children}</span>
-      {trailing !== undefined ? <span {...stylex.props(styles.trailing, wrap && styles.wrapTrailing)}>{trailing}</span> : null}
+      {trailing !== undefined ? <span {...stylex.props(styles.trailing, wrap && styles.wrapTrailing, revealTrailing && styles.revealTrailing)}>{trailing}</span> : null}
     </div>
   )
 }
@@ -151,6 +160,18 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     flexShrink: 0,
     marginInlineStart: 'auto',
+  },
+  // Read by the trailing slot: shown while the pointer or keyboard is on the row.
+  reveal: {
+    '--list-row-trailing-opacity': {
+      default: '0',
+      ':hover': { default: null, [HOVER]: '1' },
+      ':focus-within': '1',
+      '@media (hover: none)': '1',
+    },
+  },
+  revealTrailing: {
+    opacity: 'var(--list-row-trailing-opacity)',
   },
   wrap: {
     flexWrap: 'wrap',

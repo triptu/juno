@@ -99,6 +99,34 @@ function Activation() {
   )
 }
 
+/** Two notes whose Edit and Delete show only on hover or focus. */
+function RevealRows() {
+  return (
+    <Surface kind="group">
+      {['Leads the platform team.', 'Prefers short updates in threads.'].map((note, index) => (
+        <ListRow
+          key={note}
+          revealTrailing
+          divider={index === 0}
+          data-reveal-row=""
+          trailing={
+            <>
+              <Button variant="ghost" size="xs" tone="subtle">
+                Edit
+              </Button>
+              <Button variant="ghost" size="xs" tone="subtle">
+                Delete
+              </Button>
+            </>
+          }
+        >
+          <Text variant="body">{note}</Text>
+        </ListRow>
+      ))}
+    </Surface>
+  )
+}
+
 export default defineFixtures(
   ListRow,
   {
@@ -177,6 +205,11 @@ export default defineFixtures(
     Table: {
       'table-row': scene(() => <TableRows />),
       'table-row-hover': scene(() => <TableRows />, { hover: '[role="button"]:nth-of-type(1)' }),
+    },
+    'Revealed controls': {
+      resting: scene(() => <RevealRows />),
+      hovered: scene(() => <RevealRows />, { hover: '[data-reveal-row]' }),
+      focused: scene(() => <RevealRows />, { focus: '[data-reveal-row] button' }),
     },
     Activation: {
       activation: scene(() => <Activation />),
