@@ -695,12 +695,22 @@ export class Juno {
   }
 
   /**
-   * Makes the next native context menu pick `id` without showing it. With
-   * `hold`, the menu stays open until `releaseMenu`, so a test can change
-   * things under it.
+   * Makes the next native context menu pick `id` without showing it, or pick
+   * nothing with null. With `hold`, the menu stays open until `releaseMenu`,
+   * so a test can change things under it.
    */
-  chooseNextMenuItem(id: string, options: { readonly hold?: boolean } = {}): Promise<void> {
+  chooseNextMenuItem(id: string | null, options: { readonly hold?: boolean } = {}): Promise<void> {
     return chooseNextMenuItem(this.win, id, options)
+  }
+
+  /** What the last native menu showed, once it took the item `chooseNextMenuItem` set. */
+  lastMenu(): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+    return lastMenu(this.win)
+  }
+
+  /** How many native context menus were asked for since launch, Juno's and the text menu. */
+  menusAsked(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { asked: number } } }).junoTest.contextMenu.asked)
   }
 
   /** Picks the item of the menu `chooseNextMenuItem` held open. */
@@ -1070,7 +1080,7 @@ async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonl
   })
 }
 
-async function chooseNextMenuItem(win: Page, id: string, options: { readonly hold?: boolean } = {}): Promise<void> {
+async function chooseNextMenuItem(win: Page, id: string | null, options: { readonly hold?: boolean } = {}): Promise<void> {
   const app = appOf.get(win)
   if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
   await app.evaluate(
@@ -1472,7 +1482,7 @@ export class TopicPane {
    * Right-clicks the message that starts with `text` and picks `item` in its
    * menu; on its sender's name with `onSender`. Returns the menu's labels.
    */
-  async chooseInMessageMenu(text: string, item: string, options: { readonly onSender?: boolean } = {}): Promise<{ readonly labels: string[] }> {
+  async chooseInMessageMenu(text: string, item: string | null, options: { readonly onSender?: boolean } = {}): Promise<{ readonly labels: string[] }> {
     await chooseNextMenuItem(this.win, item)
     const message = this.message(text)
     await message.scrollIntoViewIfNeeded()

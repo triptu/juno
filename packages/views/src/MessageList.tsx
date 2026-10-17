@@ -6,6 +6,7 @@ import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueNam
 import type { MediaViewing } from './MediaViewer'
 import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
 import type { LinkInfo } from './MessageLink'
+import { inField } from './fieldMenu'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -138,11 +139,11 @@ interface Menus {
 /**
  * One handler for every row: an @person or #channel chip under the pointer
  * gets its own menu, otherwise the row under the pointer, or the focused row
- * for the context-menu key. A field keeps its own menu.
+ * for the context-menu key. A field keeps the text menu (`inField`).
  */
 function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
-  if (!(target instanceof Element) || target.closest('input, textarea') !== null) return
+  if (!(target instanceof Element) || inField(event)) return
   const person = onPersonMenu === undefined ? null : target.closest<HTMLElement>('[data-person]')
   if (person !== null && onPersonMenu !== undefined) {
     event.preventDefault()

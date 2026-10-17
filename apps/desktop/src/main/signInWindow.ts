@@ -18,6 +18,7 @@
 import { BrowserWindow, session as electronSession, shell, type Session } from 'electron'
 import type { SessionSecrets, SignInFailureKind } from '@juno/contract'
 import { pickTeam } from '@juno/slack/import'
+import { wireTextMenu } from './textMenu'
 
 export const SLACK_PARTITION = 'persist:slack'
 
@@ -92,6 +93,7 @@ export function openSignInWindow(options: SignInWindowOptions = {}): Promise<Sig
       if (!window.isDestroyed()) window.close()
     }
 
+    wireTextMenu(window)
     contents.on('will-navigate', guard)
     contents.on('will-redirect', guard)
     contents.setWindowOpenHandler(({ url }) => {

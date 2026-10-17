@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { CardItem } from '@juno/agent-contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
+import { inField } from '../fieldMenu'
 import { renderCard } from './cards'
 import type { ChatActions } from './commands'
 import { ReactionBadge } from './ReactionBadge'
@@ -25,7 +26,17 @@ export const CardRow = memo(function CardRow({ item, now, actions }: CardRowProp
   const menu = actions.onContextMenu
   return (
     <div data-chat-card-row={card.id} data-unread={item.unread || undefined} {...stylex.props(rowStyles.row, styles.row)}>
-      <div onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'card', id: card.id }, event)} {...stylex.props(rowStyles.anchor, styles.card)}>
+      <div
+        onContextMenu={
+          menu === undefined
+            ? undefined
+            : (event) => {
+                // A draft's field keeps the text menu.
+                if (!inField(event)) menu({ kind: 'card', id: card.id }, event)
+              }
+        }
+        {...stylex.props(rowStyles.anchor, styles.card)}
+      >
         {renderCard(card, actions, now)}
         <ReactionBadge reactions={item.reactions} corner="end" />
       </div>

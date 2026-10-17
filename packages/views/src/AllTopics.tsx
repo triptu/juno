@@ -26,6 +26,7 @@ import {
   type ChipVariant,
   type PhosphorIcon,
 } from '@juno/ui'
+import { inField } from './fieldMenu'
 import { channelIconFor } from './look'
 import { RenameField } from './RenameField'
 
@@ -117,6 +118,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
       onPointerEnter={onPrefetch === undefined ? undefined : (event: PointerEvent<HTMLDivElement>) => pointerMoved(event) && onPrefetch(row.id)}
       onFocus={onFocus}
       onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
+        if (inField(event)) return
         event.preventDefault()
         onContextMenu(row.id)
       }}

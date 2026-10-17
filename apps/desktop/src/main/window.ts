@@ -4,6 +4,7 @@ import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
 import { startupMark } from './startupMarks'
+import { wireTextMenu } from './textMenu'
 import { refitWebPanel } from './webPanel'
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
@@ -55,6 +56,8 @@ export function createWindow(options: BrowserWindowConstructorOptions = {}): Bro
     if (url.startsWith('https://')) void shell.openExternal(url)
     return { action: 'deny' }
   })
+  // Cut, Copy, Paste and spelling for fields and selections no Juno menu takes.
+  wireTextMenu(window)
 
   // ready-to-show fires after the first paint; the shell paints with no data.
   window.once('ready-to-show', () => window.show())

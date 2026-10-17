@@ -13,12 +13,15 @@ export const contextMenuForTests: {
   /** Keeps the next menu open, as if the user were still reading it, until `release` is called. */
   hold: boolean
   release: (() => void) | undefined
+  /** Every menu asked for, answered by the test or shown, so a test can tell that a right-click opened one menu and not two. */
+  asked: number
 } = {
   next: undefined,
   lastLabels: [],
   lastAt: null,
   hold: false,
   release: undefined,
+  asked: 0,
 }
 
 /** How a test reads a menu item: "-" for a separator, "(label)" when disabled, "label ✓" when checked, "label · sublabel" with a second line; submenu items start with "> ". */
@@ -31,10 +34,11 @@ function testLabel(item: ContextMenuLeaf): string {
 
 /**
  * A native menu at the pointer, or at `at` (CSS pixels from the window's top
- * left). The answer is the chosen item's id, or null. The app page's menus and
- * the web panel's both come through here, so one test seam covers both.
+ * left). The answer is the chosen item's id, or null. The app page's menus, the
+ * text menu and the web panel's all come through here, so one test seam covers them.
  */
 export function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, window: BrowserWindow | undefined, at?: ContextMenuAt): Promise<string | null> {
+  contextMenuForTests.asked += 1
   return new Promise<string | null>((resolve) => {
     if (contextMenuForTests.next !== undefined) {
       const next = contextMenuForTests.next
