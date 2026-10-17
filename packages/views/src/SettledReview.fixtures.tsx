@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { HomeTopic } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { Button, defineFixtures, Icon, IconButton, scene, Text } from '@juno/ui'
@@ -12,7 +12,9 @@ import { FixtureWindow, OverHome as SheetOverHome } from './fixtures/sheetFrame'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
 import { HomeScene } from './HomeScene'
-import { ReviewExplainer, ReviewList, type ReviewStatus } from './Review'
+import { ReviewExplainer } from './Review'
+import { ReviewList } from './ReviewList'
+import type { ReviewStatus } from './reviewModel'
 import { settledCopy } from './settled'
 import { settledAbout, settledEntries, SettledReview, settledVerbs, type SettledReviewProps } from './SettledReview'
 
@@ -96,14 +98,14 @@ export default defineFixtures(
   {
     // Direction A, built: a sheet over Home.
     'A · Sheet': {
-      'over-home': scene(() => <OverHome><Live /></OverHome>),
-      about: scene(() => <OverHome><Live initialAbout /></OverHome>),
+      'over-home': scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live /></OverHome>),
+      about: scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live initialAbout /></OverHome>),
       // Two acted on: each row stays where it was and says what happened, with Undo.
-      acted: scene(() => <OverHome><Live initial={acted} /></OverHome>),
-      'focus-row': scene(() => <OverHome><Live initialActive={settledTopics[1]!.id} /></OverHome>, { focus: `[data-review-row="${settledTopics[1]!.id}"] a` }),
-      many: scene(() => <OverHome><Live topics={manySettled} /></OverHome>),
-      'all-done': scene(() => <OverHome><Live initial={new Map(settledTopics.map((topic) => [topic.id, 'done' as const]))} /></OverHome>),
-      'minimum-window': scene(() => <OverHome><Live /></OverHome>, { width: 336, height: 436, padded: false }),
+      acted: scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live initial={acted} /></OverHome>),
+      'focus-row': scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live initialActive={settledTopics[1]!.id} /></OverHome>, { focus: `[data-review-row="${settledTopics[1]!.id}"] a` }),
+      many: scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live topics={manySettled} /></OverHome>),
+      'all-done': scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live initial={new Map(settledTopics.map((topic) => [topic.id, 'done' as const]))} /></OverHome>),
+      'minimum-window': scene(() => <OverHome items={[homeItems.waiting, homeItems.followUp, tidyUpItem]}><Live /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Direction B, explored: the row opens in place on Home.
     'B · In place': {

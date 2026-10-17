@@ -1,7 +1,15 @@
 /** What a Home row says and offers, apart from how it looks (`Home`). */
+import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
+import { ListChecks } from '@phosphor-icons/react/dist/icons/ListChecks'
+import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
+import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import type { AutomatedPlace, HomeItem, HomeItemKind } from '@juno/contract'
+import type { PhosphorIcon } from '@juno/ui'
 import { placesLine } from './settled'
 import { relativeTime } from './time'
+
+/** The cards drawn with an icon tile instead of their topic's art. */
+export const TILE_ICONS: Partial<Record<HomeItemKind, PhosphorIcon>> = { tidyUp: Broom, automated: Robot, automatedMoves: Robot, doneFollowUps: ListChecks, oldDrafts: NotePencil }
 
 /** The cards whose row opens a review sheet. */
 export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' || kind === 'doneFollowUps' || kind === 'oldDrafts' || kind === 'automatedMoves'

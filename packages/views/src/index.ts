@@ -84,7 +84,7 @@ export { AutomatedReview } from './AutomatedReview'
 export { movedToast } from './automatedMoves'
 export { type SettledStatus } from './settled'
 export { DoneFollowUpsReview, OldDraftsReview } from './ReviewCards'
-export { ReviewSheet, type ReviewEntry, type ReviewStatus, type ReviewVerbs, type ReviewAbout } from './Review'
+export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'

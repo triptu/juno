@@ -1,15 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
-import { ListChecks } from '@phosphor-icons/react/dist/icons/ListChecks'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
-import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { metaOf, opensReview, rowButtons } from './homeRows'
+import { metaOf, opensReview, rowButtons, TILE_ICONS } from './homeRows'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -112,9 +108,6 @@ interface HomeRowProps {
   readonly onItemMenu: HomeProps['onItemMenu']
 }
 
-/** The cards drawn with an icon tile instead of their topic's art. */
-const TILE_ICONS: Partial<Record<HomeItem['kind'], typeof Broom>> = { tidyUp: Broom, automated: Robot, automatedMoves: Robot, doneFollowUps: ListChecks, oldDrafts: NotePencil }
-
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
@@ -130,7 +123,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
     <>
       {tileIcon !== undefined || topic === undefined ? (
         <span {...stylex.props(styles.iconTile)}>
-          <Icon icon={tileIcon ?? Broom} size={18} />
+          <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
         </span>
       ) : (
         <TopicArt topicId={topic.id} recipe={topic.art} size={40} />

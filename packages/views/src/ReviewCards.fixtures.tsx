@@ -1,13 +1,12 @@
-import * as stylex from '@stylexjs/stylex'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { HomeTopic } from '@juno/contract'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene } from '@juno/ui'
 import { homeItems } from './fixtures/home'
 import { doneFollowUpsItem, doneFollowUpTopics, oldDraftsItem, oldDraftTopics } from './fixtures/reviews'
+import { OverHome } from './fixtures/OverHome'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
-import type { ReviewStatus } from './Review'
+import type { ReviewStatus } from './reviewModel'
 import { DoneFollowUpsReview, OldDraftsReview, type CardReviewProps } from './ReviewCards'
 
 const noop = () => {}
@@ -33,15 +32,7 @@ function Live({ card, topics, initial = new Map(), ...rest }: Partial<CardReview
   return card === 'followUps' ? <DoneFollowUpsReview {...props} /> : <OldDraftsReview {...props} />
 }
 
-/** Home under the sheet's layer, as the window shows it. */
-function OverHome({ children }: { readonly children: ReactNode }) {
-  return (
-    <div {...stylex.props(styles.window)}>
-      <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, doneFollowUpsItem, oldDraftsItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
-      <div {...stylex.props(styles.layer)}>{children}</div>
-    </div>
-  )
-}
+const cards = [homeItems.waiting, doneFollowUpsItem, oldDraftsItem]
 
 const acted = (topics: ReadonlyArray<HomeTopic>): ReadonlyMap<string, ReviewStatus> =>
   new Map([
@@ -50,7 +41,7 @@ const acted = (topics: ReadonlyArray<HomeTopic>): ReadonlyMap<string, ReviewStat
   ])
 
 function CardsOnHome() {
-  return <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, doneFollowUpsItem, oldDraftsItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
+  return <Home scene="evening" title="Evening, Tushar." items={cards} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
 }
 
 export default defineFixtures(
@@ -58,18 +49,18 @@ export default defineFixtures(
   {
     // Card 4: a promise, why it looks done, and the matching message quoted.
     'Follow-ups that look done': {
-      'over-home': scene(() => <OverHome><Live card="followUps" /></OverHome>),
-      about: scene(() => <OverHome><Live card="followUps" initialAbout /></OverHome>),
-      acted: scene(() => <OverHome><Live card="followUps" initial={acted(doneFollowUpTopics)} /></OverHome>),
-      one: scene(() => <OverHome><Live card="followUps" topics={doneFollowUpTopics.slice(0, 1)} /></OverHome>),
-      'minimum-window': scene(() => <OverHome><Live card="followUps" /></OverHome>, { width: 336, height: 436, padded: false }),
+      'over-home': scene(() => <OverHome items={cards}><Live card="followUps" /></OverHome>),
+      about: scene(() => <OverHome items={cards}><Live card="followUps" initialAbout /></OverHome>),
+      acted: scene(() => <OverHome items={cards}><Live card="followUps" initial={acted(doneFollowUpTopics)} /></OverHome>),
+      one: scene(() => <OverHome items={cards}><Live card="followUps" topics={doneFollowUpTopics.slice(0, 1)} /></OverHome>),
+      'minimum-window': scene(() => <OverHome items={cards}><Live card="followUps" /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Card 5: the topic, the draft's age and how far the topic moved, and its first line.
     'Old drafts': {
-      'over-home': scene(() => <OverHome><Live card="drafts" /></OverHome>),
-      about: scene(() => <OverHome><Live card="drafts" initialAbout /></OverHome>),
-      acted: scene(() => <OverHome><Live card="drafts" initial={acted(oldDraftTopics)} /></OverHome>),
-      'minimum-window': scene(() => <OverHome><Live card="drafts" /></OverHome>, { width: 336, height: 436, padded: false }),
+      'over-home': scene(() => <OverHome items={cards}><Live card="drafts" /></OverHome>),
+      about: scene(() => <OverHome items={cards}><Live card="drafts" initialAbout /></OverHome>),
+      acted: scene(() => <OverHome items={cards}><Live card="drafts" initial={acted(oldDraftTopics)} /></OverHome>),
+      'minimum-window': scene(() => <OverHome items={cards}><Live card="drafts" /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Home's cards: the whole row opens the review; the meta line names the places.
     Cards: {
@@ -79,26 +70,3 @@ export default defineFixtures(
   },
   { width: 1056, height: 720, padded: false },
 )
-
-const styles = stylex.create({
-  // The frame's size: its first child fills it.
-  window: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-    height: '720px', // tokens-allow: the fixture frame's height
-    overflow: 'hidden',
-    backgroundColor: colors['--background'],
-  },
-  // The `SheetLayer` look, inside the frame instead of the whole window.
-  layer: {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['--space-6'],
-    backgroundColor: colors['--overlay'],
-  },
-})
