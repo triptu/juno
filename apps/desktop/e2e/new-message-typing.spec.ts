@@ -13,7 +13,7 @@ const DRAFT = 'Half a thought'
 
 /** ⌘N, then "maya", Enter and a first word, with no wait between them. */
 async function newMessageAndType(juno: Juno): Promise<void> {
-  await juno.tabs.menu('new-message')
+  await juno.tabs.shortcut('new-message')
   await juno.win.keyboard.type('maya')
   await juno.win.keyboard.press('Enter')
   await juno.win.keyboard.type('Hi')

@@ -1928,6 +1928,21 @@ export class TabStrip {
     await clickAppMenu(this.app, id)
   }
 
+  /**
+   * ⌘N or ⌘T as a user presses it: the key's keydown reaches the page, then
+   * main runs the menu item. Key presses here never reach Electron's menu
+   * accelerators on Linux, so the keydown is sent to the page and the item
+   * clicked after it. `menu` alone skips the keydown, so keys typed at once
+   * could reach the page before the command, which a real ⌘N never allows.
+   */
+  async shortcut(id: 'new-message' | 'new-tab'): Promise<void> {
+    await this.win.evaluate((key) => {
+      const target = document.activeElement ?? document.body
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, code: `Key${key.toUpperCase()}`, metaKey: true, bubbles: true, cancelable: true }))
+    }, id === 'new-message' ? 'n' : 't')
+    await clickAppMenu(this.app, id)
+  }
+
   /** Right-clicks a tab and picks `item` in the tab menu. Returns the menu's labels, "-" for a separator and "(label)" for a disabled item. */
   async contextMenu(title: string, item: 'pin' | 'close' | 'close-others' | 'close-right' | 'close-all' | 'copy-link' | 'open-in-slack'): Promise<string[]> {
     await chooseNextMenuItem(this.win, item)
