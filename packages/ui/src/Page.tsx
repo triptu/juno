@@ -77,9 +77,16 @@ export function Section({ heading, sub, children }: SectionProps) {
   )
 }
 
+// A page this narrow (Settings beside its rail at the minimum window is 296) keeps 16px on each side, not 32.
+const NARROW = '@container page (width < 400px)'
+
 const styles = stylex.create({
+  // Stretched, so its width never comes from its content: the column's padding narrows by a container query on it.
   scroll: {
     flexGrow: 1,
+    alignSelf: 'stretch',
+    containerType: 'inline-size',
+    containerName: 'page',
     minHeight: 0,
     overflowY: 'auto',
     overscrollBehavior: 'contain',
@@ -98,7 +105,7 @@ const styles = stylex.create({
   },
   page: {
     paddingBlock: `${spacing['--space-10']} ${spacing['--space-18']}`,
-    paddingInline: spacing['--space-8'],
+    paddingInline: { default: spacing['--space-8'], [NARROW]: spacing['--space-4'] },
   },
   header: {
     display: 'flex',

@@ -17,6 +17,8 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('Home', 'items/minimum-window'), false],
   [route('CommandPalette', 'states/minimum-window'), false],
   [route('SettingsPage', 'states/notifications-minimum-window'), false],
+  [route('SettingsPage', 'states/general-minimum-window'), false],
+  [route('SettingsPage', 'states/appearance-minimum-window'), false],
   [route('JunoChatList', 'chat/minimum-window'), false],
   [route('JunoHeader', 'banner/recovery-minimum-window'), false],
   [route('JunoHeader', 'banner/paused-minimum-window'), false],
@@ -74,5 +76,31 @@ test.describe('the minimum window', () => {
     const frame = await frameOf(page, at).boundingBox()
     const palette = await frameOf(page, at).getByRole('dialog').boundingBox()
     expect(palette!.y + palette!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
+  })
+})
+
+test.describe('the minimum window with the sidebar shown', () => {
+  test('Settings at 336 narrows its list to a rail of named icons, and the page keeps its controls whole', async ({ page }) => {
+    for (const id of ['states/general-minimum-window', 'states/appearance-minimum-window']) {
+      const at = route('SettingsPage', id)
+      await openState(page, at)
+      const frame = frameOf(page, at)
+      const nav = frame.locator('[data-settings-nav="rail"]')
+      await expect(nav).toBeVisible()
+      expect((await nav.boundingBox())!.width).toBeLessThanOrEqual(41)
+      const items = nav.getByRole('button')
+      await expect(items).toHaveCount(9)
+      await expect(nav.getByRole('button', { name: 'Backup & This Mac' })).toHaveAttribute('data-tooltip', 'Backup & This Mac')
+      // Every card's content stays inside the card: a row's control goes under its label rather than past the edge.
+      const cut = await frame.locator('[data-settings-section] section, [data-settings-section] header').evaluateAll((nodes) =>
+        nodes.flatMap((node) => {
+          const box = node.getBoundingClientRect()
+          return [...node.querySelectorAll('button, [role="radiogroup"], select, input')]
+            .filter((control) => control.getBoundingClientRect().right > box.right + 0.5)
+            .map((control) => control.textContent ?? control.tagName)
+        }),
+      )
+      expect(cut).toEqual([])
+    }
   })
 })

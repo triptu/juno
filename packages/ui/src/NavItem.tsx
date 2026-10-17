@@ -4,6 +4,7 @@ import { accent, colors, radii, sizes, spacing, weights } from '@juno/tokens/tok
 import { Icon, type IconWeight, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
+import { tooltip } from './Tooltip'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 
@@ -27,6 +28,12 @@ export interface NavItemProps {
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
   readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
+  /**
+   * The icon alone in a 32px square, for a list that has narrowed to a
+   * rail. A string label becomes the accessible name and the tooltip;
+   * `trailing` and `kbd` are left out.
+   */
+  readonly compact?: boolean
 }
 
 /**
@@ -35,20 +42,27 @@ export interface NavItemProps {
  * tint, accent text, 600 and a filled icon. Navigates on mouse down like
  * rows and tabs, and never animates.
  */
-export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu }: NavItemProps) {
+export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu, compact = false }: NavItemProps) {
+  const name = compact && typeof children === 'string' ? children : undefined
   return (
     <div
       role="button"
       tabIndex={0}
       aria-current={active ? 'page' : undefined}
+      aria-label={name}
+      {...(name === undefined ? {} : tooltip(name))}
       onContextMenu={onContextMenu}
       {...activateHandlers<HTMLDivElement>(onSelect)}
-      {...stylex.props(interactive.focusRing, typeVariants.ui, styles.item, active && styles.active)}
+      {...stylex.props(interactive.focusRing, typeVariants.ui, styles.item, compact && styles.compact, active && styles.active)}
     >
       {iconWeight === undefined ? <Icon icon={icon} size={16} active={active} /> : <Icon icon={icon} size={16} weight={iconWeight} />}
-      <span {...stylex.props(styles.label)}>{children}</span>
-      {trailing}
-      {kbd ? <Kbd>{kbd}</Kbd> : null}
+      {compact ? null : (
+        <>
+          <span {...stylex.props(styles.label)}>{children}</span>
+          {trailing}
+          {kbd ? <Kbd>{kbd}</Kbd> : null}
+        </>
+      )}
     </div>
   )
 }
@@ -72,6 +86,11 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
+  },
+  compact: {
+    justifyContent: 'center',
+    width: sizes['--control-32'],
+    paddingInline: 0,
   },
   active: {
     color: accent['--hl-text'],
