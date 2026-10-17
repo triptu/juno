@@ -13,7 +13,8 @@
  *   the server never saw live. It never changes, so neither the order nor
  *   the read state moves when the run ends and the archive catches up.
  * - Bubbles group by sender within two minutes and the same origin; a day
- *   separator, an ending or a group label ends a group.
+ *   separator, an ending or a group label ends a group. The "New" divider
+ *   does not, so a read mark never changes a group.
  * - A Juno bubble is unread when it is newer than the read mark.
  *
  * - Cards (WP15) sit at the time Juno proposed them, under their run; a
@@ -609,8 +610,9 @@ function layout(entries: ReadonlyArray<Entry>, source: ChatSource, grouped: Cach
         items.push({ _tag: 'day', at: start })
       }
     }
+    // The divider does not end a group: the renderer shows only the one there when the chat opened, and ends the
+    // group at it then (`endGroupsAtDividers`). A group ended at every read mark opens a gap in the middle of an answer.
     if (!divided && entry.by === 'juno' && entry.item.unread) {
-      close()
       divided = true
       items.push({ _tag: 'newDivider', count: unread })
     }
