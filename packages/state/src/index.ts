@@ -183,7 +183,7 @@ export {
 export type { PortLike } from './transport'
 export { canRedraw, redrawTopic, type RedrawProblem } from './art'
 export { aiActivityAtom } from './aiActivity'
-export { messageLink, parseSlackLink, slackLink, threadRootTs, type LinkWorkspace, type SlackLinkMatch, type SlackLinkTarget } from './links'
+export { messageLink, parseSlackLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
   dismissToast,
