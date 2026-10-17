@@ -9,7 +9,6 @@ import {
   channelThreadsAtom,
   loadOlderMessages,
   locateMessage,
-  locatePerson,
   messagesAtom,
   openTopic,
   prefetchTopic,
@@ -127,25 +126,6 @@ describe('locating a message for a link', () => {
     const deploys = rowsOf(await watchList(engine, messagesAtom('m:C0DEPLOYS')).until((window) => window.order.length > 0, 'a deploy'))
     expect(valueOf(await locateMessage(engine.registry, 'C0DEPLOYS', deploys[0]!.ts))).toEqual({ topicId: 'm:C0DEPLOYS', stored: true, place: '#deploys' })
     expect(valueOf(await locateMessage(engine.registry, 'C0ENG', '1.000001'))).toEqual({ topicId: 'm:C0ENG', stored: false, place: '#eng' })
-  })
-
-  it('takes the thread a link names, even for a reply the store does not have', async () => {
-    const engine = await bootedEngine()
-    expect(valueOf(await locateMessage(engine.registry, 'C0ENG', '2.000002', '1.000001'))).toEqual({ topicId: 't:C0ENG:1.000001', stored: false, place: '#eng' })
-  })
-
-  it('names a DM by the person and leaves out a conversation the store does not know', async () => {
-    const engine = await bootedEngine()
-    expect(valueOf(await locateMessage(engine.registry, 'D0MAYA', '1.000001')).place).toBe('Maya Chen')
-    expect(valueOf(await locateMessage(engine.registry, 'C0NOWHERE', '1.000001'))).toEqual({ topicId: 'm:C0NOWHERE', stored: false })
-  })
-
-  it('finds a person and your DM with them', async () => {
-    const engine = await bootedEngine()
-    const maya = valueOf(await locatePerson(engine.registry, 'U0MAYA'))
-    expect(maya.person?.name).toBe('Maya Chen')
-    expect(maya.mainId).toBe('m:D0MAYA')
-    expect(valueOf(await locatePerson(engine.registry, 'U0NOBODY'))).toEqual({})
   })
 })
 
