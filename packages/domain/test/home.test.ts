@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asksUser, isQuestion, rankHomeItems, type HomeCandidate } from '../src/home'
+import { asksUser, isQuestion, rankHomeItems, settledEvidence, type HomeCandidate } from '../src/home'
 
 const item = (kind: HomeCandidate<string>['kind'], ...topicIds: string[]): HomeCandidate<string> => ({ kind, topicIds, value: `${kind}:${topicIds.join(',')}` })
 
@@ -40,5 +40,44 @@ describe('Home items', () => {
   it("asks Automated's question after a follow-up and before Tidy up", () => {
     const ranked = rankHomeItems([item('tidyUp', 'x', 'y'), item('automated', 'm'), item('followUp', 'c'), item('waiting', 'd')])
     expect(ranked.map((row) => row.value)).toEqual(['waiting:d', 'followUp:c', 'automated:m'])
+  })
+})
+
+describe('Why a topic looks settled', () => {
+  const me = 'U0ME'
+  const msg = (user_id: string | null, text: string) => ({ user_id, text })
+
+  it('names the closing message: a thank-you, done, or an OK', () => {
+    expect(settledEvidence([msg('U0MAYA', 'Thanks, that fixed it')], me, false)).toEqual({ kind: 'thanks', by: 'U0MAYA' })
+    expect(settledEvidence([msg('U0DEV', 'Merged to main')], me, false)).toEqual({ kind: 'done', by: 'U0DEV' })
+    expect(settledEvidence([msg('U0PRIYA', 'sounds good'), msg(me, 'Ship it Friday then')], me, false)).toEqual({ kind: 'agreed', by: 'U0PRIYA' })
+    expect(settledEvidence([msg('U0PRIYA', ':+1:')], me, false)).toEqual({ kind: 'agreed', by: 'U0PRIYA' })
+    expect(settledEvidence([msg(me, 'thanks all')], me, false)).toEqual({ kind: 'thanks' })
+  })
+
+  it('does not count a denied or asked closing word', () => {
+    expect(settledEvidence([msg('U0DEV', 'not merged yet')], me, false)).toEqual({ kind: 'quiet', by: 'U0DEV' })
+    expect(settledEvidence([msg('U0DEV', 'is it deployed?')], me, false)).toEqual({ kind: 'quiet', by: 'U0DEV' })
+    expect(settledEvidence([msg('U0DEV', 'ok so the next thing we need to figure out is how the billing export handles refunds')], me, false)).toEqual({ kind: 'quiet', by: 'U0DEV' })
+  })
+
+  it('says when the user wrote last, after someone else', () => {
+    expect(settledEvidence([msg(me, 'The p95 is back under 300ms'), msg('U0SAM', 'Search is slow again')], me, false)).toEqual({ kind: 'afterYou' })
+    expect(settledEvidence([msg(me, 'Note to self: rotate keys')], me, false)).toEqual({ kind: 'quiet' })
+  })
+
+  it('never proposes a topic with a question waiting on the user', () => {
+    expect(settledEvidence([msg('U0SAM', 'thanks'), msg('U0SAM', `<@${me}> can you sign off?`)], me, false)).toBeUndefined()
+    expect(settledEvidence([msg('U0SAM', 'can you sign off?')], me, true)).toBeUndefined()
+    expect(settledEvidence([msg('U0SAM', 'thanks'), msg(me, 'Signed off'), msg('U0SAM', `<@${me}> can you sign off?`)], me, false)).toEqual({ kind: 'thanks', by: 'U0SAM' })
+  })
+
+  it('never proposes a topic whose last message mentions the user', () => {
+    expect(settledEvidence([msg('U0SAM', `done, <@${me}> fyi`)], me, false)).toBeUndefined()
+  })
+
+  it('reads only messages people wrote', () => {
+    expect(settledEvidence([msg(null, 'joined the channel')], me, false)).toBeUndefined()
+    expect(settledEvidence([msg(null, 'Deploy finished'), msg('U0DEV', 'Shipped')], me, false)).toEqual({ kind: 'done', by: 'U0DEV' })
   })
 })

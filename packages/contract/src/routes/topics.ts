@@ -179,6 +179,7 @@ export const OverlayPatch = Schema.Struct({
   resolvedActivityTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
   reopenedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   pinnedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  settledDismissedTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
 })
 export type OverlayPatch = typeof OverlayPatch.Type
 
@@ -275,6 +276,12 @@ const action = <Tag extends string, P extends Schema.Struct.Fields>(tag: Tag, pa
  */
 export const topicsResolve = action('topics.resolve', topicPayload)
 
+/**
+ * Keep open on Tidy up's review: Juno stops suggesting the topic until it
+ * has new activity. Nothing changes in Slack. The undo suggests it again.
+ */
+export const topicsKeepOpen = action('topics.keepOpen', topicPayload)
+
 /** Reopens a resolved topic. The undo resolves it again as it was. */
 export const topicsReopen = action('topics.reopen', topicPayload)
 
@@ -319,6 +326,7 @@ export const TopicsRoutes = RpcGroup.make(
   topicsSubscribe,
   topicsUnsubscribe,
   topicsResolve,
+  topicsKeepOpen,
   topicsReopen,
   topicsPin,
   topicsUnpin,

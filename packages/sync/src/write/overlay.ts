@@ -37,6 +37,7 @@ export interface OverlayPatch {
   readonly resolvedActivityTs?: string | null
   readonly reopenedAt?: string | null
   readonly pinnedAt?: string | null
+  readonly settledDismissedTs?: string | null
 }
 
 const overlayColumns = {
@@ -45,6 +46,7 @@ const overlayColumns = {
   resolvedActivityTs: 'resolved_activity_ts',
   reopenedAt: 'reopened_at',
   pinnedAt: 'pinned_at',
+  settledDismissedTs: 'settled_dismissed_ts',
 } as const satisfies Record<keyof OverlayPatch, string>
 
 type OverlayKey = keyof typeof overlayColumns
@@ -55,7 +57,7 @@ export const readOverlay = (topicId: string): Effect.Effect<StoredOverlay, SqlEr
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql<Record<(typeof overlayColumns)[OverlayKey], string | null>>`
-      SELECT manual_title, resolved_at, resolved_activity_ts, reopened_at, pinned_at FROM topic_overlay WHERE topic_id = ${topicId}`
+      SELECT manual_title, resolved_at, resolved_activity_ts, reopened_at, pinned_at, settled_dismissed_ts FROM topic_overlay WHERE topic_id = ${topicId}`
     const row = rows[0]
     return {
       manualTitle: row?.manual_title ?? null,
@@ -63,6 +65,7 @@ export const readOverlay = (topicId: string): Effect.Effect<StoredOverlay, SqlEr
       resolvedActivityTs: row?.resolved_activity_ts ?? null,
       reopenedAt: row?.reopened_at ?? null,
       pinnedAt: row?.pinned_at ?? null,
+      settledDismissedTs: row?.settled_dismissed_ts ?? null,
     }
   })
 
@@ -84,10 +87,11 @@ export const patchOverlay = (topicId: string, patch: OverlayPatch): Effect.Effec
     if (Object.keys(undo).length === 0) return undefined
     const sql = yield* StoreWriter
     yield* sql`
-      INSERT INTO topic_overlay (topic_id, manual_title, resolved_at, resolved_activity_ts, reopened_at, pinned_at)
-      VALUES (${topicId}, ${after.manualTitle}, ${after.resolvedAt}, ${after.resolvedActivityTs}, ${after.reopenedAt}, ${after.pinnedAt})
+      INSERT INTO topic_overlay (topic_id, manual_title, resolved_at, resolved_activity_ts, reopened_at, pinned_at, settled_dismissed_ts)
+      VALUES (${topicId}, ${after.manualTitle}, ${after.resolvedAt}, ${after.resolvedActivityTs}, ${after.reopenedAt}, ${after.pinnedAt}, ${after.settledDismissedTs})
       ON CONFLICT (topic_id) DO UPDATE SET manual_title = excluded.manual_title, resolved_at = excluded.resolved_at,
-        resolved_activity_ts = excluded.resolved_activity_ts, reopened_at = excluded.reopened_at, pinned_at = excluded.pinned_at`
+        resolved_activity_ts = excluded.resolved_activity_ts, reopened_at = excluded.reopened_at, pinned_at = excluded.pinned_at,
+        settled_dismissed_ts = excluded.settled_dismissed_ts`
     yield* invalidate(syncKeys.overlay(topicId))
     return undo
   })
