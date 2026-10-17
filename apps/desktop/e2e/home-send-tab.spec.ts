@@ -77,3 +77,24 @@ test('a reply in a thread from Home opens the thread behind Home, once', async (
   await topic.expectMessage('Dry run notes are in the staging channel')
   await topic.expectMessage('Rollback steps are in the doc too')
 })
+
+test('a send from Home goes when another tab is chosen before its checks answer', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs } = juno
+  await tabs.menu('new-tab')
+  await tabs.expectActiveAt('Home', 1)
+  await write.pickConversation('maya', 'Maya')
+  await write.write('Sent as the tab was left')
+
+  // The first Home tab is chosen in the same task as Enter, before the wrong-place check can answer.
+  const first = await tabs.nth('Home', 0).elementHandle()
+  await first!.evaluate((tab: HTMLElement) => {
+    addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') tab.click()
+    }, { once: true })
+  })
+  await write.send()
+  await tabs.expectActiveAt('Home', 0)
+  await expect.poll(() => fake.messages('D0MAYA').filter((m) => m.text === 'Sent as the tab was left').length).toBe(1)
+})
