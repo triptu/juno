@@ -224,7 +224,7 @@ Every Main (a channel's, a DM's or a group DM's) has two lines and no line 3:
 | Reopened | Reopened tag; row is back after a resolve |
 | Thread set to Never (shown because it mentions you) | opacity .6, `bell-slash` icon |
 | Resolved (pinned only) | green `circle-check` 14 before the title, no Resolve on hover |
-| Privacy mode (SPEC section 5) | Preview blurred (`data-sensitive`, `--privacy-blur`). The title too while `titleSensitive` is set: it is the root's first words, or an AI title from before titles left out sensitive details. Same box, so nothing moves when it turns sharp; a cut-off blurred title shows no tooltip |
+| Privacy mode (SPEC section 5) | Preview blurred (`data-sensitive`, `--privacy-blur`). The title too while `titleSensitive` is set: it is the root's first words (no AI title yet). AI titles and renames stay sharp. Same box, so nothing moves when it turns sharp; a cut-off blurred title shows no tooltip |
 | Renaming | Title replaced by input: 24px, margin −2 0, padding 0 6, 1px `--border-strongest`, radius 6, bg surface, 14/600; text preselected; Enter saves, Esc cancels, blur saves. Row click disabled |
 
 ### 3.3 Density (Settings › Appearance)
