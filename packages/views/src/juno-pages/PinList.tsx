@@ -92,10 +92,10 @@ function Row({
       divider={!last}
       trailing={
         <span {...stylex.props(cell.controls)}>
-          <Button variant="ghost" size="xs" tone="subtle" onClick={() => onEditStart(pin.id)}>
+          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${docs.edit} ${pin.text}`} onClick={() => onEditStart(pin.id)}>
             {docs.edit}
           </Button>
-          <Button variant="ghost" size="xs" tone="subtle" onClick={() => onRemove(pin.id)}>
+          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${docs.delete} ${pin.text}`} onClick={() => onRemove(pin.id)}>
             {docs.delete}
           </Button>
         </span>

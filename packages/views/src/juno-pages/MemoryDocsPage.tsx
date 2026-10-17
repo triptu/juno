@@ -102,10 +102,10 @@ function EntryRow({ entry, now, onEditStart, onDelete }: { readonly entry: Memor
       data-memory-source={entry.source._tag}
       trailing={
         <span {...stylex.props(cell.controls)}>
-          <Button variant="ghost" size="xs" tone="subtle" onClick={() => onEditStart(entry.id)}>
+          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${copy.edit} ${entry.text}`} onClick={() => onEditStart(entry.id)}>
             {copy.edit}
           </Button>
-          <Button variant="ghost" size="xs" tone="subtle" onClick={() => onDelete(entry.id)}>
+          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${copy.delete} ${entry.text}`} onClick={() => onDelete(entry.id)}>
             {copy.delete}
           </Button>
         </span>
