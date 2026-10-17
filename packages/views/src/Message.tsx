@@ -102,14 +102,17 @@ const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 const STRADDLE = `(${density['--density-message-padding-block']} - ${spacing['--space-0-5']})`
 
 /**
- * Where the toolbar goes, decided once as the row is pointed at or focused
- * (never per frame). It rises above the row's top edge unless that would put
- * it under the header band at the list's top, where the band's fade washes
- * it out and the list clips it; there it flips below the row, straddling the
- * bottom edge the same way. The answer is a custom property on the row, so
+ * Where the toolbar goes, decided as the row is pointed at or focused, again
+ * as the pointer moves over it, and when the list stops scrolling (never per
+ * frame): a row can scroll or grow under a still pointer, and an answer kept
+ * from before would leave the toolbar under the band. It rises above the
+ * row's top edge unless that would put it under the header band at the
+ * list's top, where the band's fade washes it out and the list clips it;
+ * there it flips below the row, straddling the bottom edge the same way. The
+ * answer is a custom property on the row, written only when it changes, so
  * nothing re-renders.
  */
-function placeToolbar(row: HTMLElement): void {
+export function placeToolbar(row: HTMLElement): void {
   const scroller = row.closest('[data-scroll-area]')
   if (scroller === null) return
   const box = row.getBoundingClientRect()
@@ -118,8 +121,10 @@ function placeToolbar(row: HTMLElement): void {
   const toolbarHeight = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
   const rowStyle = getComputedStyle(row)
   const straddle = (Number.parseFloat(rowStyle.paddingTop) || 0) - (Number.parseFloat(rowStyle.getPropertyValue('--space-0-5')) || 0)
-  if (box.top + straddle - toolbarHeight >= listTop) row.style.removeProperty('--row-toolbar-top')
-  else row.style.setProperty('--row-toolbar-top', `${Math.round(box.height - straddle)}px`)
+  const top = box.top + straddle - toolbarHeight >= listTop ? '' : `${Math.round(box.height - straddle)}px`
+  if (row.style.getPropertyValue('--row-toolbar-top') === top) return
+  if (top === '') row.style.removeProperty('--row-toolbar-top')
+  else row.style.setProperty('--row-toolbar-top', top)
 }
 
 const dim = stylex.keyframes({
@@ -207,6 +212,7 @@ export const Message = memo(function Message({
       data-popover-active={active ? '' : undefined}
       onFocus={focus}
       onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
+      onPointerMove={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
@@ -529,6 +535,11 @@ const styles = stylex.create({
     display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
+    // Under reduced motion global.css gives every element a 0.01ms
+    // transition, and the flip is often written just after the slot shows:
+    // the slot would then be drawn above the row, under the band, until the
+    // next frame. The slot never animates, so it has no transition.
+    transitionProperty: 'none',
     right: spacing['--space-2'],
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',

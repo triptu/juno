@@ -4,7 +4,7 @@ import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
-import { Message, type MessageActions, type MessageProps } from './Message'
+import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
@@ -103,6 +103,8 @@ export interface MessageListProps {
 const ROW = '[data-message-row]'
 /** A Main message that has a thread; `data-thread` is the thread's topic id. */
 const THREAD_ROW = '[data-thread]'
+/** Rows whose toolbar can show: pointed at, or with focus in them. */
+const SHOWS_TOOLBAR = `${ROW}:is(:hover, :focus-within)`
 
 /** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
 function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
@@ -158,7 +160,8 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannel
 /**
  * The messages of one topic, oldest first, in the centred 800px column
  * (inventory 6). Rows stay in flow with `content-visibility: auto`, so the
- * browser's scroll anchoring handles prepends and nothing runs on scroll.
+ * browser's scroll anchoring handles prepends and nothing runs per scroll
+ * frame; when a scroll ends, the row under the pointer places its toolbar.
  * The list owns no scroll logic: the container reads and sets the position
  * through `scrollRef` and `anchorRef`. One row is tabbable (the last, until
  * a row takes focus); arrow keys move between rows.
@@ -207,7 +210,16 @@ export function MessageList({
   const newCount = dividerIndex < 0 ? 0 : items.length - dividerIndex
 
   return (
-    <ScrollArea scrollbar="hover" evenInset underHeader={underHeader} ref={scrollRef} data-scroll="" sx={styles.scroller}>
+    <ScrollArea
+      scrollbar="hover"
+      evenInset
+      underHeader={underHeader}
+      ref={scrollRef}
+      data-scroll=""
+      // A row that scrolled under a still pointer, or under the band with focus, places its toolbar again once the list stops.
+      onScrollEnd={actions === undefined ? undefined : (event) => event.currentTarget.querySelectorAll<HTMLElement>(SHOWS_TOOLBAR).forEach(placeToolbar)}
+      sx={styles.scroller}
+    >
       <div
         role="list"
         aria-label="Messages"
