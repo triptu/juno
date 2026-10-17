@@ -154,7 +154,9 @@ export function openMessageLink(url: string, event: ActivateEvent): void {
     openInSlack({ teamId: match.teamId, channelId: match.target.channel })
     return
   }
-  openWebLink(url, event)
+  // Another workspace's web link needs its own Slack sign-in, which the browser has.
+  if (match !== undefined) openExternal(url)
+  else openWebLink(url, event)
 }
 
 /** For `MessageBody`: which links open inside Juno, and where they go. One object for the app's life (performance 5.1). */
