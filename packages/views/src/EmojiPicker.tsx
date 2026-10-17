@@ -16,6 +16,8 @@ export interface EmojiPickerProps {
   readonly onPick: (name: string) => void
   /** Esc. */
   readonly onClose: () => void
+  /** Names already chosen (Settings' quick reactions): drawn as chosen and not picked again. */
+  readonly selected?: ReadonlySet<string>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
 }
@@ -41,6 +43,7 @@ const COLUMNS = 9
 const RESULT_CHUNK = COLUMNS * 8
 
 const EMPTY: ReadonlyArray<never> = []
+const NONE: ReadonlySet<string> = new Set()
 
 /**
  * The full emoji picker (SPEC 7): a search field, then every emoji by
@@ -55,7 +58,7 @@ const EMPTY: ReadonlyArray<never> = []
  * clearing the search is instant. One click handler on the scroller reads
  * the button's `data-emoji`; the arrows move focus through the grid.
  */
-export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected = NONE, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const search = normalize(useDeferredValue(query))
   const browseRef = useRef<HTMLDivElement>(null)
@@ -107,7 +110,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, onPick, o
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const first = typed === '' ? undefined : all.find((item) => item.keys.includes(typed))
+      const first = typed === '' ? undefined : all.find((item) => item.keys.includes(typed) && !selected.has(item.name))
       if (first === undefined) return
       event.preventDefault()
       onPick(first.name)
@@ -132,7 +135,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, onPick, o
   const onGridClick = (event: MouseEvent<HTMLElement>) => {
     const button = (event.target as Element).closest<HTMLElement>('button[data-emoji]')
     const name = button?.dataset['emoji']
-    if (name !== undefined) onPick(name)
+    if (name !== undefined && !selected.has(name)) onPick(name)
   }
 
   return (
@@ -156,13 +159,13 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, onPick, o
       <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown}>
         <div ref={browseRef} hidden={results !== undefined}>
           {browse.map((section, index) => (
-            <EmojiSection key={section.key} section={section} tabStop={results === undefined && index === 0} />
+            <EmojiSection key={section.key} section={section} selected={selected} tabStop={results === undefined && index === 0} />
           ))}
         </div>
         {results === undefined ? null : (
           <div ref={resultsRef} {...stylex.props(styles.results)}>
             {results.map((section, index) => (
-              <EmojiSection key={section.key} section={section} tabStop={index === 0} />
+              <EmojiSection key={section.key} section={section} selected={selected} tabStop={index === 0} />
             ))}
             {results.length === 0 ? (
               <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>
@@ -177,7 +180,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, onPick, o
 }
 
 /** A heading (none for search results) and its grid. Memoized: typing in search leaves it alone. */
-const EmojiSection = memo(function EmojiSection({ section, tabStop }: { readonly section: Section; readonly tabStop: boolean }) {
+const EmojiSection = memo(function EmojiSection({ section, selected, tabStop }: { readonly section: Section; readonly selected: ReadonlySet<string>; readonly tabStop: boolean }) {
   return (
     <div role="group" data-emoji-section="" aria-label={section.heading} {...stylex.props(styles.section, styles.rows(String(Math.ceil(section.items.length / COLUMNS))), section.heading === undefined && styles.bare)}>
       {section.heading === undefined ? null : (
@@ -188,24 +191,28 @@ const EmojiSection = memo(function EmojiSection({ section, tabStop }: { readonly
         </div>
       )}
       <div {...stylex.props(styles.grid)}>
-        {section.items.map((item, index) => (
-          <button
-            key={item.name}
-            type="button"
-            // One tab stop for the whole grid; the arrows move within it.
-            tabIndex={tabStop && index === 0 ? 0 : -1}
-            data-emoji={item.name}
-            aria-label={`:${item.name}:`}
-            title={`:${item.name}:`}
-            {...stylex.props(styles.cell)}
-          >
-            {item.url === undefined ? (
-              item.unicode
-            ) : (
-              <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" {...stylex.props(styles.image)} />
-            )}
-          </button>
-        ))}
+        {section.items.map((item, index) => {
+          const chosen = selected.has(item.name)
+          return (
+            <button
+              key={item.name}
+              type="button"
+              // One tab stop for the whole grid; the arrows move within it.
+              tabIndex={tabStop && index === 0 ? 0 : -1}
+              data-emoji={item.name}
+              aria-label={chosen ? `:${item.name}:, added` : `:${item.name}:`}
+              aria-disabled={chosen || undefined}
+              title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
+              {...stylex.props(styles.cell, chosen && styles.chosen)}
+            >
+              {item.url === undefined ? (
+                item.unicode
+              ) : (
+                <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" {...stylex.props(styles.image)} />
+              )}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -348,6 +355,16 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
+  },
+  // Already chosen: the accent's soft fill and ring, as your own reaction chip has, and no hover or press.
+  chosen: {
+    backgroundColor: {
+      default: accent['--hl-soft'],
+      ':hover': { default: null, [HOVER]: accent['--hl-soft'] },
+      ':focus-visible': accent['--hl-soft'],
+    },
+    boxShadow: `inset 0 0 0 1px ${accent['--hl-ring']}`, // tokens-allow: 1px hairline ring, as the reaction chip's border
+    scale: { default: '1', ':active': '1' },
   },
   image: {
     width: GLYPH,

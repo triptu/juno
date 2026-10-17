@@ -1,8 +1,8 @@
 /**
  * Settings › Appearance › Quick reactions (SPEC 14): the message toolbar's
  * one-click reactions, saved as the `quickReactions` preference in user.db.
- * Add opens the emoji picker with the workspace's custom emoji, from the
- * picker's own chunk.
+ * Add opens the message toolbar's emoji picker with the workspace's custom
+ * emoji, from the picker's own chunk, with the chosen ones marked.
  */
 import { Suspense, useMemo, useState } from 'react'
 import { composerEmojiAtom, quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
@@ -24,6 +24,7 @@ export function QuickReactions() {
   const [open, setOpen] = useState(false)
   const workspace = useAtomValue(composerEmojiAtom(open))
   const custom = useMemo(() => (workspace._tag === 'Success' ? customEmoji(workspace.value) : []), [workspace])
+  const selected = useMemo(() => new Set(reactions.map((reaction) => reaction.name)), [reactions])
 
   const change = (next: ReadonlyArray<QuickReaction>) => {
     setShown(next)
@@ -44,7 +45,7 @@ export function QuickReactions() {
       onClosePicker={() => setOpen(false)}
       picker={open ? (
         <Suspense fallback={null}>
-          <QuickReactionPicker custom={custom} recent={frequentEmoji([])} onPick={add} onClose={() => setOpen(false)} />
+          <QuickReactionPicker custom={custom} recent={frequentEmoji([])} selected={selected} onPick={add} onClose={() => setOpen(false)} />
         </Suspense>
       ) : undefined}
     />

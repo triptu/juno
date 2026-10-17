@@ -2,7 +2,8 @@
  * Quick reactions (SPEC 7, 14): chosen in Settings › Appearance, up to
  * seven, added from the emoji picker, removed, and reordered by keyboard and
  * by drag. The message toolbar shows them in that order, one click reacts,
- * and the choice survives a relaunch.
+ * and the choice survives a relaunch. Add opens the message toolbar's picker
+ * as a popover over the page, with the chosen emoji marked.
  */
 import type { Locator } from '@playwright/test'
 import { expect, launchApp, test } from './fixtures'
@@ -17,9 +18,12 @@ const pills = (juno: Juno) => juno.settings.root.getByRole('list', { name: 'Quic
 const pillNames = (juno: Juno) => pills(juno).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-quick-reaction')))
 const toolbarLabels = (row: Locator) => row.getByRole('toolbar').getByRole('button', { name: /^React / }).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
 
+/** The picker floats on `body`, outside the settings page. */
+const picker = (juno: Juno) => juno.win.getByRole('dialog', { name: 'Emoji' })
+
 async function add(juno: Juno, query: string): Promise<void> {
   await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
-  const search = juno.settings.root.getByRole('textbox', { name: 'Search emoji' })
+  const search = picker(juno).getByRole('textbox', { name: 'Search emoji' })
   await expect(search).toBeFocused()
   await search.fill(query)
   await search.press('Enter')
@@ -82,4 +86,66 @@ test('five quick reactions set in Settings show in the toolbar in order, react i
   } finally {
     await again.close()
   }
+})
+
+test('Add opens the emoji picker over the page; a pick shows in the toolbar, and remove and reset come back to the default', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'The picker test message' })
+  await juno.openSettings('Appearance')
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
+
+  // The picker is whole: not clipped by the card, with its grid, and the chosen emoji marked.
+  const addButton = juno.settings.root.getByRole('button', { name: 'Add reaction' })
+  await addButton.click()
+  await expect(picker(juno)).toBeVisible()
+  await expect(juno.settings.root.getByRole('dialog', { name: 'Emoji' })).toHaveCount(0)
+  // Nothing covers or clips its bottom edge: the grid is on top there.
+  const bottomIsPicker = await picker(juno).evaluate((panel) => {
+    const box = panel.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.bottom - 12)
+    return box.height > 300 && hit !== null && panel.contains(hit)
+  })
+  expect(bottomIsPicker).toBe(true)
+  await expect(picker(juno).getByRole('button', { name: ':+1:, added' }).first()).toHaveAttribute('aria-disabled', 'true')
+
+  // Esc closes it and gives focus back to Add.
+  await juno.win.keyboard.press('Escape')
+  await expect(picker(juno)).toHaveCount(0)
+  await expect(addButton).toBeFocused()
+
+  // A click in the grid adds it and closes the picker.
+  await addButton.click()
+  await picker(juno).getByRole('textbox', { name: 'Search emoji' }).fill('tada')
+  await picker(juno).getByRole('button', { name: ':tada:' }).first().click()
+  await expect(picker(juno)).toHaveCount(0)
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'tada'])
+
+  const row = await hoveredMessage(juno, 'The picker test message')
+  await expect.poll(() => toolbarLabels(row)).toEqual(['React 👍', 'React ✅', 'React 👀', 'React 🎉'])
+
+  await juno.openSettings('Appearance')
+  await juno.settings.root.getByRole('button', { name: 'Remove eyes' }).click()
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'tada'])
+  await juno.settings.root.getByRole('button', { name: 'Reset to default' }).click()
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
+  await expect(juno.settings.root.getByRole('button', { name: 'Reset to default' })).toBeDisabled()
+
+  const again = await hoveredMessage(juno, 'The picker test message')
+  await expect.poll(() => toolbarLabels(again)).toEqual(['React 👍', 'React ✅', 'React 👀'])
+})
+
+test('at seven, Add stays focusable, says "Up to 7" and opens nothing', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.openSettings('Appearance')
+  for (const name of ['tada', 'pray', 'rocket', 'fire']) await add(juno, name)
+  await expect.poll(() => pillNames(juno)).toHaveLength(7)
+  const full = juno.settings.root.getByRole('button', { name: 'Up to 7' })
+  await expect(full).toHaveAttribute('aria-disabled', 'true')
+  await full.focus()
+  await expect(full).toBeFocused()
+  // Playwright counts aria-disabled as disabled, so the press is forced.
+  await full.click({ force: true })
+  await expect(picker(juno)).toHaveCount(0)
 })

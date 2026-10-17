@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { DEFAULT_QUICK_REACTIONS, MAX_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { accent, colors, motion, opacity, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Button, IconButton, Text } from '@juno/ui'
@@ -14,9 +15,9 @@ export interface QuickReactionsSettingProps {
   readonly onChange: (reactions: ReadonlyArray<QuickReaction>) => void
   /** Add: the container opens the emoji picker and passes it in `picker`. */
   readonly onAdd: () => void
-  /** The open emoji picker, shown under Add. */
+  /** The open emoji picker, floated under Add (over it when there is no room below). */
   readonly picker?: ReactNode
-  /** A press outside the open picker. */
+  /** A press outside the open picker, focus leaving it, or the page scrolling under it. */
   readonly onClosePicker?: () => void
 }
 
@@ -34,7 +35,9 @@ const isDefault = (reactions: ReadonlyArray<QuickReaction>) =>
 /**
  * Settings › Appearance › Quick reactions (SPEC 14): the toolbar's one-click
  * reactions as a row of pills in toolbar order, then Add, which opens the
- * emoji picker under the row, up to seven. A pill drags to a new place. From the keyboard
+ * emoji picker as a popover under Add, up to seven. The picker is fixed in a
+ * portal on `body`, so the card never clips it and never grows for it. A
+ * pill drags to a new place. From the keyboard
  * ← and → move between pills, ⌥← and ⌥→ move the pill, and Delete removes
  * it. The last one cannot be removed. Reset to default brings back 👍 ✅ 👀.
  */
@@ -46,6 +49,7 @@ export function QuickReactionsSetting({ reactions, onChange, onAdd, picker, onCl
   const pickerRef = useRef<HTMLDivElement>(null)
   const { remove, onKey } = useKeys(listRef, addRef, reactions, onChange)
   usePickerFocus(addRef, pickerRef, picker !== undefined, onClosePicker)
+  usePickerPlace(addRef, pickerRef, picker !== undefined)
 
   const full = reactions.length >= MAX_QUICK_REACTIONS
   // The roving tab stop: the pill last focused, else the first.
@@ -72,10 +76,18 @@ export function QuickReactionsSetting({ reactions, onChange, onAdd, picker, onCl
             />
           ))}
         </div>
+        {/* Dimmed, not disabled, at seven: it keeps focus and its tooltip says why. */}
         <div ref={addRef} {...stylex.props(styles.add)}>
-          <IconButton icon={Plus} label={full ? `Up to ${MAX_QUICK_REACTIONS} quick reactions` : 'Add reaction'} size={28} disabled={full} expanded={picker !== undefined} onClick={onAdd} />
+          <IconButton
+            icon={Plus}
+            label={full ? `Up to ${MAX_QUICK_REACTIONS}` : 'Add reaction'}
+            size={28}
+            dimmed={full}
+            aria-haspopup="dialog"
+            expanded={picker !== undefined}
+            onClick={full ? undefined : onAdd}
+          />
         </div>
-        {picker === undefined ? null : <div ref={pickerRef} {...stylex.props(styles.picker)}>{picker}</div>}
       </div>
       <div {...stylex.props(styles.footer)}>
         <Text variant="meta" tone="muted" as="p">
@@ -85,6 +97,14 @@ export function QuickReactionsSetting({ reactions, onChange, onAdd, picker, onCl
           Reset to default
         </Button>
       </div>
+      {picker === undefined
+        ? null
+        : createPortal(
+            <div ref={pickerRef} data-quick-reaction-picker="" {...stylex.props(styles.picker)}>
+              {picker}
+            </div>,
+            document.body,
+          )}
     </div>
   )
 }
@@ -135,7 +155,11 @@ function useKeys(listRef: RefObject<HTMLDivElement | null>, addRef: RefObject<HT
   return { remove, onKey }
 }
 
-/** A picker that closes with focus in it (Esc, or a pick) gives focus back to Add; a press outside closes it. */
+/**
+ * A picker that closes with focus in it (Esc, or a pick) gives focus back to
+ * Add. A press outside, focus moving outside, or a scroll outside it (the
+ * page moving under it) closes it.
+ */
 function usePickerFocus(addRef: RefObject<HTMLDivElement | null>, pickerRef: RefObject<HTMLDivElement | null>, pickerOpen: boolean, onClosePicker: (() => void) | undefined) {
   const wasOpen = useRef(false)
   useLayoutEffect(() => {
@@ -146,12 +170,58 @@ function usePickerFocus(addRef: RefObject<HTMLDivElement | null>, pickerRef: Ref
 
   useEffect(() => {
     if (!pickerOpen || onClosePicker === undefined) return
-    const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !(addRef.current?.contains(event.target) ?? false) && !(pickerRef.current?.contains(event.target) ?? false)) onClosePicker()
+    const inside = (target: EventTarget | null) =>
+      target instanceof Node && ((addRef.current?.contains(target) ?? false) || (pickerRef.current?.contains(target) ?? false))
+    const outside = (event: Event) => {
+      if (!inside(event.target)) onClosePicker()
     }
     document.addEventListener('pointerdown', outside, true)
-    return () => document.removeEventListener('pointerdown', outside, true)
+    document.addEventListener('focusin', outside)
+    document.addEventListener('scroll', outside, true)
+    return () => {
+      document.removeEventListener('pointerdown', outside, true)
+      document.removeEventListener('focusin', outside)
+      document.removeEventListener('scroll', outside, true)
+    }
   }, [addRef, pickerRef, pickerOpen, onClosePicker])
+}
+
+/** The picker's gap from Add, and from the window's edges (`--space-1`, `--space-2`). */
+const GAP = 4
+const EDGE = 8
+
+/**
+ * Places the open picker under Add, its start on Add's start, moved in to
+ * stay inside the window (or the gallery's frame); over Add when there is no
+ * room below. Read once, then written, before the first paint, and again
+ * when the window resizes.
+ */
+function usePickerPlace(addRef: RefObject<HTMLDivElement | null>, pickerRef: RefObject<HTMLDivElement | null>, pickerOpen: boolean) {
+  useLayoutEffect(() => {
+    if (!pickerOpen) return
+    const place = () => {
+      const add = addRef.current
+      const picker = pickerRef.current
+      if (add === null || picker === null) return
+      const anchor = add.getBoundingClientRect()
+      const box = picker.getBoundingClientRect()
+      const bounds = add.closest('[data-tooltip-bounds]')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
+      const x = Math.max(bounds.left + EDGE, Math.min(anchor.left, bounds.right - EDGE - box.width))
+      const below = anchor.bottom + GAP
+      const above = anchor.top - GAP - box.height
+      const y = below + box.height <= bounds.bottom - EDGE ? below : above >= bounds.top + EDGE ? above : Math.max(bounds.top + EDGE, bounds.bottom - EDGE - box.height)
+      picker.style.translate = `${Math.round(x)}px ${Math.round(y)}px`
+    }
+    place()
+    // The picker's chunk may arrive after the first layout; place it again when it has a size.
+    const observer = new ResizeObserver(place)
+    if (pickerRef.current !== null) observer.observe(pickerRef.current)
+    window.addEventListener('resize', place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+    }
+  }, [addRef, pickerRef, pickerOpen])
 }
 
 /** Drag to reorder: while a pill is dragged over the row, the row shows the order it would drop in; a drop saves it. */
@@ -236,9 +306,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-2'],
   },
-  // The picker hangs from the row's start, so it stays inside the card wherever Add is.
   row: {
-    position: 'relative',
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
@@ -291,18 +359,18 @@ const styles = stylex.create({
   add: {
     display: 'inline-flex',
   },
-  // Under the row, on its start edge.
-  picker: {
-    position: 'absolute',
-    top: `calc(100% + ${spacing['--space-1']})`,
-    left: 0,
-    zIndex: z['--z-picker'],
-  },
+  // Under the pills: the count, then Reset right after it, never out at the card's far edge.
   footer: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing['--space-3'],
-    minHeight: sizes['--control-28'],
+    columnGap: spacing['--space-2'],
+  },
+  // Fixed on `body`; `usePickerPlace` moves it next to Add.
+  picker: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    zIndex: z['--z-picker'],
   },
 })
