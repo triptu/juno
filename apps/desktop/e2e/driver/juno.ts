@@ -2421,7 +2421,7 @@ export class PrivacyMode {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts'
+export type HomeItemKind = 'waiting' | 'mentioned' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore'
 
 /** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {
@@ -2481,7 +2481,7 @@ export class HomePane {
     return this.reviewOf('tidyUp', 'settled')
   }
 
-  /** A review card's row, which opens its review sheet (`data-sheet="<sheet>"`): "settled", "automated", "doneFollowUps", "oldDrafts". */
+  /** A review card's row, which opens its review sheet (`data-sheet="<sheet>"`): "settled", "automated", "doneFollowUps", "oldDrafts", "unfollow", "ignore". */
   async reviewOf(kind: HomeItemKind, sheet: string): Promise<ReviewSheetPane> {
     await this.item(kind).locator('[data-home-review]').click()
     const pane = new ReviewSheetPane(this.win, sheet)
@@ -2514,6 +2514,11 @@ export class ReviewSheetPane {
 
   get title(): Locator {
     return this.root.getByRole('heading', { level: 2 })
+  }
+
+  /** The line under the title: what the rows are, and what the action does in Slack. */
+  get lead(): Locator {
+    return this.root.locator('[data-review-lead]')
   }
 
   /** A proposal's row, by text in its title. */
