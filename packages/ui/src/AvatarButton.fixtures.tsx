@@ -14,12 +14,14 @@ export default defineFixtures(
       initials: fixture(base),
       photo: fixture({ ...base, src: photo }),
     },
-    Menu: {
-      open: fixture({ ...base, open: true }),
+    // The menu's open fill is the hover fill, through the press too, so opening changes no colour (gallery trigger-open spec).
+    Open: {
+      'avatar-hover': fixture(base, { hover: 'button' }),
+      'avatar-press': fixture(base, { press: 'button' }),
+      'avatar-open': fixture({ ...base, open: true }),
+      'avatar-open-hover': fixture({ ...base, open: true }, { hover: 'button' }),
     },
     Interaction: {
-      hover: fixture(base, { hover: 'button' }),
-      press: fixture(base, { press: 'button' }),
       focus: fixture(base, { focus: 'button' }),
     },
   },

@@ -252,7 +252,7 @@ function count(n: number) {
 function Today({ interrupted, held, rows, initiallyOpen }: { readonly interrupted: number; readonly held: number; readonly rows: ReadonlyArray<TodayRow>; readonly initiallyOpen: boolean }) {
   const [open, setOpen] = useState(initiallyOpen)
   const showWhy = (
-    <Button variant="ghost" size="sm" tone="subtle" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
+    <Button variant="ghost" size="sm" tone="subtle" expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
       Show why
     </Button>
   )

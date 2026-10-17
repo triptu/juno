@@ -1,0 +1,1 @@
+- 10-17 19:00 · owner · A control that opens a menu or popover keeps its hover fill while pressed and while open, so opening changes no colour; Button and IconButton take `expanded`, and a trigger is not also a toggle.

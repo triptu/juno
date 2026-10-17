@@ -1,0 +1,1 @@
+- 10-17 19:30 · owner · A popover lines up with the control that opened it: the topic switcher starts at the title button's left edge, not the pill's, and moves in only at the window's edge. In a picker list only the keyboard or pointer row is filled; the current item is marked with accent text and a check.

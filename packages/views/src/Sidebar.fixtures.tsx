@@ -185,7 +185,7 @@ export default defineFixtures(
       // A coloured icon keeps its colour on the selected pill's fill.
       'coloured-selected': scene(() => full({ ...viewChrome, views: colouredViews, filter: { kind: 'all', unreadOnly: false, view: 'vwork' } }, { sections: [{ id: 'recent', ids: [rows.roadmap.id] }] })),
       'sheet-colour': scene(() => full({ ...viewChrome, views: colouredViews.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} color="teal" /> })),
-      'sheet-new': scene(() => full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} /> })),
+      'sheet-new': scene(() => full({ ...viewChrome, views: views.slice(0, 2), newViewOpen: true, viewSheet: <ViewSheet {...sheetProps} /> })),
       'sheet-edit': scene(() =>
         full({ ...viewChrome, views: views.slice(0, 2), viewSheet: <ViewSheet {...sheetProps} mode="edit" name="Design crit" icon={undefined} keepOutOfAll={false} query="" chosen={sheetProps.chosen.slice(0, 1)} /> }),
       ),

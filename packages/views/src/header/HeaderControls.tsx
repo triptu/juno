@@ -18,7 +18,7 @@ const HOVER = '@media (hover: hover)'
 // The header's narrow form (inventory 5): a container query on the header
 // layer, which is as wide as its area. Container queries cannot read tokens.
 const NARROW = '@container (width < 480px)'
-/** The menu opens this far under the left island, left-aligned with it. */
+/** The menu opens this far under the left island, left-aligned with the title. */
 const MENU_GAP = 6
 /** Far above the pill's 1, so the title takes all the shortening until it reaches its floor. */
 const TITLE_SHRINK = 1000
@@ -29,7 +29,7 @@ export interface HeaderTitleButtonProps {
   readonly leading?: ReactNode
   /** The menu or popover it opens is showing. */
   readonly expanded: boolean
-  /** Click, Enter, Space or ↓; and right-click or the context-menu key unless `onMenu` is given. `at` is under the left island. */
+  /** Click, Enter, Space or ↓; and right-click or the context-menu key unless `onMenu` is given. `at` is under the left island, at the title's left edge. */
   readonly onOpen: (at: MenuAnchor) => void
   /** What it opens: a menu (the Juno menu), or a popover with a searchable list (the topic switcher). Default `menu`. */
   readonly popup?: 'menu' | 'dialog'
@@ -46,7 +46,7 @@ export interface HeaderTitleButtonProps {
 export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'menu', onMenu, ref }: HeaderTitleButtonProps) {
   const under = (target: HTMLElement): MenuAnchor => {
     const island = (target.closest('[data-island]') ?? target).getBoundingClientRect()
-    return { x: island.left, y: island.bottom + MENU_GAP }
+    return { x: target.getBoundingClientRect().left, y: island.bottom + MENU_GAP }
   }
   const open = (target: HTMLElement) => onOpen(under(target))
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -206,17 +206,14 @@ const styles = stylex.create({
     fontSize: text['--text-body-small-size'],
     fontWeight: weights['--weight-semibold'],
     lineHeight: sizes['--control-28'],
-    // The island controls' fills (IconButton's `island` variant): hover, then open or pressed, one step darker each.
+    // The island controls' fills (IconButton's `island` variant). Open keeps the hover fill, so opening changes no colour.
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
   },
   titleOpen: {
-    backgroundColor: {
-      default: colors['--secondary-hover'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
-    },
+    backgroundColor: colors['--secondary-default'],
   },
   titleText: {
     overflow: 'hidden',

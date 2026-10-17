@@ -107,6 +107,8 @@ export interface SidebarProps {
   readonly onFilterView?: (id: string) => void
   /** The "+" pill. */
   readonly onNewView?: () => void
+  /** The view sheet is open for a new view: the "+" pill holds its hover fill, as an open trigger. */
+  readonly newViewOpen?: boolean
   /** Right-click (or the context-menu key) on a view's pill. */
   readonly onViewMenu?: (id: string) => void
   /** A view's pill dropped before another view's, or at the end (`before` undefined). */
@@ -162,6 +164,7 @@ export function Sidebar({
   views = [],
   onFilterView,
   onNewView,
+  newViewOpen = false,
   onViewMenu,
   onMoveView,
   viewSheet,
@@ -303,7 +306,7 @@ export function Sidebar({
             </PillRow>
             {onNewView === undefined ? null : (
               <FilterPill>
-                <Button variant="filter" iconStart={Plus} {...tooltip('New view')} aria-label="New view" aria-haspopup="dialog" pressed={false} onClick={onNewView} />
+                <Button variant="filter" iconStart={Plus} {...tooltip('New view')} aria-label="New view" aria-haspopup="dialog" expanded={newViewOpen} onClick={onNewView} />
               </FilterPill>
             )}
             <span {...stylex.props(styles.unread)}>

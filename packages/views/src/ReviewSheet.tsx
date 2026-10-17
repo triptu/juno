@@ -69,7 +69,7 @@ export function ReviewSheet({ sheet, title, lead, aboutLabel, about, initialAbou
           <Text variant="heading" as="h2" id={titleId} truncate>
             {title}
           </Text>
-          <IconButton icon={Info} label={aboutLabel} size={28} pressed={open} expanded={open} aria-controls={aboutId} onClick={() => setOpen(!open)} data-settled-about="" />
+          <IconButton icon={Info} label={aboutLabel} size={28} expanded={open} aria-controls={aboutId} onClick={() => setOpen(!open)} data-settled-about="" />
         </span>
         <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
           {lead}

@@ -2,6 +2,7 @@ import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
+import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Button } from './Button'
 import { defineFixtures, fixture, scene } from './fixtures/define'
 import { Row, Stack } from './fixtures/layout'
@@ -43,6 +44,17 @@ export default defineFixtures(Button, {
     'hover-ghost': fixture({ variant: 'ghost', size: 'md', tone: 'subtle', children: 'Open topic' }, { hover: 'button' }),
     'hover-raised': fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }, { hover: 'button' }),
     'hover-row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve' }, { hover: 'button' }),
+  },
+  // A menu button keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
+  Open: {
+    'ghost-hover': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: false, children: 'Show why' }, { hover: 'button' }),
+    'ghost-press': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: false, children: 'Show why' }, { press: 'button' }),
+    'ghost-open': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: true, children: 'Show why' }),
+    'ghost-open-hover': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: true, children: 'Show why' }, { hover: 'button' }),
+    'filter-hover': fixture({ variant: 'filter', iconStart: Plus, 'aria-label': 'New view', expanded: false }, { hover: 'button' }),
+    'filter-press': fixture({ variant: 'filter', iconStart: Plus, 'aria-label': 'New view', expanded: false }, { press: 'button' }),
+    'filter-open': fixture({ variant: 'filter', iconStart: Plus, 'aria-label': 'New view', expanded: true }),
+    'filter-open-hover': fixture({ variant: 'filter', iconStart: Plus, 'aria-label': 'New view', expanded: true }, { hover: 'button' }),
   },
   Press: {
     'active-press': fixture({ variant: 'primary', size: '2xl', children: 'Send' }, { press: 'button' }),
