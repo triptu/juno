@@ -1,8 +1,8 @@
 import { useRef } from 'react'
 import type { EngineStatus as Status } from '@juno/contract'
-import { connectionStateAtom, engineStatusAtom, pingCommand, registry, restartEngine, syncNoticeAtom, syncProgressAtom } from '@juno/state'
+import { connectionStateAtom, engineStatusAtom, pingCommand } from '@juno/state'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
-import { EngineNotice, EngineStatusView, SyncProgress } from '@juno/views'
+import { EngineStatusView } from '@juno/views'
 
 const phaseLabel = (phase: Status['phase']): string => {
   switch (phase._tag) {
@@ -23,7 +23,7 @@ const phaseLabel = (phase: Status['phase']): string => {
   }
 }
 
-/** Wires the engine status live query and the ping command to the view. */
+/** Wires the engine status live query and the ping command to the view, for Settings › About. */
 export function EngineStatus() {
   const connection = useAtomValue(connectionStateAtom)
   const status = useAtomValue(engineStatusAtom)
@@ -50,22 +50,4 @@ export function EngineStatus() {
       onPing={() => ping({ n: ++count.current })}
     />
   )
-}
-
-function restart(): void {
-  void restartEngine(registry)
-}
-
-/**
- * The status card at the foot of the sidebar: why the rows may be behind Slack
- * (`syncNoticeAtom`), with Restart when the engine stopped; otherwise,
- * during the first sync, its progress (`syncProgressAtom`); otherwise
- * nothing.
- */
-export function SyncNotice() {
-  const kind = useAtomValue(syncNoticeAtom)
-  const progress = useAtomValue(syncProgressAtom)
-  if (kind !== undefined) return <EngineNotice kind={kind} onRestart={restart} />
-  if (progress === undefined) return null
-  return <SyncProgress {...progress} />
 }
