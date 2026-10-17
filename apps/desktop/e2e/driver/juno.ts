@@ -616,7 +616,8 @@ export class Juno {
   readonly settings: SettingsPage
   readonly notifications: NotificationsPage
   readonly topic: TopicPane
-  readonly newChat: NewChatPane
+  /** Home's composer: Recent, the destination chip and the field. */
+  readonly write: HomeWritePane
   readonly tabs: TabStrip
   readonly nav: Navigation
   readonly frame: SidebarFrame
@@ -636,7 +637,7 @@ export class Juno {
     this.settings = new SettingsPage(win)
     this.notifications = new NotificationsPage(win)
     this.topic = new TopicPane(win)
-    this.newChat = new NewChatPane(win)
+    this.write = new HomeWritePane(win)
     this.tabs = new TabStrip(app, win)
     this.nav = new Navigation(app, win)
     this.frame = new SidebarFrame(app, win)
@@ -711,13 +712,12 @@ export class Juno {
 
   /**
    * Nothing was opened: the one tab a fresh launch, or closing the last tab,
-   * leaves, with what a new tab opens. There is never no tab (SPEC 6).
+   * leaves, with Home. There is never no tab (SPEC 6).
    */
-  async expectNothingOpen(page: 'New chat' | 'Home' = 'New chat'): Promise<void> {
+  async expectNothingOpen(): Promise<void> {
     await this.tabs.expectCount(1)
-    await this.tabs.expectActive(page)
-    if (page === 'Home') await this.home.expectShown()
-    else await expect(this.newChat.root).toBeVisible()
+    await this.tabs.expectActive('Home')
+    await this.home.expectShown()
   }
 
   /**
@@ -1165,8 +1165,9 @@ function pageDown(table: Locator): Promise<boolean> {
 export class AllTopicsPane {
   constructor(readonly win: Page) {}
 
+  /** The sidebar title bar's All topics button (SPEC 5). */
   get navItem(): Locator {
-    return this.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'All topics' })
+    return this.win.locator('header[aria-label="Sidebar title bar"]').getByRole('button', { name: 'All topics' })
   }
 
   get table(): Locator {
@@ -1177,7 +1178,7 @@ export class AllTopicsPane {
     return this.win.getByRole('textbox', { name: 'Filter topics' })
   }
 
-  /** Opens the page from the sidebar's All topics item and waits for its rows. */
+  /** Opens the page from the sidebar title bar's All topics button and waits for its rows. */
   async open(): Promise<void> {
     await this.navItem.click()
     await expect(this.table).toBeVisible()
@@ -1265,19 +1266,23 @@ export class AllTopicsPane {
   }
 }
 
-/** A New chat tab: the two pickers, the composer and the preview (spec section 9). */
-export class NewChatPane {
+/**
+ * Home's composer (SPEC section 12, "Writing"): Recent, the destination chip
+ * above the field, the field, the "Send to" list a first @ or # opens, and
+ * the chip's destination list.
+ */
+export class HomeWritePane {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.locator('[data-new-chat]').filter({ visible: true })
+    this.root = win.locator('[data-home]').filter({ visible: true })
   }
 
   get composer(): Locator {
     return this.root.locator('[data-composer] textarea')
   }
 
-  /** The @ or # suggestions above the composer (inventory 7.1). */
+  /** The @ or # suggestions above the composer once a person or channel is chosen (inventory 7.1). */
   get suggestions(): Locator {
     return this.root.locator('[data-mention-suggestions]')
   }
@@ -1292,29 +1297,45 @@ export class NewChatPane {
     return this.root.locator('[data-composer] [data-mark]')
   }
 
-  /** The composer's field, whose box must not move when the tab becomes the topic. */
+  /** The composer's field, whose box must not move when a message is sent. */
   get field(): Locator {
     return this.win.locator('[data-composer-field]').filter({ visible: true })
   }
 
-  get conversationButton(): Locator {
-    return this.root.getByRole('button', { name: /^Conversation: / })
+  /** The destination chip above the field: "Send to: Juno", "Send to: Maya Chen", "Send to: #eng". */
+  get chip(): Locator {
+    return this.root.getByRole('button', { name: /^Send to: / })
   }
 
-  get threadButton(): Locator {
-    return this.root.getByRole('button', { name: /^Thread: / })
+  /** The list a first @ or # opens while Juno is chosen. */
+  get sendTo(): Locator {
+    return this.root.locator('[data-send-to]')
   }
 
-  /** The open picker's list. */
+  sendToOption(name: string): Locator {
+    return this.sendTo.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  /** Recent: the people and channels you wrote to. */
+  get recent(): Locator {
+    return this.root.locator('[data-home-recent]')
+  }
+
+  /** The Recent row named `name`. */
+  recentRow(name: string): Locator {
+    return this.recent.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}`) })
+  }
+
+  /** The chip's destination list. */
   get list(): Locator {
-    return this.root.getByRole('listbox')
+    return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('listbox')
   }
 
   get search(): Locator {
-    return this.root.getByRole('dialog').getByRole('textbox')
+    return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('textbox')
   }
 
-  /** The row in the open list named `name`, followed by its sub line ("Direct message"). */
+  /** The row in the destination list named `name`, followed by its sub line ("Direct message"). */
   option(name: string): Locator {
     return this.list.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
   }
@@ -1328,41 +1349,17 @@ export class NewChatPane {
     await this.composer.press('Enter')
   }
 
-  /** Opens the conversation list, searches it, and picks the row that starts with `name`. */
+  /** Opens the destination list, searches it, and picks the row that starts with `name`. */
   async pickConversation(query: string, name: string): Promise<void> {
-    if (!(await this.search.isVisible())) await this.conversationButton.click()
+    if (!(await this.search.isVisible())) await this.chip.click()
     await this.search.fill(query)
     await this.option(name).click()
     await expect(this.list).toBeHidden()
   }
 
-  /** Opens the thread list, searches it, and picks the row that starts with `title`. */
-  async pickThread(query: string, title: string): Promise<void> {
-    await this.threadButton.click()
-    await this.search.fill(query)
-    await this.option(title).click()
-    await expect(this.list).toBeHidden()
-  }
-
-  async expectEmpty(): Promise<void> {
-    await expect(this.root.getByText('Write your message, then pick where it goes.', { exact: true })).toBeVisible()
-  }
-
-  async expectConversation(name: string): Promise<void> {
-    await expect(this.conversationButton).toHaveAccessibleName(`Conversation: ${name}`)
-  }
-
-  async expectThread(name: string): Promise<void> {
-    await expect(this.threadButton).toHaveAccessibleName(`Thread: ${name}`)
-  }
-
-  /** A message in the preview. */
-  async expectPreview(text: string): Promise<void> {
-    await expect(this.root.locator('[data-message-row]').filter({ hasText: text }).first()).toBeVisible({ timeout: 15_000 })
-  }
-
-  async expectNote(text: string): Promise<void> {
-    await expect(this.root.getByText(text, { exact: true })).toBeVisible()
+  /** The chip names a destination starting with `label`: "Juno", "Maya" for Maya Chen, "#eng". */
+  async expectDestination(label: string): Promise<void> {
+    await expect(this.chip).toHaveAccessibleName(new RegExp(`^Send to: ${escapeRegExp(label)}`))
   }
 }
 
@@ -1916,9 +1913,9 @@ export class TabStrip {
     await expect(this.tab(title)).toBeFocused()
   }
 
-  /** The "+" after the last tab: "New chat ⌘T", or "New tab ⌘T" when a new tab opens Home. */
+  /** The "+" after the last tab: a new tab with Home. */
   get newTabButton() {
-    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: /^New (chat|tab) ⌘T$/ })
+    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New tab ⌘T' })
   }
 
   /** An item of the app menu, as its shortcut would choose it. */
@@ -1959,7 +1956,7 @@ export type AppMenuItem =
   | 'next-tab-control'
   | 'previous-tab-control'
   | 'new-tab'
-  | 'new-chat'
+  | 'new-message'
   | 'reopen-tab'
   | 'back'
   | 'forward'
@@ -2331,7 +2328,7 @@ export class PrivacyMode {
 
 export type HomeItemKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp'
 
-/** Home (SPEC section 12): the greeting, the rows and the Ask Juno field, in the visible page. */
+/** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {
   constructor(readonly win: Page) {}
 
@@ -2389,9 +2386,5 @@ export class HomePane {
     await chooseNextMenuItem(this.win, item)
     await this.item(kind).click({ button: 'right' })
     return (await lastMenu(this.win)).labels
-  }
-
-  get ask(): Locator {
-    return this.root.getByRole('button', { name: 'Ask Juno' })
   }
 }

@@ -3,7 +3,7 @@
 // and the open topic's; the pages and Settings sections are in
 // `palette-pages.spec.ts`), and in Messages: recent topics on an empty query, a topic by its title, a message by its
 // text (landing on it), a channel's Main and "show its topics" (also from
-// its menu), a person's DM and a New chat to someone never messaged, a
+// its menu), a person's DM and Home addressed to someone never messaged, a
 // command, Slack's search for what the cache lacks, and all of it from the
 // keyboard.
 import { expect, test } from './fixtures'
@@ -235,10 +235,10 @@ test('a channel has its Main and "show its topics", also from its menu', async (
   await tabs.expectActive('eng')
 })
 
-test("a person's result opens your DM, or a New chat to them when you have never messaged", async ({ juno }) => {
+test("a person's result opens your DM, or Home addressed to them when you have never messaged", async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { palette, topic, newChat } = juno
+  const { palette, topic, write, tabs } = juno
 
   await palette.openMessages()
   await palette.expectResults()
@@ -255,7 +255,9 @@ test("a person's result opens your DM, or a New chat to them when you have never
   await palette.expectResults()
   await expect(palette.row('Message Jonas Weber')).toContainText('Starts a conversation', { timeout: 15_000 })
   await palette.choose('Message Jonas Weber')
-  await newChat.expectConversation('Jonas Weber')
+  await tabs.expectActive('Home')
+  await write.expectDestination('Jonas Weber')
+  await expect(write.composer).toBeFocused()
 })
 
 test('a command shows above the results with its confidence, and Enter runs it', async ({ juno, fake }) => {

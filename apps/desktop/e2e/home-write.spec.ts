@@ -1,9 +1,9 @@
-// New chat (spec section 9) and Home (section 12): write first and pick
-// where it goes, pick a thread first, change the destination, a preview that
-// never marks read, a first DM opened with conversations.open, and Home from
-// the sidebar.
-import { expectStableAnchor, recordBoxes } from './shiftProbe'
+// Writing from Home (spec section 12, "Writing"): Juno by default, a first
+// @ or # that suggests a destination without taking over, Recent and the
+// destination list, sends that leave Home in place, a first DM opened with
+// conversations.open, ⌘N and "+", and Home from the sidebar.
 import { SELF_ID } from '@juno/fake-slack'
+import { recordBoxes } from './shiftProbe'
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -13,123 +13,107 @@ const OFFSITE = 'Can eng take the Wednesday afternoon'
 /** Shares no two words with any #eng thread, so the wrong-place check never stops the send, however soon it answers. */
 const DRAFT = 'Lunch order goes out at noon'
 
-test('write first, then pick a destination and send: the tab becomes the topic, and the composer does not move', async ({ juno, fake }) => {
+test('a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic, nav } = juno
+  const { write, tabs } = juno
 
-  // "+" opens a New chat beside the launch tab's.
-  await tabs.newTabButton.click()
-  await tabs.expectActiveAt('New chat', 1)
-  await newChat.expectEmpty()
-  await expect(newChat.composer).toBeFocused()
-  await newChat.expectConversation('Pick a conversation')
-  await newChat.expectThread('Any thread')
+  // A launch opens Home, ready to ask Juno.
+  await juno.expectNothingOpen()
+  await expect(write.composer).toBeFocused()
+  await write.expectDestination('Juno')
 
-  // "+" again opens another New chat, beside the launch tab's and this one.
-  await tabs.newTabButton.click()
-  await tabs.expectCount(3)
-  await tabs.expectActiveAt('New chat', 2)
+  await write.composer.pressSequentially('@ma')
+  await expect(write.sendToOption('Maya')).toBeVisible()
+  await write.composer.press('Tab')
+  await write.expectDestination('Maya')
+  // The typed @ma left the text and went into the chip.
+  await expect(write.composer).toHaveValue('')
+  await expect(write.composer).toBeFocused()
+  await expect(write.sendTo).toHaveCount(0)
 
-  await newChat.write(DRAFT)
-  // Enter with no destination opens the conversation picker and keeps the draft.
-  await newChat.send()
-  await expect(newChat.search).toBeFocused()
-  await expect(newChat.composer).toHaveValue(DRAFT)
-
-  await newChat.pickConversation('eng', 'eng')
-  await newChat.expectConversation('eng')
-  await newChat.expectThread('Main')
-  await tabs.expectActive('eng')
-  await expect(newChat.composer).toBeFocused()
-
-  const before = await newChat.field.boundingBox()
-  // Every frame through the change shows one composer field, in the same place.
+  await write.write(DRAFT)
+  const before = await write.field.boundingBox()
+  // Every frame through the send shows one field, in the same place.
   const fields = await recordBoxes(juno.win, '[data-composer-field]')
-  fake.holdNext({ method: 'chat.postMessage', before: true })
-  await expectStableAnchor(juno.win, '[data-topic-view] [data-message-row]', async () => {
-    await newChat.send()
-    await topic.expectMessage(DRAFT)
-    await tabs.expectActive(DRAFT)
-    await expect(newChat.root).toHaveCount(0)
-    // The topic's composer replaces its placeholder slot with a new node, so one read can find the slot and measure it detached.
-    await expect.poll(() => newChat.field.boundingBox()).toEqual(before)
-    await expect(juno.sidebar.row(DRAFT).root).toBeVisible()
-    await juno.sidebar.row(DRAFT).expectRead()
-    await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
-    await topic.composer.fill('An unfinished reply')
-    await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
-    fake.release()
-    await topic.expectSent(DRAFT)
-    // The sidebar sorts by latest activity (SPEC 5), so the send moves #eng's Main up; only those moves are skipped.
-  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
-  await expect(topic.composer).toHaveValue('An unfinished reply')
-  expect(await newChat.field.boundingBox()).toEqual(before)
+  await write.send()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['D0MAYA'])
+  await juno.expectToast('Sent to Maya')
+  // Home stays: the field is empty and back on Juno, where it was.
+  await tabs.expectActive('Home')
+  await expect(write.composer).toHaveValue('')
+  await write.expectDestination('Juno')
+  expect(await write.field.boundingBox()).toEqual(before)
   const frames = await fields()
   expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
   expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
+})
+
+test('Space keeps a first # as text for Juno', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write } = juno
+
+  await write.composer.pressSequentially('#eng')
+  await expect(write.sendToOption('eng')).toBeVisible()
+  await write.composer.pressSequentially(' what happened today?')
+  await expect(write.sendTo).toHaveCount(0)
+  await write.expectDestination('Juno')
+  await expect(write.composer).toHaveValue('#eng what happened today?')
+})
+
+test('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an empty field goes back to Juno', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write } = juno
+
+  await write.composer.pressSequentially('@ma')
+  await expect(write.sendTo).toBeVisible()
+  await write.composer.press('Escape')
+  await expect(write.sendTo).toHaveCount(0)
+  await write.expectDestination('Juno')
+  await expect(write.composer).toHaveValue('@ma')
+
+  await write.composer.fill('')
+  await write.recentRow('Maya').click()
+  await write.expectDestination('Maya')
+  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
+  await expect(write.composer).toBeFocused()
+  await write.composer.press('Backspace')
+  await write.expectDestination('Juno')
+  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs, topic, sidebar } = juno
+
+  await write.pickConversation('eng', 'eng')
+  await write.expectDestination('#eng')
+  await expect(write.composer).toBeFocused()
+  await write.write(DRAFT)
+  await write.send()
+  await juno.expectToast('Sent to #eng')
+  await tabs.expectActive('Home')
+  await write.expectDestination('Juno')
+  await expect(sidebar.row(DRAFT).root).toBeVisible()
+  await expect.poll(() => fake.messages('C0ENG').some((message) => message.text === DRAFT)).toBe(true)
+
+  await sidebar.row(DRAFT).open()
+  await topic.expectMessage(DRAFT)
+  await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
   await topic.send('second')
   await topic.expectSent('second')
-  const root = fake.messages('C0ENG').find(message => message.text === DRAFT)!
-  expect(fake.messages('C0ENG').find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
-
-  const posted = fake.calls.filter((call) => call.method === 'chat.postMessage')
-  expect(posted.map((call) => call.args['channel'])).toEqual(['C0ENG', 'C0ENG'])
-  // The New chat's entry became the topic: nothing to go back to in this new tab.
-  await nav.expectCanGo(false, false)
-  await juno.sidebar.row('#eng').open()
-  await expect(topic.list.locator(`[data-thread-link="t:C0ENG:${root.ts}"]`)).toContainText('1 reply')
-})
-
-test('a thread picked first fills in the conversation, and the reply lands in the thread', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
-
-  await tabs.menu('new-chat')
-  await newChat.write('Thursday works for the freeze')
-  await newChat.pickThread('draft', POSTGRES)
-  await newChat.expectConversation('eng')
-  await newChat.expectThread(POSTGRES)
-  await tabs.expectActive(POSTGRES)
-  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
-
-  await newChat.send()
-  await topic.expectTitle(POSTGRES)
-  await topic.expectMessage('Thursday works for the freeze')
-  const root = slack.root(POSTGRES)
-  const posted = fake.calls.find((call) => call.method === 'chat.postMessage')
-  expect(posted?.args['channel']).toBe(root.channel)
-  expect(posted?.args['thread_ts']).toBe(root.ts)
-})
-
-test('changing the destination before sending keeps Frequent and sets the thread back to Main', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
-
-  await tabs.menu('new-tab')
-  await newChat.write('Sending this to Maya instead')
-  await newChat.pickThread('draft', POSTGRES)
-  await newChat.expectConversation('eng')
-
-  await newChat.pickConversation('maya', 'Maya')
-  await newChat.expectConversation('Maya')
-  await newChat.expectThread('Main')
-  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
-  await expect(newChat.composer).toHaveValue('Sending this to Maya instead')
-
-  await newChat.send()
-  await topic.expectMessage('Sending this to Maya instead')
-  await tabs.expectActive('Maya')
-  const posted = fake.calls.filter((call) => call.method === 'chat.postMessage')
-  expect(posted.map((call) => [call.args['channel'], call.args['thread_ts']])).toEqual([['D0MAYA', undefined]])
+  const root = fake.messages('C0ENG').find((message) => message.text === DRAFT)!
+  expect(root.thread_ts).toBeUndefined()
+  expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 })
 
 test('choosing a destination never marks anything read', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, sidebar } = juno
+  const { write, sidebar } = juno
 
   slack.as('Leo').postIn('eng', 'Replica lag is under a second now')
   const engMain = sidebar.row('#eng')
@@ -138,75 +122,74 @@ test('choosing a destination never marks anything read', async ({ juno, slack })
   expect(unread).toBeGreaterThan(0)
   slack.resetCalls()
 
-  await tabs.newTabButton.click()
-  await newChat.pickConversation('eng', 'eng')
-  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
+  await write.pickConversation('eng', 'eng')
+  await write.expectDestination('#eng')
   await slack.expectNoMarks()
   await engMain.expectUnread(unread)
 })
 
-test('a person never messaged: keep Frequent, then conversations.open on send', async ({ juno, fake }) => {
+test('a person never messaged: chosen from the list, then conversations.open on send', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
+  const { write } = juno
 
-  await tabs.newTabButton.click()
-  await newChat.conversationButton.click()
-  await newChat.search.fill('jon')
-  await expect(newChat.option('Jonas')).toContainText('No messages yet')
-  await newChat.option('Jonas').click()
-  await newChat.expectConversation('Jonas')
-  await expect(newChat.root.getByRole('list', { name: 'Frequent conversations' })).toBeVisible()
+  await write.chip.click()
+  await write.search.fill('jon')
+  await expect(write.option('Jonas')).toContainText('No messages yet')
+  await write.option('Jonas').click()
+  await write.expectDestination('Jonas')
   expect(fake.calls.some((call) => call.method === 'conversations.open')).toBe(false)
 
-  await newChat.write('Welcome aboard. Your laptop arrives Monday.')
-  await newChat.send()
-  await topic.expectMessage('Welcome aboard. Your laptop arrives Monday.')
-  await tabs.expectActive('Jonas')
-  const opens = fake.calls.filter((call) => call.method === 'conversations.open')
-  expect(opens.map((call) => call.args['users'])).toEqual(['U0JONAS'])
+  await write.write('Welcome aboard. Your laptop arrives Monday.')
+  await write.send()
+  await juno.expectToast('Sent to Jonas')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.open').map((call) => call.args['users'])).toEqual(['U0JONAS'])
+  await expect.poll(() => fake.calls.find((call) => call.method === 'chat.postMessage')?.args['channel']).toBeDefined()
   const posted = fake.calls.find((call) => call.method === 'chat.postMessage')
   expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
 })
 
-test('a New chat with a draft stays in the tab history when a topic opens over it', async ({ juno }) => {
+test('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic, sidebar, nav } = juno
+  const { write, topic, sidebar, nav } = juno
 
-  await tabs.newTabButton.click()
-  await newChat.write('A long thought I do not want to lose')
-  await sidebar.row('Draft plan is in the doc').open()
-  await topic.expectTitle('Draft plan is in the doc')
-  // The launch tab's New chat and this one, which now shows the topic.
-  await tabs.expectCount(2)
+  await write.recentRow('Maya').click()
+  await write.write('A long thought I do not want to lose')
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
   await nav.back()
-  await expect(newChat.composer).toHaveValue('A long thought I do not want to lose')
+  await expect(write.composer).toHaveValue('A long thought I do not want to lose')
+  await write.expectDestination('Maya')
 })
 
-test('a New chat closed while it sends comes back as the conversation, so Enter cannot send it again', async ({ juno, fake }) => {
+test('New Message (⌘N) opens Home’s destination list, and a new Home when this one has a draft; "+" opens Home ready to write', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
+  const { write, tabs, sidebar, topic } = juno
+
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
+  await tabs.menu('new-message')
+  await tabs.expectActive('Home')
+  await tabs.expectCount(1)
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.composer).toBeFocused()
+
+  await write.write('Half a thought')
+  await tabs.menu('new-message')
+  await tabs.expectCount(2)
+  await tabs.expectActiveAt('Home', 1)
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.composer).toHaveValue('')
 
   await tabs.newTabButton.click()
-  await newChat.pickConversation('jon', 'Jonas')
-  await newChat.write('Welcome once')
-  fake.holdNext({ method: 'conversations.open' })
-  await newChat.send()
-  await tabs.menu('close-tab')
-  // The last tab gives way to a fresh New chat.
-  await juno.expectNothingOpen()
-  fake.release()
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
-
-  await tabs.menu('reopen-tab')
-  await tabs.expectActive('Jonas')
-  await topic.expectSent('Welcome once')
-  await expect(newChat.composer).toHaveCount(0)
-  await topic.composer.press('Enter')
-  await juno.win.waitForTimeout(500)
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(1)
+  await tabs.expectCount(3)
+  await tabs.expectActiveAt('Home', 2)
+  await expect(write.composer).toBeFocused()
+  await write.expectDestination('Juno')
 })
 
 test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno, win }) => {
@@ -215,9 +198,9 @@ test('Home opens from the sidebar in the current tab; a plain open focuses its t
   const { tabs, sidebar, topic, nav } = juno
   const home = win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Home' })
 
-  // A fresh launch shows one New chat tab; Home is not selected.
+  // A fresh launch shows one Home tab, selected.
   await juno.expectNothingOpen()
-  await expect(home).not.toHaveAttribute('aria-current', 'page')
+  await expect(home).toHaveAttribute('aria-current', 'page')
 
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -249,58 +232,56 @@ test('Home opens from the sidebar in the current tab; a plain open focuses its t
   await juno.home.expectShown()
 })
 
-
-test('frequent destinations choose where a new message is sent', async ({ juno, fake }) => {
+test('Recent lists people and channels by use, and choosing one sets where the message goes', async ({ juno, fake }) => {
   // Seed before sign-in so boot history, rather than socket timing, decides the order.
   for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
   fake.injectMessage({ channel: 'C0PRODUCT', user: SELF_ID, text: 'Less frequent send' })
   await juno.signIn()
   await juno.waitForSync()
-  await juno.tabs.newTabButton.click()
-  const list = juno.newChat.root.getByRole('list', { name: 'Frequent conversations' })
-  const rows = list.getByRole('button')
-  await expect(rows).toHaveCount(6)
-  await expect(rows.first()).toHaveText('eng')
-  await rows.first().dispatchEvent('pointerdown', { button: 0, pointerType: 'mouse' })
-  await juno.newChat.expectConversation('eng')
-  await expect(juno.newChat.composer).toBeFocused()
-  await expect(rows.first()).toHaveAttribute('aria-pressed', 'true')
-  // The list remains, and choosing another row with the keyboard changes the chip.
-  const next = rows.nth(1)
-  const nextName = await next.innerText()
-  await rows.first().focus()
-  await juno.win.keyboard.press('Tab')
+  const { write } = juno
+  const channels = write.recent.getByRole('list', { name: 'Channels' }).getByRole('button')
+  await expect(channels.first()).toHaveText('eng')
+  await channels.first().click()
+  await write.expectDestination('#eng')
+  await expect(write.composer).toBeFocused()
+  await expect(channels.first()).toHaveAttribute('aria-pressed', 'true')
+
+  // One Tab stop: the arrows move inside Recent, Space chooses.
+  await channels.first().focus()
+  await juno.win.keyboard.press('ArrowDown')
+  const next = channels.nth(1)
   await expect(next).toBeFocused()
-  await next.press('Space')
-  await juno.newChat.expectConversation(nextName)
-  await expect(juno.newChat.composer).toBeFocused()
-  await rows.first().focus()
-  await rows.first().press('Enter')
-  await juno.newChat.write('The release checklist is ready.')
-  await juno.newChat.send()
-  await juno.topic.expectMessage('The release checklist is ready.')
-  await expect.poll(() => fake.messages('C0ENG').some(message => message.text === 'The release checklist is ready.')).toBe(true)
-  expect(fake.calls.filter(call => call.method === 'chat.postMessage').map(call => call.args['channel'])).toEqual(['C0ENG'])
+  const nextName = await next.innerText()
+  await juno.win.keyboard.press('Space')
+  await write.expectDestination(`#${nextName}`)
+  await expect(write.composer).toBeFocused()
+
+  await channels.first().click()
+  await write.write('The release checklist is ready.')
+  await write.send()
+  await expect.poll(() => fake.messages('C0ENG').some((message) => message.text === 'The release checklist is ready.')).toBe(true)
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG'])
 })
 
-
-test('a new thread stays open when its root fails and is retried, including a queued reply', async ({ juno, fake }) => {
+test('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.newChat.pickConversation('eng', 'eng')
+  const { write, topic, sidebar } = juno
+  await write.pickConversation('eng', 'eng')
   fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
-  await juno.newChat.write('first')
-  await juno.newChat.send()
-  await juno.topic.expectTitle('first')
-  await expect(juno.topic.failed('first').row).toContainText('Not sent.')
-  await expect(juno.sidebar.row('first').root).toBeVisible()
-  await juno.topic.send('second')
-  await expect(juno.topic.message('second')).toHaveAttribute('data-pending', 'sending')
-  expect(fake.messages('C0ENG').some(message => message.text === 'second')).toBe(false)
-  await juno.topic.failed('first').retry()
-  await juno.topic.expectSent('first')
-  await juno.topic.expectSent('second')
-  await juno.topic.expectTitle('first')
-  const root = fake.messages('C0ENG').find(message => message.text === 'first')!
-  expect(fake.messages('C0ENG').find(message => message.text === 'second')?.thread_ts).toBe(root.ts)
+  await write.write('first')
+  await write.send()
+  await expect(sidebar.row('first').root).toBeVisible()
+  await sidebar.row('first').open()
+  await topic.expectTitle('first')
+  await expect(topic.failed('first').row).toContainText('Not sent.')
+  await topic.send('second')
+  await expect(topic.message('second')).toHaveAttribute('data-pending', 'sending')
+  expect(fake.messages('C0ENG').some((message) => message.text === 'second')).toBe(false)
+  await topic.failed('first').retry()
+  await topic.expectSent('first')
+  await topic.expectSent('second')
+  await topic.expectTitle('first')
+  const root = fake.messages('C0ENG').find((message) => message.text === 'first')!
+  expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 })

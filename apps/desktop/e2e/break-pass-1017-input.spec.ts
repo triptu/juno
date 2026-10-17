@@ -1,4 +1,4 @@
-// Break pass of 10-17: typing and the keyboard in New chat, the composers and
+// Break pass of 10-17: typing and the keyboard on Home, the composers and
 // the edit field, and dark mode. Findings are in
 // docs/reviews/2026-10-17-break-pass.md.
 import { SELF_ID } from '@juno/fake-slack'
@@ -8,42 +8,33 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-test('New chat works from the keyboard alone: write, pick with Enter, send', async ({ juno, fake }) => {
+test('Home works from the keyboard alone: ⌘N, pick with Enter, write, Shift Tab to the chip, send', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.tabs.menu('new-chat')
-  await expect(juno.newChat.composer).toBeFocused()
-  await juno.win.keyboard.type('Keyboard only')
-  // Enter with no destination opens the conversation list and keeps the draft.
-  await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
-  // Esc closes the list and puts focus on its button; Space opens it again.
-  await juno.win.keyboard.press('Escape')
-  await expect(juno.newChat.conversationButton).toBeFocused()
-  await juno.win.keyboard.press('Space')
-  await expect(juno.newChat.search).toBeFocused()
+  // ⌘N opens Home's destination list with its search focused.
+  await juno.tabs.menu('new-message')
+  await expect(juno.write.search).toBeFocused()
   await juno.win.keyboard.type('eng')
-  await expect(juno.newChat.option('eng')).toBeVisible()
+  await expect(juno.write.option('eng')).toBeVisible()
   await juno.win.keyboard.press('Enter')
-  await juno.newChat.expectConversation('eng')
-  await expect(juno.newChat.composer).toBeFocused()
-  await expect(juno.newChat.composer).toHaveValue('Keyboard only')
-  // Shift Tab reaches the thread picker (Attach files is out of the Tab order); Esc from its list goes back without a change.
+  await juno.write.expectDestination('#eng')
+  await expect(juno.write.composer).toBeFocused()
+  await juno.win.keyboard.type('Keyboard only')
+  // Shift Tab reaches the chip (Attach files is out of the Tab order); Enter opens its list, Esc goes back to the field without a change.
   await juno.win.keyboard.press('Shift+Tab')
-  await expect(juno.newChat.threadButton).toBeFocused()
+  await expect(juno.write.chip).toBeFocused()
   await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
+  await expect(juno.write.search).toBeFocused()
   await juno.win.keyboard.press('Escape')
-  await expect(juno.newChat.threadButton).toBeFocused()
-  await juno.newChat.expectThread('Main')
-  await juno.win.keyboard.press('Tab')
-  await expect(juno.newChat.composer).toBeFocused()
+  await expect(juno.write.composer).toBeFocused()
+  await juno.write.expectDestination('#eng')
+  await expect(juno.write.composer).toHaveValue('Keyboard only')
   await juno.win.keyboard.press('Enter')
-  await juno.topic.expectMessage('Keyboard only')
-  expect(fake.messages('C0ENG').filter((m) => m.text === 'Keyboard only')).toHaveLength(1)
+  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Keyboard only').length).toBe(1)
+  await juno.tabs.expectActive('Home')
 })
 
-test('dark mode leaves no light surface in New chat, the switcher and Settings', async ({ juno, fake }) => {
+test('dark mode leaves no light surface on Home, the switcher and Settings', async ({ juno, fake }) => {
   for (let i = 0; i < 6; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
   await juno.signIn()
   await juno.waitForSync()
@@ -61,11 +52,10 @@ test('dark mode leaves no light surface in New chat, the switcher and Settings',
       }
       return light
     })
-  await juno.tabs.menu('new-chat')
-  await expect(juno.newChat.root.getByRole('list', { name: 'Frequent conversations' }).getByRole('button').first()).toBeVisible()
+  await expect(juno.write.recent.getByRole('button').first()).toBeVisible()
   expect(await lightSurfaces()).toEqual([])
-  await juno.newChat.conversationButton.click()
-  await expect(juno.newChat.list).toBeVisible()
+  await juno.write.chip.click()
+  await expect(juno.write.list).toBeVisible()
   expect(await lightSurfaces()).toEqual([])
   await juno.win.keyboard.press('Escape')
   await juno.sidebar.row('#eng').open()
@@ -76,24 +66,22 @@ test('dark mode leaves no light surface in New chat, the switcher and Settings',
   expect(await lightSurfaces()).toEqual([])
 })
 
-test('Enter right after typing in the conversation search picks the match', async ({ juno, fake }) => {
+test('Enter right after typing in the destination search picks the match', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.tabs.menu('new-chat')
-  // As a person types once the new tab shows its composer.
-  await expect(juno.newChat.composer).toBeFocused()
-  await juno.win.keyboard.type('Typed fast')
-  await juno.win.keyboard.press('Enter')
-  await expect(juno.newChat.search).toBeFocused()
+  await juno.tabs.menu('new-message')
+  // As a person types once the list shows its search.
+  await expect(juno.write.search).toBeFocused()
   await juno.win.keyboard.type('eng')
   await juno.win.keyboard.press('Enter')
-  await juno.newChat.expectConversation('eng')
-  await expect(juno.newChat.composer).toBeFocused()
+  await juno.write.expectDestination('#eng')
+  await expect(juno.write.composer).toBeFocused()
+  await juno.win.keyboard.type('Typed fast')
   await juno.win.keyboard.press('Enter')
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typed fast').length).toBe(1)
-  // Nothing typed went to the launch tab's New chat.
-  await juno.tabs.selectAt('New chat', 0)
-  await expect(juno.newChat.composer).toHaveValue('')
+  // ⌘N used the launch tab's Home: one tab, empty again.
+  await juno.tabs.expectCount(1)
+  await expect(juno.write.composer).toHaveValue('')
 })
 
 test('the inline edit field suggests emoji, and Esc there closes the list, not the edit', async ({ juno, fake }) => {

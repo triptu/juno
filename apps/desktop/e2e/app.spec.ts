@@ -101,7 +101,7 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 test('every surface that can open over a title bar opts out of its drag region', async ({ juno, win, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { sidebar, topic, palette, tabs, newChat } = juno
+  const { sidebar, topic, palette, tabs, write } = juno
 
   await win.locator('aside [aria-label="Account and settings"]').click()
   await expectOptsOut(win.getByRole('menu', { name: 'Account' }), 'avatar menu')
@@ -130,12 +130,17 @@ test('every surface that can open over a title bar opts out of its drag region',
   await win.keyboard.press('Escape')
 
   await tabs.newTabButton.click()
-  await tabs.expectActive('New chat')
-  await newChat.conversationButton.click()
-  await expectOptsOut(newChat.list, 'New chat conversation picker')
+  await tabs.expectActive('Home')
+  await write.chip.click()
+  await expectOptsOut(write.list, 'destination list')
   await win.keyboard.press('Escape')
-  await newChat.composer.pressSequentially('@ma')
-  await expectOptsOut(newChat.suggestions, 'mention suggestions')
+  await write.composer.pressSequentially('@ma')
+  await expectOptsOut(write.sendTo, 'Send to list')
+  await win.keyboard.press('Escape')
+  await write.composer.fill('')
+  await write.pickConversation('eng', 'eng')
+  await write.composer.pressSequentially('Ask @ma')
+  await expectOptsOut(write.suggestions, 'mention suggestions')
 })
 
 test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {

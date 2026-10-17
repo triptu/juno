@@ -65,9 +65,9 @@ test('after sign-in, Skip for now leaves AI assist on, and the Juno tab says Jun
 
   await juno.waitForSync()
   expect(await hooks(juno.app, 'agentState')).toBe('stopped')
-  // AI assist stays on: Home offers Ask Juno, and Juno asks for a model.
+  // AI assist stays on: Home writes to Juno by default, and Juno asks for a model.
   await juno.home.open()
-  await expect(juno.home.ask).toBeVisible()
+  await juno.write.expectDestination('Juno')
   await junoNav(juno).click()
   const empty = juno.win.locator('main [data-juno-no-provider]')
   await expect(empty).toContainText('Juno needs a model')

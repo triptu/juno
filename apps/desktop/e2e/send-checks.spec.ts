@@ -131,7 +131,7 @@ test('hiring and people details in a public channel show the amber line while ty
   // It goes as soon as the draft stops matching.
   await topic.composer.fill('The release goes out Friday')
   await expect(topic.audienceWarning).toHaveCount(0)
-  // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and New chat below.
+  // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and Home below.
 })
 
 test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, slackApp, userData, running }) => {
@@ -162,11 +162,11 @@ test('Enter never waits for a slow model: before its answer the message sends at
     expect(posts(fake)).toHaveLength(1)
 
     await restarted.tabs.newTabButton.click()
-    await restarted.newChat.pickConversation('eng', 'eng')
-    await restarted.newChat.write(`${BILL_REPLY} next week`)
+    await restarted.write.pickConversation('eng', 'eng')
+    await restarted.write.write(`${BILL_REPLY} next week`)
     await restarted.win.waitForTimeout(500)
-    await restarted.newChat.send()
-    await expect(restarted.newChat.root).toHaveCount(0, { timeout: 500 })
+    await restarted.write.send()
+    await expect(restarted.write.composer).toHaveValue('', { timeout: 500 })
     await expect.poll(() => posts(fake).length).toBe(2)
     expect(posts(fake)[1]!.args['thread_ts']).toBeUndefined()
   } finally {
@@ -209,45 +209,45 @@ test('with AI assist off, local checks still work and models stay off', async ({
   }
 })
 
-test('New chat checks a channel draft and can post in the suggested thread', async ({ juno, fake, userData }) => {
+test('Home checks a channel draft and can post in the suggested thread', async ({ juno, fake, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.tabs.newTabButton.click()
-  await juno.newChat.pickConversation('eng', 'eng')
+  await juno.write.pickConversation('eng', 'eng')
   const since = Date.now()
-  await juno.newChat.write(BILL_REPLY)
+  await juno.write.write(BILL_REPLY)
   await routeAnswered(userData, fake.teamId, since)
-  await juno.newChat.send()
-  await expect(juno.newChat.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
+  await juno.write.send()
+  await expect(juno.write.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
   expect(posts(fake)).toHaveLength(0)
-  await juno.newChat.send()
+  await juno.write.send()
   await expect.poll(() => posts(fake).length).toBe(1)
   expect(posts(fake)[0]!.args['thread_ts']).toBeDefined()
   expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
 })
 
-test('New chat sends local mistakes unchanged and offers an edit on its topic', async ({ juno, fake }) => {
+test('Home sends local mistakes unchanged; the fix is offered only on a topic, so Home shows none', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.tabs.newTabButton.click()
-  await juno.newChat.pickConversation('eng', 'eng')
-  await juno.newChat.write(TYPOS)
-  await juno.newChat.send()
-  await expect(juno.newChat.root).toHaveCount(0)
-  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
+  await juno.write.pickConversation('eng', 'eng')
+  await juno.write.write(TYPOS)
+  await juno.write.send()
   await expect.poll(() => posts(fake).length).toBe(1)
   expect(posts(fake)[0]!.args['text']).toBe(TYPOS)
+  await juno.win.waitForTimeout(1_200)
+  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
 })
 
-test('New chat warns about the audience of the chosen channel', async ({ juno }) => {
+test('Home warns about the audience of the chosen channel', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.tabs.newTabButton.click()
-  await juno.newChat.pickConversation('eng', 'eng')
-  await juno.newChat.write('The salary offer goes out Friday')
-  await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
-  await juno.newChat.pickConversation('hiring', 'hiring')
-  await expect(juno.newChat.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
+  await juno.write.pickConversation('eng', 'eng')
+  await juno.write.write('The salary offer goes out Friday')
+  await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
+  await juno.write.pickConversation('hiring', 'hiring')
+  await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
 })
 
 

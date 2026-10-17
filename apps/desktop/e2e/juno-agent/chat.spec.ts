@@ -1,5 +1,6 @@
 // The Juno chat in the app against the fake Slack and a fake OpenRouter:
-// the Juno tab, the panel beside a topic, and Ask Juno from a menu.
+// the Juno tab, the panel beside a topic, a question written on Home, and
+// Ask Juno from a menu.
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'
@@ -24,6 +25,26 @@ async function setWindowWidth(juno: Juno, width: number): Promise<void> {
     window.setSize(w, window.getSize()[1]!)
   }, width)
 }
+
+test('a question written on Home goes to the Juno chat, with the field where Home’s was, and Back returns to Home', async ({ juno }) => {
+  await ready(juno)
+  const { write, tabs } = juno
+  await juno.expectNothingOpen()
+  await write.expectDestination('Juno')
+  await write.write('#eng what happened today?')
+  const before = await write.field.boundingBox()
+  await write.send()
+  await tabs.expectActive('Juno')
+  const chat = JunoChatPane.tab(juno.win)
+  await chat.expectOwner('#eng what happened today?')
+  await chat.expectJuno('You said: #eng what happened today?')
+  const after = await chat.root.locator('[data-composer-field]').boundingBox()
+  const edges = (box: typeof before) => ({ x: box?.x, width: box?.width, bottom: (box?.y ?? 0) + (box?.height ?? 0) })
+  expect(edges(after)).toEqual(edges(before))
+  await juno.nav.back()
+  await tabs.expectActive('Home')
+  await expect(write.composer).toHaveValue('')
+})
 
 test('the Juno tab sends a message at once and shows the answer, both ways a reaction and a reply', async ({ juno, model }) => {
   await ready(juno)

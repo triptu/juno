@@ -1,6 +1,7 @@
 // @ and # in the composer (spec section 8, inventory 7.1): people, user
 // groups and channels suggested as you type, picked with the keyboard, sent
-// as real Slack mentions and channel links, Esc and Backspace, and New chat.
+// as real Slack mentions and channel links, Esc and Backspace, and Home's
+// composer once a person or channel is chosen.
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -159,37 +160,38 @@ test('a draft keeps its mentions across tab switches', async ({ juno, fake }) =>
   expect(postedText(fake).at(-1)).toBe('Ask <@U0PRIYA> about the copy.')
 })
 
-test('suggestions in New chat, before and after picking where it goes', async ({ juno, fake }) => {
+test('Home suggests people and channels once a person or channel is chosen, and none while Juno is', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
+  const { write } = juno
 
-  await tabs.menu('new-chat')
-  await expect(newChat.composer).toBeFocused()
-  await newChat.composer.pressSequentially('Pairing with @le')
-  await expect(newChat.suggestion('Leo')).toBeVisible()
-  await newChat.composer.press('Enter')
-  await expect(newChat.composer).toHaveValue('Pairing with @Leo ')
-  await expect(newChat.composerChips).toHaveText(['@Leo'])
+  // Juno takes plain text: an @ inside a question suggests nothing.
+  await write.composer.pressSequentially('Ask about @le')
+  await juno.win.waitForTimeout(300)
+  await expect(write.suggestions).toHaveCount(0)
+  await write.composer.fill('')
 
-  await newChat.pickConversation('eng', 'eng')
-  await expect(newChat.composer).toBeFocused()
-  await newChat.composer.press('End')
-  await newChat.composer.pressSequentially('in #')
-  await expect(newChat.suggestion('eng')).toBeVisible()
+  await write.pickConversation('eng', 'eng')
+  await expect(write.composer).toBeFocused()
+  await write.composer.pressSequentially('Pairing with @le')
+  await expect(write.suggestion('Leo')).toBeVisible()
+  await write.composer.press('Enter')
+  await expect(write.composer).toHaveValue('Pairing with @Leo ')
+  await expect(write.composerChips).toHaveText(['@Leo'])
+  await write.composer.pressSequentially('in #')
+  await expect(write.suggestion('eng')).toBeVisible()
   // Enter right after typing, before the list for "pla" has answered, still picks.
-  await newChat.composer.pressSequentially('pla')
-  await newChat.composer.press('Enter')
-  await expect(newChat.composer).toHaveValue('Pairing with @Leo in #platform ')
+  await write.composer.pressSequentially('pla')
+  await write.composer.press('Enter')
+  await expect(write.composer).toHaveValue('Pairing with @Leo in #platform ')
 
   // Colon emoji work here too, picked with Tab.
-  await newChat.composer.pressSequentially(':smi')
-  await expect(newChat.suggestions).toBeVisible()
-  await newChat.composer.press('Tab')
-  await expect(newChat.composer).toHaveValue('Pairing with @Leo in #platform 😄 ')
-  await expect(newChat.composer).toBeFocused()
+  await write.composer.pressSequentially(':smi')
+  await expect(write.suggestions).toBeVisible()
+  await write.composer.press('Tab')
+  await expect(write.composer).toHaveValue('Pairing with @Leo in #platform 😄 ')
+  await expect(write.composer).toBeFocused()
 
-  await newChat.send()
-  await topic.expectMessage('Pairing with')
-  expect(postedText(fake).at(-1)).toBe('Pairing with <@U0LEO> in <#C0PLATFORM|platform> 😄')
+  await write.send()
+  await expect.poll(() => postedText(fake).at(-1)).toBe('Pairing with <@U0LEO> in <#C0PLATFORM|platform> 😄')
 })
