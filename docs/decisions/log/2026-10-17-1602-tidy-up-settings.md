@@ -1,0 +1,1 @@
+- 10-17 16:02 · settled-suggestions · Settings › Tidy up has two settings: quiet time before a suggestion (1 hour, 4 hours by default, 1 day, 3 days) and kinds (threads, direct messages). No Slack setting (Mark messages read in Slack too already decides), no frequency, no Keep open list (it ends on new activity); resolving without asking is proposed for later.

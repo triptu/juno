@@ -191,6 +191,7 @@ export {
   TOAST_LIFE_MS,
   toastAtom,
   undoLast,
+  undoOne,
   undoStackAtom,
   type ToastContent,
 } from './undo'
@@ -222,7 +223,10 @@ export {
   prefetchHome,
   showHome,
   resolveAllTopics,
+  actOnSettled,
+  setTidyUpPrefs,
   startVisitLog,
+  tidyUpPrefsAtom,
 } from './home'
 export {
   appendUnseen,

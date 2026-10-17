@@ -67,3 +67,46 @@ export function rankHomeItems<T>(candidates: ReadonlyArray<HomeCandidate<T>>, li
   }
   return out
 }
+
+/** What a topic's last messages show about why it looks settled (the contract's `SettledWhy`, before names). */
+export interface SettledEvidence {
+  readonly kind: 'thanks' | 'done' | 'agreed' | 'afterYou' | 'quiet'
+  /** Who wrote the last message; absent when it was the user. */
+  readonly by?: string
+}
+
+const THANKS = /\b(thanks|thank you|thank u|thx|tysm|ty|cheers|appreciate it|much appreciated)\b|:pray:|🙏/iu
+const DONE = /\b(done|merged|shipped|fixed|deployed|released|landed|closed|resolved|sorted|completed)\b|:white_check_mark:|:heavy_check_mark:|✅/iu
+const AGREED = /^\s*(ok|okay|k|kk|sounds good|sgtm|lgtm|great|perfect|works for me|cool|yep|yes|agreed|got it|:\+1:|:thumbsup:|:ok_hand:|👍|👌)(?![\p{L}\p{N}])/iu
+/** "not done", "isn't merged", "no thanks": a closing word that is denied does not close. */
+const DENIED = /\b(not|isn't|isnt|hasn't|hasnt|haven't|havent|never|no thanks)\b/i
+/** An agreement is a short reply; a long message that starts with "ok" goes on to say something else. */
+const AGREED_MAX = 60
+
+/**
+ * Why a topic looks settled, from its latest messages, newest first
+ * (`docs/design/settled-suggestions/README.md`, "Where the reason comes
+ * from"). The settled decision chose the topic; this records what its last
+ * messages show, so the review can say it in plain words. Undefined means
+ * the topic must not be proposed at all: someone asked the user something
+ * the user has not answered, or the last message mentions the user.
+ */
+export function settledEvidence(messages: ReadonlyArray<{ readonly user_id: string | null; readonly text: string }>, selfId: string, directMessage: boolean): SettledEvidence | undefined {
+  const written = messages.filter((message) => message.user_id !== null)
+  const last = written[0]
+  if (last === undefined) return undefined
+  // Newest first: a question to the user before any message from them is still waiting.
+  for (const message of written) {
+    if (message.user_id === selfId) break
+    if (asksUser(message, selfId, directMessage)) return undefined
+  }
+  const mine = last.user_id === selfId
+  if (!mine && last.text.includes(`<@${selfId}>`)) return undefined
+  const by = mine ? {} : { by: last.user_id! }
+  const closing = !isQuestion(last.text) && !DENIED.test(last.text)
+  if (closing && THANKS.test(last.text)) return { kind: 'thanks', ...by }
+  if (closing && DONE.test(last.text)) return { kind: 'done', ...by }
+  if (closing && last.text.length <= AGREED_MAX && AGREED.test(last.text)) return { kind: 'agreed', ...by }
+  if (mine && written.some((message) => message.user_id !== selfId)) return { kind: 'afterYou' }
+  return { kind: 'quiet', ...by }
+}

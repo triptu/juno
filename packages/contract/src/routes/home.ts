@@ -19,6 +19,26 @@ import { ChannelRef } from '../refs'
 export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
+/**
+ * Why Tidy up proposes a topic, from its latest messages (`settledEvidence`
+ * in `@juno/domain`). The settled decision chose the topic; this is what it
+ * read, so the review sheet can say it in plain words:
+ *
+ * - `thanks`: the last message thanks someone ("Ended with a thank-you from Maya").
+ * - `done`: the last message says the work is done, merged or shipped.
+ * - `agreed`: the last message agrees ("sounds good", "lgtm", a thumbs up).
+ * - `afterYou`: you wrote last, answering someone, and nobody wrote since.
+ * - `quiet`: nobody wrote since someone else's last message.
+ */
+export const SettledWhy = Schema.Struct({
+  kind: Schema.Literals(['thanks', 'done', 'agreed', 'afterYou', 'quiet']),
+  /** The first name of who wrote the last message. Absent when it was the user. */
+  by: Schema.optionalKey(Schema.String),
+  /** The decision's own clause, when a chat model gave one ("the fix was confirmed in staging"). */
+  juno: Schema.optionalKey(Schema.String),
+})
+export type SettledWhy = typeof SettledWhy.Type
+
 /** A topic as a Home row names it. */
 export const HomeTopic = Schema.Struct({
   id: Schema.String,
@@ -28,6 +48,10 @@ export const HomeTopic = Schema.Struct({
   place: Schema.String,
   /** The topic's art recipe for the tile. Absent shows the placeholder. */
   art: Schema.optionalKey(Schema.String),
+  /** Tidy up: the topic's latest activity, epoch milliseconds. */
+  at: Schema.optionalKey(Schema.Number),
+  /** Tidy up: why it looks settled. */
+  settled: Schema.optionalKey(SettledWhy),
 })
 export type HomeTopic = typeof HomeTopic.Type
 
@@ -68,6 +92,34 @@ export const HomeView = Schema.Struct({
   ready: Schema.Boolean,
 })
 export type HomeView = typeof HomeView.Type
+
+/** Settings › Tidy up: how long a topic must be quiet before it is suggested. */
+export const TidyUpQuiet = Schema.Literals(['1h', '4h', '1d', '3d'])
+export type TidyUpQuiet = typeof TidyUpQuiet.Type
+
+/** Settings › Tidy up, saved as the workspace preference `TIDY_UP_PREF`. */
+export const TidyUpPrefs = Schema.Struct({
+  quiet: TidyUpQuiet,
+  /** Suggest threads. */
+  threads: Schema.Boolean,
+  /** Suggest the Main of a DM or group DM. */
+  dms: Schema.Boolean,
+})
+export type TidyUpPrefs = typeof TidyUpPrefs.Type
+export const TIDY_UP_PREF = 'tidyUp'
+export const TIDY_UP_DEFAULTS: TidyUpPrefs = { quiet: '4h', threads: true, dms: true }
+export const TIDY_UP_QUIET_MILLIS: Record<TidyUpQuiet, number> = { '1h': 3_600_000, '4h': 4 * 3_600_000, '1d': 86_400_000, '3d': 3 * 86_400_000 }
+
+/** Reads the saved preference, filling what is missing or wrong from the defaults. */
+export function tidyUpPrefsOf(value: unknown): TidyUpPrefs {
+  const saved = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+  const quiet = TidyUpQuiet.literals.find((literal) => literal === saved.quiet) ?? TIDY_UP_DEFAULTS.quiet
+  return {
+    quiet,
+    threads: typeof saved.threads === 'boolean' ? saved.threads : TIDY_UP_DEFAULTS.threads,
+    dms: typeof saved.dms === 'boolean' ? saved.dms : TIDY_UP_DEFAULTS.dms,
+  }
+}
 
 /** The most items Home shows; the renderer shows two on a window shorter than 600px. */
 export const HOME_ITEM_LIMIT = 3

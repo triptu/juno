@@ -91,7 +91,7 @@ test.describe('the minimum window with the sidebar shown', () => {
       await expect(nav).toBeVisible()
       expect((await nav.boundingBox())!.width).toBeLessThanOrEqual(41)
       const items = nav.getByRole('button')
-      await expect(items).toHaveCount(9)
+      await expect(items).toHaveCount(10)
       await expect(nav.getByRole('button', { name: 'Backup & This Mac' })).toHaveAttribute('data-tooltip', 'Backup & This Mac')
       // Every card's content stays inside the card: a row's control goes under its label rather than past the edge.
       const cut = await frame.locator('[data-settings-section] section, [data-settings-section] header').evaluateAll((nodes) =>

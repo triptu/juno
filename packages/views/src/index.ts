@@ -77,6 +77,9 @@ export { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } f
 export { QuickReactionsSetting } from './QuickReactionsSetting'
 export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
+export { SettingsTidyUp } from './TidyUpSettings'
+export { SettledReview } from './SettledReview'
+export { type SettledStatus } from './settled'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'

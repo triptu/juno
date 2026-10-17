@@ -1,0 +1,1 @@
+- 10-17 16:01 · settled-suggestions · A settled topic's reason is what its last messages show (a thank-you, done, an OK, no replies after your answer), read by `settledEvidence` in the domain, because the classifier gives a score and no reason; the same reading drops topics with a question waiting on the user or a last message that mentions them.

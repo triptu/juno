@@ -84,6 +84,7 @@ const sectionLook: Record<SettingsSection, { readonly icon: PaletteIconName; rea
   appearance: { icon: 'appearance', words: 'theme accent colour color dark light' },
   notifications: { icon: 'notifications', words: 'alerts sounds badges quiet hours' },
   ignored: { icon: 'ignored', words: 'muted hidden channels' },
+  'tidy-up': { icon: 'tidy-up', words: 'resolve settled suggestions clean sidebar' },
   juno: { icon: 'juno', words: 'ai assistant provider key model spend' },
   connections: { icon: 'connections', words: 'juno servers tools integrations' },
   backup: { icon: 'backup', words: 'recovery restore move mac' },

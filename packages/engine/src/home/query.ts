@@ -23,7 +23,7 @@
  * (`homeTitle` in `ai_cache`) when it was made after the topic's latest
  * activity and was confident.
  */
-import { HOME_ITEM_LIMIT, type HomeItem, type HomeTopic, type HomeView } from '@juno/contract'
+import { HOME_ITEM_LIMIT, TIDY_UP_PREF, TIDY_UP_QUIET_MILLIS, tidyUpPrefsOf, type HomeItem, type HomeTopic, type HomeView, type SettledWhy } from '@juno/contract'
 import {
   asksUser,
   automatedReason,
@@ -36,11 +36,12 @@ import {
   rankHomeItems,
   resolveTitle,
   SETTLED_MIN_SCORE,
+  settledEvidence,
   tsToMillis,
   type HomeCandidate,
   type Ts,
 } from '@juno/domain'
-import { StoreReader, syncState, type SqlError } from '@juno/store'
+import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
@@ -66,6 +67,11 @@ const UNREAD_DAYS = 30
 const DAY = 24 * 60 * 60 * 1000
 /** Unread messages read per topic when looking for a question. */
 const QUESTION_WINDOW = 50
+/** Tidy up: the settled topics read for their evidence, newest first, and the most it proposes. */
+const SETTLED_READ = 30
+const SETTLED_SHOWN = 20
+/** Messages read per settled topic: the ones the decision read (`job.ts`). */
+const SETTLED_MESSAGES = 12
 
 interface Statement {
   readonly sql: string
@@ -95,6 +101,11 @@ export const homeStatements = {
         AND NOT EXISTS (SELECT 1 FROM builtin_views b WHERE b.id = ? AND NOT EXISTS (SELECT 1 FROM sidebar_views v WHERE v.id = b.id))
       ORDER BY +i.last_activity_ts DESC LIMIT 1`,
     params: [AUTOMATED_VIEW_ID],
+  }),
+  /** Topics the user chose Keep open for, and the activity they had then. */
+  kept: (ids: ReadonlyArray<string>): Statement => ({
+    sql: `SELECT topic_id, settled_dismissed_ts FROM topic_overlay WHERE topic_id IN (${ids.map(() => '?').join(', ')}) AND settled_dismissed_ts IS NOT NULL`,
+    params: [...ids],
   }),
   /** Why Home asks about a conversation, stored with its question. */
   askedWhy: (channel: string): Statement => ({
@@ -142,6 +153,8 @@ function waitingQuestion(messages: ReadonlyArray<MessageRow>, selfId: string, di
 interface Candidate {
   readonly item: Omit<HomeItem, 'topics' | 'aiTitle'>
   readonly rows: ReadonlyArray<HomeRow>
+  /** Tidy up: why each topic looks settled, by topic id, `by` still a user id. */
+  readonly settled?: ReadonlyMap<string, SettledWhy>
 }
 
 /** What `readHome` returns: the view, and the items whose title line the assistant may rewrite. */
@@ -155,6 +168,16 @@ const parseScore = (json: string): number | undefined => {
   try {
     const value = JSON.parse(json) as { score?: unknown }
     return typeof value.score === 'number' ? value.score : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** The decision's own clause, when a chat model gave one. */
+const parseReason = (json: string): string | undefined => {
+  try {
+    const value = JSON.parse(json) as { reason?: unknown }
+    return typeof value.reason === 'string' && value.reason.trim() !== '' ? value.reason.trim().replace(/\.$/, '') : undefined
   } catch {
     return undefined
   }
@@ -184,7 +207,8 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const now = yield* Clock.currentTimeMillis
     const unread = yield* run(homeStatements.unread(millisToTs(now - UNREAD_DAYS * DAY)))
     const candidates: Array<HomeCandidate<Candidate>> = []
-    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>) => candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows } })
+    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, settled?: ReadonlyMap<string, SettledWhy>) =>
+      candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...(settled === undefined ? {} : { settled }) } })
     const senders = new Set<string>()
 
     // Waiting on you: the newest topic with a question first.
@@ -220,18 +244,40 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         add({ id: `followUp:${row.topic_id}:${promise.message_ts}`, kind: 'followUp', title: promise.text, at: tsToMillis(promise.message_ts as Ts), messageTs: promise.message_ts }, [row])
       }
 
+      // Tidy up (docs/design/settled-suggestions): scored high after the latest activity, quiet for the time
+      // Settings › Tidy up chooses, of a kind it includes, not kept open since, and nothing waiting on the user.
+      const tidy = tidyUpPrefsOf(yield* prefs.get<unknown>(TIDY_UP_PREF).pipe(Effect.catch(() => Effect.succeed(undefined))))
       const scored = yield* sql<{ key: string; output_json: string; created_at: string }>`
         SELECT key, output_json, created_at FROM ai_cache WHERE task = 'settledScore'`
       const high = scored.filter((entry) => (parseScore(entry.output_json) ?? 0) >= SETTLED_MIN_SCORE)
-      if (high.length > 0) {
+      if (high.length > 0 && selfId !== undefined && (tidy.threads || tidy.dms)) {
+        const quietSince = millisToTs(now - TIDY_UP_QUIET_MILLIS[tidy.quiet])
         const rows = yield* run(homeStatements.topics(high.map((entry) => entry.key)))
-        const settled = rows
+        const keptRun = homeStatements.kept(rows.map((row) => row.topic_id))
+        const kept = rows.length === 0 ? new Map<string, string>() : new Map((yield* sql.unsafe<{ topic_id: string; settled_dismissed_ts: string }>(keptRun.sql, keptRun.params)).map((k) => [k.topic_id, k.settled_dismissed_ts]))
+        const fresh = rows
           .filter((row) => {
             const entry = high.find((h) => h.key === row.topic_id)
-            return entry !== undefined && freshFor(entry.created_at, row) && (row.kind === 'thread' ? row.subscribed === 1 : row.c_kind === 'im' || row.c_kind === 'mpim')
+            const kind = row.kind === 'thread' ? (row.subscribed === 1 && tidy.threads) : (row.c_kind === 'im' || row.c_kind === 'mpim') && tidy.dms
+            const keptAt = kept.get(row.topic_id)
+            return entry !== undefined && kind && freshFor(entry.created_at, row) && row.last_activity_ts !== null && row.last_activity_ts <= quietSince
+              && (keptAt === undefined || row.last_activity_ts > keptAt)
           })
           .toSorted((a, b) => ((b.last_activity_ts ?? '') < (a.last_activity_ts ?? '') ? -1 : 1))
-        add({ id: 'tidyUp', kind: 'tidyUp', title: `${settled.length} topics look settled` }, settled)
+          .slice(0, SETTLED_READ)
+        const settled: Array<HomeRow> = []
+        const why = new Map<string, SettledWhy>()
+        for (const row of fresh) {
+          if (settled.length >= SETTLED_SHOWN) break
+          const evidence = settledEvidence(yield* messagesAfter(row, NO_READ, SETTLED_MESSAGES), selfId, row.kind === 'main' && row.c_kind === 'im')
+          if (evidence === undefined) continue
+          const entry = high.find((h) => h.key === row.topic_id)
+          const clause = entry === undefined ? undefined : parseReason(entry.output_json)
+          settled.push(row)
+          if (evidence.by !== undefined) senders.add(evidence.by)
+          why.set(row.topic_id, { ...evidence, ...(evidence.kind === 'quiet' && clause !== undefined ? { juno: clause } : {}) })
+        }
+        add({ id: 'tidyUp', kind: 'tidyUp', title: `${settled.length} topics look settled` }, settled, why)
       }
     }
 
@@ -303,7 +349,14 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
               : base.title
       const cached = rewrites.find((entry) => entry.key === base.id)
       const aiTitle = cached !== undefined && rows[0] !== undefined && freshFor(cached.created_at, rows[0]) ? parseTitle(cached.output_json) : undefined
-      const item: HomeItem = { ...base, title, topics: rows.map(topicOf), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
+      const settledOf = (row: HomeRow): HomeTopic => {
+        const why = candidate.value.settled?.get(row.topic_id)
+        const topic = topicOf(row)
+        if (why === undefined) return topic
+        const by = why.by === undefined ? {} : { by: firstName(nameOf(why.by)) }
+        return { ...topic, ...(row.last_activity_ts === null ? {} : { at: tsToMillis(row.last_activity_ts as Ts) }), settled: { ...why, ...by } }
+      }
+      const item: HomeItem = { ...base, title, topics: rows.map(base.kind === 'tidyUp' ? settledOf : topicOf), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item
     })

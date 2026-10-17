@@ -2,6 +2,7 @@
 // the fake Slack and the fake AI provider.
 import { afterEach, describe, expect, it } from 'vitest'
 import { homeMarkDone, homeView, homeVisit, prefsSet, type HomeView } from '@juno/contract'
+import { SELF_ID } from '@juno/fake-slack'
 import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine, threadId, valueOf } from './scenario'
@@ -66,10 +67,14 @@ describe('Home', () => {
 
   it('with AI assist on, adds a follow-up until Mark done, tidies up settled topics and rewrites a title line', async () => {
     const engine = await bootedEngine(engines, { aiJobs: true })
-    // A second settled thread: a closing reply five minutes ago, so it has been idle long enough to score.
-    const root = engine.fake.messages('C0ENG').find((message) => message.text?.startsWith('Unrelated: has anyone looked at the staging bill'))!
-    const staging = `t:C0ENG:${root.ts}`
-    engine.fake.workspace.post({ channel: 'C0ENG', threadTs: root.ts, user: 'U0JONAS', text: 'Reaper is live. Done, thanks all.', at: engine.fake.now() - 5 * 60_000 })
+    // Tidy up waits for an hour of quiet here (four by default); the incident thread went quiet 70 minutes ago.
+    valueOf(await runCommand(engine.registry, prefsSet, { key: 'tidyUp', value: { quiet: '1h', threads: true, dms: true } }))
+    // A second settled thread: Dev's, answered by the user, and Dev's thanks two hours ago.
+    const HOUR = 3_600_000
+    const root = engine.fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: engine.fake.now() - 3 * HOUR })
+    engine.fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: SELF_ID, text: 'Rotated them this morning.', at: engine.fake.now() - 2.5 * HOUR })
+    engine.fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: 'U0DEV', text: 'Great, thanks', at: engine.fake.now() - 2 * HOUR })
+    const keys = `t:C0INCIDENTS:${root.ts}`
 
     const view = await homeUntil(engine, (value) => kinds(value).join() === 'waiting,followUp,tidyUp' && value.items[0]!.aiTitle !== undefined, 'the AI items')
     expect(view.items[0]!.aiTitle).toBe('Elena asks: She has a competing offer with a Friday')
@@ -77,7 +82,9 @@ describe('Home', () => {
     expect(followUp).toMatchObject({ title: "You said you'd review Dev's packet this week", topics: [{ place: 'Sam' }] })
     const tidy = view.items[2]!
     expect(tidy.title).toBe('2 topics look settled')
-    expect(tidy.topics.map((topic) => topic.id)).toContain(staging)
+    // Each proposal says why, from its last messages, with the writer's first name.
+    expect(tidy.topics.find((topic) => topic.id === keys)).toMatchObject({ place: 'incidents', settled: { kind: 'thanks', by: 'Dev' } })
+    expect(tidy.topics.find((topic) => topic.id !== keys)?.settled).toEqual({ kind: 'thanks' })
 
     valueOf(await runCommand(engine.registry, homeMarkDone, { topicId: followUp.topics[0]!.id, messageTs: followUp.messageTs! }))
     const done = await homeUntil(engine, (value) => !kinds(value).includes('followUp'), 'the follow-up gone')

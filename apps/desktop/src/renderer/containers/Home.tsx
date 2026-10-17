@@ -1,10 +1,11 @@
-import { useId, useLayoutEffect, useRef } from 'react'
-import { viewsSortChannel } from '@juno/contract'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { viewsSortChannel, type HomeItem } from '@juno/contract'
 import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
+import { TidyUpReview } from './TidyUpReview'
 import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
@@ -26,30 +27,9 @@ function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
   }, [key, stage, value])
 }
 
-/**
- * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
- * at the bottom. It shows the items `home.view` had when Home appeared
- * (`showHome`, before the first paint, again each time Home comes back
- * from a hidden tab, and once more when the first value arrives); later
- * values change only a row's title line (`freezeHome`). Until the first
- * sync is done it shows the scene and the greeting with "Syncing with
- * Slack.", and rows fill reserved slots as they land (`fillHome`).
- */
-export function HomePage({ tabId }: { readonly tabId: string }) {
-  const key = useId()
-  const result = useAtomValue(homeViewAtom)
-  const value = result._tag === 'Success' ? result.value : undefined
-  const latest = value?.ready === true ? value : undefined
-  const shown = useAtomValue(homeShownAtom(key))
-
-  // Nothing yet, the first sync running, or ready: Home is taken again at each step.
-  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
-
-  // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
-  if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
-  const view = value === undefined ? shown.view : freezeHome(shown.view, value)
-
-  const itemOf = (itemId: string) => view.items.find((candidate) => candidate.id === itemId)
+/** What Home's row buttons do, for the items `items` (Home's `key`). */
+function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeItem) => void) {
+  const itemOf = (itemId: string) => items.find((candidate) => candidate.id === itemId)
   const markDone = (itemId: string) => {
     const item = itemOf(itemId)
     if (item === undefined) return
@@ -65,6 +45,10 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       item.topics.map((topic) => topic.id),
     )
   }
+  const review = (itemId: string) => {
+    const item = itemOf(itemId)
+    if (item !== undefined) setReviewing(item)
+  }
 
   // Automated's question: Move or Keep in All, remembered, with Undo; right-click has the conversation's menu, with Ignore.
   const sort = (itemId: string, to: 'automated' | 'kept') => {
@@ -79,8 +63,38 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
     const main = item.topics[0]?.id
     void showChannelMenu({ ...item.channel, ...(main === undefined ? {} : { mainId: main }) })
   }
+  return { markDone, resolveAll, review, sort, itemMenu }
+}
+
+/**
+ * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
+ * at the bottom. It shows the items `home.view` had when Home appeared
+ * (`showHome`, before the first paint, again each time Home comes back
+ * from a hidden tab, and once more when the first value arrives); later
+ * values change only a row's title line (`freezeHome`). Until the first
+ * sync is done it shows the scene and the greeting with "Syncing with
+ * Slack.", and rows fill reserved slots as they land (`fillHome`).
+ */
+export function HomePage({ tabId }: { readonly tabId: string }) {
+  const key = useId()
+  // Tidy up's review, open over Home (`SettledReview`), with the item it shows.
+  const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
+  const result = useAtomValue(homeViewAtom)
+  const value = result._tag === 'Success' ? result.value : undefined
+  const latest = value?.ready === true ? value : undefined
+  const shown = useAtomValue(homeShownAtom(key))
+
+  // Nothing yet, the first sync running, or ready: Home is taken again at each step.
+  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
+
+  // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
+  if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
+  const view = value === undefined ? shown.view : freezeHome(shown.view, value)
+
+  const { markDone, resolveAll, review, sort, itemMenu } = itemActions(key, view.items, setReviewing)
 
   return (
+    <>
     <Home
       loading={shown.loading}
       reservedItems={shown.reservedItems}
@@ -95,9 +109,21 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onOpen={openItem}
       onMarkDone={markDone}
       onResolveAll={resolveAll}
+      onReview={review}
       onSort={sort}
       onItemMenu={itemMenu}
       composer={<HomeComposer tabId={tabId} />}
     />
+    {reviewing === undefined ? null : (
+      <TidyUpReview
+        item={reviewing}
+        now={shown.now}
+        onClose={(allDone) => {
+          if (allDone) markHomeItemUsed(registry, key, reviewing.id)
+          setReviewing(undefined)
+        }}
+      />
+    )}
+    </>
   )
 }

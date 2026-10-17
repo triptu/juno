@@ -14,14 +14,17 @@
  * - `startVisitLog`: tells the engine which topic was open for a minute,
  *   for "Pick up where you left off".
  * - `markFollowUpDone`, `resolveAllTopics`: the two row buttons.
+ * - `actOnSettled`: Resolve or Keep open on one row of Tidy up's review.
+ * - `tidyUpPrefsAtom`, `setTidyUpPrefs`: Settings › Tidy up.
  */
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { homeMarkDone, homeView, homeVisit, topicsResolve, type CommandResult, type HomeItem, type HomeView, type UndoCommand } from '@juno/contract'
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
+import { homeMarkDone, homeView, homeVisit, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
-import { showToast, undoStackAtom, UNDO_LIMIT } from './undo'
+import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
 export const homeViewAtom = liveQuery(homeView)(undefined)
 
@@ -293,18 +296,44 @@ export async function markFollowUpDone(registry: Registry, item: HomeItem): Prom
 /**
  * Resolve all on Tidy up: resolves each topic, and keeps one undo that puts
  * them all back, from the undos the engine computed. Toast "Resolved 3
- * topics" with Undo.
+ * topics" with Undo. Resolves with each topic's own undo, so a row of the
+ * review can put back just its topic.
  */
-export async function resolveAllTopics(registry: Registry, ids: ReadonlyArray<string>): Promise<boolean> {
+export async function resolveAllTopics(registry: Registry, ids: ReadonlyArray<string>): Promise<ReadonlyArray<Extract<UndoCommand, { _tag: 'topics.restore' }>>> {
   const exits = await Promise.all(ids.map((id) => runCommand(registry, topicsResolve, { id })))
   const restores = exits.flatMap((exit) => {
     if (Exit.isFailure(exit)) return []
     const undo = (exit.value as CommandResult).undo
     return undo?._tag === 'topics.restore' ? [undo] : []
   })
-  if (restores.length === 0) return exits.some(Exit.isSuccess)
+  if (restores.length === 0) return restores
   const undo: UndoCommand = { _tag: 'topics.restoreAll', restores: restores.map((restore) => ({ id: restore.id, overlay: restore.overlay, ...(restore.unreadFrom === undefined ? {} : { unreadFrom: restore.unreadFrom }) })) }
   registry.set(undoStackAtom, [...registry.get(undoStackAtom), undo].slice(-UNDO_LIMIT))
   showToast(registry, { text: restores.length === 1 ? 'Resolved 1 topic' : `Resolved ${restores.length} topics`, check: true }, true)
-  return true
+  return restores
+}
+
+/**
+ * One row of Tidy up's review: Resolve or Keep open, with the usual toast
+ * and Undo. Resolves with the undo, so the row's own Undo can replay it
+ * (`undoOne`), or undefined when nothing changed.
+ */
+export async function actOnSettled(registry: Registry, topic: HomeTopic, action: 'resolve' | 'keep'): Promise<UndoCommand | undefined> {
+  const exit =
+    action === 'resolve'
+      ? await runActionExit(registry, topicsResolve, { id: topic.id }, { text: `Resolved · ${topic.title}`, check: true })
+      : await runActionExit(registry, topicsKeepOpen, { id: topic.id }, { text: `Keeping open · ${topic.title}` })
+  return Exit.isSuccess(exit) ? (exit.value as CommandResult).undo : undefined
+}
+
+const savedTidyUpAtom = liveQuery(prefsGet)({ key: TIDY_UP_PREF })
+
+/** Settings › Tidy up, with the defaults for what was never saved. */
+export const tidyUpPrefsAtom = Atom.make((get): TidyUpPrefs => {
+  const saved = get(savedTidyUpAtom)
+  return tidyUpPrefsOf(AsyncResult.isSuccess(saved) ? saved.value : undefined)
+})
+
+export function setTidyUpPrefs(registry: Registry, prefs: TidyUpPrefs): void {
+  void runCommand(registry, prefsSet, { key: TIDY_UP_PREF, value: prefs })
 }

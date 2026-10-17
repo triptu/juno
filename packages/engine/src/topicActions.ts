@@ -72,6 +72,18 @@ export const resolveTopic = (id: string) =>
     }),
   )
 
+/** Keep open on Tidy up: not suggested again until activity after what it has now. */
+export const keepTopicOpen = (id: string) =>
+  onTopic(id, () =>
+    Effect.gen(function* () {
+      const activity = yield* lastActivity(id)
+      if (activity === undefined) return 'missing' as const
+      const before = yield* readOverlay(id)
+      if (before.settledDismissedTs === activity) return unchanged
+      return undone(restore(id, yield* patchOverlay(id, { settledDismissedTs: activity })))
+    }),
+  )
+
 export const reopenTopic = (id: string) =>
   onTopic(id, () =>
     Effect.gen(function* () {

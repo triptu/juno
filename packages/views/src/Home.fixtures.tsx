@@ -84,6 +84,7 @@ const base: HomeProps = {
   onOpen: noop,
   onMarkDone: noop,
   onResolveAll: noop,
+  onReview: noop,
   onSort: noop,
   onItemMenu: noop,
   composer: write(),

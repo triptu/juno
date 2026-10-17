@@ -37,7 +37,7 @@ test.describe('Settings', () => {
     test(`${id}: the section list keeps the sidebar's 10px inset on both sides, and its first row starts on the title's top edge`, async ({ page }) => {
       await open(page, 'SettingsPage', id)
       const at = await measure(page)
-      expect(at.rows).toHaveLength(9)
+      expect(at.rows).toHaveLength(10)
       for (const row of at.rows) expect({ left: row.left, right: row.right }).toEqual({ left: 10, right: 10 })
       expect(at.rows[0]!.top).toBe(at.titleTop)
       // The settings column: 760 wide, centred in the space beside the list.

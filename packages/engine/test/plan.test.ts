@@ -183,6 +183,7 @@ describe('query plans', () => {
         staleStatement('settledScore', '1700000000.000000', '1800000000.000000', 12),
         homeStatements.automated(),
         homeStatements.askedWhy('C0ALERTS'),
+        homeStatements.kept(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
         automatedStatements.candidates(),
         automatedStatements.sample('C0ALERTS'),
       ]

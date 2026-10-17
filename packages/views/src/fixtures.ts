@@ -17,6 +17,7 @@ import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
+import SettledReview from './SettledReview.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
@@ -101,6 +102,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EngineStatusView,
   MediaViewer,
   Home,
+  SettledReview,
   HoverToolbar,
   JunoChatList,
   JunoComposer,

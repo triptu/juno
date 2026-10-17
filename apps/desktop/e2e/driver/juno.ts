@@ -531,7 +531,7 @@ export class SettingsPage {
   }
 }
 
-export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
+export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Tidy up' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
 /** Settings › Notifications (inventory 13). */
 export class NotificationsPage {
@@ -2438,10 +2438,72 @@ export class HomePane {
     return this.item(kind).getByRole('button', { name, exact: true })
   }
 
+  /** Tidy up's row, which opens the review sheet. */
+  async review(): Promise<SettledReviewSheet> {
+    await this.item('tidyUp').locator('[data-home-review]').click()
+    const sheet = new SettledReviewSheet(this.win)
+    await expect(sheet.root).toBeVisible()
+    return sheet
+  }
+
   /** Right-clicks a row and chooses `item` in its menu. Returns the menu's labels. */
   async chooseInItemMenu(kind: HomeItemKind, item: string): Promise<string[]> {
     await chooseNextMenuItem(this.win, item)
     await this.item(kind).click({ button: 'right' })
     return (await lastMenu(this.win)).labels
+  }
+}
+
+/** Tidy up's review (SPEC 12, `docs/design/settled-suggestions/`): every proposal with its reason, Resolve and Keep open. */
+export class SettledReviewSheet {
+  constructor(readonly win: Page) {}
+
+  get root(): Locator {
+    return this.win.locator('[data-sheet="settled"]')
+  }
+
+  get title(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  /** A proposal's row, by text in its title. */
+  row(title: string): Locator {
+    return this.root.locator('[data-settled-row]').filter({ has: this.win.locator('[data-settled-title]', { hasText: title }) })
+  }
+
+  reason(title: string): Locator {
+    return this.row(title).locator('[data-settled-reason]')
+  }
+
+  status(title: string): Promise<string | null> {
+    return this.row(title).getAttribute('data-settled-status')
+  }
+
+  resolve(title: string): Locator {
+    return this.row(title).locator('[data-settled-resolve]')
+  }
+
+  keep(title: string): Locator {
+    return this.row(title).locator('[data-settled-keep]')
+  }
+
+  undo(title: string): Locator {
+    return this.row(title).locator('[data-settled-undo]')
+  }
+
+  get resolveAll(): Locator {
+    return this.root.locator('[data-settled-resolve-all]')
+  }
+
+  get done(): Locator {
+    return this.root.locator('[data-settled-close]')
+  }
+
+  get about(): Locator {
+    return this.root.locator('[data-settled-about]')
+  }
+
+  get explainer(): Locator {
+    return this.root.locator('[data-settled-explainer]')
   }
 }

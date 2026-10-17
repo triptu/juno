@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
+import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
@@ -19,6 +20,7 @@ export const settingsSections: ReadonlyArray<{ readonly section: SettingsSection
   { section: 'appearance', label: 'Appearance', icon: Palette },
   { section: 'notifications', label: 'Notifications', icon: Bell },
   { section: 'ignored', label: 'Ignored', icon: EyeSlash },
+  { section: 'tidy-up', label: 'Tidy up', icon: Broom },
   { section: 'juno', label: 'Juno', icon: Sparkle },
   { section: 'ai-activity', label: 'AI activity', icon: Pulse },
   { section: 'connections', label: 'Connections', icon: Plugs },
