@@ -47,7 +47,7 @@ const large = signInOn({})
 /** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */
 const medium = signInOn({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } })
 
-large('first sign-in shows threads, channels and DMs within the budget, then fills in without a reload', async ({ juno }) => {
+large('first sign-in shows threads, channels and DMs before history is read, then fills in without a reload', async ({ juno }) => {
   test.setTimeout(180_000)
   await juno.signIn({ skipSetUp: false })
   const signedIn = Date.now()
