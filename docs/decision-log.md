@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 15:39 · quick-reactions-picker · Settings' Add reaction opens the message toolbar's `EmojiPicker` as a popover fixed in a portal on `body`, not inside the card, so the card neither clips it nor grows for it; chosen emoji show through a new `selected` prop, Add is dimmed and focusable at seven ("Up to 7"), and Reset to default sits under the pills, right after the count line.
 - 10-17 15:30 · bundle-split · Duotone is not an `IconWeight`: a duotone icon is a wrapped icon from `packages/ui/src/duotone.ts`, the desktop build drops the duotone weight from every other icon (36.9 KB of initial JS), and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
 - 10-17 14:42 · topic-sidebar-review · A sidebar row's place line is as tall as Resolve on every row, so rows without Resolve (resolved, renaming) keep one rhythm; my reaction chip keeps its ring on hover and its fill steps up to `--hl-bubble`; the audience line starts its icon and text on the check bar's edge.
 - 10-17 14:30 · status-page · The status page puts decisions at full width, grouped by day with search and area filters; areas come from one keyword table in `scripts/status-areas.mjs`, and `needsYou` in now.json holds real blockers only, with optional checks in `later`.
