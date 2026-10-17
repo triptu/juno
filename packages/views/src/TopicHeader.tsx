@@ -1,16 +1,14 @@
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { ContextPill, Popover, type ContextTint, type PhosphorIcon } from '@juno/ui'
+import { layout } from '@juno/tokens/tokens.stylex'
+import { ContextPill, Popover, type ContextTint } from '@juno/ui'
 import { HeaderTitleButton, IslandButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
+import { kindIcon } from './look'
 import { RenameField } from './RenameField'
 
 export interface TopicHeaderProps {
@@ -39,21 +37,12 @@ export interface TopicHeaderProps {
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
 
-/** A one-off size: the header pill's widest (inventory 5). */
-const PILL_MAX_WIDTH = '160px'
 
 const kindLabels: Record<TopicDetail['channel']['kind'], string> = {
   public: 'Public channel',
   private: 'Private channel',
   im: 'Direct message',
   mpim: 'Group DM',
-}
-
-const kindIcons: Record<TopicDetail['channel']['kind'], PhosphorIcon> = {
-  public: Hash,
-  private: Lock,
-  im: User,
-  mpim: Users,
 }
 
 const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
@@ -112,7 +101,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
           >
             <ContextPill
               tint={tints[channel.kind]}
-              icon={kindIcons[channel.kind]}
+              icon={kindIcon(channel.kind)}
               name={channel.name}
               kindLabel={kind}
               size={24}
@@ -156,6 +145,6 @@ const styles = stylex.create({
     display: 'flex',
     flexShrink: 1,
     minWidth: 0,
-    maxWidth: PILL_MAX_WIDTH,
+    maxWidth: layout['--header-pill-max-width'],
   },
 })

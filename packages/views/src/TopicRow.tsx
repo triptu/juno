@@ -3,18 +3,15 @@ import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { Person, TopicRow as TopicRowModel } from '@juno/contract'
-import { accent, colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
+import { colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
   AvatarStack,
   Chip,
+  focusRing,
   GroupAvatar,
   Icon,
   IconButton,
@@ -24,9 +21,8 @@ import {
   TopicArt,
   type ActivateEvent,
   type AvatarStackPerson,
-  type PhosphorIcon,
 } from '@juno/ui'
-import { countLabel, groupInitials, hueFor, initials } from './look'
+import { countLabel, groupInitials, hueFor, initials, kindIcon } from './look'
 import { RenameField } from './RenameField'
 
 export interface TopicRowProps {
@@ -212,7 +208,7 @@ export const TopicRow = memo(function TopicRow({
       onContextMenu={onContextMenu === undefined ? undefined : (event) => onContextMenu(row.id, event)}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(row.id, event), { disabled: renaming })}
       data-row-lines={twoLine ? 2 : 3}
-      {...stylex.props(styles.row, twoLine && styles.twoLineRow, selected && styles.selected)}
+      {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, quiet && styles.quietTile)}>
         <Tile row={row} />
@@ -264,7 +260,7 @@ export const TopicRow = memo(function TopicRow({
             <span {...stylex.props(styles.where, resolvable && styles.whereUnderAction)}>
               <span {...stylex.props(styles.place)}>
                 <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
-                  <Icon icon={whereIcon(row)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
+                  <Icon icon={kindIcon(row.channel.kind)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
                 </span>
                 <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated data-row-part="place">
                   {row.channel.name}
@@ -355,24 +351,6 @@ function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string 
   return parts.length === 0 ? undefined : `${parts.join(', ')}.`
 }
 
-/**
- * Line three's leading glyph says what kind of place it is, nothing more: #
- * for a public channel, a lock for a private one, a person for a DM and two
- * for a group DM. A channel's own icon is for its art, not this line.
- */
-function whereIcon(row: TopicRowModel): PhosphorIcon {
-  switch (row.channel.kind) {
-    case 'im':
-      return User
-    case 'mpim':
-      return Users
-    case 'private':
-      return Lock
-    default:
-      return Hash
-  }
-}
-
 const styles = stylex.create({
   row: {
     display: 'flex',
@@ -396,14 +374,6 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
-    // Keyboard focus ring, inset because the row sits flush in its list.
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
-    outlineColor: accent['--focus-ring'],
     // The Resolve check reads this: hidden until the pointer is over the row
     // or keyboard focus is on the row or the check itself (a mouse press
     // leaves focus on the row too, and must not show it). Only opacity
