@@ -2,78 +2,7 @@
   "ok": true,
   "messages": [
     {
-      "text": "redacted",
-      "files": [
-        {
-          "id": "F0REDACTED",
-          "created": 1700000000,
-          "timestamp": 1700000000,
-          "mimetype": "redacted",
-          "filetype": "redacted",
-          "pretty_type": "redacted",
-          "user": "U0REDACTED",
-          "user_team": "T0REDACTED",
-          "editable": false,
-          "size": 545028,
-          "mode": "hosted",
-          "is_external": false,
-          "external_type": "",
-          "is_public": true,
-          "public_url_shared": false,
-          "display_as_bot": false,
-          "username": "",
-          "name": "redacted",
-          "title": "redacted",
-          "is_modified_by_ai": false,
-          "url_private": "https://redacted.invalid/",
-          "url_private_download": "https://redacted.invalid/",
-          "media_display_type": "redacted",
-          "thumb_64": "https://redacted.invalid/",
-          "thumb_80": "https://redacted.invalid/",
-          "thumb_360": "https://redacted.invalid/",
-          "thumb_360_w": 195,
-          "thumb_360_h": 360,
-          "thumb_480": "https://redacted.invalid/",
-          "thumb_480_w": 261,
-          "thumb_480_h": 480,
-          "thumb_160": "https://redacted.invalid/",
-          "thumb_720": "https://redacted.invalid/",
-          "thumb_720_w": 391,
-          "thumb_720_h": 720,
-          "thumb_800": "https://redacted.invalid/",
-          "thumb_800_w": 800,
-          "thumb_800_h": 1474,
-          "original_w": 876,
-          "original_h": 1614,
-          "thumb_tiny": "redacted",
-          "permalink": "https://redacted.invalid/",
-          "permalink_public": "https://redacted.invalid/",
-          "is_starred": false,
-          "skipped_shares": true,
-          "has_rich_preview": false,
-          "file_access": "redacted"
-        }
-      ],
-      "upload": false,
       "user": "U0REDACTED",
-      "display_as_bot": false,
-      "blocks": [
-        {
-          "type": "rich_text",
-          "block_id": "redacted",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "text",
-                  "text": "redacted"
-                }
-              ]
-            }
-          ]
-        }
-      ],
       "type": "message",
       "ts": "1700000000.000001",
       "edited": {
@@ -81,143 +10,23 @@
         "ts": "1700000000.000001"
       },
       "client_msg_id": "redacted",
-      "thread_ts": "1700000000.000001",
-      "reply_count": 1,
-      "reply_users_count": 1,
-      "latest_reply": "1700000000.000001",
-      "reply_users": [
-        "U0REDACTED"
-      ],
-      "is_locked": false,
-      "subscribed": false,
-      "reactions": [
-        {
-          "name": "redacted",
-          "users": [
-            "U0REDACTED",
-            "U0REDACTED",
-            "U0REDACTED"
-          ],
-          "count": 4
-        }
-      ]
-    },
-    {
-      "text": "redacted",
-      "files": [
-        {
-          "id": "F0REDACTED",
-          "created": 1700000000,
-          "timestamp": 1700000000,
-          "mimetype": "redacted",
-          "filetype": "redacted",
-          "pretty_type": "redacted",
-          "user": "U0REDACTED",
-          "user_team": "T0REDACTED",
-          "editable": false,
-          "size": 59382,
-          "mode": "hosted",
-          "is_external": false,
-          "external_type": "",
-          "is_public": true,
-          "public_url_shared": false,
-          "display_as_bot": false,
-          "username": "",
-          "name": "redacted",
-          "title": "redacted",
-          "is_modified_by_ai": false,
-          "url_private": "https://redacted.invalid/",
-          "url_private_download": "https://redacted.invalid/",
-          "media_display_type": "redacted",
-          "thumb_64": "https://redacted.invalid/",
-          "thumb_80": "https://redacted.invalid/",
-          "thumb_360": "https://redacted.invalid/",
-          "thumb_360_w": 360,
-          "thumb_360_h": 76,
-          "thumb_480": "https://redacted.invalid/",
-          "thumb_480_w": 480,
-          "thumb_480_h": 102,
-          "thumb_160": "https://redacted.invalid/",
-          "original_w": 964,
-          "original_h": 204,
-          "thumb_tiny": "redacted",
-          "permalink": "https://redacted.invalid/",
-          "permalink_public": "https://redacted.invalid/",
-          "is_starred": false,
-          "skipped_shares": true,
-          "has_rich_preview": false,
-          "file_access": "redacted"
-        }
-      ],
-      "upload": false,
-      "user": "U0REDACTED",
-      "display_as_bot": false,
-      "blocks": [
-        {
-          "type": "rich_text",
-          "block_id": "redacted",
-          "elements": [
-            {
-              "type": "rich_text_section",
-              "elements": [
-                {
-                  "type": "text",
-                  "text": "redacted"
-                }
-              ]
-            }
-          ]
-        }
-      ],
-      "type": "message",
-      "ts": "1700000000.000001",
-      "client_msg_id": "redacted",
-      "thread_ts": "1700000000.000001",
-      "reply_count": 4,
-      "reply_users_count": 2,
-      "latest_reply": "1700000000.000001",
-      "reply_users": [
-        "U0REDACTED",
-        "U0REDACTED"
-      ],
-      "is_locked": false,
-      "subscribed": false
-    },
-    {
-      "user": "U0REDACTED",
-      "type": "message",
-      "ts": "1700000000.000001",
-      "client_msg_id": "redacted",
       "text": "redacted",
       "team": "T0REDACTED",
-      "thread_ts": "1700000000.000001",
-      "reply_count": 1,
-      "reply_users_count": 1,
-      "latest_reply": "1700000000.000001",
-      "reply_users": [
-        "U0REDACTED"
-      ],
-      "is_locked": false,
-      "subscribed": false,
       "attachments": [
         {
+          "image_url": "https://redacted.invalid/",
+          "image_width": 1120,
+          "image_height": 584,
+          "image_bytes": 82761,
           "from_url": "https://redacted.invalid/",
           "service_icon": "https://redacted.invalid/",
-          "thumb_url": "https://redacted.invalid/",
-          "thumb_width": 480,
-          "thumb_height": 360,
-          "video_html": "redacted",
-          "video_html_width": 400,
-          "video_html_height": 225,
           "id": 1,
           "original_url": "https://redacted.invalid/",
           "fallback": "redacted",
+          "text": "redacted",
           "title": "redacted",
           "title_link": "https://redacted.invalid/",
-          "author_name": "redacted",
-          "author_link": "https://redacted.invalid/",
           "service_name": "redacted",
-          "service_url": "https://redacted.invalid/",
           "media_type": "redacted"
         }
       ],
@@ -235,21 +44,130 @@
                   "text": "redacted",
                   "truncated": true,
                   "unsafe": true
+                },
+                {
+                  "type": "text",
+                  "text": "redacted"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "user": "U0REDACTED",
+      "type": "message",
+      "ts": "1700000000.000001",
+      "client_msg_id": "redacted",
+      "text": "redacted",
+      "team": "T0REDACTED",
+      "attachments": [
+        {
+          "image_url": "https://redacted.invalid/",
+          "image_width": 1200,
+          "image_height": 675,
+          "image_bytes": 314303,
+          "from_url": "https://redacted.invalid/",
+          "service_icon": "https://redacted.invalid/",
+          "ts": 1700000000,
+          "id": 1,
+          "original_url": "https://redacted.invalid/",
+          "fallback": "redacted",
+          "text": "redacted",
+          "title": "redacted",
+          "title_link": "https://redacted.invalid/",
+          "service_name": "redacted",
+          "media_type": "redacted"
+        }
+      ],
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://redacted.invalid/",
+                  "text": "redacted",
+                  "truncated": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "redacted",
+      "files": [
+        {
+          "id": "F0REDACTED",
+          "created": 1700000000,
+          "timestamp": 1700000000,
+          "mimetype": "redacted",
+          "filetype": "redacted",
+          "pretty_type": "redacted",
+          "user": "U0REDACTED",
+          "user_team": "T0REDACTED",
+          "editable": false,
+          "size": 47315,
+          "mode": "hosted",
+          "is_external": false,
+          "external_type": "",
+          "is_public": true,
+          "public_url_shared": false,
+          "display_as_bot": false,
+          "username": "",
+          "name": "redacted",
+          "title": "redacted",
+          "is_modified_by_ai": false,
+          "url_private": "https://redacted.invalid/",
+          "url_private_download": "https://redacted.invalid/",
+          "media_display_type": "redacted",
+          "thumb_64": "https://redacted.invalid/",
+          "thumb_80": "https://redacted.invalid/",
+          "thumb_360": "https://redacted.invalid/",
+          "thumb_360_w": 360,
+          "thumb_360_h": 106,
+          "thumb_160": "https://redacted.invalid/",
+          "original_w": 776,
+          "original_h": 228,
+          "thumb_tiny": "redacted",
+          "permalink": "https://redacted.invalid/",
+          "permalink_public": "https://redacted.invalid/",
+          "is_starred": false,
+          "skipped_shares": true,
+          "has_rich_preview": false,
+          "file_access": "redacted"
+        }
+      ],
+      "upload": false,
+      "user": "U0REDACTED",
+      "display_as_bot": false,
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "redacted",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "text",
+                  "text": "redacted"
                 }
               ]
             }
           ]
         }
       ],
-      "reactions": [
-        {
-          "name": "redacted",
-          "users": [
-            "U0REDACTED"
-          ],
-          "count": 1
-        }
-      ]
+      "type": "message",
+      "ts": "1700000000.000001",
+      "client_msg_id": "redacted"
     }
   ],
   "has_more": true,

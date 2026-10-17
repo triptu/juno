@@ -1,0 +1,1 @@
+- 10-17 19:54 · live-fixes · The fake's `subscriptions.thread.getView` sends `unread_replies` for a thread with unread replies and `latest_replies` otherwise, never both, as seen live on 10-17 (one unread and two read threads); the sync already read either.

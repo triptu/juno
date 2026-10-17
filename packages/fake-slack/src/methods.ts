@@ -301,14 +301,15 @@ export const handlers: Handlers = {
       if (args.current_ts !== undefined && compareTs(latest, args.current_ts) >= 0) continue
       if (args.channel_id !== undefined && args.channel_id !== sub.channel) continue
       const full = withChannel(ws, sub.channel, root)
+      const unread = replies.filter((r) => compareTs(r.ts, sub.lastRead) > 0 && r.user !== ws.selfId)
       views.push({
         latest,
         view: {
           root_msg: { ...full, channel: sub.channel, thread_ts: root.ts, reply_count: replies.length, latest_reply: latest },
-          unread_replies: replies
-            .filter((r) => compareTs(r.ts, sub.lastRead) > 0 && r.user !== ws.selfId)
-            .map((r) => withChannel(ws, sub.channel, r)),
-          latest_replies: replies.slice(-3).map((r) => withChannel(ws, sub.channel, r)),
+          // Live, a thread with unread replies carries `unread_replies` and no `latest_replies`; a read one the reverse (research section 10, "Live checks").
+          ...(unread.length > 0
+            ? { unread_replies: unread.map((r) => withChannel(ws, sub.channel, r)) }
+            : { latest_replies: replies.slice(-3).map((r) => withChannel(ws, sub.channel, r)) }),
         },
       })
     }

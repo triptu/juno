@@ -97,12 +97,12 @@
     }
   ],
   "activity_v2": {
-    "at_user": 5,
+    "at_user": 1,
     "at_user_group": 0,
     "at_channel": 0,
     "at_everyone": 0,
     "channel": 0,
-    "dm": 0,
+    "dm": 2,
     "keyword": 0,
     "message_reaction": 0,
     "internal_channel_invite": 0,
@@ -118,18 +118,18 @@
     "list_approval_request": 0,
     "list_approval_reviewed": 0,
     "bot_dm_bundle": 1,
-    "thread_v2": 3,
+    "thread_v2": 1,
     "saved_reminder": 0,
     "prejoin_dm_welcome_party_alert": 0,
     "quietly_added_to_channel": 0,
     "code_review_requested": 0
   },
   "channel_badges": {
-    "channels": 5,
-    "dms": 0,
+    "channels": 1,
+    "dms": 2,
     "app_dms": 1,
     "thread_mentions": 0,
-    "thread_unreads": 3
+    "thread_unreads": 1
   },
   "alerts": {
     "external_channel_invite": 0,
@@ -154,10 +154,10 @@
     "uncompleted_count": 0,
     "uncompleted_overdue_count": 0,
     "archived_count": 0,
-    "completed_count": 593,
+    "completed_count": 654,
     "total_count": 654,
-    "todo_count": 61,
-    "todo_unfiltered_count": 61,
+    "todo_count": 0,
+    "todo_unfiltered_count": 0,
     "saved_no_due_date_count": 0,
     "saved_created_range_counts": {
       "last_3_days": 0,
@@ -167,7 +167,7 @@
     "todo_created_range_counts": {
       "last_3_days": 0,
       "last_7_days": 0,
-      "last_15_days": 1
+      "last_15_days": 0
     }
   },
   "counts_last_fetched": 1700000000
