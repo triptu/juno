@@ -105,6 +105,10 @@ export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow
   // Control-scroll can change it without the menu.
   window.webContents.on('did-finish-load', () => fitMinimumSizeToZoom(window))
   window.webContents.on('zoom-changed', () => setImmediate(() => fitMinimumSizeToZoom(window)))
+  // macOS hides the traffic lights in full screen, so the title bars drop the room they keep for them.
+  // Both events come as the animation ends: the lights are already gone on entry, and come back on exit.
+  window.on('enter-full-screen', () => window.webContents.send(Events.windowFullScreen, true))
+  window.on('leave-full-screen', () => window.webContents.send(Events.windowFullScreen, false))
 
   void window.loadURL(appPageUrl(launch))
 
@@ -112,9 +116,9 @@ export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow
 }
 
 /** The app page for `launch`. electron-vite sets ELECTRON_RENDERER_URL in dev for the Vite server. */
-function appPageUrl(launch: PageLaunch): string {
+function appPageUrl(launch: PageLaunch, fullScreen = false): string {
   const devUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
-  return pageUrl(devUrl || APP_URL, launch)
+  return pageUrl(devUrl || APP_URL, launch, fullScreen)
 }
 
 /**
@@ -125,7 +129,7 @@ function appPageUrl(launch: PageLaunch): string {
 function reload(window: BaseWindow | undefined, ignoringCache: boolean): void {
   if (window === undefined || window.isDestroyed() || !(window instanceof BrowserWindow)) return
   const launch = launchOf.get(window)
-  if (launch !== undefined) void window.loadURL(appPageUrl(launch()), ignoringCache ? { extraHeaders: 'pragma: no-cache\n' } : {})
+  if (launch !== undefined) void window.loadURL(appPageUrl(launch(), window.isFullScreen()), ignoringCache ? { extraHeaders: 'pragma: no-cache\n' } : {})
   else if (ignoringCache) window.webContents.reloadIgnoringCache()
   else window.webContents.reload()
 }
@@ -327,9 +331,10 @@ function setAppMenu(state: MenuState, rebuild = false): void {
 
 /**
  * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
- * accent, density and privacy mode, and the saved sidebar. `?tour=manual` (tests only) keeps the tour from opening by itself.
+ * accent, density and privacy mode, and the saved sidebar. `?fullscreen=1` is a reload in full screen, so the title bars start without the
+ * traffic lights' room. `?tour=manual` (tests only) keeps the tour from opening by itself.
  */
-function pageUrl(base: string, launch: PageLaunch): string {
+function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string {
   const url = new URL(base)
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
@@ -338,6 +343,7 @@ function pageUrl(base: string, launch: PageLaunch): string {
   if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
+  if (fullScreen) url.searchParams.set('fullscreen', '1')
   // Under JUNO_E2E the tour opens only when asked, unless the test wants it to open by itself (JUNO_E2E_TOUR).
   if (process.env.JUNO_E2E === '1' && process.env.JUNO_E2E_TOUR !== '1') url.searchParams.set('tour', 'manual')
   return url.toString()

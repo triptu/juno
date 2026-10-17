@@ -4,6 +4,7 @@ import {
   connectionStateAtom,
   currentPlace,
   engineStatusAtom,
+  fullScreenAtom,
   notificationStatusAtom,
   popupContextMenu,
   privacyAtom,
@@ -95,6 +96,7 @@ export function Sidebar() {
   const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
+  const fullScreen = useAtomValue(fullScreenAtom)
   const user = useAtomValue(signedInAtom)
   const profile = useAtomValue(sessionProfileAtom)
   const person = profile._tag === 'Success' ? profile.value : null
@@ -143,6 +145,7 @@ export function Sidebar() {
   return (
     <SidebarView
       titlebarLeading={<TitlebarNav />}
+      fullScreen={fullScreen}
       account={account}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}

@@ -229,3 +229,29 @@ test('the sidebar resizes by its edge, resets on double-click, and hides', { tag
     await again.close()
   }
 })
+
+test('in full screen the title bars drop the traffic lights’ room, and keep it again after', async ({ juno, app }) => {
+  await juno.signIn()
+  const fullScreen = (on: boolean) => app.evaluate(({ BrowserWindow }, on) => BrowserWindow.getAllWindows()[0]!.setFullScreen(on), on)
+  // A button's left edge from the left of the pane it sits in.
+  const leftOf = (pane: string, name: RegExp) =>
+    juno.win.locator(pane).getByRole('button', { name }).evaluate((button, pane) => button.getBoundingClientRect().left - button.closest(pane)!.getBoundingClientRect().left, pane)
+  const hide = () => leftOf('aside[aria-label="Sidebar"]', /^Hide sidebar/)
+  const show = () => leftOf('[data-tab-strip]', /^Show sidebar/)
+
+  // The 78px after the lights, then the sidebar's 10px inset in full screen.
+  expect(await hide()).toBe(78)
+  await fullScreen(true)
+  await expect.poll(hide).toBe(10)
+  await fullScreen(false)
+  await expect.poll(hide).toBe(78)
+
+  // With the sidebar hidden, the tab strip does the same, from its own 10px padding.
+  await juno.frame.toggleWithButton()
+  await juno.frame.expectHidden()
+  expect(await show()).toBe(78)
+  await fullScreen(true)
+  await expect.poll(show).toBe(10)
+  await fullScreen(false)
+  await expect.poll(show).toBe(78)
+})

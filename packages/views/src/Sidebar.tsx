@@ -78,6 +78,8 @@ export interface SidebarScope {
 export interface SidebarProps {
   /** After the traffic lights: Hide sidebar, Back and Forward (`TitlebarNav`). */
   readonly titlebarLeading?: ReactNode
+  /** The window is in full screen, where macOS hides the traffic lights: the title bar starts at the sidebar's inset. */
+  readonly fullScreen?: boolean
   readonly account: SidebarAccount
   /** Unread Juno messages: the count on the Juno item, in the sidebar's counter colours. */
   readonly junoUnread?: number
@@ -141,6 +143,7 @@ export interface SidebarProps {
  */
 export function Sidebar({
   titlebarLeading,
+  fullScreen = false,
   account,
   junoUnread = 0,
   junoBusy = false,
@@ -188,7 +191,7 @@ export function Sidebar({
   return (
     <aside aria-label="Sidebar" aria-busy={syncing} {...stylex.props(styles.root)}>
       <header aria-label="Sidebar title bar" {...stylex.props(styles.header)}>
-        <div {...stylex.props(styles.titlebar)}>
+        <div {...stylex.props(styles.titlebar, fullScreen && styles.titlebarFullScreen)}>
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
             <IconButton icon={MagnifyingGlass} label="Search" shortcut={menuKeys('palette.toggle')} size={30} onClick={onSearch} />
@@ -445,6 +448,10 @@ const styles = stylex.create({
     paddingInlineStart: layout['--titlebar-lights-inset'],
     paddingInlineEnd: layout['--sidebar-inset'],
     WebkitAppRegion: 'drag',
+  },
+  // No traffic lights in full screen, so no room for them.
+  titlebarFullScreen: {
+    paddingInlineStart: layout['--sidebar-inset'],
   },
   icons: {
     display: 'flex',
