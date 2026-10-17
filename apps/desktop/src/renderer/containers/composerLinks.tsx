@@ -1,8 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
 import { linkAt, moveLinks, pastedLink, setLink, shownLinks, type LinkRange, type MentionPick } from '@juno/contract'
 import { openExternal } from '@juno/state'
-import { LinkEditor, type ComposerPopover } from '@juno/views'
+import type { ComposerPopover } from '@juno/views'
+import { chunk, usePreloaded } from './chunks'
 import { editField } from './suggestionKeys'
+
+// The link editor shows only after ⌘K, so it loads when idle once a composer has mounted.
+const linkEditor = chunk(() => import('./LinkEditorPanel'))
+const LinkEditor = linkEditor.component((module) => module.LinkEditor)
 
 /** The composers that can take ⌘K for a link: each answers whether it took it. */
 const editors = new Set<() => boolean>()
@@ -132,23 +137,26 @@ function useLinkEditor(
     close(range.end)
   }
 
-  return editing === undefined
+  const ready = usePreloaded(linkEditor, editing !== undefined)
+  return editing === undefined || !ready
     ? undefined
     : {
         anchorAt: editing.start,
         content: (
-          <LinkEditor
-            key={`${editing.start}-${editing.end}`}
-            url={editing.url}
-            onSave={(typed) => {
-              const url = pastedLink(typed)
-              if (url === undefined) return false
-              apply(editing, url)
-              return true
-            }}
-            {...(drawn.some((link) => link.start === editing.start && link.end === editing.end) ? { onRemove: () => apply(editing, undefined) } : {})}
-            onCancel={() => close(undefined)}
-          />
+          <Suspense fallback={null}>
+            <LinkEditor
+              key={`${editing.start}-${editing.end}`}
+              url={editing.url}
+              onSave={(typed) => {
+                const url = pastedLink(typed)
+                if (url === undefined) return false
+                apply(editing, url)
+                return true
+              }}
+              {...(drawn.some((link) => link.start === editing.start && link.end === editing.end) ? { onRemove: () => apply(editing, undefined) } : {})}
+              onCancel={() => close(undefined)}
+            />
+          </Suspense>
         ),
       }
 }
