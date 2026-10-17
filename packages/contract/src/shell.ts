@@ -16,7 +16,7 @@ export type ResolvedTheme = Exclude<Theme, 'system'>
 export const DEFAULT_THEME: Theme = 'system'
 
 /** The sections of Settings (SPEC 14), in the order its list shows them. */
-export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'juno', 'ai-activity', 'connections', 'backup', 'about'])
+export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'tidy-up', 'juno', 'ai-activity', 'connections', 'backup', 'about'])
 export type SettingsSection = typeof SettingsSectionSchema.Type
 
 /** Settings › Appearance › Density (inventory 3.3). */

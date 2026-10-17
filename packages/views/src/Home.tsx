@@ -26,6 +26,8 @@ export interface HomeProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
+  /** Tidy up's row: opens the review of every topic it proposes (`SettledReview`). */
+  readonly onReview: (itemId: string) => void
   /** Automated's Move (`automated`) and Keep in All (`kept`). */
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
   /** Right-click on Automated's row: the conversation's menu, with Ignore. */
@@ -47,7 +49,7 @@ export interface HomeProps {
  * when a title line is rewritten: a title is one ellipsised line in a 52px
  * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, loading = false, reservedItems = 0, composer, waiting = false }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
@@ -79,6 +81,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
                   onOpen={onOpen}
                   onMarkDone={onMarkDone}
                   onResolveAll={onResolveAll}
+                  onReview={onReview}
                   onSort={onSort}
                   onItemMenu={onItemMenu}
                 />
@@ -99,6 +102,7 @@ interface HomeRowProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
+  readonly onReview: (itemId: string) => void
   readonly onSort: HomeProps['onSort']
   readonly onItemMenu: HomeProps['onItemMenu']
 }
@@ -106,7 +110,7 @@ interface HomeRowProps {
 /** The meta line: plain data, the same with and without AI. */
 function metaOf(item: HomeItem, now: number): string {
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
-  if (item.kind === 'tidyUp') return item.topics.map((topic) => topic.title).join(', ')
+  if (item.kind === 'tidyUp') return placesLine(item.topics.map((topic) => topic.place))
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
   const first = topic?.title
@@ -114,15 +118,22 @@ function metaOf(item: HomeItem, now: number): string {
   return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
 
+/** Tidy up's meta line: where the topics are, "eng, incidents and 3 more". Titles made from a first message's words read badly in a list. */
+export function placesLine(places: ReadonlyArray<string>): string {
+  const unique = [...new Set(places.filter((place) => place !== ''))]
+  if (unique.length <= 3) return unique.length <= 1 ? (unique[0] ?? '') : `${unique.slice(0, -1).join(', ')} and ${unique.at(-1)}`
+  return `${unique.slice(0, 2).join(', ')} and ${unique.length - 2} more`
+}
+
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
- * One row: a link to the topic (Tidy up opens nothing), and its buttons in
+ * One row: a link to the topic (Tidy up's opens its review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, or Automated's Keep
  * in All and Move. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
+function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
   const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' ? Robot : undefined
   const body = (
@@ -166,7 +177,14 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, on
       : undefined
   return (
     <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
-      {item.kind === 'tidyUp' || handlers === undefined ? (
+      {item.kind === 'tidyUp' ? (
+        <button type="button" aria-haspopup="dialog" onClick={() => onReview(item.id)} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
+          {body}
+          <span {...stylex.props(styles.caret)}>
+            <Icon icon={CaretRight} size={13} />
+          </span>
+        </button>
+      ) : handlers === undefined ? (
         <div {...stylex.props(styles.link)}>{body}</div>
       ) : (
         <a
@@ -317,6 +335,16 @@ const styles = stylex.create({
     color: 'inherit',
     textDecoration: 'none',
     cursor: 'default',
+  },
+  // The review button keeps the link's look: no fill, no border, its text at the row's start.
+  button: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    padding: 0,
+    paddingInlineStart: spacing['--space-1-5'],
+    paddingInlineEnd: spacing['--space-1-5'],
+    font: 'inherit',
+    textAlign: 'start',
   },
   focusable: {
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
