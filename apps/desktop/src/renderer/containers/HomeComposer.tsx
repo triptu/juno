@@ -351,7 +351,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
 function Recent({ chosen, onPick }: { readonly chosen: string | undefined; readonly onPick: (conversation: PickConversation) => void }) {
   const frequent = useAtomValue(frequentConversationsAtom)
   const recent = frequent._tag === 'Success' ? frequent.value : []
-  // While the first sync runs or the ranking is on its way, Recent keeps its room, so the chip and the field never move.
+  // Until the first sync ends and the ranking is here, Recent keeps its room empty: rows landing mid-sync re-rank under the pointer.
   const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready)
   return (
     <HomeRecent

@@ -2,14 +2,18 @@
 import type { Person, PickConversation, PickConversations } from '@juno/contract'
 import { people } from './topics'
 
-const channel = (key: string, name: string, kind: 'public' | 'private' = 'public', empty = false): PickConversation => ({
+type Art = { readonly icon: NonNullable<PickConversation['icon']>; readonly color: NonNullable<PickConversation['color']> }
+
+/** A channel, with the art the engine gives it when it has some (as Recent shows it). */
+const channel = (key: string, name: string, kind: 'public' | 'private' = 'public', art?: Art): PickConversation => ({
   key,
   name,
   kind,
   tint: kind,
   channelId: key,
   mainId: `m:${key}`,
-  empty,
+  ...art,
+  empty: false,
 })
 
 const dm = (key: string, person: Person): PickConversation => ({
@@ -24,9 +28,9 @@ const dm = (key: string, person: Person): PickConversation => ({
 })
 
 export const conversations = {
-  eng: channel('C0ENG', 'eng'),
-  billing: channel('C0BILLING', 'billing-ops'),
-  hiring: channel('C0HIRING', 'hiring', 'private'),
+  eng: channel('C0ENG', 'eng', 'public', { icon: 'code', color: 'emerald' }),
+  billing: channel('C0BILLING', 'billing-ops', 'public', { icon: 'globe', color: 'claret' }),
+  hiring: channel('C0HIRING', 'hiring', 'private', { icon: 'shield', color: 'midnight' }),
   onboarding: channel('C0JONAS', 'jonas-onboarding', 'private'),
   maya: dm('D0MAYA', people.maya),
   sam: dm('D0SAM', people.sam),

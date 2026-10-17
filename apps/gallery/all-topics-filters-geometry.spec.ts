@@ -81,7 +81,7 @@ test.describe('All topics filter row geometry', () => {
 
 test.describe('All topics place picker', () => {
   for (const theme of ['light', 'dark'] as const) {
-    test(`picker-query, ${theme}: the searchable list opens below the place button with avatars, # and the group icon`, async ({ page }) => {
+    test(`picker-query, ${theme}: the searchable list opens below the place button with Recent's marks`, async ({ page }) => {
       const id = 'filters/picker-query'
       await openState(page, { component: 'AllTopics', id, route: `AllTopics/${id}`, group: '', groupId: '', state: 'picker-query', frame: {} }, theme)
       const dialog = page.getByRole('dialog', { name: 'Pick a place' })
@@ -89,11 +89,12 @@ test.describe('All topics place picker', () => {
       await expect(dialog.getByRole('textbox')).toHaveValue('ma')
       await expect(dialog.getByRole('option')).toHaveCount(3)
       await expect(dialog.getByRole('option', { name: /^Anywhere/ })).toHaveCount(0)
-      // Maya's DM shows her avatar; the group DM and the channel show their kind's icon.
+      // Recent's marks: Maya's face, the group DM's initials, the channel's tile; each 20px, so the names start on one edge.
       const options = dialog.getByRole('option')
       await expect(options.nth(0).locator('[data-kind="person"]')).toBeVisible()
-      await expect(options.nth(1).locator('svg')).toBeVisible()
-      await expect(options.nth(2).locator('svg')).toBeVisible()
+      await expect(options.nth(1).locator('[data-kind="group"]')).toBeVisible()
+      await expect(options.nth(2).locator('[data-kind]')).toHaveCount(0)
+      for (let i = 0; i < 3; i++) expect((await options.nth(i).locator('span').first().boundingBox())!.width).toBe(20)
       const [button, panel] = await Promise.all([page.getByRole('button', { name: /^Where: / }).boundingBox(), dialog.boundingBox()])
       expect(panel!.y).toBeGreaterThan(button!.y + button!.height - 1)
     })

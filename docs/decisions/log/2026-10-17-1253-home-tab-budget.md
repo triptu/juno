@@ -1,0 +1,1 @@
+- 10-17 12:53 · home-review-2 · A new tab with Home (⌘T, "+") to its focused composer has New chat open's one-frame budget, gated in perf.spec.ts.

@@ -3,8 +3,8 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import type { PickConversation } from '@juno/contract'
 import { accent, colors, layout, radii, sizes, spacing, text, tints, weights, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, ChannelIcon, Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
-import { channelIconFor, hueFor, initials } from './look'
+import { Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
+import { DestinationMark } from './DestinationMark'
 
 /**
  * Home's writing block (SPEC section 12, "Writing"): Recent, then the
@@ -17,15 +17,6 @@ const isChannel = (conversation: PickConversation) => conversation.kind === 'pub
 /** "#eng" or "Maya Chen": as the chip and the list's footer name it. */
 export const destinationLabel = (conversation: PickConversation): string => (isChannel(conversation) ? `#${conversation.name}` : conversation.name)
 
-/** A face, a group's initials or a channel's art, at 20px. */
-function DestinationMark({ conversation }: { readonly conversation: PickConversation }) {
-  const person = conversation.person
-  if (person !== undefined) return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
-  if (conversation.kind === 'mpim') return <Avatar kind="group" size={20} label={initials(conversation.name)} hue={hueFor('', conversation.key)} />
-  const icon = conversation.icon === undefined ? undefined : channelIconFor(conversation.icon)
-  return <ChannelIcon name={conversation.name} id={conversation.channelId ?? conversation.key} size={20} {...(icon === undefined ? {} : { icon })} {...(conversation.color === undefined ? {} : { color: hueFor(conversation.color, conversation.key) })} />
-}
-
 export interface HomeRecentProps {
   /** DMs and group DMs, at most five. */
   readonly people: ReadonlyArray<PickConversation>
@@ -37,7 +28,7 @@ export interface HomeRecentProps {
   readonly onPick: (conversation: PickConversation) => void
   /** ⌘-click or ⌘Enter: opens the conversation instead. */
   readonly onOpen: (conversation: PickConversation) => void
-  /** Keep Recent's space while its rows may still arrive (the first sync), so the chip and the field never move. */
+  /** Recent's room, empty, while its rows can still change (the first sync, or the ranking on its way): rows that would re-rank under the pointer stay out, and nothing moves when they come. */
   readonly reserve?: boolean
 }
 
@@ -49,14 +40,16 @@ export interface HomeRecentProps {
  * the caret. Below about 400px the columns stack. Recent always keeps room
  * for five rows in each column, so rows that arrive later move nothing above;
  * the rows sit at the bottom of that room, so the chip stays close under them.
+ * While `reserve` is set the room stays empty, so rows never change under the
+ * pointer during the first sync.
  */
 export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve = false }: HomeRecentProps) {
   // Both columns always take their place, so one that fills later moves nothing; the keys skip an empty one.
   const lists = [people, channels]
   const filled = lists.flatMap((list, index) => (list.length > 0 ? [index] : []))
   const [at, setAt] = useState<readonly [number, number]>([0, 0])
-  if (filled.length === 0 && !reserve) return null
-  if (filled.length === 0) return <RecentReserved />
+  if (reserve) return <RecentReserved />
+  if (filled.length === 0) return null
   const column = filled.includes(at[0]) ? at[0] : filled[0]!
   const row = Math.min(at[1], lists[column]!.length - 1)
   const move = (event: KeyboardEvent<HTMLElement>) => {

@@ -3,9 +3,9 @@ import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, holdKeys, Icon, OptionGroupLabel, OptionList, OptionRow, releaseKeys, SparkleDuotone, useOptionListKeys } from '@juno/ui'
+import { holdKeys, Icon, OptionGroupLabel, OptionList, OptionRow, releaseKeys, SparkleDuotone, useOptionListKeys } from '@juno/ui'
+import { DestinationMark } from './DestinationMark'
 import { Highlighted } from './Highlighted'
-import { hueFor, initials, kindIcon } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 
 const kindLabels: Record<ConversationKind, string> = {
@@ -122,7 +122,7 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
                       size={36}
                       active={id === activeId}
                       selected={onJuno !== undefined ? row.key === selected : onAnywhere !== undefined && row.channelId !== undefined && row.channelId === selected}
-                      leading={<ConversationMark conversation={row} />}
+                      leading={<DestinationMark conversation={row} />}
                       label={<Highlighted text={row.name} ranges={row.highlight} />}
                       sub={conversationSub(row)}
                       onSelect={() => onPickConversation(row)}
@@ -156,18 +156,6 @@ function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly i
       onActivate={() => onActivate(id)}
     />
   )
-}
-
-/** A face or the kind's icon, in a slot as wide as the face, so every name starts on one edge. */
-function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
-  const person = conversation.person
-  if (person === undefined)
-    return (
-      <span {...stylex.props(styles.mark)}>
-        <Icon icon={kindIcon(conversation.kind)} size={15} />
-      </span>
-    )
-  return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
 }
 
 const styles = stylex.create({
