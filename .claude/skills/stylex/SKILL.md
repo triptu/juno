@@ -35,7 +35,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    backgroundColor: {
      default: colors['--secondary-default'],
      ':hover': { default: null, '@media (hover: hover)': colors['--secondary-hover'] },
-     ':active': colors['--secondary-active'],
+     ':active': { default: colors['--secondary-active'], '@media (hover: hover)': colors['--secondary-active'] },
      ':disabled': colors['--secondary-default'],
    },
    ```
@@ -102,6 +102,10 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   `base`'s width at every size, not only under the query. State the wide value as the default
   (`ContextPill`'s narrow form, 10-17). `null` nested inside a condition (`':hover': { default: null, … }`)
   is fine: it means no hover value outside the media query.
+- **A pseudo-class nested in a media query gets a doubled class** (`.x.x:hover`), so it outranks the
+  same property's plain `:active` (`.y:active`) whatever their order: a press colour next to a
+  `@media (hover: hover)` hover never shows under the pointer. Nest the press the same way (rule 4;
+  Home's rows and `SuggestionChip`, 10-17, found by the feel suite's press checks).
 - **Pseudo-class order is fixed by StyleX, not by your key order.** Priority, low to high:
   `:disabled` 92, `:hover` 130, `:focus-visible` 160, `:active` 170 (read from
   `@stylexjs/shared`). So `:hover` and `:active` beat `:disabled`. Set the disabled colour
