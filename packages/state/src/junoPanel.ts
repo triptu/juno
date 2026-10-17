@@ -36,6 +36,7 @@ import { aiAssistOnAtom } from './notifications'
 import type { Registry } from './client'
 import { signedInAtom } from './session'
 import { activeTab, setJunoPanel, tabsAtom, updateTabs, type JunoView } from './tabs'
+import { closeWebPanel, webPanelAtom } from './webPanel'
 
 export const JUNO_PANEL_PREF = 'junoPanel'
 
@@ -51,9 +52,10 @@ export const junoPanelOpenAtom = Atom.make((get): boolean => {
   return tabs.tabs.find((tab) => tab.id === tabs.active)?.junoPanel === true
 })
 
-/** Opens or closes the panel in the active tab. */
+/** Opens or closes the panel in the active tab. Opening it closes the web panel there. */
 export function setJunoPanelOpen(registry: Registry, open: boolean): void {
   const tab = activeTab(registry.get(tabsAtom))
+  if (open && tab !== undefined && registry.get(webPanelAtom)?.tabId === tab.id) closeWebPanel(registry)
   if (tab === undefined || (tab.junoPanel === true) === open) return
   updateTabs(registry, (tabs) => setJunoPanel(tabs, tab.id, open))
   if (!open) {
