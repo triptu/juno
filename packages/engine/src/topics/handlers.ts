@@ -31,7 +31,7 @@ import { MarkWorker } from '../markWorker'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { Workspace, type StoreServices } from '../workspace'
-import { keepTopicOpen, renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
+import { keepSuggested, keepTopicOpen, renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
 import { setSubscribed } from '../follow'
 import { countTopics, forgetUsergroups, forgetUsers, listTopics, makeRowCache } from './query'
@@ -133,6 +133,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
       'topics.unsubscribe': (payload) => setSubscribed(payload.id, false).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
       'topics.resolve': ({ id }) => act(resolveTopic(id)),
       'topics.keepOpen': ({ id }) => act(keepTopicOpen(id)),
+      'topics.keepSuggested': ({ id, suggestion }) => act(keepSuggested(id, suggestion)),
       'topics.reopen': ({ id }) => act(reopenTopic(id)),
       'topics.pin': ({ id }) => act(setPinned(id, true)),
       'topics.unpin': ({ id }) => act(setPinned(id, false)),

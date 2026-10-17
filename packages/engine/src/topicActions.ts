@@ -16,8 +16,8 @@
  * sync). It never unfollows: Slack's follow flag is not touched.
  */
 import { Clock, Effect } from 'effect'
-import { NotFound, NotSignedIn, type EngineConfig as Config, type CommandResult, type OverlayPatch, type TopicActionError, type UndoCommand } from '@juno/contract'
-import { compareTs, manualTitleAfterRename, parseTopicId, type ParsedTopicId, type Ts } from '@juno/domain'
+import { NotFound, NotSignedIn, type EngineConfig as Config, type CommandResult, type KeptSuggestion, type OverlayPatch, type TopicActionError, type UndoCommand } from '@juno/contract'
+import { compareTs, manualTitleAfterRename, millisToTs, parseTopicId, type ParsedTopicId, type Ts } from '@juno/domain'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { patchOverlay, readOverlay, setIgnored } from '@juno/sync'
 import { EngineConfig } from './config'
@@ -81,6 +81,20 @@ export const keepTopicOpen = (id: string) =>
       const before = yield* readOverlay(id)
       if (before.settledDismissedTs === activity) return unchanged
       return undone(restore(id, yield* patchOverlay(id, { settledDismissedTs: activity })))
+    }),
+  )
+
+/**
+ * Keep following or Keep showing on Home's Unfollow or Ignore review: the
+ * suggestion waits its full time again from now (`unfollowEvidence`,
+ * `ignoreEvidence`).
+ */
+export const keepSuggested = (id: string, suggestion: KeptSuggestion) =>
+  onTopic(id, (_topic, _config, now) =>
+    Effect.gen(function* () {
+      if ((yield* lastActivity(id)) === undefined) return 'missing' as const
+      const patch: OverlayPatch = suggestion === 'unfollow' ? { unfollowKeptTs: millisToTs(now) } : { ignoreKeptTs: millisToTs(now) }
+      return undone(restore(id, yield* patchOverlay(id, patch)))
     }),
   )
 

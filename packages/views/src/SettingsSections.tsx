@@ -147,7 +147,7 @@ export interface SettingsIgnoredProps {
 export function SettingsIgnored({ ignored, onStopIgnoring }: SettingsIgnoredProps) {
   return (
     <Page width="settings">
-      <PageHeader title="Ignored" subtitle="Ignored channels are hidden from your topics, search and All topics, and they never notify you. Nothing changes in Slack." />
+      <PageHeader title="Ignored" subtitle="Ignored channels are hidden from your topics, search and All topics. They notify you only when someone mentions you or a group you are in. Nothing changes in Slack." />
       <Section heading="Channels">
         <Surface kind="group" padding="md" sx={styles.card}>
           <IgnoredChannels channels={ignored} onStopIgnoring={onStopIgnoring} />

@@ -83,6 +83,7 @@ export { SettledReview } from './SettledReview'
 export { AutomatedReview } from './AutomatedReview'
 export { movedToast } from './automatedMoves'
 export { DoneFollowUpsReview, OldDraftsReview } from './ReviewCards'
+export { IgnoreReview, UnfollowReview } from './SuggestionReviews'
 export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'

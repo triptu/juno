@@ -1,0 +1,1 @@
+- 10-17 19:09 · cards-unfollow-ignore · A mention of you by name, or of a user group you are in, breaks through an ignored channel: it is decided by the usual notification settings, shows on Home as "Maya mentioned you in #deploys" and opens the topic, while the channel stays out of the sidebar. @here, @channel and @everyone do not break through. Asked by the owner.

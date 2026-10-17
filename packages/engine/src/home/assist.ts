@@ -13,7 +13,7 @@ import { AiProvider, cacheKeyOf, type AiMessage, type Decision, type StructuredT
 import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { userName, type JoinedRow, type UserRow } from '../topicRows'
-import { messagesAfter, NO_READ } from './query'
+import { messagesAfter, NO_READ } from './rows'
 import { unescapeMrkdwn } from '@juno/richtext'
 
 /** Home's calls per workspace per day, across its tasks. */

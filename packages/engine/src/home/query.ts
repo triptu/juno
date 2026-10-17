@@ -14,6 +14,7 @@
  * - Tidy up (AI assist on): followed topics the settled decision scored at
  *   least `SETTLED_MIN_SCORE`, scored after their latest activity.
  * - Follow-ups that look done (AI on; they leave Follow-up), old drafts: `reviewCards.ts`.
+ * - Mentioned (a direct mention in an ignored channel), Unfollow and Ignore: `suggested.ts`.
  * - Automated: the most recently active conversation the rules and Juno
  *   could not place (`ask` in `automated_channels`, by `automated.ts`), in
  *   no view, while the user has not deleted the Automated view.
@@ -22,12 +23,12 @@
  *   the first sync is done and at most once a day (`MOVES_SHOWN_PREF`).
  *
  * "Followed" is a thread Slack follows or a DM's Main. Resolved topics and
- * ignored channels never appear. `rankHomeItems` keeps at most one of each
+ * ignored channels never appear, except as Mentioned. `rankHomeItems` keeps at most one of each
  * kind and three in all. An item's `aiTitle` is the assistant's rewrite
  * (`homeTitle` in `ai_cache`) when it was made after the topic's latest
  * activity and was confident.
  */
-import { HOME_ITEM_LIMIT, TIDY_UP_PREF, TIDY_UP_QUIET_MILLIS, tidyUpPrefsOf, type HomeItem, type HomeTopic, type HomeView, type OldDraft, type SettledWhy } from '@juno/contract'
+import { HOME_ITEM_LIMIT, TIDY_UP_PREF, TIDY_UP_QUIET_MILLIS, tidyUpPrefsOf, type HomeItem, type HomeTopic, type HomeView, type OldDraft, type SettledWhy, type UnopenedWhy } from '@juno/contract'
 import {
   asksUser,
   automatedReason,
@@ -52,28 +53,14 @@ import { aiAssistOn } from '../ai'
 import { readMoves, withMove, type MoveRow } from './moves'
 import { parseReason, parseScore, parseTitle } from './answers'
 import { cardTitle, readDelivered, readOldDrafts, withDelivery, withDraft, type Delivered, type OpenPromise } from './reviewCards'
-import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
-
-/** A topic row with Juno's read pointer. */
-export interface HomeRow extends JoinedRow {
-  readonly last_read_ts: string | null
-}
-
-/** Open: a member of a live channel that is not ignored, and not resolved (or reopened by later activity). */
-export const OPEN = `c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
-  AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
-/** Followed: a thread Slack follows, or a DM's Main. A channel's Main is a stream, not a topic the user follows. */
-export const FOLLOWED = `((i.kind = 'thread' AND s.subscribed = 1) OR (i.kind = 'main' AND c.kind IN ('im', 'mpim')))`
-
-export const HOME_SELECT = `${TOPIC_COLUMNS}, NULL AS channel_activity_ts, r.last_read_ts AS last_read_ts ${TOPIC_FROM}
-  LEFT JOIN topic_reads r ON r.topic_id = i.topic_id`
+import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
+import { FOLLOWED, HOME_SELECT, messagesAfter, messageStatements, NO_READ, OPEN, type HomeRow, type MessageRow, type Statement } from './rows'
+import { readIgnore, readMentioned, readUnfollow, withUnopened, type Suggested } from './suggested'
 
 /** Unread followed topics looked at for Waiting and Moved, newest first, from the last `UNREAD_DAYS`. */
 const UNREAD_LIMIT = 100
 const UNREAD_DAYS = 30
 const DAY = 24 * 60 * 60 * 1000
-/** Unread messages read per topic when looking for a question. */
-const QUESTION_WINDOW = 50
 /** Tidy up: the settled topics read for their evidence, newest first, and the most it proposes. */
 const SETTLED_READ = 30
 const SETTLED_SHOWN = 20
@@ -81,11 +68,6 @@ const SETTLED_SHOWN = 20
 const SETTLED_MESSAGES = 12
 /** Follow-ups that look done: the promises looked at, newest first. */
 const PROMISES_READ = 30
-
-interface Statement {
-  readonly sql: string
-  readonly params: ReadonlyArray<string | number>
-}
 
 /** The statements that read `topic_index` and `messages`, so the plan test can check each one uses an index. */
 export const homeStatements = {
@@ -98,10 +80,7 @@ export const homeStatements = {
     sql: `${HOME_SELECT} WHERE i.topic_id IN (${ids.map(() => '?').join(', ')}) AND ${OPEN}`,
     params: [...ids],
   }),
-  threadAfter: (channel: string, threadTs: string, after: string, limit = QUESTION_WINDOW): Statement => ({
-    sql: `SELECT ts, user_id, text, files_json FROM messages WHERE channel = ? AND thread_ts = ? AND ts > ? AND deleted = 0 ORDER BY ts DESC LIMIT ?`,
-    params: [channel, threadTs, after, limit],
-  }),
+  threadAfter: messageStatements.threadAfter,
   /** The Main of the newest conversation Home asks about for Automated. */
   automated: (): Statement => ({
     sql: `${HOME_SELECT}
@@ -126,34 +105,8 @@ export const homeStatements = {
     sql: `SELECT apps, sampled, reason FROM automated_channels WHERE channel = ?`,
     params: [channel],
   }),
-  mainAfter: (channel: string, after: string, limit = QUESTION_WINDOW): Statement => ({
-    sql: `SELECT ts, user_id, text, files_json FROM messages WHERE channel = ? AND ts > ? AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND deleted = 0
-      ORDER BY ts DESC LIMIT ?`,
-    params: [channel, after, limit],
-  }),
+  mainAfter: messageStatements.mainAfter,
 }
-
-export interface MessageRow {
-  readonly ts: string
-  readonly user_id: string | null
-  readonly text: string
-  readonly files_json: string | null
-}
-
-/** The messages after `after`, newest first: a thread's replies, or a Main's top-level messages. */
-export const messagesAfter = (
-  row: Pick<JoinedRow, 'kind' | 'channel' | 'root_ts'>,
-  after: string,
-  limit?: number,
-): Effect.Effect<ReadonlyArray<MessageRow>, SqlError, StoreReader> =>
-  Effect.gen(function* () {
-    const sql = yield* StoreReader
-    const statement =
-      row.kind === 'thread' && row.root_ts !== null ? homeStatements.threadAfter(row.channel, row.root_ts, after, limit) : homeStatements.mainAfter(row.channel, after, limit)
-    return yield* sql.unsafe<MessageRow>(statement.sql, statement.params)
-  })
-
-export const NO_READ = '0000000000.000000'
 
 /** The question waiting on the user in this topic, if any. */
 function waitingQuestion(messages: ReadonlyArray<MessageRow>, selfId: string, directMessage: boolean): MessageRow | undefined {
@@ -176,6 +129,8 @@ interface Candidate {
   readonly delivered?: ReadonlyMap<string, Delivered>
   /** Old drafts, by topic id. */
   readonly drafts?: ReadonlyMap<string, OldDraft>
+  /** Unfollow and Ignore: the unread stretch behind each, by topic id. */
+  readonly unopened?: ReadonlyMap<string, UnopenedWhy>
 }
 
 /** What `readHome` returns: the view, and the items whose title line the assistant may rewrite. */
@@ -215,6 +170,13 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         add({ id: `waiting:${row.topic_id}`, kind: 'waiting', title: question.user_id!, at: tsToMillis(question.ts as Ts) }, [row])
         break
       }
+    }
+
+    // Mentioned: someone named the user, or a group they are in, in a channel they ignore.
+    const mentioned = selfId === undefined ? undefined : yield* readMentioned(selfId, now)
+    if (mentioned !== undefined) {
+      senders.add(mentioned.mention.user_id!)
+      add({ id: `mentioned:${mentioned.row.topic_id}`, kind: 'mentioned', title: mentioned.mention.user_id!, at: tsToMillis(mentioned.mention.ts as Ts) }, [mentioned.row])
     }
 
     // Pick up where you left off: the last topic open for a minute, when something came after.
@@ -286,6 +248,11 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       if (shown.length > 0) add({ id: 'oldDrafts', kind: 'oldDrafts', title: '' }, shown, { drafts })
     }
 
+    // Unfollow and Ignore (cards 1 and 6): rules on the cache, with AI on or off.
+    const suggest = (kind: 'unfollow' | 'ignore', found: Suggested) => found.rows.length > 0 && add({ id: kind, kind, title: '' }, found.rows, { unopened: found.unopened })
+    if (tidy.unfollow && selfId !== undefined) suggest('unfollow', yield* readUnfollow(unread, selfId, now))
+    if (tidy.ignore) suggest('ignore', yield* readIgnore(now))
+
     // Automated: a conversation the rules and Juno could not place. Asked with AI on or off.
     const [asked] = yield* run(homeStatements.automated())
     if (asked !== undefined) {
@@ -350,13 +317,15 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const items = ranked.map((candidate): HomeItem => {
       const rows = candidate.value.rows.filter((row) => candidate.topicIds.includes(row.topic_id))
       const base = candidate.value.item
-      const channel = base.kind === 'automated' && rows[0] !== undefined ? automatedChannelOf(rows[0]) : undefined
+      const channel = (base.kind === 'automated' || base.kind === 'mentioned') && rows[0] !== undefined ? automatedChannelOf(rows[0]) : undefined
       const title =
         base.kind === 'waiting'
           ? `${firstName(nameOf(base.title))} asked you something`
+          : base.kind === 'mentioned'
+            ? `${firstName(nameOf(base.title))} mentioned you in ${channel?.label ?? ''}`
           : base.kind === 'tidyUp'
             ? `${rows.length} topics look settled`
-            : base.kind === 'doneFollowUps' || base.kind === 'oldDrafts'
+            : base.kind === 'doneFollowUps' || base.kind === 'oldDrafts' || base.kind === 'unfollow' || base.kind === 'ignore'
               ? cardTitle(base.kind, rows.length)
               : channel !== undefined
               ? `Move ${channel.label}?`
@@ -373,7 +342,8 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       const movedOf = (row: HomeRow) => withMove(topicOf(row), candidate.value.moves?.get(row.topic_id), () => automatedChannelOf(row))
       const deliveredOf = (row: HomeRow) => withDelivery(topicOf(row), candidate.value.delivered?.get(row.topic_id), { ...(selfId === undefined ? {} : { me: selfId }), user: nameOf })
       const draftOf = (row: HomeRow) => withDraft(topicOf(row), candidate.value.drafts?.get(row.topic_id))
-      const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : base.kind === 'doneFollowUps' ? deliveredOf : base.kind === 'oldDrafts' ? draftOf : topicOf
+      const unopenedOf = (row: HomeRow) => withUnopened(topicOf(row), row, candidate.value.unopened?.get(row.topic_id))
+      const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : base.kind === 'doneFollowUps' ? deliveredOf : base.kind === 'oldDrafts' ? draftOf : base.kind === 'unfollow' || base.kind === 'ignore' ? unopenedOf : topicOf
       const item: HomeItem = { ...base, title, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item

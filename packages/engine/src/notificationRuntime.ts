@@ -1,5 +1,5 @@
 /** Shared session composition and host seam for the notifications feature. */
-import { ChannelId, UserId, isDm, messageMentionsMe, type Me, type Presence } from '@juno/domain'
+import { ChannelId, UserId, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
 import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
@@ -115,6 +115,7 @@ export const startNotifications = Effect.gen(function* () {
     }
     const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id), usergroup: (id) => groups.get(id) })
     const mentionsMe = messageMentionsMe(body, me)
+    const mentionsMeDirectly = mentionsMe && messageMentionsMeDirectly(body, me)
     const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
       COALESCE(u.display_name, u.real_name, u.name) AS person_name,
       COALESCE(sender.display_name, sender.real_name, sender.name) AS sender_name FROM conversations c
@@ -129,7 +130,7 @@ export const startNotifications = Effect.gen(function* () {
     }
     yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
       name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
-      senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, ts, text: plainText(body),
+      senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: plainText(body),
       topicId })
   })
   yield* Effect.forkScoped(Stream.runForEach(Stream.fromQueue(queue), (event) => safe(handle(event))))

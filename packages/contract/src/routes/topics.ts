@@ -182,6 +182,8 @@ export const OverlayPatch = Schema.Struct({
   reopenedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   pinnedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   settledDismissedTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  unfollowKeptTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  ignoreKeptTs: Schema.optionalKey(Schema.NullOr(Schema.String)),
 })
 export type OverlayPatch = typeof OverlayPatch.Type
 
@@ -303,6 +305,18 @@ export const topicsResolve = action('topics.resolve', topicPayload)
  */
 export const topicsKeepOpen = action('topics.keepOpen', topicPayload)
 
+/** Home's suggestions that a review can say no to (`docs/design/settled-suggestions/`), besides Tidy up's Keep open. */
+export const KeptSuggestion = Schema.Literals(['unfollow', 'ignore'])
+export type KeptSuggestion = typeof KeptSuggestion.Type
+
+/**
+ * Keep following (a thread) or Keep showing (a channel, by its Main's id)
+ * on Home's Unfollow or Ignore review: Juno stops suggesting it until the
+ * rule's wait has passed again from now. Nothing changes in Slack. The undo
+ * suggests it again.
+ */
+export const topicsKeepSuggested = action('topics.keepSuggested', { id: Schema.String, suggestion: KeptSuggestion })
+
 /** Reopens a resolved topic. The undo resolves it again as it was. */
 export const topicsReopen = action('topics.reopen', topicPayload)
 
@@ -321,8 +335,10 @@ export const topicsRename = action('topics.rename', { id: Schema.String, title: 
 export const topicsRestore = action('topics.restore', restorePayload)
 
 /**
- * Ignores a channel in Juno: its topics are hidden everywhere and never
- * notify. Nothing changes in Slack. A DM cannot be ignored: `NotFound`.
+ * Ignores a channel in Juno: its topics are hidden everywhere and do not
+ * notify, except for a mention of the user by name or of a group they are
+ * in, which notifies and shows on Home. Nothing changes in Slack. A DM
+ * cannot be ignored: `NotFound`.
  */
 export const channelsIgnore = action('channels.ignore', { channel: Schema.String })
 
@@ -348,6 +364,7 @@ export const TopicsRoutes = RpcGroup.make(
   topicsUnsubscribe,
   topicsResolve,
   topicsKeepOpen,
+  topicsKeepSuggested,
   topicsReopen,
   topicsPin,
   topicsUnpin,

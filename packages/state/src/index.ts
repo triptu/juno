@@ -236,6 +236,7 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
+export { actOnSuggested } from './suggested'
 export {
   appendUnseen,
   COMMAND_DELAY_MS,

@@ -136,7 +136,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
   const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort, onDismiss)
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
   const menu =
-    item.kind === 'automated'
+    item.kind === 'automated' || item.kind === 'mentioned'
       ? (event: MouseEvent) => {
           event.preventDefault()
           onItemMenu(item.id)

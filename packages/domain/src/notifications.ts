@@ -1,8 +1,9 @@
 /**
  * Notifications and presence (spec section 14, inventory section 13).
  *
- * Order: ignored channel → Every message (channel or person) → Never →
- * outside notification hours (hold) → AI assist off (DMs and mentions) → Juno's judgement.
+ * Order: ignored channel, unless the message mentions the owner directly
+ * → Every message (channel or person) → Never → outside notification hours
+ * (hold) → AI assist off (DMs and mentions) → Juno's judgement.
  * Every message wins over Never, so nothing important is silently lost.
  */
 import { channelLabel, isDm, type ChannelInfo } from './channel'
@@ -63,6 +64,12 @@ export interface NotificationCandidate {
   readonly channel: ChannelInfo
   readonly senderId: UserId
   readonly mentionsMe: boolean
+  /**
+   * A mention of the owner by name or of a user group they are in, not
+   * @here or @channel (`messageMentionsMeDirectly`). It breaks through an
+   * ignored channel.
+   */
+  readonly mentionsMeDirectly?: boolean
   readonly at: LocalTime
 }
 
@@ -237,7 +244,8 @@ export function decideWithCause(
 ): CausedDecision {
   const { channel, senderId } = candidate
   const where = channelLabel(channel)
-  if (channel.ignored) return { decision: { outcome: 'hold', reason: `${where} is ignored` }, cause: { kind: 'ignored' } }
+  // An ignored channel never notifies, except to say someone needs the owner by name: that goes on through the settings.
+  if (channel.ignored && candidate.mentionsMeDirectly !== true) return { decision: { outcome: 'hold', reason: `${where} is ignored` }, cause: { kind: 'ignored' } }
 
   const thread = candidate.topicId?.startsWith('t:') ? candidate.topicId : undefined
   const threadLevel = thread === undefined ? undefined : settings.threads?.[thread]

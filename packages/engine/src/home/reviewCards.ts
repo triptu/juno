@@ -8,7 +8,7 @@ import type { FollowUpMatch, HomeTopic, OldDraft } from '@juno/contract'
 import { draftFirstLine, followUpDelivery, isOldDraft, messagePreviewText, millisToTs, OLD_DRAFT_MILLIS, tsToMillis, type PreviewMessage, type Ts } from '@juno/domain'
 import { StoreReader, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
-import type { HomeRow, MessageRow } from './query'
+import type { HomeRow, MessageRow } from './rows'
 
 type SlackFile = NonNullable<PreviewMessage['files']>[number]
 type ReadAfter = (row: HomeRow, after: string, limit: number) => Effect.Effect<ReadonlyArray<MessageRow>, SqlError, StoreReader>
@@ -117,8 +117,10 @@ export function withDraft(topic: HomeTopic, draft: OldDraft | undefined): HomeTo
   return draft === undefined ? topic : { ...topic, draft }
 }
 
-/** The card's title line: "2 follow-ups look done", "1 old draft". */
-export function cardTitle(kind: 'doneFollowUps' | 'oldDrafts', count: number): string {
+/** The card's title line: "2 follow-ups look done", "1 old draft", "2 threads you never open", "1 channel you never read". */
+export function cardTitle(kind: 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore', count: number): string {
   if (kind === 'oldDrafts') return count === 1 ? '1 old draft' : `${count} old drafts`
+  if (kind === 'unfollow') return count === 1 ? '1 thread you never open' : `${count} threads you never open`
+  if (kind === 'ignore') return count === 1 ? '1 channel you never read' : `${count} channels you never read`
   return count === 1 ? '1 follow-up looks done' : `${count} follow-ups look done`
 }
