@@ -42,7 +42,7 @@ function close(): void {
 const titleOf = (detail: TopicDetail) => (detail.kind === 'main' ? `${detail.channel.label} · Main` : detail.title)
 
 /** The context line's words: "eng · Main" or "eng · Postgres 16 migration plan", after the kind icon that stands for the "#". */
-const panelPlaceOf = (detail: TopicDetail): PanelPlace => ({ tint: detail.channel.tint, label: `${detail.channel.name} · ${detail.kind === 'main' ? 'Main' : detail.title}` })
+const panelPlaceOf = (detail: TopicDetail): PanelPlace => ({ tint: detail.channel.tint, label: `${detail.channel.name} · ${detail.kind === 'main' ? 'Main' : detail.title}`, name: detail.channel.name })
 
 /**
  * The Juno panel beside a topic (SPEC 7, inventory 12.1): the same single

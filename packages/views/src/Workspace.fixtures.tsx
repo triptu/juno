@@ -82,7 +82,7 @@ const panelItems = [
   ...juno('m-w1-r', 'Not yet. Leo asked for a reviewer from platform before Thursday, and nobody has said yes.', { at: NOW - 4 * 60_000 }),
 ]
 
-const postgresPlace = { tint: 'public', label: 'eng · Postgres 16 migration plan' } as const
+const postgresPlace = { tint: 'public', label: 'eng · Postgres 16 migration plan', name: 'eng' } as const
 
 /** The Juno panel as the workspace's side shows it, beside the Postgres topic. */
 const panel = (context: JunoPanelContextProps, items: Parameters<typeof JunoChatList>[0]['items'] = panelItems) => (
@@ -97,7 +97,7 @@ const panel = (context: JunoPanelContextProps, items: Parameters<typeof JunoChat
 
 const junoPanel = panel({})
 // The owner's case: a Main in a channel with a long name.
-const longMainPanel = panel({ place: { tint: 'public', label: 'proj-trainingdata-pipeline-and-model-evaluation-review-q4 · Main' } })
+const longMainPanel = panel({ place: { tint: 'public', label: 'proj-trainingdata-pipeline-and-model-evaluation-review-q4 · Main', name: 'proj-trainingdata-pipeline-and-model-evaluation-review-q4' } })
 // The chip quotes the selection: a short one whole, a long one cut at a word, several messages by count.
 const selection = { text: 'logical replication', sender: 'Leo', ts: '1712000000.000300' }
 const longSelection = { text: 'We could use logical replication for the cutover and keep the old primary as a fallback.', sender: 'Leo', ts: '1712000000.000300' }
@@ -167,8 +167,10 @@ export default defineFixtures(
       'juno-panel-selection': workspace({ side: panel({ selection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
       'juno-panel-selection-long': workspace({ side: panel({ selection: longSelection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
       'juno-panel-selection-messages': workspace({ side: panel({ selection: multiSelection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
-      // The panel at its narrowest: the topic chip gives way first.
+      // The panel at its narrowest with a selection: the topic chip names the place alone ("eng"); its tooltip keeps the title.
       'juno-panel-selection-narrow': workspace({ side: panel({ selection: longSelection, onRemoveSelection: noop }), sideWidth: 360 }, postgresPanelPage, { width: 1200, height: 720 }),
+      // At its narrowest with no selection, the chip keeps the topic's title.
+      'juno-panel-narrow': workspace({ side: junoPanel, sideWidth: 360 }, postgresPanelPage, { width: 1200, height: 720 }),
       // Ask Juno about a person: the line names them instead of the topic.
       'juno-panel-about': workspace({ side: panel({ about: { _tag: 'person', userId: 'U0MAYA', name: 'Maya Chen' }, onRemoveAbout: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
       // Nothing said yet: the empty chat with its suggestion chips.
