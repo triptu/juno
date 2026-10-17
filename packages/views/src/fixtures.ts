@@ -18,6 +18,7 @@ import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
 import SettledReview from './SettledReview.fixtures'
+import AutomatedReview from './AutomatedReview.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
@@ -102,6 +103,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MediaViewer,
   Home,
   SettledReview,
+  AutomatedReview,
   HoverToolbar,
   JunoChatList,
   JunoComposer,

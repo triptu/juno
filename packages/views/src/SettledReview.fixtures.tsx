@@ -8,6 +8,7 @@ import { colors, layout, radii, sizes, spacing, text, weights } from '@juno/toke
 import { Button, defineFixtures, Icon, IconButton, scene, Text } from '@juno/ui'
 import { homeItems } from './fixtures/home'
 import { manySettled, settledTopics, tidyUpItem } from './fixtures/settled'
+import { FixtureWindow, OverHome as SheetOverHome } from './fixtures/sheetFrame'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
 import { HomeScene } from './HomeScene'
@@ -40,12 +41,7 @@ function Live({ topics = settledTopics, initial = new Map(), ...rest }: Partial<
 
 /** Home under the sheet's layer, as the window shows it: the layer dims the page and the sheet sits in the middle. */
 function OverHome({ children }: { readonly children: ReactNode }) {
-  return (
-    <div {...stylex.props(styles.window)}>
-      <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
-      <div {...stylex.props(styles.layer)}>{children}</div>
-    </div>
-  )
+  return <SheetOverHome home={<Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />}>{children}</SheetOverHome>
 }
 
 const acted: ReadonlyMap<string, SettledStatus> = new Map([
@@ -62,7 +58,7 @@ function InPlace({ topics, about = false }: { readonly topics: ReadonlyArray<Hom
   const [statuses, setStatuses] = useState<ReadonlyMap<string, SettledStatus>>(new Map())
   const set = (id: string, status: SettledStatus) => setStatuses(new Map([...statuses, [id, status]]))
   return (
-    <div {...stylex.props(styles.window, styles.home)}>
+    <FixtureWindow scroll>
       <div {...stylex.props(styles.column)}>
         <HomeScene name="evening" />
         <h2 {...stylex.props(styles.greeting)}>Evening, Tushar.</h2>
@@ -91,7 +87,7 @@ function InPlace({ topics, about = false }: { readonly topics: ReadonlyArray<Hom
           </section>
         </div>
       </div>
-    </div>
+    </FixtureWindow>
   )
 }
 
@@ -125,29 +121,6 @@ export default defineFixtures(
 )
 
 const styles = stylex.create({
-  // The frame's size: its first child fills it.
-  window: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-    height: '720px', // tokens-allow: the fixture frame's height
-    overflow: 'hidden',
-    backgroundColor: colors['--background'],
-  },
-  // The `SheetLayer` look, inside the frame instead of the whole window.
-  layer: {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['--space-6'],
-    backgroundColor: colors['--overlay'],
-  },
-  home: {
-    overflowY: 'auto',
-  },
   column: {
     display: 'flex',
     flexDirection: 'column',

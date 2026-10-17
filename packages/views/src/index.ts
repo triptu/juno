@@ -79,6 +79,8 @@ export { WhyPopover } from './WhyPopover'
 export { Home } from './Home'
 export { SettingsTidyUp } from './TidyUpSettings'
 export { SettledReview } from './SettledReview'
+export { AutomatedReview } from './AutomatedReview'
+export { movedToast } from './automatedMoves'
 export { type SettledStatus } from './settled'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
