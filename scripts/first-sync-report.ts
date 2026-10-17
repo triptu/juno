@@ -50,7 +50,7 @@ export const hash = (text: string) => {
 
 interface MethodStat { n: number; ms: number; first: number; last: number; retries: number; limited: number; retryAfter: Array<number>; reasons: Record<string, number> }
 
-export const report = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call>, ended: number) => {
+const milestonesOf = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call>) => {
   const first = (test: (s: Sample) => boolean) => samples.find(test)?.t
   const final = samples.at(-1)!
   /** The first sample from which `value` stays at its final value. */
@@ -63,28 +63,8 @@ export const report = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call
     }
     return at
   }
-  const phases: Array<{ t: number; phase: string; syncing: boolean }> = []
-  for (const s of samples) {
-    const prev = phases.at(-1)
-    if (prev === undefined || prev.phase !== s.phase || prev.syncing !== s.syncing) phases.push({ t: s.t, phase: s.phase, syncing: s.syncing })
-  }
-
-  const byMethod = new Map<string, MethodStat>()
-  for (const c of calls) {
-    const m = byMethod.get(c.m) ?? { n: 0, ms: 0, first: c.s, last: 0, retries: 0, limited: 0, retryAfter: [], reasons: {} }
-    m.n++
-    m.ms += (c.e ?? ended) - c.s
-    m.last = Math.max(m.last, c.e ?? ended)
-    if (c.retry !== undefined) m.retries++
-    if (c.status === 429 || c.limited !== undefined) m.limited++
-    if (c.retryAfter !== undefined) m.retryAfter.push(c.retryAfter)
-    const reason = c.reason ?? '-'
-    m.reasons[reason] = (m.reasons[reason] ?? 0) + 1
-    byMethod.set(c.m, m)
-  }
   const lastOf = (test: (c: Call) => boolean) => calls.filter(test).reduce((at, c) => Math.max(at, c.e ?? 0), 0) || undefined
-
-  const milestones = {
+  return {
     quickStartStored: first((s) => s.quickStart),
     firstSidebarRows: first((s) => s.sidebarRows > 0),
     homeReady: first((s) => s.homeReady),
@@ -101,16 +81,27 @@ export const report = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call
     firstSyncEnded: first((s) => s.bootDone && s.phase === 'live' && !s.syncing),
     lastCall: lastOf(() => true),
   }
+}
 
-  /** Calls started per 10 s bucket, by method: the shape of the sync over time. */
-  const buckets: Record<string, Record<string, number>> = {}
+const methodsOf = (calls: ReadonlyArray<Call>, ended: number) => {
+  const byMethod = new Map<string, MethodStat>()
   for (const c of calls) {
-    const key = String(Math.floor(c.s / 10_000) * 10)
-    buckets[key] ??= {}
-    buckets[key][c.m] = (buckets[key][c.m] ?? 0) + 1
+    const m = byMethod.get(c.m) ?? { n: 0, ms: 0, first: c.s, last: 0, retries: 0, limited: 0, retryAfter: [], reasons: {} }
+    m.n++
+    m.ms += (c.e ?? ended) - c.s
+    m.last = Math.max(m.last, c.e ?? ended)
+    if (c.retry !== undefined) m.retries++
+    if (c.status === 429 || c.limited !== undefined) m.limited++
+    if (c.retryAfter !== undefined) m.retryAfter.push(c.retryAfter)
+    const reason = c.reason ?? '-'
+    m.reasons[reason] = (m.reasons[reason] ?? 0) + 1
+    byMethod.set(c.m, m)
   }
+  return byMethod
+}
 
-  /** Per class of history call: how many, their first and last place in the order, and when the last one ended. */
+/** Per class of history call: how many, their first and last place in the order, and when the last one ended. */
+const historyOrderOf = (calls: ReadonlyArray<Call>) => {
   const history = calls.filter((c) => c.cls !== undefined)
   const byClass: Record<string, { n: number; first: number; last: number; lastEnd: number }> = {}
   history.forEach((c, i) => {
@@ -120,15 +111,30 @@ export const report = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call
     entry.lastEnd = Math.max(entry.lastEnd, c.e ?? 0)
   })
   const spacing = history.length > 1 ? ((history.at(-1)!.s - history[0]!.s) / (history.length - 1)) : 0
+  return { byClass, spacing: Math.round(spacing) }
+}
 
+export const report = (samples: ReadonlyArray<Sample>, calls: ReadonlyArray<Call>, ended: number) => {
+  const phases: Array<{ t: number; phase: string; syncing: boolean }> = []
+  for (const s of samples) {
+    const prev = phases.at(-1)
+    if (prev === undefined || prev.phase !== s.phase || prev.syncing !== s.syncing) phases.push({ t: s.t, phase: s.phase, syncing: s.syncing })
+  }
+  /** Calls started per 10 s bucket, by method: the shape of the sync over time. */
+  const buckets: Record<string, Record<string, number>> = {}
+  for (const c of calls) {
+    const key = String(Math.floor(c.s / 10_000) * 10)
+    buckets[key] ??= {}
+    buckets[key][c.m] = (buckets[key][c.m] ?? 0) + 1
+  }
   return {
-    milestones,
+    milestones: milestonesOf(samples, calls),
     phases,
-    final,
-    byMethod,
+    final: samples.at(-1)!,
+    byMethod: methodsOf(calls, ended),
     buckets,
     /** Per call, compact: method, reason, start, end. For the gaps between history calls. */
     callLog: calls.map((c) => [c.m, c.reason ?? '', c.s, c.e ?? -1, c.status ?? 0, c.cls ?? '']),
-    historyOrder: { byClass, spacing: Math.round(spacing) },
+    historyOrder: historyOrderOf(calls),
   }
 }
