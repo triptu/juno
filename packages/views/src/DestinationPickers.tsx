@@ -10,7 +10,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, ThreadSummary } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { Avatar, chunk, Icon, Popover, SparkleDuotone, TopicArt, type PhosphorIcon } from '@juno/ui'
+import { Avatar, chunk, Icon, Popover, SparkleDuotone, Text, TopicArt, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 
 const lists = chunk(() => import('./DestinationLists'))
@@ -308,7 +308,9 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
     >
       <span key={change} {...stylex.props(styles.face, rises && styles.rise)}>
         {leading ?? <Icon icon={icon} size={13} />}
-        <span {...stylex.props(styles.buttonLabel, wide && styles.buttonLabelWide)}>{children}</span>
+        <Text variant="inherit" truncate tooltipWhenTruncated sx={[styles.buttonLabel, wide && styles.buttonLabelWide]}>
+          {children}
+        </Text>
       </span>
       <span {...stylex.props(styles.caret)}>
         <Icon icon={CaretDown} size={12} />
@@ -317,8 +319,8 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
   )
 }
 
-/** The longest a place's name runs in its button before the ellipsis. */
-const THREAD_LABEL_MAX = '260px' // tokens-allow: a place name's widest in its button
+/** The longest a topic's title runs in its chip before the ellipsis; the whole title shows on hover. */
+const THREAD_LABEL_MAX = '260px' // tokens-allow: a topic title's widest in its chip
 
 // The new destination rises 4px into the chip with the fade; with reduced motion it only fades.
 const rise = stylex.keyframes({
