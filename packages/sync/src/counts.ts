@@ -77,6 +77,9 @@ const unknownConversations = (ids: ReadonlyArray<string>): Effect.Effect<Readonl
     return ids.filter((id) => !known.has(id))
   })
 
+/** The last tier Home waits for: unread followed threads. */
+const HOME_TIER = 3
+
 interface Active {
   readonly id: string
   readonly latest: Ts
@@ -91,10 +94,17 @@ interface Active {
  * then the other unread channels; then the ones where the store already
  * holds the user's own messages (most first); then the rest. Newest first
  * within each tier. Order only: every conversation is still read once.
+ * `home` counts the leading conversations of the first three tiers (DMs,
+ * mentions, unread followed threads): Home is ready once they are read
+ * (owner, 10-18).
  */
-export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, counts: Counts): Effect.Effect<ReadonlyArray<Active>, SqlError, StoreWriter> =>
+export const historyOrder = (
+  ctx: SyncContext,
+  active: ReadonlyArray<Active>,
+  counts: Counts,
+): Effect.Effect<{ readonly order: ReadonlyArray<Active>; readonly home: number }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
-    if (active.length === 0) return active
+    if (active.length === 0) return { order: active, home: 0 }
     const sql = yield* StoreWriter
     const ids = active.map((conversation) => conversation.id)
     const kinds = new Map((yield* sql<{ id: string; kind: string }>`SELECT id, kind FROM conversations WHERE id IN ${sql.in(ids)}`).map((row) => [row.id, row.kind]))
@@ -112,7 +122,8 @@ export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, co
       return own.has(id) ? 5 : 6
     }
     // A stable sort: `active` is newest first, and stays so within a tier.
-    return active.toSorted((a, b) => tier(a.id) - tier(b.id) || (tier(a.id) === 5 ? (own.get(b.id) ?? 0) - (own.get(a.id) ?? 0) : 0))
+    const order = active.toSorted((a, b) => tier(a.id) - tier(b.id) || (tier(a.id) === 5 ? (own.get(b.id) ?? 0) - (own.get(a.id) ?? 0) : 0))
+    return { order, home: order.filter((conversation) => tier(conversation.id) <= HOME_TIER).length }
   })
 
 /** Member conversations with activity inside the window, newest first. */
