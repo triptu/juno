@@ -191,12 +191,13 @@ test('exposes only the bridge to the page', async ({ win }) => {
       clipboard: Object.keys(window.juno.clipboard),
       menu: Object.keys(window.juno.menu),
       notifications: Object.keys(window.juno.notifications),
+      webPanel: Object.keys(window.juno.webPanel),
     }
   })
   expect(exposed).toEqual({
     require: 'undefined',
     process: 'undefined',
-    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications'],
+    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
     updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
     app: ['getInfo'],
     engine: ['requestPort', 'restart'],
@@ -209,6 +210,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     clipboard: ['writeText', 'writeImage'],
     menu: ['onCommand'],
     notifications: ['setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
+    webPanel: ['show', 'setBounds', 'hide', 'close', 'onState'],
   })
 })
 
