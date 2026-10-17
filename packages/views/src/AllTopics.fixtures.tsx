@@ -124,6 +124,10 @@ export default defineFixtures(
       'where-hidden': page(undefined, { width: 620, height: 560 }),
       // The minimum window with the sidebar hidden: every column fits.
       'minimum-window': page(undefined, { width: 720, height: 436 }),
+      // The minimum window with the sidebar shown (336): the status tabs are a pop-up, Status hides, nothing scrolls sideways.
+      'minimum-window-sidebar': page(undefined, { width: 336, height: 436 }),
+      // Just under 520: the compact header and table, with a place picked.
+      compact: page({ place: placePicker({ place: eng }), filter: { status: 'open', kind: 'all', sort: 'recent' } }, { width: 500, height: 480 }),
       wide: page(undefined, { width: 1400, height: 640 }),
     },
     Window: {

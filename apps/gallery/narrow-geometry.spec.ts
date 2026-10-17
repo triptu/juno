@@ -14,6 +14,8 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
   [route('AllTopics', 'size/where-hidden'), false],
   [route('AllTopics', 'size/narrow'), false],
   [route('AllTopics', 'filters/narrow'), false],
+  [route('AllTopics', 'size/minimum-window-sidebar'), false],
+  [route('AllTopics', 'size/compact'), false],
   [route('Home', 'items/minimum-window'), false],
   [route('CommandPalette', 'states/minimum-window'), false],
   [route('SettingsPage', 'states/notifications-minimum-window'), false],
@@ -53,7 +55,7 @@ test.describe('the minimum window', () => {
     expect(where.topicTop).toBeGreaterThanOrEqual(where.pillBottom)
   })
 
-  test('All topics hides Where under 648px, then Msgs under 560px, and the table still fits', async ({ page }) => {
+  test('All topics hides Where under 664px, then Msgs under 576px, and the table still fits', async ({ page }) => {
     const states = [
       ['size/minimum-window', true, true],
       ['size/where-hidden', false, true],
@@ -102,5 +104,26 @@ test.describe('the minimum window with the sidebar shown', () => {
       )
       expect(cut).toEqual([])
     }
+  })
+
+  test('All topics at 336 shows Status as a pop-up and never scrolls sideways, so a focused row keeps its whole ring', async ({ page }) => {
+    const at = route('AllTopics', 'size/minimum-window-sidebar')
+    await openState(page, at)
+    const frame = frameOf(page, at)
+    await expect(frame.getByRole('combobox', { name: 'Status' })).toBeVisible()
+    await expect(frame.getByRole('radiogroup', { name: 'Status' })).toBeHidden()
+    await expect(frame.getByRole('columnheader', { name: 'Status' })).toBeHidden()
+    const filters = frame.locator('[data-all-topics-filters]')
+    expect(await filters.evaluate((row) => [...row.querySelectorAll('select, [role="radiogroup"], button')].every((node) => node.getBoundingClientRect().right <= row.getBoundingClientRect().right + 0.5))).toBe(true)
+    const table = frame.locator('[data-all-topics-table]')
+    expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+    const row = frame.locator('[data-all-topics-row]').first()
+    await row.focus()
+    const [rowBox, tableBox] = await Promise.all([row.boundingBox(), table.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      return { left: box.left, right: box.left + node.clientWidth }
+    })])
+    expect(rowBox!.x).toBeGreaterThanOrEqual(tableBox.left)
+    expect(rowBox!.x + rowBox!.width).toBeLessThanOrEqual(tableBox.right)
   })
 })

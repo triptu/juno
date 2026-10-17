@@ -22,7 +22,8 @@ function measure() {
     row: box(row),
     controls: controls.map(box),
     // Everything the pointer can press in the row, outside the four controls: a stray chevron would show here.
-    extras: [...row.querySelectorAll('button, select, [role="button"]')].filter((element) => !controls.some((control) => control === element || control.contains(element))).length,
+    // The Status pop-up of a compact page is not drawn at these widths.
+    extras: [...row.querySelectorAll('button, select, [role="button"]')].filter((element) => element.getClientRects().length > 0 && !controls.some((control) => control === element || control.contains(element))).length,
     clipped: controls.filter((control) => control.scrollWidth > control.clientWidth + 1).length,
     segments: segments.map(box),
     segmentsClipped: segments.filter((segment) => segment.scrollWidth > segment.clientWidth).length,
