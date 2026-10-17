@@ -83,15 +83,14 @@ interface Active {
 }
 
 /**
- * The cold boot's history order. Each page makes its conversation's unread
- * count exact, so the conversations whose counts a user reads first go
- * first (10-18): DMs and group DMs with unread messages, then channels with
- * an unread mention of the user (in Main or a followed thread), then the
- * other unread channels. After them the owner's order of 10-16 for the
- * rest: the read DMs and group DMs, then channels with unread replies in a
- * followed thread, then the ones where the store already holds the user's
- * own messages (most first), then the rest. Newest first within each tier.
- * Order only: every conversation is still read once.
+ * The cold boot's history order: the owner's order of 2026-10-16, with
+ * unread before read inside it (10-18), since each page makes its
+ * conversation's unread count exact. DMs and group DMs, the unread ones
+ * first; then conversations with an unread mention of the user (in Main or
+ * a followed thread); then those with unread replies in a followed thread;
+ * then the other unread channels; then the ones where the store already
+ * holds the user's own messages (most first); then the rest. Newest first
+ * within each tier. Order only: every conversation is still read once.
  */
 export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, counts: Counts): Effect.Effect<ReadonlyArray<Active>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
@@ -106,10 +105,10 @@ export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, co
       const kind = kinds.get(id)
       const entry = entries.get(id)
       const unread = entry?.has_unreads === true
-      if (kind === 'im' || kind === 'mpim') return unread ? 0 : 3
-      if ((unread && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 1
-      if (unread) return 2
-      if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 4
+      if (kind === 'im' || kind === 'mpim') return unread ? 0 : 1
+      if ((unread && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 2
+      if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 3
+      if (unread) return 4
       return own.has(id) ? 5 : 6
     }
     // A stable sort: `active` is newest first, and stays so within a tier.

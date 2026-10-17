@@ -243,7 +243,7 @@ describe('cold boot', () => {
     await engine.phase('live')
   })
 
-  it('reads unread DMs, then mentions, then other unread channels, before the read DMs and the bulk of channels', async () => {
+  it('reads DMs (unread first), then mentions, then unread followed threads, then other unread channels, before the bulk', async () => {
     // Live in 2 to 5 s on a quiet machine, 7 to 23 s at four busy processes per core and 14 to 75 s at ten.
     const engine = await bootedEngine(
       { fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } },
@@ -259,14 +259,15 @@ describe('cold boot', () => {
       const entry = ws.countEntry(c)
       return !isDirect(c) && ((entry.has_unreads && entry.mention_count > 0) || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0)
     }).map((c) => c.id))
-    const unread = new Set(members.filter((c) => !isDirect(c) && !mentioned.has(c.id) && ws.countEntry(c).has_unreads).map((c) => c.id))
+    const followed = new Set(members.filter((c) => !isDirect(c) && !mentioned.has(c.id) && (threads.unread_count_by_channel?.[c.id] ?? 0) > 0).map((c) => c.id))
+    const unread = new Set(members.filter((c) => !isDirect(c) && !mentioned.has(c.id) && !followed.has(c.id) && ws.countEntry(c).has_unreads).map((c) => c.id))
     // Channels with nothing for the user: nothing unread, no followed reply, no message of their own.
     const bulk = new Set(members.filter((c) =>
-      !isDirect(c) && !mentioned.has(c.id) && !unread.has(c.id) && (threads.unread_count_by_channel?.[c.id] ?? 0) === 0 && !ws.main(c.id).some((m) => m.user === SELF_ID),
+      !isDirect(c) && !mentioned.has(c.id) && !followed.has(c.id) && !unread.has(c.id) && !ws.main(c.id).some((m) => m.user === SELF_ID),
     ).map((c) => c.id))
     const order = apiCalls(engine, 'conversations.history').map((call) => call.args['channel']!)
     const positions = (ids: ReadonlySet<string>) => order.flatMap((id, i) => (ids.has(id) ? [i] : []))
-    const groups = [unreadDms, mentioned, unread, readDms, bulk]
+    const groups = [unreadDms, readDms, mentioned, followed, unread, bulk]
     for (const group of groups) expect(positions(group).length).toBeGreaterThan(0)
     // Each group is read before the next one starts.
     for (let i = 0; i + 1 < groups.length; i++) expect(Math.max(...positions(groups[i]!))).toBeLessThan(Math.min(...positions(groups[i + 1]!)))
