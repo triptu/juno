@@ -3,7 +3,7 @@ import type { Banner, ChatItem, Ending } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
-import { answersInPlace, bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, reactionsAtTop, richReply, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
+import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, reactionsAtTop, richReply, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
 const noop = () => {}
@@ -147,7 +147,6 @@ export default defineFixtures(
       'owner-replies': list(ownerReplies),
       'juno-replies': list(junoReplies),
       'narrow-quote': list(ownerReplies, {}, { width: 336, height: 640, padded: false }),
-      'answers-in-place': list(answersInPlace),
     },
     States: {
       'ai-off': list(conversation, { banner: { _tag: 'aiOff' } }),

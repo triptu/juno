@@ -1,7 +1,7 @@
 // Reactions in the Juno chat (SPEC 13.1): the quick reactions and the emoji
 // picker a topic's messages use, badges that show whole at the panel's
-// narrowest and in the wide Juno tab, in light and dark, and no quote on an
-// answer right under the message it answers.
+// narrowest and in the wide Juno tab, in light and dark. An answer keeps its
+// quote even right under the message it answers.
 import type { Locator } from '@playwright/test'
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
@@ -96,10 +96,10 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await juno.win.mouse.up()
   await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
 
-  // An answer right under the message it answers shows no quote of it.
+  // An answer right under the message it answers still quotes it: you may have sent several.
   await panel.send('quote me first')
   await panel.expectJuno('Answering quote me first')
-  await expect(panel.junoBubble('Answering quote me first').locator('[data-quote]')).toHaveCount(0)
+  await expect(panel.root.locator('[data-chat-juno]').filter({ hasText: 'Answering quote me first' }).locator('[data-quote="owner"]')).toContainText('quote me first')
 
   // Enough for the list to scroll, so the first bubble sits right under the header at the top.
   for (const n of [2, 3, 4, 5, 6]) {
