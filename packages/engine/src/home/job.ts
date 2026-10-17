@@ -165,11 +165,14 @@ export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider | AiCrede
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
     const passes = workspace.changes.pipe(
-      Stream.zipLatest(wakes),
-      Stream.switchMap(([open]) => {
+      Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
         const memory: Memory = { deferred: new Map() }
-        const triggers = Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK))
+        // A wake forgets the waits and runs a pass after the one under way, which it does not stop.
+        const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => {
+          memory.deferred.clear()
+        })))
+        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK)), woken)
         return triggers.pipe(
           Stream.mapEffect(() =>
             runPass(memory).pipe(

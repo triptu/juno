@@ -53,7 +53,7 @@ interface Candidate {
 interface Memory {
   /** Calls today that stored no title: they may have been billed. Shared by every pass of the workspace. */
   readonly spent: { day: number; unstored: number }
-  /** Waits, per wake, so a pass cut short by a wake cannot hold a thread back in the next one. */
+  /** Waits, cleared on each wake, so a thread held back before a wake is tried again after it. */
   readonly deferred: Map<string, number>
 }
 
@@ -136,13 +136,14 @@ export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCred
   const wakes = yield* aiWakes
   const spending = new Map<string, Memory['spent']>()
   yield* Effect.forkScoped(workspace.changes.pipe(
-    Stream.zipLatest(wakes),
-    Stream.switchMap(([open]) => {
+    Stream.switchMap((open) => {
       if (open === undefined) return Stream.empty
       const spent = spending.get(open.id) ?? { day: 0, unstored: 0 }
       spending.set(open.id, spent)
       const memory: Memory = { spent, deferred: new Map() }
-      return Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), Stream.tick(TICK)).pipe(
+      // A wake forgets the waits and runs a pass after the one under way, which it does not stop.
+      const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => memory.deferred.clear())))
+      return Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), Stream.tick(TICK)), woken).pipe(
         Stream.mapEffect(() => runPass(memory).pipe(Effect.catch(() => Effect.logWarning('titles: a pass failed')), Effect.provideService(AiProvider, provider))),
         Stream.provide(open.context),
       )

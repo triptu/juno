@@ -38,6 +38,8 @@ export class AiCredentials extends Context.Service<AiCredentials, {
  * What starts a new pass of a background AI job: a key change, a new link to
  * the agent's spend ledger, or the ledger's word that it may have room again
  * (the owner raised the cap), so a job stopped at the cap does not wait for its timer.
+ * A wake starts the next pass after the one running; it never stops a call in
+ * flight, since a stopped call may keep its whole reservation in the cap.
  */
 export const aiWakes: Effect.Effect<Stream.Stream<string>, never, AiCredentials | AiSpend> = Effect.gen(function* () {
   const credentials = yield* AiCredentials
