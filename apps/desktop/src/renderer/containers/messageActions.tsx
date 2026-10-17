@@ -25,7 +25,7 @@ import type { MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
-import { useSentSuggestion } from './topic/sentSuggestion'
+import { useSentSuggestions } from './topic/sentSuggestion'
 import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
 
 // The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
@@ -47,7 +47,7 @@ export interface MessageActionsInput {
 }
 
 export interface MessageActionsOutput {
-  readonly suggestion: ReturnType<typeof useSentSuggestion>
+  readonly suggestions: ReturnType<typeof useSentSuggestions>
   readonly actions: MessageActions
   readonly activeMessage: string | undefined
   readonly confirmingDelete: string | undefined
@@ -106,7 +106,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   'use no memo'
   const channel = detail.channel.id
   const { editing, setEditing, confirming, setConfirming, latest } = useEditState(detail, list)
-  const suggestion = useSentSuggestion(detail.id, list, setEditing, editing)
+  const suggestions = useSentSuggestions(list, setEditing, editing)
   const [picker, setPicker] = useState<Picker | undefined>(undefined)
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   useEffect(preloadPicker, [])
@@ -154,7 +154,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const handlers = rowHandlers(actions, rowMessage, latest, scrollRef, composer)
   return {
     actions,
-    suggestion,
+    suggestions,
     ...handlers,
     // ↑ selects a message, which E then edits: the field's chunk comes now if the idle preload has not run.
     selectNewest: () => {

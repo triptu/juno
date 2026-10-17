@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
-import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast, stopPrecheck } from '@juno/state'
+import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
@@ -47,14 +47,14 @@ export function withQuote(draft: string, text: string): string {
  * (`drafts.get`), read once when the composer mounts and written back after
  * a pause in typing and when the tab hides, so it survives tab switches and
  * restarts. Until the draft has loaded, the `ComposerSlot` holds the place.
- * While typing pauses, grammar for the draft starts, and in a Main the model
- * is asked whether the draft is a reply to a recent topic (`messages.precheck`);
- * the next edit stops that grammar request (`messages.precheckStop`). Enter runs the checks on
+ * While typing pauses in a Main, the model is asked whether the draft is a
+ * reply to a recent topic (`messages.precheck`). Enter runs the checks on
  * send (`messages.check`, spec section 8), which use that answer only if it
  * is already there, unless AI assist is off. When they find nothing the message is queued
  * (`messages.send`, which clears the stored draft in the same transaction)
  * and the pending row shows in the list at once; otherwise the check bar
- * shows inside the composer until a choice, Esc or an edit. While typing
+ * shows inside the composer until a choice, Esc or an edit. The other checks
+ * run once the send is accepted and offer a fix line on the sent message. While typing
  * pauses in a public channel, the audience line warns about hiring and
  * people details. Typing @ or # suggests people and user groups, or
  * channels (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
@@ -146,13 +146,8 @@ function LoadedComposer({
     // Only a change of the stored draft is taken, not this field's own edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest])
-  // A pause asked about the draft; the next edit stops its grammar request.
-  const asked = useRef(false)
-  const threadTs = detail.kind === 'thread' ? detail.rootTs : undefined
   const precheck = (value: string) => {
-    if (!aiAssist || value.trim() === '') return
-    asked.current = true
-    precheckMessage(registry, detail.channel.id, value, threadTs, encoded(value))
+    if (routeChecked && value.trim() !== '') precheckMessage(registry, detail.channel.id, value)
   }
   // A saved draft is asked about once, as if typing had just paused.
   useEffect(() => {
@@ -174,16 +169,12 @@ function LoadedComposer({
     // Editing closes the bar and drops a check still running: Enter checks the new text.
     setBar(undefined)
     stopChecking()
-    if (asked.current) {
-      asked.current = false
-      stopPrecheck(registry, detail.channel.id, threadTs)
-    }
     unsaved.current = encoded(next)
     clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       setPaused(next)
       flush()
-      // The models answer now: Enter never waits for the wrong-place question, and grammar is usually ready by send.
+      // The route model answers now: Enter never waits for the wrong-place question.
       precheck(next)
     }, DRAFT_SAVE_MS)
   }
@@ -198,8 +189,6 @@ function LoadedComposer({
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
-    // The engine keeps the sent text's grammar request; the next edit has nothing to stop.
-    asked.current = false
     links.reset('', [])
     setText('')
     setPaused('')

@@ -21,7 +21,9 @@ const sentSlip = [
   ...thread.slice(10),
   message({ ago: 0, from: me, text: "dry run passed on staging, replica lag stayed under 2s the whole time. its ready for thursday, i'll post the runbook diff after lunch" }, thread.at(-1)),
 ]
-const slip = { ts: sentSlip.at(-1)!.message.ts, value: { label: "its → it's", onEdit: noop } }
+const slip = new Map([[sentSlip.at(-1)!.message.ts, { label: "its → it's", onReview: noop, onDismiss: noop }]])
+/** Two fixes: the count, then the fixes in muted text. */
+const slips = new Map([[sentSlip.at(-1)!.message.ts, { label: '2 small fixes', detail: "its → it's, the the → the", onReview: noop, onDismiss: noop }]])
 
 interface Scene {
   readonly detail: TopicDetail
@@ -216,9 +218,10 @@ export default defineFixtures(
           </Floating>
         ),
       }),
-      // Just after sending: the post-send check's slip floats over the sent row and reserves nothing.
-      'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: slip } }),
-      'sent-suggestion-narrow': topic({ detail: details.postgres, items: sentSlip, list: { suggestion: slip } }, { width: 400, height: 640 }),
+      // After sending: the fix line under the sent message, until Review or Dismiss.
+      'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestions: slip } }),
+      'sent-suggestions': topic({ detail: details.postgres, items: sentSlip, list: { suggestions: slips } }),
+      'sent-suggestion-narrow': topic({ detail: details.postgres, items: sentSlip, list: { suggestions: slips } }, { width: 400, height: 640 }),
       'minimum-window': topic({ detail: details.engMain, items: main, list: { dividerBefore: mainDividerBefore } }, { width: 720, height: 480 }),
     },
   },

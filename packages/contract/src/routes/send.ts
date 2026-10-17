@@ -17,19 +17,18 @@
  *   the outbox sends it. A message Slack may not have yet waits for it
  *   (`depends_on`). Neither has an undo (ADR 0010).
  * - `messages.react`: adds or removes the user's reaction, the same way.
- * - `messages.precheck`: while typing pauses, starts the grammar request for
- *   the draft as it would be sent (`grammarCheck`), so the second after
- *   sending usually has its answer. In Main it also asks the route model
+ * - `messages.precheck`: while typing pauses in Main, asks the route model
  *   whether the draft reads like a reply to one of the channel's latest
- *   topics (`routeCheck`) and stores the answer. Answers once the route
- *   answer is stored; grammar goes on in the background.
- * - `messages.precheckStop`: the draft changed after a pause, so the grammar
- *   request that pause started stops, unless that text was sent.
+ *   topics (`routeCheck`) and stores the answer. Nothing else is asked while
+ *   typing.
  * - `messages.check`: the checks on send (spec section 8), run on Enter
  *   before `messages.send`. It never waits for a model: the wrong-place
  *   finding is the precheck's stored answer for this exact draft, if there
- *   is one. Local fixes and grammar run after sending. Empty
- *   when nothing was found: the message then just sends.
+ *   is one. Empty when nothing was found: the message then just sends.
+ * - `messages.postcheck`: once a send is accepted, the local fixes for the
+ *   sent text at once, and the grammar request for it started.
+ * - `messages.grammar`: waits for that grammar answer and returns it merged
+ *   with the local fixes. Neither holds the send.
  *
  * A message Slack refuses to change (too old to edit, say) goes back to
  * what Slack has.
@@ -141,23 +140,23 @@ export const messagesCheck = Rpc.make('messages.check', {
   success: SendCheck,
 })
 
-/**
- * Asked while typing pauses: the wrong-place question, so `messages.check` finds the answer, and grammar, so
- * `messages.postcheck` does. `message` is the draft as it will be sent, when that differs from `text`.
- */
+/** Asked while typing pauses in Main: the wrong-place question, so `messages.check` finds the answer. */
 export const messagesPrecheck = Rpc.make('messages.precheck', {
-  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String), text: Schema.String, message: Schema.optionalKey(Schema.String) },
+  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String), text: Schema.String },
   success: Schema.Void,
 })
 
-/** The composer at this place changed after a pause: its grammar request stops unless its text was sent. */
-export const messagesPrecheckStop = Rpc.make('messages.precheckStop', {
-  payload: { channelId: Schema.String, threadTs: Schema.optionalKey(Schema.String) },
-  success: Schema.Void,
-})
-
-/** One background pass for a message just sent by this renderer. Never delays the send. */
+/**
+ * The local fixes for a message this renderer just sent, at once. `grammar` is true when a grammar answer
+ * is on its way: `messages.grammar` waits for it. Empty for a message sent too long ago or in another workspace.
+ */
 export const messagesPostcheck = Rpc.make('messages.postcheck', {
+  payload: { clientMsgId: Schema.String },
+  success: Schema.Struct({ ...SendCheck.fields, grammar: Schema.Boolean }),
+})
+
+/** The grammar answer for a message `messages.postcheck` started, merged with the local fixes. Empty when grammar found nothing. */
+export const messagesGrammar = Rpc.make('messages.grammar', {
   payload: { clientMsgId: Schema.String },
   success: SendCheck,
 })
@@ -168,4 +167,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPrecheckStop, messagesPostcheck, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)

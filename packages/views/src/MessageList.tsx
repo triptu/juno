@@ -68,7 +68,8 @@ export interface MessageListProps {
   readonly activeMessage?: string | undefined
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
-  readonly suggestion?: { readonly ts: string; readonly value: MessageProps['suggestion'] } | undefined
+  /** The fix lines after sending, by message `ts`. */
+  readonly suggestions?: ReadonlyMap<string, MessageProps['suggestion']> | undefined
   readonly editing?: { readonly ts: string; readonly editor: ReactNode } | undefined
   /**
    * A key on a selected row that the list does not use itself (it moves the
@@ -188,7 +189,7 @@ export function MessageList({
   activeMessage,
   confirmingDelete,
   editing,
-  suggestion,
+  suggestions,
   onRowKey,
   onOpenThread,
   onPrefetchThread,
@@ -279,7 +280,7 @@ export function MessageList({
                 actions={actions}
                 active={activeMessage === item.message.ts}
                 confirmingDelete={confirmingDelete === item.message.ts}
-                suggestion={suggestion?.ts === item.message.ts ? suggestion.value : undefined}
+                suggestion={suggestions?.get(item.message.ts)}
                 editor={editing?.ts === item.message.ts ? editing.editor : undefined}
                 onOpenThread={onOpenThread}
                 onChannel={onChannel}

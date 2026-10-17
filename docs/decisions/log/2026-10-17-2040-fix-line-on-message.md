@@ -1,0 +1,1 @@
+- 10-17 20:40 · checks-after-send · Post-send fixes are a line under the sent message ("2 small fixes · Review · Dismiss"), not an overlay that went after eight seconds or on leaving the topic. It waits on the message until reviewed or dismissed, also while another topic shows, with no notification. It lives in memory only.

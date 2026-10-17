@@ -122,7 +122,6 @@ export {
   draftAtom,
   editMessage,
   precheckMessage,
-  stopPrecheck,
   reactToMessage,
   retryMessage,
   saveDraft,
@@ -272,4 +271,4 @@ export {
 
 export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
 
-export { sentSuggestionAtom, dismissSentSuggestion } from './sentSuggestions'
+export { sentSuggestionsAtom, dismissSentSuggestion, type SentSuggestion } from './sentSuggestions'
