@@ -75,11 +75,10 @@ test('a capture running at launch hides nothing, and true then false then true h
   }
 })
 
-test('a capture that never stops says detection is not available, until it stops', async ({ running, userData, fake, slackApp }) => {
-  await running.close()
-  const always = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, screenShared: true })
-  try {
-    const juno = new Juno(always.app, always.win)
+test.describe('with a capture running at launch', () => {
+  test.use({ screenShared: true })
+
+  test('a capture that never stops says detection is not available, until it stops', async ({ juno }) => {
     await juno.signIn()
     await juno.waitForSync()
     await juno.openSettings('General')
@@ -100,9 +99,7 @@ test('a capture that never stops says detection is not available, until it stops
     await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
     await juno.privacy.startSharing()
     await expect(juno.privacy.footer).toBeVisible()
-  } finally {
-    await always.close()
-  }
+  })
 })
 
 test('a mode turned on by hand stays on after sharing stops, and the setting turns hiding off', async ({ juno }) => {

@@ -134,20 +134,18 @@ test('hiring and people details in a public channel show the amber line while ty
   // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and Home below.
 })
 
-test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await running.close()
+test.describe('with a model slower than the typing pause', () => {
+  test.use({ fakeAiDelayMillis: 1_000 })
 
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_000 })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    const { topic } = restarted
-    await restarted.sidebar.row(ENG_MAIN).open()
+  test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, userData }) => {
+    await juno.signIn()
+    await juno.waitForSync()
+    const { topic } = juno
+    await juno.sidebar.row(ENG_MAIN).open()
     await topic.expectTitle('Main')
     // Enter while the model is still answering the pause: no bar, no wait.
     await topic.composer.fill(BILL_REPLY)
-    await restarted.win.waitForTimeout(500)
+    await juno.win.waitForTimeout(500)
     await topic.composer.press('Enter')
     await expect(topic.composer).toHaveValue('', { timeout: 500 })
     await topic.expectSent(BILL_REPLY)
@@ -161,17 +159,15 @@ test('Enter never waits for a slow model: before its answer the message sends at
     await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
     expect(posts(fake)).toHaveLength(1)
 
-    await restarted.tabs.newTabButton.click()
-    await restarted.write.pickConversation('eng', 'eng')
-    await restarted.write.write(`${BILL_REPLY} next week`)
-    await restarted.win.waitForTimeout(500)
-    await restarted.write.send()
-    await expect(restarted.write.composer).toHaveValue('', { timeout: 500 })
+    await juno.tabs.newTabButton.click()
+    await juno.write.pickConversation('eng', 'eng')
+    await juno.write.write(`${BILL_REPLY} next week`)
+    await juno.win.waitForTimeout(500)
+    await juno.write.send()
+    await expect(juno.write.composer).toHaveValue('', { timeout: 500 })
     await expect.poll(() => posts(fake).length).toBe(2)
     expect(posts(fake)[1]!.args['thread_ts']).toBeUndefined()
-  } finally {
-    await again.close()
-  }
+  })
 })
 
 test('with AI assist off, local checks still work and models stay off', async ({ juno, fake, slackApp, userData, running }) => {
@@ -286,41 +282,39 @@ test('grammar offers its broken as an inline edit after sending', async ({ juno,
   expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
 })
 
-test('a slow grammar response never holds Enter or shows a late suggestion', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 1_200 })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.sidebar.row(POSTGRES).open()
-    await restarted.topic.send('its broken')
-    await expect(restarted.topic.composer).toHaveValue('', { timeout: 500 })
-    await restarted.topic.expectSent('its broken')
-    await restarted.win.waitForTimeout(1500)
-    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
-    await expect(restarted.topic.checkBar.bar).toHaveCount(0)
+test.describe('with a grammar model slower than the window', () => {
+  test.use({ fakeAiDelayMillis: 1_200 })
+
+  test('a slow grammar response never holds Enter or shows a late suggestion', async ({ juno, fake, userData }) => {
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.send('its broken')
+    await expect(juno.topic.composer).toHaveValue('', { timeout: 500 })
+    await juno.topic.expectSent('its broken')
+    await juno.win.waitForTimeout(1500)
+    await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
+    await expect(juno.topic.checkBar.bar).toHaveCount(0)
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
     try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'").get()).toEqual({ n: 1 }) }
     finally { db.close() }
-  } finally { await again.close() }
+  })
 })
 
-test('leaving the topic drops a pending grammar result, including after returning', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeAiDelayMillis: 600 })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.sidebar.row(POSTGRES).open()
-    await restarted.topic.send('its broken')
-    await restarted.sidebar.row(RINA).open()
-    await restarted.win.waitForTimeout(1100)
-    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
-    await restarted.sidebar.row(POSTGRES).open()
-    await expect(restarted.win.locator('[data-send-suggestion]')).toHaveCount(0)
-  } finally { await again.close() }
+test.describe('with a grammar model still answering when the user leaves', () => {
+  test.use({ fakeAiDelayMillis: 600 })
+
+  test('leaving the topic drops a pending grammar result, including after returning', async ({ juno }) => {
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.send('its broken')
+    await juno.sidebar.row(RINA).open()
+    await juno.win.waitForTimeout(1100)
+    await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
+    await juno.sidebar.row(POSTGRES).open()
+    await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
+  })
 })
 
 test('Wrong place and grammar can be turned off without disabling local checks', async ({ juno, fake, userData }) => {
