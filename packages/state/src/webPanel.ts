@@ -6,17 +6,22 @@
  *   One panel per window, in memory only. It shows while its tab is active.
  * - `webPanelStateAtom`: the page as main reports it (url, title, icon,
  *   loading), or undefined before the first report. `followWebPanel` feeds it.
+ * - `webPanelOnAtom`: Settings › General "Open links in Juno", a workspace
+ *   preference, on by default. Off, every link opens in the browser, and
+ *   turning it off closes the panel (`followWebPanel` watches it).
  * - `openWebPanel`: a link opens in the active tab's panel, or in the browser
- *   when the panel cannot show it or the window is too narrow for it.
+ *   when the panel is off, cannot show the link or the window is too narrow.
  *
  * In a tab the side slot shows the web panel or the Juno panel, never both:
  * opening a link closes the Juno panel there, and `setJunoPanelOpen(true)`
  * closes the web panel.
  */
 import { Schema } from 'effect'
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { JUNO_PANEL_WIDTH, WebPanelState, webPanelCanShow } from '@juno/contract'
+import { JUNO_PANEL_WIDTH, WebPanelState, prefsGet, prefsSet, webPanelCanShow } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
+import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { openExternal, sidebarLayoutAtom } from './shell'
 import { setJunoPanelOpen } from './junoPanel'
@@ -37,12 +42,36 @@ const decodeState = Schema.decodeUnknownOption(WebPanelState)
 
 export const webPanelStateAtom = Atom.make<WebPanelState | undefined>(undefined).pipe(Atom.keepAlive)
 
-/** Follows main's reports of the page into `webPanelStateAtom`. Returns the unsubscribe. */
+export const WEB_PANEL_PREF = 'webPanel'
+
+const savedWebPanelOnAtom = liveQuery(prefsGet)({ key: WEB_PANEL_PREF })
+
+export const webPanelOnAtom = Atom.make((get): boolean => {
+  const saved = get(savedWebPanelOnAtom)
+  return !(AsyncResult.isSuccess(saved) && saved.value === false)
+})
+
+export function setWebPanelOn(registry: Registry, on: boolean) {
+  return runCommand(registry, prefsSet, { key: WEB_PANEL_PREF, value: on })
+}
+
+/**
+ * Follows main's reports of the page into `webPanelStateAtom`, and closes the
+ * panel when it is turned off. Holds `webPanelOnAtom` so `openWebPanel` reads
+ * the saved value. Returns the unsubscribe.
+ */
 export function followWebPanel(registry: Registry): () => void {
-  return window.juno.webPanel.onState((value) => {
+  const stopState = window.juno.webPanel.onState((value) => {
     const state = decodeState(value)
     if (state._tag === 'Some' && registry.get(webPanelAtom) !== undefined) registry.set(webPanelStateAtom, state.value)
   })
+  const stopOn = registry.subscribe(webPanelOnAtom, (on) => {
+    if (!on) closeWebPanel(registry)
+  }, { immediate: true })
+  return () => {
+    stopState()
+    stopOn()
+  }
 }
 
 /**
@@ -59,7 +88,7 @@ function roomForPanel(registry: Registry): boolean {
 
 export function openWebPanel(registry: Registry, url: string): void {
   const tab = activeTab(registry.get(tabsAtom))
-  if (tab === undefined || !webPanelCanShow(url) || !roomForPanel(registry)) {
+  if (tab === undefined || !registry.get(webPanelOnAtom) || !webPanelCanShow(url) || !roomForPanel(registry)) {
     openExternal(url)
     return
   }

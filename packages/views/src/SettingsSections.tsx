@@ -39,6 +39,9 @@ export interface SettingsGeneralProps {
   readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
+  /** A plain click on a web link opens it in the web panel (SPEC 7). */
+  readonly webPanel: boolean
+  readonly onWebPanelChange: (enabled: boolean) => void
   readonly mirrorReads: boolean
   readonly onMirrorReadsChange: (enabled: boolean) => void
   /** Earlier reads still to send to Slack (`reads.catchUpStatus`); undefined until it arrives. */
@@ -56,8 +59,8 @@ export interface SettingsGeneralProps {
   readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -74,6 +77,13 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTab
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
+        </Surface>
+      </Section>
+      <Section heading="Links">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Open links in Juno" checked={webPanel}
+            onChange={(event) => onWebPanelChange(event.currentTarget.checked)}
+            description="A web link opens in a panel beside the topic. Off, links open in your browser." />
         </Surface>
       </Section>
       <Section heading="Read status">

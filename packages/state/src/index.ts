@@ -220,7 +220,7 @@ export {
   setJunoPanelOpen,
   setJunoPanelWidth,
 } from './junoPanel'
-export { closeWebPanel, followWebPanel, openWebPanel, webPanelAtom, webPanelStateAtom } from './webPanel'
+export { closeWebPanel, followWebPanel, openWebPanel, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelStateAtom } from './webPanel'
 export {
   fillHome,
   freezeHome,
