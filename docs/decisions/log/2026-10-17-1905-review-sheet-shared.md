@@ -1,0 +1,1 @@
+- 10-17 19:05 · cards-followup-drafts · Tidy up's review sheet became `ReviewSheet` in `@juno/views` with `useReview` in the containers: every later Home card gives its rows, words and two verbs, so the keys, Undo in place and the row that never moves stay the same across cards.
