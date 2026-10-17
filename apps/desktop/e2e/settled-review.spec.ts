@@ -52,24 +52,24 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
 
   // One Resolve: the row stays and says so, the topic leaves the sidebar, and the row's Undo brings it back.
   await sheet.resolve(KEYS).click()
-  await expect(sheet.row(KEYS)).toHaveAttribute('data-settled-status', 'resolved')
+  await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'done')
   await juno.expectToast('Resolved · The staging deploy keys need rotating')
   await juno.sidebar.row(KEYS).expectAbsent()
   await sheet.undo(KEYS).click()
-  await expect(sheet.row(KEYS)).toHaveAttribute('data-settled-status', 'open')
+  await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'open')
   await juno.sidebar.row(KEYS).expectVisible()
 
   // The keyboard: the first row has focus; K keeps it open and moves on.
   await sheet.row(INCIDENT).getByRole('link').focus()
   await win.keyboard.press('k')
-  await expect(sheet.row(INCIDENT)).toHaveAttribute('data-settled-status', 'kept')
+  await expect(sheet.row(INCIDENT)).toHaveAttribute('data-review-status', 'declined')
   await juno.expectToast('Keeping open · ')
   await expect(sheet.row(KEYS).getByRole('link')).toBeFocused()
 
   // Resolve all takes only what is still open.
   await sheet.resolveAll.click()
   await juno.expectToast('Resolved 1 topic')
-  await expect(sheet.row(KEYS)).toHaveAttribute('data-settled-status', 'resolved')
+  await expect(sheet.row(KEYS)).toHaveAttribute('data-review-status', 'done')
   await juno.sidebar.row(KEYS).expectAbsent()
   await juno.sidebar.row(INCIDENT).expectVisible()
 

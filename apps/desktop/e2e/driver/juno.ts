@@ -2490,6 +2490,12 @@ export class HomePane {
     const sheet = new AutomatedRecordSheet(this.win)
     await expect(sheet.root).toBeVisible()
     return sheet
+  /** Another card's row, which opens its review sheet (`data-sheet="<sheet>"`). */
+  async reviewOf(kind: HomeItemKind, sheet: string): Promise<ReviewSheetPane> {
+    await this.item(kind).locator('[data-home-review]').click()
+    const pane = new ReviewSheetPane(this.win, sheet)
+    await expect(pane.root).toBeVisible()
+    return pane
   }
 
   /** Right-clicks a row and chooses `item` in its menu. Returns the menu's labels. */
@@ -2559,9 +2565,18 @@ export class AutomatedRecordSheet {
 /** Tidy up's review (SPEC 12, `docs/design/settled-suggestions/`): every proposal with its reason, Resolve and Keep open. */
 export class SettledReviewSheet {
   constructor(readonly win: Page) {}
+/**
+ * A Home card's review sheet (SPEC 12, `docs/design/settled-suggestions/`):
+ * every proposal with its reason, the card's action and its "no", and Undo.
+ */
+export class ReviewSheetPane {
+  constructor(
+    readonly win: Page,
+    readonly name: string,
+  ) {}
 
   get root(): Locator {
-    return this.win.locator('[data-sheet="settled"]')
+    return this.win.locator(`[data-sheet="${this.name}"]`)
   }
 
   get title(): Locator {
@@ -2570,42 +2585,67 @@ export class SettledReviewSheet {
 
   /** A proposal's row, by text in its title. */
   row(title: string): Locator {
-    return this.root.locator('[data-settled-row]').filter({ has: this.win.locator('[data-settled-title]', { hasText: title }) })
+    return this.root.locator('[data-review-row]').filter({ has: this.win.locator('[data-review-title]', { hasText: title }) })
   }
 
   reason(title: string): Locator {
-    return this.row(title).locator('[data-settled-reason]')
+    return this.row(title).locator('[data-review-reason]')
   }
 
+  /** The message or draft quoted in the row. */
+  quote(title: string): Locator {
+    return this.row(title).locator('[data-review-quote]')
+  }
+
+  /** `open`, `done` or `declined`. */
   status(title: string): Promise<string | null> {
-    return this.row(title).getAttribute('data-settled-status')
+    return this.row(title).getAttribute('data-review-status')
   }
 
-  resolve(title: string): Locator {
-    return this.row(title).locator('[data-settled-resolve]')
+  act(title: string): Locator {
+    return this.row(title).locator('[data-review-act]')
   }
 
-  keep(title: string): Locator {
-    return this.row(title).locator('[data-settled-keep]')
+  decline(title: string): Locator {
+    return this.row(title).locator('[data-review-decline]')
   }
 
   undo(title: string): Locator {
-    return this.row(title).locator('[data-settled-undo]')
+    return this.row(title).locator('[data-review-undo]')
   }
 
-  get resolveAll(): Locator {
-    return this.root.locator('[data-settled-resolve-all]')
+  get all(): Locator {
+    return this.root.locator('[data-review-all]')
   }
 
   get done(): Locator {
-    return this.root.locator('[data-settled-close]')
+    return this.root.locator('[data-review-close]')
   }
 
   get about(): Locator {
-    return this.root.locator('[data-settled-about]')
+    return this.root.locator('[data-review-about]')
   }
 
   get explainer(): Locator {
-    return this.root.locator('[data-settled-explainer]')
+    return this.root.locator('[data-review-explainer]')
+  }
+}
+
+/** Tidy up's review: Resolve and Keep open. */
+export class SettledReviewSheet extends ReviewSheetPane {
+  constructor(win: Page) {
+    super(win, 'settled')
+  }
+
+  resolve(title: string): Locator {
+    return this.act(title)
+  }
+
+  keep(title: string): Locator {
+    return this.decline(title)
+  }
+
+  get resolveAll(): Locator {
+    return this.all
   }
 }

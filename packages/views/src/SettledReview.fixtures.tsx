@@ -12,26 +12,26 @@ import { FixtureWindow, OverHome as SheetOverHome } from './fixtures/sheetFrame'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
 import { HomeScene } from './HomeScene'
-import { settledCopy, type SettledStatus } from './settled'
-import { SettledList } from './SettledList'
-import { ResolveExplainer, SettledReview, type SettledReviewProps } from './SettledReview'
+import { ReviewExplainer, ReviewList, type ReviewStatus } from './Review'
+import { settledCopy } from './settled'
+import { settledAbout, settledEntries, SettledReview, settledVerbs, type SettledReviewProps } from './SettledReview'
 
 const noop = () => {}
 
 /** The review with its buttons working, so the gallery and the shift guard see a row change state in place. */
-function Live({ topics = settledTopics, initial = new Map(), ...rest }: Partial<SettledReviewProps> & { readonly initial?: ReadonlyMap<string, SettledStatus> }) {
-  const [statuses, setStatuses] = useState<ReadonlyMap<string, SettledStatus>>(initial)
-  const set = (id: string, status: SettledStatus) => setStatuses(new Map([...statuses, [id, status]]))
+function Live({ topics = settledTopics, initial = new Map(), ...rest }: Partial<SettledReviewProps> & { readonly initial?: ReadonlyMap<string, ReviewStatus> }) {
+  const [statuses, setStatuses] = useState<ReadonlyMap<string, ReviewStatus>>(initial)
+  const set = (id: string, status: ReviewStatus) => setStatuses(new Map([...statuses, [id, status]]))
   return (
     <SettledReview
       topics={topics}
       statuses={statuses}
       now={NOW}
       onOpen={noop}
-      onResolve={(id) => set(id, 'resolved')}
-      onKeep={(id) => set(id, 'kept')}
+      onAct={(id) => set(id, 'done')}
+      onDecline={(id) => set(id, 'declined')}
       onUndo={(id) => set(id, 'open')}
-      onResolveAll={() => setStatuses(new Map(topics.map((topic) => [topic.id, statuses.get(topic.id) ?? 'resolved'])))}
+      onAll={() => setStatuses(new Map(topics.map((topic) => [topic.id, statuses.get(topic.id) ?? 'done'])))}
       onSettings={noop}
       onClose={noop}
       {...rest}
@@ -44,9 +44,9 @@ function OverHome({ children }: { readonly children: ReactNode }) {
   return <SheetOverHome home={<Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />}>{children}</SheetOverHome>
 }
 
-const acted: ReadonlyMap<string, SettledStatus> = new Map([
-  [settledTopics[0]!.id, 'resolved'],
-  [settledTopics[3]!.id, 'kept'],
+const acted: ReadonlyMap<string, ReviewStatus> = new Map([
+  [settledTopics[0]!.id, 'done'],
+  [settledTopics[3]!.id, 'declined'],
 ])
 
 /**
@@ -55,8 +55,8 @@ const acted: ReadonlyMap<string, SettledStatus> = new Map([
  * `docs/design/settled-suggestions/` can be shot again.
  */
 function InPlace({ topics, about = false }: { readonly topics: ReadonlyArray<HomeTopic>; readonly about?: boolean }) {
-  const [statuses, setStatuses] = useState<ReadonlyMap<string, SettledStatus>>(new Map())
-  const set = (id: string, status: SettledStatus) => setStatuses(new Map([...statuses, [id, status]]))
+  const [statuses, setStatuses] = useState<ReadonlyMap<string, ReviewStatus>>(new Map())
+  const set = (id: string, status: ReviewStatus) => setStatuses(new Map([...statuses, [id, status]]))
   return (
     <FixtureWindow scroll>
       <div {...stylex.props(styles.column)}>
@@ -79,8 +79,8 @@ function InPlace({ topics, about = false }: { readonly topics: ReadonlyArray<Hom
               <IconButton icon={Info} label={settledCopy.about} size={28} pressed={about} />
               <IconButton icon={CaretDown} label="Collapse" size={28} />
             </div>
-            {about ? <ResolveExplainer onSettings={noop} /> : null}
-            <SettledList topics={topics} statuses={statuses} now={NOW} label={settledCopy.title(topics.length)} compact onOpen={noop} onResolve={(id) => set(id, 'resolved')} onKeep={(id) => set(id, 'kept')} onUndo={(id) => set(id, 'open')} />
+            {about ? <ReviewExplainer about={settledAbout} onSettings={noop} /> : null}
+            <ReviewList entries={settledEntries(topics, NOW)} statuses={statuses} verbs={settledVerbs} label={settledCopy.title(topics.length)} compact onOpen={noop} onAct={(id) => set(id, 'done')} onDecline={(id) => set(id, 'declined')} onUndo={(id) => set(id, 'open')} />
             <div {...stylex.props(styles.cardFoot)}>
               <Button variant="secondary" size="sm">{settledCopy.resolveAll}</Button>
             </div>
@@ -100,9 +100,9 @@ export default defineFixtures(
       about: scene(() => <OverHome><Live initialAbout /></OverHome>),
       // Two acted on: each row stays where it was and says what happened, with Undo.
       acted: scene(() => <OverHome><Live initial={acted} /></OverHome>),
-      'focus-row': scene(() => <OverHome><Live initialActive={settledTopics[1]!.id} /></OverHome>, { focus: `[data-settled-row="${settledTopics[1]!.id}"] a` }),
+      'focus-row': scene(() => <OverHome><Live initialActive={settledTopics[1]!.id} /></OverHome>, { focus: `[data-review-row="${settledTopics[1]!.id}"] a` }),
       many: scene(() => <OverHome><Live topics={manySettled} /></OverHome>),
-      'all-done': scene(() => <OverHome><Live initial={new Map(settledTopics.map((topic) => [topic.id, 'resolved' as const]))} /></OverHome>),
+      'all-done': scene(() => <OverHome><Live initial={new Map(settledTopics.map((topic) => [topic.id, 'done' as const]))} /></OverHome>),
       'minimum-window': scene(() => <OverHome><Live /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Direction B, explored: the row opens in place on Home.
