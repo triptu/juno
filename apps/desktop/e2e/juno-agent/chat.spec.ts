@@ -63,8 +63,8 @@ test('the Juno tab sends a message at once and shows the answer, both ways a rea
   await chat.expectJuno('Reacted to please react')
   await expect(chat.ownerBubble('please react').getByLabel('Reacted 🎉')).toBeVisible()
 
-  // The owner reacts to Juno: the badge shows at once, and Juno hears it.
-  await chat.react('You said: what is on today?', '🎉')
+  // The owner reacts to Juno through the emoji picker: the badge shows at once, and Juno hears it.
+  await chat.reactWithPicker('You said: what is on today?', 'tada', 'tada')
   await expect(chat.junoBubble('You said: what is on today?').getByLabel('Reacted 🎉')).toBeVisible()
   await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="🎉"'))).toBe(true)
 

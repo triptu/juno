@@ -15,6 +15,7 @@ export function answer(request: OpenRouterRequest): string {
   const id = /<message id="(n\d+)">/.exec(input)?.[1]
   const words = input.replace(/<about[^>]*\/>|<about[\s\S]*?<\/about>|<quote[\s\S]*?<\/quote>|<[^>]*>/g, '').trim()
   if (/\breact\b/.test(words) && id !== undefined) return `<react to="${id}">🎉</react><say>Reacted to ${words}</say>`
+  if (/\bquote me\b/.test(words) && id !== undefined) return `<say reply-to="${id}">Answering ${words}</say>`
   if (/\bformatting\b/.test(words)) return '<say>**Staging** is green, and <b>deploys</b> run at 14:00.</say>'
   return `<say>You said: ${words}</say>`
 }
@@ -82,11 +83,32 @@ export class JunoChatPane {
     await expect(this.junoBubble(text)).toBeVisible({ timeout: 15_000 })
   }
 
-  async react(bubble: string, emoji: string): Promise<void> {
+  /** The open quick reactions of a bubble or card, as a topic message's toolbar shows them. */
+  get reactions(): Locator {
+    return this.root.locator('[data-juno-reactions]')
+  }
+
+  /** Opens a bubble's quick reactions. */
+  async openReactions(bubble: string): Promise<void> {
     const row = this.junoBubble(bubble)
     await row.hover()
     await row.getByRole('button', { name: 'React' }).click()
-    await this.win.locator('[data-reaction-picker]').getByRole('button', { name: `Reacted ${emoji}` }).click()
+    await expect(this.reactions).toBeVisible()
+  }
+
+  /** A quick reaction (👍 ✅ 👀 by default). */
+  async react(bubble: string, emoji: string): Promise<void> {
+    await this.openReactions(bubble)
+    await this.reactions.getByRole('button', { name: `React ${emoji}` }).click()
+  }
+
+  /** Any emoji, through More reactions and the emoji picker's search. */
+  async reactWithPicker(bubble: string, search: string, name: string): Promise<void> {
+    await this.openReactions(bubble)
+    await this.reactions.getByRole('button', { name: 'More reactions' }).click()
+    const picker = this.root.locator('[data-emoji-picker]')
+    await picker.getByRole('textbox', { name: 'Search emoji' }).fill(search)
+    await picker.getByRole('button', { name: `:${name}:`, exact: true }).click()
   }
 
   async reply(bubble: string): Promise<void> {
