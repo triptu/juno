@@ -654,17 +654,26 @@ Each milestone lists parallel tracks; each track owns disjoint files. Done alway
 
 ### M12 packaging and updates
 
-The Electron shell owns `electron-updater` and the `updates.get`, `updates.set`
-and `updates.restart` IPC routes. The opt-in setting persists in `launch.json`;
-main broadcasts a schema-checked update state to a renderer container, which
-passes props to the dumb `UpdateSettings` view in Settings › About. The
-updater loads only when enabled, after startup, and uses the public GitHub
-Releases feed set at build time through `JUNO_UPDATE_FEED_URL`. There is no
-default repository; without a public feed, updates are unavailable. The app
-contains no release token. It never installs on ordinary quit and never checks
-in development or tests. A downloaded update is installed
-only after Restart to update. Signing, notarization and publishing are separate
-from checking for updates; see development.md, Releasing.
+The Electron shell owns `electron-updater` and the `updates.get`, `updates.set`,
+`updates.restart`, `updates.download` and `updates.notes` IPC routes. The
+opt-in setting persists in `launch.json`; main broadcasts a schema-checked
+update state to a renderer container, which passes props to the dumb
+`UpdateSettings` view in Settings › About. Updates come from GitHub Releases of
+the private `triptu/juno-releases` repository, read with a fine-grained token
+that can only read that repository. `build/package.cjs` writes the repository,
+the token and whether the build is Developer ID signed into the app's
+`update.json` from `JUNO_UPDATE_TOKEN`; without it, updates are unavailable.
+The token stays in main (`releaseFeed.ts`), is sent only to the API's origin,
+and is never logged. The updater checks only when enabled, after startup, and
+never in development or tests (except against a local fake under
+`JUNO_E2E_UPDATE_SERVER`). A signed build downloads through electron-updater,
+with the shipped token in a custom provider so a `GH_TOKEN` in the environment
+is never used, and installs only after Restart to update. Squirrel.Mac cannot
+install into an unsigned build, so an unsigned build offers the DMG instead,
+as does a signed build whose in-place download fails. "What's new" fetches
+`CHANGELOG.md` from the same repository when asked and keeps it for an hour.
+Signing, notarization and publishing are separate from checking for updates;
+see development.md, Releasing, and ADR 0016.
 
 The package uses asar integrity validation and asar-only loading, encrypts
 cookies, and disables RunAsNode, NODE_OPTIONS and Node CLI inspection. Both

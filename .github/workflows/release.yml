@@ -12,7 +12,8 @@ jobs:
     runs-on: macos-26
     env:
       JUNO_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY }}
-      JUNO_UPDATE_FEED_URL: ${{ vars.UPDATE_FEED_URL }}
+      # Read-only, fine-grained, scoped to the releases repository; written into the app.
+      JUNO_UPDATE_TOKEN: ${{ secrets.UPDATE_READ_TOKEN }}
       GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -47,9 +48,6 @@ jobs:
           else
             echo 'Release credentials absent; building unsigned artifacts only.'
           fi
-      - name: Check the update release repository is public
-        if: env.JUNO_UPDATE_FEED_URL != '' && env.JUNO_RELEASE_REPOSITORY != ''
-        run: test "$(gh repo view "$JUNO_RELEASE_REPOSITORY" --json isPrivate --jq .isPrivate)" = false
       - run: pnpm package
       - name: Check the signed package
         if: env.JUNO_RELEASE == '1'

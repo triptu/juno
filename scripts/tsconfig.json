@@ -7,5 +7,5 @@
     "erasableSyntaxOnly": true,
     "noEmit": true
   },
-  "include": ["smoke-live.ts", "sync-live-dry-run.ts", "probe-live.ts", "react-live.ts", "live-common.ts"]
+  "include": ["smoke-live.ts", "sync-live-dry-run.ts", "probe-live.ts", "react-live.ts", "live-common.ts", "release-publish.ts", "release-version.ts"]
 }

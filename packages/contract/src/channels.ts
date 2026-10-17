@@ -13,6 +13,10 @@ export const Channels = {
   updatesGet: 'updates.get',
   updatesSet: 'updates.set',
   updatesRestart: 'updates.restart',
+  /** Without a Developer ID signature: saves the new version's DMG to Downloads and opens it. */
+  updatesDownload: 'updates.download',
+  /** "What's new": changelog entries from the releases repository, fetched when asked. */
+  updatesNotes: 'updates.notes',
   appGetInfo: 'app.getInfo',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
@@ -218,6 +222,8 @@ export interface JunoBridge {
     readonly get: () => Promise<unknown>
     readonly set: (enabled: boolean) => Promise<unknown>
     readonly restart: () => Promise<unknown>
+    readonly download: () => Promise<unknown>
+    readonly notes: (scope: 'installed' | 'update') => Promise<unknown>
     readonly onChange: (listener: (state: unknown) => void) => () => void
   }
   readonly app: {

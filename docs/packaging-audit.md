@@ -97,5 +97,7 @@ The owner still needs a Developer ID Application certificate and private key
 (`.p12` plus export password), Apple Team ID, either Apple ID plus app-specific
 password or an App Store Connect API key with its key ID and issuer, a public
 feed URL, a release repository, and a GitHub token with Contents: write for
-uploads. The token stays in the release environment. See
+uploads. The token stays in the release environment. (10-17: the public feed
+was replaced by the private `triptu/juno-releases` repository and a shipped
+read-only token, ADR 0016.) See
 [Releasing](development.md#releasing) for the exact variables and steps.

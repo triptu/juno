@@ -119,6 +119,8 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
+  handle(Channels.updatesDownload, () => updates.download())
+  handle(Channels.updatesNotes, ({ scope }) => updates.notes(scope))
   handle(Channels.appGetInfo, () => ({
     name: app.getName(),
     version: app.getVersion(),

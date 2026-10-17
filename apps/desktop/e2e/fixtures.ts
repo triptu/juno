@@ -80,6 +80,8 @@ export interface LaunchOptions {
   readonly paced?: boolean
   /** The welcome card shows by itself, as outside tests (`JUNO_E2E_TOUR`). Without it, only Help, ⌘K and Settings › About bring it. */
   readonly tour?: boolean
+  /** A fake of the releases repository's GitHub API, so updates are available (`JUNO_E2E_UPDATE_SERVER`). */
+  readonly updateServer?: string
 }
 
 let launches = 0
@@ -131,6 +133,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.cacheMigration === true) env.JUNO_E2E_CACHE_MIGRATION = '1'
   if (options.paced === true) env.JUNO_E2E_FAKE_PACED = '1'
   if (options.tour === true) env.JUNO_E2E_TOUR = '1'
+  if (options.updateServer !== undefined) env.JUNO_E2E_UPDATE_SERVER = options.updateServer
+  else delete env.JUNO_E2E_UPDATE_SERVER
   if (options.aiJobs === true) env.JUNO_E2E_AI_JOBS = '1'
   else delete env.JUNO_E2E_AI_JOBS
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
@@ -190,6 +194,8 @@ export interface Fixtures {
   readonly fakeAiDelayMillis: number | undefined
   /** Another app is capturing the screen when the `running` app starts (`LaunchOptions.screenShared`). */
   readonly screenShared: boolean
+  /** The fake releases API the `running` app checks for updates (`LaunchOptions.updateServer`); undefined leaves updates unavailable. */
+  readonly updateServer: string | undefined
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -262,10 +268,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   aiJobs: [false, { option: true }],
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared }, use) => {
+  updateServer: [undefined, { option: true }],
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer }, use) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
       aiJobs, screenShared, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+      ...(updateServer === undefined ? {} : { updateServer }),
     })
     await use(running)
     await running.close()

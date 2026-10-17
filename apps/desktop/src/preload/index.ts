@@ -45,6 +45,8 @@ const bridge: JunoBridge = {
     get: () => ipcRenderer.invoke(Channels.updatesGet),
     set: (enabled) => ipcRenderer.invoke(Channels.updatesSet, { enabled }),
     restart: () => ipcRenderer.invoke(Channels.updatesRestart),
+    download: () => ipcRenderer.invoke(Channels.updatesDownload),
+    notes: (scope) => ipcRenderer.invoke(Channels.updatesNotes, { scope }),
     onChange: (listener) => {
       const forward = (_event: unknown, state: unknown) => listener(state)
       ipcRenderer.on(Events.updatesChanged, forward)

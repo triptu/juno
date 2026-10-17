@@ -176,7 +176,6 @@ const reactCompiler = [
 
 export default defineConfig({
   main: {
-    define: { __JUNO_UPDATE_FEED_URL__: JSON.stringify(process.env.JUNO_UPDATE_FEED_URL ?? '') },
     plugins: [externalize, runtimeImports(), codemodeFiles()],
     build: {
       minify,
