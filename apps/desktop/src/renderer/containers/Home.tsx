@@ -17,10 +17,11 @@ function openItem(topicId: string, event: ActivateEvent): void {
 }
 
 /**
- * Takes Home at each stage (`showHome`), with Juno's open asks as they are
- * then, and while the first sync runs adds the items each new value brings (`fillHome`).
+ * Takes Home at each stage (`showHome`), with Juno's open asks as they are then: no value, not ready, ready while
+ * the first sync still reads history, done. Until the first sync is done it adds the items each new value brings
+ * (`fillHome`).
  */
-function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown, asks: ReadonlyArray<HomeItem>): void {
+function useShowHome(key: string, stage: 0 | 1 | 2 | 3, value: unknown, asks: ReadonlyArray<HomeItem>): void {
   const appeared = useRef(false)
   const asksRef = useRef(asks)
   useLayoutEffect(() => {
@@ -32,7 +33,7 @@ function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown, asks: Readon
     if (stage > 0) appeared.current = true
   }, [key, stage])
   useLayoutEffect(() => {
-    if (stage === 1) fillHome(registry, key)
+    if (stage === 1 || stage === 2) fillHome(registry, key)
   }, [key, stage, value])
 }
 
@@ -143,10 +144,11 @@ function SyncLine({ line }: { readonly line: string }) {
  * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
  * at the bottom. It shows the items `home.view` had when Home appeared
  * (`showHome`, before the first paint, again each time Home comes back
- * from a hidden tab, and once more when the first value arrives); later
- * values change only a row's title line (`freezeHome`). Until the first
- * sync is done it shows the scene and the greeting with "Syncing with
- * Slack.", then the sync's count, and rows fill reserved slots as they land (`fillHome`).
+ * from a hidden tab, once more when the first value arrives, and when
+ * Home is ready and the first sync ends); later values change only a row's
+ * title line (`freezeHome`). Until Home is ready it shows the scene and
+ * the greeting with "Syncing with Slack.", then the sync's count; until
+ * the first sync is done rows fill reserved slots as they land (`fillHome`).
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
@@ -160,8 +162,8 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   useMovesShown(shown?.view.items, shown?.now)
 
   const asks = useAtomValue(homeAsksAtom)
-  // Nothing yet, the first sync running, or ready: Home is taken again at each step.
-  useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value, asks)
+  // Nothing yet, not ready, ready while history still lands, or done: Home is taken again at each step.
+  useShowHome(key, latest !== undefined ? (latest.firstSync ? 2 : 3) : value !== undefined ? 1 : 0, value, asks)
 
   // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
   if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />

@@ -4,10 +4,11 @@
  * - `homeViewAtom`: the engine's `home.view`. Home keeps the items it
  *   showed when it appeared (`freezeHome`) and takes only their `aiTitle`
  *   from later values, so a row never moves or leaves under the pointer.
- *   During the first sync it adds items as they land, below the ones it
- *   shows, into slots it reserved (`fillHome`).
- * - `homeGreeting`, `homeScene`, `homeItemLimit`: the copy, the scene and
- *   the cap, from the local clock and the window, chosen when Home appears.
+ *   During the first sync, before and after Home is ready, it adds items
+ *   as they land, below the ones it shows, into slots it reserved
+ *   (`fillHome`).
+ * - `homeItemLimit`: the cap, from the window, chosen when Home appears;
+ *   the greeting and the scene come from `homeScene.ts`.
  * - `prefetchHome`: warms `home.view` on pointer enter or focus of the
  *   sidebar's Home button, so an open after the subscription's idle time
  *   renders what is cached instead of waiting on the engine.
@@ -27,6 +28,7 @@ import { liveQuery, prefetch, runCommand } from './atoms'
 import { withAsks } from './homeAsks'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
+import { homeAppeared, homeGreeting, homeScene, type HomeScene } from './homeScene'
 import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
 export const homeViewAtom = liveQuery(homeView)(undefined)
@@ -35,9 +37,6 @@ export const homeViewAtom = liveQuery(homeView)(undefined)
 export function prefetchHome(registry: Registry): void {
   prefetch(registry, homeViewAtom)
 }
-
-/** The scenes in `docs/design/home/scenes.png`. */
-export type HomeScene = 'morning' | 'midday' | 'evening' | 'night' | 'friday' | 'winter' | 'autumn' | 'caughtUp'
 
 /** At most this many rows; two on a window shorter than `SHORT_WINDOW` px, one there while the welcome card shows. */
 const ITEM_LIMIT = 3
@@ -51,78 +50,6 @@ export const homeItemLimit = (windowHeight: number, welcome = false): number => 
 
 /** No items and no unread messages in followed topics. */
 export const caughtUp = (view: HomeView): boolean => view.items.length === 0 && !view.unread
-
-type TimeOfDay = 'morning' | 'midday' | 'evening' | 'night'
-
-function timeOfDay(now: Date): TimeOfDay {
-  const hour = now.getHours()
-  if (hour >= 5 && hour < 11) return 'morning'
-  if (hour >= 11 && hour < 17) return 'midday'
-  if (hour >= 17 && hour < 22) return 'evening'
-  return 'night'
-}
-
-const isFriday = (now: Date): boolean => now.getDay() === 5 && timeOfDay(now) !== 'night'
-
-/**
- * The greeting (the home README, "Copy"): one line, by the time of day, or
- * "All caught up." There is no count under it; the rows are the count.
- */
-export function homeGreeting(input: { readonly now: Date; readonly firstName?: string | undefined; readonly caughtUp: boolean }): { readonly title: string } {
-  if (input.caughtUp) return { title: 'All caught up.' }
-  const name = input.firstName === undefined || input.firstName === '' ? '' : `, ${input.firstName}`
-  const opening = isFriday(input.now) ? 'Happy Friday' : { morning: 'Morning', midday: 'Hello', evening: 'Evening', night: 'Still up' }[timeOfDay(input.now)]
-  return { title: `${opening}${name}.` }
-}
-
-const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
-
-function seasonOf(date: Date): 'winter' | 'autumn' | undefined {
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  if (month === 12 || month === 1) return 'winter'
-  if ((month === 9 && day >= 15) || month === 10 || (month === 11 && day <= 15)) return 'autumn'
-  return undefined
-}
-
-/** One day in six inside a season window, by a hash of the date. */
-function pickedDay(date: Date): boolean {
-  let hash = 0
-  for (const char of dayKey(date)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
-  return seasonOf(date) !== undefined && hash % 6 === 0
-}
-
-/** A picked day whose day before was not picked: never two seasonal days running. */
-function seasonalDay(date: Date): boolean {
-  const yesterday = new Date(date)
-  yesterday.setDate(date.getDate() - 1)
-  return pickedDay(date) && !pickedDay(yesterday)
-}
-
-/**
- * The scene (the home README, "Picking a scene"): caught up, then the
- * season on the first visit of a picked day (never at night), then Friday,
- * then the time of day.
- */
-export function homeScene(input: { readonly now: Date; readonly caughtUp: boolean; readonly firstVisitToday: boolean }): HomeScene {
-  if (input.caughtUp) return 'caughtUp'
-  const time = timeOfDay(input.now)
-  const season = seasonOf(input.now)
-  if (season !== undefined && input.firstVisitToday && time !== 'night' && seasonalDay(input.now)) return season
-  if (isFriday(input.now)) return 'friday'
-  return time
-}
-
-/** The day Home last appeared, for the seasonal scene's "first visit of a day". */
-const lastVisitDayAtom = Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive)
-
-/** Home appeared: whether it is the first time today. */
-export function homeAppeared(registry: Registry, now: Date): boolean {
-  const today = dayKey(now)
-  const first = registry.get(lastVisitDayAtom) !== today
-  registry.set(lastVisitDayAtom, today)
-  return first
-}
 
 /**
  * What Home shows from now on: the items of `shown` in their order, each
@@ -154,7 +81,7 @@ export interface HomeShown {
   readonly view: HomeView
   readonly scene: HomeScene
   readonly title: string
-  /** Under the greeting only while the first sync runs (`HOME_SYNCING_LINE`). */
+  /** Under the greeting only until Home is ready (`HOME_SYNCING_LINE`). */
   readonly line: string | undefined
   readonly now: number
   readonly caughtUp: boolean
@@ -162,8 +89,10 @@ export interface HomeShown {
   readonly enter: boolean
   /** Items whose Mark done or Resolve all was used. */
   readonly used: ReadonlySet<string>
-  /** The first sync is still running: the greeting shows with `HOME_SYNCING_LINE`, and items fill in as they land. */
+  /** Home is not ready yet: the greeting shows with `HOME_SYNCING_LINE`. */
   readonly loading: boolean
+  /** Shown during the first sync, which is still running: items fill the free slots as they land (`fillHome`). */
+  readonly filling: boolean
   /** Row slots held through the first sync's visit: rows that land later fill them, so nothing shown moves. */
   readonly reservedItems: number
 }
@@ -177,20 +106,23 @@ export function addHomeItems(shown: ReadonlyArray<HomeItem>, latest: ReadonlyArr
   return added.length === 0 ? shown : [...shown, ...added]
 }
 
-/** Home's second line until the first sync is done: present tense, names what is happening (SPEC 17). */
+/** Home's second line until Home is ready in the first sync: present tense, names what is happening (SPEC 17). */
 export const HOME_SYNCING_LINE = 'Syncing with Slack.'
 
 /** By a key of the Home component's own, so two Homes never share one. Reset when nothing reads it. */
 export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown | undefined>(undefined))
 
 /**
- * Home appeared (mounted, shown again, or its first value arrived): takes
- * the items, the copy and the scene now, or nothing while there is no
- * value yet. Before the first sync is done it shows the greeting with
+ * Home appeared (mounted, shown again, or its value moved on a stage):
+ * takes the items, the copy and the scene now, or nothing while there is
+ * no value yet. Until Home is ready it shows the greeting with
  * `HOME_SYNCING_LINE`, never a blank page and never "All caught up", and
  * reserves the rows' slots; `fillHome` adds items to them as they land.
- * When the sync ends, the rows already shown stay where they are, the
- * free slots take the next items, and the scene stays.
+ * When Home is ready, and again when the first sync ends, the rows already
+ * shown stay where they are, the free slots take the next items, and the
+ * scene stays. Shown during the first sync, Home reserves the slots and
+ * keeps filling them until it ends. A Home that said "All caught up" then
+ * stays so for the visit: what lands later shows on the next one.
  */
 export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean; readonly welcome?: boolean; readonly asks?: ReadonlyArray<HomeItem> }): void {
   const served = registry.get(homeViewAtom)
@@ -199,7 +131,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
   const now = new Date()
   const previous = registry.get(homeShownAtom(key))
   const limit = homeItemLimit(options.windowHeight, options.welcome)
-  const syncing = previous?.loading === true
+  const syncing = previous?.filling === true
   if (!result.value.ready) {
     const greeting = homeGreeting({ now, firstName: result.value.firstName, caughtUp: false })
     return registry.set(homeShownAtom(key), {
@@ -212,10 +144,12 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       enter: options.enter,
       used: syncing ? previous.used : new Set<string>(),
       loading: true,
+      filling: true,
       reservedItems: limit,
     })
   }
   const view = result.value
+  if (syncing && previous.caughtUp) return registry.set(homeShownAtom(key), { ...previous, filling: view.firstSync })
   // Rows shown while syncing keep their places; the free slots take the next items.
   const items = syncing ? addHomeItems(previous.view.items, view.items, previous.reservedItems) : view.items.slice(0, limit)
   const shown = { ...view, items }
@@ -232,16 +166,17 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     enter: options.enter,
     used: syncing ? previous.used : new Set<string>(),
     loading: false,
-    // The reserved slots stay until Home appears again, so nothing moves.
-    reservedItems: syncing ? previous.reservedItems : 0,
+    filling: view.firstSync,
+    // The reserved slots stay until Home appears again, so nothing moves; shown while history lands, it reserves them.
+    reservedItems: syncing ? previous.reservedItems : view.firstSync && !done ? limit : 0,
   })
 }
 
-/** During the first sync: adds the items that landed since, into the free slots. */
+/** During the first sync: adds the items that landed since, into the free slots. A caught-up Home stays so. */
 export function fillHome(registry: Registry, key: string): void {
   const shown = registry.get(homeShownAtom(key))
   const result = registry.get(homeViewAtom)
-  if (shown?.loading !== true || result._tag !== 'Success' || result.value.ready) return
+  if (shown?.filling !== true || shown.caughtUp || result._tag !== 'Success' || !result.value.firstSync) return
   const items = addHomeItems(shown.view.items, result.value.items, shown.reservedItems)
   if (items !== shown.view.items) registry.set(homeShownAtom(key), { ...shown, view: { ...shown.view, items } })
 }

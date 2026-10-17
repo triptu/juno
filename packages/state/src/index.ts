@@ -222,7 +222,6 @@ export {
 export {
   fillHome,
   freezeHome,
-  homeGreeting,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
@@ -240,6 +239,7 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
+export { homeGreeting } from './homeScene'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,
