@@ -62,8 +62,7 @@ test('a saved key starts art and titles for recent topics, survives an engine re
     // A $0 daily cap blocks the engine's calls too; raising it wakes the title job, which does not wait for its 30 s timer.
     await juno.openSettings('AI activity')
     const cap = page.getByLabel('Daily limit in dollars')
-    await cap.fill('0')
-    await cap.press('Enter')
+    await cap.fill('0').then(() => cap.press('Enter'))
     await expect(cap).toHaveValue('0')
     const capped = await calls()
     const atCap = post('Billing export. The CSV for October is missing two columns.')
@@ -71,8 +70,7 @@ test('a saved key starts art and titles for recent topics, survives an engine re
     await running.win.waitForTimeout(5_000)
     await expect(atCap).toHaveAttribute('data-title-source', 'fallback')
     expect(await calls()).toEqual(capped)
-    await cap.fill('2')
-    await cap.press('Enter')
+    await cap.fill('2').then(() => cap.press('Enter'))
     await expect(atCap).toHaveAttribute('data-title-source', 'ai', { timeout: 8_000 })
     await juno.openSettings('Juno')
 

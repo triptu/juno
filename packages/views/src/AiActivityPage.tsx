@@ -60,7 +60,7 @@ const kindLabel = (kind: string): string => KINDS[kind] ?? kind
 const ALL = 'all'
 
 /** Today's spend from the agent's ledger, counted as the daily limit counts it. */
-export interface AiSpendToday {
+interface AiSpendToday {
   readonly spentUsd: number
   /** Today's limit: the daily limit plus any "Allow $1 more". */
   readonly limitUsd: number
@@ -147,6 +147,47 @@ export function AiActivityPage({ activity, spend, onLimit, now, onCopyDetails }:
   return (
     <Page width="settings">
       <PageHeader title="AI activity" subtitle="Every call Juno made to a model, what it was for, and what it cost. Juno keeps the last 500 here, without what was sent or answered." />
+      <SpendSections activity={activity} spend={spend} onLimit={onLimit} />
+      <Section heading="Calls">
+        <div {...stylex.props(styles.filters)}>
+          <Select size={30} label="Feature" value={feature} onChange={(event) => setFeature(event.currentTarget.value)}
+            options={[{ value: ALL, label: 'All features' }, ...features.map((value) => ({ value, label: featureLabel(value) }))]} />
+          <Select size={30} label="Outcome" value={outcome} onChange={(event) => setOutcome(event.currentTarget.value)}
+            options={[{ value: ALL, label: 'All outcomes' }, ...outcomes.map((value) => ({ value, label: OUTCOMES[value] }))]} />
+          <Select size={30} label="Model" value={model} onChange={(event) => setModel(event.currentTarget.value)}
+            options={[{ value: ALL, label: 'All models' }, ...models.map((value) => ({ value, label: value }))]} />
+        </div>
+        {activity === undefined ? null : rows.length === 0 ? (
+          <EmptyState
+            illustration="nothing-here"
+            title={calls.length === 0 ? 'No calls yet' : 'No calls match'}
+            body={calls.length === 0 ? 'Calls show up here as Juno titles topics, draws their art and answers you.' : 'Try another feature, outcome or model.'}
+            enter={false}
+          />
+        ) : (
+          <Surface kind="group" role="list" aria-label="AI calls">
+            {rows.map((call, index) => (
+              <Call key={call.id} call={call} now={now} open={open === call.id} divider={index < rows.length - 1}
+                onToggle={() => setOpen(open === call.id ? undefined : call.id)} onCopyDetails={onCopyDetails} />
+            ))}
+          </Surface>
+        )}
+        {matching.length > shown ? (
+          <div {...stylex.props(styles.more)}>
+            <Button variant="secondary" size="md" onClick={() => setShown(shown + AI_ACTIVITY_PAGE)}>
+              Show older calls
+            </Button>
+          </div>
+        ) : null}
+      </Section>
+    </Page>
+  )
+}
+
+/** Today's spend against the daily limit, and the field that sets the limit. */
+function SpendSections({ activity, spend, onLimit }: Pick<AiActivityPageProps, 'activity' | 'spend' | 'onLimit'>) {
+  return (
+    <>
       <Section heading="Today">
         <Surface kind="group" padding="md" sx={styles.card}>
           <div {...stylex.props(styles.lines)}>
@@ -208,39 +249,7 @@ export function AiActivityPage({ activity, spend, onLimit, now, onCopyDetails }:
           </Surface>
         </Section>
       )}
-      <Section heading="Calls">
-        <div {...stylex.props(styles.filters)}>
-          <Select size={30} label="Feature" value={feature} onChange={(event) => setFeature(event.currentTarget.value)}
-            options={[{ value: ALL, label: 'All features' }, ...features.map((value) => ({ value, label: featureLabel(value) }))]} />
-          <Select size={30} label="Outcome" value={outcome} onChange={(event) => setOutcome(event.currentTarget.value)}
-            options={[{ value: ALL, label: 'All outcomes' }, ...outcomes.map((value) => ({ value, label: OUTCOMES[value] }))]} />
-          <Select size={30} label="Model" value={model} onChange={(event) => setModel(event.currentTarget.value)}
-            options={[{ value: ALL, label: 'All models' }, ...models.map((value) => ({ value, label: value }))]} />
-        </div>
-        {activity === undefined ? null : rows.length === 0 ? (
-          <EmptyState
-            illustration="nothing-here"
-            title={calls.length === 0 ? 'No calls yet' : 'No calls match'}
-            body={calls.length === 0 ? 'Calls show up here as Juno titles topics, draws their art and answers you.' : 'Try another feature, outcome or model.'}
-            enter={false}
-          />
-        ) : (
-          <Surface kind="group" role="list" aria-label="AI calls">
-            {rows.map((call, index) => (
-              <Call key={call.id} call={call} now={now} open={open === call.id} divider={index < rows.length - 1}
-                onToggle={() => setOpen(open === call.id ? undefined : call.id)} onCopyDetails={onCopyDetails} />
-            ))}
-          </Surface>
-        )}
-        {matching.length > shown ? (
-          <div {...stylex.props(styles.more)}>
-            <Button variant="secondary" size="md" onClick={() => setShown(shown + AI_ACTIVITY_PAGE)}>
-              Show older calls
-            </Button>
-          </div>
-        ) : null}
-      </Section>
-    </Page>
+    </>
   )
 }
 
