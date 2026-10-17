@@ -313,16 +313,14 @@ const elu = performance.eventLoopUtilization(eluStart)
 const ended = now()
 
 // Each history call's class, from the store before it goes: what kind of conversation, and what `client.counts` said.
-// The old order (before 10-18) put every DM first, then mentions, then channels with unread followed threads, then the
-// user's own channels; `oldTier` is that tier, without the thread counts, which the store does not keep by channel.
+// Without the thread counts, which the store does not keep by channel, so a channel with only unread followed threads
+// is `other`.
 const facts = new Map(
-  query<{ id: string; kind: string; has_unreads: number | null; mention_count: number | null; own: number }>(
-    `SELECT c.id, c.kind, r.has_unreads, r.mention_count,
-       (SELECT count(*) FROM messages m WHERE m.channel = c.id AND m.user_id = '${session.userId.replace(/[^A-Z0-9]/g, '')}') AS own
+  query<{ id: string; kind: string; has_unreads: number | null; mention_count: number | null }>(
+    `SELECT c.id, c.kind, r.has_unreads, r.mention_count
      FROM conversations c LEFT JOIN channel_reads r ON r.channel = c.id WHERE c.is_member = 1`,
   ).map((row) => [row.id, row]),
 )
-const oldTiers: Array<number> = []
 for (const c of calls) {
   if (c.channel === undefined) continue
   const f = facts.get(c.channel)
@@ -330,7 +328,6 @@ for (const c of calls) {
   const unread = f?.has_unreads === 1
   const mention = unread && (f?.mention_count ?? 0) > 0
   c.cls = direct ? (unread ? 'dm-unread' : 'dm-read') : mention ? 'mention' : unread ? 'unread' : 'other'
-  oldTiers.push(direct ? 0 : mention ? 1 : (f?.own ?? 0) > 0 ? 3 : 4)
   delete c.channel
 }
 for (const unmount of unmounts) unmount()
@@ -424,12 +421,8 @@ const timeline = {
       entry.last = i
       entry.lastEnd = Math.max(entry.lastEnd, c.e ?? 0)
     })
-    // Where the old order would have put the last unread DM or mention: after every DM and every mention.
-    const oldPriorityLast = oldTiers.filter((tier) => tier <= 1).length - 1
     const spacing = history.length > 1 ? ((history.at(-1)!.s - history[0]!.s) / (history.length - 1)) : 0
-    const first = history[0]
-    if (first === undefined) return { byClass }
-    return { byClass, oldPriorityLast, oldPriorityEndEstimate: Math.round(first.s + oldPriorityLast * spacing + ((first.e ?? first.s) - first.s)), spacing: Math.round(spacing) }
+    return { byClass, spacing: Math.round(spacing) }
   })(),
 }
 
