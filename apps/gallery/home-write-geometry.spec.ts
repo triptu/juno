@@ -26,8 +26,9 @@ test.describe('Home writing geometry', () => {
           const columns = [...recent.querySelectorAll('ul')].map((list) =>
             [...list.querySelectorAll('button')].map((row) => {
               const box = row.getBoundingClientRect()
-              const name = row.querySelector('span:nth-child(2)')!
-              const mark = row.querySelector('span:first-child > *')!.getBoundingClientRect()
+              // The row's own children: a channel's art has spans of its own.
+              const name = row.querySelector(':scope > span:nth-child(2)')!
+              const mark = row.querySelector(':scope > span:first-child > *')!.getBoundingClientRect()
               return { x: box.x, height: box.height, name: textX(name), mark: mark.x, bottom: box.bottom }
             }),
           )
