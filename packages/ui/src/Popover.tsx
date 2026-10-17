@@ -27,6 +27,12 @@ export interface PopoverProps {
   readonly closeOnBlur?: boolean
   /** Where focus goes back after Escape, as a selector inside the anchor: for an anchor with several controls. Default its first focusable. */
   readonly returnFocusTo?: string
+  /**
+   * A start placement whose anchor is wider than the control that opens it (the header's left island):
+   * a selector inside the anchor, and the panel's left edge goes on that element's left edge.
+   * The panel still hangs below or above the whole anchor.
+   */
+  readonly alignTo?: string
   readonly children?: ReactNode
 }
 
@@ -98,6 +104,7 @@ export function Popover({
   label,
   closeOnBlur = true,
   returnFocusTo = FOCUSABLE,
+  alignTo,
   children,
 }: PopoverProps) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -109,9 +116,14 @@ export function Popover({
   const placePanel = useCallback(
     (panel: HTMLDivElement | null) => {
       panelRef.current = panel
-      if (panel !== null) clamp(panel, placement)
+      if (panel === null) return
+      // The panel's parent is the root: a panel open on first render gets its ref before the root does.
+      const root = panel.parentElement
+      const trigger = alignTo === undefined || !placement.endsWith('-start') ? null : root?.querySelector(alignTo)
+      if (root && trigger) panel.style.left = `${trigger.getBoundingClientRect().left - root.getBoundingClientRect().left}px`
+      clamp(panel, placement)
     },
-    [placement],
+    [placement, alignTo],
   )
 
   useLayoutEffect(() => {
