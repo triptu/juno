@@ -1,7 +1,6 @@
 const { build } = require('electron-builder')
 const { execFileSync } = require('node:child_process')
-const { mkdtempSync, rmSync } = require('node:fs')
-const { tmpdir } = require('node:os')
+const { mkdirSync, mkdtempSync, rmSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 
 const feed = process.env.JUNO_UPDATE_FEED_URL
@@ -36,24 +35,33 @@ rmSync(resolve(__dirname, '../release/latest-mac.yml'), { force: true })
 // electron-builder cannot find the dependencies of a dependency. Package from
 // `pnpm deploy` instead: the built app and its production dependencies as
 // real files in a temporary folder. Native rebuilds then touch only this copy.
-const staging = mkdtempSync(join(tmpdir(), 'juno-deploy-'))
-const app = join(staging, 'app')
-execFileSync('pnpm', ['--filter', '@juno/desktop', 'deploy', '--prod', app], { cwd: resolve(__dirname, '..'), stdio: 'inherit' })
-
-build({
-  config: {
-    extends: './electron-builder.yml',
-    directories: { app, output: 'release', buildResources: 'build' },
-    forceCodeSigning: release,
-    publish: feed ? { provider: 'generic', url: feed } : null,
-    mac: { notarize: release, ...(!release ? { identity: null } : {}) },
-    // ARM64 macOS requires a valid local signature after the fuse bytes change.
-    electronFuses: { resetAdHocDarwinSignature: !release },
-  },
-  publish: 'never',
-})
-  .catch(() => {
+// The folder is on the AgentWork volume when it is mounted, so writing and
+// deleting the copy does not load fseventsd (scripts/worktree-folder.mjs).
+async function main() {
+  const { scratchFolder } = await import('../../../scripts/worktree-folder.mjs')
+  mkdirSync(scratchFolder(), { recursive: true })
+  const staging = mkdtempSync(join(scratchFolder(), 'juno-deploy-'))
+  const app = join(staging, 'app')
+  try {
+    execFileSync('pnpm', ['--filter', '@juno/desktop', 'deploy', '--prod', app], { cwd: resolve(__dirname, '..'), stdio: 'inherit' })
+    await build({
+      config: {
+        extends: './electron-builder.yml',
+        directories: { app, output: 'release', buildResources: 'build' },
+        forceCodeSigning: release,
+        publish: feed ? { provider: 'generic', url: feed } : null,
+        mac: { notarize: release, ...(!release ? { identity: null } : {}) },
+        // ARM64 macOS requires a valid local signature after the fuse bytes change.
+        electronFuses: { resetAdHocDarwinSignature: !release },
+      },
+      publish: 'never',
+    })
+  } catch {
     console.error('Packaging failed; see electron-builder output above.')
     process.exitCode = 1
-  })
-  .finally(() => rmSync(staging, { recursive: true, force: true }))
+  } finally {
+    rmSync(staging, { recursive: true, force: true })
+  }
+}
+
+void main()
