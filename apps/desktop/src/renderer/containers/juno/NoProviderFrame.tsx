@@ -35,7 +35,9 @@ export function NoProviderFrame({ column, actions }: { readonly column: 'page' |
           banner={{ _tag: 'none' }}
           menuOpen={menuOpen}
           onMenu={setMenuOpen}
-          onOpenPage={openJunoPage}
+          onOpenPage={(target) => {
+            if (target !== 'chat') openJunoPage(target)
+          }}
           onResume={() => {}}
           {...(actions === undefined ? {} : { actions })}
         />

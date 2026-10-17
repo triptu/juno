@@ -45,6 +45,9 @@ import { signedInAtom } from './session'
 /** The Juno menu's pages that have a tab of their own. Its Connections and Settings are sections of Settings. */
 export type JunoTabPage = Exclude<JunoPage, 'settings' | 'connections'>
 
+/** What a Juno tab or the Juno panel shows: the chat, or one of its pages. */
+export type JunoView = 'chat' | JunoTabPage
+
 /** What a tab shows: a topic, or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
 export type Place =
   | { readonly kind: 'topic'; readonly topicId: string; readonly viewId?: string }
@@ -189,6 +192,19 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false, background
   if (samePlace(currentPlace(current), place)) return tabs
   const tab: Tab = { ...current, history: push(current.history, place) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
+}
+
+/**
+ * `place` in the active tab, as a new history entry, even when another tab
+ * shows it: the Juno header's switcher moves within its own tab, so Back
+ * returns to where it was (SPEC 13.10). With no active tab, a plain open.
+ */
+export function showInActiveTab(tabs: Tabs, place: Place): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
+  if (at < 0) return openPlace(tabs, place)
+  const current = tabs.tabs[at]!
+  if (samePlace(currentPlace(current), place)) return tabs
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...current, history: push(current.history, place) }), recent: touch(tabs.recent, current.id) }
 }
 
 /** With no tab left, one tab that shows `place`, active. Otherwise the tabs as they are. */

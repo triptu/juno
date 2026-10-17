@@ -76,4 +76,37 @@ const turns4 = [
   ) STRICT`,
 ]
 
-export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3, turns4] }
+const turns5 = [
+  // Each tool call the model made in a run, for Activity (SPEC 13.9). Written before the call runs and
+  // ended once, so a call cut off by a crash reads as unfinished. Nested calls a script made are in
+  // `script_calls`. `args` is the call's arguments as the model wrote them, cut to a few hundred
+  // bytes. `detail` is what came back, in a shape that never holds what Juno read: a count of lines
+  // for a read's result, the first line of Juno's own tools' text, or an error's text. A removal
+  // clears both for the runs that saw the removed messages.
+  `CREATE TABLE run_steps (
+    run_id TEXT NOT NULL REFERENCES runs (id),
+    call_id TEXT NOT NULL,
+    seq INTEGER NOT NULL CHECK (seq >= 0),
+    tool TEXT NOT NULL,
+    args TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('running', 'done', 'failed')),
+    detail TEXT,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    PRIMARY KEY (run_id, call_id)
+  ) STRICT`,
+  // The model requests a run made, per model: how many and what they cost, as the guard reported.
+  // `cost` is null while any request's cost is unknown. `name` is the model's name for people.
+  `CREATE TABLE run_usage (
+    run_id TEXT NOT NULL REFERENCES runs (id),
+    model TEXT NOT NULL,
+    name TEXT NOT NULL,
+    requests INTEGER NOT NULL CHECK (requests > 0),
+    cost REAL CHECK (cost IS NULL OR cost >= 0),
+    PRIMARY KEY (run_id, model)
+  ) STRICT`,
+  // Activity reads the newest runs first, a window at a time.
+  'CREATE INDEX runs_by_start ON runs (started_at DESC, id DESC) WHERE ended_at IS NOT NULL',
+]
+
+export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3, turns4, turns5] }

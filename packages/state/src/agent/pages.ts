@@ -31,6 +31,8 @@ import type {
   T3Address,
 } from '@juno/agent-contract'
 import type { Registry } from '../client'
+import { afterPaint } from '../perf'
+import type { JunoView } from '../tabs'
 import { call, live, rememberCards } from './chat'
 import { AgentClient } from './client'
 import { uuidv7 } from './ids'
@@ -65,11 +67,62 @@ export const reviewPageAtom = AgentClient.runtime
   )
   .pipe(Atom.setIdleTTL(IDLE_TTL))
 
-/** Memory and Activity: the newest `limit` rows, oldest first. A larger limit is "Load more". */
+/** Memory: the newest `limit` rows, oldest first. Activity: the newest `limit` runs, newest first. A larger limit is "Load more". */
 const memoryFamily = Atom.family((limit: number) => page<MemoryPage>('agent.memory.page', { window: { limit } }))
 const activityFamily = Atom.family((limit: number) => page<ActivityPage>('agent.activity.page', { window: { limit } }))
 export const memoryPageAtom = (limit: number) => memoryFamily(limit)
 export const activityPageAtom = (limit: number) => activityFamily(limit)
+
+/** Runs Activity opens with, and adds for each "Show older runs"; the agent's page limit is 200, which Memory opens with. */
+export const PAGE_ROWS = 50
+export const PAGE_MAX = 200
+
+/** The atom each Juno view draws first. The chat keeps its own window warm. */
+function viewAtom(view: JunoView): Atom.Atom<{ readonly _tag: string }> | undefined {
+  switch (view) {
+    case 'chat':
+      return undefined
+    case 'activity':
+      return activityPageAtom(PAGE_ROWS)
+    case 'memory':
+      return memoryPageAtom(PAGE_MAX)
+    case 'remembers':
+      return remembersPageAtom
+    case 'scheduled':
+      return scheduledPageAtom
+    case 'review':
+      return reviewPageAtom
+  }
+}
+
+/**
+ * Resolves once a Juno view has what it draws first, or after `waitMs`: the
+ * header's switcher then shows the finished page in one frame, never an
+ * empty page under the header (performance 4.4). The page stays warm until
+ * the frame after.
+ */
+export function junoViewReady(registry: Registry, view: JunoView, waitMs: number): Promise<void> {
+  const atom = viewAtom(view)
+  if (atom === undefined) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const release = registry.mount(atom)
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      off()
+      resolve()
+      afterPaint(release)
+    }
+    const check = () => {
+      if (registry.get(atom)._tag !== 'Initial') finish()
+    }
+    const timer = setTimeout(finish, waitMs)
+    const off = registry.subscribe(atom, check, { immediate: false })
+    check()
+  })
+}
 
 /** A model family, the cap, Pause, the rules and the backup folder: what Settings › Juno changes. */
 export type JunoSettingsChange =

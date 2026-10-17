@@ -162,6 +162,11 @@ function commit(store: Store, input: RemoveInput, expected: number): Committed |
   for (const id of bubbles.keys()) bubble.run(id, memory.gen)
   clearRemovePreviews(store, new Set(ids.map(String)))
   revokeExposedGrants(store, new Set(runs), memory.gen)
+  // Activity's steps of the runs the removed messages started hold arguments written from them. Later runs keep
+  // theirs, as Juno's later replies that quote a removed message stay (SPEC 13.8).
+  if (scope.ops.length > 0) {
+    db.prepare(`UPDATE run_steps SET args = '', detail = NULL WHERE run_id IN (SELECT run_id FROM run_inputs WHERE op_id IN (${placeholders(scope.ops.length)}))`).run(...scope.ops)
+  }
 
   // §4.5 step 2: jobs from runs that saw the messages stop, and their waiting reports never reach the model.
   const jobs = runs.length === 0 ? [] : (db

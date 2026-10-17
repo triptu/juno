@@ -34,6 +34,7 @@ import { type Input, type Queued, type Retry } from './router'
 import { TURNS_MIGRATIONS } from './schema'
 import { createTurnServices } from './services'
 import { createTurnSession } from './session'
+import { stepLog } from './steps'
 import { closeTurns, turnApi } from './turns'
 /**
  * Opens the turn engine on an agent directory: WP8's durable core with
@@ -242,6 +243,12 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
 
 const noop = () => {}
 
+/** "Claude Sonnet 5.5": the catalogue's name without its maker ("Anthropic: "), or the model's id. */
+function modelName(guard: ProviderGuardApi, call: { readonly provider: string; readonly model: string }): string {
+  const name = guard.models.getModel(call.provider, call.model)?.name
+  return name === undefined || name === '' ? call.model : name.replace(/^[^:]+:\s*/, '')
+}
+
 /** The backup, or undefined without a keychain. A backup that cannot start is reported, and Juno runs without it. */
 function openBackup(store: Store, options: TurnsOptions, observed: (deviceName: string) => void, changed: () => void): Backup | undefined {
   if (options.backup === undefined) return undefined
@@ -287,7 +294,7 @@ async function start(
     hooks: [
       { task: 'pi.generation', handlers: router.hooks.generation },
       // A script's call that is not a read is refused before the router counts it.
-      { task: 'pi.tool', handlers: scripts ? { beforeTool: (call: Parameters<typeof scripts.guard>[0]) => scripts.guard(call) ?? router.hooks.tool.beforeTool(call) } : router.hooks.tool },
+      { task: 'pi.tool', handlers: scripts ? { ...router.hooks.tool, beforeTool: (call: Parameters<typeof scripts.guard>[0]) => scripts.guard(call) ?? router.hooks.tool.beforeTool(call) } : router.hooks.tool },
     ],
   } as Extension
   const settings: JournalSettings = {
@@ -310,6 +317,16 @@ async function start(
   const scheduleDriver = driveScheduler(scheduler, options.onReport ?? noop)
   void scheduleDriver.tick()
 
-  const close = closeTurns({ scheduleDriver, services, compactor, session, backup, release })
+  // Activity's model and cost per run, from the guard's own log of each chat request it ended.
+  const usage = stepLog(store)
+  const stopUsage = guard.onCall((call) => {
+    const runId = call.path === 'chat' && call.outcome !== 'blocked' ? router.latestRun() : undefined
+    if (runId !== undefined) usage.request(runId, { model: call.model, name: modelName(guard, call), costUsd: call.costUsd })
+  })
+  const closeAll = closeTurns({ scheduleDriver, services, compactor, session, backup, release })
+  const close = async () => {
+    stopUsage()
+    await closeAll()
+  }
   return turnApi({ store, guard, opened, options, services, session, models, compactor, backup, scheduleDriver, close })
 }

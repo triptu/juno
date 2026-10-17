@@ -21,6 +21,7 @@ import {
   reopenClosedTab,
   savedTabs,
   setPinned,
+  showInActiveTab,
   stepHistory,
   tabByNumber,
   tabTopic,
@@ -133,6 +134,20 @@ describe('Juno pages', () => {
     expect(activeShows(again)).toBe('scheduled')
     expect(shown(again)).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
     expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(again)))))).toEqual(['a', 'b', 'scheduled', 'activity', 'c'])
+  })
+
+  it('the switcher moves within its own tab, even to a page another tab shows, and Back returns to the chat', () => {
+    const chat = openPlace(three, junoPlace, { newTab: true })
+    const elsewhere = openPlace(chat, junoPagePlace('activity'), { newTab: true })
+    const back = openPlace(elsewhere, junoPlace)
+    expect(activeShows(back)).toBe('juno')
+    const switched = showInActiveTab(back, junoPagePlace('activity'))
+    expect(shown(switched)).toEqual(['a', 'b', 'activity', 'activity', 'c'])
+    expect(activeShows(switched)).toBe('activity')
+    expect(switched.active).toBe(back.active)
+    expect(activeShows(stepHistory(switched, -1))).toBe('juno')
+    // The page shown already adds nothing to Back.
+    expect(showInActiveTab(switched, junoPagePlace('activity'))).toBe(switched)
   })
 })
 

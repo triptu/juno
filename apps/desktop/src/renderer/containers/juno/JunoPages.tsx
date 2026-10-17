@@ -9,6 +9,8 @@ import {
   junoPageActions,
   junoSettingsAtom,
   memoryPageAtom,
+  PAGE_MAX,
+  PAGE_ROWS,
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,
@@ -28,21 +30,18 @@ const actions = junoPageActions(registry)
 
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
-/** Rows Memory and Activity open with, and add for each "Load more"; the agent's page limit is 200. */
-const PAGE_ROWS = 50
-const PAGE_MAX = 200
 
 const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
 
 /**
- * A Juno page in its tab (SPEC 13.10): a page behind the Juno menu, live
- * from the agent. Until its first value arrives the page draws nothing
- * (performance 4.4: no spinner under 300 ms). Commands answer through the
- * page's own stream, so a refusal shows as the page staying as it was.
- * Settings › Juno, Connections and Backup & This Mac are sections of
- * Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
+ * A Juno page's body, live from the agent (SPEC 13.10), under the Juno
+ * header (`JunoPageView`). Until its first value arrives the page draws
+ * nothing (performance 4.4: no spinner under 300 ms). Commands answer
+ * through the page's own stream, so a refusal shows as the page staying as
+ * it was. Settings › Juno, Connections and Backup & This Mac are sections
+ * of Settings (`JunoSettings`, `JunoConnections`, `JunoBackup`).
  */
-export const JunoPageTab = memo(function JunoPageTab({ page }: { readonly page: JunoTabPage }) {
+export const JunoPageBody = memo(function JunoPageBody({ page }: { readonly page: JunoTabPage }) {
   switch (page) {
     case 'remembers':
       return <Remembers />

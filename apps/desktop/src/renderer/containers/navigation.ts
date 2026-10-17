@@ -49,6 +49,7 @@ import {
   junoPagePlace,
   locateMessage,
   junoPlace,
+  junoPanelViewAtom,
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
@@ -58,6 +59,7 @@ import {
   requestHomeFocus,
   openInSlack,
   openPlace,
+  showInActiveTab,
   openSettingsSection,
   pickConversation,
   popupContextMenu,
@@ -90,6 +92,8 @@ import {
   type Tabs,
 } from '@juno/state'
 import { chatCopy, type JunoPage } from '@juno/agent-contract'
+import type { JunoView } from '@juno/state'
+import { junoViewReady } from '@juno/state/agent'
 import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
@@ -425,6 +429,42 @@ export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
   if (page === 'settings') return openSettings('juno', options)
   if (page === 'connections') return openSettings('connections', options)
   show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
+}
+
+const junoViewReadyFor = (view: JunoView) => junoViewReady(registry, view, READY_WAIT_MS)
+
+/**
+ * The Juno header's switcher in a Juno tab (SPEC 13.10): the chat or a page
+ * in this same tab, as a new history entry, so Back returns. Connections and
+ * Settings open their sections of Settings.
+ */
+export function showJunoView(target: JunoView | 'connections' | 'settings'): void {
+  if (target === 'settings' || target === 'connections') return openJunoPage(target)
+  switchStartedAt = target === 'chat' ? undefined : performance.now()
+  const place = target === 'chat' ? junoPlace : junoPagePlace(target)
+  show((tabs) => showInActiveTab(tabs, place), undefined, true, junoViewReadyFor(target))
+}
+
+/** The same switcher in the Juno panel: the panel shows the chat or the page in place, beside the topic. */
+export function showJunoPanelView(tabId: string, target: JunoView | 'connections' | 'settings'): void {
+  if (target === 'settings' || target === 'connections') return openJunoPage(target)
+  switchStartedAt = target === 'chat' ? undefined : performance.now()
+  // The last pick wins, however long each page took to be ready.
+  const ticket = ++panelTicket
+  void junoViewReadyFor(target).then(() => {
+    if (ticket === panelTicket) registry.set(junoPanelViewAtom(tabId), target)
+  })
+}
+
+let panelTicket = 0
+
+let switchStartedAt: number | undefined
+
+/** When the switcher was last picked from, once, for `juno.page-switch`. */
+export function takeJunoSwitchStart(): number | undefined {
+  const at = switchStartedAt
+  switchStartedAt = undefined
+  return at
 }
 
 /** The Juno tab (SPEC 13). A plain open focuses a tab that shows it; each Juno tab shows the one chat. */
