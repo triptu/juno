@@ -228,7 +228,8 @@ async function armHomeSample(nav: Locator): Promise<void> {
 // Every fourth sample comes back after 31 s idle, past the home.view
 // atom's idle time, when the CPU has slowed down. The pointer entering the
 // Home item warms home.view (performance.md 4.2), and that prefetch is still
-// held here, so these opens render cached data on a slow CPU.
+// held here, so these opens render cached data on a slow CPU. They have
+// their own budget, 150 ms; the quick opens keep 50 ms (performance.md 1).
 test('home open: from a topic to Home painted', async ({ juno, win }) => {
   test.setTimeout(360_000)
   await juno.signIn()
@@ -248,6 +249,7 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     }).observe({ type: 'measure' })
   })
   const samples: number[] = []
+  const idle: number[] = []
   const cold: string[] = []
   for (let i = 0; i < 20; i++) {
     await sidebar.row(POSTGRES).open()
@@ -261,19 +263,23 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     const measureOpen = async () => {
       await press(win)
-      samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+      const sample = await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample)
+      if (i % 4 === 3) idle.push(sample)
+      else samples.push(sample)
     }
     if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, `home-open-${i}`, measureOpen)
     else await measureOpen()
     if (i % 4 === 3) {
       await win.waitForTimeout(100)
       const query = await win.evaluate((from) => (window as unknown as { __homeQuery: number[] }).__homeQuery.slice(from), queries)
-      cold.push(`${samples.at(-1)!.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
+      cold.push(`${idle.at(-1)!.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
     }
   }
   console.log(`home open after the subscription's idle time: ${cold.join('; ')}`)
-  const open = stats('home open (pointerdown on Home) to Home painted', samples)
-  within('home open, p95', open.p95, 50)
+  const open = stats('home open, quick (pointerdown on Home) to Home painted', samples)
+  within('home open, quick, p95', open.p95, 50)
+  const afterIdle = stats('home open after 31 s idle (pointerdown on Home) to Home painted', idle)
+  within('home open after idle, p95', afterIdle.p95, 150)
 })
 
 // A click on a picture in a message to the first presented frame that
