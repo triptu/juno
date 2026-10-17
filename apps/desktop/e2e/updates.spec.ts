@@ -116,7 +116,8 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
 
   // Opting in checks at once; an unsigned build offers the DMG.
-  await updates.check()
+  await updates.click()
+  await expect(updates).toBeChecked()
   await expect(about.getByText('Juno 99.0.0 is available.')).toBeVisible()
   await expect(about.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
   await about.getByRole('button', { name: "What's new" }).nth(1).click()
