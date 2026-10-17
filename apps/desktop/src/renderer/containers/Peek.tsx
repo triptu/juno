@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { isPeekKey, messageListAtom, peekKeyAtom, registry, topicAtom } from '@juno/state'
+import { isPeekKey, messageListAtom, openTopic, peekKeyAtom, refreshMessages, registry, topicAtom } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { PeekView, TopicArt, type PeekPlacement } from '@juno/views'
@@ -183,11 +183,18 @@ export const Peek = memo(function Peek() {
   return <PeekTopic key={shown.id} id={shown.id} at={shown.at} placement={shown.placement} />
 })
 
-/** The topic's header and first window are local (or it failed, or is unknown): a peek at it can paint. */
+/**
+ * The topic's header and first window are local and covered (or it failed, or is unknown): a peek at it
+ * can paint. A window of search matches is not covered (performance.md 3.3) and would grow when the
+ * replies page lands, so the peek waits for the fetch it makes anyway.
+ */
 function canPaint(id: string): boolean {
   const header = registry.get(topicAtom(id))
   if (header._tag === 'Failure') return true
-  return header._tag === 'Success' && (header.value === null || registry.get(messageListAtom(id)).ready)
+  if (header._tag !== 'Success') return false
+  if (header.value === null) return true
+  const list = registry.get(messageListAtom(id))
+  return list.ready && list.meta.windowCovered !== false
 }
 
 /**
@@ -205,12 +212,28 @@ function useWhenReady(peeking: Peeking | undefined): Peeking | undefined {
   if (next !== shown) setShown(next)
   useEffect(() => {
     if (peeking === undefined || ready) return
+    // After the fetch: the window update it brings, whether or not that covers the window.
+    let fetchedMeta: object | undefined
     const check = () => {
-      if (canPaint(peeking.id)) setArrived(peeking)
+      if (canPaint(peeking.id) || (fetchedMeta !== undefined && registry.get(messageListAtom(peeking.id)).meta !== fetchedMeta)) setArrived(peeking)
     }
     // Each subscription also looks once now, in case the topic arrived after this render.
     const offs = [registry.subscribe(topicAtom(peeking.id), check, { immediate: true }), registry.subscribe(messageListAtom(peeking.id), check, { immediate: true })]
+    // An uncovered window waits for Slack: the fetch the peeked list makes on mount, started here. Its answer
+    // reaches the window in a later update, which is asked for again as `useTopicFetch` does. Offline, the
+    // peek shows what is stored.
+    let live = true
+    void openTopic(registry, peeking.id).then((exit) => {
+      if (!live) return
+      const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
+      if (!done) return setArrived(peeking)
+      // The list keeps its last value while the subscription starts again, so a new `meta` is a new answer.
+      fetchedMeta = registry.get(messageListAtom(peeking.id)).meta
+      refreshMessages(registry, peeking.id)
+      check()
+    })
     return () => {
+      live = false
       for (const off of offs) off()
     }
   }, [peeking, ready])
