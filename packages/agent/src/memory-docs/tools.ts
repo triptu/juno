@@ -38,12 +38,12 @@ export function sourceOf(named: string | undefined, clean: boolean): { readonly 
   return { source: 'connection', connection: word.slice(0, 60) }
 }
 
-/** The tool's answer for one write. */
-export function writeAnswer(result: WriteResult): { readonly text: string; readonly isError?: boolean } {
+/** The tool's answer for one write. Its summary names the doc, for Activity's step ("Updated memory · People"). */
+export function writeAnswer(result: WriteResult): { readonly text: string; readonly isError?: boolean; readonly summary?: string } {
   if (result._tag === 'refused') return { text: refusalText[result.reason], isError: true }
   const { write, entry } = result
   const verb = write.kind === 'add' ? 'Added' : write.kind === 'update' ? 'Changed' : 'Removed'
-  return { text: `${verb} e${entry.id} in ${DOC_TITLES[write.doc]}.` }
+  return { text: `${verb} e${entry.id} in ${DOC_TITLES[write.doc]}.`, summary: DOC_TITLES[write.doc] }
 }
 
 export function memoryDocsTools(context: MemoryDocsToolContext): ReadonlyArray<JunoTool> {
@@ -54,7 +54,12 @@ export function memoryDocsTools(context: MemoryDocsToolContext): ReadonlyArray<J
     parameters: { type: 'object', properties: { doc: { type: 'string', enum: [...DOCS] } }, additionalProperties: false },
     replay: 'safe',
     status: () => 'Reading what I know about you',
-    run: async ({ doc }) => ({ text: renderDocs(docEntries(entries(store)), doc !== undefined && isDoc(doc) ? doc : undefined) }),
+    run: async ({ doc }) => {
+      const all = docEntries(entries(store))
+      const only = doc !== undefined && isDoc(doc) ? doc : undefined
+      const shown = only === undefined ? all.length : all.filter((entry) => entry.doc === only).length
+      return { text: renderDocs(all, only), summary: shown === 1 ? '1 note' : `${shown} notes` }
+    },
   })
   const search = defineTool<{ readonly query: string }>({
     name: 'memory_search',
@@ -64,7 +69,8 @@ export function memoryDocsTools(context: MemoryDocsToolContext): ReadonlyArray<J
     status: () => 'Looking through what I know about you',
     run: async ({ query }) => {
       const found = searchDocs(docEntries(entries(store)), query)
-      return { text: found.length === 0 ? 'No entries match.' : found.map((entry) => `[${entry.id}] ${DOC_TITLES[entry.doc]}: ${entry.text}`).join('\n') }
+      const summary = found.length === 1 ? '1 note' : `${found.length} notes`
+      return { text: found.length === 0 ? 'No entries match.' : found.map((entry) => `[${entry.id}] ${DOC_TITLES[entry.doc]}: ${entry.text}`).join('\n'), summary }
     },
   })
   const write = defineTool<{ readonly doc?: string; readonly entry?: string; readonly text?: string; readonly remove?: boolean; readonly source?: string }>({
