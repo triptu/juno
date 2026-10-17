@@ -40,3 +40,27 @@ minimumReleaseAgeExclude:
 # points: a test-only cycle. check-deps leaves test-only edges out of its cycle
 # check and fails on any other cycle; this tells `pnpm -r` the same.
 ignoreWorkspaceCycles: true
+
+# Every worktree links its packages from one shared folder in the store
+# (`<store>/links`), so a worktree's node_modules holds about 1,000 entries
+# instead of about 50,000. Creating and removing worktrees then stays cheap for
+# macOS's file event and Spotlight services. See docs/development.md,
+# "Worktrees and installs".
+virtualStoreType: global
+
+# With the shared store, a package resolves only what it declares. These two
+# import types they do not declare: Phosphor's from React, Playwright's
+# Electron API from electron. Optional peers link them next to the package.
+packageExtensions:
+  "@phosphor-icons/react":
+    peerDependencies:
+      "@types/react": "*"
+    peerDependenciesMeta:
+      "@types/react":
+        optional: true
+  playwright-core:
+    peerDependencies:
+      electron: "*"
+    peerDependenciesMeta:
+      electron:
+        optional: true
