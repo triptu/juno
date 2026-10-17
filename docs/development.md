@@ -879,6 +879,12 @@ Causes found so far (2026-10-15):
 
 - **A draft that a send check could stop.** A Main draft that shares two words with a thread gets "Looks like a reply to" on Enter only if the typing pause's check (400 ms) has answered by then, so the same test sometimes sent and sometimes showed the bar (1 of 20). A test that is not about the check uses a draft that matches no thread; one that is waits for the answer (`routeAnswered` in `send-checks.spec.ts`).
 
+- **A product window shorter than the test's own steps.** A new read mark waits 400 ms and later marks replace its intent, so marks in quick succession make one call. The test sent five marks one after another and expected one call, but on a loaded machine the five round trips took up to 1.2 s, and a second call is then correct (3 of 20 at ten busy processes per core, each run whose five marks took over 600 ms). The test now sets a 3 s window (`markDelayMillis`, tests only) and checks that the five marks fit in it. A test of a time window must make its steps fit the window by construction, not by speed.
+
+- **A boot wait sized for the small seed.** `bootedEngine` waited 30 s for `live`, which the default seed reaches in 0.5 to 2.6 s even under load. The large-seed cold boot test reaches it in 2 to 5 s quiet, 7 to 23 s at four busy processes per core and 14 to 75 s at ten, so it timed out in plan runs at 97 to 99% busy. It now waits 90 s (`liveMillis`).
+
+- **A speed budget asserted inside a loaded plan.** `quick-start.spec.ts` failed its 5 s sign-in-to-rows budget in a plan at 96% busy. On a quiet remote machine it takes about 2.7 s, the same before and after the tour (10 runs each: 2,687 to 2,738 ms at `480da939^1`, 2,681 to 2,782 ms at `480da939`). Budgets belong to `perf.spec.ts` on the Mac; the e2e test keeps the flow with a ceiling and records the time.
+
 ## Machine shapes
 
 Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.
