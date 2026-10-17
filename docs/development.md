@@ -45,6 +45,7 @@ Run these from the repo root.
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
+| `JUNO_LIVE=1 pnpm presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
 | `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
@@ -429,6 +430,8 @@ launch through the first sign-in and sync, in order:
 7. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
    read only when the agent asks, after a provider is set up. Like step 1,
    `security` created them, so there is no prompt.
+
+Checked on 10-17 with an unsigned package of `bb4fcb71` and a fresh user-data folder, while a "Juno Safe Storage" item from a 10-15 build was in the login keychain: launch to the sign-in screen showed no prompt. The import's prompts (steps 4 and 5) need someone at the Mac and were not counted.
 
 **Signing caveat.** macOS ties "Juno Safe Storage" to the code signature of
 the app that created it. A build without Developer ID signing has an ad-hoc
