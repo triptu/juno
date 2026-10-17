@@ -182,6 +182,10 @@ export async function writeSlackApp(
 export interface Fixtures {
   /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
   readonly aiJobs: boolean
+  /** How long the `running` app's fake AI takes to answer (`LaunchOptions.fakeAiDelayMillis`); undefined answers at once. */
+  readonly fakeAiDelayMillis: number | undefined
+  /** Another app is capturing the screen when the `running` app starts (`LaunchOptions.screenShared`). */
+  readonly screenShared: boolean
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -252,8 +256,13 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await rm(userData, { recursive: true, force: true })
   },
   aiJobs: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs })
+  fakeAiDelayMillis: [undefined, { option: true }],
+  screenShared: [false, { option: true }],
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared }, use) => {
+    const running = await launchApp(userData, {
+      fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
+      aiJobs, screenShared, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+    })
     await use(running)
     await running.close()
   },

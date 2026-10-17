@@ -3,9 +3,10 @@
 // request pacing. The sidebar shows rows before history is read, then
 // keeps filling in while the background lane reads history, with no
 // reload. The 5 s quick-start budget (performance.md, "First sync") is
-// asserted by `quick start` in perf.spec.ts on the Mac; here, inside a
-// loaded plan, the time is recorded and only a ceiling is checked. The preview test needs busy
-// channels, not the budget's size, so it uses a smaller seed.
+// asserted by `quick start` in perf.spec.ts on the Mac, on the large seed;
+// here, inside a loaded plan, the time is recorded and only a ceiling is
+// checked. The flows need busy channels and history still being read when
+// they look, not the budget's size, so they use a fifth of the large seed.
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -42,12 +43,10 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0]) => test.extend({
   },
 })
 
-/** The budget is for the large seed. */
-const large = signInOn({})
 /** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */
 const medium = signInOn({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } })
 
-large('first sign-in shows threads, channels and DMs before history is read, then fills in without a reload', async ({ juno }) => {
+medium('first sign-in shows threads, channels and DMs before history is read, then fills in without a reload', async ({ juno }) => {
   test.setTimeout(180_000)
   await juno.signIn({ skipSetUp: false })
   const signedIn = Date.now()
