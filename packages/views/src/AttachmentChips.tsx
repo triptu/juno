@@ -67,7 +67,7 @@ interface ChipProps {
 function ThumbnailChip({ file, preview, onRemove }: ChipProps & { readonly preview: string }) {
   return (
     <div role="listitem" title={file.name} data-attachment={file.state} {...stylex.props(styles.chip, styles.thumbChip)}>
-      <img src={preview} alt={file.name} data-sensitive="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.thumb, file.state === 'staging' && styles.staging)} />
+      <img src={preview} alt={file.name} data-sensitive="" draggable={false} decoding="async" {...stylex.props(styles.thumb, file.state === 'staging' && styles.staging)} />
       <Frame />
       <Remove file={file} onRemove={onRemove} />
     </div>

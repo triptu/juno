@@ -96,16 +96,47 @@ export function readForJuno(attachment: Pick<Attachment, 'id' | 'name' | 'mimety
   return reading
 }
 
+const isImage = (file: { readonly type: string; readonly name: string }) => junoFileKind(file.type, file.name) === 'image'
+
 /**
  * Attaches files in a composer only Juno reads (the Juno tab and the
- * panel): nothing is staged in the engine. An image's chip shows its
- * thumbnail once it is read, or that it could not be read.
+ * panel): nothing is staged in the engine. An image's chip is its picture
+ * from its first frame: a chip-sized copy, decoded before the chip is
+ * added, so it never shows as a file chip or an empty square first. The
+ * chip says when the image could not be read.
  */
 export function attachToJuno(key: string, files: ReadonlyArray<File>): void {
-  const added = attachLocal(registry, key, files, (file) => junoFileKind(file.type, file.name) === 'image')
-  for (const chip of added) {
-    if (chip.state !== 'staging') continue
-    void readForJuno(chip).then((input) => settleLocal(registry, key, chip.id, input?._tag === 'image' ? { preview: input.thumb } : 'failed'))
+  void Promise.all(files.map((file) => (isImage(file) ? previewOf(file) : undefined))).then((previews) => {
+    const added = attachLocal(registry, key, files, isImage, (file) => previews[files.indexOf(file as File)])
+    for (const chip of added) {
+      if (chip.state !== 'staging') continue
+      void readForJuno(chip).then((input) => settleLocal(registry, key, chip.id, input?._tag === 'image' ? {} : 'failed'))
+    }
+  })
+}
+
+/** Twice the chip's 44px, for a Retina screen. */
+const PREVIEW_EDGE = 88
+
+/**
+ * The chip's picture: the image scaled to cover the chip, as a data URL (the
+ * page's CSP takes `data:` images), decoded so an `<img>` of it draws in its
+ * first frame. Undefined when Chromium cannot decode the image.
+ */
+async function previewOf(file: File): Promise<string | undefined> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => undefined)
+  if (bitmap === undefined) return undefined
+  try {
+    const scale = Math.min(1, PREVIEW_EDGE / Math.min(bitmap.width, bitmap.height))
+    const url = await dataUrl(await encode(bitmap, Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)), 'image/webp', 0.8))
+    const image = new Image()
+    image.src = url
+    await image.decode()
+    return url
+  } catch {
+    return undefined
+  } finally {
+    bitmap.close()
   }
 }
 
