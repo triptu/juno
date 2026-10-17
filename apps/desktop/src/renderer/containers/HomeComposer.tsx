@@ -37,6 +37,12 @@ function typeIn(field: HTMLTextAreaElement | null, text: string): void {
   if (field !== null && field === document.activeElement) document.execCommand('insertText', false, text)
 }
 
+/** Focus is on an open menu's anchor or in its panel, outside this Home. */
+function inOpenMenu(active: Element | null, field: HTMLElement | null): boolean {
+  const menu = active?.closest('[aria-expanded="true"], [role="dialog"], [role="menu"]')
+  return menu != null && field?.closest('[data-home]')?.contains(menu) !== true
+}
+
 /** A first @ or # with what follows it, and nothing else typed yet. */
 const FIRST = /^([@#])([^\s@#]*)$/
 
@@ -306,9 +312,10 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const sendTo = useSendTo(draft, (conversation) => destination.choose(conversation, true))
   useFocusRequest(tabId, field, destination.openList, search)
 
-  // Shown again: the field takes focus, so keys typed after ⌘T or a click on Home reach it.
+  // Shown again: the field takes focus, so keys typed after ⌘T or a click on Home reach it. Not from
+  // an open menu elsewhere: the account menu opened while Home still loaded would close.
   useLayoutEffect(() => {
-    focusField()
+    if (!inOpenMenu(document.activeElement, inputRef.current)) focusField()
     afterPaint(() => {
       if (inputRef.current === document.activeElement) mark('juno.composer-ready')
     })
