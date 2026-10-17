@@ -120,6 +120,8 @@ export default defineFixtures(
       // Juno changed its notes about the owner in this reply: the docs it touched, with Undo.
       'memory-updated-undo': list([day(0), owner('m-n5', 'I lead the sync team now, and Priya is my manager', 'single', { _tag: 'sent' }, NOW - MINUTE), ...juno('m-n5-r', 'Congratulations. I noted both.', { at: NOW }), { _tag: 'note', id: messageId('memory:r-n5'), kind: 'memoryUpdated', docs: ['you', 'people'], run: 'r-n5', undo: true }]),
       'memory-updated': list([day(0), owner('m-n6', 'Keep my replies short in #eng', 'single', { _tag: 'sent' }, NOW - 3 * MINUTE), ...juno('m-n6-r', 'Will do.', { at: NOW - 2 * MINUTE }), { _tag: 'note', id: messageId('memory:r-n6'), kind: 'memoryUpdated', docs: ['preferences'], run: 'r-n6' }]),
+      // A new chat holding only the ask: the empty state, with the ask under its suggestions.
+      'learn-ask-empty': list([day(0), learnAsk({ _tag: 'open' }, NOW - MINUTE)]),
       // A proactive ask in the chat, and the same ask once its pass has run.
       'learn-ask': list([day(0), ...juno('m-n7', 'Happy to help with anything in Slack.', { at: NOW - 2 * MINUTE }), learnAsk({ _tag: 'open' }, NOW - MINUTE)]),
       'learn-done': list([day(0), learnAsk({ _tag: 'done', written: 14 }, NOW - 20 * MINUTE), { _tag: 'note', id: messageId('memory:learn:a1'), kind: 'memoryUpdated', docs: ['you', 'people', 'projects', 'style'], run: 'learn:a1', undo: true }]),

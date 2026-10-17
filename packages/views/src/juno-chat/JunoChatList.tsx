@@ -66,7 +66,9 @@ const COMPACT_BELOW = 400
  */
 export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions, onSuggest, scrollRef, anchorRef, topEdgeRef, bottomEdgeRef, enterEmpty = true, column = 'page', eagerTail = 0 }: JunoChatListProps) {
   // With AI assist off an empty chat is the one AI-off line (SPEC 13.7), not suggestions it cannot act on.
-  const empty = items.length === 0 && banner._tag !== 'aiOff'
+  // A chat that holds only Juno's proactive asks is still empty: the asks sit under the suggestions.
+  const empty = items.every((item) => item._tag === 'ask' || item._tag === 'day') && banner._tag !== 'aiOff'
+  const rows = empty ? items.filter((item) => item._tag === 'ask') : items
   const columnRef = useRef<HTMLDivElement>(null)
   const compact = useNarrowerThan(columnRef, COMPACT_BELOW)
   return (
@@ -74,8 +76,8 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
       <div ref={columnRef} role="list" aria-label="Juno chat" data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
-        {items.map((item, index) => (
-          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} eager={index >= items.length - eagerTail} compact={compact} />
+        {rows.map((item, index) => (
+          <Row key={keyOf(item)} item={item} now={now} actions={actions} anchorRef={anchorRef} eager={index >= rows.length - eagerTail} compact={compact} />
         ))}
         {banner._tag === 'aiOff' ? (
           <div {...stylex.props(styles.aiOff)}>
