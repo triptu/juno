@@ -116,15 +116,16 @@ export function SettledRow({ topic, status, now, active, compact = false, copy =
         </span>
         <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
           {/* Both words are always laid out, one hidden, so the slot is as wide as the wider whatever happens. */}
-          <span {...stylex.props(styles.done)} data-settled-done={handled ? '' : undefined}>
+          <span {...stylex.props(styles.done)}>
             <span {...stylex.props(status !== 'resolved' && styles.hidden)}>
               <Icon icon={Check} size={13} />
             </span>
             <span {...stylex.props(styles.words)}>
-              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'resolved' && styles.hidden]}>
+              {/* `data-settled-done` marks the word shown, so its text is what the row says. */}
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'resolved' && styles.hidden]} data-settled-done={status === 'resolved' ? '' : undefined}>
                 {copy.acted}
               </Text>
-              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'kept' && styles.hidden]}>
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'kept' && styles.hidden]} data-settled-done={status === 'kept' ? '' : undefined}>
                 {copy.kept}
               </Text>
             </span>
