@@ -37,6 +37,7 @@ import { PostWorker } from './send/worker'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './markWorker'
 import { Outbox } from './outbox'
+import { SlackSchedule } from './slackSchedule'
 import { SessionClientLive } from './session/client'
 import { SessionHandlers } from './session/handlers'
 import { Session } from './session/Session'
@@ -90,6 +91,7 @@ const EnginePhases = Layer.effectDiscard(
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
 export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, AutomatedJob, AiWarmup).pipe(
   Layer.provideMerge(MarkWorker.layer),
+  Layer.provideMerge(SlackSchedule.layer),
   Layer.provideMerge(PostWorker.layer),
   Layer.provideMerge(Staging.layer),
   Layer.provideMerge(UploadProgress.layer),

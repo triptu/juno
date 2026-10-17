@@ -1,5 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -7,8 +6,10 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type ReactNode } from 'react'
 import type { Hours, NotificationPermission, NotifyTag, TodayRow } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, Chip, DayToggles, Icon, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
+import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
+import { PermissionLine } from './PermissionLine'
+import { SlackScheduleSection, type SlackScheduleProps } from './SlackScheduleSection'
 import { clockLabel, hourLabel } from './time'
 
 export type HoursKind = 'notifications' | 'presence'
@@ -27,6 +28,8 @@ export interface NotificationsPageProps {
   /** The messages that notified today, newest first. */
   readonly today: ReadonlyArray<TodayRow>
   readonly onHoursChange: (which: HoursKind, hours: Hours) => void
+  /** Slack's own schedule, its switch and Restore. */
+  readonly slack: SlackScheduleProps
   /** On blur, with the text as typed. */
   readonly onMattersSave: (text: string) => void
   /** Back to When it matters. */
@@ -52,15 +55,15 @@ const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
 const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'], PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
 
 /**
- * The Notifications page (SPEC 14, inventory 13): two sets of hours, what
- * matters in the owner's words, the channels and people set to Every
- * message or Never, one line for today with Show why, and a test
- * notification. Everything else is said to Juno or set from a channel's or
+ * The Notifications page (SPEC 14, inventory 13): two sets of hours, whether
+ * Slack's own schedule follows them, what matters in the owner's words, the
+ * channels and people set to Every message or Never, one line for today
+ * with Show why, and a test notification. Everything else is said to Juno or set from a channel's or
  * person's menu. While macOS does not let Juno notify, a line at the top
  * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slack, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
@@ -78,6 +81,8 @@ export function NotificationsPage(props: NotificationsPageProps) {
           </div>
         </Surface>
       </Section>
+
+      <SlackScheduleSection {...slack} />
 
       <Section heading="What matters to you" sub="Juno reads this for every message. You can also just tell Juno.">
         {aiAssist ? (
@@ -129,32 +134,6 @@ export function NotificationsPage(props: NotificationsPageProps) {
         <TestRow permission={permission} onSendTest={onSendTest} onOpenSettings={onOpenSettings} />
       </Section>
     </Page>
-  )
-}
-
-/** While macOS does not let Juno notify: one line with the way to turn it on. Nothing otherwise. */
-function PermissionLine({ permission, onOpenSettings, onAllow }: Pick<NotificationsPageProps, 'permission' | 'onOpenSettings' | 'onAllow'>) {
-  if (permission !== 'denied' && permission !== 'notDetermined') return null
-  return (
-    <Surface kind="group" role="status" aria-label="Notification permission">
-      <ListRow
-        divider={false}
-        leading={<Icon icon={BellSlash} size={15} />}
-        trailing={
-          permission === 'denied' ? (
-            <Button variant="secondary" size="sm" onClick={onOpenSettings}>
-              Open Notification Settings
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={onAllow}>
-              Allow notifications
-            </Button>
-          )
-        }
-      >
-        <Text variant="ui">macOS is not showing Juno's notifications.</Text>
-      </ListRow>
-    </Surface>
   )
 }
 

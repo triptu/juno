@@ -12,11 +12,14 @@
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
  * - `notifications.setPresence` is Set yourself away or active. It holds
  *   until the next switch in the active hours.
+ * - `notifications.setSlackSchedule` and `notifications.restoreSlackSchedule`
+ *   are the switch and Restore for Slack's own schedule; the page value
+ *   carries their state.
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { ConversationKind } from '@juno/domain'
-import { NotSignedIn } from '../errors'
+import { NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveValueRoute } from '../live'
 import { CommandResult, NotifyChoiceSchema, NotifyTargetSchema, SubscribeError } from './topics'
 
@@ -63,6 +66,19 @@ export const TodayRow = Schema.Struct({
 })
 export type TodayRow = typeof TodayRow.Type
 
+/** Slack's own notification schedule, which Juno writes from the notification hours (SPEC 14). */
+export const SlackScheduleView = Schema.Struct({
+  /** Juno writes the notification hours into Slack's schedule. On by default. */
+  enabled: Schema.Boolean,
+  /** Juno kept the schedule Slack had before Juno's first write, so Restore can put it back. */
+  canRestore: Schema.Boolean,
+  /** The schedule was changed in Slack after Juno wrote it. Juno leaves it until the hours change in Juno. */
+  changedInSlack: Schema.Boolean,
+  /** On, but the hours are still Juno's defaults on this install: nothing is written until they are set or the switch is turned on again. */
+  waitingForHours: Schema.Boolean,
+})
+export type SlackScheduleView = typeof SlackScheduleView.Type
+
 export const NotificationsPage = Schema.Struct({
   every: Schema.Array(NotifyTag),
   never: Schema.Array(NotifyTag),
@@ -72,6 +88,7 @@ export const NotificationsPage = Schema.Struct({
   held: Schema.Int,
   /** The messages that notified today, newest first, at most 50. */
   today: Schema.Array(TodayRow),
+  slackSchedule: SlackScheduleView,
 })
 export type NotificationsPage = typeof NotificationsPage.Type
 
@@ -142,6 +159,20 @@ export const notificationsSetPresence = Rpc.make('notifications.setPresence', {
   error: NotSignedIn,
 })
 
+/** Turns writing Slack's schedule on or off. On applies the notification hours once, even unchanged. */
+export const notificationsSetSlackSchedule = Rpc.make('notifications.setSlackSchedule', {
+  payload: { enabled: Schema.Boolean },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
+/** Writes back the schedule Slack had before Juno's first write, and turns writing it off. */
+export const notificationsRestoreSlackSchedule = Rpc.make('notifications.restoreSlackSchedule', {
+  payload: {},
+  success: Schema.Void,
+  error: Schema.Union([NotSignedIn, Rejected, RateLimited, Offline]),
+})
+
 export const NotificationsRoutes = RpcGroup.make(
   notificationsSettings,
   notificationsPage,
@@ -151,4 +182,6 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsSetMatters,
   notificationsSetLevel,
   notificationsSetPresence,
+  notificationsSetSlackSchedule,
+  notificationsRestoreSlackSchedule,
 )

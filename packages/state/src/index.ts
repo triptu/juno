@@ -137,9 +137,11 @@ export {
   notificationSettingsAtom,
   notificationsPageAtom,
   notificationStatusAtom,
+  restoreSlackSchedule,
   setHours,
   setMatters,
   setPresence,
+  setSlackSchedule,
   whyPopoverAtom,
 } from './notifications'
 export { ignoredChannelsAtom, stopIgnoring } from './ignored'

@@ -420,17 +420,27 @@ Observed
 
 Inferred
 
-- To make the phone match Juno's notification hours, Juno writes `dnd_days: "every_day"`, `dnd_end_hour: <hours start>`, `dnd_start_hour: <hours end>` and `dnd_enabled: true` in one `users.prefs.set` call. If the hours differ by weekday, it writes `dnd_days: "custom"` with the per-day keys instead. Times are rounded to the half hour, because the official page cannot show other values, although it inserts an unknown value as an extra option.
+- To make the phone match Juno's notification hours, Juno writes `dnd_days` (`every_day`, `weekdays`, or `custom` with the per-day keys for any other days), `dnd_end_hour: <hours start>`, `dnd_start_hour: <hours end>` and `dnd_enabled: true` in one `users.prefs.set` call (`slackScheduleFor` in `@juno/domain`). Times are written as Juno holds them, which the page's selects already keep to the half hour; the official page inserts an unknown value as an extra option.
 - Pauses for mobile push are applied by Slack's server from these prefs, and `next_dnd_*_ts` show the server works out the times. Juno's desktop notifications are its own and do not depend on them.
 
 Unknown
 
 - Which time zone the server applies the hours in. Probably the profile `tz`; not checked.
-- Whether the server stores values exactly as sent. Some live values come back without the leading zero, so either an older client wrote them or the server normalises them.
-- Whether `users.prefs.set` returns the stored values, and whether the server sends `pref_change` and `dnd_updated` to the other clients after the write. Expected, but not seen.
+- Whether the server sends `pref_change` and `dnd_updated` to the other clients after the write. Expected, but not seen: the live write below did not listen on the socket. Juno does not depend on it; it stores the values it wrote in its cached prefs.
 - What `dnd_weekdays_off_allday` controls, and how `weekdays` applies the weekend (whole weekend paused, going by the page text).
 - How `disabled` gets set for a day. The page code read never writes it.
 - How Enterprise Grid org policy, or the workspace default under `team.prefs`, interacts with a user's own values.
+
+### Live write (2026-10-17)
+
+With the owner's approval, on the owner's own account only, `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts --apply` (`scripts/dnd-live.ts`) wrote Juno's notification hours once and read them back. Three calls: `users.prefs.get` with `prefs=<the schedule names>`, one `users.prefs.set`, `users.prefs.get` again. Only schedule values were printed.
+
+- `users.prefs.get` with `prefs=<comma-separated names>` returns just those names, as the read-only check found.
+- `users.prefs.set` with `prefs={"dnd_enabled":true,"dnd_days":"weekdays","dnd_start_hour":"19:00","dnd_end_hour":"09:00"}` answered `{ ok: true }` and nothing else, so the answer does not carry the stored values.
+- **The server normalises times.** `09:00` was sent and `9:00` read back, so the missing leading zero seen before is the server's form, not an older client's. A reader must compare padded times (`slackScheduleMatches` does).
+- **Changing `dnd_days` leaves the per-day keys as they were.** After the switch from `custom` to `weekdays`, the fourteen `dnd_before_<day>` / `dnd_after_<day>` values and the seven `dnd_enabled_<day>` values were unchanged. Restoring a `custom` schedule therefore needs only `dnd_days: "custom"`, but Juno writes the whole saved copy back.
+- The hours written were Juno's defaults, not the owner's (that Mac had none of his), so the previous schedule was written back the same day with `--restore` and read back identical, every-day fields included. Since then Juno writes only hours set on that install (SPEC 14).
+- The owner's previous schedule used `custom` with `23:59` as the stop on weekdays, which is how the official page spells "until midnight". Juno uses the same value when a custom day's hours cross midnight.
 
 ## 8. Recommended minimal API surface for Juno v1
 

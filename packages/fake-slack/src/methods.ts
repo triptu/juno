@@ -161,7 +161,28 @@ export const handlers: Handlers = {
 
   'dnd.info': () => ({ dnd_enabled: false, next_dnd_start_ts: 0, next_dnd_end_ts: 0, snooze_enabled: false }),
 
-  'users.prefs.get': (ctx) => ({ prefs: ctx.workspace.prefs }),
+  'users.prefs.get': (ctx, args) => {
+    const prefs = ctx.workspace.prefs
+    if (args.prefs === undefined) return { prefs }
+    return { prefs: Object.fromEntries(args.prefs.split(',').filter((name) => name in prefs).map((name) => [name, prefs[name]])) }
+  },
+
+  /** Stores each pref and sends a `pref_change` for it, as Slack is expected to (research section 7). */
+  'users.prefs.set': (ctx, args) => {
+    let changes: unknown
+    try {
+      changes = JSON.parse(args.prefs)
+    } catch {
+      return new ApiError('invalid_prefs')
+    }
+    if (typeof changes !== 'object' || changes === null || Array.isArray(changes)) return new ApiError('invalid_prefs')
+    const ws = ctx.workspace
+    for (const [name, value] of Object.entries(changes)) {
+      ws.prefs = { ...ws.prefs, [name]: value }
+      ws.emit({ type: 'pref_change', name, value })
+    }
+    return {}
+  },
 
   'client.getWebSocketURL': (ctx) => ({
     primary_websocket_url: ctx.socketUrl(),

@@ -1,0 +1,1 @@
+- 10-17 20:10 · orchestrator · Juno never writes default notification hours into Slack's schedule: it writes only after the hours are set on that install or the switch is turned on (the hours are shown above it). The live check had applied the defaults on a Mac without the owner's hours; his previous schedule was restored exactly.

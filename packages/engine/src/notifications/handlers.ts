@@ -9,9 +9,10 @@
  * When it matters follow it in Slack through `topics.subscribe`, Never
  * unfollows it. Only Every message is stored as a thread level.
  *
- * Writing the notification hours into Slack's own schedule (the `dnd_*`
- * user prefs) is not done: the owner has not approved writing Slack's
- * prefs. `slackScheduleSeam` is where it goes (docs/backlog.md).
+ * Slack's own schedule (the `dnd_*` user prefs) follows the notification
+ * hours through `SlackSchedule` (`../slackSchedule.ts`), which watches the
+ * hours itself, so every way of changing them reaches it. The page carries
+ * its state; the switch and Restore are served here.
  */
 import { Clock, Effect, Schema, Semaphore, Stream } from 'effect'
 import {
@@ -19,7 +20,6 @@ import {
   NotificationsRoutes,
   NotSignedIn,
   type CommandResult,
-  type Hours,
   type NotificationSettingsView,
   type NotificationsPage,
   type NotificationStatus,
@@ -46,23 +46,15 @@ import { Candidate, Judgement, NotificationSettingsSchema, readSettings } from '
 import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
 import { Outbox } from '../outbox'
+import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
 import { setSubscribed } from '../follow'
 import { Workspace, type StoreServices } from '../workspace'
 import { UNKNOWN_PERSON } from '@juno/richtext'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs']
-const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users']
+const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team']
 const TODAY_LIMIT = 50
-
-/**
- * Writes Slack's own notification schedule from the notification hours.
- * Disabled: the owner has not approved writing Slack's prefs, and a live
- * write may go only to a private test channel or the self-DM. The research
- * is in docs/research/slack-data-access.md section 7; the backlog has the
- * steps. Until then the page does not say that the phone pauses.
- */
-const slackScheduleSeam = (_hours: Hours): Effect.Effect<void> => Effect.void
 
 const levelsOf = (settings: NotificationSettings) => ({ ...settings, threads: settings.threads ?? {} })
 
@@ -247,6 +239,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const control = yield* NotificationControl
+    const slackSchedule = yield* SlackSchedule
     // Read-modify-write of one pref: one writer at a time, so two quick changes never lose one.
     const writes = yield* Semaphore.make(1)
 
@@ -320,7 +313,12 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
             Effect.gen(function* () {
               const { settings } = yield* readSettings
               const now = yield* Clock.currentTimeMillis
-              return { every: yield* tagsFor(settings, 'every'), never: yield* tagsFor(settings, 'never'), ...(yield* today(now)) } satisfies NotificationsPage
+              return {
+                every: yield* tagsFor(settings, 'every'),
+                never: yield* tagsFor(settings, 'never'),
+                ...(yield* today(now)),
+                slackSchedule: yield* slackScheduleView,
+              } satisfies NotificationsPage
             }),
             // Today starts again at midnight.
             Stream.tick('1 minute').pipe(Stream.drop(1)),
@@ -347,7 +345,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       'notifications.setHours': ({ which, hours }) =>
         Effect.gen(function* () {
           yield* updateSettings((settings) => (which === 'notifications' ? { ...settings, notificationHours: hours } : { ...settings, presenceHours: hours }))
-          if (which === 'notifications') yield* slackScheduleSeam(hours)
+          // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
+          if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
         }),
       'notifications.setMatters': ({ text }) => updateSettings((settings) => ({ ...settings, matters: text.trim() })).pipe(Effect.asVoid),
       'notifications.setLevel': ({ target, choice }) => setLevel(target, choice),
@@ -356,6 +355,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
           yield* control.setPresence(presence)
         }),
+      'notifications.setSlackSchedule': ({ enabled }) => inWorkspace(slackSchedule.setEnabled(enabled).pipe(Effect.orDie)),
+      'notifications.restoreSlackSchedule': () => inWorkspace(slackSchedule.restore.pipe(Effect.catchTag('SqlError', Effect.die))),
     }
   }),
 )
