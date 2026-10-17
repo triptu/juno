@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
+import { worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -12,7 +13,7 @@ function fixture(t) {
   const dir = mkdtempSync(resolve(root, '.juno-status/batch-test-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const command = (bin, args, cwd = dir, env = {}) => spawnSync(bin, args, {
-    cwd, encoding: 'utf8', env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, ...env },
+    cwd, encoding: 'utf8', env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, JUNO_WORKTREE_DIR: resolve(dir, '.claude/worktrees'), ...env },
   })
   const git = (args, cwd = dir) => {
     const result = command('git', args, cwd)
@@ -33,7 +34,7 @@ function fixture(t) {
   write('health-baseline.json', '{}\n')
   write('docs/decisions/log/2026-10-16-1200-base.md', '- 10-16 12:00 · Test · Base decision.\n')
   mkdirSync(resolve(dir, 'scripts'))
-  for (const script of ['batch-merge.mjs', 'decision-log.mjs']) copyFileSync(resolve(root, 'scripts', script), resolve(dir, 'scripts', script))
+  for (const script of ['batch-merge.mjs', 'decision-log.mjs', 'worktree-folder.mjs']) copyFileSync(resolve(root, 'scripts', script), resolve(dir, 'scripts', script))
   assert.equal(command(process.execPath, ['scripts/decision-log.mjs']).status, 0)
   write('bin/pnpm', `#!/bin/sh
 printf '%s\\n' "$*"
@@ -111,4 +112,11 @@ test('decision check rejects stale output and a mismatched fragment without over
   assert.equal(f.command(process.execPath, ['scripts/decision-log.mjs', '--check']).status, 0)
   f.write('docs/decisions/log/2026-10-17-0055-bad.md', '- 10-16 00:55 · Test · Wrong date.\n')
   assert.equal(f.command(process.execPath, ['scripts/decision-log.mjs']).status, 1)
+})
+
+test('worktrees go on the AgentWork volume when it is mounted, else in .claude/worktrees', () => {
+  const mounted = (path) => path === '/Volumes/AgentWork/.fseventsd/no_log'
+  assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: mounted }), '/Volumes/AgentWork/worktrees/juno')
+  assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: () => false }), '/repo/juno/.claude/worktrees')
+  assert.equal(worktreeFolder('/repo/juno', { env: { JUNO_WORKTREE_DIR: '/tmp/trees' }, exists: mounted }), '/tmp/trees')
 })
