@@ -167,7 +167,7 @@ export interface SettingsAboutProps {
   readonly updates: ReactNode
   /** The engine's status line and Ping engine. */
   readonly diagnostics: ReactNode
-  /** Opens the tour again (SPEC 4, "The tour"). */
+  /** Brings the welcome card back on Home (SPEC 4, "The welcome"). */
   readonly onShowTour: () => void
 }
 
@@ -187,7 +187,7 @@ export function SettingsAbout({ build, updates, diagnostics, onShowTour }: Setti
       <Section heading="Tour">
         <Surface kind="group" padding="md" sx={styles.card}>
           <div {...stylex.props(styles.tour)}>
-            <Text variant="body">Topics, Mains, views and Juno, in five steps.</Text>
+            <Text variant="body">Three things to try, back on Home.</Text>
             <Button variant="secondary" size="sm" onClick={onShowTour}>
               Show the tour
             </Button>
