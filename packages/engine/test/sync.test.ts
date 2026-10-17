@@ -38,7 +38,7 @@ afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
-const bootedEngine = (options: Parameters<typeof startTestEngine>[0] = {}) => boot(engines, options)
+const bootedEngine = (options: Parameters<typeof startTestEngine>[0] = {}, liveMillis?: number) => boot(engines, options, liveMillis)
 
 /**
  * A booted engine whose All list holds every conversation. These tests are
@@ -241,9 +241,11 @@ describe('cold boot', () => {
   })
 
   it('reads DMs, mentions and unread followed threads before the bulk of channels', async () => {
-    const engine = await bootedEngine({
-      fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) },
-    })
+    // Live in 2 to 5 s on a quiet machine, 7 to 23 s at four busy processes per core and 14 to 75 s at ten.
+    const engine = await bootedEngine(
+      { fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } },
+      90_000,
+    )
     const ws = engine.fake.workspace
     const threads = ws.threadCounts()
     const members = [...ws.conversations.values()].filter((c) => c.members.has(SELF_ID))
@@ -266,7 +268,7 @@ describe('cold boot', () => {
     expect(Math.max(...positions(mentioned))).toBeLessThan(firstBulk)
     // DMs come before mentions.
     expect(Math.max(...positions(direct))).toBeLessThan(Math.min(...positions(mentioned)))
-  }, 120_000)
+  }, 150_000)
 
   it('filters by kind, unread and scope, and counts for the dots', async () => {
     const engine = await bootedEngine()
