@@ -59,6 +59,7 @@ import {
   openSettingsSection,
   pickConversation,
   popupContextMenu,
+  prefetchHome,
   prefetchTopic,
   registry,
   reopenClosedTab,
@@ -649,6 +650,11 @@ export function runMenuCommand(command: MenuCommand): void {
 /** Pointer enter, focus or keyboard selection of something that opens a topic. */
 export function warmTopic(id: string): void {
   prefetchTopic(registry, id)
+}
+
+/** Pointer enter or focus on the sidebar's Home item: after the idle TTL, `openHome` then has a value at once. */
+export function warmHome(): void {
+  prefetchHome(registry)
 }
 
 /** The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a topic tab whose header is local. */

@@ -19,7 +19,8 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → channel previews | 10 s after the quick start | Same setup. One or two newest-first searches after the quick start (`searchPreviews`, `@juno/sync` discovery) give the busiest channels a preview before their history is read. Asserted by `quick-start.spec.ts` with history held. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
-| Home open (the sidebar's Home item, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts`. |
+| Home open (the sidebar's Home item, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts` over the opens that follow 300 ms after the last action. |
+| Home open after idle | 150 ms | The same open after 31 s with no input. The owner set this separate budget on 10-17: after idle the CPU clock on the reference Mac drops and the same work takes 5 to 13 times as long (observed 32 to 121 ms before the prefetch below, 11 to 134 ms after). Asserted by `home open` in `perf.spec.ts` over its five idle opens ("Home open after idle", section 8). |
 | Peek open | 16 ms | Peek key `keydown` over a hovered row → the peeked messages painted. The hover warmed the topic's query, so this is a prefetched open. Asserted by `peek` in `perf.spec.ts` on the topic300 seed. |
 | Tab switch | 16 ms | One frame. Recently used tabs stay mounted (section 4.3). Unmounted tabs: 50 ms including scroll restore. |
 | Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the sidebar box's inline `width` changes, at most once per frame; nothing re-renders until the drag ends. A custom property on the shell cost 4.7 ms of style recalculation per frame, because every element under it inherits it. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
@@ -207,7 +208,8 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 ### 4.2 Prefetch
 
 - Pointer enter, focus, or keyboard selection of a sidebar row or a ⌘K result mounts that topic's `messagesAtom` through the atom registry (`useAtomMount` or a registry `mount` from the container) with `Atom.setIdleTTL(30 s)`. The engine runs the window query and keeps the subscription warm; the open becomes a cache hit and paints in one frame. No Slack call is made by a prefetch; the replies fetch starts on the real open.
-- At most 3 prefetched topics are kept warm (LRU). The active tab's topic is never evicted.
+- Pointer enter or focus on the sidebar's Home item warms `home.view` the same way (`prefetchHome`). Without it, an open after the 30 s idle TTL waits for a new subscription's first value with the topic on screen, a painted frame in between ("Home open after idle", section 8).
+- At most 3 prefetched entries (topics, Home) are kept warm (LRU). The active tab's topic is never evicted.
 - After the sidebar first paints, prefetch the lazy page chunks and the first topic in the list on idle.
 - Prefetch work in the engine runs on the interactive lane's query path but must yield to a real open: a real subscription is served before any prefetch subscription in the same tick.
 
@@ -324,7 +326,7 @@ The `mention typing` scenario types "@ma " ten times in a reply, so every "@" op
 
 Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `apps/desktop/perf/`, and run with `pnpm perf` (all) or `pnpm perf -g "topic view"` (some), queued behind the machine-wide heavy-job lock. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported. `pnpm verify:main --with-mac` runs the suite and the feel suite on the Mac. Each prints its samples with the load average and fails when its p95 (p50 where section 1 says so) is over budget; the one-frame budgets use the rule proposed in section 8 on a display slower than 120 Hz. Both scroll scenarios trace the renderer over CDP and check the main thread's work per frame, the long animation frames and the dropped frames. Baselines and the 15 % median check below do not exist yet. To explain a number, `JUNO_PERF_TRACE=<dir>` writes a trace and a CPU profile per traced scenario, `JUNO_UNMINIFIED=1` builds with function names (the bundle check is skipped), and `node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]` sums the main thread's time by trace event and by function inside each `juno.*` measure. Add `JUNO_TRACE_SKIA=1` to record the GPU process's raster passes too (blurs, image filters, pipeline compiles); a keystroke that is slow after its frame callback is usually raster, and shows there.
 
-Each scroll scenario runs three kinds of sweep, twice each, over the same distance down and back, and pools the two of a kind before taking the p95. The **continuous** sweep is one scroll gesture with a delta every frame (CDP `Input.synthesizeScrollGesture`, mouse source, 2,000 px/s), as a trackpad sends; it carries the 8.3 ms gate (owner's decision, 10-17, section 8.5). The **stepped** sweep is 200 px wheel steps 100 ms apart, each its own gesture; its p95 is reported, not gated. The **held-clock** sweep repeats the stepped one with two background worker threads busy and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. The continuous and stepped sweeps both fail on a visible placeholder, a long animation frame or 1 % dropped frames, and both count toward the dirty-layout ceiling.
+Each scroll scenario runs three kinds of sweep, twice each, over the same distance down and back, and pools the two of a kind before taking the p95. The **continuous** sweep is one scroll gesture with a delta every frame (CDP `Input.synthesizeScrollGesture`, mouse source, 2,000 px/s), as a trackpad sends; it carries the 8.3 ms gate (owner's decision, 10-17, section 8.5). The **stepped** sweep is 200 px wheel steps 100 ms apart, each its own gesture; its p95 is reported, not gated. The **held-clock** sweep repeats the stepped one with two background worker threads busy and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. `holdClock()` lives in `e2e/perfStats.ts`. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. The continuous and stepped sweeps both fail on a visible placeholder, a long animation frame or 1 % dropped frames, and both count toward the dirty-layout ceiling.
 
 The trace also reports dirty layout objects and styled elements in frames over 8.3 ms. A separate structural check limits dirty layout objects across **all** measured frames, so a faster clock cannot hide extra layout: 256 for All topics (the fixed-row trace reaches 128), and 2,000 for the in-flow sidebar, messages and chat lists. These are regression ceilings for the fixed test fixtures, not replacements for the 8.3 ms budget. With `JUNO_PERF_TRACE` set, the harness saves layer sizes and compositing reasons beside each trace and CPU profile. `JUNO_TRACE_EXTRA=<categories>` adds Chromium trace categories, comma separated; `renderer` and `input` show the selection and editing work in a frame (`WidgetBase::UpdateSelectionBounds`, `VisibleUnits::canonicalPosition`). Profiled runs are diagnostic; final numbers use the ordinary trace categories without a CPU profile. `node scripts/perf-frames.mjs <dir>/<name>.trace.json [--sequence <n>]` splits a scroll sweep's frame work the way the gate counts it into stages (script, GC, input, applying the scroll offset, style, layout, prepaint, paint, layerize, commit), for all frames and for those over 8.3 ms, and lists the heaviest frames. Read stage sizes from a trace without extra categories: the invalidation-tracking categories make prepaint and DOM removal several times slower.
 
@@ -732,6 +734,59 @@ held throughout; load at each scroll reading was 3.4–4.5. This single run
 confirms the gates execute, not the cause of the ordinary tail. The log is
 `.juno-status/perf-gates-1017/scroll.log`.
 
+### Home open after idle (10-17)
+
+Home open's opens after a 31 s idle gap read 32 to 117 ms against the 50 ms
+budget, while a quick open took about 10 ms (8.6).
+
+**Holding the clock did not help.** As the scroll gates do, two worker
+threads kept cores busy for the last 500 ms of the gap and the measure.
+In three runs the held idle opens read 29.1, 76.8, 195.6, 17.5 / 49.7, 68.4,
+56.2, 27.0 / 24.9, 20.9, 29.5, 14.3 ms and the unheld ones 78.3, 32.4, 33.8,
+34.0 / 60.1, 36.5, 34.2, 27.4 / 109.8, 120.8, 78.5, 37.3 ms. Only the third
+run fits the clock. In the first two, holding made `home.view` slower (5.7
+to 51.2 ms against 0.8 to 5.5 ms): the workers competed with the engine.
+That matches 8.1. The held reading was dropped; the scenario measures as
+a person meets it.
+
+**Where the time went.** Traced (78.6 ms): the pointerdown (9.4 ms) found
+`home.view`'s subscription ended with the atom's 30 s idle TTL, so
+`openHome` kept the topic on screen and started a new one; a frame painted
+the topic again (18 ms); the engine's first value arrived at 28.8 ms;
+React rendered Home (15 ms); one frame laid out and painted it (27 ms). A
+quick open does the same in the pointerdown and one 4.6 ms frame, because
+the value is already in the renderer. The same layout (21 of 969 objects
+dirty) took 1.1 ms on a quick open and 8.4 to 18.8 ms after idle: every
+stage runs several times slower on the CPU after idle.
+
+**The change.** Pointer enter or focus on the sidebar's Home item warms
+`home.view` (`prefetchHome`, 4.2). The open after idle then renders cached
+data in the pointerdown, with no engine wait and no frame in between. The
+scenario still presses right after the pointer arrives, so no hover time
+is added. Its prefetch entry is still held at the idle open, so these opens
+measure cached data on the slow CPU; an entry evicted by three later
+prefetches is warmed again when the pointer enters the item.
+
+| Run | Idle opens (ms) | p95 of 20 (ms) |
+| --- | --- | --- |
+| 1 | 19.0, 26.3, 19.2, 20.3, 20.5 | 20.5, passed |
+| 2 | 24.1, 17.9, 15.5, 134.4, 93.8 | 93.8, failed |
+| 3 | 24.9, 26.1, 22.2, 13.4, 23.9 | 24.9, passed |
+| traced | 11.2, 11.9, 14.0, 85.5, 17.2 | 19.1, passed |
+
+**Budget.** 3 of 20 idle opens still took 85 to 134 ms. The traced
+one (85.5 ms) waited on nothing: the pointerdown took 50 ms (React 16 ms,
+then the press's hit test forced the layout, 18.6 ms against 1.4 ms on a
+quick open), a paint frame 11.8 ms and the compositor commit 20 ms. That
+is the same work 5 to 13 times slower, which points at the CPU state
+after idle rather than at Juno's work. The owner set a separate budget
+for these opens on 10-17, 150 ms p95, because the CPU clock drops after
+idle on this Mac; quick opens keep 50 ms (section 1). The scenario gates
+its 15 quick opens at 50 ms and its 5 idle opens at 150 ms; with five
+samples the p95 is the slowest one, so a single idle open over 150 ms
+fails the run. Not tried: rendering Home on pointer enter, so the press
+only swaps it in, which helps only if the pointer rests on the item first.
+
 ### 8.5 Scroll frame work beyond JavaScript (10-17)
 
 The four ordinary scroll gates failed with held-clock readings well inside
@@ -1026,9 +1081,8 @@ suite went from 14 of 18 to 18 of 18.
   4 ms) and script. A quick open does the same work in about 10 ms. It
   never waits on the engine, so warming `home.view` on hover would not
   help; this is the low clock after an idle gap (8.5), which this
-  scenario meets on purpose. It was red on 10-16 too (79.8 ms). Next: a
-  held-clock reading of the same opens, as the scroll gates have, to
-  separate the clock from the work.
+  scenario meets on purpose. It was red on 10-16 too (79.8 ms). Followed up in
+  "Home open after idle" above.
 - **Initial JS grew.** From 997.1 KB at `90928615` to 1,047.0 KB. Before
   minification the entry gained about 99 KB, spread over the day's
   features: the topic container's hooks (41 KB), the media grid (11 KB),

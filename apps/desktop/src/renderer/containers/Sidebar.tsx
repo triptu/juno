@@ -30,7 +30,7 @@ import { chunk } from './chunks'
 import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
-import { openAllTopics, openHome, openSettings } from './navigation'
+import { openAllTopics, openHome, openSettings, warmHome } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { TitlebarNav } from './TitlebarNav'
@@ -168,6 +168,9 @@ export function Sidebar() {
       junoBusy={junoBusy}
       onNavigate={navigate}
       onNavigateMenu={(target) => void navigateMenu(target)}
+      onNavigatePrefetch={(target) => {
+        if (target === 'home') warmHome()
+      }}
       onFilterKind={selectKind}
       views={views}
       onFilterView={selectView}

@@ -1,28 +1,8 @@
 import { loadavg } from 'node:os'
-import { contention } from './perfStats'
-import { Worker } from 'node:worker_threads'
+import { contention, holdClock } from './perfStats'
 import type { Page } from '@playwright/test'
 import { expect } from './fixtures'
 import { traced, type FrameWork } from './perfTrace'
-
-/** Keep two cores busy without changing the renderer's workload. */
-async function holdClock(): Promise<() => Promise<void>> {
-  const workers = Array.from({ length: 2 }, () => new Worker(`
-    const { parentPort } = require('node:worker_threads')
-    parentPort.postMessage('ready')
-    for (;;) Math.sqrt(Math.random())
-  `, { eval: true }))
-  try {
-    await Promise.all(workers.map((worker) => new Promise<void>((resolve, reject) => {
-      worker.once('message', () => resolve())
-      worker.once('error', reject)
-    })))
-  } catch (error) {
-    await Promise.all(workers.map((worker) => worker.terminate()))
-    throw error
-  }
-  return async () => { await Promise.all(workers.map((worker) => worker.terminate())) }
-}
 
 const percentile = (values: ReadonlyArray<number>, q: number): number => values.toSorted((a, b) => a - b)[Math.max(0, Math.ceil(values.length * q) - 1)] ?? 0
 

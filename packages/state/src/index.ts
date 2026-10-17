@@ -212,6 +212,7 @@ export {
   homeViewAtom,
   markFollowUpDone,
   markHomeItemUsed,
+  prefetchHome,
   showHome,
   resolveAllTopics,
   startVisitLog,
