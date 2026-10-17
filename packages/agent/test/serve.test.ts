@@ -62,9 +62,9 @@ it('words Juno took from a Slack message it read show as a source, and an unknow
   ])
 })
 
-it('a reaction shows on its bubble, and a reply quotes what it answers', async () => {
+it('a reaction shows on its bubble, and a reply quotes what it answers unless that is right above it', async () => {
   const { h, client, pageWhere } = await chat()
-  h.fake.script([reply(say('The deploy is green.')), reply('<say reply-to="n2">The one on staging.</say>')])
+  h.fake.script([reply(say('The deploy is green.')), reply('<say reply-to="n2">The one on staging.</say>'), reply('<say reply-to="n1">It went green at 4.</say>')])
   await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'how is the deploy?' }))
   const answered = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 0, 'the answer')
   const bubble = of(answered, 'juno')[0]!
@@ -74,8 +74,16 @@ it('a reaction shows on its bubble, and a reply quotes what it answers', async (
 
   await run(client['agent.chat.send']({ opId: 'op-3' as OpId, text: 'which deploy?', replyTo: { _tag: 'bubble', id: bubble.id } }))
   const replied = await pageWhere((p) => of(p, 'juno').length === 2 && of(p, 'status').length === 0, 'the second answer')
-  expect(of(replied, 'owner')[1]).toMatchObject({ text: 'which deploy?', replyTo: { target: { _tag: 'bubble', id: bubble.id }, preview: 'The deploy is green.' } })
-  expect(of(replied, 'juno')[1]).toMatchObject({ body: [{ inlines: [{ text: 'The one on staging.' }] }], replyTo: { target: { _tag: 'owner', opId: 'op-3' }, preview: 'which deploy?' } })
+  // Each reply sits right under what it answers, so neither shows a quote.
+  expect(of(replied, 'owner')[1]).toMatchObject({ text: 'which deploy?' })
+  expect(of(replied, 'owner')[1]!.replyTo).toBeUndefined()
+  expect(of(replied, 'juno')[1]).toMatchObject({ body: [{ inlines: [{ text: 'The one on staging.' }] }] })
+  expect(of(replied, 'juno')[1]!.replyTo).toBeUndefined()
+
+  // An answer to an older message, with others between, keeps its quote.
+  await run(client['agent.chat.send']({ opId: 'op-4' as OpId, text: 'when?' }))
+  const older = await pageWhere((p) => of(p, 'juno').length === 3 && of(p, 'status').length === 0, 'the third answer')
+  expect(of(older, 'juno')[2]).toMatchObject({ body: [{ inlines: [{ text: 'It went green at 4.' }] }], replyTo: { target: { _tag: 'owner', opId: 'op-1' }, preview: 'how is the deploy?' } })
 })
 
 it('a failed run shows its ending line, and Try again sends the same message without a second bubble', async () => {

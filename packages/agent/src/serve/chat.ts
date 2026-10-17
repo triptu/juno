@@ -46,7 +46,7 @@ import type {
 } from '@juno/agent-contract'
 import type { CardView } from '../actions/cards'
 import { sessionOf } from '../t3/protocol'
-import { aboutOf, junoText } from '@juno/agent-contract'
+import { aboutOf, answersPrevious, junoText } from '@juno/agent-contract'
 import type { Job } from '../jobs/jobs'
 import type { RunState } from '../router/events'
 import { parseOutput } from '../router/output'
@@ -139,6 +139,8 @@ function caches() {
     removed: memo<{ readonly ops: ReadonlySet<string>; readonly bubbles: ReadonlySet<string> }>(),
     // A row with its group position, by the row it was made from.
     grouped: new WeakMap<ChatItem, { readonly position: GroupPosition; readonly item: ChatItem }>(),
+    // A reply's row without its quote, by the row it was made from (`answersPrevious`).
+    unquoted: new WeakMap<object, ChatItem>(),
   }
 }
 type Caches = ReturnType<typeof caches>
@@ -501,7 +503,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
   }
   // Stable: at the same time an owner message comes before what answers it.
   entries.sort((a, b) => a.at - b.at)
-  const result = layout(entries, source, cache.grouped)
+  const result = layout(entries, source, cache.grouped, cache.unquoted)
   cache.endings.sweep()
   cache.origins.sweep()
   cache.bubbles.sweep()
@@ -574,8 +576,8 @@ function labelOf(origin: Origin, jobs: ReadonlyArray<Job>): string {
   }
 }
 
-/** Day separators, the "New" divider, and each bubble's place in its group. */
-function layout(entries: ReadonlyArray<Entry>, source: ChatSource, grouped: Caches['grouped']): ReadonlyArray<ChatItem> {
+/** Day separators, the "New" divider, each bubble's place in its group, and no quote on a reply right under what it answers. */
+function layout(entries: ReadonlyArray<Entry>, source: ChatSource, grouped: Caches['grouped'], unquoted: Caches['unquoted']): ReadonlyArray<ChatItem> {
   const items: ChatItem[] = []
   const unread = entries.filter((e) => e.by === 'juno' && e.item.unread).length
   let divided = false
@@ -628,11 +630,23 @@ function layout(entries: ReadonlyArray<Entry>, source: ChatSource, grouped: Cach
       (entry.by === 'owner' || (previous.by === 'juno' && previous.originKey === entry.originKey))
     if (!joins) close()
     group.push(items.length)
-    items.push(entry.item as ChatItem)
+    items.push(unquotedIf(entry.item as ChatItem, items, unquoted))
     previous = entry
   }
   close()
   return items
+}
+
+/** The row without its quote when it sits right under the message it answers (SPEC 13.1), the same object each time. */
+function unquotedIf(item: ChatItem, before: ReadonlyArray<ChatItem>, unquoted: Caches['unquoted']): ChatItem {
+  if ((item._tag !== 'owner' && item._tag !== 'juno') || item.replyTo === undefined || !answersPrevious(before, before.length, item.replyTo.target)) return item
+  let bare = unquoted.get(item)
+  if (bare === undefined) {
+    const { replyTo: _, ...rest } = item
+    bare = rest as ChatItem
+    unquoted.set(item, bare)
+  }
+  return bare
 }
 
 /** The id a window can be anchored on. */

@@ -41,7 +41,7 @@ import type {
   SendContext,
 } from '@juno/agent-contract'
 import type { CardView } from '../../src/actions/cards'
-import { aboutOf, junoText } from '@juno/agent-contract'
+import { aboutOf, answersPrevious, junoText } from '@juno/agent-contract'
 import type { Job } from '../../src/jobs/jobs'
 import { ownerOpOf } from '../../src/router/input'
 import type { RunState } from '../../src/router/events'
@@ -350,7 +350,10 @@ function layout(entries: ReadonlyArray<Entry>, source: ChatSource): ReadonlyArra
       (entry.by === 'owner' || (previous.by === 'juno' && previous.originKey === entry.originKey))
     if (!joins) close()
     group.push(items.length)
-    items.push({ ...entry.item, group: 'single' } as ChatItem)
+    // No quote on a reply right under what it answers (SPEC 13.1).
+    const { replyTo, ...rest } = entry.item
+    const quoted = replyTo !== undefined && !answersPrevious(items, items.length, replyTo.target)
+    items.push({ ...rest, ...(quoted ? { replyTo } : {}), group: 'single' } as ChatItem)
     previous = entry
   }
   close()

@@ -40,7 +40,7 @@ import type {
   Card,
   SendContext,
 } from '@juno/agent-contract'
-import { aboutOf, junoText, ownerFilesOf } from '@juno/agent-contract'
+import { aboutOf, answersPrevious, junoText, ownerFilesOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
 import { agentProviderAtom } from './provider'
 import { AgentClient } from './client'
@@ -152,21 +152,26 @@ export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>)
   if (page.moreBelow) return page
   // A send on a day the page has no separator for gets the one the agent will put above its row, so the bubble does not move when the row lands.
   let day = page.items.findLast((item) => item._tag === 'day')?.at
+  // What each send sits under, for its quote: the page's rows without the status bubble, then the sends before it.
+  const above: ChatItem[] = page.items.at(-1)?._tag === 'status' ? page.items.slice(0, -1) : [...page.items]
   const shown: ReadonlyArray<ChatItem> = pending
     .filter((send) => !stored.has(send.opId) && !landed.has(send.opId))
     .flatMap((send): ReadonlyArray<ChatItem> => {
+      // No quote right under what it answers, as the agent lays the row out (`answersPrevious`).
+      const quote = send.replyTo === undefined || answersPrevious(above, above.length, send.replyTo) ? undefined : quoteIn(page.items, send.replyTo)
       const owner: ChatItem = {
         _tag: 'owner',
         opId: send.opId,
         text: send.text,
         at: send.at,
         delivery: send.delivery,
-        ...(send.replyTo ? { replyTo: quoteIn(page.items, send.replyTo) } : {}),
+        ...(quote === undefined ? {} : { replyTo: quote }),
         ...(send.context ? { about: aboutOf(send.context) } : {}),
         ...(send.files !== undefined && send.files.length > 0 ? { files: ownerFilesOf(send.files) } : {}),
         reactions: [],
         group: 'single',
       }
+      above.push(owner)
       const start = dayOf(send.at)
       if (start === day) return [owner]
       day = start

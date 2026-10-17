@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { Emoji, endGroupsAtDividers, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type ProposedMessage, type RunId } from '../src/index'
+import { answersPrevious, Emoji, endGroupsAtDividers, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type OpId, type ProposedMessage, type RunId } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -93,5 +93,23 @@ describe('endGroupsAtDividers', () => {
     expect(groups(endGroupsAtDividers(items))).toEqual(['single', 'newDivider', 'first', 'last'])
     const plain = [bubble(0, 'first'), bubble(1, 'last')]
     expect(endGroupsAtDividers(plain)).toBe(plain)
+  })
+})
+
+describe('a reply right under what it answers', () => {
+  const owner = (opId: string): ChatItem => ({ _tag: 'owner', opId: opId as OpId, text: opId, at: 0, delivery: { _tag: 'sent' }, reactions: [], group: 'single' })
+  const bubble = (id: string): ChatItem => ({ _tag: 'juno', id: id as BubbleId, runId: 'run-1' as RunId, body: [], at: 0, origin: { _tag: 'owner' }, reactions: [], group: 'single', unread: false })
+  const answers = (items: ReadonlyArray<ChatItem>, target: Parameters<typeof answersPrevious>[2]) => answersPrevious(items, items.length, target)
+
+  it('shows no quote under the message it answers, past a day separator or the New divider', () => {
+    expect(answers([owner('op-1')], { _tag: 'owner', opId: 'op-1' as OpId })).toBe(true)
+    expect(answers([bubble('b-1'), { _tag: 'day', at: 0 }, { _tag: 'newDivider', count: 1 }], { _tag: 'bubble', id: 'b-1' as BubbleId })).toBe(true)
+  })
+
+  it('keeps the quote when a queued message or another reply sits between', () => {
+    expect(answers([owner('op-1'), owner('op-2')], { _tag: 'owner', opId: 'op-1' as OpId })).toBe(false)
+    expect(answers([owner('op-1'), bubble('b-1')], { _tag: 'owner', opId: 'op-1' as OpId })).toBe(false)
+    expect(answers([bubble('b-1'), { _tag: 'note', id: 'n-1' as never, kind: 'removed' }], { _tag: 'bubble', id: 'b-1' as BubbleId })).toBe(false)
+    expect(answers([], { _tag: 'owner', opId: 'op-1' as OpId })).toBe(false)
   })
 })
