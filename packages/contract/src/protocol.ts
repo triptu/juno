@@ -36,6 +36,8 @@ export const EngineConfig = Schema.Struct({
   aiJobs: Schema.optionalKey(Schema.Boolean),
   /** Tests only: how long a reaction waits unsent before the message says so (the app waits 30 s). */
   actionStallMillis: Schema.optionalKey(Schema.Number),
+  /** Tests only: how long a new read mark waits before it is sent (the app waits 400 ms). */
+  markDelayMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
   cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })

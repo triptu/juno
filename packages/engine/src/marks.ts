@@ -103,7 +103,7 @@ const step = (id: string, topic: Topic, config: Config, now: number, change: Cha
     const mirrors = (yield* mirrorSetting(config)).on && (topic.kind === 'main' || (yield* threadSub(topic.channel, topic.threadTs))?.subscribed === true)
     const changed = yield* change(yield* readState(id), millisToTs(now), mirrors)
     if (changed === undefined) return { queued: false }
-    yield* writeLocalMark(id, changed.next, changed.from, now, MARK_DELAY_MILLIS)
+    yield* writeLocalMark(id, changed.next, changed.from, now, config.markDelayMillis ?? MARK_DELAY_MILLIS)
     const me = yield* storedMe
     if (me !== undefined) yield* reindexTopics([id], { me })
     return { undo: changed.undo, queued: changed.next.pendingLocalWrite }
