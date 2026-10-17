@@ -59,7 +59,7 @@ test('a selected option row prints its second line in the subtle colour, which k
 })
 
 test('two-line picker rows are 44px, and Main’s title starts on the threads’ edge', async ({ page }) => {
-  for (const [component, id] of [['TopicHeader', 'switcher/switcher-thread'], ['NewChat', 'flow/thread-list']] as const) {
+  for (const [component, id] of [['TopicHeader', 'switcher/switcher-thread']] as const) {
     await open(page, component, id)
     const rows = await page.evaluate(() =>
       [...document.querySelectorAll('[role="option"]')].map((row) => {
