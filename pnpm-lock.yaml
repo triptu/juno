@@ -162,7 +162,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-packageExtensionsChecksum: sha256-3lXf/3J56cafGCCakRltR/1ENA2Cst1VDRE8WS4LPgU=
+packageExtensionsChecksum: sha256-iEJCIJ4Xe2oV5TJZF7bCK6K2JWpGMUU0BfjC9RYo3gw=
 
 importers:
 
@@ -5109,7 +5109,9 @@ snapshots:
       line-column: 1.0.2
       lodash: 4.18.1
       lodash.clonedeep: 4.5.0
+      protobufjs: 7.6.6
       seedrandom: 3.0.5
+      semver: 7.7.4
       tar: 7.5.22
       yargs: 17.7.3
 

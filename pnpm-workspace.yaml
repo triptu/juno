@@ -48,10 +48,15 @@ ignoreWorkspaceCycles: true
 # "Worktrees and installs".
 virtualStoreType: global
 
-# With the shared store, a package resolves only what it declares. These two
-# import types they do not declare: Phosphor's from React, Playwright's
-# Electron API from electron. Optional peers link them next to the package.
+# With the shared store, a package resolves only what it declares. Phosphor
+# imports React's types and Playwright imports Electron's API without
+# declaring them; optional peers link them next to the package. Quint's
+# Apalache client requires protobufjs and semver without declaring them.
 packageExtensions:
+  "@informalsystems/quint":
+    dependencies:
+      protobufjs: 7.6.6
+      semver: 7.7.4
   "@phosphor-icons/react":
     peerDependencies:
       "@types/react": "*"
