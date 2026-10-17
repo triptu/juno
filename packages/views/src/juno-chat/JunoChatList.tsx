@@ -3,6 +3,7 @@ import { useRef, type ReactNode, type Ref } from 'react'
 import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
 import { chat, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Text, useNarrowerThan } from '@juno/ui'
+import { AskRow } from './AskCard'
 import { CardRow } from './CardRow'
 import type { ChatActions } from './commands'
 import { DaySeparator } from './DaySeparator'
@@ -98,6 +99,8 @@ function keyOf(item: ChatItem): string {
       return `j:${item.id}`
     case 'card':
       return `c:${item.card.id}`
+    case 'ask':
+      return `a:${item.ask.id}`
     case 'ending':
       return `e:${item.runId}`
     case 'status':
@@ -121,6 +124,8 @@ function Row({ item, now, actions, anchorRef, eager, compact }: { readonly item:
       return <JunoBubble item={item} now={now} actions={actions} eager={eager} compact={compact} />
     case 'card':
       return <CardRow item={item} now={now} actions={actions} />
+    case 'ask':
+      return <AskRow item={item} actions={actions} />
     case 'ending':
       return <EndingLine item={item} actions={actions} />
     case 'status':

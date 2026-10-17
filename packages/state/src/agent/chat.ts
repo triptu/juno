@@ -187,6 +187,8 @@ function rowKey(item: ChatItem): string {
       return `j:${item.id}`
     case 'card':
       return `c:${item.card.id}`
+    case 'ask':
+      return `a:${item.ask.id}`
     case 'ending':
     case 'status':
       return `${item._tag}:${item.runId}`
