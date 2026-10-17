@@ -23,8 +23,15 @@ export interface MessageListItem {
  */
 export type MessageListStatus = 'ready' | 'pending' | 'loading' | 'offline'
 
-/** Whether older messages exist above the window, and whether a page is on its way. */
-export type OlderStatus = 'none' | 'more' | 'loading'
+/**
+ * Whether older messages can come above the window. `more`: they may, and a
+ * slot above the first row is kept for "Loading older messages", so the line
+ * appearing moves nothing. `loading`: a page is on its way. `none`: the
+ * topic's first message is in the window, so there is no slot. `ended`: the
+ * start became known while the slot was on screen, so the slot stays empty
+ * until the topic opens again rather than move the rows under the reader.
+ */
+export type OlderStatus = 'none' | 'more' | 'loading' | 'ended'
 
 export interface MessageListProps {
   readonly items: ReadonlyArray<MessageListItem>
@@ -51,10 +58,7 @@ export interface MessageListProps {
   readonly scrollRef?: Ref<HTMLElement>
   /** The list runs under the topic's floating header (default). False where nothing floats over it, as in peek. */
   readonly underHeader?: boolean
-  /**
-   * In a popover (peek): a tighter column, as tall as its rows, and no slot
-   * above the first row while nothing older can load.
-   */
+  /** In a popover (peek): a tighter column, as tall as its rows. */
   readonly popover?: boolean
   /** The divider, for the container to scroll it 80px below the header band on open. */
   readonly anchorRef?: Ref<HTMLDivElement>
@@ -240,8 +244,8 @@ export function MessageList({
         }
         {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >
-        {items.length > 0 && !(popover && older === 'none') ? (
-          <div aria-live="polite" {...stylex.props(styles.olderLine)}>
+        {items.length > 0 && older !== 'none' ? (
+          <div aria-live="polite" data-older-line="" {...stylex.props(styles.olderLine)}>
             {older === 'loading' ? (
               <Text variant="meta" tone="muted">
                 Loading older messages
@@ -340,7 +344,10 @@ const styles = stylex.create({
     maxWidth: layout['--reading-width'],
     minHeight: '100%',
     marginInline: 'auto',
-    paddingTop: spacing['--space-5'],
+    // At scroll top the first row starts where the header band ends, 24px
+    // under the islands; the last row ends 16 + the composer's 8 = 24px
+    // above the field. The two gaps match.
+    paddingTop: `calc(${layout['--header-band']} - ${layout['--header-inset']})`,
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-4'],
     boxSizing: 'border-box',
@@ -353,8 +360,9 @@ const styles = stylex.create({
     paddingInline: sizes['--focus-ring-room'],
     paddingBottom: spacing['--space-2'],
   },
-  // A fixed slot above the first row, so "Loading older messages" appearing
-  // or going away never moves the rows below it.
+  // A fixed slot above the first row while older messages may come, so
+  // "Loading older messages" appearing or going away never moves the rows
+  // below it. None once the topic's start is known (OlderStatus).
   olderLine: {
     display: 'flex',
     alignItems: 'center',

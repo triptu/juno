@@ -104,3 +104,28 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   // The custom emoji on a line is an image too.
   await expect(page.locator('[data-msg-text] img[alt=":makes-sense:"]')).toHaveCount(1)
 })
+
+test('a topic at its start keeps no slot above the first row, and its top gap matches its bottom one', async ({ page }) => {
+  await open(page, 'TopicView', 'thread/long-thread')
+  await expect(page.locator('[data-older-line]')).toHaveCount(0)
+  const at = await page.evaluate(async () => {
+    const island = document.querySelector('[data-island="left"]')!.getBoundingClientRect()
+    const rows = [...document.querySelectorAll('[data-message-row]')]
+    const top = rows[0]!.getBoundingClientRect().top - island.bottom
+    const scroller = rows[0]!.closest('[data-scroll-area]') as HTMLElement
+    scroller.scrollTop = scroller.scrollHeight
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const field = document.querySelector('[data-composer-field]')!.getBoundingClientRect()
+    const bottom = field.top - rows[rows.length - 1]!.getBoundingClientRect().bottom
+    return { top, bottom }
+  })
+  expect(at.top).toBe(24)
+  expect(at.bottom).toBe(at.top)
+})
+
+test('while older messages may come, a slot above the first row is kept for the loading line', async ({ page }) => {
+  await open(page, 'MessageList', 'thread/more-above')
+  await expect(page.locator('[data-older-line]')).toHaveCount(1)
+  await open(page, 'MessageList', 'thread/loading-older')
+  await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')
+})

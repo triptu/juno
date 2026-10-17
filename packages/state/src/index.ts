@@ -47,6 +47,7 @@ export {
   refreshMessages,
   topicAtom,
   topicOfView,
+  topicStartKnownAtom,
   topicView,
   type MessageWindow,
   type MessageWindowSpec,
