@@ -160,18 +160,24 @@ export function createDispatcher(options: DispatcherOptions) {
       options.onReport?.(error)
       result = { _tag: 'unknown', detail: 'The action failed in Juno.' }
     }
-    if (result.output !== undefined) {
+    // What came back is kept with the outcome it belongs to, never before it: an attempt Juno lost
+    // after the server answered reads Failed with nothing from that answer.
+    const keepOutput = () => {
+      if (result.output === undefined) return
       store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line, shown) VALUES (?, ?, ?, ?)').run(attemptId, result.output.model ?? null, result.output.line ?? null, result.output.shown ?? null)
     }
     switch (result._tag) {
       case 'done':
         crashPoint('attempt.beforeReceipt')
+        keepOutput()
         recordReceipt(store, attemptId, result.receipt)
         break
       case 'failed':
+        keepOutput()
         settleAuthorization(store, authorized.id, 'failed', result.detail)
         break
       case 'unknown':
+        keepOutput()
         settleAuthorization(store, authorized.id, 'unknown', result.detail)
         break
     }
