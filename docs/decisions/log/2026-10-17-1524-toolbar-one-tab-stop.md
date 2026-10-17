@@ -1,0 +1,1 @@
+- 10-17 15:24 · topic-sidebar-review-2 · The message hover toolbar is one Tab stop with a roving tabindex: ← → move, Home and End go to the ends, Esc returns to the message. It had up to ten Tab stops.
