@@ -583,7 +583,6 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     row.rev,
     row.manual_title,
     row.ai_title,
-    row.ai_title_version,
     row.resolved_at,
     row.resolved_activity_ts,
     row.reopened_at,

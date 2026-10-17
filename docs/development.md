@@ -435,15 +435,49 @@ launch through the first sign-in and sync, in order:
 
 Checked on 10-17 with an unsigned package of `bb4fcb71` and a fresh user-data folder, while a "Juno Safe Storage" item from a 10-15 build was in the login keychain: launch to the sign-in screen showed no prompt. The import's prompts (steps 4 and 5) need someone at the Mac and were not counted.
 
-**Signing caveat.** macOS ties "Juno Safe Storage" to the code signature of
-the app that created it. A build without Developer ID signing has an ad-hoc
-signature, which is a hash of that exact build, so after each update macOS
-may see a different app and ask once for "Juno Safe Storage" at launch (choose
-"Always Allow" for Juno's own item, or it asks again next launch). A
-Developer ID signature is matched by team and bundle id, so updates keep
-access and these prompts stop. The Slack item prompt in step 4 is for
-`security`, not Juno, so signing does not change it; it appears once per run
-that imports.
+**Who reads "Juno Safe Storage".** Only main, once per launch. Chromium keeps
+the key in memory and hands it to the network service (cookies) over IPC; the
+helpers, the engine and the agent never read the keychain. Measured on 10-18
+with an unsigned package of `391da5cc`, a test keychain holding a dummy
+"Juno Safe Storage" item first in the search list, and securityd's
+`integrity` log (`log stream --level debug --predicate 'process ==
+"securityd" AND category == "integrity"'`), which names each reader by
+cdhash: a launch with an encrypted `secrets.bin` read it once, from
+`Juno.app`; a fake-Slack sign-in and a signed-in relaunch (cookies decrypted,
+sync running) each read it once, from `Juno.app`. The cookie encryption fuse
+adds no reader, and turning it off would leave the `d` cookie in plain text on
+disk without removing the prompt, since `safeStorage` reads the same item.
+
+**Why updates prompt.** macOS checks two things before an app reads an item:
+the item's access list (the app's designated requirement) and its partition
+list (an id securityd gives the app). Without Developer ID both change with
+every build:
+
+- An ad-hoc designated requirement is `cdhash H"…"`, a hash of that build.
+- The partition id is `teamid:<team>` only for Apple-issued Developer ID,
+  Mac Development, Mac Distribution and App Store signatures. Every other
+  signed app, a self-signed certificate included, gets `cdhash:<hash>`
+  (`partitionIdForProcess` in Apple's `securityd/src/clientid.cpp`).
+
+So the first launch after an update fails both checks on main's one read. The
+macOS dialog asks for the login keychain password. **Always Allow** adds the new
+build to both lists: one prompt, and none on later launches of that build.
+**Allow** passes the access list once, then securityd asks again for the
+partition list, so two prompts on every launch until Always Allow is chosen.
+This is how one update produced three or four prompts. (Read from Apple's
+source, not counted with someone at the Mac.)
+
+A stable self-signed identity does not help. Checked on 10-18 on a
+partition-capable test keychain: two builds signed with the same self-signed
+certificate shared a designated requirement (`identifier "…" and
+certificate root = H"…"`) and passed the access list, but the second build
+failed the partition list (`ACL partition mismatch: client cdhash:…`). A
+Developer ID signature (or an Apple Development one) gets `teamid:` and a
+designated requirement anchored to Apple and the team, so access survives
+updates and these prompts stop.
+
+The Slack item prompt in step 4 is for `security`, not Juno, so signing does
+not change it; it appears once per run that imports.
 
 ## The live sync dry run
 
@@ -1028,8 +1062,11 @@ On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
 flipping fuses. This uses no certificate or credentials and does not grant
 Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
 "unsigned" here means without Developer ID signing or notarization.
-Without Developer ID signing, each update makes macOS ask once for the
-"Juno Safe Storage" keychain item ("Keychain prompts" above).
+This ad-hoc signature has no hardened runtime and no entitlements; only the
+`JUNO_RELEASE=1` build applies them. Without Developer ID signing, the first
+launch after each update makes macOS ask for the "Juno Safe Storage" keychain
+item: once if the owner chooses Always Allow, twice per launch if they choose
+Allow ("Keychain prompts" above).
 
 The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLite
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
