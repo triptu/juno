@@ -325,6 +325,17 @@ function clickOutputOf(store: Store, cardId: string): string | undefined {
   return row?.model
 }
 
+/**
+ * Whether a Change card's call made a change: "Applied" then, else "Done". A connection call made a
+ * change only when its auto-review judged it one (`risk`); a call the review judged a read, or that
+ * had no review (Always ask), claims nothing. A server's own read-only mark never decides this.
+ * A Change card that is not a connection call (a correction, 13.10) always made one.
+ */
+function changes(payload: Extract<CardPayload, { _tag: 'change' }>): boolean {
+  if (payload.review === undefined) return true
+  return payload.review.risk !== undefined && payload.review.risk !== 'read'
+}
+
 /** One line on what a card asks, for the model: its outcome, or the quote in a reply to it. Rendered from the stored payload. */
 export function summaryOf(payload: CardPayload): string {
   switch (payload._tag) {
@@ -425,8 +436,7 @@ function doneLine(payload: CardPayload, receipt: unknown): { readonly line: stri
       return { line: copy.connect.connected }
     case 'change': {
       const open = (receipt as { open?: unknown } | null)?.open
-      // The auto-review judged it only reads: nothing was applied.
-      const line = payload.review?.risk === 'read' ? copy.change.done : copy.change.applied
+      const line = changes(payload) ? copy.change.applied : copy.change.done
       return Schema.is(OpenTarget)(open) ? { line, open } : { line }
     }
     case 'remove':
