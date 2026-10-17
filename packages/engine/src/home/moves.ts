@@ -6,6 +6,7 @@
  * day: `home.movesSeen` marks the moves seen and keeps the time in
  * `MOVES_SEEN_PREF`.
  */
+import type { ChannelRef, HomeTopic } from '@juno/contract'
 import { AUTOMATED_VIEW_ID, automatedReason, movedBackReason } from '@juno/domain'
 import { prefs, StoreReader, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
@@ -93,3 +94,8 @@ export const readMoves = <R extends { readonly channel: string; readonly topic_i
     if (rows.length === 0) return undefined
     return { title: movesTitle([...byTopic.values()]), rows, moves: byTopic as ReadonlyMap<string, MoveRow> }
   })
+
+/** A Main of the record, with its move and the conversation it moves (`channel`, read only when there is a move). */
+export function withMove(topic: HomeTopic, move: MoveRow | undefined, channel: () => ChannelRef): HomeTopic {
+  return move === undefined ? topic : { ...topic, at: Number(move.at), moved: { channel: channel(), change: move.change, ...moveLines(move) } }
+}

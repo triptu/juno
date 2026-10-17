@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { HomeTopic } from '@juno/contract'
 import { defineFixtures, scene } from '@juno/ui'
 import { homeItems } from './fixtures/home'
 import { doneFollowUpsItem, doneFollowUpTopics, oldDraftsItem, oldDraftTopics } from './fixtures/reviews'
-import { OverHome } from './fixtures/OverHome'
+import { OverHome as SheetOverHome } from './fixtures/sheetFrame'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
 import type { ReviewStatus } from './reviewModel'
@@ -34,6 +34,11 @@ function Live({ card, topics, initial = new Map(), ...rest }: Partial<CardReview
 
 const cards = [homeItems.waiting, doneFollowUpsItem, oldDraftsItem]
 
+/** Home under the sheet's layer, as the window shows it. */
+function OverHome({ children }: { readonly children: ReactNode }) {
+  return <SheetOverHome home={<CardsOnHome />}>{children}</SheetOverHome>
+}
+
 const acted = (topics: ReadonlyArray<HomeTopic>): ReadonlyMap<string, ReviewStatus> =>
   new Map([
     [topics[0]!.id, 'done'],
@@ -49,18 +54,18 @@ export default defineFixtures(
   {
     // Card 4: a promise, why it looks done, and the matching message quoted.
     'Follow-ups that look done': {
-      'over-home': scene(() => <OverHome items={cards}><Live card="followUps" /></OverHome>),
-      about: scene(() => <OverHome items={cards}><Live card="followUps" initialAbout /></OverHome>),
-      acted: scene(() => <OverHome items={cards}><Live card="followUps" initial={acted(doneFollowUpTopics)} /></OverHome>),
-      one: scene(() => <OverHome items={cards}><Live card="followUps" topics={doneFollowUpTopics.slice(0, 1)} /></OverHome>),
-      'minimum-window': scene(() => <OverHome items={cards}><Live card="followUps" /></OverHome>, { width: 336, height: 436, padded: false }),
+      'over-home': scene(() => <OverHome><Live card="followUps" /></OverHome>),
+      about: scene(() => <OverHome><Live card="followUps" initialAbout /></OverHome>),
+      acted: scene(() => <OverHome><Live card="followUps" initial={acted(doneFollowUpTopics)} /></OverHome>),
+      one: scene(() => <OverHome><Live card="followUps" topics={doneFollowUpTopics.slice(0, 1)} /></OverHome>),
+      'minimum-window': scene(() => <OverHome><Live card="followUps" /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Card 5: the topic, the draft's age and how far the topic moved, and its first line.
     'Old drafts': {
-      'over-home': scene(() => <OverHome items={cards}><Live card="drafts" /></OverHome>),
-      about: scene(() => <OverHome items={cards}><Live card="drafts" initialAbout /></OverHome>),
-      acted: scene(() => <OverHome items={cards}><Live card="drafts" initial={acted(oldDraftTopics)} /></OverHome>),
-      'minimum-window': scene(() => <OverHome items={cards}><Live card="drafts" /></OverHome>, { width: 336, height: 436, padded: false }),
+      'over-home': scene(() => <OverHome><Live card="drafts" /></OverHome>),
+      about: scene(() => <OverHome><Live card="drafts" initialAbout /></OverHome>),
+      acted: scene(() => <OverHome><Live card="drafts" initial={acted(oldDraftTopics)} /></OverHome>),
+      'minimum-window': scene(() => <OverHome><Live card="drafts" /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Home's cards: the whole row opens the review; the meta line names the places.
     Cards: {

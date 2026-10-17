@@ -82,7 +82,6 @@ export { SettingsTidyUp } from './TidyUpSettings'
 export { SettledReview } from './SettledReview'
 export { AutomatedReview } from './AutomatedReview'
 export { movedToast } from './automatedMoves'
-export { type SettledStatus } from './settled'
 export { DoneFollowUpsReview, OldDraftsReview } from './ReviewCards'
 export { type ReviewStatus } from './reviewModel'
 

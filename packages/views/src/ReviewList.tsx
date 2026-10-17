@@ -4,7 +4,7 @@ import { accent, colors, opacity as opacityTokens, radii, sizes, spacing } from 
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { reviewCopy, type ReviewEntry, type ReviewStatus, type ReviewVerbs } from './reviewModel'
 
-// A sheet narrower than this (the minimum window, `Review.tsx`'s) puts a row's buttons under its text.
+// A sheet narrower than this (the minimum window, `ReviewSheet.tsx`'s) puts a row's buttons under its text.
 const NARROW = '@container review (width < 460px)'
 
 export interface ReviewRowProps {
@@ -31,6 +31,7 @@ export interface ReviewRowProps {
 export function ReviewRow({ entry, status, verbs, active, compact = false, onOpen, onAct, onDecline, onUndo, onFocusRow }: ReviewRowProps) {
   const handlers = activateHandlers<HTMLAnchorElement>((event) => onOpen(entry.topicId, event))
   const handled = status !== 'open'
+  const words = entry.words ?? verbs
   return (
     <li data-review-row={entry.id} data-review-status={status} {...stylex.props(styles.row, compact && styles.rowCompact)}>
       <a
@@ -75,24 +76,24 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
       <span {...stylex.props(styles.slot)}>
         <span {...stylex.props(styles.cell, handled && styles.hidden)} aria-hidden={handled || undefined}>
           <Button variant="ghost" tone="muted" size="sm" tabIndex={active && !handled ? 0 : -1} onClick={() => onDecline(entry.id)} data-review-decline="">
-            {verbs.decline}
+            {words.decline}
           </Button>
-          <Button variant="secondary" size="sm" iconStart={verbs.actIcon} tabIndex={active && !handled ? 0 : -1} onClick={() => onAct(entry.id)} aria-label={`${verbs.act} ${entry.title}`} data-review-act="">
-            {verbs.act}
+          <Button variant="secondary" size="sm" iconStart={words.actIcon} tabIndex={active && !handled ? 0 : -1} onClick={() => onAct(entry.id)} aria-label={`${words.act} ${entry.title}`} data-review-act="">
+            {words.act}
           </Button>
         </span>
         <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
           {/* Both outcomes share one cell too, so the slot is as wide as the widest of all four and never changes. */}
-          <span {...stylex.props(styles.outcomes)} data-review-outcome="">
-            <span {...stylex.props(styles.done, styles.outcome, status !== 'done' && styles.hidden)} aria-hidden={status !== 'done' || undefined}>
-              {verbs.actIcon === undefined ? null : <Icon icon={verbs.actIcon} size={13} />}
+          <span {...stylex.props(styles.outcomes)}>
+            <span {...stylex.props(styles.done, styles.outcome, status !== 'done' && styles.hidden)} aria-hidden={status !== 'done' || undefined} data-review-outcome={status === 'done' ? '' : undefined}>
+              {words.actIcon === undefined ? null : <Icon icon={words.actIcon} size={13} />}
               <Text variant="bodySmall" tone="subtle">
-                {verbs.done}
+                {words.done}
               </Text>
             </span>
-            <span {...stylex.props(styles.done, styles.outcome, status !== 'declined' && styles.hidden)} aria-hidden={status !== 'declined' || undefined}>
+            <span {...stylex.props(styles.done, styles.outcome, status !== 'declined' && styles.hidden)} aria-hidden={status !== 'declined' || undefined} data-review-outcome={status === 'declined' ? '' : undefined}>
               <Text variant="bodySmall" tone="subtle">
-                {verbs.declined}
+                {words.declined}
               </Text>
             </span>
           </span>

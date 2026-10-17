@@ -5,9 +5,7 @@ import { useAtomValue } from '@juno/state/react'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
-import { AutomatedMovesReview } from './AutomatedMovesReview'
-import { CardReview } from './CardReviews'
-import { TidyUpReview } from './TidyUpReview'
+import { HomeReview } from './HomeReview'
 import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
@@ -114,7 +112,7 @@ function SyncLine({ line }: { readonly line: string }) {
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
-  // A card's review, open over Home (`SettledReview`, `AutomatedReview`, `CardReview`), with the item it shows.
+  // A card's review, open over Home (`HomeReview`), with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
@@ -158,13 +156,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />
-    {reviewing === undefined ? null : reviewing.kind === 'automatedMoves' ? (
-      <AutomatedMovesReview item={reviewing} now={shown.now} onClose={() => setReviewing(undefined)} />
-    ) : reviewing.kind === 'tidyUp' ? (
-      <TidyUpReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
-    ) : (
-      <CardReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
-    )}
+    {reviewing === undefined ? null : <HomeReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />}
     </>
   )
 }

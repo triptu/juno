@@ -17,7 +17,12 @@ export interface ReviewEntry {
   readonly quote?: string
   /** Where it is and when: "eng · 2d". */
   readonly meta: string
+  /** This row's own words when they differ from the card's (Automated's record: Move back, or Move to Automated). The keys stay the card's. */
+  readonly words?: ReviewWords
 }
+
+/** A row's words: its two buttons and what it says once one was used. */
+export type ReviewWords = Omit<ReviewVerbs, 'actKey' | 'declineKey'>
 
 /** A card's words for its two buttons, their keys and what a row says once acted on. */
 export interface ReviewVerbs {

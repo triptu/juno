@@ -49,8 +49,9 @@ import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
-import { moveLines, readMoves, type MoveRow } from './moves'
-import { readDelivered, readOldDrafts, withDelivery, type Delivered, type OpenPromise } from './reviewCards'
+import { readMoves, withMove, type MoveRow } from './moves'
+import { parseReason, parseScore, parseTitle } from './answers'
+import { cardTitle, readDelivered, readOldDrafts, withDelivery, withDraft, type Delivered, type OpenPromise } from './reviewCards'
 import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
 
 /** A topic row with Juno's read pointer. */
@@ -182,34 +183,6 @@ export interface HomeRun {
   readonly view: HomeView
   readonly aiAssist: boolean
   readonly rewritable: ReadonlyArray<{ readonly item: HomeItem; readonly row: HomeRow }>
-}
-
-const parseScore = (json: string): number | undefined => {
-  try {
-    const value = JSON.parse(json) as { score?: unknown }
-    return typeof value.score === 'number' ? value.score : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/** The decision's own clause, when a chat model gave one. */
-const parseReason = (json: string): string | undefined => {
-  try {
-    const value = JSON.parse(json) as { reason?: unknown }
-    return typeof value.reason === 'string' && value.reason.trim() !== '' ? value.reason.trim().replace(/\.$/, '') : undefined
-  } catch {
-    return undefined
-  }
-}
-
-const parseTitle = (json: string): string | undefined => {
-  try {
-    const value = JSON.parse(json) as { title?: unknown; confident?: unknown }
-    return value.confident === true && typeof value.title === 'string' && value.title.trim() !== '' ? value.title.trim() : undefined
-  } catch {
-    return undefined
-  }
 }
 
 /** Was an `ai_cache` row (created at epoch millis) made after the topic's latest activity? */
@@ -383,11 +356,9 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
           ? `${firstName(nameOf(base.title))} asked you something`
           : base.kind === 'tidyUp'
             ? `${rows.length} topics look settled`
-            : base.kind === 'doneFollowUps'
-              ? rows.length === 1 ? '1 follow-up looks done' : `${rows.length} follow-ups look done`
-              : base.kind === 'oldDrafts'
-                ? rows.length === 1 ? '1 old draft' : `${rows.length} old drafts`
-            : channel !== undefined
+            : base.kind === 'doneFollowUps' || base.kind === 'oldDrafts'
+              ? cardTitle(base.kind, rows.length)
+              : channel !== undefined
               ? `Move ${channel.label}?`
               : base.title
       const cached = rewrites.find((entry) => entry.key === base.id)
@@ -399,15 +370,9 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         const by = why.by === undefined ? {} : { by: firstName(nameOf(why.by)) }
         return { ...topic, ...(row.last_activity_ts === null ? {} : { at: tsToMillis(row.last_activity_ts as Ts) }), settled: { ...why, ...by } }
       }
-      const movedOf = (row: HomeRow): HomeTopic => {
-        const move = candidate.value.moves?.get(row.topic_id)
-        const topic = topicOf(row)
-        if (move === undefined) return topic
-        const ref = automatedChannelOf(row)
-        return { ...topic, at: Number(move.at), moved: { channel: ref, change: move.change, ...moveLines(move) } }
-      }
+      const movedOf = (row: HomeRow) => withMove(topicOf(row), candidate.value.moves?.get(row.topic_id), () => automatedChannelOf(row))
       const deliveredOf = (row: HomeRow) => withDelivery(topicOf(row), candidate.value.delivered?.get(row.topic_id), { ...(selfId === undefined ? {} : { me: selfId }), user: nameOf })
-      const draftOf = (row: HomeRow) => ({ ...topicOf(row), ...(candidate.value.drafts?.has(row.topic_id) === true ? { draft: candidate.value.drafts.get(row.topic_id)! } : {}) })
+      const draftOf = (row: HomeRow) => withDraft(topicOf(row), candidate.value.drafts?.get(row.topic_id))
       const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : base.kind === 'doneFollowUps' ? deliveredOf : base.kind === 'oldDrafts' ? draftOf : topicOf
       const item: HomeItem = { ...base, title, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })

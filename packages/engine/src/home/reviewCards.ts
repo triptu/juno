@@ -111,3 +111,14 @@ export function withDelivery(topic: HomeTopic, match: Delivered | undefined, loo
   const text = messagePreviewText({ text: match.message.text, ...(files.length === 0 ? {} : { files }) }, lookups)
   return { ...topic, at: tsToMillis(match.promiseTs as Ts), followUp: { promiseTs: match.promiseTs, promise: match.promise, ts: match.message.ts, kind: match.kind, text } }
 }
+
+/** A topic of the old drafts card, with its draft. */
+export function withDraft(topic: HomeTopic, draft: OldDraft | undefined): HomeTopic {
+  return draft === undefined ? topic : { ...topic, draft }
+}
+
+/** The card's title line: "2 follow-ups look done", "1 old draft". */
+export function cardTitle(kind: 'doneFollowUps' | 'oldDrafts', count: number): string {
+  if (kind === 'oldDrafts') return count === 1 ? '1 old draft' : `${count} old drafts`
+  return count === 1 ? '1 follow-up looks done' : `${count} follow-ups look done`
+}

@@ -1,7 +1,7 @@
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import type { FollowUpMatch, HomeTopic, OldDraft } from '@juno/contract'
-import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './Review'
+import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
 import type { ReviewEntry, ReviewVerbs } from './reviewModel'
 import { quietSpan } from './settled'
 import { relativeTime } from './time'

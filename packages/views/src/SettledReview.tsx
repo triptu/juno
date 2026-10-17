@@ -1,6 +1,6 @@
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import type { HomeTopic } from '@juno/contract'
-import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './Review'
+import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
 import type { ReviewEntry, ReviewVerbs } from './reviewModel'
 import { settledCopy, settledReason } from './settled'
 import { relativeTime } from './time'

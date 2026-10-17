@@ -80,7 +80,7 @@ test.describe('follow-ups that look done', () => {
     await expect(again.reason(PROMISE)).toHaveText(/^You shared a file /)
     await again.act(PROMISE).click()
     await juno.expectToast('Follow-up done')
-    await again.done.click()
+    await again.close.click()
     const after = await freshHome(juno)
     expect(after).not.toContain('doneFollowUps')
     expect(after).not.toContain('followUp')

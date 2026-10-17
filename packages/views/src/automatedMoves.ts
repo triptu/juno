@@ -1,5 +1,6 @@
 import type { HomeTopic } from '@juno/contract'
-import type { ReviewRowCopy, ReviewRowLines } from './SettledList'
+import type { ReviewAbout } from './ReviewSheet'
+import type { ReviewEntry, ReviewVerbs, ReviewWords } from './reviewModel'
 import { relativeTime } from './time'
 
 /** The words Automated's record uses (SPEC 12, "Automated, with a record"). */
@@ -12,25 +13,31 @@ export const automatedMovesCopy = {
     'Nothing changes in Slack. You stay in every channel.',
     'After Move back or Keep, Juno leaves that channel where you chose.',
   ],
-  done: 'Done',
-  undo: 'Undo',
-  moveBack: 'Move back',
 } as const
 
-const IN: ReviewRowCopy = { act: 'Move back', keep: 'Keep', acted: 'Moved back to All', kept: 'Kept in Automated' }
-const OUT: ReviewRowCopy = { act: 'Move to Automated', keep: 'Keep', acted: 'Moved to Automated', kept: 'Kept in All' }
+const IN: ReviewWords = { act: 'Move back', decline: 'Keep', done: 'Moved back to All', declined: 'Kept in Automated' }
+const OUT: ReviewWords = { act: 'Move to Automated', decline: 'Keep', done: 'Moved to Automated', declined: 'Kept in All' }
 
-/** A row's buttons: Move back and Keep for a move in; Move to Automated and Keep for a move back out. */
-export function movedCopy(topic: HomeTopic): ReviewRowCopy {
-  return topic.moved?.change === 'out' ? OUT : IN
-}
+/** The record's keys: M takes a row's main action, K keeps. A row's own words say which way it moves. */
+export const movedVerbs: ReviewVerbs = { ...IN, actKey: 'M', declineKey: 'K' }
 
-/** A row's lines: the fact that decided the move, then Juno's own reason or the counts, and when. */
-export function movedLines(topic: HomeTopic, now: number): ReviewRowLines {
-  return {
-    reason: topic.moved?.reason,
+export const movedAbout: ReviewAbout = { label: automatedMovesCopy.about, lines: automatedMovesCopy.explain }
+
+/**
+ * The moves as review rows: Move back and Keep for a move in, Move to
+ * Automated and Keep for a move back out; the fact that decided it, then
+ * Juno's own reason or the counts, and when.
+ */
+export function movedEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
+  return topics.map((topic) => ({
+    id: topic.id,
+    topicId: topic.id,
+    title: topic.title,
+    ...(topic.art === undefined ? {} : { art: topic.art }),
+    ...(topic.moved?.reason === undefined ? {} : { reason: topic.moved.reason }),
     meta: [topic.moved?.detail, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
-  }
+    words: topic.moved?.change === 'out' ? OUT : IN,
+  }))
 }
 
 /** The toast after a row's action, with the channel's label: "Moved #ci-builds back to All". */
