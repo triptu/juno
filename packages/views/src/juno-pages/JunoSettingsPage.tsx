@@ -13,6 +13,8 @@ export interface JunoSettingsPageProps {
   /** A listed modelChoiceKey, or a typed custom model id. */
   readonly onChatModel: (family: string) => void
   readonly onCompactionModel: (family: string) => void
+  /** A fallback family, or '' for none. Absent where the page has no fallback (Set up Juno). */
+  readonly onFallbackModel?: (family: string) => void
   /** "Change limit": opens Settings › AI activity, where the daily limit is set. */
   readonly onOpenLimit: () => void
   readonly onPaused: (paused: boolean) => void
@@ -50,6 +52,7 @@ export function JunoSettingsPage({
   page,
   onChatModel,
   onCompactionModel,
+  onFallbackModel,
   onOpenLimit,
   providers,
   onSignInCodex,
@@ -69,6 +72,8 @@ export function JunoSettingsPage({
   const customSelected = page.chatModels.find(model => model.provider === 'custom')?.family ?? ''
   const chatSelected = chatChoice === undefined ? '' : modelChoiceKey(chatChoice)
   const compactionSelected = page.compactionModels.find((model) => model.selected)?.family ?? ''
+  const fallbacks = page.fallbackModels
+  const fallbackSelected = fallbacks?.find((model) => model.selected)?.family ?? ''
   return (
     <Page width="settings">
       <PageHeader title="Juno" subtitle="Models, spend and the provider. Only you can change these." />
@@ -113,8 +118,29 @@ export function JunoSettingsPage({
             </ListRow>
           ) : null}
           {custom ? null : (
-            <ListRow divider={false} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
+            <ListRow divider={fallbacks !== undefined} trailing={<Select size={30} label="Compaction model" options={modelOptions(page.compactionModels)} value={compactionSelected} onChange={(event) => onCompactionModel(event.currentTarget.value)} />}>
               <Text variant="body">Compaction</Text>
+            </ListRow>
+          )}
+          {custom || fallbacks === undefined ? null : (
+            <ListRow
+              divider={false}
+              trailing={
+                <Select
+                  size={30}
+                  label="Fallback model"
+                  options={[{ value: '', label: 'None' }, ...modelOptions(fallbacks)]}
+                  value={fallbackSelected}
+                  onChange={(event) => onFallbackModel?.(event.currentTarget.value)}
+                />
+              }
+            >
+              <span {...stylex.props(cell.lines)}>
+                <Text variant="body">Fallback</Text>
+                <Text variant="meta" tone="muted">
+                  Asked once when the model refuses under its own policy or is down. Pick one from another maker.
+                </Text>
+              </span>
             </ListRow>
           )}
         </Surface>

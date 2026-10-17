@@ -69,6 +69,17 @@ const aiActivity: AiActivity = {
   ],
 }
 
+/** A title the main model refused, answered by the fallback, and one refused with no fallback, not sent again. */
+const refusedActivity: AiActivity = {
+  todayUsd: 0.0009,
+  todayCalls: 3,
+  calls: [
+    call(8, 1, { model: 'google/gemini-3.8-flash', kind: 'fallback', durationMs: 1400, inputTokens: 790, outputTokens: 8, costUsd: 0.0006, summary: 'title, 4 words' }),
+    call(7, 1, { outcome: 'error', kind: 'policy.fallback', message: 'This request triggered restrictions under the model’s usage policy.', durationMs: 900, inputTokens: null, outputTokens: null, costUsd: 0.0003, summary: '' }),
+    call(6, 4, { subject: { kind: 'topic', id: 't:C1:6', name: 'Kafka retention' }, outcome: 'error', kind: 'policy', message: 'This request triggered restrictions under the model’s usage policy.', durationMs: 850, inputTokens: null, outputTokens: null, costUsd: 0, summary: '' }),
+  ],
+}
+
 const about = (
   <SettingsAbout
     build={<AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" compact />}
@@ -118,6 +129,7 @@ export default defineFixtures(
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
       'ai-activity-background-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, spentUsd: 2.51, backgroundUsd: 2.5 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       'ai-activity-no-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, capUsd: NO_LIMIT_USD, limitUsd: NO_LIMIT_USD, backgroundLimitUsd: NO_LIMIT_USD / 2 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
+      'ai-activity-refused': at('ai-activity', <AiActivityPage activity={refusedActivity} spend={spendToday} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       'ai-activity-empty': at('ai-activity', <AiActivityPage activity={{ calls: [], todayUsd: 0, todayCalls: 0 }} now={NOW} onCopyDetails={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),
