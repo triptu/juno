@@ -11,15 +11,7 @@ export interface TitleTopicInput {
   readonly messages: ReadonlyArray<AiMessage>
 }
 
-/**
- * The first `titleTopic` version whose prompt keeps sensitive details out of
- * titles (SPEC section 2, Topic titles). An AI title stored under an older
- * version is titled again, and is blurred in privacy mode until then. A later
- * prompt change that keeps the rule leaves this as it is.
- */
-export const TITLE_SAFE_SINCE = 2
-
-/** Generation. Runs once for a new thread, and once more for a title made before `TITLE_SAFE_SINCE`. */
+/** Generation. Runs once for a new thread. Version 2 keeps sensitive details out of titles (SPEC section 2, Topic titles). */
 export const titleTopic = defineTextTask<TitleTopicInput>({
   name: 'titleTopic',
   version: 2,

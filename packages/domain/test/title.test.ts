@@ -20,12 +20,11 @@ describe('title resolution', () => {
     expect(resolveTitle(topic({ channel: hiring }))).toEqual({ text: '#hiring', source: 'channel', sensitive: false })
   })
 
-  it('marks message text nobody checked for a shared screen as sensitive', () => {
+  it('marks only the first words of the message as sensitive, never an AI title or a rename', () => {
     const text = 'Go with 100k for Donna, she asked for 110k.'
     expect(resolveTitle(topic({ firstMessageText: text })).sensitive).toBe(true)
-    expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Donna offer at 100k', aiTitleOld: true } }))).toEqual({ text: 'Donna offer at 100k', source: 'ai', sensitive: true })
     expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Comp discussion for Donna' } })).sensitive).toBe(false)
-    expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Donna 100k', aiTitle: 'Donna offer at 100k', aiTitleOld: true } })).sensitive).toBe(false)
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Donna 100k', aiTitle: 'Comp discussion for Donna' } })).sensitive).toBe(false)
   })
 
 })
