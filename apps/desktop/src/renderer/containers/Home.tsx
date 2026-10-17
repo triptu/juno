@@ -1,10 +1,11 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
+import { AutomatedMovesReview } from './AutomatedMovesReview'
 import { TidyUpReview } from './TidyUpReview'
 import { showChannelMenu } from './placeMenus'
 
@@ -68,6 +69,17 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
 
 const closeCard = () => closeWelcome(registry)
 
+/** Tells the engine once per appearance that Home showed Automated's record, so its moves are shown only this once. */
+function useMovesSeen(items: ReadonlyArray<HomeItem> | undefined, appearedAt: number | undefined): void {
+  const told = useRef<number | undefined>(undefined)
+  const record = items?.find((item) => item.kind === 'automatedMoves')
+  useEffect(() => {
+    if (record === undefined || appearedAt === undefined || told.current === appearedAt) return
+    told.current = appearedAt
+    markMovesSeen(registry, record)
+  }, [record, appearedAt])
+}
+
 /**
  * The welcome card (SPEC 4) as this Home shows it. Once it has shown, its
  * room stays until Home appears again (`appearedAt` changes), empty after
@@ -101,13 +113,14 @@ function SyncLine({ line }: { readonly line: string }) {
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
-  // Tidy up's review, open over Home (`SettledReview`), with the item it shows.
+  // Tidy up's review or Automated's record, open over Home, with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
   const welcome = useWelcome(shown?.now)
+  useMovesSeen(shown?.view.items, shown?.now)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
   useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
@@ -140,7 +153,9 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />
-    {reviewing === undefined ? null : (
+    {reviewing?.kind === 'automatedMoves' ? (
+      <AutomatedMovesReview item={reviewing} now={shown.now} onClose={() => setReviewing(undefined)} />
+    ) : reviewing === undefined ? null : (
       <TidyUpReview
         item={reviewing}
         now={shown.now}

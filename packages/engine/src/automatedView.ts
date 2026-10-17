@@ -11,11 +11,17 @@
  *
  * `automated_channels` holds one row per conversation whose place is
  * settled. The rules and Juno only ever write a conversation that has no
- * row, or one still asked about by them; a row by `you` is the user's
- * choice and stays.
+ * row, or one still asked about by them, or one they moved themselves; a
+ * row by `you` is the user's choice and stays.
+ *
+ * `automated_moves` records what the rules and Juno moved, in or back out,
+ * with the counts that decided it, for Home's "Juno moved 2 channels to
+ * Automated" (SPEC 12). Moves into the view are recorded once the first
+ * boot's own sorting is done (`RECORD_FROM_PREF`, set by `sortClearCases`
+ * after a whole pass): sorting a new workspace is setting up, not news.
  */
-import { AUTOMATED_SAMPLE, AUTOMATED_VIEW, AUTOMATED_VIEW_ID, classifyConversation, type AutomatedVerdict, type Sender } from '@juno/domain'
-import { invalidate, keys, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
+import { AUTOMATED_SAMPLE, AUTOMATED_VIEW, AUTOMATED_VIEW_ID, classifyConversation, postingCounts, type AutomatedVerdict, type PostingCounts, type Sender } from '@juno/domain'
+import { invalidate, keys, prefs, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 
 export type Verdict = 'automated' | 'kept' | 'ask'
@@ -65,17 +71,40 @@ export const clearVerdict = (channel: string) =>
     yield* sql`DELETE FROM automated_channels WHERE channel = ${channel}`
   })
 
+/** The workspace preference set once the first sync's sorting is done: from then on, moves into Automated are recorded. */
+export const RECORD_FROM_PREF = 'automatedRecordFrom'
+
+/** Why the rules or Juno moved a conversation: the counts the rule read, and Juno's line when Juno decided. */
+export interface MoveWhy {
+  readonly counts: PostingCounts
+  readonly reason?: string
+}
+
+/** Records a move by the rules or Juno for Home's record, replacing the conversation's earlier one. */
+export const recordMove = (channel: string, change: 'in' | 'out', by: Exclude<SortedBy, 'you'>, now: number, why: MoveWhy) =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`INSERT INTO automated_moves (channel, change, by, at, apps, people, you, sampled, reason, seen_at)
+      VALUES (${channel}, ${change}, ${by}, ${String(now)}, ${why.counts.apps}, ${why.counts.people}, ${why.counts.you}, ${why.counts.of}, ${why.reason ?? null}, NULL)
+      ON CONFLICT (channel) DO UPDATE SET change = excluded.change, by = excluded.by, at = excluded.at, apps = excluded.apps,
+        people = excluded.people, you = excluded.you, sampled = excluded.sampled, reason = excluded.reason, seen_at = NULL`
+    yield* invalidate(keys.automatedMoves)
+  })
+
 /**
  * Puts a conversation in Automated, making the view first if Juno never
  * has (last in the pill row). A view the user deleted is made again only
  * for the user's own Move; for the rules and Juno it stays deleted and
- * nothing is written. Resolves with whether the conversation is in the view.
+ * nothing is written. A move by the rules or Juno with `why` is recorded
+ * for Home once recording has begun. Resolves with whether the
+ * conversation is in the view.
  */
-export const moveToAutomated = (channel: string, by: SortedBy, now: number) =>
+export const moveToAutomated = (channel: string, by: SortedBy, now: number, why?: MoveWhy) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const state = yield* automatedViewState
     if (state === 'deleted' && by !== 'you') return false
+    const already = (yield* sql<{ n: number }>`SELECT count(*) AS n FROM sidebar_view_channels WHERE view_id = ${AUTOMATED_VIEW_ID} AND channel = ${channel}`)[0]?.n === 1
     if (state !== 'live') {
       const last = (yield* sql<{ position: number | null }>`SELECT max(position) AS position FROM sidebar_views`)[0]?.position ?? -1
       yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at)
@@ -84,7 +113,34 @@ export const moveToAutomated = (channel: string, by: SortedBy, now: number) =>
     }
     yield* sql`INSERT OR IGNORE INTO sidebar_view_channels (view_id, channel, added_at) VALUES (${AUTOMATED_VIEW_ID}, ${channel}, ${String(now)})`
     yield* setVerdict(channel, 'automated', by, now)
+    if (by !== 'you' && why !== undefined && !already && (yield* recording)) yield* recordMove(channel, 'in', by, now, why)
     return true
+  })
+
+/** Whether moves into Automated are recorded yet (`RECORD_FROM_PREF`). */
+const recording = Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  return (yield* sql<{ n: number }>`SELECT count(*) AS n FROM prefs WHERE key = ${RECORD_FROM_PREF}`)[0]?.n === 1
+})
+
+/** Starts recording moves into Automated, once: a write only the first time. Its own transaction. */
+export const startRecording = (now: number): Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    if ((yield* prefs.get(RECORD_FROM_PREF)) !== undefined) return
+    yield* transaction(prefs.set(RECORD_FROM_PREF, now))
+  })
+
+/**
+ * The rules took back a conversation they or Juno had put in Automated:
+ * people start most conversations there now. It leaves the view, its place
+ * is open again (so a later look can move it back in), and the move is
+ * recorded for Home.
+ */
+export const moveBackOut = (channel: string, by: Exclude<SortedBy, 'you'>, now: number, why: MoveWhy) =>
+  Effect.gen(function* () {
+    yield* leaveAutomated(channel)
+    yield* clearVerdict(channel)
+    yield* recordMove(channel, 'out', by, now, why)
   })
 
 /** Takes a conversation out of Automated, if it is there. */
@@ -137,8 +193,10 @@ export interface SampleRow {
   readonly is_bot: number | null
 }
 
-/** Message subtypes people and apps write; joins, topic changes and the like say nothing. */
-const SAID = `(m.subtype IS NULL OR m.subtype IN ('bot_message', 'thread_broadcast', 'file_share', 'me_message'))`
+/** Message subtypes people and apps write; joins, topic changes and the like say nothing. A reply also sent to the channel is still a reply. */
+const SAID = `(m.subtype IS NULL OR m.subtype IN ('bot_message', 'file_share', 'me_message'))`
+/** A top-level message, in the words of the Main index (`messages_main`), so the sample reads through it. */
+const TOP_LEVEL = `(m.thread_ts IS NULL OR m.thread_ts = m.ts OR m.subtype = 'thread_broadcast')`
 
 const CANDIDATES = `SELECT c.id, c.kind, c.name, c.topic, u.is_bot AS partner_is_bot, a.verdict, a.by, a.apps, a.sampled, a.reason,
     (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = c.id) AS activity
@@ -155,10 +213,34 @@ export const automatedStatements = {
   candidates: () => ({ sql: CANDIDATES, params: [] as ReadonlyArray<string | number> }),
   sample: (channel: string) => ({
     sql: `SELECT m.ts, m.user_id, m.subtype, m.text, u.is_bot FROM messages m LEFT JOIN users u ON u.id = m.user_id
-      WHERE m.channel = ? AND m.deleted = 0 AND ${SAID} ORDER BY m.ts DESC LIMIT ?`,
+      WHERE m.channel = ? AND ${TOP_LEVEL} AND m.deleted = 0 AND ${SAID} ORDER BY m.ts DESC LIMIT ?`,
     params: [channel, AUTOMATED_SAMPLE] as ReadonlyArray<string | number>,
   }),
+  moved: () => ({ sql: MOVED, params: [AUTOMATED_VIEW_ID] as ReadonlyArray<string | number> }),
 }
+
+/** What the rules and Juno put in Automated and the user has not settled, for the re-check. */
+const MOVED = `SELECT c.id, c.kind, c.name, a.by,
+    (SELECT max(t.last_activity_ts) FROM topic_index t WHERE t.channel = c.id) AS activity
+  FROM sidebar_view_channels vc
+  JOIN automated_channels a ON a.channel = vc.channel
+  JOIN conversations c ON c.id = vc.channel
+  WHERE vc.view_id = ? AND a.verdict = 'automated' AND a.by IN ('rules', 'juno') AND c.kind IN ('public', 'private')`
+
+/** A conversation the rules or Juno moved into Automated. */
+export interface MovedRow {
+  readonly id: string
+  readonly kind: 'public' | 'private'
+  readonly name: string | null
+  readonly by: 'rules' | 'juno'
+  readonly activity: string | null
+}
+
+export const movedIn = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const statement = automatedStatements.moved()
+  return yield* sql.unsafe<MovedRow>(statement.sql, statement.params)
+})
 
 export const sampleOf = (channel: string) =>
   Effect.gen(function* () {
@@ -183,17 +265,17 @@ export const candidates = (now: number) =>
     return (yield* sql.unsafe<Candidate>(CANDIDATES)).filter((row) => row.activity !== null && row.activity >= since)
   })
 
-/** What the rules say about a conversation, with the sample they read. */
-export const classify = (row: Candidate, selfId: string | undefined) =>
+/**
+ * What the rules say about a conversation, with the top-level sample they
+ * read and its counts, so a reason quotes the numbers that decided.
+ */
+export const classify = (row: Pick<Candidate, 'id' | 'kind' | 'name'> & { readonly partner_is_bot?: number | null }, selfId: string | undefined) =>
   Effect.gen(function* () {
     const sample = yield* sampleOf(row.id)
-    const verdict: AutomatedVerdict = classifyConversation({
-      kind: row.kind,
-      name: row.name ?? '',
-      partnerIsApp: row.partner_is_bot === 1,
-      senders: sample.map((message) => senderOf(message, selfId)),
-    })
-    return { verdict, sample }
+    const messages = sample.map((message) => ({ sender: senderOf(message, selfId) }))
+    const verdict: AutomatedVerdict = classifyConversation({ kind: row.kind, name: row.name ?? '', partnerIsApp: row.partner_is_bot === 1, messages })
+    const counts = postingCounts(messages)
+    return { verdict, sample, counts }
   })
 
 export const selfIdOf = Effect.gen(function* () {
@@ -202,7 +284,7 @@ export const selfIdOf = Effect.gen(function* () {
 })
 
 /** One write in its own transaction, telling the sidebar and Home. */
-export const write = <A>(effect: Effect.Effect<A, SqlError, StoreWriter>) =>
+export const write = <A>(effect: Effect.Effect<A, SqlError, StoreWriter | Invalidation>) =>
   transaction(Effect.tap(effect, () => invalidate([...keys.sidebarViews, ...keys.automatedChannels])))
 
 /**
@@ -218,7 +300,8 @@ export const sortClearCases = (channel?: string): Effect.Effect<void, SqlError, 
   const selfId = yield* selfIdOf
   for (const row of yield* candidates(now)) {
     if (channel !== undefined && row.id !== channel) continue
-    const { verdict } = yield* classify(row, selfId)
-    if (verdict === 'automated') yield* write(moveToAutomated(row.id, 'rules', now))
+    const { verdict, counts } = yield* classify(row, selfId)
+    if (verdict === 'automated') yield* write(moveToAutomated(row.id, 'rules', now, { counts }))
   }
+  if (channel === undefined) yield* startRecording(now)
 })

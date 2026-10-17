@@ -17,7 +17,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
-import { AutomatedPlace, SavedView, ViewColor, ViewIcon } from '../views'
+import { AutomatedPlace, AutomatedRestore, SavedView, ViewColor, ViewIcon } from '../views'
 import { CommandResult, TopicActionError } from './topics'
 
 /** A view as the pill row and the sheet show it: its conversations joined, by name. */
@@ -74,11 +74,16 @@ export const viewsRemoveChannel = Rpc.make('views.removeChannel', { payload: mem
 export const viewsReorder = Rpc.make('views.reorder', { payload: { ids: Schema.Array(Schema.String) }, success: Schema.Void, error: NotSignedIn })
 
 /**
- * The user's answer about the Automated view, from Home's question: Move puts
- * the conversation in the view (making the view if Juno has not yet), Keep
- * in All keeps it where it is. Either is remembered and never asked again.
- * The undo puts back the question, or the earlier answer.
+ * The user's answer about the Automated view, from Home's question or
+ * Automated's record: Move puts the conversation in the view (making the
+ * view if Juno has not yet), Keep in All keeps it where it is. Either is
+ * remembered and never asked again. The undo puts back the question, the
+ * earlier answer, or Juno's own move (`restore`).
  */
-export const viewsSortChannel = Rpc.make('views.sortChannel', { payload: { channel: Schema.String, to: AutomatedPlace }, success: CommandResult, error: TopicActionError })
+export const viewsSortChannel = Rpc.make('views.sortChannel', {
+  payload: { channel: Schema.String, to: AutomatedPlace, restore: Schema.optionalKey(AutomatedRestore) },
+  success: CommandResult,
+  error: TopicActionError,
+})
 
 export const ViewsRoutes = RpcGroup.make(viewsList, viewsSave, viewsDelete, viewsRestore, viewsAddChannel, viewsRemoveChannel, viewsReorder, viewsSortChannel)

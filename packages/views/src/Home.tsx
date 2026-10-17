@@ -26,7 +26,7 @@ export interface HomeProps {
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onMarkDone: (itemId: string) => void
   readonly onResolveAll: (itemId: string) => void
-  /** Tidy up's row: opens the review of every topic it proposes (`SettledReview`). */
+  /** Tidy up's row and Automated's record: opens the review of every topic or move (`SettledReview`, `AutomatedReview`). */
   readonly onReview: (itemId: string) => void
   /** Automated's Move (`automated`) and Keep in All (`kept`). */
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
@@ -113,14 +113,14 @@ interface HomeRowProps {
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
- * One row: a link to the topic (Tidy up's opens its review), and its buttons in
+ * One row: a link to the topic (Tidy up's and Automated's record open their review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, or Automated's Keep
  * in All and Move. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
 function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
-  const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' ? Robot : undefined
+  const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' || item.kind === 'automatedMoves' ? Robot : undefined
   const body = (
     <>
       {tileIcon !== undefined || topic === undefined ? (
@@ -152,7 +152,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       : undefined
   return (
     <li data-home-item={item.kind} onContextMenu={menu} {...stylex.props(styles.row)}>
-      {item.kind === 'tidyUp' ? (
+      {item.kind === 'tidyUp' || item.kind === 'automatedMoves' ? (
         <button type="button" aria-haspopup="dialog" onClick={() => onReview(item.id)} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
           {body}
           <span {...stylex.props(styles.caret)}>

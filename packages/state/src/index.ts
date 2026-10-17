@@ -227,6 +227,8 @@ export {
   showHome,
   resolveAllTopics,
   actOnSettled,
+  actOnMove,
+  markMovesSeen,
   setTidyUpPrefs,
   startVisitLog,
   tidyUpPrefsAtom,

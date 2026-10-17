@@ -3,9 +3,37 @@ import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { HomeTopic } from '@juno/contract'
 import { accent, colors, opacity as opacityTokens, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 import { settledCopy, settledReason, type SettledStatus } from './settled'
 import { relativeTime } from './time'
+
+/** A row's words: its two buttons, and what it says once one was used. Tidy up's by default. */
+export interface ReviewRowCopy {
+  /** The main action ("Resolve", "Move back"), the raised button. */
+  readonly act: string
+  readonly actIcon?: PhosphorIcon
+  /** The quiet answer ("Keep open", "Keep"). */
+  readonly keep: string
+  /** What the row says after the main action ("Resolved") and after the quiet one ("Kept open"). */
+  readonly acted: string
+  readonly kept: string
+}
+
+export const SETTLED_ROW_COPY: ReviewRowCopy = { act: settledCopy.resolve, actIcon: Check, keep: settledCopy.keep, acted: settledCopy.resolved, kept: settledCopy.kept }
+
+/** A row's lines under its title: why it is proposed, and where and when. */
+export interface ReviewRowLines {
+  readonly reason?: string | undefined
+  readonly meta: string
+}
+
+/** Tidy up's lines: why the topic looks settled, then its place and last activity. */
+export function settledLines(topic: HomeTopic, now: number): ReviewRowLines {
+  return {
+    reason: topic.settled === undefined ? undefined : settledReason(topic.settled, topic.at, now),
+    meta: [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
+  }
+}
 
 // A sheet narrower than this (the minimum window) puts a row's buttons under its text and drops the key hints.
 const SETTLED_NARROW = '@container settled (width < 460px)'
@@ -18,6 +46,12 @@ export interface SettledRowProps {
   readonly active: boolean
   /** A row in a narrow card: no art, smaller gaps. */
   readonly compact?: boolean
+  /** The buttons' words; Tidy up's when absent. */
+  readonly copy?: ReviewRowCopy
+  /** The lines under the title; Tidy up's when absent. */
+  readonly lines?: ReviewRowLines
+  /** The key that takes the main action, for assistive tech: R for Resolve. */
+  readonly actKey?: string
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onResolve: (topicId: string) => void
   readonly onKeep: (topicId: string) => void
@@ -29,19 +63,20 @@ export interface SettledRowProps {
  * One proposal: the art, the title, why it looks settled, and where it is
  * and when it last moved; then Keep open and Resolve. Once acted on, the
  * row stays where it is and says what happened, with Undo in the same
- * slot, so nothing under the pointer moves.
+ * slot, so nothing under the pointer moves. Another review (Automated's
+ * record) passes its own `copy` and `lines`; `resolved` is then its main
+ * action.
  */
-export function SettledRow({ topic, status, now, active, compact = false, onOpen, onResolve, onKeep, onUndo, onFocusRow }: SettledRowProps) {
+export function SettledRow({ topic, status, now, active, compact = false, copy = SETTLED_ROW_COPY, lines, actKey = 'R', onOpen, onResolve, onKeep, onUndo, onFocusRow }: SettledRowProps) {
   const handlers = activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
-  const reason = topic.settled === undefined ? undefined : settledReason(topic.settled, topic.at, now)
-  const meta = [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · ')
+  const { reason, meta } = lines ?? settledLines(topic, now)
   const handled = status !== 'open'
   return (
     <li data-settled-row={topic.id} data-settled-status={status} {...stylex.props(styles.row, compact && styles.rowCompact)}>
       <a
         href={`#topic/${encodeURIComponent(topic.id)}`}
         tabIndex={active ? 0 : -1}
-        aria-keyshortcuts="R K Enter"
+        aria-keyshortcuts={`${actKey} K Enter`}
         {...handlers}
         onClick={(event) => {
           event.preventDefault()
@@ -73,26 +108,30 @@ export function SettledRow({ topic, status, now, active, compact = false, onOpen
       <span {...stylex.props(styles.slot)}>
         <span {...stylex.props(styles.cell, handled && styles.hidden)} aria-hidden={handled || undefined}>
           <Button variant="ghost" tone="muted" size="sm" tabIndex={active && !handled ? 0 : -1} onClick={() => onKeep(topic.id)} data-settled-keep="">
-            {settledCopy.keep}
+            {copy.keep}
           </Button>
-          <Button variant="secondary" size="sm" iconStart={Check} tabIndex={active && !handled ? 0 : -1} onClick={() => onResolve(topic.id)} aria-label={`${settledCopy.resolve} ${topic.title}`} data-settled-resolve="">
-            {settledCopy.resolve}
+          <Button variant="secondary" size="sm" iconStart={copy.actIcon} tabIndex={active && !handled ? 0 : -1} onClick={() => onResolve(topic.id)} aria-label={`${copy.act} ${topic.title}`} data-settled-resolve="">
+            {copy.act}
           </Button>
         </span>
         <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
-          {handled ? (
-            <>
-              <span {...stylex.props(styles.done)} data-settled-done="">
-                {status === 'resolved' ? <Icon icon={Check} size={13} /> : null}
-                <Text variant="bodySmall" tone="subtle">
-                  {status === 'resolved' ? settledCopy.resolved : settledCopy.kept}
-                </Text>
-              </span>
-              <Button variant="ghost" tone="muted" size="sm" tabIndex={active ? 0 : -1} onClick={() => onUndo(topic.id)} data-settled-undo="">
-                {settledCopy.undo}
-              </Button>
-            </>
-          ) : null}
+          {/* Both words are always laid out, one hidden, so the slot is as wide as the wider whatever happens. */}
+          <span {...stylex.props(styles.done)} data-settled-done={handled ? '' : undefined}>
+            <span {...stylex.props(status !== 'resolved' && styles.hidden)}>
+              <Icon icon={Check} size={13} />
+            </span>
+            <span {...stylex.props(styles.words)}>
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'resolved' && styles.hidden]}>
+                {copy.acted}
+              </Text>
+              <Text variant="bodySmall" tone="subtle" sx={[styles.word, status !== 'kept' && styles.hidden]}>
+                {copy.kept}
+              </Text>
+            </span>
+          </span>
+          <Button variant="ghost" tone="muted" size="sm" tabIndex={handled && active ? 0 : -1} onClick={() => onUndo(topic.id)} data-settled-undo="">
+            {settledCopy.undo}
+          </Button>
         </span>
       </span>
     </li>
@@ -109,6 +148,11 @@ export interface SettledListProps {
   readonly initialActive?: string
   /** Focus the first row when the list appears, as a sheet does with its first control. */
   readonly autoFocus?: boolean
+  /** Each row's words and lines; Tidy up's when absent. */
+  readonly copyOf?: (topic: HomeTopic) => ReviewRowCopy
+  readonly linesOf?: (topic: HomeTopic) => ReviewRowLines
+  /** The key that takes the main action: R (Resolve) by default. K always keeps. */
+  readonly actKey?: string
   readonly onOpen: SettledRowProps['onOpen']
   readonly onResolve: SettledRowProps['onResolve']
   readonly onKeep: SettledRowProps['onKeep']
@@ -117,10 +161,12 @@ export interface SettledListProps {
 
 /**
  * The proposals, one Tab stop: ↑ ↓ (and Home, End) move between rows,
- * Enter opens (⌘Enter in a new tab), R resolves and K keeps open. ⌘Z is
- * Edit › Undo, which undoes the last action; the container follows it.
+ * Enter opens (⌘Enter in a new tab), R resolves (or `actKey` takes the
+ * main action) and K keeps open. ⌘Z is Edit › Undo, which undoes the last
+ * action; the container follows it.
  */
-export function SettledList({ topics, statuses, now, label, compact = false, initialActive, autoFocus = false, onOpen, onResolve, onKeep, onUndo }: SettledListProps) {
+export function SettledList({ topics, statuses, now, label, compact = false, initialActive, autoFocus = false, copyOf, linesOf, actKey = 'R', onOpen, onResolve, onKeep, onUndo }: SettledListProps) {
+  const act = actKey.toLowerCase()
   const [active, setActive] = useState(initialActive ?? topics[0]?.id)
   const list = useRef<HTMLUListElement>(null)
   const focusRow = (id: string) => list.current?.querySelector<HTMLElement>(`[data-settled-row="${CSS.escape(id)}"] a`)?.focus()
@@ -146,9 +192,9 @@ export function SettledList({ topics, statuses, now, label, compact = false, ini
     if (event.key === 'End') return move(topics.length - 1)
     if (event.metaKey || event.shiftKey) return
     const key = event.key.toLowerCase()
-    if ((key === 'r' || key === 'k') && status === 'open') {
+    if ((key === act || key === 'k') && status === 'open') {
       event.preventDefault()
-      if (key === 'r') onResolve(current.id)
+      if (key === act) onResolve(current.id)
       else onKeep(current.id)
       // On to the next open row, as Mail moves on after an archive.
       const next = topics.slice(index + 1).find((topic) => (statuses.get(topic.id) ?? 'open') === 'open')
@@ -165,6 +211,9 @@ export function SettledList({ topics, statuses, now, label, compact = false, ini
           now={now}
           active={topic.id === active}
           compact={compact}
+          {...(copyOf === undefined ? {} : { copy: copyOf(topic) })}
+          {...(linesOf === undefined ? {} : { lines: linesOf(topic) })}
+          actKey={actKey}
           onOpen={onOpen}
           onResolve={onResolve}
           onKeep={onKeep}
@@ -255,6 +304,13 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     paddingInline: spacing['--space-2'],
     color: colors['--foreground-subtle'],
+  },
+  words: {
+    display: 'grid',
+    justifyItems: 'end',
+  },
+  word: {
+    gridArea: '1 / 1',
   },
   hidden: {
     visibility: 'hidden',

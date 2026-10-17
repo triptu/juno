@@ -32,7 +32,7 @@ export const ViewsHandlers = ViewsRoutes.toLayer(
       'views.addChannel': ({ id, channel }) => provide(setViewChannel(id, channel, true)),
       'views.removeChannel': ({ id, channel }) => provide(setViewChannel(id, channel, false)),
       'views.reorder': ({ ids }) => provide(reorderViews(ids)),
-      'views.sortChannel': ({ channel, to }) => provide(sortChannel(channel, to)),
+      'views.sortChannel': ({ channel, to, restore }) => provide(sortChannel(channel, to, restore)),
     }
   }),
 )

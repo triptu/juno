@@ -6,7 +6,7 @@ import { relativeTime } from './time'
 /** The meta line: plain data, the same with and without AI. */
 export function metaOf(item: HomeItem, now: number): string {
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
-  if (item.kind === 'tidyUp') return placesLine(item.topics.map((topic) => topic.place))
+  if (item.kind === 'tidyUp' || item.kind === 'automatedMoves') return placesLine(item.topics.map((topic) => topic.place))
   const topic = item.topics[0]
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
   const first = topic?.title

@@ -15,8 +15,13 @@ SPEC §12 (Home, Tidy up), §14 (Settings › Tidy up) and §15 decide behaviour
 | `a-sheet-minimum-*.png` | The minimum window: the buttons go under each row's text |
 | `b-in-place-*.png`, `b-in-place-many-*.png` | Direction B, the card opening in place on Home |
 | `settings-light.png`, `settings-dark.png` | Settings › Tidy up |
+| `automated-card-*.png`, `automated-card-mixed-*.png` | Card 3, Automated's record on Home: "Juno moved 2 channels to Automated", and with a move back |
+| `automated-sheet-*.png` | Its sheet: each channel with the fact that decided the move, Keep and Move back (Move to Automated for a move back out) |
+| `automated-sheet-acted-*.png` | One moved back, one kept, each with Undo in place |
+| `automated-sheet-about-*.png` | The info button open: What Automated is |
+| `automated-sheet-minimum-*.png` | The minimum window |
 
-Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.
+Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,AutomatedReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.
 
 ## Where the reason comes from
 
@@ -74,13 +79,13 @@ The preference is one workspace value, `tidyUp` (`TidyUpPrefs` in `@juno/contrac
 
 ## More self-management
 
-Cards in the same spirit, each opening the same kind of review sheet: every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). None is built.
+Cards in the same spirit, each opening the same kind of review sheet: every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). Card 3 is built (SPEC §12, "Automated's record"); the rest are not.
 
 | # | Card | Signal | What it does | Staying transparent | Value | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | **Unfollow threads you never open** | A followed thread with replies over two weeks that you have not opened or been mentioned in ("14 replies since you joined, never opened") | Notify me Never: unfollows it in Slack, so it leaves the sidebar and stops notifying on every device | The sheet says it unfollows in Slack and that a mention follows again; Undo follows again | High | Medium: it writes to Slack |
 | 2 | **Quiet a channel you always mark read** | A channel whose Main you marked read without opening five times in two weeks | Notify me Never on the channel, in Juno only | "You marked #deploys read 7 times without opening it"; Keep notifying; Undo | High | Low |
-| 3 | **Automated, with a record** | Exists: unclear channels are asked on Home with the reason line. Clear cases move by themselves and only the view sheet marks them "Added by Juno" | Add a once-a-day card "Juno moved 2 channels to Automated" with the review sheet: each channel's reason ("Apps wrote 24 of the last 30 messages") and Move back | Today's silent moves become visible once, then stop | Medium | Low |
+| 3 | **Automated, with a record** (built) | Every move the rules or Juno make after the first sync, in or back out, with the counts that decided it | A once-a-day card "Juno moved 2 channels to Automated" with the same review sheet (`AutomatedReview`): each channel's reason ("Apps wrote 24 of the last 30 top-level messages"), Move back and Keep | Silent moves become visible once, then stop; the info says what Automated is and that nothing changes in Slack | Medium | Low |
 | 4 | **Mark a follow-up done by itself** | A promise in Follow-up ("I'll send the deck") followed by your own message with a file or link in the same topic | Mark done, with the matching message quoted in the row | Shows both messages; Not done brings it back | Medium | Low |
 | 5 | **Clear old drafts** | A topic draft untouched for 14 days, in a topic that moved on since | Deletes the draft | The draft's first line and age in the row; Undo restores it; Keep | Medium | Low |
 | 6 | **Ignore a channel you never read** | A channel you are in that you have not opened for 30 days, with more than 50 messages since | Ignore channel (hidden everywhere in Juno, nothing in Slack) | "312 messages since you last opened it, 5 weeks ago"; Settings › Ignored lists it; Undo | Medium | Medium: hides content |

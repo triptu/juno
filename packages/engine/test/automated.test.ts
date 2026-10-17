@@ -1,10 +1,10 @@
 // The built-in Automated view (SPEC section 5, "Automated") against the
 // fake Slack and the fake AI: clear bot channels are in it when the first
-// sync reports live, an ambiguous channel is asked about on Home, answers
-// stick, a hand-placed channel is never moved, and a deleted view stays
-// deleted.
+// sync reports live, later moves in and back out are recorded for Home, an
+// ambiguous channel is asked about on Home, answers stick, a hand-placed
+// channel is never moved, and a deleted view stays deleted.
 import { afterEach, describe, expect, it } from 'vitest'
-import { homeView, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
+import { homeMovesSeen, homeView, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { liveQuery, runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
@@ -39,7 +39,7 @@ const RELEASES = 'C0RELEASES'
 /** The job takes changes in 3 second windows: after this, a pass has looked at what changed. */
 const afterAPass = () => sleep(4000)
 
-/** Half the messages from the deploy bot, half from people: the rules cannot tell, nor can the fake AI. */
+/** More top-level posts from the deploy bot than from people, but not nearly all: the rules cannot tell, nor can the fake AI. */
 function addReleases(fake: FakeSlack): void {
   fake.addChannel({
     id: RELEASES,
@@ -51,6 +51,7 @@ function addReleases(fake: FakeSlack): void {
       { user: 'U0PRIYA', text: 'Can we hold 2.3 until the icons land?', ago: 45 },
       { user: 'U0DEPLOYBOT', text: 'web 2.3.1 tagged', ago: 40 },
       { user: 'U0SAM', text: 'Sure, Friday then.', ago: 35 },
+      { user: 'U0DEPLOYBOT', text: 'web 2.3.2 tagged', ago: 30 },
     ],
   })
 }
@@ -72,22 +73,12 @@ describe('the Automated view', () => {
     expect([...inView].toSorted()).toEqual(['C0ALERTSPROD', 'C0DEPLOYS'])
   })
 
-  it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
-    const now = engine.fake.now()
-    engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
-    engine.fake.joinChannel({ channel: 'C0BUILDS' })
-    for (let n = 1; n <= 5; n++) engine.fake.injectMessage({ channel: 'C0BUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
-    const views = await viewsUntil(engine, (list) => holds(list, 'C0BUILDS'), 'the new channel in Automated')
-    expect(automatedOf(views)!.addedByJuno).toContain('C0BUILDS')
-  })
-
   it('asks about an ambiguous channel on Home; Move and Keep in All stick, and each undoes', async () => {
     const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true })
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
     // The reason is Juno's, from the fake AI.
-    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases?', channel: { id: RELEASES, label: '#releases' }, reason: '3 of 6 messages from apps' })
+    expect(question).toMatchObject({ id: `automated:${RELEASES}`, title: 'Move #releases?', channel: { id: RELEASES, label: '#releases' }, reason: '4 of 7 messages from apps' })
 
     const moved = valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: RELEASES, to: 'automated' }))
     expect(moved.undo).toEqual({ _tag: 'views.sortChannel', channel: RELEASES, to: 'ask' })
@@ -128,5 +119,45 @@ describe('the Automated view', () => {
     await engine.rowsUntil((rows) => rows.some((row) => row.channel.id === 'C0DEPLOYS' && row.preview.text.includes('aa11')), 'deploys back in All')
     await afterAPass()
     expect(automatedOf(await viewsUntil(engine, () => true, 'views'))).toBeUndefined()
+  })
+})
+
+describe("Automated's record", () => {
+  it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
+    const engine = await bootedEngine(engines, { aiJobs: true })
+    const now = engine.fake.now()
+    engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
+    engine.fake.joinChannel({ channel: 'C0BUILDS' })
+    for (let n = 1; n <= 5; n++) engine.fake.injectMessage({ channel: 'C0BUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
+    const views = await viewsUntil(engine, (list) => holds(list, 'C0BUILDS'), 'the new channel in Automated')
+    expect(automatedOf(views)!.addedByJuno).toContain('C0BUILDS')
+
+    // Moved after the first sync, so Home's record says so, with the counts the rule read.
+    const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automatedMoves'), 'the record on Home')
+    const record = home.items.find((item) => item.kind === 'automatedMoves')!
+    expect(record.title).toBe('Juno moved 1 channel to Automated')
+    expect(record.topics.map((topic) => topic.moved)).toEqual([
+      expect.objectContaining({ change: 'in', channel: expect.objectContaining({ id: 'C0BUILDS', label: '#builds' }), reason: expect.stringMatching(/^Apps wrote \d+ of the last \d+ top-level messages$/) }),
+    ])
+
+    // Shown once: then it waits.
+    valueOf(await runCommand(engine.registry, homeMovesSeen, { channels: ['C0BUILDS'] }))
+    await homeUntil(engine, (view) => !view.items.some((item) => item.kind === 'automatedMoves'), 'the record seen')
+  })
+
+  it('takes a channel back out once people start most conversations there, and the record says so', async () => {
+    const engine = await bootedEngine(engines, { aiJobs: true })
+    await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
+    // The first sync's own sorting is not news.
+    expect((await homeUntil(engine, () => true, 'home')).items.some((item) => item.kind === 'automatedMoves')).toBe(false)
+
+    // Its name says alerts, so people must start seven in ten: 21 of the latest 30 top-level messages.
+    for (let n = 0; n < 21; n++) engine.fake.injectMessage({ channel: 'C0ALERTSPROD', user: n % 2 === 0 ? 'U0SAM' : 'U0PRIYA', text: `Looking at the p95 spike, part ${n}` })
+    await viewsUntil(engine, (list) => !holds(list, 'C0ALERTSPROD'), 'alerts moved back')
+    const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automatedMoves'), 'the record on Home')
+    const record = home.items.find((item) => item.kind === 'automatedMoves')!
+    expect(record.title).toBe('Juno moved 1 channel out of Automated')
+    expect(record.topics[0]!.moved).toMatchObject({ change: 'out', reason: 'Moved back: people start most conversations here', detail: 'People wrote 21 of the last 30 top-level messages' })
+    expect(channelsOf(await engine.rows()).has('C0ALERTSPROD')).toBe(true)
   })
 })

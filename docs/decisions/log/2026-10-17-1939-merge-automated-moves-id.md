@@ -1,0 +1,1 @@
+- 10-17 19:39 · release-keeper · Merging automated-explain after privacy-titles: its automated_moves migration is renumbered 202610181600, after ai_title_version (1500), because the Migrator only runs ids above the newest one an install has.

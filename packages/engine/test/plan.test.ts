@@ -13,6 +13,7 @@ import { reactionsStatement, rootStatement, threadsStatements, threadTitlesState
 import { homeStatements } from '../src/home/query'
 import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
+import { movesStatements } from '../src/home/moves'
 import { activityStatement, frequentConversationsStatement, frequentSendsStatement, pickerStatements } from '../src/newchat/query'
 import { mentionStatements } from '../src/mentions/query'
 import { searchStatements } from '../src/search/query'
@@ -186,6 +187,9 @@ describe('query plans', () => {
         homeStatements.kept(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
         automatedStatements.candidates(),
         automatedStatements.sample('C0ALERTS'),
+        automatedStatements.moved(),
+        movesStatements.unseen(),
+        homeStatements.mains(['C0ALERTS', 'C0DEPLOYS']),
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)

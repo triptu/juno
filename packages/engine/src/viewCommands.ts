@@ -13,10 +13,10 @@
  */
 import { randomUUID } from 'node:crypto'
 import { Clock, Effect } from 'effect'
-import { NotFound, NotSignedIn, type AutomatedPlace, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
+import { NotFound, NotSignedIn, type AutomatedPlace, type AutomatedRestore, type CommandResult, type SavedView, type SidebarView, type ViewDraft } from '@juno/contract'
 import { AUTOMATED_VIEW_ID, viewName, type ViewColor, type ViewIcon } from '@juno/domain'
 import { invalidate, keys, StoreReader, StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
-import { leaveAutomated, moveToAutomated, placedByHand, setVerdict } from './automatedView'
+import { clearVerdict, leaveAutomated, moveToAutomated, placedByHand, setVerdict, type SortedBy } from './automatedView'
 import { channelInfoOf, channelRefOf, userName, type UserRow } from './topicRows'
 import { Workspace } from './workspace'
 
@@ -172,31 +172,40 @@ export const reorderViews = (ids: ReadonlyArray<string>) =>
   )
 
 /**
- * The user's answer about Automated (Home's Move and Keep in All), or its
- * undo (`ask`, or the earlier answer). Move makes the view if needed, even
- * one the user deleted, since they asked for it. The undo is the place the
- * conversation had before; nothing changed, no undo.
+ * The user's answer about Automated (Home's Move and Keep in All, and the
+ * record's Move back and Keep), or its undo (`ask`, the earlier answer, or
+ * with `restore` the place the rules or Juno had given it). Move makes the
+ * view if needed, even one the user deleted, since they asked for it. The
+ * undo is the place the conversation had before; nothing changed, no undo.
  */
-export const sortChannel = (channel: string, to: AutomatedPlace) =>
+export const sortChannel = (channel: string, to: AutomatedPlace, restore?: AutomatedRestore) =>
   Effect.gen(function* () {
     const before = yield* inWorkspace((now) =>
       Effect.gen(function* () {
         const sql = yield* StoreWriter
         const inView = (yield* sql<{ n: number }>`SELECT count(*) AS n FROM sidebar_view_channels WHERE view_id = ${AUTOMATED_VIEW_ID} AND channel = ${channel}`)[0]?.n === 1
-        const row = (yield* sql<{ verdict: string; by: string }>`SELECT verdict, by FROM automated_channels WHERE channel = ${channel}`)[0]
+        const row = (yield* sql<{ verdict: string; by: SortedBy }>`SELECT verdict, by FROM automated_channels WHERE channel = ${channel}`)[0]
         const place: AutomatedPlace = inView ? 'automated' : row?.verdict === 'kept' ? 'kept' : 'ask'
-        if (place === to && (to === 'ask' || row?.by === 'you')) return undefined
-        if (to === 'automated') yield* moveToAutomated(channel, 'you', now)
+        // Who had placed it, when the undo must give it back to them rather than to a question.
+        const by: AutomatedRestore | undefined = inView && row !== undefined && row.by !== 'you' ? row.by : !inView && row === undefined ? 'none' : undefined
+        if (restore === undefined && place === to && (to === 'ask' || row?.by === 'you')) return undefined
+        if (restore === 'rules' || restore === 'juno') yield* moveToAutomated(channel, restore, now)
+        else if (restore === 'none') {
+          yield* leaveAutomated(channel)
+          yield* clearVerdict(channel)
+        } else if (to === 'automated') yield* moveToAutomated(channel, 'you', now)
         else {
           yield* leaveAutomated(channel)
           // Back to a question the rules asked; the job looks at it again when the conversation moves.
           yield* setVerdict(channel, to, to === 'ask' ? 'rules' : 'you', now)
         }
-        return place
+        return { place, by }
       }),
     )
     if (before === undefined) return {} satisfies CommandResult
-    return { undo: { _tag: 'views.sortChannel', channel, to: before } } satisfies CommandResult
+    // A question put back stays a question; otherwise who placed it comes back with the place.
+    const restoreBy = before.place === 'ask' && before.by !== 'none' ? undefined : before.by
+    return { undo: { _tag: 'views.sortChannel', channel, to: before.place, ...(restoreBy === undefined ? {} : { restore: restoreBy }) } } satisfies CommandResult
   })
 
 interface MemberRow extends ViewRow {

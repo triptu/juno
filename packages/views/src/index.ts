@@ -80,6 +80,8 @@ export { Home } from './Home'
 export { HomeSyncLine } from './HomeSyncLine'
 export { SettingsTidyUp } from './TidyUpSettings'
 export { SettledReview } from './SettledReview'
+export { AutomatedReview } from './AutomatedReview'
+export { movedToast } from './automatedMoves'
 export { type SettledStatus } from './settled'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'

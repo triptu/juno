@@ -30,3 +30,11 @@ export type SavedView = typeof SavedView.Type
  */
 export const AutomatedPlace = Schema.Literals(['automated', 'kept', 'ask'])
 export type AutomatedPlace = typeof AutomatedPlace.Type
+
+/**
+ * Only in an undo: who had settled the conversation before the user's
+ * answer, so the undo puts it back exactly. `rules` or `juno`: they had
+ * moved it into Automated. `none`: nobody had, and it was in no question.
+ */
+export const AutomatedRestore = Schema.Literals(['rules', 'juno', 'none'])
+export type AutomatedRestore = typeof AutomatedRestore.Type

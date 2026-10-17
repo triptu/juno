@@ -40,7 +40,7 @@ export const homeItems = {
     topics: [releases],
     at: NOW - 35 * MINUTE,
     channel: { id: 'C0RELEASES', kind: 'public', name: 'releases', label: '#releases', tint: 'public', icon: 'rocket', color: 'cyan' },
-    reason: 'Apps wrote 18 of the last 30 messages',
+    reason: 'Apps wrote 18 of the last 30 top-level messages',
   },
   /** Asked after Juno judged it: Juno's reason, on a long channel name. */
   automatedByJuno: {

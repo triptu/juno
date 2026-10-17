@@ -12,7 +12,7 @@ const open = (page: Page, component: string, id: string) =>
   openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
 
 for (const [state, title, meta] of [
-  ['items/automated', 'Move #releases?', 'To Automated · Apps wrote 18 of the last 30 messages'],
+  ['items/automated', 'Move #releases?', 'To Automated · Apps wrote 18 of the last 30 top-level messages'],
   ['items/automated-juno', 'Move #vendor-status-updates?', 'To Automated · Status updates from an app, a few replies'],
 ] as const) {
   test(`Home Automated keeps its two lines aligned, says why it asks, and insets its actions evenly (${state})`, async ({ page }) => {

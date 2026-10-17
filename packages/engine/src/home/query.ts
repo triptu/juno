@@ -16,6 +16,9 @@
  * - Automated: the most recently active conversation the rules and Juno
  *   could not place (`ask` in `automated_channels`, by `automated.ts`), in
  *   no view, while the user has not deleted the Automated view.
+ * - Automated's record: the moves the rules and Juno made (`automated_moves`)
+ *   that Home has not shown yet and the user has not settled since, once
+ *   the first sync is done and at most once a day (`MOVES_SEEN_PREF`).
  *
  * "Followed" is a thread Slack follows or a DM's Main. Resolved topics and
  * ignored channels never appear. `rankHomeItems` keeps at most one of each
@@ -45,6 +48,7 @@ import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
+import { moveLines, readMoves, type MoveRow } from './moves'
 import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, TOPIC_COLUMNS, TOPIC_FROM, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
 
 /** A topic row with Juno's read pointer. */
@@ -107,6 +111,11 @@ export const homeStatements = {
     sql: `SELECT topic_id, settled_dismissed_ts FROM topic_overlay WHERE topic_id IN (${ids.map(() => '?').join(', ')}) AND settled_dismissed_ts IS NOT NULL`,
     params: [...ids],
   }),
+  /** The Mains of the channels Automated's record names. */
+  mains: (channels: ReadonlyArray<string>): Statement => ({
+    sql: `${HOME_SELECT} WHERE i.channel IN (${channels.map(() => '?').join(', ')}) AND i.kind = 'main' AND ${OPEN}`,
+    params: [...channels],
+  }),
   /** Why Home asks about a conversation, stored with its question. */
   askedWhy: (channel: string): Statement => ({
     sql: `SELECT apps, sampled, reason FROM automated_channels WHERE channel = ?`,
@@ -155,6 +164,8 @@ interface Candidate {
   readonly rows: ReadonlyArray<HomeRow>
   /** Tidy up: why each topic looks settled, by topic id, `by` still a user id. */
   readonly settled?: ReadonlyMap<string, SettledWhy>
+  /** Automated's record: each Main's move, by topic id. */
+  readonly moves?: ReadonlyMap<string, MoveRow>
 }
 
 /** What `readHome` returns: the view, and the items whose title line the assistant may rewrite. */
@@ -207,8 +218,8 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const now = yield* Clock.currentTimeMillis
     const unread = yield* run(homeStatements.unread(millisToTs(now - UNREAD_DAYS * DAY)))
     const candidates: Array<HomeCandidate<Candidate>> = []
-    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, settled?: ReadonlyMap<string, SettledWhy>) =>
-      candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...(settled === undefined ? {} : { settled }) } })
+    const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, extra?: Pick<Candidate, 'settled' | 'moves'>) =>
+      candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...extra } })
     const senders = new Set<string>()
 
     // Waiting on you: the newest topic with a question first.
@@ -277,7 +288,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
           if (evidence.by !== undefined) senders.add(evidence.by)
           why.set(row.topic_id, { ...evidence, ...(evidence.kind === 'quiet' && clause !== undefined ? { juno: clause } : {}) })
         }
-        add({ id: 'tidyUp', kind: 'tidyUp', title: `${settled.length} topics look settled` }, settled, why)
+        add({ id: 'tidyUp', kind: 'tidyUp', title: `${settled.length} topics look settled` }, settled, { settled: why })
       }
     }
 
@@ -296,6 +307,13 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         },
         [asked],
       )
+    }
+
+    // Automated's record: what Juno moved that Home has not shown, after the first sync and once a day.
+    const booted = yield* syncState.get(BOOT_KEY)
+    if (booted !== undefined) {
+      const record = yield* readMoves(now, (channels) => run(homeStatements.mains(channels)))
+      if (record !== undefined) add({ id: 'automatedMoves', kind: 'automatedMoves', title: record.title }, record.rows, { moves: record.moves })
     }
 
     const ranked = rankHomeItems(candidates, HOME_ITEM_LIMIT)
@@ -356,12 +374,19 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
         const by = why.by === undefined ? {} : { by: firstName(nameOf(why.by)) }
         return { ...topic, ...(row.last_activity_ts === null ? {} : { at: tsToMillis(row.last_activity_ts as Ts) }), settled: { ...why, ...by } }
       }
-      const item: HomeItem = { ...base, title, topics: rows.map(base.kind === 'tidyUp' ? settledOf : topicOf), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
+      const movedOf = (row: HomeRow): HomeTopic => {
+        const move = candidate.value.moves?.get(row.topic_id)
+        const topic = topicOf(row)
+        if (move === undefined) return topic
+        const ref = automatedChannelOf(row)
+        return { ...topic, at: Number(move.at), moved: { channel: ref, change: move.change, ...moveLines(move) } }
+      }
+      const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : topicOf
+      const item: HomeItem = { ...base, title, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item
     })
 
-    const booted = yield* syncState.get(BOOT_KEY)
     const self = selfId === undefined ? undefined : users.get(selfId)
     const name = self === undefined ? '' : firstName(self.real_name ?? self.display_name ?? self.name ?? '')
     return {
