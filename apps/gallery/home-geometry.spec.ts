@@ -44,8 +44,8 @@ for (const [state, title, meta] of [
 test('Home keeps the syncing line under the greeting as its copy changes', async ({ page }) => {
   const starts: Array<{ readonly greeting: number; readonly line: number; readonly first: number }> = []
   for (const [state, copy] of [
-    ['Empty/syncing', 'Syncing with Slack.'],
-    ['Empty/syncing-count', /^Syncing\s*7\s*of 143 conversations\.$/],
+    ['empty/syncing', 'Syncing with Slack.'],
+    ['empty/syncing-count', /^Syncing\s*7\s*of 143 conversations\.$/],
   ] as const) {
     await open(page, 'Home', state)
     const line = page.locator('[data-home] h2 + p')
