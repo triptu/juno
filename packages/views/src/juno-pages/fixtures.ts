@@ -187,6 +187,9 @@ export const settings: JunoSettingsPage = {
   compactionModels: models('Muse'),
   spentTodayUsd: 0.35,
   capUsd: 2,
+  limitTodayUsd: 2,
+  backgroundTodayUsd: 0.1,
+  backgroundLimitUsd: 1,
   codex: { _tag: 'ready', version: '0.42.1' },
   openRouterKey: 'set',
   rules: [

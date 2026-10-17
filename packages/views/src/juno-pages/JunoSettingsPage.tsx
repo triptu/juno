@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { chatCopy, modelChoiceKey, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
+import { chatCopy, modelChoiceKey, NO_LIMIT_USD, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
 import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
 import { BackupSection, ThisMacSection, type BackupSectionProps, type ThisMacSectionProps } from './BackupSections'
@@ -13,14 +13,10 @@ export interface JunoSettingsPageProps {
   /** A listed modelChoiceKey, or a typed custom model id. */
   readonly onChatModel: (family: string) => void
   readonly onCompactionModel: (family: string) => void
-  readonly onCap: (usd: number) => void
+  /** "Change limit": opens Settings › AI activity, where the daily limit is set. */
+  readonly onOpenLimit: () => void
   readonly onPaused: (paused: boolean) => void
   readonly onSignInCodex?: () => void
-}
-
-function commitCap(text: string, current: number, onCap: (usd: number) => void): void {
-  const value = Number(text)
-  if (text.trim() !== '' && Number.isFinite(value) && value >= 0 && value !== current) onCap(value)
 }
 
 function commitModel(text: string, current: string, onChatModel: (id: string) => void): void {
@@ -47,14 +43,14 @@ export function modelOptions(models: ReadonlyArray<ModelChoice>) {
 
 /**
  * Settings › Juno (SPEC 13.10): the providers, the models, today's spend
- * and the cap, Codex and Pause. The owner's rules are on Connections. Settings change only
+ * with a way to the daily limit in AI activity, Codex and Pause. The owner's rules are on Connections. Settings change only
  * here; no conversation can change them.
  */
 export function JunoSettingsPage({
   page,
   onChatModel,
   onCompactionModel,
-  onCap,
+  onOpenLimit,
   providers,
   onSignInCodex,
   onPaused,
@@ -124,52 +120,30 @@ export function JunoSettingsPage({
         </Surface>
       </Section>
 
-      <Section heading="Spend" sub="At the cap, new spending waits until tomorrow or you raise it. Work already under way can finish.">
+      <Section heading="Spend" sub="At the daily limit, new spending waits until midnight or until you raise it. Work already under way can finish.">
         <Surface kind="group">
-          <ListRow
-            trailing={
-              <Text variant="body" numeric>
-                {usd(page.spentTodayUsd)}
-              </Text>
-            }
-          >
-            <Text variant="body">Today</Text>
-          </ListRow>
           <ListRow
             divider={false}
             trailing={
-              <TextField
-                size={30}
-                label="Daily cap in dollars"
-                leading={
-                  <Text variant="ui" tone="muted" aria-hidden>
-                    $
-                  </Text>
-                }
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={0.5}
-                // Committed on blur or Enter, so a field cleared while typing never sets the cap to $0.
-                key={page.capUsd}
-                defaultValue={page.capUsd}
-                onBlur={(event) => commitCap(event.currentTarget.value, page.capUsd, onCap)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') commitCap(event.currentTarget.value, page.capUsd, onCap)
-                }}
-                width="keyword"
-              />
+              <span {...stylex.props(cell.controls)}>
+                <Text variant="body" numeric>
+                  {page.capUsd >= NO_LIMIT_USD ? `${usd(page.spentTodayUsd)} today` : `${usd(page.spentTodayUsd)} of ${usd(page.limitTodayUsd)} today`}
+                </Text>
+                <Button variant="secondary" size="sm" onClick={onOpenLimit}>
+                  Change limit
+                </Button>
+              </span>
             }
           >
             {page.spendUntracked === true ? (
               <span {...stylex.props(cell.lines)}>
-                <Text variant="body">Daily cap</Text>
+                <Text variant="body">Today</Text>
                 <Text variant="meta" tone="muted" data-spend-untracked="">
-                  {chatChoice?.provider === 'codex' ? 'Codex uses your ChatGPT plan. The daily cap applies to API models only.' : chatCopy.providers.spendUntracked}
+                  {chatChoice?.provider === 'codex' ? 'Codex uses your ChatGPT plan. The daily limit applies to API models only.' : chatCopy.providers.spendUntracked}
                 </Text>
               </span>
             ) : (
-              <Text variant="body">Daily cap</Text>
+              <Text variant="body">Today</Text>
             )}
           </ListRow>
         </Surface>

@@ -16,8 +16,9 @@
  *   from the next compaction job.
  * - A model with no prices (most custom endpoints) costs $0 in the ledger,
  *   so the cap cannot track it (`spendUntracked`).
- * - Spend: today's spend from the WP9 ledger (actual plus unknown spend),
- *   and the cap. A new cap applies today at once and is saved for later
+ * - Spend: today's spend from the WP9 ledger, counted as it is checked
+ *   against the limit (reported costs, open and unknown reservations in
+ *   full), the engine's part and its half share, and the cap. A new cap applies today at once and is saved for later
  *   days; existing reservations are kept when it is lowered.
  * - Keys: only whether the active provider refused its key on the last
  *   call. Whether each key is set is main's (`ProviderState`); the keys
@@ -179,8 +180,12 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
     return {
       chatModels: choices('chat'),
       compactionModels: choices('compaction'),
-      spentTodayUsd: (spend.actual + spend.unknown) / DOLLAR,
+      // The same rows the ledger checks a reservation against (`spend/index.ts` `fits`).
+      spentTodayUsd: (spend.reserved + spend.actual) / DOLLAR,
       capUsd: spend.cap / DOLLAR,
+      limitTodayUsd: (spend.cap + spend.raises) / DOLLAR,
+      backgroundTodayUsd: spend.engine / DOLLAR,
+      backgroundLimitUsd: Math.floor((spend.cap + spend.raises) / 2) / DOLLAR,
       codex: picker.codexStatus?.() ?? { _tag: 'missing' },
       openRouterKey: active?._tag === 'openRouter' ? (connection.isRejected() ? 'rejected' : 'set') : 'missing',
       ...(custom ? { provider: 'custom' as const } : {}),

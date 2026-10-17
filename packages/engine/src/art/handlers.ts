@@ -1,8 +1,9 @@
 /**
  * `art.redraw`: a new drawing for one topic, different from the stored one,
  * in place of it, with the old row as its undo. `art.restore` writes that
- * row back. `art.available` says whether a redraw could draw now, so the
- * topic menu shows Redraw art only then. The job (`job.ts`) draws
+ * row back. `art.available` says whether a redraw could draw: AI assist on
+ * and a key, so the topic menu shows Redraw art only then. At the daily
+ * limit it still shows, and a click says so. The job (`job.ts`) draws
  * everything else by itself.
  */
 import { AiProvider } from '@juno/ai'
@@ -13,7 +14,6 @@ import { Clock, Effect } from 'effect'
 import { AiPurpose, aiAssistOn, decisionProviderAvailable } from '../ai'
 import { AiAudit } from '../aiAudit'
 import { AiCredentials } from '../aiCredentials'
-import { AiSpend } from '../aiSpend'
 import { EngineConfig } from '../config'
 import { Workspace, type StoreServices } from '../workspace'
 import { ART_SELECT, canDraw, drawTopic, restoreArt, type ArtOutcome } from './draw'
@@ -38,9 +38,6 @@ const UNAVAILABLE: Record<Exclude<ArtOutcome, 'ok' | 'unsure'>, AiUnavailable['r
   'no-agent': 'no-agent',
 }
 
-/** How long the topic menu waits for the spend ledger before it shows Redraw art anyway. */
-const CAP_CHECK_TIMEOUT = '200 millis'
-
 const storedOf = (art: TopicArtRow): StoredArt => ({
   recipe: art.recipe,
   inputHash: art.input_hash,
@@ -59,27 +56,13 @@ export const ArtHandlers = ArtRoutes.toLayer(
     const audit = yield* AiAudit
     const config = yield* EngineConfig
     const credentials = yield* AiCredentials
-    const spend = yield* AiSpend
-    /** Today's cap is not reached for a call Redraw makes: a reservation of nothing fits, and is settled at once. */
-    const underCap = Effect.gen(function* () {
-      // The ungated fake spends nothing, so no cap applies to it.
-      if (config.ai === 'fake' && config.fakeAiRequiresKey !== true) return true
-      const admission = yield* spend.admit(0).pipe(Effect.timeoutOption(CAP_CHECK_TIMEOUT))
-      if (admission._tag === 'None') return true
-      if (admission.value._tag === 'Admitted') {
-        yield* admission.value.settle(0)
-        return true
-      }
-      // No agent to ask is not the cap; Redraw art then says why it could not draw.
-      return admission.value.reason !== 'cap'
-    })
     return {
       'art.available': () =>
         Effect.gen(function* () {
           const open = yield* workspace.current
           if (open === undefined || !(yield* aiAssistOn.pipe(Effect.provide(open.context)))) return false
-          if (!(yield* decisionProviderAvailable.pipe(Effect.provideService(EngineConfig, config), Effect.provideService(AiCredentials, credentials)))) return false
-          return yield* underCap
+          // At the daily limit Redraw art still shows: a click says which limit, with a way to change it.
+          return yield* decisionProviderAvailable.pipe(Effect.provideService(EngineConfig, config), Effect.provideService(AiCredentials, credentials))
         }),
       'art.redraw': ({ id }) =>
         Effect.gen(function* () {

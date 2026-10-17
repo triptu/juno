@@ -285,7 +285,7 @@ export const chatCopy = {
     customRejected: 'The endpoint rejected this key',
     modelId: 'Model id',
     modelTyped: 'This endpoint does not list its models. Type the id of the one to use.',
-    spendUntracked: 'This model reports no prices, so the cap cannot track what it costs.',
+    spendUntracked: 'This model reports no prices, so the daily limit cannot track what it costs.',
   },
   contextMenu: {
     copy: 'Copy',

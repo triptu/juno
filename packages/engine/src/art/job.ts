@@ -155,15 +155,18 @@ export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCreden
     let previous: OpenWorkspace | undefined
     let unstored = { today: 0, day: 0 }
     const passes = workspace.changes.pipe(
-      Stream.zipLatest(wakes),
-      Stream.switchMap(([open]) => {
+      Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
         if (previous !== open) unstored = { today: 0, day: 0 }
         previous = open
         const memory: Memory = { unstored, deferred: new Map(), passDeferredUntil: 0 }
         // The live query is the trigger; each pass reads its own fresh candidates, so a stale emission costs one query.
-        return liveQuery(KEYS, Effect.void).pipe(
-          Stream.debounce(DEBOUNCE),
+        // A wake forgets the waits and runs a pass after the one under way, which it does not stop.
+        const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => {
+          memory.deferred.clear()
+          memory.passDeferredUntil = 0
+        })))
+        return Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), woken).pipe(
           Stream.mapEffect(() =>
             runPass(memory).pipe(
               Effect.catch((error) => Effect.logWarning('topic art: a pass failed', error)),

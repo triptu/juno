@@ -245,11 +245,22 @@ export type Ownership = typeof Ownership.Type
 /** Provider disambiguates the same family offered through two transports. */
 export const modelChoiceKey = (model: Pick<ModelChoice, 'provider' | 'family'>): string => model.provider === 'codex' ? `codex:${model.family}` : model.family
 
+/** A daily limit this high is "No limit" (Settings › AI activity). */
+export const NO_LIMIT_USD = 1_000_000
+
 export const JunoSettingsPage = Schema.Struct({
   chatModels: Schema.Array(ModelChoice),
   compactionModels: Schema.Array(ModelChoice),
+  /** Today's spend as the ledger counts it against the limit: reported costs, plus calls under way or of unknown cost at their reserved amount. */
   spentTodayUsd: Schema.Number,
+  /** The daily limit the owner set, for today and later days. `NO_LIMIT_USD` or more is no limit. */
   capUsd: Schema.Number,
+  /** Today's limit: the daily limit plus any "Allow $1 more". */
+  limitTodayUsd: Schema.Number,
+  /** What topic art, titles, Home and the send checks spent today, counted the same way. */
+  backgroundTodayUsd: Schema.Number,
+  /** Their share of today's limit: half, so Juno chats always keep the rest. */
+  backgroundLimitUsd: Schema.Number,
   /** Codex on this Mac: not installed, signed out, or ready with its version. */
   codex: Schema.Union([
     Schema.TaggedStruct('missing', {}),

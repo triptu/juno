@@ -51,7 +51,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.connections.add': [{ ...op, label: 'Docs', url: 'https://mcp.example.com/mcp' }, accepted],
   'agent.review.page': [null, { page: { backupAt: 1234, pending: [] }, cards: [] }],
   'agent.review.activate': [{ ...op, backupAt: 1234, oldDeviceOffOrErased: true }, accepted],
-  'agent.settings.page': [null, { chatModels: [], compactionModels: [], spentTodayUsd: 0, capUsd: 2, codex: { _tag: 'missing' }, openRouterKey: 'missing', rules: [], paused: false, backupFolder: 'backup', ownership: { _tag: 'active', epoch: 1 } }],
+  'agent.settings.page': [null, { chatModels: [], compactionModels: [], spentTodayUsd: 0, capUsd: 5, limitTodayUsd: 5, backgroundTodayUsd: 0, backgroundLimitUsd: 2.5, codex: { _tag: 'missing' }, openRouterKey: 'missing', rules: [], paused: false, backupFolder: 'backup', ownership: { _tag: 'active', epoch: 1 } }],
   'agent.settings.change': [{ ...op, change: { _tag: 'cap', usd: 2 } }, accepted],
   'agent.settings.credentials': [{ provider: 'codex', action: 'setUp' }, undefined],
   'agent.settings.ownership': [{ ...op, action: { _tag: 'move' } }, accepted],

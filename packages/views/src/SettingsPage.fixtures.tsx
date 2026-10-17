@@ -11,12 +11,16 @@ import { RulesSection } from './juno-pages/RulesSection'
 import { NotificationsPage } from './NotificationsPage'
 import { notificationsBase } from './NotificationsPage.fixtures'
 import { SettingsPage, type SettingsPageProps } from './SettingsPage'
+import { NO_LIMIT_USD } from '@juno/agent-contract'
 import { AiActivityPage } from './AiActivityPage'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
 import { EmojiPicker } from './EmojiPicker'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
 import { sevenQuickReactions } from './fixtures/quickReactions'
 import { UpdateSettings } from './UpdateSettings'
+
+/** Today's spend from the agent's ledger, under the default $5 limit. */
+const spendToday = { spentUsd: 0.42, limitUsd: 5, capUsd: 5, backgroundUsd: 0.31, backgroundLimitUsd: 2.5 }
 
 /** As a new install has them: all on except Capital i. */
 const checks = sendCheckPrefKeys.map((key) => ({ key, enabled: sendCheckDefaults[key] }))
@@ -37,7 +41,7 @@ const drafts = { openRouterKey: '', baseUrl: '', customKey: '' }
 const provider = (state: ProviderState, focusFirst = false) => (
   <ProviderSection state={state} shown="openRouter" drafts={drafts} focusFirst={focusFirst} onShow={noop} onDraft={noop} onSave={noop} onRemove={noop} />
 )
-const juno = { onChatModel: noop, onCompactionModel: noop, onCap: noop, onPaused: noop }
+const juno = { onChatModel: noop, onCompactionModel: noop, onOpenLimit: noop, onPaused: noop }
 const backup = { now: NOW, onBackupFolder: noop, onExportPhrase: noop, onMove: noop, onRestore: noop, onStopJob: noop, onAddProvider: noop }
 
 const ignored = [
@@ -84,7 +88,7 @@ export default defineFixtures(
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
       ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
       juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} />),
-      'ai-activity': at('ai-activity', <AiActivityPage activity={aiActivity} now={NOW} onCopyDetails={noop} />),
+      'ai-activity': at('ai-activity', <AiActivityPage activity={aiActivity} spend={spendToday} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       connections: at('connections', <ConnectionsPage page={connections} rules={<RulesSection rules={settings.rules} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />} onAction={noop} onConfigure={noop} onAdd={noop} />),
       backup: at('backup', <JunoBackupPage {...backup} page={settings} />),
       about: at('about', about),
@@ -107,6 +111,8 @@ export default defineFixtures(
       'general-minimum-window': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />, { width: 336, height: 436, padded: false }),
       'appearance-minimum-window': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />, { width: 336, height: 436, padded: false }),
       'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
+      'ai-activity-background-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, spentUsd: 2.51, backgroundUsd: 2.5 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
+      'ai-activity-no-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, capUsd: NO_LIMIT_USD, limitUsd: NO_LIMIT_USD, backgroundLimitUsd: NO_LIMIT_USD / 2 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       'ai-activity-empty': at('ai-activity', <AiActivityPage activity={{ calls: [], todayUsd: 0, todayCalls: 0 }} now={NOW} onCopyDetails={noop} />),
       // From "Add a provider" or "Juno needs a model": no agent runs, and the key field has focus.
       'juno-add-provider': at('juno', <JunoSettingsPage {...juno} providers={provider(none, true)} />),

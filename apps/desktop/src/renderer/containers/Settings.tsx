@@ -1,6 +1,7 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
 import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, showTour, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
 import { AppInfo } from './AppInfo'
@@ -145,10 +146,22 @@ function Ignored() {
   return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
 }
 
-/** AI activity: the engine's log of model calls, from the engine and the agent. */
+/**
+ * AI activity: the engine's log of model calls, from the engine and the
+ * agent, and today's spend and the daily limit from the agent's ledger,
+ * the numbers the limit is checked against.
+ */
 function AiActivity() {
   const activity = useAtomValue(aiActivityAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
+  const juno = useAtomValue(junoSettingsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
   // A row's time reads "10:42" or "Yesterday": a minute is fine enough.
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
-  return <AiActivityPage activity={activity} now={now} onCopyDetails={copyText} />
+  const spend = juno === undefined ? undefined : {
+    spentUsd: juno.spentTodayUsd,
+    limitUsd: juno.limitTodayUsd,
+    capUsd: juno.capUsd,
+    backgroundUsd: juno.backgroundTodayUsd,
+    backgroundLimitUsd: juno.backgroundLimitUsd,
+  }
+  return <AiActivityPage activity={activity} spend={spend} onLimit={(usd) => void junoPageActions(registry).settings({ _tag: 'cap', usd })} now={now} onCopyDetails={copyText} />
 }

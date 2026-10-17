@@ -43,6 +43,13 @@ type Revision = number
 const page = <A>(tag: string, payload: unknown = undefined) => AgentClient.runtime.atom(live<A, never>(tag, payload)).pipe(Atom.setIdleTTL(IDLE_TTL))
 
 export const junoSettingsAtom = page<JunoSettingsPage>('agent.settings.page')
+
+/** The agent's settings page now, for a message that names today's limit. Undefined when the agent does not answer within a second. */
+export async function junoSettingsNow(registry: Registry): Promise<JunoSettingsPage | undefined> {
+  const unmount = registry.mount(junoSettingsAtom)
+  const exit = await Effect.runPromiseExit(AtomRegistry.getResult(registry, junoSettingsAtom).pipe(Effect.timeoutOption('1 second'))).finally(unmount)
+  return Exit.isSuccess(exit) && exit.value._tag === 'Some' ? exit.value.value : undefined
+}
 export const remembersPageAtom = page<{ readonly page: RemembersPage; readonly revisions: ReadonlyArray<{ readonly id: PinId; readonly revision: Revision }> }>('agent.remembers.page')
 export const scheduledPageAtom = page<{ readonly page: ScheduledPage; readonly revisions: ReadonlyArray<{ readonly id: ScheduleId; readonly revision: Revision }> }>('agent.scheduled.page')
 export const connectionsPageAtom = page<ConnectionsPage>('agent.connections.page')

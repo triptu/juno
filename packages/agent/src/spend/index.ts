@@ -25,6 +25,8 @@ export interface SpendSnapshot {
   readonly unknown: number
   readonly actual: number
   readonly compaction: number
+  /** What the engine's path holds: open and unknown reservations in full, settled ones at their reported cost. */
+  readonly engine: number
   readonly codexTurns: number
 }
 export type Reservation = { readonly kind: 'reserved'; readonly id: string } | { readonly kind: 'blocked'; readonly reason: 'budget' }
@@ -61,13 +63,14 @@ export function createSpend(store: Store, cap: () => number = () => 2 * DOLLAR) 
       coalesce(sum(CASE WHEN state != 'settled' THEN amount ELSE 0 END), 0) AS reserved,
       coalesce(sum(CASE WHEN state = 'unknown' THEN amount ELSE 0 END), 0) AS unknown,
       coalesce(sum(actual), 0) AS actual,
-      coalesce(sum(CASE WHEN path = 'compaction' THEN coalesce(actual, amount) ELSE 0 END), 0) AS compaction
+      coalesce(sum(CASE WHEN path = 'compaction' THEN coalesce(actual, amount) ELSE 0 END), 0) AS compaction,
+      coalesce(sum(CASE WHEN path = 'engine' THEN coalesce(actual, amount) ELSE 0 END), 0) AS engine
       FROM spend_reservations WHERE day = ?`).get(day)!
     return {
       day,
       cap: Number(db.prepare('SELECT cap FROM spend_days WHERE day = ?').get(day)?.cap ?? cap()),
       raises: Number(db.prepare('SELECT coalesce(sum(amount), 0) AS n FROM spend_raises WHERE day = ?').get(day)!.n),
-      reserved: Number(row.reserved), unknown: Number(row.unknown), actual: Number(row.actual), compaction: Number(row.compaction),
+      reserved: Number(row.reserved), unknown: Number(row.unknown), actual: Number(row.actual), compaction: Number(row.compaction), engine: Number(row.engine),
       codexTurns: Number(db.prepare('SELECT count(*) AS n FROM codex_turns WHERE day = ?').get(day)!.n),
     }
   }

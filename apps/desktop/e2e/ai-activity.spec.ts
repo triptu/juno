@@ -38,7 +38,9 @@ test('a saved key gives a new thread an AI title and art, Redraw draws it again,
       await expect(call).toBeVisible()
       await expect(call).toContainText(/\$0\.\d{4}/)
     }
-    await expect(page.locator('[data-ai-activity-today-cost]')).not.toHaveText('$0.0000')
+    // Today's spend is the ledger's, against the default limit.
+    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $5.00 today')
+    await expect(page.getByLabel('Daily limit in dollars')).toHaveValue('5')
 
     // A row opens to its details, named by the topic's title as it is now.
     const redraw = calls.locator('[data-ai-call-feature="topicArt.redraw"]').first()

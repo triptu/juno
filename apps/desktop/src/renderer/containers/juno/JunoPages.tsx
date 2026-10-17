@@ -74,7 +74,7 @@ export function JunoSettings() {
   if (left !== shown) setShown(left)
   const providers = <Providers rejected={served?.openRouterKey === 'rejected' || served?.customKeyRejected === true} />
   // No agent runs until a provider is set up, and none answers until it starts: the provider section alone.
-  if (served === undefined) return <JunoSettingsPage providers={providers} onChatModel={noop} onCompactionModel={noop} onCap={noop} onPaused={noop} />
+  if (served === undefined) return <JunoSettingsPage providers={providers} onChatModel={noop} onCompactionModel={noop} onOpenLimit={noop} onPaused={noop} />
   const page = withShown(served, shown)
   const change = (next: Shown, request: JunoSettingsChange) => {
     setShown({ ...shown, ...next })
@@ -93,7 +93,7 @@ export function JunoSettings() {
         change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
       }}
       onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
-      onCap={(usd) => void actions.settings({ _tag: 'cap', usd })}
+      onOpenLimit={() => openSettings('ai-activity')}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
     />
   )

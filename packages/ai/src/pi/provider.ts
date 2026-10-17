@@ -68,6 +68,11 @@ interface Usage {
   output: number
 }
 
+/** How far a call got: the attempts started so far. */
+interface Progress {
+  attempts: number
+}
+
 /** One decision: up to two attempts inside the task's timeout, then a `Decision` with its meta. */
 interface Call<A> {
   readonly modelId: string
@@ -75,6 +80,8 @@ interface Call<A> {
   readonly timeoutMillis: number
   readonly maxAttempts?: number
   readonly started: number
+  /** Counts the attempts started, so a call stopped part way can settle what it may have cost. */
+  readonly progress?: Progress
   /** One attempt. `previous` is the failed first attempt, so the retry can change shape. */
   readonly attempt: (previous: Outcome<A> | undefined, usage: Usage) => Effect.Effect<Outcome<A>>
 }
@@ -167,12 +174,14 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       if (classifierSlug !== undefined) {
         const { model, priced } = resolveClassifier(models, classifierSlug)
         if (!config.apiKey) return noKey(model.id, started)
+        const apiKey = config.apiKey
         const bounds = attemptBounds(model.cost, priced, JSON.stringify(task.classify!.ask(input)), DECISION_MAX_TOKENS)
-        return yield* admitted(config, model.id, priced, bounds,
-          run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: classifyAttempt(task, input, model, config.apiKey) }))
+        return yield* admitted(config, model.id, priced, bounds, (progress) =>
+          run<Static<S>>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: classifyAttempt(task, input, model, apiKey) }))
       }
       const { model, priced } = resolveModel(models, modelFor(task.tier, config))
       if (!config.apiKey) return noKey(model.id, started)
+      const apiKey = config.apiKey
       const tool: Tool = { name: task.tool.name, description: task.tool.description, parameters: task.output }
       const request: Request<Static<S>> = {
         model,
@@ -187,8 +196,8 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
         },
       }
-      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
-        run<Static<S>>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
+      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
+        run<Static<S>>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, apiKey) }))
     })
 
   const generate: AiProviderShape['generate'] = <I>(task: TextTask<I>, input: I) =>
@@ -197,6 +206,7 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       const config = yield* readConfig
       const { model, priced } = resolveModel(models, modelFor(task.tier, config))
       if (!config.apiKey) return noKey(model.id, started)
+      const apiKey = config.apiKey
       const request: Request<string> = {
         model,
         toolChoice: 'auto',
@@ -212,8 +222,8 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
           return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
         },
       }
-      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens),
-        run<string>({ modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, config.apiKey) }))
+      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
+        run<string>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, apiKey) }))
     })
 
   return { decide, generate }
@@ -268,15 +278,30 @@ export function settledUsd<A>(decision: Decision<A>, priced: boolean, bounds: At
   return undefined
 }
 
+/**
+ * What to settle for a call stopped before it ended (its job restarted, the
+ * key changed, the app quit). Before any attempt nothing was sent. In the
+ * first attempt the retry was never sent, so the first attempt's bound is at
+ * least what it can have been billed, as for a timeout. Later, `undefined`
+ * keeps the whole reservation.
+ */
+export function stoppedUsd(priced: boolean, bounds: AttemptBounds, attempts: number): number | undefined {
+  if (attempts === 0) return 0
+  if (!priced) return undefined
+  return attempts === 1 ? bounds.first : undefined
+}
+
 /** Reserves the call's upper cost when the config has a cap, and settles it however the call ends. */
-function admitted<A>(config: AiConfig, modelId: string, priced: boolean, bounds: AttemptBounds, call: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
+function admitted<A>(config: AiConfig, modelId: string, priced: boolean, bounds: AttemptBounds, call: (progress: Progress) => Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
   const admit = config.admit
-  if (admit === undefined) return call
+  const progress: Progress = { attempts: 0 }
+  if (admit === undefined) return call(progress)
   return Effect.gen(function* () {
     const started = Date.now()
     const admission = yield* admit(bounds.total)
     if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', detail: admission.reason ?? 'cap', meta: { model: modelId, latencyMillis: Date.now() - started, attempts: 0 } } as Decision<A>
-    return yield* call.pipe(Effect.onExit((exit) => admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced, bounds) : undefined)))
+    return yield* call(progress).pipe(Effect.onExit((exit) =>
+      admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced, bounds) : stoppedUsd(priced, bounds, progress.attempts))))
   })
 }
 
@@ -288,6 +313,7 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
     const once = (previous: Outcome<A> | undefined) =>
       Effect.suspend(() => {
         attempts++
+        if (call.progress !== undefined) call.progress.attempts = attempts
         return call.attempt(previous, usage)
       })
     const twice = Effect.gen(function* () {

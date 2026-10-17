@@ -15,7 +15,7 @@ const provider = (props: Partial<ProviderSectionProps> = {}) => (
 const onCustom = (key: 'set' | 'missing' = 'missing') =>
   provider({ state: { ...none, active: 'custom', custom: { baseUrl: LOCAL, key } }, shown: 'custom', drafts: { ...emptyDrafts, baseUrl: LOCAL } })
 
-const callbacks = { onChatModel: noop, onCompactionModel: noop, onCap: noop, onPaused: noop }
+const callbacks = { onChatModel: noop, onCompactionModel: noop, onOpenLimit: noop, onPaused: noop }
 
 const page = (props: Pick<JunoSettingsPageProps, 'page'>) =>
   fixture<JunoSettingsPageProps>({
