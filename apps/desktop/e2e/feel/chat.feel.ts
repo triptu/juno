@@ -3,7 +3,7 @@
 // OpenRouter (`../juno-agent/chat.ts`).
 import { test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
-import { happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, switchesOnce } from './checks'
+import { happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
 import { Feel } from './feel'
 import { Studio } from './studio'
 
@@ -39,12 +39,14 @@ test('open the Juno tab, send, and the first bubble arrives', async ({ juno, fee
       probes: [
         { kind: 'rect', name: 'composer', selector: `${TAB} [data-juno-composer]` },
         { kind: 'text', name: 'header', selector: `${TAB} [data-juno-header]` },
+        { kind: 'opacity', name: 'welcome', selector: `${TAB} [data-chat-empty] h1` },
       ],
       regions: { chat: TAB },
       checks: [
         landsAndStays('composer', 'the composer', { from: 'press' }),
         switchesOnce('the header', (v) => String(v['header'] ?? 'none'), { from: 'press' }),
         noFlicker('chat', 'the chat', { from: 'press' }),
+        staysDrawn('welcome', 'the empty chat', { from: 'press' }),
       ],
     },
     async (rec) => {

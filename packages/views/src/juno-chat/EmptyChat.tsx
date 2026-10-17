@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import * as stylex from '@stylexjs/stylex'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/icons/ClockCounterClockwise'
@@ -11,7 +12,10 @@ import { SuggestionChip } from './SuggestionChip'
 export interface EmptyChatProps {
   /** A suggestion pill was clicked: the text is sent as the owner's message. */
   readonly onSuggest: (text: string) => void
-  /** Play the staggered entrance. Pass false when the state was visible less than a second ago. */
+  /**
+   * Play the staggered entrance. Pass false when the state was visible less than a second ago.
+   * Read when the empty chat mounts: once it has drawn whole, a later true does not start the entrance over it.
+   */
   readonly enter?: boolean
 }
 
@@ -23,8 +27,9 @@ const suggestionIcons: ReadonlyArray<PhosphorIcon> = [ClockCounterClockwise, Tex
  * on what Juno can do, and four suggestion chips. The parts enter staggered
  * once, per friendly-layer section 5.
  */
-export function EmptyChat({ onSuggest, enter = true }: EmptyChatProps) {
+export function EmptyChat({ onSuggest, enter: enterProp = true }: EmptyChatProps) {
   const copy = chatCopy.empty
+  const [enter] = useState(enterProp)
   return (
     <div data-chat-empty="" {...stylex.props(styles.root)}>
       <span {...stylex.props(styles.part, enter && styles.enter, enter && styles.delay0)}>

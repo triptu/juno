@@ -34,6 +34,7 @@ Juno should feel as stable as a native macOS app: nothing moves unless the user 
 | switches once | a frame shows a third state between the old and the new (a blank pane, the new header over old rows), or goes back |
 | first frame is at the saved position | a restored tab paints somewhere else first |
 | never blank, does not flicker | a region is one flat colour, or changes and changes back within 100 ms (pixel diffs between frames) |
+| stays drawn once shown | an element drawn fully opaque is later drawn fainter: content that fades out or starts an entrance over itself |
 | no long animation frames | a frame over 100 ms with work of the page in it (blocking time or a script) fails; any other frame over 50 ms warns, since a busy machine makes those too |
 
 Confirm every failed check in the images before reporting it. Each image is stamped with the animation frame it shows (`f12` in the filmstrip label), and the probes read the same frame just before it paints, so they should agree. If a check reports a move that the frames do not show, the images win: report it as a suite problem with both frame numbers.

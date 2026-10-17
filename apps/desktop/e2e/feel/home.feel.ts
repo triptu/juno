@@ -85,7 +85,8 @@ test('Home fills reserved slots during the first sync without moving painted con
       happened('first Home frame has its greeting, sync text and reserved slots', (r) => {
         const first = r.frames.find((f) => f.values['greetingBox'] !== null)
         return first !== undefined && typeof first.values['greeting'] === 'string' && first.values['greeting'].length > 0
-          && first.values['line'] === 'Syncing with Slack.' && first.values['slots'] !== null
+          // "Syncing with Slack." while the conversations are listed, then the first sync's count (SPEC 12).
+          && /^Syncing (with Slack|\d+ of \d+ conversations)\.$/.test(String(first.values['line'])) && first.values['slots'] !== null
           && first.values['rows'] === 0 && first.values['syncing'] === 1
       }),
       happened('rows arrive while sync is still running', (r) => r.frames.some((f) => Number(f.values['rows']) > 0 && f.values['syncing'] === 1)),

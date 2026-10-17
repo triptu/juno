@@ -23,8 +23,12 @@ export function contention(): string {
   for (const line of listing.split('\n')) {
     // A checkout's own Electron app running: a queued or idle test runner is no load.
     const program = line.split(' ')[0] ?? ''
-    if (!program.includes('/node_modules/') || !program.includes('/electron/dist/') || line.includes(ROOT)) continue
-    others.add(line.match(/\/([^/ ]+)\/(?:apps|packages)\/[^/ ]+\/node_modules\//)?.[1] ?? line.match(/\/([^/ ]+)\/node_modules\//)?.[1] ?? 'another checkout')
+    if (!program.includes('/node_modules/') || !program.includes('/electron/dist/')) continue
+    // Electron runs from the shared pnpm store, so the checkout is the app path in the
+    // arguments. The main and renderer processes carry it; helpers without it are skipped.
+    const app = line.match(/(\/[^\s=]*\/([^/ ]+))\/apps\/desktop(?:\s|$)/)
+    if (app === null || app[1] === ROOT) continue
+    others.add(app[2]!)
   }
   return others.size === 0 ? '' : `, contended by ${[...others].join(', ')}`
 }

@@ -57,6 +57,13 @@ function usePendingEnter(loading: boolean, ids: ReadonlyArray<string>, pick: (id
   }
 }
 
+/** `text` once its rows have arrived; while `waiting`, the text of the rows still shown. */
+function useShownText(text: string, waiting: boolean): string {
+  const [shown, setShown] = useState(text)
+  if (!waiting && shown !== text) setShown(text)
+  return waiting ? shown : text
+}
+
 /** The highlighted row: the one the pointer or the arrows chose, or the first. */
 function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (id: string) => void] {
   const [chosen, setChosen] = useState<string | undefined>(undefined)
@@ -90,7 +97,8 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
           ['Channels', conversations.channels],
         ]
   const rows = sections.flatMap(([, items]) => items)
-  const typed = query.trim().toLowerCase()
+  // The first row follows the text the rows shown belong to, so while an earlier query's rows are held the list changes in one step.
+  const typed = useShownText(query.trim().toLowerCase(), loading || conversations === undefined)
   const showAnywhere = onAnywhere !== undefined && 'anywhere'.startsWith(typed)
   const showJuno = onJuno !== undefined && 'juno'.startsWith(typed)
   const first = showAnywhere ? [ANYWHERE_ID] : showJuno ? [JUNO_ID] : []

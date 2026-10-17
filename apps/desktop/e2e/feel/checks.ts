@@ -367,6 +367,19 @@ export function neverZero(probe: string, label: string, options: Window = {}): C
   }
 }
 
+/** An `opacity` probe, once drawn fully opaque, never reads lower again: content that shows whole does not fade out or start an entrance over. */
+export function staysDrawn(probe: string, label: string, options: Window = {}): Check {
+  const name = `${label} stays drawn once shown`
+  return (evidence) => {
+    const frames = framesIn(evidence.recording, options)
+    const shown = frames.findIndex((frame) => Number(frame.values[probe] ?? 0) >= 0.99)
+    if (shown < 0) return pass(name, `never fully drawn in ${frames.length} frames`)
+    const faded = frames.slice(shown).filter((frame) => Number(frame.values[probe] ?? 0) < 0.99)
+    if (faded.length === 0) return pass(name, `drawn from #${shot(evidence, frames[shown]!)} to the end`)
+    return fail(name, `drawn at #${shot(evidence, frames[shown]!)}, then at opacity ${String(faded[0]!.values[probe])} at #${shot(evidence, faded[0]!)}`, [shot(evidence, frames[shown]!), ...shotsOf(evidence, faded).slice(0, 11)])
+  }
+}
+
 /** A precondition of the scenario: without it the other checks prove nothing. */
 export function happened(label: string, test: (recording: Recording) => boolean): Check {
   const name = label

@@ -1095,6 +1095,97 @@ suite went from 14 of 18 to 18 of 18.
 
 Logs are under `.juno-status/perf-pass-1017/`.
 
+### 8.7 A Mac pass over the 10-17 UI changes (10-17)
+
+Full `pnpm perf` and `pnpm test:feel` runs on the M2 (60 Hz, so a
+one-frame budget is 24.7 ms) after the day's UI work: the unified Home
+(Recent, the destination and topic chips, the welcome card), Home as a
+title bar icon, the sidebar order hold, the new preview text, the Tidy up
+sheet, Juno images, toolbar placement, Compact by default, Slack links in
+Juno and the lazy parts. The heavy lock was exclusive, but other agents'
+lint, typecheck and git runs kept the load at 2 to 13; a bare `<input>`
+took 50 ms p95 to show a character at the worst of it. "First" is
+`bb4fcb71` at load 5 to 13.6; "after" is the `mac-perf-feel` branch on
+`551bf0b8`, a full run at load 2.4 to 11 and then one rerun of the misses
+at load 2 to 5. ms, p95 unless marked.
+
+| Metric | First | After | Budget |
+| --- | --- | --- | --- |
+| Warm start to shell / rows, median | 787.0 / 876.8 | **460.7 / 570.0** | 400 / 500 |
+| Quick start, slowest of three | 7165 | 2894 | 5000 |
+| Topic open, uncached | **358.2** | 55.3, then 36.1 | 50 |
+| Topic open, cached / prefetched | 53.5 / 73.4 | 28.0 / 19.4 | 50 / 24.7 |
+| Tab switch, mounted / unmounted | 49.4 / 74.4 | 17.4 / 19.5 | 24.7 / 50 |
+| Peek open | 13.2 | 12.6 | 24.7 |
+| Home open, quick / after idle | 18.3 / **269.0** | 16.1 / **209.5**, then 17.8 / 103.2 | 50 / 150 |
+| New tab with Home | 28.3 | 19.5 | 24.7 |
+| Media viewer open | 9.5 | 13.0 | 50 |
+| Filter change | 45.6 | 23.8 | 50 |
+| ⌘K open / keystroke to rows | 23.6 / 61.4 | 25.3 / 29.8 | 50 / 100 |
+| Send / send in Main | 53.6 / 35.4 | 53.3 / 54.4, then 36.8 / 30.3 | 50 |
+| Live update, sidebar / open thread | 16.1 / 74.1 | 14.3 / 21.0 | 50 |
+| Row hover | 5.7 | 77.1 (one of nine), then 4.9 | 24.7 |
+| Juno panel open / chat send to bubble | 21.8 / 23.6 | 25.0, then 22.1 / 21.3 | 24.7 |
+| Juno's first bubble, fake model | 842.1 | 225.6 | 2500 |
+| All topics open | did not measure | 29.0 | 50 |
+| First opens in a second app (account, switcher, emoji, Settings) | 9.6, 12.1, 30.8, 17.6 | 12.8, 16.6, 23.3, 17.6 | 50 |
+| Sidebar drag, work per frame | 20.7 | 6.6 | 8.3 |
+| Sidebar scroll, continuous / held-clock | 5.5 / 4.4, 2 long frames | 5.1 / 5.0, 2 long frames, then 5.3 / 4.4 | 8.3 / 7 |
+| All topics scroll | did not measure | 6.1 / 5.2, then 5.4 / 5.9 | 8.3 / 7 |
+| Message scroll, prepend shift | 8.8 / 13.0, 5 long frames | 3.4 / 3.5, 0 px | 8.3 / 7, 0 px |
+| Chat scroll | 9.0 / 8.7 | 4.5 / 4.1 | 8.3 / 7 |
+
+Keystrokes stayed within one refresh interval of the same run's bare
+input: composer 52.9, mention 38.9, emoji 39.7 and palette 39.4, against
+73.3, 66.1, 69.6 and 56.1. Initial JS is 1,074.7 KB of 1,100 KB (1,047.0 on
+8.6) and CSS 142.6 of 150. After scrolling the renderer's JS heap was
+19.9 MB and its tab 93 MB.
+
+The first run passed 12 of 26 perf scenarios, the full after run 17, and
+the rerun 8 of the 9 that had missed. The feel suite went from 16 of 18
+to 17 of 18.
+
+- **Uncached topic open was load.** On a fresh app the engine answers
+  `messages.list` and `topics.get` 2 to 23 ms after the press; the rest
+  is the renderer drawing the header. Traced, one text run in the header
+  took 4 to 15 ms to shape (`InlineNode::ShapeTextIncludingFirstLine`)
+  in a layout of 13 dirty objects, and the commit waited up to 16 ms.
+  Four of five opens took 32 to 35 ms in every run at load 6 or under.
+  The 195 and 358 ms readings came at load 13 or more.
+- **Home open after idle still misses in some runs.** Its five idle opens
+  read 247.9, 77.4, 44.2, 269.0, 128.0 / 155.0, 126.3, 209.5, 21.8, 123.6
+  / 69.7, 63.3, 87.8, 103.2, 17.1 ms in three runs. None waited on the
+  engine. Traced, the slow ones do the same work as a quick open
+  (mounting Home, React's `focus` of the composer forcing the layout,
+  11 ms; React's `initInput`, 8.6 ms) several times slower. Under load 19
+  the five read 37 to 77 ms. This is the clock after idle again (8.5). The
+  150 ms budget is unchanged.
+- **Warm start missed.** Most of it is Electron starting the renderer
+  (process start to navigation 301 to 418 ms in the quiet rerun); Juno's
+  renderer added 83 to 160 ms to the shell and 182 to 299 ms to the rows.
+  On 10-16 navigation took 308 to 335 ms. Whether today's merges added the
+  rest, or the load did, needs an A/B of the two builds on an idle Mac.
+- **All topics did not measure (test fixed).** Since `6f971705` All
+  topics is an icon button in the sidebar title bar, and the scenario
+  pressed 40 px from its left edge, outside it. It now presses the
+  button's centre. Its first full run had one frame with 463 dirty
+  layout objects against the 256 ceiling; the traced rerun's most was
+  125.
+- **Contention was misreported (test fixed).** Since installs link from
+  the shared pnpm store, the Electron helpers of the run's own app were
+  printed as another checkout's. A checkout is now named by the app path
+  in the process's arguments.
+- **The palette opened without its rows (fixed).** ⌘K drew the search
+  field alone for a frame, then grew to 459 px when the Frequent rows'
+  first answer came (`palette-open` #4 to #5). Nothing kept that query
+  warm. `Palette.tsx` now subscribes to it on idle, with the chunk, for
+  the life of the window: one query per change to the conversations.
+- **Not reproduced.** Sidebar scroll's long frames (50 to 409 ms with no
+  script and no blocking time) passed on the rerun, as in 8.6.
+
+The feel findings and frames are in
+`docs/reviews/mac-perf-feel-1017/feel-review.md`.
+
 ### Engine speed measurements (2026-10-15)
 
 Five alternating baseline/revised runs on the shared Apple M2, through the
