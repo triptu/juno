@@ -73,7 +73,7 @@ export function SettledReview({ topics, statuses, now, initialAbout = false, ini
           <Text variant="heading" as="h2" id={titleId} truncate>
             {settledCopy.title(topics.length)}
           </Text>
-          <IconButton icon={Info} label={settledCopy.about} size={28} pressed={about} expanded={about} aria-controls={aboutId} onClick={() => setAbout(!about)} data-settled-about="" />
+          <IconButton icon={Info} label={settledCopy.about} size={28} expanded={about} aria-controls={aboutId} onClick={() => setAbout(!about)} data-settled-about="" />
         </span>
         <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
           {settledCopy.lead}

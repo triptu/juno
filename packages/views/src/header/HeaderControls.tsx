@@ -206,17 +206,14 @@ const styles = stylex.create({
     fontSize: text['--text-body-small-size'],
     fontWeight: weights['--weight-semibold'],
     lineHeight: sizes['--control-28'],
-    // The island controls' fills (IconButton's `island` variant): hover, then open or pressed, one step darker each.
+    // The island controls' fills (IconButton's `island` variant). Open keeps the hover fill, so opening changes no colour.
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
   },
   titleOpen: {
-    backgroundColor: {
-      default: colors['--secondary-hover'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
-    },
+    backgroundColor: colors['--secondary-default'],
   },
   titleText: {
     overflow: 'hidden',

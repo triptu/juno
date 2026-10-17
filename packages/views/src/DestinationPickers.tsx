@@ -304,7 +304,7 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
       onFocus={warm}
       onClick={onOpen}
       onKeyDown={onKeyDown}
-      {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}
+      {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint], expanded && tint === undefined && styles.open)}
     >
       <span key={change} {...stylex.props(styles.face, rises && styles.rise)}>
         {leading ?? <Icon icon={icon} size={13} />}
@@ -325,7 +325,6 @@ const rise = stylex.keyframes({
   from: { opacity: 0, transform: 'var(--picker-rise-from)' },
   to: { opacity: 1, transform: 'none' },
 })
-
 
 const styles = stylex.create({
   face: {
@@ -375,6 +374,8 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
     backgroundColor: { default: colors['--secondary-default'], ':hover': { default: null, '@media (hover: hover)': colors['--secondary-hover'] } },
   },
+  // The hover fill held still while the list is open, so opening changes no colour.
+  open: { backgroundColor: colors['--secondary-hover'] },
   buttonLabel: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -394,5 +395,4 @@ const tintStyles = stylex.create({
   private: { color: tints['--tint-private-fg'], backgroundColor: tints['--tint-private-bg'] },
   dm: { color: tints['--tint-dm-fg'], backgroundColor: tints['--tint-dm-bg'] },
 })
-
 

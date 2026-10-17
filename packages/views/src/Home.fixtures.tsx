@@ -183,6 +183,13 @@ export default defineFixtures(
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
+    // The chip keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
+    Open: {
+      'chip-hover': state({ items: two }, { hover: 'button[aria-label="Send to: Juno"]' }),
+      'chip-press': state({ items: two }, { press: 'button[aria-label="Send to: Juno"]' }),
+      'chip-open': state({ items: two, composer: write({ listOpen: true }) }),
+      'chip-open-hover': state({ items: two, composer: write({ listOpen: true }) }, { hover: 'button[aria-label="Send to: Juno"]' }),
+    },
     Interaction: {
       'hover-row': state({}, { hover: '[data-home-item="waiting"] a' }),
       'focus-row': state({}, { focus: '[data-home-item="resume"] a' }),

@@ -81,6 +81,17 @@ export default defineFixtures(
       'juno-open': state({ detail: details.postgres, juno: { open: true, onToggle: noop } }),
       'ai-assist-off': fixture<TopicHeaderProps>({ detail: details.postgres, onMenu: noop, onPill: noop, onResolve: noop }),
     },
+    // The title and ⋯ keep their hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
+    Open: {
+      'title-hover': state({ detail: details.postgres }, { hover: 'h1 button' }),
+      'title-press': state({ detail: details.postgres }, { press: 'h1 button' }),
+      'title-open': state({ detail: details.postgres, switcher: { open: true, onOpen: noop, content: null } }),
+      'title-open-hover': state({ detail: details.postgres, switcher: { open: true, onOpen: noop, content: null } }, { hover: 'h1 button' }),
+      'more-hover': state({ detail: details.postgres }, { hover: 'button[aria-label="More"]' }),
+      'more-press': state({ detail: details.postgres }, { press: 'button[aria-label="More"]' }),
+      'more-open': state({ detail: details.postgres, menuOpen: true }),
+      'more-open-hover': state({ detail: details.postgres, menuOpen: true }, { hover: 'button[aria-label="More"]' }),
+    },
     Content: {
       'long-title': state({ detail: details.long }),
       'right-to-left': state({ detail: details.mohammed }),
