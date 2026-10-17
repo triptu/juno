@@ -28,7 +28,9 @@ import { openSettings } from './navigation'
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
   // Following or unfollowing a thread adds or removes its row at once, even while the sidebar holds its order (SPEC 5).
   if (target.kind === 'thread') releaseSidebarTopic(registry, target.id)
-  void runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` })
+  // The toast waits until the settings the menus read hold the new level. A thread's follow flag arrives with its row.
+  const stored = () => loadNotificationSettings(registry, (settings) => choiceFor(settings, target, choice !== 'never') === choice)
+  void runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, stored)
 }
 
 /** The current choice for a target, from the settings and, for a thread, Slack's follow flag. */
