@@ -40,8 +40,7 @@ async function cutsOf(badge: Locator): Promise<ReadonlyArray<string>> {
       if (!scrolls && !paint) continue
       const margin = scrolls ? 0 : Number.parseFloat(style.overflowClipMargin) || 0
       const r = node.getBoundingClientRect()
-      const at = (b: { top: number; bottom: number; left: number; right: number }) => `${Math.round(b.left)},${Math.round(b.top)} to ${Math.round(b.right)},${Math.round(b.bottom)}`
-      if (outside(r, margin)) cuts.push(`${node.tagName.toLowerCase()}${[...node.attributes].filter((a) => a.name.startsWith('data-')).map((a) => `[${a.name}]`).join('')}: badge ${at(box)}, clip ${at(r)} + ${margin}`)
+      if (outside(r, margin)) cuts.push(`${node.tagName.toLowerCase()}${[...node.attributes].filter((a) => a.name.startsWith('data-')).map((a) => `[${a.name}]`).join('')}: badge ${[box.left, box.top, box.right, box.bottom].map(Math.round).join(',')}, clip ${[r.left, r.top, r.right, r.bottom].map(Math.round).join(',')} + ${margin}`)
     }
     for (const island of el.closest('[data-juno-chat]')?.querySelectorAll('[data-juno-header] [data-island]') ?? []) {
       const r = island.getBoundingClientRect()
