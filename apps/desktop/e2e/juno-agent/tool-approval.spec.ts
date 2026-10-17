@@ -76,12 +76,12 @@ test('an approved call runs once, the card shows its result, and Juno goes on wi
   // Named by what it does, with a short verb on the button.
   await expect(asked.locator('[data-chat-card-kind]')).toHaveText('Create note in Context')
   expect(mcp.calls).toHaveLength(0)
-  await test.info().attach('card-before', { body: await asked.screenshot(), contentType: 'image/png' })
+  await asked.screenshot({ path: test.info().outputPath('card-before.png') })
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'done')
   await expect(asked).toContainText('Applied')
   await expect(asked.locator('[data-card-result]')).toContainText('note-1')
-  await test.info().attach('card-after', { body: await asked.screenshot(), contentType: 'image/png' })
+  await asked.screenshot({ path: test.info().outputPath('card-after.png') })
   expect(mcp.calls.map((call) => call.name)).toEqual(['create_note'])
   // The run goes on with the result.
   await pane.expectJuno('Saved. note-1')
@@ -97,6 +97,6 @@ test('a failed call shows the server error, and Juno hears it', async ({ juno, m
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'failed')
   await expect(asked.locator('[data-card-result]')).toContainText('Notes are full for this workspace.')
-  await test.info().attach('card-failed', { body: await asked.screenshot(), contentType: 'image/png' })
+  await asked.screenshot({ path: test.info().outputPath('card-failed.png') })
   await pane.expectJuno('Saving the note failed.')
 })
