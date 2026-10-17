@@ -1,7 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
 import { useId, useState } from 'react'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, spacing, z } from '@juno/tokens/tokens.stylex'
+
+// The list's least height: room for the info's lines and its button over a short list. The minimum window still fits the head, this and the foot.
+const ABOUT_ROOM = '176px' // tokens-allow: the info panel's usual height
 import { Button, IconButton, Kbd, ringRoom, Surface, Text } from '@juno/ui'
 import { ReviewList, type ReviewRowProps } from './ReviewList'
 import { reviewCopy, type ReviewEntry, type ReviewStatus, type ReviewVerbs } from './reviewModel'
@@ -28,12 +31,14 @@ export interface ReviewAbout {
 export interface ReviewExplainerProps {
   readonly about: ReviewAbout
   readonly onSettings: () => void
+  /** Over the list, under the sheet's head: the sheet keeps its size, so nothing moves when it opens. */
+  readonly floating?: boolean
 }
 
 /** What the action does, and the way to its settings. */
-export function ReviewExplainer({ about, onSettings }: ReviewExplainerProps) {
+export function ReviewExplainer({ about, onSettings, floating = false }: ReviewExplainerProps) {
   return (
-    <Surface kind="inset" padding="md" sx={styles.explainer} data-review-explainer="">
+    <Surface kind={floating ? 'popover' : 'inset'} padding="md" sx={[styles.explainer, floating && styles.floating]} data-review-explainer="">
       <Text variant="ui" weight="medium">
         {about.label}
       </Text>
@@ -103,9 +108,10 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
         <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
           {lead}
         </Text>
-        <div id={aboutId}>{showAbout ? <ReviewExplainer about={about} onSettings={onSettings} /> : null}</div>
       </div>
       <div {...stylex.props(styles.scroll, ringRoom.inline)}>
+        {/* The info opens over the list, not above it, so the sheet keeps its size and nothing moves. */}
+        <div id={aboutId} {...stylex.props(styles.aboutLayer)}>{showAbout ? <ReviewExplainer about={about} onSettings={onSettings} floating /> : null}</div>
         <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
       </div>
       <div {...stylex.props(styles.foot)}>
@@ -171,6 +177,16 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     marginTop: spacing['--space-2'],
   },
+  floating: {
+    marginTop: 0,
+  },
+  // Over the top of the list, inset as the head's text is; a tall one scrolls with the list.
+  aboutLayer: {
+    position: 'absolute',
+    top: 0,
+    insetInline: spacing['--space-3'],
+    zIndex: z['--z-header'],
+  },
   points: {
     display: 'flex',
     flexDirection: 'column',
@@ -182,8 +198,9 @@ const styles = stylex.create({
     color: colors['--foreground-muted'],
   },
   scroll: {
+    position: 'relative',
     flexGrow: 1,
-    minHeight: 0,
+    minHeight: ABOUT_ROOM,
     overflowY: 'auto',
     paddingInline: spacing['--space-2'],
   },

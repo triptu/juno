@@ -82,19 +82,23 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
           </Button>
         </span>
         <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
-          {handled ? (
-            <>
-              <span {...stylex.props(styles.done)} data-review-outcome="">
-                {status === 'done' && verbs.actIcon !== undefined ? <Icon icon={verbs.actIcon} size={13} /> : null}
-                <Text variant="bodySmall" tone="subtle">
-                  {status === 'done' ? verbs.done : verbs.declined}
-                </Text>
-              </span>
-              <Button variant="ghost" tone="muted" size="sm" tabIndex={active ? 0 : -1} onClick={() => onUndo(entry.id)} data-review-undo="">
-                {reviewCopy.undo}
-              </Button>
-            </>
-          ) : null}
+          {/* Both outcomes share one cell too, so the slot is as wide as the widest of all four and never changes. */}
+          <span {...stylex.props(styles.outcomes)} data-review-outcome="">
+            <span {...stylex.props(styles.done, styles.outcome, status !== 'done' && styles.hidden)} aria-hidden={status !== 'done' || undefined}>
+              {verbs.actIcon === undefined ? null : <Icon icon={verbs.actIcon} size={13} />}
+              <Text variant="bodySmall" tone="subtle">
+                {verbs.done}
+              </Text>
+            </span>
+            <span {...stylex.props(styles.done, styles.outcome, status !== 'declined' && styles.hidden)} aria-hidden={status !== 'declined' || undefined}>
+              <Text variant="bodySmall" tone="subtle">
+                {verbs.declined}
+              </Text>
+            </span>
+          </span>
+          <Button variant="ghost" tone="muted" size="sm" tabIndex={active && handled ? 0 : -1} onClick={() => onUndo(entry.id)} data-review-undo="">
+            {reviewCopy.undo}
+          </Button>
         </span>
       </span>
     </li>
@@ -268,6 +272,13 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     paddingInline: spacing['--space-2'],
     color: colors['--foreground-subtle'],
+  },
+  outcomes: {
+    display: 'grid',
+    justifyItems: 'end',
+  },
+  outcome: {
+    gridArea: '1 / 1',
   },
   hidden: {
     visibility: 'hidden',
