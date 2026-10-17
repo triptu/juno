@@ -57,7 +57,7 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
   const content = (
     <>
       <Icon icon={icon} size={iconBySize[size]} />
-      <span {...stylex.props(styles.name, iconWhenNarrow && styles.nameNarrow)}>{name}</span>
+      <span {...stylex.props(styles.name, iconWhenNarrow && kind === undefined && styles.nameNarrow)}>{name}</span>
       {kind !== undefined ? (
         <span {...stylex.props(styles.kind)}>
           <span aria-hidden>{' · '}</span>
@@ -73,14 +73,14 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
         {...hint}
         aria-label={label}
         onClick={onClick}
-        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint], iconWhenNarrow && narrowStyles[size])}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint], iconWhenNarrow && kind === undefined && narrowStyles[size])}
       >
         {content}
       </button>
     )
   }
   return (
-    <span {...hint} {...stylex.props(styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], iconWhenNarrow && narrowStyles[size])}>
+    <span {...hint} {...stylex.props(styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], iconWhenNarrow && kind === undefined && narrowStyles[size])}>
       {content}
     </span>
   )
@@ -114,28 +114,30 @@ const styles = stylex.create({
   kind: {
     fontWeight: weights['--weight-regular'],
   },
-  // Out of sight in the narrow form but still read, so a pill that is not a button keeps its name.
+  // Out of sight in the narrow form but still read, so a pill that is not a
+  // button keeps its name. Every property states its wide value too: a
+  // `null` default would drop the value set before it.
   nameNarrow: {
-    position: { default: null, [NARROW]: 'absolute' },
+    position: { default: 'static', [NARROW]: 'absolute' },
     width: {
-      default: null,
+      default: 'auto',
       [NARROW]: '1px', // tokens-allow: the standard visually hidden box
     },
     height: {
-      default: null,
+      default: 'auto',
       [NARROW]: '1px', // tokens-allow: the standard visually hidden box
     },
-    overflow: { default: null, [NARROW]: 'hidden' },
-    clipPath: { default: null, [NARROW]: 'inset(50%)' },
+    clipPath: { default: 'none', [NARROW]: 'inset(50%)' },
   },
 })
 
-// The narrow form: the icon centred in a circle as tall as the pill.
+// The narrow form: the icon centred in a circle as tall as the pill. Not
+// with `showKind`, whose grid has a third column.
 const narrowStyles = stylex.create({
-  22: { gridTemplateColumns: { default: null, [NARROW]: 'auto' }, justifyContent: { default: null, [NARROW]: 'center' }, width: { default: null, [NARROW]: sizes['--control-22'] }, paddingInline: { default: null, [NARROW]: 0 } },
-  24: { gridTemplateColumns: { default: null, [NARROW]: 'auto' }, justifyContent: { default: null, [NARROW]: 'center' }, width: { default: null, [NARROW]: sizes['--control-24'] }, paddingInline: { default: null, [NARROW]: 0 } },
-  26: { gridTemplateColumns: { default: null, [NARROW]: 'auto' }, justifyContent: { default: null, [NARROW]: 'center' }, width: { default: null, [NARROW]: sizes['--control-26'] }, paddingInline: { default: null, [NARROW]: 0 } },
-  28: { gridTemplateColumns: { default: null, [NARROW]: 'auto' }, justifyContent: { default: null, [NARROW]: 'center' }, width: { default: null, [NARROW]: sizes['--control-28'] }, paddingInline: { default: null, [NARROW]: 0 } },
+  22: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-22'] }, paddingInline: { default: spacing['--space-2'], [NARROW]: 0 } },
+  24: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-24'] }, paddingInline: { default: spacing['--space-2'], [NARROW]: 0 } },
+  26: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-26'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
+  28: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-28'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
 })
 
 const sizeStyles = stylex.create({

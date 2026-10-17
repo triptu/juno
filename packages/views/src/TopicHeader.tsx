@@ -105,7 +105,8 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
               name={channel.name}
               kindLabel={kind}
               size={24}
-              iconWhenNarrow
+              // A Main's title is the one word "Main": the channel's name keeps its place there.
+              iconWhenNarrow={!main}
               {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
             />
           </span>
