@@ -1,6 +1,6 @@
 /**
  * The check bar for a draft the checks on send found something in. Loaded
- * on its own (`chunk` in `TopicComposer.tsx`) because it only shows after
+ * on its own (`sendCheckChunk.ts`) because it only shows after
  * Enter; the chunk is fetched once a composer has mounted, before the first
  * Enter can need it.
  */

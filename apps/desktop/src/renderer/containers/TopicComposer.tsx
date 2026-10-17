@@ -4,24 +4,13 @@ import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, sav
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
-import { chunk } from './chunks'
 import { takeAttachments, useAttachments } from './attachments'
 import { useComposerLinks } from './composerLinks'
 import { useMentions } from './mentions'
 import type { ComposerHandle } from './messageActions'
+import { preloadBar, sendCheck, SendCheckPanel } from './sendCheckChunk'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 import { cancelSendMark, markSend } from './sendMark'
-
-const sendCheck = chunk(() => import('./SendCheckPanel'))
-const SendCheckPanel = sendCheck.component((module) => module.default)
-
-/** Fetch the bar's chunk once a composer has mounted, so the first bar does not wait for it. */
-let barLoaded = false
-function preloadBar(): void {
-  if (barLoaded) return
-  barLoaded = true
-  window.requestIdleCallback(() => void sendCheck.load())
-}
 
 /** Typing pauses this long before the draft is written. */
 const DRAFT_SAVE_MS = 400
