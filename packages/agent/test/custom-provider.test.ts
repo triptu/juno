@@ -27,7 +27,7 @@ it('lists the endpoint models, answers through the first one, and counts it as $
     { family: 'qwen3:8b', resolved: 'qwen3:8b', provider: 'custom', selected: true },
     { family: 'llama3.3:70b', resolved: 'llama3.3:70b', provider: 'custom', selected: false },
   ])
-  expect(page).toMatchObject({ provider: 'custom', compactionModels: [], spendUntracked: true, spentTodayUsd: 0, capUsd: 2, openRouterKey: 'missing' })
+  expect(page).toMatchObject({ provider: 'custom', compactionModels: [], spendUntracked: true, spentTodayUsd: 0, capUsd: 5, openRouterKey: 'missing' })
   expect(page.modelTyped).toBeUndefined()
 
   await run(client['agent.chat.send']({ opId: 'op-1' as OpId, text: 'hello' }))

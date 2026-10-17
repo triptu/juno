@@ -170,3 +170,19 @@ it('says it may have room again when the cap goes up, on a raise, and on a relea
   ledger.setCap(dollars(4))
   expect(rooms).toBe(3)
 })
+
+it('counts what the cap counts: a reservation left open or settled unknown is spent today, so a refusal never shows $0', () => {
+  const open = ledger.reserve('engine', dollars(0.4))
+  const unknown = ledger.reserve('engine', dollars(0.3))
+  const known = ledger.reserve('engine', dollars(0.2))
+  if (open.kind !== 'reserved' || unknown.kind !== 'reserved' || known.kind !== 'reserved') throw new Error('expected room')
+  ledger.settle(unknown.id, undefined)
+  ledger.settle(known.id, dollars(0.01))
+  const s = ledger.snapshot()
+  // Settings › AI activity shows `reserved + actual`, the sum `fits` checks.
+  expect(s.reserved + s.actual).toBe(dollars(0.4) + dollars(0.3) + dollars(0.01))
+  expect(s.engine).toBe(s.reserved + s.actual)
+  // The engine's half of $2 is $1: $0.71 held, so $0.3 more does not fit, and the page shows $0.71 of it.
+  expect(ledger.reserve('engine', dollars(0.3)).kind).toBe('blocked')
+  expect(ledger.reserve('engine', dollars(0.29)).kind).toBe('reserved')
+})

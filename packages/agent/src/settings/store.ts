@@ -20,7 +20,14 @@ export interface Saved {
   readonly customModel: string | null
 }
 
-const DEFAULTS: Saved = { chat: DEFAULT_CHAT_FAMILY, compaction: DEFAULT_COMPACTION_FAMILY, cap: 2 * DOLLAR, customModel: null }
+/**
+ * The daily cap until the owner sets one. A first day draws art for a few
+ * hundred topics (about $0.006 each, $2 for 300) inside the background half,
+ * and a day of Juno chats on Sonnet costs a few dollars.
+ */
+const DEFAULT_CAP = 5 * DOLLAR
+
+const DEFAULTS: Saved = { chat: DEFAULT_CHAT_FAMILY, compaction: DEFAULT_COMPACTION_FAMILY, cap: DEFAULT_CAP, customModel: null }
 
 export function saved(store: Store): Saved {
   const row = store.db

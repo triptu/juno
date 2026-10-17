@@ -78,7 +78,7 @@ export function budgetCard(store: Store, spend: SpendLedger): CardPayload {
   const snapshot = spend.snapshot()
   return decode({
     _tag: 'budget',
-    spentTodayUsd: usd(snapshot.actual + snapshot.reserved + snapshot.unknown),
+    spentTodayUsd: usd(snapshot.actual + snapshot.reserved),
     capUsd: usd(snapshot.cap + snapshot.raises),
     action: encodeChild(localChild(store, SPEND_RAISE_TOOL, SPEND_RAISE_SCHEMA, { day: snapshot.day }, 3)),
   })
