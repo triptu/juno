@@ -39,6 +39,10 @@ test('the panel switches to Activity and back in place, and a run says what star
   await switchTo(juno, 'aside[data-juno-panel]', 'Activity')
   await expect(juno.win.locator('aside[data-juno-panel] [data-juno-header="activity"]')).toBeVisible()
   await expect(header.getByRole('button', { name: 'Juno · Activity' })).toBeVisible()
+  // The switcher is a menu button, not a heading: the page's serif title is the panel's one h1.
+  const panelHeadings = juno.win.locator('aside[data-juno-panel]').getByRole('heading', { level: 1 })
+  await expect(panelHeadings).toHaveCount(1)
+  await expect(panelHeadings).toHaveText('Activity')
   await juno.topic.expectTitle(TOPIC)
 
   // One row per run: the message's words, not "You"; what it read by name and how it ended; the model, quietly.
