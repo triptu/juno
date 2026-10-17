@@ -11,6 +11,7 @@ import {
   resumeSidebarHold,
   rowRenamingAtom,
   setSidebarEngaged,
+  traceSidebarHold,
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
@@ -70,7 +71,8 @@ function open(id: string, event: ActivateEvent): void {
 let releaseHold: ReturnType<typeof setTimeout> | undefined
 
 /** The pointer or keyboard focus came into the list, or both left it: hold the order now, or let go after the grace. */
-function engage(engaged: boolean): void {
+function engage(engaged: boolean, inside: { readonly pointer: boolean; readonly keyboard: boolean }): void {
+  traceSidebarHold(registry, () => `list ${engaged ? 'entered' : 'left'} (pointer ${inside.pointer}, keyboard ${inside.keyboard})`)
   clearTimeout(releaseHold)
   releaseHold = undefined
   if (engaged) setSidebarEngaged(registry, true)

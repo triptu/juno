@@ -35,6 +35,7 @@ export {
   sidebarRowAtom,
   sidebarSectionsAtom,
   setSidebarEngaged,
+  traceSidebarHold,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
