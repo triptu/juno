@@ -1,0 +1,1 @@
+- 10-17 05:18 · fullscreen-titlebar · In macOS full screen the sidebar bar and the collapsed tab strip drop the traffic lights' 78px: main sends `window.fullScreen` on enter and leave, a `fullScreen` prop picks the style variant, and the shift is one frame as the animation ends, since Electron reports neither transition earlier.
