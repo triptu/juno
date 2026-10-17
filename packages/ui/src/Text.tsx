@@ -46,7 +46,9 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
 }
 
 function setTitle(node: HTMLElement) {
-  if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) node.title = node.textContent ?? ''
+  // Privacy mode: a blurred line's tooltip would show it in full (SPEC section 5).
+  if (node.closest('[data-sensitive]') !== null && document.documentElement.hasAttribute('data-privacy')) node.removeAttribute('title')
+  else if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) node.title = node.textContent ?? ''
   else node.removeAttribute('title')
 }
 

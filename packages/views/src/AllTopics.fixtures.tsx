@@ -97,7 +97,7 @@ export default defineFixtures(
       empty: page({ list: [], query: 'nothing like this', counts: { all: 0, open: 0, resolved: 0, quiet: 0, unsubscribed: 0 } }),
       // Before the first window: the chrome, and no rows yet.
       loading: page({ list: [], ready: false }),
-      // Privacy mode: the previews blur, the titles stay readable.
+      // Privacy mode: the previews blur, and so do titles that are only the first words; AI and renamed titles stay readable.
       privacy: scene<AllTopicsProps>(() => (
         <PrivacyOn>
           <AllTopics {...props()} />

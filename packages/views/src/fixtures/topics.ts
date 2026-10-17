@@ -157,6 +157,8 @@ export const rows = {
   pricing: row({
     id: 'C0PRODUCT:1759990000.000400',
     title: 'Final copy for pricing is in',
+    // The root's first words: privacy mode blurs it.
+    titleSensitive: true,
     sender: 'Priya',
     text: 'Legal flagged the annual discount line. Reopening this.',
     channel: channels.product,
@@ -243,6 +245,8 @@ export const rows = {
   flags: row({
     id: 'C0PLATFORM:1759900000.000800',
     title: "We have 142 flags. 61 haven't…",
+    // The root's first words: privacy mode blurs it.
+    titleSensitive: true,
     sender: 'Jonas',
     text: '@Tushar ship it?',
     channel: { id: 'C0PLATFORM', kind: 'public', name: 'platform', label: '#platform', tint: 'public', icon: 'globe', color: 'jordy' },

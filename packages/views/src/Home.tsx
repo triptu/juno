@@ -131,8 +131,8 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
         <TopicArt topicId={topic.id} recipe={topic.art} size={40} />
       )}
       <span {...stylex.props(styles.text)}>
-        {/* An assistant title can quote the messages; the plain one only says what kind of thing waits. */}
-        <span data-home-title="" data-sensitive={item.aiTitle === undefined ? undefined : ''} {...stylex.props(styles.itemTitle)}>
+        {/* An assistant title, and a follow-up's promise, can quote the messages; the plain one only says what kind of thing waits. */}
+        <span data-home-title="" data-sensitive={item.aiTitle === undefined && item.kind !== 'followUp' ? undefined : ''} {...stylex.props(styles.itemTitle)}>
           {item.aiTitle ?? item.title}
         </span>
         <span data-home-meta="" {...stylex.props(styles.itemMeta)}>
