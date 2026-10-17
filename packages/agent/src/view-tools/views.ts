@@ -1,6 +1,6 @@
 /** Local sidebar settings: the owner's words apply now; untrusted runs propose Apply. */
 import { Schema } from 'effect'
-import { HostViewDraft, HostViewUndo, type CardBinding } from '@juno/agent-contract'
+import { chatCopy, HostViewDraft, HostViewUndo, type CardBinding } from '@juno/agent-contract'
 import { AccountId, CardPayload, digestJson, expandChildActions } from '@juno/agent-cards'
 import type { Actions, CardView, Executor, Proposal } from '../actions'
 import { bindingOf, cardRow, intentOf, memoryGen, payloadOf, recordOutcome } from '../actions/cards'
@@ -109,7 +109,7 @@ export function createViewSettings(context: {
     if (row === undefined || view.card._tag !== 'change') return view
     const card = cardRow(store, view.card.id)!
     return { ...view, binding: bindingOf(card, payloadOf(store, card)), card: { ...view.card,
-      status: row.undone === 1 ? { _tag: 'done', line: 'Undone' } : { _tag: 'done', line: 'Applied', undo: true } } }
+      status: row.undone === 1 ? { _tag: 'done', line: chatCopy.card.change.undone } : { _tag: 'done', line: chatCopy.card.change.done, undo: true } } }
   }
   const undo = async (identity: typeof CardBinding.Type['identity']): Promise<boolean> => {
     const card = cardRow(store, identity.cardId)

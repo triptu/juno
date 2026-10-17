@@ -8,7 +8,7 @@ account. A view update replaces all fields, including membership and the icon.
 The tool uses `toolDecision('viewsSet')`: a clean owner run applies immediately;
 an owner run that read Slack, a connection or a job report proposes a Change
 card with a Because line. Wakes and reports cannot change views. Both paths show
-Applied with Undo. The direct path records an authorization before calling the
+"Done · Undo". The direct path records an authorization before calling the
 host, with the journal position, and keeps unsafe replay. `view_authorities` binds its single-use owner grant
 to the card, source input and memory generation; the authorization records that
 id as `grant_id`. It is never a live grant for later tool calls. An unconfirmed call

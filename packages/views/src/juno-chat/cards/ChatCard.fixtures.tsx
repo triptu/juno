@@ -199,20 +199,21 @@ export const changeCard = defineFixtures(
     'Change': {
       open: card(change('c1')),
       'long-field': card(change('c2', open, true)),
-      applied: card(change('c3', done('Applied', { open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }))),
+      // Every change that ran says Done, whatever its button said.
+      done: card(change('c3', done('Done', { open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }))),
       failed: card(change('c4', failed('Failed'))),
       // The auto-review asked (SPEC 13.9): one fixed line says why.
       'asked-delete': card(change('c5', open, false, { rule: 'auto', intent: 'explicit', risk: 'delete', line: "Asked because deleting can't be undone." })),
       'asked-implied': card(change('c6', open, false, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." })),
       // A connection call named by what it does, with its verb on the button, and its result once it ran.
       'call-open': card(connectionCall('c7', 'create', open, { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." })),
-      'call-applied': card(connectionCall('c8', 'create', done('Applied', { detail: 'Offsite agenda', result: PAGE_RESULT }), IMPLIED)),
+      'call-done': card(connectionCall('c8', 'create', done('Done', { detail: 'Offsite agenda', result: PAGE_RESULT }), IMPLIED)),
       'call-failed': card(connectionCall('c9', 'create', failed('Failed', 'Notes are full for this workspace.', 'error: Notes are full for this workspace.\ncode: quota_exceeded'), IMPLIED)),
       // Everything the call gave back, as a person reads it, under "Hide result".
-      'call-result-shown': scene(() => <ChangeCard card={connectionCall('c12', 'create', done('Applied', { detail: 'Offsite agenda', result: PAGE_RESULT }), IMPLIED)} actions={noopActions} enter={false} resultShown />),
+      'call-result-shown': scene(() => <ChangeCard card={connectionCall('c12', 'create', done('Done', { detail: 'Offsite agenda', result: PAGE_RESULT }), IMPLIED)} actions={noopActions} enter={false} resultShown />),
       // Argument values as a person reads them: strings bare, short lists on one line, the rest as indented lines.
       'call-arguments': card(connectionCall('c13', 'nested', open, IMPLIED)),
-      // A read the owner's rule asked about: the card claims no change once it ran.
+      // A read the owner's rule asked about.
       'search-asked': card(connectionCall('c10', 'search', open, ALWAYS)),
       'search-done': card(connectionCall('c11', 'search', done('Done', { detail: 'Found 4 results', result: SEARCH_RESULT }), ALWAYS)),
     },

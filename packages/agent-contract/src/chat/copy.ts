@@ -209,9 +209,9 @@ export const chatCopy = {
     connect: { connect: 'Connect', skip: 'Skip', connected: 'Connected' },
     change: {
       apply: 'Apply',
-      applied: 'Applied',
-      /** A connection call that only looks something up, or that no review judged a change, once it ran. */
+      /** Any change once it ran, whatever its button said, before the line of what came back. */
       done: 'Done',
+      undone: 'Undone',
       /** A connection call's result: its one line, and the disclosure for the rest. */
       result: {
         found: (count: number) => (count === 0 ? 'Found nothing' : count === 1 ? 'Found 1 result' : `Found ${count} results`),
