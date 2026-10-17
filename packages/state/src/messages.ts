@@ -90,8 +90,8 @@ export const messageWindowSpecAtom = Atom.family((_view: string) => Atom.make<Me
 
 /**
  * Topics whose first message the store holds, as `messages.loadOlder` said
- * this run. A topic opened again knows it from its first frame, so its list
- * draws no slot for older messages that cannot come.
+ * this run. A topic opened again knows it from its first frame, so it asks
+ * for no older page and shows no "Loading older messages".
  */
 export const topicStartKnownAtom = Atom.family((_id: string) => Atom.make(false).pipe(Atom.keepAlive))
 

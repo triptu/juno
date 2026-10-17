@@ -105,27 +105,25 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   await expect(page.locator('[data-msg-text] img[alt=":makes-sense:"]')).toHaveCount(1)
 })
 
-test('a topic at its start keeps no slot above the first row, and its top gap matches its bottom one', async ({ page }) => {
-  await open(page, 'TopicView', 'thread/long-thread')
-  await expect(page.locator('[data-older-line]')).toHaveCount(0)
-  const at = await page.evaluate(async () => {
-    const island = document.querySelector('[data-island="left"]')!.getBoundingClientRect()
-    const rows = [...document.querySelectorAll('[data-message-row]')]
-    const top = rows[0]!.getBoundingClientRect().top - island.bottom
-    const scroller = rows[0]!.closest('[data-scroll-area]') as HTMLElement
-    scroller.scrollTop = scroller.scrollHeight
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-    const field = document.querySelector('[data-composer-field]')!.getBoundingClientRect()
-    const bottom = field.top - rows[rows.length - 1]!.getBoundingClientRect().bottom
-    return { top, bottom }
-  })
-  expect(at.top).toBe(24)
-  expect(at.bottom).toBe(at.top)
-})
-
-test('while older messages may come, a slot above the first row is kept for the loading line', async ({ page }) => {
+test('at scroll top the first row sits the toolbar’s room below the header band, and “Loading older messages” takes no space', async ({ page }) => {
+  const firstRow = () =>
+    page.evaluate(() => {
+      const row = document.querySelector('[data-message-row]')!
+      const scroller = row.closest('[data-scroll-area]')!
+      const band = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
+      const toolbar = Number.parseFloat(getComputedStyle(row).getPropertyValue('--toolbar-height'))
+      const padding = Number.parseFloat(getComputedStyle(row).paddingTop)
+      const line = document.querySelector('[data-older-line]')?.getBoundingClientRect()
+      return { below: row.getBoundingClientRect().top - band, room: toolbar - padding + 2, lineBottom: line?.bottom ?? 0, rowTop: row.getBoundingClientRect().top }
+    })
+  await open(page, 'MessageList', 'thread/long')
+  const none = await firstRow()
+  expect(none.below).toBe(none.room)
   await open(page, 'MessageList', 'thread/more-above')
-  await expect(page.locator('[data-older-line]')).toHaveCount(1)
+  expect((await firstRow()).below).toBe(none.below)
   await open(page, 'MessageList', 'thread/loading-older')
   await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')
+  const loading = await firstRow()
+  expect(loading.below).toBe(none.below)
+  expect(loading.lineBottom).toBeLessThanOrEqual(loading.rowTop)
 })

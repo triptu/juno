@@ -40,7 +40,7 @@ test('the hover toolbar is one Tab stop: arrows, Home and End move along it, and
 
 test('Esc in the toolbar goes back to its message', async ({ page }) => {
   await open(page, 'Message', 'interaction/focus')
-  await page.getByRole('toolbar', { name: 'Message actions' }).getByRole('button', { name: 'Quote' }).focus()
+  await page.locator('[data-message-row] [role="toolbar"] button[aria-label="Quote"]').focus()
   await page.keyboard.press('Escape')
   expect(await page.evaluate(() => document.activeElement?.hasAttribute('data-message-row'))).toBe(true)
 })
