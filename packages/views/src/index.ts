@@ -84,5 +84,5 @@ export { type SettledStatus } from './settled'
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'
 
-export { UpdateSettings } from './UpdateSettings'
+export { UpdateSettings, type UpdateOffer, type WhatsNew } from './UpdateSettings'
 export { chunk } from '@juno/ui'

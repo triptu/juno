@@ -7,6 +7,8 @@ directories:
 files:
   - out/**
   - package.json
+  # The updater's repository and read-only token, written by build/package.cjs when JUNO_UPDATE_TOKEN is set.
+  - update.json
   - "!**/*.map"
   # koffi ships its C++ sources, headers and docs; the app needs only its JS and the prebuilt .node.
   - "!**/node_modules/koffi/{doc,lib,vendor}/**"
@@ -36,5 +38,5 @@ electronFuses:
   enableEmbeddedAsarIntegrityValidation: true
   onlyLoadAppFromAsar: true
   enableCookieEncryption: true
-# No inferred GitHub repository. A configured public feed is supplied by package.cjs.
+# No inferred GitHub repository. build/package.cjs names the private releases repository.
 publish: null

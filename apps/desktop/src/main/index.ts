@@ -22,6 +22,7 @@ import { slackKeychainReads } from './slackImport'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
 import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
+import { loadUpdateConfig } from './releaseFeed'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
@@ -91,7 +92,7 @@ const screenWatch = createScreenWatch({
   now: () => Date.now() + screenClockForTests,
 })
 
-const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }))
+const updates = createUpdates(launch.autoUpdate === true, (autoUpdate) => updateLaunch({ autoUpdate }), loadUpdateConfig(e2e), e2e)
 
 // Test seams (architecture 13): the fake Slack to sign in against, a fixture
 // Slack-app directory to import from, and a stand-in keychain password.

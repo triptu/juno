@@ -118,11 +118,36 @@ export const ContextMenuItems = Schema.Array(
 /** Where the menu opens, in CSS pixels from the window's top left. */
 export const ContextMenuAt = Schema.Struct({ x: Schema.Number, y: Schema.Number })
 
+/**
+ * The updater as main sees it. `ready`: a signed build downloaded the update and
+ * installs it on Restart to update. `available`: an unsigned build found a newer
+ * version, which the owner downloads as a DMG (`download` tracks that).
+ */
 export const UpdateState = Schema.Union([
   Schema.Struct({ kind: Schema.Literals(['unavailable', 'disabled', 'idle']) }),
   Schema.Struct({ kind: Schema.Literal('ready'), version: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('available'), version: Schema.String, download: Schema.Literals(['none', 'downloading', 'failed']) }),
 ])
 export type UpdateState = typeof UpdateState.Type
+
+/** One version's changelog section, as plain lines. */
+export const ReleaseNote = Schema.Struct({
+  version: Schema.String,
+  date: Schema.NullOr(Schema.String),
+  lines: Schema.Array(Schema.String),
+})
+export type ReleaseNote = typeof ReleaseNote.Type
+
+/**
+ * "What's new": `installed` is the running version's section, `update` the sections
+ * between it and the found update, newest first. `failed` when the changelog
+ * could not be fetched.
+ */
+export const ReleaseNotes = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('notes'), entries: Schema.Array(ReleaseNote) }),
+  Schema.Struct({ kind: Schema.Literal('failed') }),
+])
+export type ReleaseNotes = typeof ReleaseNotes.Type
 
 /**
  * Privacy mode as main set it when sharing started or ended (SPEC section 5):
@@ -155,6 +180,8 @@ export const ShellRoutes = {
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
   [Channels.updatesRestart]: { input: Schema.Void, output: Schema.Void },
+  [Channels.updatesDownload]: { input: Schema.Void, output: UpdateState },
+  [Channels.updatesNotes]: { input: Schema.Struct({ scope: Schema.Literals(['installed', 'update']) }), output: ReleaseNotes },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
