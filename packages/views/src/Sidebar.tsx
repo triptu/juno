@@ -100,6 +100,8 @@ export interface SidebarProps {
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   /** Right-click on a page item: its menu (Open in new tab). */
   readonly onNavigateMenu?: (target: SidebarNavTarget) => void
+  /** Pointer enter or focus on a page item: warm the page it opens. */
+  readonly onNavigatePrefetch?: (target: SidebarNavTarget) => void
   readonly onFilterKind: (kind: KindFilter) => void
   /** The views, in pill order, after DMs. */
   readonly views?: ReadonlyArray<SidebarViewPill>
@@ -158,6 +160,7 @@ export function Sidebar({
   onNewChat,
   onNavigate,
   onNavigateMenu,
+  onNavigatePrefetch,
   onFilterKind,
   views = [],
   onFilterView,
@@ -223,7 +226,7 @@ export function Sidebar({
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
-        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')}>
+        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')} {...(onNavigatePrefetch === undefined ? {} : { onPrefetch: () => onNavigatePrefetch('home') })}>
           Home
         </NavItem>
         <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)} onContextMenu={navMenu('all-topics')}>

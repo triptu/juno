@@ -8,6 +8,9 @@
  *   shows, into slots it reserved (`fillHome`).
  * - `homeGreeting`, `homeScene`, `homeItemLimit`: the copy, the scene and
  *   the cap, from the local clock and the window, chosen when Home appears.
+ * - `prefetchHome`: warms `home.view` on pointer enter or focus of the
+ *   sidebar's Home item, so an open after the subscription's idle time
+ *   renders what is cached instead of waiting on the engine.
  * - `startVisitLog`: tells the engine which topic was open for a minute,
  *   for "Pick up where you left off".
  * - `markFollowUpDone`, `resolveAllTopics`: the two row buttons.
@@ -15,12 +18,17 @@
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { homeMarkDone, homeView, homeVisit, topicsResolve, type CommandResult, type HomeItem, type HomeView, type UndoCommand } from '@juno/contract'
-import { liveQuery, runCommand } from './atoms'
+import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
 export const homeViewAtom = liveQuery(homeView)(undefined)
+
+/** Warms Home for an open (performance 4.2): one entry of at most three per registry (`prefetch`). A local query only. */
+export function prefetchHome(registry: Registry): void {
+  prefetch(registry, homeViewAtom)
+}
 
 /** The scenes in `docs/design/home/scenes.png`. */
 export type HomeScene = 'morning' | 'midday' | 'evening' | 'night' | 'friday' | 'winter' | 'autumn' | 'caughtUp'

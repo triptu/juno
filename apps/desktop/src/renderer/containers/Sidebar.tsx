@@ -30,7 +30,7 @@ import { chunk } from './chunks'
 import { SyncNotice } from './EngineStatus'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
-import { openAllTopics, openHome, openNewChat, openSettings } from './navigation'
+import { openAllTopics, openHome, openNewChat, openSettings, warmHome } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { TitlebarNav } from './TitlebarNav'
@@ -169,6 +169,9 @@ export function Sidebar() {
       onNewChat={openNewChat}
       onNavigate={navigate}
       onNavigateMenu={(target) => void navigateMenu(target)}
+      onNavigatePrefetch={(target) => {
+        if (target === 'home') warmHome()
+      }}
       onFilterKind={selectKind}
       views={views}
       onFilterView={selectView}

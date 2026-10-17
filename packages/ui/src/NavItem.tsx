@@ -28,6 +28,8 @@ export interface NavItemProps {
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
   readonly onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void
+  /** Pointer enter or focus: warm what the item opens (performance.md 4.2). */
+  readonly onPrefetch?: () => void
   /**
    * The icon alone in a 32px square, for a list that has narrowed to a
    * rail. A string label becomes the accessible name and the tooltip;
@@ -42,7 +44,7 @@ export interface NavItemProps {
  * tint, accent text, 600 and a filled icon. Navigates on mouse down like
  * rows and tabs, and never animates.
  */
-export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu, compact = false }: NavItemProps) {
+export function NavItem({ icon, iconWeight, children, active = false, trailing, kbd, onSelect, onContextMenu, onPrefetch, compact = false }: NavItemProps) {
   const name = compact && typeof children === 'string' ? children : undefined
   return (
     <div
@@ -52,6 +54,8 @@ export function NavItem({ icon, iconWeight, children, active = false, trailing, 
       aria-label={name}
       {...(name === undefined ? {} : tooltip(name))}
       onContextMenu={onContextMenu}
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       {...activateHandlers<HTMLDivElement>(onSelect)}
       {...stylex.props(interactive.focusRing, typeVariants.ui, styles.item, compact && styles.compact, active && styles.active)}
     >
