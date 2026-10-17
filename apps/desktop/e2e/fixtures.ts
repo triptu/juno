@@ -78,7 +78,7 @@ export interface LaunchOptions {
   readonly cacheMigration?: boolean
   /** Keep the production request pacing against the fake (`JUNO_E2E_FAKE_PACED`), to time a first sync. */
   readonly paced?: boolean
-  /** The tour opens by itself, as outside tests (`JUNO_E2E_TOUR`). Without it, only Help, ⌘K and Settings › About open it. */
+  /** The welcome card shows by itself, as outside tests (`JUNO_E2E_TOUR`). Without it, only Help, ⌘K and Settings › About bring it. */
   readonly tour?: boolean
 }
 
