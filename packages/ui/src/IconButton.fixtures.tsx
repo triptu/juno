@@ -60,6 +60,17 @@ export default defineFixtures(IconButton, {
     'hover-raised': fixture({ icon: Quotes, label: 'Quote', variant: 'raised' }, { hover: 'button' }),
     'hover-toggle-on': fixture({ icon: Bell, label: 'Subscribe', size: 32, pressed: true }, { hover: 'button' }),
   },
+  // A menu button keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
+  Open: {
+    'more-hover': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', expanded: false }, { hover: 'button' }),
+    'more-press': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', expanded: false }, { press: 'button' }),
+    'more-open': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', expanded: true }),
+    'more-open-hover': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', expanded: true }, { hover: 'button' }),
+    'island-hover': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', radius: 'full', variant: 'island', expanded: false }, { hover: 'button' }),
+    'island-press': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', radius: 'full', variant: 'island', expanded: false }, { press: 'button' }),
+    'island-open': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', radius: 'full', variant: 'island', expanded: true }),
+    'island-open-hover': fixture({ icon: DotsThree, label: 'More', size: 28, iconWeight: 'bold', radius: 'full', variant: 'island', expanded: true }, { hover: 'button' }),
+  },
   Press: {
     'active-press': fixture({ icon: PushPin, label: 'Pin', size: 32 }, { press: 'button' }),
     'active-press-primary': fixture({ icon: ArrowUp, label: 'Send', size: 28, radius: 'full', variant: 'primary', iconWeight: 'bold' }, { press: 'button' }),

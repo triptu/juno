@@ -33,7 +33,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
    * the fill pops in with the spring, toggling off just cross-fades.
    */
   readonly pressed?: boolean
-  /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
+  /** A menu button whose menu or popover is showing: `aria-expanded`, held at the hover fill so opening changes no colour. */
   readonly expanded?: boolean
   /** Opens a page and that page is the current tab: `aria-current="page"`, the nav's accent tint and the filled icon, as an active NavItem. */
   readonly current?: boolean
@@ -121,7 +121,8 @@ export function IconButton({
         radiusStyles[radius ?? radiusBySize[size]],
         variants[variant],
         variant === 'ghost' && tones[tone],
-        (pressed === true || expanded === true) && pressedStyles[variant],
+        pressed === true && pressedStyles[variant],
+        expanded === true && pressed !== true && openStyles[variant],
         current && styles.current,
         (dimmed || disabled) && interactive.dimmed,
       )}
@@ -282,6 +283,18 @@ const tones = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
   },
+})
+
+// Open is the hover fill held still: the trigger keeps the colour it had under the pointer when its menu opened.
+const openStyles = stylex.create({
+  ghost: {
+    color: colors['--foreground-default'],
+    backgroundColor: colors['--surface-hover'],
+  },
+  secondary: { backgroundColor: colors['--secondary-hover'] },
+  primary: {},
+  raised: {},
+  island: { backgroundColor: colors['--secondary-default'] },
 })
 
 const pressedStyles = stylex.create({

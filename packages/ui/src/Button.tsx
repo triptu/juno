@@ -35,6 +35,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   readonly kbd?: string
   /** Selected state for toggles (Pin, filters). Sets aria-pressed. */
   readonly pressed?: boolean
+  /** A menu button whose menu or popover is showing: `aria-expanded`, held at the hover fill so opening changes no colour. */
+  readonly expanded?: boolean
   /** Looks disabled but stays focusable. Sets aria-disabled. */
   readonly dimmed?: boolean
   readonly children?: ReactNode
@@ -93,6 +95,7 @@ export function Button({
   iconWeight,
   kbd,
   pressed,
+  expanded,
   dimmed = false,
   type = 'button',
   disabled,
@@ -108,6 +111,7 @@ export function Button({
       type={type}
       disabled={disabled}
       aria-pressed={pressed}
+      aria-expanded={expanded}
       aria-disabled={dimmed || undefined}
       {...rest}
       {...stylex.props(
@@ -123,6 +127,7 @@ export function Button({
         variantStyles[variant],
         (variant === 'ghost' || variant === 'outline') && tones[tone],
         pressed && pressedStyles[variant],
+        expanded && !pressed && openStyles[variant],
         filter && (children === undefined || children === null) && styles.filterSquare,
         dimmed && interactive.dimmed,
         disabled && interactive.dimmed,
@@ -259,6 +264,16 @@ const tones = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
     },
   },
+})
+
+// Open is the hover fill held still: the trigger keeps the colour it had under the pointer when its menu opened.
+const openStyles = stylex.create({
+  primary: {},
+  secondary: { backgroundColor: colors['--secondary-hover'] },
+  outline: { color: colors['--foreground-default'], backgroundColor: colors['--surface-hover'], borderColor: colors['--border-strongest'] },
+  ghost: { color: colors['--foreground-default'], backgroundColor: colors['--surface-hover'] },
+  raised: { backgroundColor: colors['--background'] },
+  filter: { color: colors['--foreground-default'], backgroundColor: colors['--surface-hover'] },
 })
 
 const pressedStyles = stylex.create({

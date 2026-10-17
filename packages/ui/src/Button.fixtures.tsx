@@ -44,6 +44,13 @@ export default defineFixtures(Button, {
     'hover-raised': fixture({ variant: 'raised', size: 'sm', kbd: '↵', children: 'Fix and send' }, { hover: 'button' }),
     'hover-row-resolve': fixture({ variant: 'outline', size: 'xs', iconStart: Check, children: 'Resolve' }, { hover: 'button' }),
   },
+  // A menu button keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
+  Open: {
+    'ghost-hover': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: false, children: 'Show why' }, { hover: 'button' }),
+    'ghost-press': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: false, children: 'Show why' }, { press: 'button' }),
+    'ghost-open': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: true, children: 'Show why' }),
+    'ghost-open-hover': fixture({ variant: 'ghost', size: 'sm', tone: 'subtle', expanded: true, children: 'Show why' }, { hover: 'button' }),
+  },
   Press: {
     'active-press': fixture({ variant: 'primary', size: '2xl', children: 'Send' }, { press: 'button' }),
     'active-press-secondary': fixture({ variant: 'secondary', size: '2xl', children: 'Discard' }, { press: 'button' }),

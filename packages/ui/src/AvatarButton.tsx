@@ -57,10 +57,8 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
   },
+  // The hover fill held still, so opening the menu changes no colour.
   open: {
-    backgroundColor: {
-      default: colors['--secondary-default'],
-      ':hover': { default: null, [HOVER]: colors['--secondary-hover'] },
-    },
+    backgroundColor: colors['--surface-hover'],
   },
 })
