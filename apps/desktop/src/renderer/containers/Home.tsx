@@ -1,16 +1,20 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
 import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { chatCopy } from '@juno/agent-contract'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
+import { chunk, usePreloaded } from './chunks'
 import { HomeComposer } from './HomeComposer'
 import { openJuno, openTopic } from './navigation'
-import { HomeReview } from './HomeReview'
 import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
+
+/** The review sheets open only from a card, so they load after Home, when idle or on the click. */
+const reviewSheets = chunk(() => import('./HomeReview'))
+const HomeReview = reviewSheets.component((module) => module.HomeReview)
 
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
@@ -152,6 +156,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
   // A card's review, open over Home (`HomeReview`), with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
+  const reviewReady = usePreloaded(reviewSheets, reviewing !== undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
@@ -197,7 +202,11 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />
-    {reviewing === undefined ? null : <HomeReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />}
+    {reviewing === undefined || !reviewReady ? null : (
+      <Suspense fallback={null}>
+        <HomeReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
+      </Suspense>
+    )}
     </>
   )
 }
