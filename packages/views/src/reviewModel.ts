@@ -41,4 +41,7 @@ export interface ReviewVerbs {
 }
 
 /** The words every review shares. */
+/** A row's meta line: its present parts, joined by middle dots. */
+export const metaLine = (...parts: ReadonlyArray<string | undefined>): string => parts.filter((part) => part !== undefined && part !== '').join(' · ')
+
 export const reviewCopy = { undo: 'Undo', close: 'Done', move: 'Move', open: 'Open' } as const

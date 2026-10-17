@@ -3,8 +3,8 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import type { HomeTopic, UnopenedWhy } from '@juno/contract'
 import type { CardReviewProps } from './ReviewCards'
 import { ReviewSheet, type ReviewAbout } from './ReviewSheet'
-import type { ReviewEntry, ReviewVerbs } from './reviewModel'
-import { quietSpan } from './settled'
+import { metaLine, type ReviewEntry, type ReviewVerbs } from './reviewModel'
+import { quietSpan, settledCopy } from './settled'
 import { relativeTime } from './time'
 
 /**
@@ -13,8 +13,6 @@ import { relativeTime } from './time'
  * cards 1 and 6; SPEC 12). Unfollow writes to Slack, so its lead says so;
  * Ignore is Juno's own, so its lead says nothing changes in Slack.
  */
-
-const SETTINGS = 'Tidy up settings'
 
 /** The words of the Unfollow review. */
 export const unfollowCopy = {
@@ -28,7 +26,7 @@ export const unfollowCopy = {
       'When someone mentions you in it, you follow it again, as in Slack.',
       'Keep following stops Juno suggesting it until two more weeks of replies go unread.',
     ],
-    settings: SETTINGS,
+    settings: settledCopy.settings,
   } satisfies ReviewAbout,
   verbs: { act: 'Unfollow', actIcon: BellSlash, actKey: 'U', decline: 'Keep following', declineKey: 'K', done: 'Unfollowed', declined: 'Following' } satisfies ReviewVerbs,
 } as const
@@ -45,7 +43,7 @@ export const ignoreCopy = {
       'A mention of you, or of a group you are in, still notifies you and shows on Home. @here and @channel do not.',
       'Keep showing stops Juno suggesting it for another 30 days.',
     ],
-    settings: SETTINGS,
+    settings: settledCopy.settings,
   } satisfies ReviewAbout,
   verbs: { act: 'Ignore', actIcon: EyeSlash, actKey: 'I', decline: 'Keep showing', declineKey: 'K', done: 'Ignored', declined: 'Showing' } satisfies ReviewVerbs,
 } as const
@@ -68,7 +66,7 @@ export function unopenedEntries(topics: ReadonlyArray<HomeTopic>, unit: 'reply' 
   return topics.flatMap((topic) => {
     const why = topic.unopened
     if (why === undefined) return []
-    const meta = [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · ')
+    const meta = metaLine(topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now))
     return [{ id: topic.id, topicId: topic.id, title: topic.title, ...(topic.art === undefined ? {} : { art: topic.art }), reason: unopenedReason(why, unit, now), meta }]
   })
 }
