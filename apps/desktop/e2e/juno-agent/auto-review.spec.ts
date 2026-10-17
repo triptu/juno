@@ -93,7 +93,7 @@ test('a call the owner asked for that can be undone runs with no card, and a del
   await expect(asked).toBeVisible()
   await expect(asked.locator('[data-change-review]')).toHaveText("Asked because deleting can't be undone.")
   expect(mcp.calls.map((call) => call.name)).not.toContain('delete_material')
-  await asked.getByRole('button', { name: 'Apply' }).click()
+  await asked.getByRole('button', { name: 'Delete material' }).click()
   await expect(asked).toContainText('Applied')
   expect(mcp.calls.filter((call) => call.name === 'delete_material')).toHaveLength(1)
   expect(mcp.materials()).toHaveLength(0)
