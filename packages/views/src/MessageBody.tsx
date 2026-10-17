@@ -167,13 +167,14 @@ interface LinkProps {
  */
 function Link({ url, onLink, linkInfo, tabIndex, children }: LinkProps) {
   const inApp = linkInfo?.inApp(url) === true
-  const [title, setTitle] = useState(url)
+  const [described, setDescribed] = useState<{ readonly url: string; readonly place: string }>()
+  const title = described?.url === url ? described.place : url
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
     onLink?.(url, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: event.detail === 0 ? 'keyboard' : 'pointer' })
   }
   const describe = () => {
-    if (inApp && title === url) void linkInfo?.describe(url).then((place) => place === undefined || setTitle(place))
+    if (inApp && described?.url !== url) void linkInfo?.describe(url).then((place) => place === undefined || setDescribed({ url, place }))
   }
   return (
     <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, inApp ? styles.inAppLink : styles.outLink, styles.focusRing)}>
