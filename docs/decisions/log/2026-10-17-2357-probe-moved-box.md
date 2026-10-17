@@ -1,0 +1,1 @@
+- 10-17 23:57 · ci-fix-31 · The desktop shift probe (`expectStableAnchor`) counts a `layout-shift` entry only if a source outside its `outside` region has a different box before and after, as the feel suite's check does. Chromium reports a right-aligned count going from 9 to 10 in its fixed box as a shift of that box, with the same box before and after. No threshold changed.
