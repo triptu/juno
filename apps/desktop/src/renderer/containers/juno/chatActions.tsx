@@ -1,6 +1,6 @@
 /**
  * What the chat's rows and composer do (see `JunoChat`): sending, focus
- * requests, the remove sheet, the reaction picker and the row callbacks.
+ * requests, the remove sheet and the row callbacks.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
 import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
@@ -8,7 +8,7 @@ import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } fro
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionPickerAt, type ReactionTarget } from '@juno/views'
+import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
 import { junoCommands, openJunoPage } from './actions'
 import { scrollToRow } from './chatScroll'
@@ -93,39 +93,19 @@ export function useRemoval(now: number) {
   return { setRemoval, sheet }
 }
 
-type Picker = { readonly target: ReactionTarget; readonly x: number; readonly y: number }
-
-/** The reaction picker on a bubble or card, with the owner's current reaction selected. */
-export function useReactionPicker(items: ReadonlyArray<ChatItem>) {
-  const [picker, setPicker] = useState<Picker | undefined>(undefined)
-  const pickerAt: ReactionPickerAt | undefined =
-    picker === undefined
-      ? undefined
-      : {
-          x: picker.x,
-          y: picker.y,
-          ...selectedOf(items, picker.target),
-          onPick: (emoji) => {
-            setPicker(undefined)
-            void junoCommands.react(picker.target, emoji)
-          },
-          onClose: () => setPicker(undefined),
-        }
-  return { setPicker, pickerAt }
-}
-
 interface ActionsInput {
   readonly items: ReadonlyArray<ChatItem>
   readonly scrollRef: RefObject<HTMLElement | null>
   readonly pinnedRef: RefObject<boolean>
   readonly inputRef: RefObject<HTMLTextAreaElement | null>
   readonly setQuote: Dispatch<SetStateAction<Quote | undefined>>
-  readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
+  /** Opens the reactions of a bubble or card under (or over) this box (`useReactionPicker`). */
+  readonly openPicker: (target: ReactionTarget, box: DOMRect) => void
   readonly setRemoval: Dispatch<SetStateAction<Removal | undefined>>
 }
 
 /** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
-export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval }: ActionsInput): ChatActions {
+export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval }: ActionsInput): ChatActions {
   const itemsRef = useRef(items)
   useLayoutEffect(() => {
     itemsRef.current = items
@@ -149,10 +129,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
         }
       },
       onRetry: (opId: OpId) => junoCommands.onRetry(opId),
-      onReactions: (target, event: MouseEvent<HTMLElement>) => {
-        const box = event.currentTarget.getBoundingClientRect()
-        setPicker({ target, x: box.right, y: box.bottom })
-      },
+      onReactions: (target, event: MouseEvent<HTMLElement>) => openPicker(target, event.currentTarget.getBoundingClientRect()),
       onReply: (target) => {
         setQuote(quoteOf(itemsRef.current, target))
         inputRef.current?.focus()
@@ -162,17 +139,15 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
       onGroupLabel: () => {},
       onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
         event.preventDefault()
-        void showChatMenu(target, itemsRef.current, selectedSpan(event.currentTarget), setRemoval, (reaction) => {
-          const box = event.currentTarget.getBoundingClientRect()
-          setPicker({ target: reaction, x: box.right, y: box.top })
-        }, (reply) => {
+        const box = event.currentTarget.getBoundingClientRect()
+        void showChatMenu(target, itemsRef.current, selectedSpan(event.currentTarget), setRemoval, (reaction) => openPicker(reaction, box), (reply) => {
           setQuote(quoteOf(itemsRef.current, reply))
           inputRef.current?.focus()
         })
       },
       renderOwnerImage,
     }),
-    [scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval],
+    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval],
   )
 }
 
@@ -180,14 +155,6 @@ function quoteOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): Quote 
   const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
   const preview = item?._tag === 'juno' ? junoText(item.body).trim().split('\n', 1)[0] ?? '' : item?._tag === 'card' ? item.card._tag : ''
   return { target, preview }
-}
-
-/** The owner's current reaction on a bubble or card, for the picker. */
-function selectedOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): { readonly selected?: string } {
-  const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
-  const reactions = item?._tag === 'juno' ? item.reactions : item?._tag === 'card' ? item.reactions : []
-  const mine = reactions.find((reaction) => reaction.by === 'owner')
-  return mine === undefined ? {} : { selected: mine.emoji }
 }
 
 /** Capture a range in the message's words before the native menu takes focus. */

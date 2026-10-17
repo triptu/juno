@@ -19,6 +19,7 @@ export interface HoverToolbarProps {
   readonly onReact?: (name: string) => void
   /** Opens the emoji picker under the toolbar's bottom right corner. */
   readonly onMoreReactions?: (at: MenuAnchor) => void
+  /** Quote. Without it the toolbar has no Quote button: the Juno chat's reactions, which reply instead. */
   readonly onQuote?: () => void
   /** Start thread or Open thread; `newTab` on ⌘-click or ⌘Enter, which opens it in a background tab. */
   readonly onReply?: (options: { readonly newTab: boolean }) => void
@@ -32,6 +33,8 @@ export interface HoverToolbarProps {
   readonly confirmDelete?: { readonly onConfirm: () => void; readonly onCancel: () => void }
   /** -1 on every row but the list's tabbable one: then no button is in the Tab order. */
   readonly tabIndex?: 0 | -1
+  /** The toolbar's accessible name. Default "Message actions". */
+  readonly label?: string
 }
 
 /** A toolbar button, for the roving tab stop. */
@@ -69,8 +72,8 @@ const FITS = [
  * first reaction at the start; ← and → move along the buttons, Home and End
  * go to the ends, and Esc goes back to the message.
  */
-export function HoverToolbar({ main = false, hasThread = false, reactions = DEFAULT_QUICK_REACTIONS, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0 }: HoverToolbarProps) {
-  const keys = [...reactions.map((reaction) => `react:${reaction.name}`), 'more-reactions', 'quote', ...(main ? ['reply'] : []), ...(onMore === undefined ? [] : ['more'])]
+export function HoverToolbar({ main = false, hasThread = false, reactions = DEFAULT_QUICK_REACTIONS, onReact, onMoreReactions, onQuote, onReply, onMore, confirmDelete, tabIndex = 0, label = 'Message actions' }: HoverToolbarProps) {
+  const keys = [...reactions.map((reaction) => `react:${reaction.name}`), 'more-reactions', ...(onQuote === undefined ? [] : ['quote']), ...(main ? ['reply'] : []), ...(onMore === undefined ? [] : ['more'])]
   const [focused, setFocused] = useState<string | undefined>(undefined)
   const stop = focused !== undefined && keys.includes(focused) ? focused : keys[0]
   const tab = (key: string) => (key === stop ? tabIndex : -1)
@@ -94,7 +97,7 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
       kind="toolbar"
       padding="xs"
       role="toolbar"
-      aria-label="Message actions"
+      aria-label={label}
       onFocus={(event) => {
         const key = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-toolbar-item]')?.dataset['toolbarItem'] : undefined
         if (key !== undefined && key !== focused) setFocused(key)
@@ -111,7 +114,7 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
         <Divider vertical inset="none" />
       </span>
       <IconButton icon={Smiley} label="More reactions" size={28} data-toolbar-item="more-reactions" tabIndex={tab('more-reactions')} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
-      <IconButton icon={Quotes} label="Quote" size={28} data-toolbar-item="quote" tabIndex={tab('quote')} onClick={onQuote} />
+      {onQuote !== undefined ? <IconButton icon={Quotes} label="Quote" size={28} data-toolbar-item="quote" tabIndex={tab('quote')} onClick={onQuote} /> : null}
       {main ? (
         <IconButton
           icon={ChatsCircle}

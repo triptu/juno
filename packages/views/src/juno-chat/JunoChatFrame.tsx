@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { accent, colors, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Popover, rootDuration } from '@juno/ui'
-import { ReactionPicker } from './ReactionPicker'
+import { rootDuration } from '@juno/ui'
 
 export interface JunoChatFrameProps {
   /** `JunoHeader`, over the top of the list. */
@@ -13,42 +12,32 @@ export interface JunoChatFrameProps {
   readonly pill?: ReactNode
   /** `JunoComposer`. */
   readonly composer: ReactNode
-  /** The reaction picker, open at a point in the window (the React button's corner). */
-  readonly picker?: ReactionPickerAt
+  /**
+   * Over the list, outside its rows: the quick reactions and the emoji
+   * picker of a bubble or card (`Floating`). Positioned from the list
+   * area's top left, as in `TopicView`.
+   */
+  readonly floating?: ReactNode
   /** `panel`: drawn on the Juno panel's own material, with no page colour. Default `page`. */
   readonly column?: 'page' | 'panel'
-}
-
-export interface ReactionPickerAt {
-  readonly x: number
-  readonly y: number
-  readonly selected?: string
-  readonly onPick: (emoji: string | null) => void
-  readonly onClose: () => void
 }
 
 /**
  * The Juno chat as the Juno tab and the Juno panel show it: the header's
  * islands over the list, the pill over its bottom edge, the composer under
  * it. Neither the header nor the pill takes part in the list's layout. The
- * reaction picker floats at the point the container gives it.
+ * reactions float at the point the container gives them.
  */
-export function JunoChatFrame({ header, children, pill, composer, picker, column = 'page' }: JunoChatFrameProps) {
+export function JunoChatFrame({ header, children, pill, composer, floating, column = 'page' }: JunoChatFrameProps) {
   return (
     <div data-juno-chat="" {...stylex.props(styles.root, column === 'panel' && styles.panel)}>
-      <div {...stylex.props(styles.middle)}>
+      <div data-juno-chat-middle="" {...stylex.props(styles.middle)}>
         {header}
         {children}
         {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
+        {floating}
       </div>
       {composer}
-      {picker !== undefined ? (
-        <div {...stylex.props(styles.at(picker.x, picker.y))}>
-          <Popover open onClose={picker.onClose} anchor={<span />} placement="bottom-end" width="picker" layer="picker" padding="none" label="Reactions">
-            <ReactionPicker {...(picker.selected === undefined ? {} : { selected: picker.selected })} onPick={picker.onPick} />
-          </Popover>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -96,11 +85,4 @@ const styles = stylex.create({
     display: 'inline-flex',
     zIndex: z['--z-toolbar'],
   },
-  at: (x: number, y: number) => ({
-    position: 'fixed',
-    left: x,
-    top: y,
-    width: 0,
-    height: 0,
-  }),
 })

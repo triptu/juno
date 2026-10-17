@@ -15,6 +15,12 @@ export default defineFixtures(HoverToolbar, {
     seven: fixture({ main: true, reactions: sevenQuickReactions, onMore: noop }),
     one: fixture({ main: true, reactions: fiveQuickReactions.slice(0, 1), onMore: noop }),
   },
+  // The Juno chat's React button (SPEC 13.1): the same quick reactions and More reactions, with no Quote; the chat replies instead.
+  'Juno chat': {
+    reactions: fixture({ label: 'Reactions', onReact: noop, onMoreReactions: noop }),
+    'reactions-seven': fixture({ label: 'Reactions', reactions: sevenQuickReactions, onReact: noop, onMoreReactions: noop }),
+    'reactions-hover-more': fixture({ label: 'Reactions', onReact: noop, onMoreReactions: noop }, { hover: '[aria-label="More reactions"]' }),
+  },
   // Delete on your own message asks once, in the toolbar's place (ADR 0010).
   Confirm: {
     'confirm-delete': fixture({ confirmDelete: { onConfirm: noop, onCancel: noop } }),
