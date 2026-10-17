@@ -144,6 +144,8 @@ A first version wrote the narrow styles with `default: null`. In StyleX that rem
 
 **3. The hover toolbar is one Tab stop.** Tab reaches one button on the focused message's toolbar: the one last focused, or the first reaction. ← and → move along the visible buttons and wrap, Home and End go to the ends, and Esc returns focus to the message. This uses `moveFocus` from `@juno/ui` and is covered by `roving.spec.ts`.
 
+Writing that test turned up a keyboard bug that is on main too: Tab from a focused message could not reach its toolbar at all. The toolbar is out of the layout unless something in its row has keyboard focus. As the row let go of focus, the toolbar hid before its button could take focus, and focus fell to the page. The arrows had the same problem. The row now keeps the toolbar laid out for the one key press that moves focus into or along it (`holdToolbarForMove` in `Message.tsx`), and lets go once focus lands. Checked against the built gallery, on this branch and on `41ad6fe9`.
+
 **4. The icon and colour pickers are radio groups.** In the view sheet and the channel icon picker, each group is one Tab stop on its chosen item. Every arrow moves to the next or previous choice and chooses it, and Home and End go to the ends. The items say `aria-checked`, not `aria-pressed`. This uses `radioItem` and `radioKeys` from `@juno/ui`. The e2e driver's colour query and `views.spec.ts` now ask for radios. The channel picker's focus shot now shows the ring on the chosen icon, where Tab lands.
 
 | | Before | After |
