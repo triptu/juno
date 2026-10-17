@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
+import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, TopicArt, useOptionListKeys, type ActivateEvent } from '@juno/ui'
 import { countLabel, titleMatches as matches } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
@@ -12,6 +12,8 @@ export interface TopicSwitcherProps {
   readonly mainId: string
   /** Main's unread messages. */
   readonly mainUnread: number
+  /** Main's art as a recipe; absent shows the placeholder. */
+  readonly mainArt?: string
   /** The topic the header belongs to: its row is marked. */
   readonly currentId: string
   /** The channel's threads, open ones newest first, then the resolved ones (`resolved`); undefined while they load. */
@@ -32,11 +34,12 @@ const rowId = (id: string) => `switch-${id}`
  * opens. A search field, then the channel's Main and its threads, newest
  * activity first, with the resolved ones last under their own label. Unread
  * shows as in the sidebar, a bold title and a count; the topic on screen is
- * the selected row. Typing filters, ↑ ↓ move, Enter opens and ⌘Enter opens
+ * the selected row. Each row leads with the topic's art, as in the sidebar
+ * and Home's topic list, so a topic looks the same everywhere. Typing filters, ↑ ↓ move, Enter opens and ⌘Enter opens
  * in a new tab. Esc is the popover's: it closes and gives focus back to
  * the title.
  */
-export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, query, onQuery, onOpen }: TopicSwitcherProps) {
+export function TopicSwitcher({ mainId, mainUnread, mainArt, currentId, threads, now, query, onQuery, onOpen }: TopicSwitcherProps) {
   const main = matches('Main', query)
   const shown = (threads ?? []).filter((thread) => matches(thread.title, query))
   const open = shown.filter((thread) => thread.resolved !== true)
@@ -82,7 +85,7 @@ export function TopicSwitcher({ mainId, mainUnread, currentId, threads, now, que
       {/* Not a Tab stop: the rows are driven from the search field, so Chromium's own stop on a scroller would lead nowhere. */}
       <div tabIndex={-1} {...stylex.props(styles.scroll)}>
         <OptionList label="Topics in this channel" {...(activeId === undefined ? {} : { activeId })}>
-          {main ? <MainRow mainId={mainId} unread={mainUnread} active={rowId(mainId) === activeId} current={mainId === currentId} onOpen={onOpen} onActivate={setChosen} /> : null}
+          {main ? <MainRow mainId={mainId} unread={mainUnread} art={mainArt} active={rowId(mainId) === activeId} current={mainId === currentId} onOpen={onOpen} onActivate={setChosen} /> : null}
           {open.map(row)}
           {resolved.length === 0 ? null : (
             <div role="group" aria-label="Resolved">
@@ -105,8 +108,8 @@ interface RowProps {
   readonly onActivate: (rowId: string) => void
 }
 
-/** Main: first, with its line, and no icon, so its title starts on the threads' edge. */
-function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowProps & { readonly mainId: string; readonly unread: number }) {
+/** Main: first, with its line. */
+function MainRow({ mainId, unread, art, active, current, onOpen, onActivate }: RowProps & { readonly mainId: string; readonly unread: number; readonly art: string | undefined }) {
   const id = rowId(mainId)
   return (
     <OptionRow
@@ -114,6 +117,7 @@ function MainRow({ mainId, unread, active, current, onOpen, onActivate }: RowPro
       size={44}
       active={active}
       selected={current}
+      leading={<TopicArt topicId={mainId} {...(art === undefined ? {} : { recipe: art })} size={20} />}
       label={
         <Text variant="body" weight={unread > 0 ? 'semibold' : 'medium'} tone="default" sx={styles.title}>
           Main
@@ -137,6 +141,7 @@ function ThreadRow({ thread, now, active, current, onOpen, onActivate }: RowProp
       size={44}
       active={active}
       selected={current}
+      leading={<TopicArt topicId={thread.id} {...(thread.art === undefined ? {} : { recipe: thread.art })} size={20} />}
       label={
         <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate dir="auto" sx={styles.title}>
           {thread.title}

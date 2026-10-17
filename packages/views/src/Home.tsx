@@ -280,7 +280,7 @@ const styles = stylex.create({
     padding: 0,
     listStyle: 'none',
   },
-  // The row is the hover and focus surface; its link and its button sit side by side inside it.
+  // The row is the hover, press and focus surface; its link and its button sit side by side inside it.
   row: {
     display: 'flex',
     alignItems: 'center',
@@ -292,6 +292,8 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
       ':has(:focus-visible)': colors['--surface-hover'],
+      // Held down: the press shows in the next frame. Nested as the hover is, or the hover's doubled class outranks it under the pointer.
+      ':active': { default: colors['--surface-active'], [HOVER]: colors['--surface-active'] },
     },
     // The caret and the row button read this: shown on hover and on keyboard focus only. Only opacity changes.
     '--home-action-opacity': {

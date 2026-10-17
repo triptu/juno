@@ -51,7 +51,8 @@ const styles = stylex.create({
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
-      ':active': colors['--surface-active'],
+      // Nested as the hover is, or the hover's doubled class outranks the press under the pointer.
+      ':active': { default: colors['--surface-active'], [HOVER]: colors['--surface-active'] },
     },
     color: colors['--foreground-default'],
     fontFamily: text['--text-button-small-family'],

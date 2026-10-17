@@ -1,5 +1,7 @@
-import { happened, landsAndStays, noLayoutShift, shotOfFrame, switchesOnce, type Check } from './checks'
+import { pointAt, press } from '../driver/juno'
+import { feedbackInOneFrame, happened, landsAndStays, noFlicker, noLayoutShift, shotOfFrame, switchesOnce, type Check } from './checks'
 import { expect, test } from './feel'
+import { tag } from './pane'
 
 test('Home has its data when it replaces the topic after its subscription expires', async ({ juno, win, feel }) => {
   await juno.signIn()
@@ -120,5 +122,39 @@ test('Home fills reserved slots during the first sync without moving painted con
     await rec.mark('finish sync')
     fake.release({ method: replies })
     await expect(home).not.toHaveAttribute('data-home-loading', { timeout: 30_000 })
+  })
+})
+
+test("the title bar's Home icon shows its press at once and replaces the topic with Home once", async ({ juno, win, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  await juno.topic.expectTitle('Draft plan is in the doc')
+  const icon = await tag(juno.home.navItem, 'home-icon')
+  await pointAt(win, juno.home.navItem)
+  await win.waitForTimeout(300)
+
+  await feel.run({
+    name: 'home-icon',
+    title: "Press the Home icon in the sidebar's title bar from a topic: the press shows in the next frame, and Home replaces the topic in one step",
+    probes: [
+      { kind: 'look', name: 'look', selector: icon },
+      { kind: 'count', within: 'main', name: 'topic', selector: '[data-topic-view]' },
+      { kind: 'count', within: 'main', name: 'home', selector: '[data-home-item]' },
+      { kind: 'count', within: 'main', name: 'waiting', selector: '[data-home-waiting], [data-home-loading]' },
+      { kind: 'box', name: 'field', selector: '[data-home] [data-composer-field]' },
+    ],
+    regions: { main: 'main' },
+    checks: [
+      feedbackInOneFrame('look', 'pointerdown', 'the icon press', { from: 'press' }),
+      happened('Home showed its rows', (r) => r.frames.some((f) => Number(f.values['home']) > 0)),
+      switchesOnce('topic to Home', (v) => (Number(v['home']) > 0 && Number(v['waiting']) === 0 ? 'home' : Number(v['topic']) > 0 ? 'topic' : 'empty')),
+      landsAndStays('field', "Home's field", { tolerance: 0 }),
+      noFlicker('main', 'the page'),
+    ],
+  }, async (rec) => {
+    await rec.mark('press')
+    await press(win)
+    await expect(juno.home.item('waiting')).toBeVisible()
   })
 })

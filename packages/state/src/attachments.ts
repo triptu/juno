@@ -24,7 +24,7 @@ export interface Attachment {
   readonly mimetype: string
   /** `staging` while the bytes go to the engine, `failed` when they could not. */
   readonly state: 'staging' | 'ready' | 'failed'
-  /** An image's preview, once staged. */
+  /** An image's preview, once staged; a Juno-only image's is made from its file before its chip shows (`attachLocal`). */
   readonly preview?: string | undefined
   /** Held here only, for Juno: never staged in the engine (`attachLocal`). */
   readonly local?: true
@@ -56,16 +56,17 @@ export function removeAttachment(registry: Registry, key: string, id: string): v
  * Nothing is staged in the engine, since nothing goes to Slack from there:
  * a chip is ready at once, or `staging` when `reading` says the renderer
  * reads its file first (`settleLocal`). Empty files and files past
- * `MAX_FILES_PER_MESSAGE` are left out, as `attachFiles` does. Returns the
- * chips added.
+ * `MAX_FILES_PER_MESSAGE` are left out, as `attachFiles` does. `preview`
+ * gives a chip its picture from the start. Returns the chips added.
  */
-export function attachLocal(registry: Registry, key: string, files: ReadonlyArray<FileLike>, reading: (file: FileLike) => boolean): ReadonlyArray<Attachment> {
+export function attachLocal(registry: Registry, key: string, files: ReadonlyArray<FileLike>, reading: (file: FileLike) => boolean, preview: (file: FileLike) => string | undefined = () => undefined): ReadonlyArray<Attachment> {
   const room = MAX_FILES_PER_MESSAGE - registry.get(attachmentsAtom(key)).length
   const added = files
     .filter((file) => file.size > 0)
     .slice(0, Math.max(0, room))
     .map((file): Attachment => {
-      const attachment = { id: crypto.randomUUID(), name: file.name.trim() === '' ? 'Untitled' : file.name, size: file.size, mimetype: file.type || 'application/octet-stream', state: reading(file) ? ('staging' as const) : ('ready' as const), local: true as const }
+      const url = preview(file)
+      const attachment = { id: crypto.randomUUID(), name: file.name.trim() === '' ? 'Untitled' : file.name, size: file.size, mimetype: file.type || 'application/octet-stream', state: reading(file) ? ('staging' as const) : ('ready' as const), local: true as const, ...(url === undefined ? {} : { preview: url }) }
       attachedFiles.set(attachment.id, file)
       return attachment
     })

@@ -1,15 +1,19 @@
 import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
 import { engTopics } from './fixtures/messages'
-import { NOW } from './fixtures/topics'
+import { art, NOW } from './fixtures/topics'
 import { TopicSwitcher, type TopicSwitcherProps } from './TopicSwitcher'
 
 const noop = () => {}
 
+// Drawn art on Main and the first threads; the rest show the placeholder, as before their art is drawn.
+const drawn = [art.database, art.calendar, art.coins]
+
 const base: TopicSwitcherProps = {
   mainId: 'C0ENG:main',
   mainUnread: 3,
+  mainArt: art.people,
   currentId: 'C0ENG:1760000000.000100',
-  threads: engTopics,
+  threads: engTopics.map((thread, i) => (drawn[i] === undefined ? thread : { ...thread, art: drawn[i] })),
   now: NOW,
   query: '',
   onQuery: noop,
