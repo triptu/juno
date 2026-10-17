@@ -12,7 +12,7 @@ import type { Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { stats } from './perfStats'
+import { holdClock, stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
 import { typingReading } from './perfTyping'
@@ -200,9 +200,13 @@ test('row hover to paint', async ({ juno, win }) => {
 // pointerdown to the first presented frame that shows Home's greeting and
 // rows, read from the local cache (performance.md section 1, "Home open").
 // Every fourth sample comes back after the home.view subscription's idle
-// time, so both a warm and a cold query are in the numbers.
+// time, so both a warm and a cold query are in the numbers. Half of those
+// opens hold the CPU clock up (performance.md 7.3): after 31 s idle the clock
+// drops and the same work takes several times as long. The gate is on the
+// quick opens and the held idle opens; the unheld idle opens are reported
+// beside it, so a regression in the work after idle still shows.
 test('home open: from a topic to Home painted', async ({ juno, win }) => {
-  test.setTimeout(360_000)
+  test.setTimeout(480_000)
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic } = juno
@@ -220,11 +224,15 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     }).observe({ type: 'measure' })
   })
   const samples: number[] = []
+  const unheld: number[] = []
   const cold: string[] = []
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 32; i++) {
+    const idle = i % 4 === 3
+    // Every other idle open holds the clock for its last half second and the measure.
+    const held = idle && i % 8 === 3
     await sidebar.row(POSTGRES).open()
     await topic.expectTitle(POSTGRES)
-    await win.waitForTimeout(i % 4 === 3 ? 31_000 : 300)
+    await win.waitForTimeout(idle ? (held ? 30_500 : 31_000) : 300)
     const nav = home.navItem
     const queries = await win.evaluate(() => (window as unknown as { __homeQuery: number[] }).__homeQuery.length)
     await nav.evaluate((node) => {
@@ -252,21 +260,32 @@ test('home open: from a topic to Home painted', async ({ juno, win }) => {
     // `press`, not `click`: a pointerup in the next frame defers the end of the measure by a frame (performance.md 7.1).
     const box = (await nav.boundingBox())!
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    let sample = 0
     const measureOpen = async () => {
       await press(win)
-      samples.push(await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample))
+      sample = await win.evaluate(() => (window as unknown as { __homeSample: Promise<number> }).__homeSample)
     }
-    if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, `home-open-${i}`, measureOpen)
-    else await measureOpen()
-    if (i % 4 === 3) {
+    const stop = held ? await holdClock() : undefined
+    try {
+      if (held) await win.waitForTimeout(500)
+      if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, `home-open-${i}`, measureOpen)
+      else await measureOpen()
+    } finally {
+      await stop?.()
+    }
+    if (idle && !held) unheld.push(sample)
+    else samples.push(sample)
+    if (idle) {
       await win.waitForTimeout(100)
       const query = await win.evaluate((from) => (window as unknown as { __homeQuery: number[] }).__homeQuery.slice(from), queries)
-      cold.push(`${samples.at(-1)!.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
+      cold.push(`${held ? 'held' : 'unheld'} ${sample.toFixed(1)} ms (home.view ${query.map((ms) => ms.toFixed(1)).join(', ') || 'no run'})`)
     }
   }
   console.log(`home open after the subscription's idle time: ${cold.join('; ')}`)
-  const open = stats('home open (pointerdown on Home) to Home painted', samples)
-  within('home open, p95', open.p95, 50)
+  // Report only: the clock after idle dominates these (performance.md 8.6).
+  stats('home open after idle, clock not held (report only)', unheld)
+  const open = stats('home open (pointerdown on Home) to Home painted, idle opens held-clock', samples)
+  within('home open, held-clock idle opens, p95', open.p95, 50)
 })
 
 // A click on a picture in a message to the first presented frame that
