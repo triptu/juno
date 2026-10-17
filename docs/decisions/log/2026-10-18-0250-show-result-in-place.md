@@ -1,0 +1,1 @@
+- 10-18 02:50 · ci-fix-33 · A connection card's Show result is growth the user asks for, so it is marked `data-expands-in-place` like Show more; its label reserves the width of the other label, so the after-line keeps its width when it toggles. Why: the gallery shift walk failed on the toggle, and the card's own state cannot be drawn static without a gallery-only branch.
