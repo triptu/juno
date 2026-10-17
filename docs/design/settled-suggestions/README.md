@@ -15,8 +15,13 @@ SPEC §12 (Home, Tidy up), §14 (Settings › Tidy up) and §15 decide behaviour
 | `a-sheet-minimum-*.png` | The minimum window: the buttons go under each row's text |
 | `b-in-place-*.png`, `b-in-place-many-*.png` | Direction B, the card opening in place on Home |
 | `settings-light.png`, `settings-dark.png` | Settings › Tidy up |
+| `automated-card-*.png`, `automated-card-mixed-*.png` | Card 3, Automated's record on Home: "Juno moved 2 channels to Automated", and with a move back |
+| `automated-sheet-*.png` | Its sheet: each channel with the fact that decided the move, Keep and Move back (Move to Automated for a move back out) |
+| `automated-sheet-acted-*.png` | One moved back, one kept, each with Undo in place |
+| `automated-sheet-about-*.png` | The info button open: What Automated is |
+| `automated-sheet-minimum-*.png` | The minimum window |
 
-Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.
+Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,AutomatedReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.
 
 ## Where the reason comes from
 
