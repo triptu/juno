@@ -106,6 +106,8 @@ export function OptionRow({
       id={id}
       role={listRole === 'menu' ? 'menuitem' : 'option'}
       aria-selected={listRole === 'menu' ? undefined : selected}
+      // A menu has no selection state; the checked row is the current one (the Juno switcher's page).
+      aria-current={listRole === 'menu' && selected ? 'true' : undefined}
       aria-disabled={disabled || undefined}
       {...activateHandlers<HTMLDivElement>(onSelect, { keepFocus: true, disabled })}
       // Synchronous, so the highlight follows the pointer in the next frame as a hover style would;
