@@ -88,7 +88,7 @@ async function touch(page: Page, element: Locator): Promise<string[]> {
   const box = await element.evaluate((node) => {
     node.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     return node.getClientRects().length > 0 ? node.getBoundingClientRect().toJSON() as DOMRect : null
-  })
+  }, undefined, { timeout: 5_000 })
   if (!box) return failures
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
@@ -124,6 +124,10 @@ const drawn = (page: Page, route: Route) =>
     const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text))
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
   }, route.route)
+
+/** The state's elements and attributes, without scroll positions: what a press on an interactive fixture changes. */
+const markup = (page: Page, route: Route) =>
+  page.evaluate((frameName) => document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '', route.route)
 
 /**
  * SPEC section 16: the arrow cursor everywhere, the text cursor only over
@@ -169,7 +173,15 @@ for (let part = 0; part < shards; part++) {
         for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
         const shotOnly = route.frame.hover !== undefined || route.frame.press !== undefined || route.frame.focus !== undefined
         if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
+        // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
+        // after it would be gone or different: open the state again whenever a touch changed what it draws.
+        const original = await markup(page, route)
         for (const [index, element] of (await targets(page, route)).entries()) {
+          if ((await markup(page, route)) !== original) {
+            // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
+            await page.goto('about:blank')
+            await openState(page, route)
+          }
           for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
         }
       })
