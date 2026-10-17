@@ -1,12 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
+import type { ConversationKind, PickConversation, PickConversations, ThreadSummary } from '@juno/contract'
 import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { holdKeys, Icon, OptionGroupLabel, OptionList, OptionRow, releaseKeys, SparkleDuotone, useOptionListKeys } from '@juno/ui'
+import { holdKeys, Icon, OptionGroupLabel, OptionList, OptionRow, releaseKeys, SparkleDuotone, TopicArt, useOptionListKeys } from '@juno/ui'
 import { DestinationMark } from './DestinationMark'
 import { Highlighted } from './Highlighted'
+import { titleMatches } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
+import { relativeTime } from './time'
 
 const kindLabels: Record<ConversationKind, string> = {
   public: 'Public channel',
@@ -155,6 +157,99 @@ function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly i
       onSelect={onSelect}
       onActivate={() => onActivate(id)}
     />
+  )
+}
+
+export interface TopicListProps {
+  /** The search text. */
+  readonly query: string
+  readonly onQuery: (query: string) => void
+  /** The conversation the topics are in, for Main's mark. */
+  readonly conversation: PickConversation
+  /** Its threads, open ones newest first, then the resolved ones; undefined while they load. */
+  readonly threads: ReadonlyArray<ThreadSummary> | undefined
+  readonly now: number
+  /** The chosen thread's id; none is Main. */
+  readonly selected: string | undefined
+  /** A thread, or Main with `undefined`. */
+  readonly onPick: (thread: ThreadSummary | undefined) => void
+  readonly onClose: () => void
+}
+
+const MAIN_ID = 'pick-topic-main'
+const topicRowId = (id: string) => `pick-topic-${id}`
+
+/**
+ * Home's topic list (SPEC section 12, "Writing"): where in the chosen
+ * conversation the message goes. Main first, a new message as today, then
+ * the conversation's threads, newest activity first, with the resolved ones
+ * last; a thread makes the send a reply in it. The destination list's look:
+ * a search field, then one-line rows with the topic's art, its title and its
+ * last activity. Typing filters by the starts of words, as the topic
+ * switcher does.
+ */
+export function TopicList({ query, onQuery, conversation, threads, now, selected, onPick, onClose }: TopicListProps) {
+  const main = titleMatches('Main', query)
+  const shown = (threads ?? []).filter((thread) => titleMatches(thread.title, query))
+  const open = shown.filter((thread) => thread.resolved !== true)
+  const resolved = shown.filter((thread) => thread.resolved === true)
+  const rows = [...open, ...resolved]
+  const ids = [...(main ? [MAIN_ID] : []), ...rows.map((thread) => topicRowId(thread.id))]
+  const [activeId, setActive] = useActive(ids)
+  const pick = (id: string) => (id === MAIN_ID ? onPick(undefined) : onPick(rows.find((thread) => topicRowId(thread.id) === id)))
+  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose })
+  const search = usePendingEnter(threads === undefined, ids, pick, keys, onQuery)
+  const row = (thread: ThreadSummary) => {
+    const id = topicRowId(thread.id)
+    return (
+      <OptionRow
+        key={id}
+        id={id}
+        size={36}
+        active={id === activeId}
+        selected={thread.id === selected}
+        leading={<TopicArt topicId={thread.id} {...(thread.art === undefined ? {} : { recipe: thread.art })} size={20} />}
+        label={thread.title}
+        sub={relativeTime(thread.lastActivityAt, now)}
+        onSelect={() => onPick(thread)}
+        onActivate={() => setActive(id)}
+      />
+    )
+  }
+  return (
+    <>
+      <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search topics" onKeyDown={search.onKeyDown} activeId={activeId} />
+      <div {...stylex.props(styles.scroll)}>
+        <OptionList label="Topics" {...(activeId === undefined ? {} : { activeId })}>
+          {main ? (
+            <OptionRow
+              id={MAIN_ID}
+              size={36}
+              active={activeId === MAIN_ID}
+              selected={selected === undefined}
+              leading={<DestinationMark conversation={conversation} />}
+              label="Main"
+              sub="New message"
+              onSelect={() => onPick(undefined)}
+              onActivate={() => setActive(MAIN_ID)}
+            />
+          ) : null}
+          {open.length === 0 ? null : (
+            <div role="group" aria-label="Threads">
+              <OptionGroupLabel>Threads</OptionGroupLabel>
+              {open.map(row)}
+            </div>
+          )}
+          {resolved.length === 0 ? null : (
+            <div role="group" aria-label="Resolved">
+              <OptionGroupLabel>Resolved</OptionGroupLabel>
+              {resolved.map(row)}
+            </div>
+          )}
+          {threads !== undefined && ids.length === 0 ? <PickerNoMatch /> : null}
+        </OptionList>
+      </div>
+    </>
   )
 }
 

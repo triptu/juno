@@ -3,7 +3,7 @@ import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, useOptionListKeys, type ActivateEvent } from '@juno/ui'
-import { countLabel } from './look'
+import { countLabel, titleMatches as matches } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
 
@@ -24,14 +24,6 @@ export interface TopicSwitcherProps {
 }
 
 const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`)
-
-/** A title matches when each word of the query starts a word in it, in any order. */
-function matches(title: string, query: string): boolean {
-  const words = query.toLowerCase().split(/\s+/).filter((word) => word !== '')
-  if (words.length === 0) return true
-  const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u)
-  return words.every((word) => titleWords.some((each) => each.startsWith(word)))
-}
 
 const rowId = (id: string) => `switch-${id}`
 

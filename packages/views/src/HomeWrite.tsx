@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { PickConversation } from '@juno/contract'
 import { accent, colors, layout, radii, sizes, spacing, text, tints, weights, z } from '@juno/tokens/tokens.stylex'
 import { Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
@@ -163,16 +163,6 @@ function RecentRow({ conversation, place, chosen, tabbable, onPick, onOpen, onMo
   )
 }
 
-/** Recent, then the destination chip, as one stack above the field. */
-export function HomeWriteTop({ recent, chip }: { readonly recent: ReactNode; readonly chip: ReactNode }) {
-  return (
-    <div data-home-write="" {...stylex.props(styles.top)}>
-      {recent}
-      <div {...stylex.props(styles.chipRow)}>{chip}</div>
-    </div>
-  )
-}
-
 export interface SendToListProps {
   /** People for a first @, channels for a first #. */
   readonly kind: 'person' | 'channel'
@@ -248,17 +238,6 @@ const tintRows = stylex.create({
 
 const styles = stylex.create({
   // Recent, the chip and the field read as one stack: a wider gap under Recent, the chip close to the field it labels.
-  top: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-3'],
-    width: '100%',
-    minWidth: 0,
-  },
-  chipRow: {
-    display: 'flex',
-    minWidth: 0,
-  },
   // As wide as Home's column; it starts on the field's edge.
   // A window too short for Recent and Home's rows keeps the rows; the chip's list still has every conversation.
   recent: {

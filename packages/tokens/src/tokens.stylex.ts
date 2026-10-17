@@ -868,6 +868,8 @@ export const layout = stylex.defineVars({
   // Home's destination list and All topics' place list.
   '--menu-width-picker': '340px',
   '--destination-list-max-height': '360px',
+  // On a narrow Home the topic chip shortens to this before the destination chip shortens: its mark, a few letters and the caret.
+  '--topic-chip-min-width': '96px',
   // A sidebar view's name pill (inventory 2.3): longer names end with an ellipsis.
   '--filter-pill-max-width': '120px',
   // The view sheet's conversation list (inventory 2.3), which scrolls past this.
