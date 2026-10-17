@@ -222,6 +222,8 @@ export {
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
+  actOnDoneFollowUp,
+  actOnOldDraft,
   markHomeItemUsed,
   prefetchHome,
   showHome,

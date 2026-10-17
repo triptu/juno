@@ -16,6 +16,8 @@ import {
   artRestore,
   channelsIgnore,
   channelsUnignore,
+  draftsRestore,
+  followUpsRestore,
   notificationsSetLevel,
   readsMarkRead,
   readsMarkUnread,
@@ -163,5 +165,9 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, viewsRemoveChannel, payloadOf(undo))
     case 'views.sortChannel':
       return runCommand(registry, viewsSortChannel, payloadOf(undo))
+    case 'followUps.restore':
+      return runCommand(registry, followUpsRestore, payloadOf(undo))
+    case 'drafts.restore':
+      return runCommand(registry, draftsRestore, payloadOf(undo))
   }
 }
