@@ -15,6 +15,7 @@ import {
   setHomeDraft,
   showToast,
   tabsAtom,
+  untouched,
   type HomeDraft,
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
@@ -191,13 +192,15 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
   if (attached === undefined) return false
   // A send to a channel's or a group DM's Main starts a thread there (SPEC 9).
   const startsThread = target.kind === 'channel' && target.threadTs === undefined && current.conversation?.kind !== 'im'
+  // The field empties at once, as a topic's does, so what is typed while the send waits (a DM to open) is kept.
+  setHomeDraft(registry, tabId, emptyHomeDraft)
   const exit = await sendMessage(registry, target, encodeMentions(body, current.mentions), undefined, attached.ids, startsThread)
   if (exit._tag === 'Success') {
-    setHomeDraft(registry, tabId, emptyHomeDraft)
     if (current.conversation !== undefined) showToast(registry, { text: `Sent to ${destinationLabel(current.conversation)}` })
     return true
   }
-  // The draft and its files stay; the send can be tried again.
+  // Nothing was queued: the draft, its destination and its files come back, unless something new was written meanwhile.
+  if (untouched(registry.get(homeDraftAtom(tabId)))) setHomeDraft(registry, tabId, current)
   attached.restore()
   console.warn('juno: send failed', exit.cause)
   return false
