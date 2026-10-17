@@ -1,0 +1,1 @@
+- 10-17 20:31 · owner · Titles of sensitive topics stay vague and safe ("Process discussion for Victor", "Check-in process for Lena"): no category names such as HR matter or performance check-in, since titles show on shared screens.

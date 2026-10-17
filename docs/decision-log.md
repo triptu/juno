@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 20:31 · owner · Titles of sensitive topics stay vague and safe ("Process discussion for Victor", "Check-in process for Lena"): no category names such as HR matter or performance check-in, since titles show on shared screens.
 - 10-17 20:10 · orchestrator · Juno never writes default notification hours into Slack's schedule: it writes only after the hours are set on that install or the switch is turned on (the hours are shown above it). The live check had applied the defaults on a Mac without the owner's hours; his previous schedule was restored exactly.
 - 10-17 20:05 · release-keeper · Merging cards-followup-drafts after automated-record-until-seen: the shared review sheet (HomeReview, useReview, ReviewList) is kept, with Automated's Dismiss, home.movesShown and home.movesSeen carried over; ReviewList's data-review-outcome already marks only the shown word.
 - 10-17 19:54 · live-fixes · The fake's `subscriptions.thread.getView` sends `unread_replies` for a thread with unread replies and `latest_replies` otherwise, never both, as seen live on 10-17 (one unread and two read threads); the sync already read either.
