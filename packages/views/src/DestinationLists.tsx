@@ -3,7 +3,7 @@ import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, SparkleDuotone, useOptionListKeys } from '@juno/ui'
+import { Avatar, holdKeys, Icon, OptionGroupLabel, OptionList, OptionRow, releaseKeys, SparkleDuotone, useOptionListKeys } from '@juno/ui'
 import { Highlighted } from './Highlighted'
 import { hueFor, initials, kindIcon } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
@@ -25,8 +25,10 @@ const rowId = (key: string) => `pick-conversation-${key}`
 
 /**
  * Enter while the rows for the typed query are still loading (none yet, or
- * an earlier query's still shown) picks the first row once they land, so a name typed and entered at once is not lost. Typing
- * again drops the waiting Enter.
+ * an earlier query's still shown) picks the first row once they land, so a
+ * name typed and entered at once is not lost. Keys typed after that Enter
+ * wait for the pick and then go where focus went (Home's field), in order.
+ * A change to the query drops the waiting Enter.
  */
 function usePendingEnter(loading: boolean, ids: ReadonlyArray<string>, pick: (id: string) => void, onKeyDown: (event: KeyboardEvent<HTMLElement>) => void, onQuery: (query: string) => void) {
   const pending = useRef(false)
@@ -34,12 +36,14 @@ function usePendingEnter(loading: boolean, ids: ReadonlyArray<string>, pick: (id
     if (!pending.current || loading) return
     pending.current = false
     if (ids[0] !== undefined) pick(ids[0])
+    releaseKeys()
   }, [loading, ids, pick])
   return {
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
       if (event.key === 'Enter' && loading) {
         event.preventDefault()
         pending.current = true
+        holdKeys()
         return
       }
       onKeyDown(event)
