@@ -18,9 +18,10 @@ export function imageTag() {
 export const quote = (value) => (/^[\w@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`)
 export const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
 
-/** Runs nsc and returns its stdout; throws with its stderr on failure. */
-export function nsc(args) {
-  const result = spawnSync('nsc', args, { encoding: 'utf8' })
+/** Runs nsc and returns its stdout; throws with its stderr on failure. A hung call ends after `timeout` ms (ETIMEDOUT). */
+export function nsc(args, { timeout = 120_000 } = {}) {
+  const result = spawnSync('nsc', args, { encoding: 'utf8', timeout })
+  if (result.error?.code === 'ETIMEDOUT') throw new Error(`nsc ${args[0]} failed: spawnSync nsc ETIMEDOUT after ${timeout / 1000} s`)
   if (result.error) throw new Error(`nsc is not installed or not on PATH: ${result.error.message}`)
   if (result.status !== 0) throw new Error(`nsc ${args[0]} failed:\n${result.stderr.trim()}`)
   return result.stdout

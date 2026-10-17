@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -151,7 +151,8 @@ const request = acquire('linux/amd64:2x4', async (_, labels) => {
  return id;
 }, message => logs.push(message));
 let result;
-if (${exhausted}) await assert.rejects(request, /context deadline exceeded/); else result = await request;
+// Past the quick retries a run waits out the outage; JUNO_REMOTE_OUTAGE_WAIT=0 gives up at once.
+if (${exhausted}) await assert.rejects(request, (error) => error.outage && /Namespace unreachable since .*nsc create timed out 3 times.*context deadline exceeded/.test(error.message)); else result = await request;
 assert.equal(attempts, ${exhausted ? 3 : 2});
 if (result) assert.equal(result.id, 'ready');
 assert(logs.some(x => x.includes('inventory unavailable')));
@@ -162,7 +163,7 @@ assert(!readdirSync(${JSON.stringify(poolDir)}).some(x => x.startsWith('pending-
 `
     try {
       const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-        env: { ...process.env, TMPDIR: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: state, TEST_LISTS: counter, JUNO_REMOTE_MAX_VCPU: '2' },
+        env: { ...process.env, TMPDIR: dir, PATH: `${dir}:${process.env.PATH}`, TEST_INSTANCES: state, TEST_LISTS: counter, JUNO_REMOTE_MAX_VCPU: '2', ...(exhausted ? { JUNO_REMOTE_OUTAGE_AFTER: '5s', JUNO_REMOTE_OUTAGE_WAIT: '0' } : {}) },
         encoding: 'utf8', timeout: 30_000,
       })
       assert.equal(result.status, 0, result.stderr || result.error?.message)
@@ -329,7 +330,6 @@ if (!destroy(job.id)) throw new Error('destroy failed');
 }
 
 test('daemon owns inventory, holds capacity for a queue head past its hold, and survives a crash through direct admission', { timeout: 60_000 }, async () => {
-  const { readdirSync } = await import('node:fs')
   const { dir, poolDir, instances, children, waitFor, run } = await poolHarness({ JUNO_REMOTE_HOLD_SECONDS: '0' })
   let daemon
   try {

@@ -2,11 +2,14 @@
 // destroying machines so a killed run or failed Namespace call can be recovered.
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap, orphanGraceMs } from './pool-decisions.mjs'
+import { daemonScript } from './daemon-home.mjs'
+import { alive, lock, lockIsNew, lockOwner, lockPath, takeLock, unlock } from './locks.mjs'
+import { noteNamespace, outageWatcher } from './outage.mjs'
+import { attemptSettled, capacity, defaultCap, machinesToDestroy, mayPass, pendingVcpu, planCap, requestCap } from './pool-decisions.mjs'
 
 const dir = join(tmpdir(), 'juno-remote-pool')
 const owner = createHash('sha256').update(hostname()).update(dir).digest('hex').slice(0, 16)
@@ -18,20 +21,11 @@ const maxVcpu = Math.min(planCap, Number(process.env.JUNO_REMOTE_MAX_VCPU ?? def
 const lifetimeMs = 3 * 60 * 60_000
 const handOutMs = lifetimeMs - 30 * 60_000
 mkdirSync(dir, { recursive: true })
-const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused/i.test(error.message)
+// 502, 503 and 504 came back from Namespace's API during the 10-17 outage.
+const transient = (error) => /ETIMEDOUT|context deadline exceeded|DeadlineExceeded|Unavailable|i\/o timeout|connection reset|connection refused|\b50[234]\b|Gateway Time-?out|Bad Gateway/i.test(error.message)
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
-const alive = (pid) => {
-  if (!pid) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error.code === 'EPERM'
-  }
-}
 const vcpu = (machine) => Number(/:(\d+)x/.exec(machine)?.[1] ?? 8)
 const statePath = (id) => join(dir, `${id}.json`)
-const lockPath = (id) => join(dir, `${id}.lock`)
 function read(id) {
   try {
     return JSON.parse(readFileSync(statePath(id), 'utf8'))
@@ -46,36 +40,6 @@ function write(state) {
 }
 const entries = () => readdirSync(dir).filter((name) => name.endsWith('.json')).map((name) => read(name.slice(0, -5))).filter(Boolean)
 const machines = () => entries().filter((state) => !state.pending)
-function lockOwner(id) {
-  try {
-    return Number(readFileSync(join(lockPath(id), 'pid'), 'utf8'))
-  } catch {
-    return undefined
-  }
-}
-function lock(id) {
-  try {
-    mkdirSync(lockPath(id))
-    writeFileSync(join(lockPath(id), 'pid'), String(process.pid))
-    return true
-  } catch {
-    return false
-  }
-}
-const unlock = (id) => rmSync(lockPath(id), { recursive: true, force: true })
-function lockIsNew(id) {
-  try { return Date.now() - statSync(lockPath(id)).mtimeMs <= 30_000 } catch { return false }
-}
-function takeLock(id) {
-  const pid = lockOwner(id)
-  if (pid !== undefined && !alive(pid)) unlock(id)
-  if (pid === undefined && existsSync(lockPath(id))) {
-    // A process can die between mkdir and writing its PID. Allow time for a
-    // live creator to finish publishing the lock before recovering it.
-    if (!lockIsNew(id)) unlock(id)
-  }
-  return lock(id)
-}
 const inventoryPath = join(dir, 'inventory-cache')
 const revisionPath = join(dir, 'inventory-revision')
 const inventoryRevision = () => {
@@ -88,6 +52,8 @@ export function invalidateInventory() {
   rmSync(inventoryPath, { force: true })
 }
 
+const listTimeoutMs = Number(process.env.JUNO_REMOTE_LIST_TIMEOUT_SECONDS ?? 90) * 1000
+
 let daemonInventory
 export function list() {
   if (daemonInventory) return daemonInventory
@@ -99,12 +65,14 @@ export function list() {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const startedAt = Date.now()
     const revision = inventoryRevision()
-    const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: 90_000 })
+    const result = spawnSync('nsc', ['list', '-o', 'json'], { encoding: 'utf8', timeout: listTimeoutMs })
     if (result.status !== 0) {
       const error = new Error(`nsc list failed: ${result.error?.message ?? result.stderr.trim()}`)
+      if (transient(error)) noteNamespace('list', false, error.message)
       if (attempt < 3 && transient(error)) continue
       throw error
     }
+    noteNamespace('list', true)
     // nsc prints null when no instance exists.
     const instances = JSON.parse(result.stdout) ?? []
     if (!Array.isArray(instances)) throw new Error('nsc list did not return an array')
@@ -122,25 +90,32 @@ function forget(id) {
   rmSync(statePath(id), { force: true })
   unlock(id)
 }
+// The daemon runs from a copy in the pool folder (daemon-home.mjs).
+const watcherVersion = 12
 export function ensureReaper() {
   if (!takeLock('watcher-start')) return
   try {
     const pidFile = join(dir, 'watcher.pid')
     const versionFile = join(dir, 'watcher.version')
+    const scriptFile = join(dir, 'watcher.script')
     let pid
     try { pid = Number(readFileSync(pidFile, 'utf8')) } catch { /* No watcher yet. */ }
     const version = existsSync(versionFile) ? Number(readFileSync(versionFile, 'utf8')) : 1
-    if (alive(pid) && version >= 11) return
+    const script = existsSync(scriptFile) ? readFileSync(scriptFile, 'utf8') : undefined
+    // A daemon whose files were deleted is replaced, whatever its version.
+    if (alive(pid) && version >= watcherVersion && script && existsSync(script)) return
     // Upgrade housekeeping only. Machine/job owners are untouched.
     if (alive(pid)) {
       const command = spawnSync('ps', ['-p', String(pid), '-o', 'args='], { encoding: 'utf8', timeout: 1000 }).stdout ?? ''
-      if (!/\/scripts\/remote\/pool\.mjs --watch\s*$/.test(command)) return
+      if (!/\/pool\.mjs --watch\s*$/.test(command)) return
       try { process.kill(pid, 'SIGTERM') } catch (error) { if (error.code !== 'ESRCH') throw error }
     }
-    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--watch'], { detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
+    const daemon = daemonScript(dir)
+    const child = spawn(process.execPath, [daemon, '--watch'], { cwd: dir, detached: true, stdio: 'ignore', env: { ...process.env, JUNO_REMOTE_IDLE_MINUTES: String(defaultIdleMinutes) } })
     child.on('error', () => { /* Clients fall back when the daemon cannot start. */ })
     writeFileSync(pidFile, String(child.pid))
-    writeFileSync(versionFile, '11')
+    writeFileSync(scriptFile, daemon)
+    writeFileSync(versionFile, String(watcherVersion))
     child.unref()
   } finally { unlock('watcher-start') }
 }
@@ -202,18 +177,28 @@ function reconcile() {
   const remaining = remainingSnapshot.instances
   const present = new Set(remaining.map((instance) => instance.cluster_id))
   for (const state of states) if (!present.has(state.id) && !state.live && state.created < remainingSnapshot.startedAt) forget(state.id)
-  for (const entry of pending) if (!entry.live) {
-    const observed = instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
-    const gone = !remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
-    if (!entry.failed || (observed && gone) || Date.now() - entry.created >= orphanGraceMs) rmSync(statePath(entry.id), { force: true })
+  for (const { live, ...entry } of pending) if (!live) {
+    // The daemon reads one inventory per tick, so a machine destroyed above is
+    // seen gone on the next tick; remember that it was seen.
+    const observed = entry.seen || instances.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    const visible = remaining.some((instance) => instance.labels?.['juno-create'] === entry.token)
+    // A client that died before nsc create left nothing behind; one that died
+    // during it is treated as a failure from now on.
+    if (!entry.failed && !entry.creating) rmSync(statePath(entry.id), { force: true })
+    else if (!entry.failed) write({ ...entry, pid: undefined, failed: true, failedAt: Date.now() })
+    else if (attemptSettled({ entry, observed, present: visible, inventoryStartedAt: remainingSnapshot.startedAt, now: Date.now() })) rmSync(statePath(entry.id), { force: true })
+    else if (observed && !entry.seen) write({ ...entry, seen: true })
   }
   return remaining
 }
 
 async function provision(machine, pending, create) {
   invalidateInventory()
+  pending = { ...pending, creating: Date.now() }
+  write(pending)
   try {
     const id = await create('3h', { 'juno-pool': owner, 'juno-create': pending.token })
+    noteNamespace('create', true)
     // Admission must never observe neither the pending reservation nor its machine.
     while (!takeLock('decide')) await sleep(100)
     try {
@@ -223,7 +208,8 @@ async function provision(machine, pending, create) {
     } finally { unlock('decide') }
     return { id, warm: false, images: [] }
   } catch (error) {
-    write({ ...pending, pid: undefined, failed: true })
+    if (transient(error)) noteNamespace('create', false, error.message)
+    write({ ...pending, pid: undefined, failed: true, failedAt: Date.now() })
     if (error.instanceId && destroy(error.instanceId)) rmSync(statePath(pending.id), { force: true })
     throw error
   } finally { invalidateInventory() }
@@ -304,6 +290,7 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
   if (!Number.isFinite(maxVcpu) || maxVcpu < 0) throw new Error('JUNO_REMOTE_MAX_VCPU must be non-negative')
   if (maxVcpu === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0)')
   if (vcpu(machine) > maxVcpu) throw new Error(`machine needs ${vcpu(machine)} vCPU, above cap ${maxVcpu}`)
+  const watchOutage = outageWatcher(log, Date.now())
   ensureReaper()
   let createFailures = 0
   const started = Date.now()
@@ -336,6 +323,7 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
           if (!current.result.pending) return current.result
           return await provision(machine, current.result.pending, create)
         }
+        if (Date.now() - reportedAt >= 10_000 && watchOutage()) reportedAt = Date.now()
         if (Date.now() - reportedAt >= 10_000) {
           const position = queue().filter((item) => !item.result && !item.error).findIndex((item) => item.id === request.id) + 1
           if (position > 0) log(`waiting: ${ordinal(position)} in queue, ${vcpu(machine)} cores, ${Math.floor((Date.now() - started) / 1000)} s elapsed`)
@@ -344,9 +332,19 @@ export async function acquire(machine, create, log, { fresh = false } = {}) {
         await sleep(500)
       }
     } catch (error) {
-      if (!transient(error) || ++createFailures > 2) throw error
-      log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
-      await sleep(createFailures * 2000)
+      if (error.outage || !transient(error)) throw error
+      if (++createFailures <= 2) {
+        log(`infrastructure: create timed out; reclaiming attempt and retrying (${createFailures}/2)`)
+        await sleep(createFailures * 2000)
+      } else {
+        // The failed attempt keeps its reservation and label until an inventory
+        // settles it, so a machine that arrives late is destroyed, not doubled.
+        log(`infrastructure: create failed ${createFailures} times; retrying in a minute (${error.message.split('\n').at(-1)})`)
+        for (const until = Date.now() + 60_000; Date.now() < until;) {
+          watchOutage()
+          await sleep(Math.min(10_000, until - Date.now()))
+        }
+      }
     } finally { rmSync(requestPath(request.id), { force: true }) }
   }
 }
@@ -397,4 +395,5 @@ export async function reap() {
 export function status() {
   return machines().map((state) => ({ ...state, busy: alive(lockOwner(state.id)), idleFor: Date.now() - state.lastUsed }))
 }
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === '--watch') await reap()
+// The temp folder sits behind a symlink on macOS (/var is /private/var).
+if (process.argv[2] === '--watch' && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) await reap()

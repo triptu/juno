@@ -3,6 +3,8 @@
 //   pnpm affected                 local Bun check, then the affected suites on one Namespace machine
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
+//   pnpm affected --local-on-outage   run the remote steps here if Namespace stays
+//                                 unreachable for JUNO_REMOTE_OUTAGE_WAIT (default 10m here)
 //   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
 //   pnpm affected --plan --files packages/ui/src/Chip.tsx   plan for those files
 //   pnpm affected --graph         pick desktop specs by the import graph, not the coverage map
@@ -42,6 +44,7 @@ import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, mapProblem, selectSpecs } from './affected-select.mjs'
 import { forwardSignals } from './remote/children.mjs'
+import { outageExit } from './remote/pool-decisions.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -294,6 +297,8 @@ if (flag('--plan') || plan.length === 0) process.exit(0)
 const children = new Set()
 forwardSignals(children)
 const localAll = flag('--local')
+// Without this flag a remote run waits out an outage, since this Mac is the owner's computer.
+const localOnOutage = flag('--local-on-outage')
 const spawnStep = (command, env, onLine) =>
   new Promise((resolvePromise) => {
     const child = spawn(command[0], command[1], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } })
@@ -314,7 +319,8 @@ const run = async (step) => ({ step, code: await spawnStep(['pnpm', [step.script
 const runRemote = async (steps) => {
   const words = steps.flatMap((step, index) => [...(index ? ['+'] : []), ...Object.entries(step.env ?? {}).map(([key, value]) => `${key}=${value}`), step.script, ...step.args])
   const codes = new Map()
-  const code = await spawnStep(['node', [join(root, 'scripts/remote.mjs'), 'test:plan', ...words]], {}, (line) => {
+  const env = localOnOutage && !process.env.JUNO_REMOTE_OUTAGE_WAIT ? { JUNO_REMOTE_OUTAGE_WAIT: '10m' } : {}
+  const code = await spawnStep(['node', [join(root, 'scripts/remote.mjs'), 'test:plan', ...words]], env, (line) => {
     const result = /^plan: step (\d+) \S+ exited with (\d+)/.exec(line)
     if (result) codes.set(Number(result[1]), Number(result[2]))
     process.stdout.write(`${line}\n`)
@@ -336,7 +342,14 @@ else {
     return done
   })()
   const [localResults, remoteResults] = await Promise.all([local, remote.length ? runRemote(remote) : []])
-  results.push(...localResults, ...remoteResults)
+  results.push(...localResults)
+  if (remoteResults.some(({ code }) => code === outageExit) && localOnOutage) {
+    console.log('affected: Namespace is unreachable; running the remote steps on this Mac')
+    for (const { step } of remoteResults) results.push(await run(step))
+  } else {
+    if (remoteResults.some(({ code }) => code === outageExit)) console.log('affected: Namespace is unreachable; pnpm affected --local runs these steps on this Mac')
+    results.push(...remoteResults)
+  }
 }
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)

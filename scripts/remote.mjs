@@ -20,6 +20,10 @@
 // and `--drain` destroys its idle machines.
 //
 // Needs `nsc` logged in (`nsc login`, or NSC_TOKEN_FILE for a token). See ADR 0013.
+//
+// When Namespace stops answering, a waiting run says so and keeps waiting;
+// JUNO_REMOTE_OUTAGE_WAIT=10m makes it give up after that much outage with
+// exit code 75 (docs/development.md, "Remote runs", "Outages").
 
 import { randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
@@ -32,6 +36,8 @@ import { runnerConfig, checkRunner, runnerCommand } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
+import { outage } from './remote/outage.mjs'
+import { describeOutage, outageExit } from './remote/pool-decisions.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const started = Date.now()
@@ -96,6 +102,8 @@ if (process.argv[2] === '--reap') {
 }
 if (process.argv[2] === '--status') {
   const pool = status()
+  const active = outage()
+  if (active) console.log(`remote: ${describeOutage(active)}`)
   console.log(pool.length === 0 ? 'remote: no machines in the pool' : pool.map((state) => `${state.id} ${state.machine} ${state.destroying ? 'destroying (retry pending)' : state.kept ? 'kept until expiry' : state.busy ? 'busy' : `idle ${Math.round(state.idleFor / 60000)} min`}, up ${Math.round((Date.now() - state.created) / 60000)} min`).join('\n'))
   process.exit(0)
 }
@@ -213,11 +221,12 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 
 let code = 1
 let infraFailure = false
+let outageFailure = false
 let finalized = false
 function finishLog(result) {
   if (finalized) return
   finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 }
 try {
   runner = runnerConfig()
@@ -249,7 +258,8 @@ try {
       const cidfile = join(work, 'id')
       acquiredAt = Date.now()
       rmSync(cidfile, { force: true })
-      try { nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile]) } catch (error) {
+      // A create normally takes about 20 s; a hung one is ended and reconciled by its label.
+      try { nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile], { timeout: 10 * 60_000 }) } catch (error) {
         if (existsSync(cidfile)) error.instanceId = readFileSync(cidfile, 'utf8').trim()
         throw error
       }
@@ -362,7 +372,9 @@ try {
   appendFileSync(runLog, `remote: ${error.message}\n`)
   console.error(`remote: ${error.message}`)
   infraFailure = true
-  code = 255
+  // A run that gave up on a Namespace outage (JUNO_REMOTE_OUTAGE_WAIT) exits 75, so callers can run it locally instead.
+  outageFailure = Boolean(error.outage)
+  code = outageFailure ? outageExit : 255
   clean = false
 } finally {
   if (backend === 'namespace' && id && options.keep) console.error(`remote: kept ${id}; nsc ssh ${id} to look around, nsc destroy ${id} when done`)
