@@ -43,6 +43,7 @@ export {
   channelTopicsAtom,
   loadOlderMessages,
   locateMessage,
+  locatePerson,
   messageListAtom,
   messagesAtom,
   messageWindowSpecAtom,
