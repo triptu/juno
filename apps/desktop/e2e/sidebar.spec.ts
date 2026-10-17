@@ -366,5 +366,6 @@ test('Unread keeps read topics until no tab shows them', async ({ juno, win }) =
   await roadmap.expectRead()
   await roadmap.expectSelected()
   await tabs.menu('close-tab')
+  await sidebar.leave()
   await expect(roadmap.root).toHaveCount(0)
 })
