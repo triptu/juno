@@ -96,6 +96,9 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
   const titleId = useId()
   const aboutId = useId()
   const [showAbout, setShowAbout] = useState(initialAbout)
+  // The hints name the current row's buttons: Automated's record has rows that move back and rows that move in.
+  const [activeId, setActiveId] = useState(initialActive ?? entries[0]?.id)
+  const words = entries.find((entry) => entry.id === activeId)?.words ?? verbs
   const left = entries.filter((entry) => (statuses.get(entry.id) ?? 'open') === 'open').length
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal padding="none" sx={styles.sheet} data-sheet={name}>
@@ -117,7 +120,7 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
             <ReviewExplainer about={about} onSettings={onSettings} />
           </div>
         ) : null}
-        <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
+        <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onActiveChange={setActiveId} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
       </div>
       <div {...stylex.props(styles.foot)}>
         <span {...stylex.props(styles.keys)} aria-hidden>
@@ -126,9 +129,9 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
           <Kbd>↵</Kbd>
           <Text variant="meta" tone="muted">{reviewCopy.open}</Text>
           <Kbd>{verbs.actKey}</Kbd>
-          <Text variant="meta" tone="muted">{verbs.act}</Text>
+          <Text variant="meta" tone="muted" data-review-hint-act="">{words.act}</Text>
           <Kbd>{verbs.declineKey}</Kbd>
-          <Text variant="meta" tone="muted">{verbs.decline}</Text>
+          <Text variant="meta" tone="muted">{words.decline}</Text>
         </span>
         <span {...stylex.props(styles.buttons)}>
           <Button variant={all === undefined ? 'primary' : 'secondary'} size="md" onClick={onClose} data-review-close="">

@@ -56,6 +56,10 @@ export default defineFixtures(
       // One moved back, one kept: each row stays where it was and says what happened, with Undo.
       acted: scene(() => <OverHome><Live initial={acted} /></OverHome>),
       'focus-row': scene(() => <OverHome><Live initialActive={movedTopics[1]!.id} /></OverHome>, { focus: `[data-review-row="${movedTopics[1]!.id}"] a` }),
+      // On a row that moves a channel in, the key hint names its own button: "M Move to Automated".
+      'focus-move-in': scene(() => <OverHome><Live initialActive={movedOut.id} /></OverHome>, { focus: `[data-review-row="${movedOut.id}"] a` }),
+      // A narrower window: each row's buttons take only their own width, so the reason keeps its room.
+      'narrow-window': scene(() => <OverHome><Live /></OverHome>, { width: 600, height: 620, padded: false }),
       'minimum-window': scene(() => <OverHome><Live /></OverHome>, { width: 336, height: 436, padded: false }),
     },
     // Home's card: the whole row opens the record.

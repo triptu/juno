@@ -16,8 +16,9 @@ export const automatedMovesCopy = {
   ],
 } as const
 
-const IN: ReviewWords = { act: 'Move back', decline: 'Keep', done: 'Moved back to All', declined: 'Kept in Automated' }
-const OUT: ReviewWords = { act: 'Move to Automated', decline: 'Keep', done: 'Moved to Automated', declined: 'Kept in All' }
+// The row's outcome fits in its buttons' room, so it is short; the toast names the channel and where it went.
+const IN: ReviewWords = { act: 'Move back', decline: 'Keep', done: 'Moved back', declined: 'Kept' }
+const OUT: ReviewWords = { act: 'Move to Automated', decline: 'Keep', done: 'Moved in', declined: 'Kept' }
 
 /** The record's keys: M takes a row's main action, K keeps. A row's own words say which way it moves. */
 export const movedVerbs: ReviewVerbs = { ...IN, actKey: 'M', declineKey: 'K' }
