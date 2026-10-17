@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 5,
     "oversizedFiles": 43,
-    "oversizedFunctions": 131
+    "oversizedFunctions": 130
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -182,7 +182,6 @@
     "packages/views/src/Sidebar.tsx:Sidebar#1",
     "packages/views/src/TopicRow.tsx:TopicRow/memo/TopicRow#1",
     "packages/views/src/ViewSheet.tsx:ViewSheet#1",
-    "packages/views/src/juno-pages/ActivityPage.tsx:Run#1",
     "packages/views/src/juno-pages/JunoSettingsPage.tsx:JunoSettingsPage#1",
     "packages/views/src/juno-pages/ProviderSection.tsx:ProviderSection#1",
     "scripts/probe-live.ts:main#1",
