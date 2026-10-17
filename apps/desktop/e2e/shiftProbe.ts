@@ -24,6 +24,8 @@ declare global {
  * `outside` skips a shift whose every moved node is inside that element: for a region whose movement during the
  * action is intended and checked by its own test. A shift that also moves anything else still fails, but Chromium
  * names at most five nodes per shift, so the anchor's samples and the test's own boxes guard the region under test.
+ * A shift counts only if a source outside that region has a different box before and after, as in the feel suite: Chromium
+ * reports some text changes as a shift whose every box stays where it was.
  */
 export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom'; readonly outside?: string } = {}): Promise<void> {
   await waitForLayoutReady(page)
@@ -35,7 +37,13 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
         if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') {
           const shift = entry as PerformanceEntry & { sources?: Array<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }
           const region = outside === undefined ? null : document.querySelector(outside)
-          if (region !== null && (shift.sources ?? []).length > 0 && (shift.sources ?? []).every(({ node }) => node !== null && region.contains(node))) continue
+          const sources = shift.sources ?? []
+          const others = sources.filter(({ node }) => region === null || node === null || !region.contains(node))
+          // Chromium reports a text that moves inside a box that stays (a right-aligned count going from 9 to 10) with only
+          // that box as its source, the same before and after. Nothing on screen moved a box, so it does not count. An
+          // entry without sources cannot be told apart from a real one, so it counts.
+          const moved = ({ previousRect: a, currentRect: b }: { previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }) => a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height
+          if (sources.length > 0 && !others.some(moved)) continue
           shifts.push({ value: entry.value, sources: (shift.sources ?? []).map(({ node, previousRect, currentRect }) => `${node instanceof Element ? node.outerHTML.slice(0, 240) : node?.parentElement?.outerHTML.slice(0, 240)}: ${JSON.stringify(previousRect)} → ${JSON.stringify(currentRect)}`) })
         }
       }
