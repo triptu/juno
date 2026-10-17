@@ -207,6 +207,7 @@ export const chatCopy = {
         implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
         send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
+        ranRead: 'Ran without asking because it only looks something up.',
         ranNever: 'Ran without asking because your rule for this tool is Never ask.',
         ruleChanged: 'Asked because your rule for this tool changed.',
       },

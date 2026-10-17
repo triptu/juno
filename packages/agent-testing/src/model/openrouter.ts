@@ -184,7 +184,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         const answers = (options.review ?? fakeReview)(review)
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answers: {
           intent: { type: 'choice', ...choice(answers.intent, ['explicit', 'implied', 'notAsked']) },
-          risk: { type: 'choice', ...choice(answers.risk, ['reversible', 'write', 'delete', 'send']) },
+          risk: { type: 'choice', ...choice(answers.risk, ['read', 'reversible', 'write', 'delete', 'send']) },
         } }))
         return
       }
