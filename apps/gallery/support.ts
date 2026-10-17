@@ -41,7 +41,7 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
   return routes
 }
 
-/** Opens one state and waits until it is drawn: chunks and fonts loaded, theme applied, entrance animations done. */
+/** Opens one state and waits until it is drawn: chunks, fonts and images loaded, theme applied, entrance animations done. */
 export async function openState(page: Page, route: Route, theme: Theme = 'light'): Promise<void> {
   await page.goto(stateUrl(route, theme))
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
@@ -49,6 +49,25 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
   // callback with a 5 s deadline (the destination lists), so on a busy machine the load begins only then.
   await expect(page.locator('[data-chunk-pending]')).toHaveCount(0, { timeout: 15_000 })
   await page.evaluate(() => document.fonts.ready)
+  // Let the frame's images load or fail: a failed unfurl image removes its box (AttachmentCard), and on a busy machine
+  // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for.
+  await page.evaluate(async (frameName) => {
+    const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
+    const inView = (img: HTMLImageElement) => {
+      const box = img.getBoundingClientRect()
+      return box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth
+    }
+    const loading = Array.from(frame?.querySelectorAll('img') ?? []).filter(
+      (img) => !img.complete && !img.src.endsWith('/__fixture/pending.png') && (img.loading !== 'lazy' || inView(img)),
+    )
+    const settled = loading.map((img) => new Promise((resolve) => {
+      img.addEventListener('load', resolve, { once: true })
+      img.addEventListener('error', resolve, { once: true })
+    }))
+    await Promise.race([Promise.all(settled), new Promise((resolve) => setTimeout(resolve, 10_000))])
+    // Two frames, so React has drawn what the load or error changed.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  }, route.route)
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
   // Let entrances (toasts, popovers) finish; an endless animation does not hold this up.
   await page.evaluate(() =>
