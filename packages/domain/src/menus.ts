@@ -76,7 +76,7 @@ export interface TopicMenuState {
   readonly notify: NotifyChoice
   /** The views, in pill order, for Add to view on a Main row. Absent: no item. */
   readonly views?: ReadonlyArray<ViewChoice>
-  /** Art can be drawn now (spec section 5): AI assist on, an OpenRouter key, and today's AI spend cap not reached. */
+  /** Art can be drawn (spec section 5): AI assist on and an OpenRouter key. At the daily AI limit Redraw art still shows and says why it cannot draw. */
   readonly canDraw: boolean
 }
 

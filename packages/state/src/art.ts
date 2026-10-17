@@ -8,7 +8,7 @@ import { runActionExit, type ToastContent } from './undo'
 /** Why a redraw made no new drawing: the engine's reason, or `other` for anything else. */
 export type RedrawProblem = AiUnavailable['reason'] | 'other'
 
-/** Whether Redraw art can draw now (`art.available`): AI assist on, a key, and the spend cap not reached. False when the engine does not answer. */
+/** Whether Redraw art can draw (`art.available`): AI assist on and a key. False when the engine does not answer. */
 export async function canRedraw(registry: Registry): Promise<boolean> {
   const exit = await runCommand(registry, artAvailable, undefined)
   return exit._tag === 'Success' && exit.value

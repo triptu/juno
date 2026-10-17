@@ -28,11 +28,9 @@ export const artRedraw = Rpc.make('art.redraw', { payload: { id: Schema.String }
 export const artRestore = Rpc.make('art.restore', { payload: artRestorePayload, success: Schema.Void, error: NotSignedIn })
 
 /**
- * Whether Redraw art can draw now, for the topic menu: AI assist on, an
- * OpenRouter key, and today's AI spend cap not reached for the engine's
- * calls. False with no workspace. Answers within a fraction of a second;
- * when the spend ledger is slow to say, it answers true and Redraw art
- * says why if it then cannot draw.
+ * Whether Redraw art can draw, for the topic menu: AI assist on and an
+ * OpenRouter key. False with no workspace. At the daily AI limit it is
+ * still true, and Redraw art says which limit stopped it.
  */
 export const artAvailable = Rpc.make('art.available', { success: Schema.Boolean })
 
