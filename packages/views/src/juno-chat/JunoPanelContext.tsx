@@ -73,6 +73,7 @@ function SelectionChip({ selection, onRemove }: { readonly selection: Selection;
   const onKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
     if (onRemove === undefined || (event.key !== 'Backspace' && event.key !== 'Delete')) return
     event.preventDefault()
+    event.stopPropagation()
     focusField(event.currentTarget)
     onRemove()
   }

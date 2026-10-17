@@ -264,7 +264,7 @@ test('⌘J with text selected across messages asks about it without closing the 
 
   // From Dev's reply into the owner's: the open panel's chip follows the selection.
   const from = juno.topic.message('4 minutes is fine')
-  const to = juno.topic.message("What's the rollback")
+  const to = juno.topic.message("Good. What's the rollback")
   await from.evaluate((start, end) => {
     const text = (row: Element) => document.createTreeWalker(row.querySelector('[data-msg-text]')!, NodeFilter.SHOW_TEXT).nextNode()!
     const range = document.createRange()
@@ -276,8 +276,9 @@ test('⌘J with text selected across messages asks about it without closing the 
   const chip = panel.root.locator('[data-panel-selection]')
   await expect(chip).toHaveText('2 messages: “4 minutes is fine for us…”')
 
-  // ⌘J with the selection asks about it: the panel stays, its field takes focus.
+  // ⌘J with the selection asks about it: the highlight clears, the panel stays, its field has focus.
   await juno.tabs.menu('juno')
+  await expect.poll(() => juno.win.evaluate(() => document.getSelection()?.toString())).toBe('')
   await expect(panel.composer).toBeFocused()
   await expect(chip).toHaveText('2 messages: “4 minutes is fine for us…”')
 
