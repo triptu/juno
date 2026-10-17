@@ -81,22 +81,6 @@ function settledBox(target: Locator): Promise<Box | null> {
   )
 }
 
-/** Whether the element is still at `box` two frames after the pointer moved onto it. */
-function keptBox(target: Locator, box: Box): Promise<boolean> {
-  return target.evaluate(
-    (node, box) =>
-      new Promise<boolean>((resolve) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const { x, y, height } = node.getBoundingClientRect()
-            resolve(node.isConnected && x === box.x && y === box.y && height === box.height)
-          }),
-        ),
-      ),
-    box,
-  )
-}
-
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -141,19 +125,16 @@ export class SidebarRow {
 
   /**
    * Selects the row with the mouse (it activates on mouse down). Rows move
-   * while the list fills and when a topic gets activity, so the press waits
-   * until the row has kept its box for two frames, and points again if it
-   * moved once the pointer was over it. It cannot see a move that starts
-   * after the press: a test that just caused one waits for it first.
+   * while the list fills and when a topic gets activity, so the pointer goes
+   * to the row once its box has stayed the same for two frames; from then on
+   * the list holds its order under the pointer (SPEC 5). A test that has just
+   * caused a move waits for it first (`expectTop`).
    */
   async select(): Promise<void> {
     await this.root.scrollIntoViewIfNeeded()
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const box = await settledBox(this.root)
-      if (!box) throw new Error(`Row "${this.title}" is not on screen`)
-      await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
-      if (await keptBox(this.root, box)) break
-    }
+    const box = await settledBox(this.root)
+    if (!box) throw new Error(`Row "${this.title}" is not on screen`)
+    await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
     await press(this.win)
   }
 
