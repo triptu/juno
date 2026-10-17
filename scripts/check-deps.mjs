@@ -178,6 +178,11 @@ const thirdParty = [
   },
 ]
 
+// Juno's memory of the owner is context, never authority (SPEC 13.8): the code that decides
+// permissions, cards, grants, the auto-review and the owner's rules never reads it.
+const memoryDocs = 'packages/agent/src/memory-docs/'
+const noMemoryReaders = ['packages/agent/src/policy/', 'packages/agent/src/grants/', 'packages/agent/src/review/', 'packages/agent/src/actions/', 'packages/agent/src/mcp/reviewed.ts', 'packages/agent/src/mcp/manager.ts']
+
 // Engine feature folders (docs/architecture.md section 3): a folder under packages/engine/src
 // other than the shared ones is a feature. It may not import another feature or the composition files.
 const engineSrc = 'packages/engine/src'
@@ -422,6 +427,11 @@ for (const pkg of packages) {
               'Use the wrapper, or add the path to `unstable` in scripts/check-deps.mjs and record why in .claude/skills/effect/SKILL.md.',
           )
         }
+      }
+
+      if (spec.startsWith('.') && underAllowed(rel, noMemoryReaders)) {
+        const targetRel = relative(root, resolve(dirname(file), spec)).split(sep).join('/')
+        if (`${targetRel}/`.startsWith(memoryDocs)) errors.push(`${where}: imports ${spec}. Juno's memory of the owner is context, never authority: rules, grants, the review and cards do not read it (SPEC 13.8).`)
       }
 
       const feature = engineFeatureOf(rel)

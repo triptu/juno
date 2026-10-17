@@ -20,7 +20,8 @@
  *   Task card at the time its job started. A card is unread like a bubble.
  *
  * Removed messages leave a "Removed" note in their place. The server adds
- * pin notes and their time-limited Undo after this cached projection.
+ * pin notes and their time-limited Undo after this cached projection, and
+ * gives the memory notes and proactive asks as `lines`, placed by time.
  */
 import type {
   BubbleId,
@@ -71,6 +72,8 @@ export interface ChatSource {
   readonly waiting: 'network' | 'resume' | 'review' | undefined
   /** Local midnight of the day `at` falls in. */
   readonly dayOf: (at: number) => number
+  /** Rows the server places by time: memory notes and proactive asks. */
+  readonly lines?: ReadonlyArray<{ readonly at: number; readonly item: ChatItem }>
 }
 
 interface OpRow {
@@ -162,6 +165,7 @@ export function createChatCache(store: Store, changed: () => void = () => {}) {
     source.readAt, source.waiting, source.dayOf, new Date().getTimezoneOffset(),
     JSON.stringify(source.jobs), JSON.stringify(source.cards.map((view) => [view.at, view.runId, view.card.id])),
     JSON.stringify(source.live === undefined ? undefined : { ...source.live, status: undefined }),
+    JSON.stringify(source.lines ?? []),
   ]
   return {
     items(source: ChatSource): ReadonlyArray<ChatItem> {
@@ -498,6 +502,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     entries.push(cache.entries.get(`card:${card.id}`, [at, job.runId, JSON.stringify(card), JSON.stringify(reactions), at > source.readAt],
       () => ({ by: 'line', at, item: { _tag: 'card', runId: job.runId as RunId, card, reactions, unread: at > source.readAt } })))
   }
+  for (const line of source.lines ?? []) entries.push({ by: 'line', at: line.at, item: line.item })
   // Stable: at the same time an owner message comes before what answers it.
   entries.sort((a, b) => a.at - b.at)
   const result = layout(entries, source, cache.grouped)
@@ -644,6 +649,8 @@ export function keyOf(item: ChatItem): string | undefined {
       return item.card.id
     case 'note':
       return item.id
+    case 'ask':
+      return item.ask.id
     case 'groupLabel':
       return item.id
     default:

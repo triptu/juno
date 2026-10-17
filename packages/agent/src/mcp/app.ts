@@ -8,7 +8,7 @@ import { mcpTools } from './tools'
 import type { Credentials } from './types'
 import type { ReviewModel } from '../review/review'
 
-type Wrapped = Pick<TurnsOptions, 'provider' | 'migrations' | 'actions' | 'tools' | 'jobDrivers' | 'stopExternalJob'>
+type Wrapped = Pick<TurnsOptions, 'provider' | 'migrations' | 'actions' | 'tools' | 'jobDrivers' | 'stopExternalJob' | 'connections'>
 
 /**
  * Adds the MCP connections to the turn engine's options: the migrations, the
@@ -35,6 +35,7 @@ export function withMcp<T extends Wrapped>(turns: T, credentials: Credentials, r
         return turns.provider(store)
       },
       actions: { ...turns.actions, executors },
+      connections: () => manager,
       stopExternalJob: async (job, click) => job.kind === 't3' ? (t3?.stop(job, click) ?? false) : (turns.stopExternalJob?.(job, click) ?? false),
       jobDrivers: () => [...(turns.jobDrivers?.() ?? []), ...(t3 ? [t3.driver] : [])],
       tools: (context) => [

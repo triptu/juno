@@ -59,6 +59,9 @@ import type { JunoSettings } from '../settings/settings'
 import { thumbOf } from '../router/files'
 import { createChatCache, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
+import { askLines, askViews, docNotes, docsPage } from '../memory-docs/views'
+import { entryId, ownerAdd, ownerDelete, ownerEdit, undoRun, type WriteResult } from '../memory-docs/store'
+import { dismiss } from '../memory-docs/asks'
 import { runnerPlatform, type RendererTransport } from './runner'
 
 export interface ChatHost {
@@ -181,6 +184,7 @@ function chatState(host: ChatHost) {
       readAt: readAt(turns.store),
       waiting: recovery ? 'review' : mode === 'paused' ? 'resume' : presence?.online === false ? 'network' : undefined,
       dayOf,
+      lines: [...docNotes(turns.store), ...askLines(askViews(turns.store, host.connections))],
     }))
   }
 
@@ -257,6 +261,38 @@ const pinAnswer = (opId: OpId, result: PinResult) => {
       return Effect.fail(new AgentCommandError({ reason: 'invalid', message: 'Juno can remember up to 280 bytes of one of your messages.' }))
   }
 }
+
+/** An owner change to Juno's memory of them: the op id once written, or why it was refused. */
+const docAnswer = (opId: OpId, result: WriteResult) => {
+  if (result._tag === 'written') return Effect.succeed({ opId })
+  const copy = chatCopy.docs.refused
+  switch (result.reason) {
+    case 'stale':
+    case 'unknownEntry':
+      return Effect.fail(new AgentCommandError({ reason: 'stale', message: copy.stale }))
+    case 'empty':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.empty }))
+    case 'tooLong':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.tooLong }))
+    case 'secret':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.secret }))
+    case 'full':
+    case 'docFull':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.full }))
+  }
+}
+
+/**
+ * The engine for an owner change that needs no model: the memory page's
+ * edits work paused, offline and with AI assist off, as Remove does.
+ */
+const local = (state: ReturnType<typeof chatState>, host: ChatHost) =>
+  Effect.suspend(() => {
+    if (host.turns?._tag === 'updateNeeded') return unavailable('Juno needs to update its records.')
+    if (state.turns === undefined) return unavailable('Juno is not running.')
+    if (state.turns.ownership.owner().state === 'released') return readOnly()
+    return Effect.succeed(state.turns)
+  })
 
 /** The engine, or why a command cannot reach it. */
 const engine = (state: ReturnType<typeof chatState>, host: ChatHost) =>
@@ -456,6 +492,29 @@ export function agentHandlers(host: ChatHost) {
               }),
             ),
           ),
+        'agent.docs.page': () => (state.turns === undefined ? Stream.make({ page: { docs: [], changes: [] }, revisions: [] }) : live(state.changes, () => docsPage(state.turns!.store))),
+        'agent.docs.add': ({ opId, doc, text }) => Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerAdd(turns.store, { opId, doc, text }))))),
+        'agent.docs.edit': ({ opId, id, revision, text }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerEdit(turns.store, { opId, entry: entryId(id) ?? -1, version: revision, text }))))),
+        'agent.docs.delete': ({ opId, id, revision }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerDelete(turns.store, { entry: entryId(id) ?? -1, version: revision }))))),
+        'agent.docs.undo': ({ opId, run }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() =>
+            undoRun(turns.store, run) > 0 ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: chatCopy.docs.refused.stale }))))),
+        'agent.asks.list': () => (state.turns === undefined ? Stream.make({ asks: [] }) : live(state.changes, () => ({ asks: askViews(state.turns!.store, host.connections) }))),
+        'agent.asks.answer': ({ opId, id, answer: choice }) =>
+          // Not now and Stop are the owner's alone; Start needs Juno on, as a pass calls the model.
+          Effect.flatMap(choice === 'start' ? engine(state, host) : local(state, host), (turns) =>
+            changed(Effect.suspend(() => {
+              if (choice === 'dismiss') {
+                if (!dismiss(turns.store, id)) return Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This changed.' }))
+                turns.learning.notify()
+                return Effect.succeed({ opId })
+              }
+              if (choice === 'stop') return Effect.promise(() => turns.learning.stop(id)).pipe(Effect.as({ opId }))
+              if (turns.mode() !== 'on') return unavailable('Juno is paused.')
+              return turns.learning.start(id) ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: 'This changed.' }))
+            }))),
         'agent.memory.page': ({ window }) =>
           state.turns === undefined
             ? Stream.make({ lines: [] })

@@ -43,6 +43,7 @@ import { createSpend } from './spend'
 import { answerEngineSpend } from './spend/engine'
 import { forwardAiCalls } from './providers/audit'
 import type { UpdateNeeded } from './runtime/core'
+import { offerAsks } from './memory-docs/offers'
 
 export interface AgentHandle {
   readonly config: AgentConfig
@@ -134,9 +135,22 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
           )
         }
         const manager = engine?._tag === 'running' ? mcp?.manager() : undefined
+        // Juno offers to learn about the owner once they are set up, and again for a new context connection (SPEC 13.8).
+        const offers = engine?._tag === 'running'
+          ? offerAsks({
+              store: engine.store, presence: bound.presence, mode: engine.mode, offered: engine.learning.notify,
+              ...(turns?.connection ? { provider: turns.connection } : {}),
+              ...(manager ? { manager: () => manager } : {}),
+            })
+          : undefined
+        if (engine?._tag === 'running' && offers !== undefined) {
+          yield* bound.presenceChanges.pipe(Stream.runForEach(() => Effect.sync(offers)), Effect.forkScoped, Scope.provide(scope))
+          const provider = turns?.connection
+          if (provider !== undefined) yield* Effect.acquireRelease(Effect.sync(() => provider.subscribe(offers)), (unsubscribe) => Effect.sync(unsubscribe)).pipe(Scope.provide(scope))
+        }
         if (engine?._tag === 'running' && manager !== undefined) {
           // Registered after the engine, so the manager closes first.
-          yield* Effect.acquireRelease(Effect.sync(() => manager.subscribe(() => engine.actions.kick())), (unsubscribe) =>
+          yield* Effect.acquireRelease(Effect.sync(() => manager.subscribe(() => { engine.actions.kick(); offers?.() })), (unsubscribe) =>
             Effect.promise(async () => { unsubscribe(); await manager.close() })).pipe(Scope.provide(scope))
           // Reconnects the enabled servers without opening a browser; it never fails.
           void manager.start()
