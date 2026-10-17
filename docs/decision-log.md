@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 21:28 · first-sync-feel · During the first sync a channel the Automated rules have not decided stays out of All (`automated_holds`) until its history is sorted, 5 s at most, so a bot channel never shows in All and then leaves; people channels and DMs show at once. Home's syncing line starts under the greeting's first letter, so its copy changing moves no word. The `sidebar-first-sync` feel scenario checks both.
 - 10-17 21:05 · checks-after-send · Post-send checks read the text as the composer showed it (`decodeDraft`), not as Slack encodes it. The line is matched against the message's edit text, so a message with a mention or a linked word never got its line, and Review would have opened Slack's markup.
 - 10-17 20:51 · checks-after-send · Wrong place stays the only check before sending, on typing pauses, and Enter still never waits for it. Its deadline goes from 1.5 s to 5 s: at 1.5 s a chat model in the classifier's place mostly timed out, and a later answer still serves the next Enter on the same draft.
 - 10-17 20:50 · checks-after-send · Background AI calls get generous deadlines, since nobody waits on them: settled score and Automated 30 s, follow-ups and Home titles 45 s, topic titles and the art job 60 s. Redraw keeps 15 s, ⌘K 4 s and the notification gate 2 s, because someone waits. The table is in architecture section 10, "AI call deadlines"; the spend ledger's settling rules are unchanged.
