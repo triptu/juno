@@ -210,6 +210,18 @@ test.describe('composer attachments', () => {
     expect(at.chips[0]!.top - at.bar.bottom).toBe(6)
   })
 
+  test('checks/audience-and-check: the audience line and the check bar start their icon and text on one edge', async ({ page }) => {
+    await open(page, 'Composer', 'checks/audience-and-check')
+    const at = await page.evaluate(() => {
+      const edges = (selector: string) => {
+        const [icon, text] = [...document.querySelector(selector)!.children].map((child) => child.getBoundingClientRect().left)
+        return { icon: icon!, text: text! }
+      }
+      return { audience: edges('[data-audience-warning]'), check: edges('[data-send-check]') }
+    })
+    expect(at.audience).toEqual(at.check)
+  })
+
   for (const id of ['checks/narrow-audience-and-check', 'checks/narrow-wrong-place']) {
     test(`${id}: in a 336px field the choices move under the finding and keep the bar's insets`, async ({ page }) => {
       await open(page, 'Composer', id)
