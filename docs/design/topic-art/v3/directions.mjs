@@ -10,6 +10,8 @@ export const ROLES = ['ink', 'soft', 'accent', 'accent2']
 export const LIFT = { coral: 0, amber: 0.05, olive: 0.04, sage: 0.02, teal: 0.01, sky: -0.02, periwinkle: -0.04, plum: -0.03 }
 
 const flat = (L, C) => () => ({ L, C })
+/** One chroma for every hue, as round 2 had, with lightness stepped by `LIFT` times `lift`. */
+const lifted = (L, C, lift) => (hue) => ({ L: L + LIFT[hue] * lift, C })
 /** Chroma as a share of what this hue reaches at this lightness, capped so blue-violets do not run away. */
 const share = (L, p, cap, lift = 1) => (hue) => {
   const l = L + LIFT[hue] * lift
@@ -21,8 +23,9 @@ const share = (L, p, cap, lift = 1) => (hue) => {
 export const directions = [
   {
     id: '0-now',
-    name: 'Now',
-    note: 'The tokens on main: one lightness for every hue, ink chroma 0.022 and 0.028.',
+    name: 'Round 2',
+    note: 'Round 2\'s tokens, in the hue the model picked: one lightness for every hue, ink chroma 0.022 and 0.028.',
+    hueOf: 'recipe',
     light: { ink: flat(0.43, 0.022), soft: flat(0.885, 0.038), accent: flat(0.6, 0.1), accent2: flat(0.76, 0.06) },
     dark: { ink: flat(0.78, 0.028), soft: flat(0.36, 0.032), accent: flat(0.72, 0.085), accent2: flat(0.56, 0.05) },
   },
@@ -65,6 +68,40 @@ export const directions = [
 ]
 directions[5].light = directions[4].light
 directions[5].dark = directions[4].dark
+
+// Round 3b, after the owner chose direction 5 but found it too bright: the
+// spread hues stay, the colour goes back near round 2 with a small lift.
+directions.push(
+  {
+    id: '6-v2-spread',
+    name: 'Round 2, hues spread',
+    note: 'Round 2\'s values exactly, in the topic\'s pebble hue.',
+    light: directions[0].light,
+    dark: directions[0].dark,
+  },
+  {
+    id: '7a-calm',
+    name: 'Calm a',
+    note: 'A small lift over round 2: ink chroma 0.032 and 0.035, soft and accent a little above round 2, dark ink (0.79), accent (0.75) and fill (0.40) a little lighter. One lightness for every hue.',
+    light: { ink: flat(0.43, 0.032), soft: flat(0.88, 0.045), accent: flat(0.6, 0.11), accent2: flat(0.76, 0.065) },
+    dark: { ink: flat(0.79, 0.035), soft: flat(0.4, 0.04), accent: flat(0.75, 0.095), accent2: flat(0.6, 0.055) },
+  },
+  {
+    id: '7b-calm-lift',
+    name: 'Calm b',
+    note: 'Calm a with half of round 3\'s per-hue lightness steps on soft and accent, a quarter on ink.',
+    light: { ink: lifted(0.43, 0.032, 0.25), soft: lifted(0.88, 0.045, 0.5), accent: lifted(0.6, 0.11, 0.5), accent2: lifted(0.76, 0.065, 0.5) },
+    dark: { ink: lifted(0.785, 0.035, 0.25), soft: lifted(0.4, 0.04, 0.5), accent: lifted(0.75, 0.095, 0.5), accent2: lifted(0.6, 0.055, 0.5) },
+  },
+  {
+    id: '7c-calm-bright',
+    privacy: true,
+    name: 'Calm c',
+    note: 'Calm b with a lighter dark fill (0.43) and accent (0.76), and a little more chroma on the light fill.',
+    light: { ink: lifted(0.43, 0.035, 0.25), soft: lifted(0.875, 0.05, 0.5), accent: lifted(0.6, 0.115, 0.5), accent2: lifted(0.76, 0.07, 0.5) },
+    dark: { ink: lifted(0.785, 0.035, 0.25), soft: lifted(0.43, 0.042, 0.5), accent: lifted(0.76, 0.1, 0.5), accent2: lifted(0.62, 0.06, 0.5) },
+  },
+)
 
 export function values(direction, theme) {
   const out = {}

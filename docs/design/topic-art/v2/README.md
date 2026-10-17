@@ -115,7 +115,7 @@ What the numbers say:
 - *Tide in dark.* At low lightness, amber, olive and coral turned to mud at any real chroma. The dark Tide tones now stay near neutral (chroma 0.012 to 0.026) and step in lightness instead.
 - *Tide with no container.* A full 40px block was the heaviest thing in the list, heavier than any line drawing, and a 32px rounded square was still a box among drawings. The owner asked for a free-form shape, so with no container the bands are now clipped to a pebble: a smooth closed curve through six or seven points around a circle, radius 13.5 to 16.5 with seeded jitter, so each topic gets its own outline at about 30px across. The light tones went one step deeper (base L 0.905) so the pebble still reads on paper. Inside a container the frame is the container's box, as before.
 
-**Colour.** Superseded by round 3 (`../v3/`): the art is now two-tone and painted in the topic's pebble hue. What follows is round 2's palette.
+**Colour.** Superseded by round 3 (`../v3/`): the art is painted in the topic's pebble hue, with chroma a little above this round's. What follows is round 2's palette.
 
 - Lines are a warm near-neutral with only a trace of the hue. In light, ink is 7.6:1 against the sidebar; in dark it is 9.1:1.
 - The hue lives in one low-chroma soft fill and one small accent. In light the accent is 3.6 to 3.9:1; in dark it is 7.2 to 7.7:1.
