@@ -1,9 +1,10 @@
 /**
  * The feel suite's fixture. `feel.run(scenario, action)` records the action,
  * runs the scenario's checks, writes the frames, filmstrip, video and
- * result under `feel-report/<name>/`, and fails the test softly for each
+ * result and the probe recording under `feel-report/<name>/`, and fails the test softly for each
  * failed check, so the other scenarios in the test still record.
  */
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test as base } from '../fixtures'
@@ -42,6 +43,8 @@ export class Feel {
     }
     const recording = await recorder.stop(scenario.settleMs)
     const pixels = await this.studio.analyse(dir, recording)
+    // The probes and pixels without the images, so a check can be run again on them, or on a copy with a bug put back.
+    await writeFile(join(dir, 'recording.json'), JSON.stringify({ recording: { ...recording, shots: recording.shots.map((shot) => ({ number: shot.number, t: shot.t, deviceWidth: shot.deviceWidth, deviceHeight: shot.deviceHeight })) }, pixels }))
     const verdicts: Verdict[] = scenario.checks.map((check) => {
       try {
         return check({ recording, pixels })
