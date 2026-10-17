@@ -43,8 +43,12 @@ export function followWebPanel(registry: Registry): () => void {
   })
 }
 
-/** The panel at its narrowest, the topic at its narrowest (--juno-panel-topic-min) and the panel's two insets: under this the panel would cover the topic. */
-const MIN_ROOM = JUNO_PANEL_WIDTH.min + 480 + 2 * 8
+/**
+ * The panel at its narrowest beside a 360px topic, with the panel's two
+ * insets. The default 1200px window has room; below this the page would hide
+ * most of the topic, so the link opens in the browser.
+ */
+const MIN_ROOM = JUNO_PANEL_WIDTH.min + 360 + 2 * 8
 
 function roomForPanel(registry: Registry): boolean {
   const sidebar = registry.get(sidebarLayoutAtom)
