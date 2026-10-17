@@ -540,6 +540,27 @@ export const unusualReactions: ReadonlyArray<ChatItem> = [
   ...juno('m-123', 'Both have the pager app.', { group: 'last', at: NOW - 3 * MINUTE, reactions: [reacted('owner', '1️⃣')] }),
 ]
 
+/**
+ * Badges at the list's very top, where the first bubble meets the scroll
+ * area's edge: a Juno bubble, a card and an owner bubble, each reacted.
+ */
+export const reactionsAtTop: ReadonlyArray<ChatItem> = [
+  ...juno('m-160', 'Two things in #eng this morning.', { at: NOW - 6 * MINUTE, reactions: [reacted('owner', '👍')], cards: [sendMessage('c-160')], cardReactions: { 'c-160': [reacted('owner', '🎉')] } }),
+  owner('m-161', 'ok', 'single', { _tag: 'sent' }, NOW - 5 * MINUTE, { reactions: [reacted('juno', '✅')] }),
+  ...juno('m-162', 'Done.', { at: NOW - 4 * MINUTE, reactions: [reacted('owner', '🚀')] }),
+]
+
+/** Juno answers the message right above it: no quote. Then an older one, with a message between: the quote stays. */
+export const answersInPlace: ReadonlyArray<ChatItem> = [
+  day(0),
+  owner('m-170', 'can you format text?', 'single', { _tag: 'sent' }, NOW - 5 * MINUTE),
+  ...juno('m-171', 'Yes: bold, italic, code and lists.', { at: NOW - 4 * MINUTE }),
+  owner('m-172', 'Is the offsite on the 23rd?', 'first', { _tag: 'sent' }, NOW - 3 * MINUTE),
+  owner('m-173', 'And who booked the room?', 'last', { _tag: 'sent' }, NOW - 3 * MINUTE),
+  ...juno('m-174', 'Maya booked it.', { group: 'first', at: NOW - 2 * MINUTE }),
+  ...juno('m-175', 'Yes, the 23rd.', { group: 'last', at: NOW - 2 * MINUTE, replyTo: quoteOf({ _tag: 'owner', opId: opId('op-m-172') }, 'Is the offsite on the 23rd?') }),
+]
+
 const firstBubble = bubbleId('m-130')
 
 /** The owner replies to a Juno bubble, to a card, and to a bubble that was removed since. */
