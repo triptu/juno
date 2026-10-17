@@ -355,7 +355,7 @@ Observed (`shared`, `DW51` `BaseRequest`, `GGwr` `SlackApiRequest`, `kPEx` API q
 - Response envelope: `{ ok: boolean, error?: string, response_metadata?: { next_cursor?: string, messages?: string[] }, ... }`. Pagination: `cursor`/`next_cursor` for `conversations.history`/`replies` (plus `oldest`/`latest`/`has_more` windows), `marker`/`next_marker` for edge queries, `page`/`cursor` for search, `cursor` for `activity.feed`, `cursor_mark`/`next_cursor_mark` for usergroup search.
 - History fetch loop protection: the client logs an error every 100 history fetches for one channel (`react_messages_loop_fetch`), implying no hard client-side rate limit on history.
 - Socket rate limiting: `error.retry_after` on the socket, backoff capped at 60 s.
-- Live, no Web API call has been rate limited yet: 0 in the 298 calls of the sync dry run and 0 in the 34 of the probe (section 10, "Live probe"). The value a real 429 carries in `Retry-After` is still Unknown.
+- Live, no Web API call has been rate limited yet: 0 in the 298 calls of the sync dry run, 0 in the 34 of the probe (section 10, "Live probe"), and 0 in each of three first syncs of 366 to 368 calls of the whole engine on 10-17 (`pnpm sync:timeline`, performance.md "First sync timeline"), which started history 1.5 s apart beside replies and edge pages. The value a real 429 carries in `Retry-After` is still Unknown.
 
 Inferred
 

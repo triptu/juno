@@ -93,7 +93,9 @@ export function largeSeed(options: LargeSeedOptions = {}): (workspace: Workspace
     }
     const memberSet = (count: number) => {
       const set = new Set<string>([SELF_ID])
-      while (set.size < count) set.add(pick(humans))
+      // A small seed has fewer people than a channel asks for: everyone, then.
+      const wanted = Math.min(count, new Set([SELF_ID, ...humans]).size)
+      while (set.size < wanted) set.add(pick(humans))
       return [...set]
     }
     for (let i = 0; i < config.channels.public; i++) addConversation(`C${String(i).padStart(5, '0')}L`, 'public', `${pick(CHANNEL_WORDS)}-${i}`, memberSet(8 + Math.floor(rand() * 40)))
