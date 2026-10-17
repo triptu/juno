@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useRef, type ReactNode, type Ref, type TextareaHTMLAttributes, type UIEvent } from 'react'
+import { useCallback, useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
 import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { chipVariants, personHues } from './Chip'
 import type { HueName } from './internal/hue'
@@ -50,10 +50,24 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
  * back with a negative margin), so every glyph sits where the field's
  * caret and selection expect it. The layer follows the field's scroll.
  */
-export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, anchorAt, onScroll, ...rest }: TextareaProps) {
+export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
   const layer = useRef<HTMLDivElement>(null)
+  const own = useRef<HTMLTextAreaElement | null>(null)
+  // Text the field opens with (a saved draft, a message to edit) takes typing at its end, not before it.
+  useLayoutEffect(() => {
+    const element = own.current
+    if (element !== null) element.setSelectionRange(element.value.length, element.value.length)
+  }, [])
+  const attach = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      own.current = node
+      setRef(ref, node)
+    },
+    [ref],
+  )
   const field = (
     <textarea
+      ref={attach}
       aria-label={label}
       rows={rows ?? (variant === 'inline' ? 1 : 2)}
       {...rest}
@@ -77,6 +91,11 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
       {field}
     </div>
   )
+}
+
+function setRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextAreaElement | null): void {
+  if (typeof ref === 'function') ref(node)
+  else if (ref !== undefined && ref !== null) (ref as RefObject<HTMLTextAreaElement | null>).current = node
 }
 
 /** The text as runs: plain text, chips, and the anchor character. A trailing newline keeps its empty line. */

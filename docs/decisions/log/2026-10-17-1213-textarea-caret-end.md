@@ -1,0 +1,1 @@
+- 10-17 12:13 · break-pass-b · Every `Textarea` puts the caret at the end of the text it opens with, so a restored Home or Juno draft takes typing after it; the topic composer's own fix moved into the primitive.
