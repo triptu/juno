@@ -1,10 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
+import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { flushSync } from 'react-dom'
 import { createContext, useCallback, useContext, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { Divider } from './Divider'
 import { activateHandlers, type ActivateEvent } from './internal/activate'
 import { focusRing } from './focusRing'
+import { Icon } from './Icon'
 import { variants as typeVariants } from './internal/type'
 import { Text } from './Text'
 
@@ -65,7 +67,7 @@ export interface OptionRowProps {
   readonly trailing?: ReactNode
   /** Highlighted by the keyboard or the pointer: the list's one active row. */
   readonly active?: boolean
-  /** The current value (selected row background). */
+  /** The current value: accent text and a check at the end, as a Mac pop-up menu marks its item. Only `active` fills a row. */
   readonly selected?: boolean
   readonly disabled?: boolean
   readonly size?: OptionRowSize
@@ -128,7 +130,12 @@ export function OptionRow({
         ) : null}
       </span>
       {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, typeVariants.tag)}>{sub}</span> : null}
-      {trailing ? <span {...stylex.props(styles.trailing)}>{trailing}</span> : null}
+      {trailing || selected ? (
+        <span {...stylex.props(styles.trailing)}>
+          {trailing}
+          {selected ? <Icon icon={Check} size={14} weight="bold" /> : null}
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -293,10 +300,10 @@ const styles = stylex.create({
   rowActive: {
     backgroundColor: colors['--surface-hover'],
   },
+  // No fill of its own, so the pointer's or the keyboard's row is the only filled one. A label drawn by a `Text` reads the variable.
   rowSelected: {
-    backgroundColor: colors['--secondary-default'],
-    // Muted text on the fill is under 4.5:1 in light; one step stronger, as ListRow's selected row.
-    '--foreground-muted': colors['--foreground-subtle'],
+    color: accent['--hl-text'],
+    '--foreground-default': accent['--hl-text'],
   },
   rowDisabled: {
     color: colors['--foreground-muted'],
