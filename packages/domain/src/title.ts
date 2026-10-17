@@ -1,6 +1,11 @@
 /**
  * Titles: manual, then AI, then the first six or so words of the first
  * message. Main rows show the channel label instead.
+ *
+ * A title is `sensitive` when it is message text nobody checked for a
+ * shared screen: the first words of the first message, or an AI title made
+ * before titles left out sensitive details. Privacy mode blurs those
+ * (SPEC section 5, Privacy mode). Your own rename and the channel are not.
  */
 import { bodyFromMrkdwn, previewText, type Lookups } from '@juno/richtext'
 import { channelLabel } from './channel'
@@ -11,6 +16,8 @@ export type TitleSource = 'manual' | 'ai' | 'fallback' | 'channel'
 export interface ResolvedTitle {
   readonly text: string
   readonly source: TitleSource
+  /** Privacy mode blurs it. */
+  readonly sensitive: boolean
 }
 
 export const FALLBACK_TITLE_WORDS = 6
@@ -58,15 +65,15 @@ export function firstWords(text: string, count = FALLBACK_TITLE_WORDS, lookups: 
 
 /** The title a topic shows. `lookups` names the people a fallback title mentions. */
 export function resolveTitle(topic: Topic, lookups: Lookups = {}): ResolvedTitle {
-  if (topic.kind === 'main') return { text: channelLabel(topic.channel), source: 'channel' }
+  if (topic.kind === 'main') return { text: channelLabel(topic.channel), source: 'channel', sensitive: false }
   const manual = topic.overlay.manualTitle?.trim()
-  if (manual) return { text: manual, source: 'manual' }
+  if (manual) return { text: manual, source: 'manual', sensitive: false }
   const ai = topic.overlay.aiTitle?.trim()
-  if (ai) return { text: ai, source: 'ai' }
+  if (ai) return { text: ai, source: 'ai', sensitive: topic.overlay.aiTitleOld === true }
   const fallback = firstWords(topic.firstMessageText ?? '', FALLBACK_TITLE_WORDS, lookups)
-  if (fallback) return { text: fallback, source: 'fallback' }
+  if (fallback) return { text: fallback, source: 'fallback', sensitive: true }
   // A thread whose root has no text (a file, say) falls back to where it lives.
-  return { text: channelLabel(topic.channel), source: 'channel' }
+  return { text: channelLabel(topic.channel), source: 'channel', sensitive: false }
 }
 
 /**

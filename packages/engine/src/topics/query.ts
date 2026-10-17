@@ -580,6 +580,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     row.rev,
     row.manual_title,
     row.ai_title,
+    row.ai_title_version,
     row.resolved_at,
     row.resolved_activity_ts,
     row.reopened_at,
@@ -595,6 +596,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     sender,
     title.text,
     title.source,
+    title.sensitive,
     entry.moreParticipants,
     ...entry.participantIds,
   ].join('\u0001')
@@ -607,6 +609,7 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     status: status === 'ignored' ? 'open' : status,
     title: title.text,
     titleSource: title.source,
+    ...(title.sensitive ? { titleSensitive: true } : {}),
     preview: { sender, text: stored.text },
     channelId: topic.channel.id,
     participantIds: entry.participantIds,

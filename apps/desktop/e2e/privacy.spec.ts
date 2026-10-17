@@ -1,7 +1,8 @@
 /**
  * Privacy mode for screen sharing (SPEC section 5): message text blurs in
- * the sidebar and All topics, titles stay readable, notifications leave the
- * text out, the sidebar footer turns it off, and it survives a relaunch.
+ * the sidebar and All topics, and so do titles that are only a message's first
+ * words (AI titles and renames stay readable), notifications leave the text
+ * out, the sidebar footer turns it off, and it survives a relaunch.
  */
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -27,8 +28,8 @@ test('privacy mode blurs previews from the account menu, hides notification text
   await privacy.expectBlurred(rina.preview)
   await expect(privacy.footer).toBeVisible()
   expect(await privacy.menuLabel()).toBe('Show Message Text')
-  // The title stays readable to find your way by, and hovering the row reveals nothing.
-  await privacy.expectBlurred(rina.titleText, false)
+  // With AI off the title is the message's first words, so it blurs too; hovering the row reveals nothing.
+  await privacy.expectBlurred(rina.titleText)
   await rina.root.hover()
   await privacy.expectBlurred(rina.preview)
 

@@ -1152,9 +1152,9 @@ export class AllTopicsRow {
     await expect.poll(() => this.reveal(), { timeout: 10_000 }).toBe(true)
   }
 
-  /** The "Sender: text" line under the title, the one part privacy mode blurs. */
+  /** The "Sender: text" line under the title, which privacy mode always blurs (the title blurs only while it is first words). */
   get preview(): Locator {
-    return this.root.locator('[data-sensitive]')
+    return this.root.locator('[data-sensitive]:not([data-row-title])')
   }
 
   async expectAbsent(): Promise<void> {

@@ -253,7 +253,7 @@ export default defineFixtures(
       'every-row': scene(() => allArt()),
       'every-row-privacy': scene(() => <PrivacyOn>{allArt({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
     },
-    // Privacy mode (SPEC section 5): previews blurred, the footer with Show.
+    // Privacy mode (SPEC section 5): previews and first-words titles blurred, the footer with Show.
     // Sharing: turned on because the screen is shared, and the footer says so.
     Privacy: {
       sharing: scene(() => <PrivacyOn>{full({ privacy: true, privacySharing: true, onPrivacyOff: noop })}</PrivacyOn>),

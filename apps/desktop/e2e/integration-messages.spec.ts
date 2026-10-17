@@ -18,7 +18,8 @@ test('a bot attachment names its thread and expands its description', async ({ j
   await juno.accountMenu.open()
   await juno.accountMenu.item(/^Hide message text/).click()
   await juno.privacy.expectBlurred(row.preview)
-  await juno.privacy.expectBlurred(row.titleText, false)
+  // The title is the app's text, not checked by Juno yet: it blurs until an AI title replaces it.
+  await juno.privacy.expectBlurred(row.titleText)
   await row.open()
   await juno.topic.expectTitle('PR #42: Improve cache')
   const card = juno.win.getByRole('region', { name: 'Attachment' }).filter({ has: juno.win.getByRole('link', { name: '#42 Improve cache' }) })

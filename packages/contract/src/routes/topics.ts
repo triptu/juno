@@ -65,6 +65,8 @@ const TopicRowFields = {
   status: TopicStatus,
   title: Schema.String,
   titleSource: TitleSource,
+  /** The title is message text nobody checked for a shared screen (the first words, an AI title from before the rule): privacy mode blurs it. */
+  titleSensitive: Schema.optionalKey(Schema.Boolean),
   preview: TopicPreview,
   messageCount: Schema.Int,
   unreadCount: Schema.Int,

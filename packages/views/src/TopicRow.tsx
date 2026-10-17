@@ -229,6 +229,7 @@ export const TopicRow = memo(function TopicRow({
               dir="auto"
               id={titleId}
               data-row-part="title"
+              data-sensitive={row.titleSensitive === true ? '' : undefined}
               tooltipWhenTruncated
               sx={styles.title}
             >

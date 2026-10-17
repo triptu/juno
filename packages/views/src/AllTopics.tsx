@@ -128,7 +128,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
           {renaming ? (
             <RenameField title={row.title} size="row" onSave={(title) => onRename?.(row.id, title)} onCancel={() => onRenameCancel?.(row.id)} />
           ) : (
-            <Text variant="bodySmall" tone="default" weight={unread ? 'semibold' : 'medium'} truncate dir="auto" tooltipWhenTruncated data-row-title="">
+            <Text variant="bodySmall" tone="default" weight={unread ? 'semibold' : 'medium'} truncate dir="auto" tooltipWhenTruncated data-row-title="" data-sensitive={row.kind !== 'main' && row.titleSensitive === true ? '' : undefined}>
               {row.kind === 'main' ? row.channel.label : row.title}
             </Text>
           )}

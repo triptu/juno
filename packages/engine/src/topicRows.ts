@@ -20,6 +20,7 @@ import {
   type Ts,
   type UserId,
 } from '@juno/domain'
+import { TITLE_SAFE_SINCE } from '@juno/ai'
 import type { ChannelRef, Person, TopicArt } from '@juno/contract'
 import type { TopicIndexRow } from '@juno/store'
 import type { StoredPreview } from '@juno/sync'
@@ -32,6 +33,8 @@ export interface JoinedRow extends TopicIndexRow {
   readonly c_members: string | null
   readonly manual_title: string | null
   readonly ai_title: string | null
+  /** The `titleTopic` version that wrote `ai_title`; null for a title from before the column. */
+  readonly ai_title_version: number | null
   readonly resolved_at: string | null
   readonly resolved_activity_ts: string | null
   readonly reopened_at: string | null
@@ -47,7 +50,7 @@ export interface JoinedRow extends TopicIndexRow {
 /** The columns of a `JoinedRow`, without `channel_activity_ts`. */
 export const TOPIC_COLUMNS = `
   SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
-    o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
+    o.manual_title, o.ai_title, o.ai_title_version, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
     s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status`
 
 /** `topic_index` as `i` with its conversation `c`, overlay `o`, ignored flag `ig`, Slack follow flag `s` and drawing `a`. */
@@ -194,6 +197,9 @@ const millis = (value: string | null): number | undefined => {
   return Number.isFinite(n) ? n : undefined
 }
 
+/** An AI title made before titles left out sensitive details: the title job makes it again, privacy mode blurs it until then. */
+export const aiTitleOld = (version: number | null): boolean => version === null || version < TITLE_SAFE_SINCE
+
 /** The domain topic for a joined row, for the pure rules (title, status, placement, tags). */
 export function topicFrom(row: JoinedRow, columns: ParsedColumns, channel: ChannelInfo): Topic {
   const { participants, preview } = columns
@@ -213,6 +219,7 @@ export function topicFrom(row: JoinedRow, columns: ParsedColumns, channel: Chann
     overlay: {
       ...(row.manual_title === null ? {} : { manualTitle: row.manual_title }),
       ...(row.ai_title === null ? {} : { aiTitle: row.ai_title }),
+      ...(row.ai_title !== null && aiTitleOld(row.ai_title_version) ? { aiTitleOld: true } : {}),
       ...(millis(row.resolved_at) === undefined ? {} : { resolvedAt: millis(row.resolved_at)! }),
       ...(row.resolved_activity_ts === null ? {} : { resolvedActivityTs: row.resolved_activity_ts as Ts }),
       ...(millis(row.reopened_at) === undefined ? {} : { reopenedAt: millis(row.reopened_at)! }),

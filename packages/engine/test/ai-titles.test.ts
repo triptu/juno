@@ -36,7 +36,37 @@ it('titles recent sidebar threads after sync without opening them and respects t
   await new Promise(resolve => setTimeout(resolve, 3_000))
   const after = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
   expect(after.find(row => row.id === id)?.titleSource).toBe('fallback')
+  // The first words are message text: privacy mode blurs them.
+  expect(after.find(row => row.id === id)?.titleSensitive).toBe(true)
   expect(calls()).toBe(before)
+})
+
+it('titles again, once, an AI title made before titles left out sensitive details', async () => {
+  const engine = await bootedEngine(engines, { aiJobs: true })
+  const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
+  const thread = titled.find(row => row.kind === 'thread')!
+  expect(thread.titleSensitive).toBeUndefined()
+  const user = join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db')
+  const sql = <A>(run: (db: DatabaseSync) => A): A => {
+    const db = new DatabaseSync(user)
+    try {
+      return run(db)
+    } finally {
+      db.close()
+    }
+  }
+  // An invented title as the old prompt might have written it, stored before the version column.
+  sql(db => db.prepare("UPDATE topic_overlay SET ai_title = 'Go with 100k for Donna', ai_title_version = NULL WHERE topic_id = ?").run(thread.id))
+  engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
+  const stored = () => sql(db => db.prepare('SELECT ai_title, ai_title_version, ai_title_at FROM topic_overlay WHERE topic_id = ?').get(thread.id)) as { ai_title: string; ai_title_version: number | null; ai_title_at: string }
+  for (let tries = 0; tries < 100 && stored().ai_title_version === null; tries++) await new Promise(resolve => setTimeout(resolve, 100))
+  const made = stored()
+  expect(made.ai_title_version).toBe(2)
+  expect(made.ai_title).not.toBe('Go with 100k for Donna')
+  // Made again once: later passes leave it.
+  engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key-2' })
+  await new Promise(resolve => setTimeout(resolve, 3_000))
+  expect(stored().ai_title_at).toBe(made.ai_title_at)
 })
 
 it('asks a title the model refused once, not again on later passes or after a wake, and again once the thread has a new message', async () => {
