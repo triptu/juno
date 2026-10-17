@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { attachmentsAtom, clearAttachments, readyFiles, registry, removeAttachment, restoreAttachments, sendableFiles, whenStarted, type Attachment } from '@juno/state'
+import { attachedFiles, attachmentsAtom, clearAttachments, readyFiles, registry, removeAttachment, restoreAttachments, sendableFiles, whenStarted, type Attachment } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { AttachButton } from '@juno/views'
 import { chunk } from './chunks'
@@ -25,13 +25,17 @@ export const attach = (key: string, files: ReadonlyArray<File>) =>
 /**
  * A composer's attachments (spec section 8): the attach button, the chips
  * and the handler for pasted and dropped files, for the composer whose
- * draft `key` owns (a topic, or a Home tab). Without `tabbable` the
- * attach button is out of the Tab order and works by pointer.
+ * draft `key` owns (a topic, a Home tab, or a Juno chat). Without
+ * `tabbable` the attach button is out of the Tab order and works by
+ * pointer. `take` replaces staging, as the Juno chat does (`attachToJuno`).
  */
-export function useAttachments(key: string, { tabbable = true }: { readonly tabbable?: boolean } = {}) {
+export function useAttachments(key: string, { tabbable = true, take }: { readonly tabbable?: boolean; readonly take?: (key: string, files: ReadonlyArray<File>) => void } = {}) {
   const files = useAtomValue(attachmentsAtom(key))
   useEffect(preload, [])
-  const onFiles = useCallback((list: ReadonlyArray<File>) => attach(key, list), [key])
+  const onFiles = useCallback(
+    (list: ReadonlyArray<File>) => (take === undefined ? attach(key, list) : void chipsPanel.load().then(() => take(key, list))),
+    [key, take],
+  )
   const leading = useMemo(() => <AttachButton onFiles={onFiles} tabbable={tabbable} />, [onFiles, tabbable])
   const onRemove = useCallback((id: string) => removeAttachment(registry, key, id), [key])
   const chips = files.length === 0 ? undefined : <AttachmentChipsPanel files={files} onRemove={onRemove} />
@@ -53,6 +57,7 @@ export function takeAttachments(
   const ids = staging ? sendableFiles(registry, key) : readyFiles(registry, key)
   if (ids === undefined) return undefined
   const taken: ReadonlyArray<Attachment> = registry.get(attachmentsAtom(key))
+  const bodies = new Map(taken.flatMap((file) => { const body = attachedFiles.get(file.id); return body === undefined ? [] : [[file.id, body] as const] }))
   clearAttachments(registry, key)
-  return { ids, started: whenStarted(ids), restore: () => restoreAttachments(registry, key, taken) }
+  return { ids, started: whenStarted(ids), restore: () => restoreAttachments(registry, key, taken, bodies) }
 }
