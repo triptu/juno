@@ -13,7 +13,7 @@ import { EmojiPickerPanel, preloadPicker, usePickerDismiss } from '../emojiPicke
 import { frequentEmoji, noteRecentEmoji } from '../recentEmoji'
 import { junoCommands } from './actions'
 
-/** The picker's height and its gap: below the button when this much room is there, else above. */
+/** The picker's height and its gap: below the button when this much room is there, else above, else inside the list area over the button. */
 const PICKER_ROOM = 368
 /** The picker's width and the gap kept from the list's edges: its right edge never comes closer to the left than this. */
 const PICKER_WIDTH = 314
@@ -48,9 +48,14 @@ export function useReactionPicker(items: ReadonlyArray<ChatItem>, scrollRef: Ref
       const area = scrollRef.current?.closest('[data-juno-chat-middle]')
       if (area == null) return
       const origin = area.getBoundingClientRect()
-      const below = box.bottom + PICKER_ROOM <= origin.bottom || origin.bottom - box.bottom >= box.top - origin.top
       const right = Math.min(Math.max(box.right - origin.left, PICKER_WIDTH + EDGE_GAP), origin.width - EDGE_GAP)
-      setPicker({ target, x: right, y: (below ? box.bottom : box.top) - origin.top, placement: below ? 'below-end' : 'above-end', full: false })
+      const top = box.top - origin.top
+      const bottom = box.bottom - origin.top
+      // Under the button, else over it; where neither has room, as low as the picker still fits in the list area, over the button.
+      const place = (y: number, placement: Picker['placement']) => setPicker({ target, x: right, y, placement, full: false })
+      if (bottom + PICKER_ROOM <= origin.height) place(bottom, 'below-end')
+      else if (top >= PICKER_ROOM) place(top, 'above-end')
+      else place(Math.max(0, origin.height - PICKER_ROOM), 'below-end')
     },
     [scrollRef],
   )
