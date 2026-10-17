@@ -137,6 +137,14 @@ test.describe('truncation tooltip', () => {
     await expect(title).toHaveText('Postgres 16 migration plan')
     await expect(title).not.toHaveAttribute('title')
   })
+
+  test('a cut-off topic switcher row title shows the full title; one that fits does not', async ({ page }) => {
+    await page.goto('/#/TopicSwitcher?__state=list/long-title')
+    const long = await hoverText(page, /^Two options for the thread list/)
+    await expect(long).toHaveAttribute('title', 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one')
+    const short = await hoverText(page, 'Pin the Node version in CI')
+    await expect(short).not.toHaveAttribute('title')
+  })
 })
 
 /**
