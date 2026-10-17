@@ -11,7 +11,7 @@
  * - `topics.get`: its index row, overlay, art and read state by id, the
  *   conversation, the follow flags, users and prefs, and for Main every
  *   topic (its thread count);
- * - `channel.threads`: topics, overlays, users and prefs.
+ * - `channel.threads`: topics, overlays, users, prefs and art.
  *
  * A `topics.get` subscription marks its topic as shown in `SyncLink`, so a
  * reconnect fetches it again. The two commands run the sync's fetcher on
@@ -143,7 +143,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
       },
       'channel.threads': (payload) => {
         const limit = Math.max(1, Math.min(THREADS_WINDOW_MAX, payload.range.limit))
-        const keys: InvalidationKeys = ['topics', 'topic_overlay', 'users', 'prefs', 'conversations']
+        const keys: InvalidationKeys = ['topics', 'topic_overlay', 'users', 'prefs', 'conversations', 'topic_art']
         const setup = Effect.succeed(Effect.flatMap(now, (at) => channelThreads(payload.channel, limit, at, payload.all === true)))
         return serveLiveList(runs(keys, setup), { encodeRow: encodeThread, measure }).pipe(retryFirstRun('channel.threads'), Stream.orDie)
       },

@@ -140,9 +140,11 @@ export function threadsStatements(channel: string, cutoff: string | undefined, l
   return {
     list: {
       sql: `SELECT i.topic_id, i.root_ts, i.last_activity_ts, i.message_count, i.unread_count, i.unread_exact, i.mentions_me,
-          i.participants_json, i.preview_json, i.rev, o.manual_title, o.ai_title, ${RESOLVED} AS resolved
+          i.participants_json, i.preview_json, i.rev, o.manual_title, o.ai_title, ${RESOLVED} AS resolved,
+          a.recipe AS art_recipe, a.status AS art_status
         FROM topic_index i
         LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
+        LEFT JOIN topic_art a ON a.topic_id = i.topic_id
         WHERE ${where} ORDER BY ${cutoff === undefined ? 'resolved, ' : ''}i.last_activity_ts DESC LIMIT ?`,
       params: [...params, limit],
     },

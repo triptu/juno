@@ -5,8 +5,9 @@
  * - `messages.list`: a window of one topic's messages, oldest first, as
  *   `MessageView` rows. People are in `refs` (`senderId`).
  * - `topics.get`: the header of one topic, a `TopicDetail`.
- * - `channel.threads`: a channel's active threads, for the "Threads" button
- *   in Main's header, as `ThreadSummary` rows.
+ * - `channel.threads`: a channel's threads, for the "Threads" button in
+ *   Main's header, the topic switcher and Home's topic chip, as
+ *   `ThreadSummary` rows.
  *
  * Commands, which call Slack on the interactive lane:
  * - `topics.open`: fetch what the store is missing for a topic that is being
@@ -291,6 +292,8 @@ export const ThreadSummary = Schema.Struct({
   participantIds: Schema.Array(Schema.String),
   /** Resolved with no activity since; only sent with `all`. */
   resolved: Schema.optionalKey(Schema.Boolean),
+  /** The thread's art as a recipe, as on `TopicRow.art`; Home's topic list draws it. Absent means the placeholder. */
+  art: Schema.optionalKey(Schema.String),
 })
 export type ThreadSummary = typeof ThreadSummary.Type
 

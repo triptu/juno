@@ -160,6 +160,8 @@ interface ThreadRow {
   readonly manual_title: string | null
   readonly ai_title: string | null
   readonly resolved: 0 | 1
+  readonly art_recipe: string | null
+  readonly art_status: 'ok' | 'unsure' | 'failed' | null
 }
 
 const THREAD_PARTICIPANTS = 3
@@ -171,7 +173,7 @@ const THREAD_PARTICIPANTS = 3
 export const channelThreads = (channel: string, limit: number, now: number, all = false): Effect.Effect<ListRun<ThreadSummary>, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const { cutoff } = yield* settings(sql, now)
+    const { cutoff, aiAssist } = yield* settings(sql, now)
     const statements = threadsStatements(channel, all ? undefined : cutoff, limit)
     const rows = yield* sql.unsafe<ThreadRow>(statements.list.sql, statements.list.params)
     const total = rows.length < limit ? rows.length : ((yield* sql.unsafe<{ n: number }>(statements.count.sql, statements.count.params))[0]?.n ?? rows.length)
@@ -209,6 +211,7 @@ export const channelThreads = (channel: string, limit: number, now: number, all 
         ...(rootText === undefined ? {} : { firstMessageText: rootText }),
       }
       const title = resolveTitle(topic, { user: (id) => userName(id, users.get(id)) })
+      const art = artRefOf(row, aiAssist)
       const fields: Omit<ThreadSummary, 'rev'> = {
         id: row.topic_id,
         rootTs: row.root_ts,
@@ -222,6 +225,7 @@ export const channelThreads = (channel: string, limit: number, now: number, all 
         mentionsMe: row.mentions_me === 1,
         participantIds: participants.get(row.topic_id) ?? [],
         ...(row.resolved === 1 ? { resolved: true } : {}),
+        ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
       }
       return { ...fields, rev: hashId(JSON.stringify(fields)) }
     })
