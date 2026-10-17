@@ -4,7 +4,7 @@ import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
 import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton, SparkleDuotone, tooltip, type PhosphorIcon } from '@juno/ui'
+import { focusRing, Icon, IconButton, SparkleDuotone, Text, tooltip, type PhosphorIcon } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -41,7 +41,8 @@ export interface HeaderTitleButtonProps {
 /**
  * The page title as a menu button, inside the page's `h1` (inventory 5):
  * the title on one line, then a chevron. It opens the page's menu: the
- * topic's row menu, or the Juno menu.
+ * topic's row menu, or the Juno menu. A cut-off title shows in full on
+ * hover, as the thread link and sender name do.
  */
 export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'menu', onMenu, ref }: HeaderTitleButtonProps) {
   const under = (target: HTMLElement): MenuAnchor => {
@@ -72,9 +73,9 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
         {...stylex.props(styles.reset, focusRing.outside, styles.title, expanded && styles.titleOpen)}
       >
         {leading}
-        <span dir="auto" {...stylex.props(styles.titleText)}>
+        <Text variant="inherit" truncate tooltipWhenTruncated dir="auto" as="span">
           {title}
-        </span>
+        </Text>
         <span {...stylex.props(styles.caret)}>
           <Icon icon={CaretDown} size={12} weight="bold" />
         </span>
@@ -214,12 +215,6 @@ const styles = stylex.create({
   },
   titleOpen: {
     backgroundColor: colors['--secondary-default'],
-  },
-  titleText: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    minWidth: 0,
   },
   caret: {
     display: 'inline-flex',
