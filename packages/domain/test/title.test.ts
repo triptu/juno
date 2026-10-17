@@ -5,19 +5,27 @@ import { eng, group, hiring, maya, topic } from './fixtures'
 describe('title resolution', () => {
   it('prefers a manual title, then the AI title, then the first six words', () => {
     const text = 'Has anyone looked at the staging bill? It doubled since August.'
-    expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Staging bill', aiTitle: 'Staging bill doubled since August' } }))).toEqual({ text: 'Staging bill', source: 'manual' })
-    expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Staging bill doubled since August' } }))).toEqual({ text: 'Staging bill doubled since August', source: 'ai' })
-    expect(resolveTitle(topic({ firstMessageText: text }))).toEqual({ text: 'Has anyone looked at the staging…', source: 'fallback' })
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Staging bill', aiTitle: 'Staging bill doubled since August' } }))).toEqual({ text: 'Staging bill', source: 'manual', sensitive: false })
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Staging bill doubled since August' } }))).toEqual({ text: 'Staging bill doubled since August', source: 'ai', sensitive: false })
+    expect(resolveTitle(topic({ firstMessageText: text }))).toEqual({ text: 'Has anyone looked at the staging…', source: 'fallback', sensitive: true })
   })
 
   it('treats blank manual and AI titles as missing', () => {
-    expect(resolveTitle(topic({ firstMessageText: 'short one', overlay: { manualTitle: '  ', aiTitle: '' } }))).toEqual({ text: 'short one', source: 'fallback' })
+    expect(resolveTitle(topic({ firstMessageText: 'short one', overlay: { manualTitle: '  ', aiTitle: '' } }))).toEqual({ text: 'short one', source: 'fallback', sensitive: true })
   })
 
   it('uses the channel label for Main rows and for threads with no text', () => {
-    expect(resolveTitle(topic({ kind: 'main', channel: eng, overlay: { aiTitle: 'ignored' } }))).toEqual({ text: '#eng', source: 'channel' })
-    expect(resolveTitle(topic({ kind: 'main', channel: maya }))).toEqual({ text: 'Maya Chen', source: 'channel' })
-    expect(resolveTitle(topic({ channel: hiring }))).toEqual({ text: '#hiring', source: 'channel' })
+    expect(resolveTitle(topic({ kind: 'main', channel: eng, overlay: { aiTitle: 'ignored' } }))).toEqual({ text: '#eng', source: 'channel', sensitive: false })
+    expect(resolveTitle(topic({ kind: 'main', channel: maya }))).toEqual({ text: 'Maya Chen', source: 'channel', sensitive: false })
+    expect(resolveTitle(topic({ channel: hiring }))).toEqual({ text: '#hiring', source: 'channel', sensitive: false })
+  })
+
+  it('marks message text nobody checked for a shared screen as sensitive', () => {
+    const text = 'Go with 100k for Donna, she asked for 110k.'
+    expect(resolveTitle(topic({ firstMessageText: text })).sensitive).toBe(true)
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Donna offer at 100k', aiTitleOld: true } }))).toEqual({ text: 'Donna offer at 100k', source: 'ai', sensitive: true })
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Comp discussion for Donna' } })).sensitive).toBe(false)
+    expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Donna 100k', aiTitle: 'Donna offer at 100k', aiTitleOld: true } })).sensitive).toBe(false)
   })
 
 })

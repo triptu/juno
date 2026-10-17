@@ -8,6 +8,8 @@ import type { TopicId, TopicKind, Ts, UserId } from './ids'
 export interface TopicOverlay {
   readonly manualTitle?: string
   readonly aiTitle?: string
+  /** The AI title was made before titles left out sensitive details, and has not been made again yet. */
+  readonly aiTitleOld?: boolean
   /** Wall-clock millis when the user resolved it. */
   readonly resolvedAt?: number
   /** The latest activity at the time of the resolve. Later activity reopens the topic. */

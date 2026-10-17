@@ -10,6 +10,11 @@
  * - Each thread is titled once: one with an AI title is not asked again, and
  *   neither is one you renamed, since your title wins (an empty rename brings
  *   the AI title back, so the job titles it then).
+ * - Once more for an AI title made before titles left out sensitive details
+ *   (`ai_title_version` NULL, before `TITLE_SAFE_SINCE`), in any channel you
+ *   are in and at any age, newest first. These fill a pass after the new
+ *   threads, as backlog work in the spend cap (`AiBackground`), and privacy
+ *   mode blurs them until then.
  * - Paced: a pass takes at most `PASS_SIZE` threads, `CONCURRENCY` calls at
  *   a time, after a 1.5 s debounce of store changes or every 30 s, inside
  *   `TITLE_DAILY_BUDGET` calls per workspace per day. Every call also
@@ -32,7 +37,7 @@ import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn, aiJobsOn } from './ai'
 import type { EngineConfig } from './config'
 import { AiCredentials, aiWakes } from './aiCredentials'
-import { AiSpend } from './aiSpend'
+import { AiBackground, AiSpend } from './aiSpend'
 import { Workspace, type StoreServices } from './workspace'
 
 /** Calls per workspace per day, counted from stored titles and this process's unfinished calls. */
@@ -50,6 +55,8 @@ interface Candidate {
   readonly channel: string
   readonly root_ts: string
   readonly name: string | null
+  /** It has an AI title from before the sensitive-details rule. */
+  readonly old?: boolean
 }
 
 /** What one workspace's job remembers between passes. */
@@ -89,7 +96,21 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
       -- A refused title is asked again once the thread has activity after the refusal (seconds against milliseconds).
       AND (r.key IS NULL OR CAST(i.last_activity_ts AS REAL) * 1000 > r.at)
     ORDER BY i.last_activity_ts DESC LIMIT 100`
-  const chosen = rows.filter((row) => (memory.deferred.get(row.topic_id) ?? 0) <= now).slice(0, Math.min(PASS_SIZE, budget))
+  const room = Math.min(PASS_SIZE, budget)
+  const due = (row: Candidate) => (memory.deferred.get(row.topic_id) ?? 0) <= now
+  const chosen = rows.filter(due).slice(0, room)
+  if (chosen.length < room) {
+    // Titles made before the rule, through the partial index `topic_overlay_old_ai_title`.
+    const old = yield* sql<Candidate>`SELECT i.topic_id, i.channel, i.root_ts, c.name
+      FROM topic_overlay o JOIN topic_index i ON i.topic_id = o.topic_id JOIN conversations c ON c.id = i.channel
+      LEFT JOIN ignored_channels ig ON ig.channel = i.channel
+      LEFT JOIN ai_refusals r ON r.task = 'titleTopic' AND r.key = i.topic_id
+      WHERE o.ai_title IS NOT NULL AND o.ai_title_version IS NULL AND trim(o.ai_title) <> '' AND NULLIF(trim(o.manual_title), '') IS NULL
+        AND i.kind = 'thread' AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
+        AND (r.key IS NULL OR CAST(i.last_activity_ts AS REAL) * 1000 > r.at)
+      ORDER BY i.last_activity_ts DESC LIMIT 100`
+    chosen.push(...old.filter(due).slice(0, room - chosen.length).map((row) => ({ ...row, old: true })))
+  }
   const provider = yield* AiProvider
   let stopped = false
   yield* Effect.forEach(chosen, (row) => Effect.gen(function* () {
@@ -106,7 +127,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
     }
     // Counted before the call, so a call cut short (a key change, a new workspace) still counts today.
     spent.unstored++
-    const answer = yield* provider.generate(tasks.titleTopic, input)
+    const answer = yield* provider.generate(tasks.titleTopic, input).pipe(Effect.provideService(AiBackground, row.old === true))
     if (answer._tag !== 'Decided') {
       // Refused for good: kept by the provider wrapper, so nothing to wait for. One answered from that record was never sent.
       if (isFinal(answer)) {
@@ -130,9 +151,10 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         VALUES ('titleTopic', ${row.topic_id}, ${hash}, ${JSON.stringify(answer.value)}, ${answer.meta.model}, ${answer.meta.costUsd ?? null}, ${at})
         ON CONFLICT (task, key) DO UPDATE SET input_hash = excluded.input_hash, output_json = excluded.output_json, model = excluded.model,
           cost_usd = excluded.cost_usd, created_at = excluded.created_at`
-      yield* writer`INSERT INTO topic_overlay (topic_id, ai_title, ai_title_source_hash, ai_title_at)
-        VALUES (${row.topic_id}, ${answer.value}, ${hash}, ${at})
-        ON CONFLICT (topic_id) DO UPDATE SET ai_title = excluded.ai_title, ai_title_source_hash = excluded.ai_title_source_hash, ai_title_at = excluded.ai_title_at`
+      yield* writer`INSERT INTO topic_overlay (topic_id, ai_title, ai_title_source_hash, ai_title_at, ai_title_version)
+        VALUES (${row.topic_id}, ${answer.value}, ${hash}, ${at}, ${tasks.titleTopic.version})
+        ON CONFLICT (topic_id) DO UPDATE SET ai_title = excluded.ai_title, ai_title_source_hash = excluded.ai_title_source_hash, ai_title_at = excluded.ai_title_at,
+          ai_title_version = excluded.ai_title_version`
       yield* (yield* Invalidation).invalidate(['topic_overlay', 'ai_cache'])
     }))
     spent.unstored--
