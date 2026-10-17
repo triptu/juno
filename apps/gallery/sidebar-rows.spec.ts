@@ -71,6 +71,22 @@ test('hovering a row shows Resolve in its reserved slot without moving anything,
   await expect(slot).toHaveCSS('opacity', '1')
 })
 
+test('the place line sits at one height with or without Resolve: renaming, and a resolved row', async ({ page }) => {
+  const placeTop = (id: string) =>
+    page.evaluate((topicId) => {
+      const row = document.querySelector(`[data-topic-id="${topicId}"]`)!
+      return row.querySelector('[data-row-part="place"]')!.getBoundingClientRect().top - row.getBoundingClientRect().top
+    }, id)
+  await open(page, 'TopicRow', 'state/read')
+  const id = (await row(page, 'Postgres 16').getAttribute('data-topic-id'))!
+  const read = await placeTop(id)
+  await open(page, 'TopicRow', 'state/renaming')
+  expect(await placeTop(id)).toBe(read)
+  await open(page, 'TopicRow', 'kind/pinned-resolved')
+  const notes = (await page.locator('[data-topic-row]').first().getAttribute('data-topic-id'))!
+  expect(await placeTop(notes)).toBe(read)
+})
+
 test('the list scrollbar shows only while the pointer is over the list, and nothing moves', async ({ page }) => {
   await open(page, 'Sidebar', 'list/default')
   const list = page.getByRole('group', { name: 'Topics' })

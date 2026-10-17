@@ -547,11 +547,14 @@ const styles = stylex.create({
   },
   // The place and its tags in one run, so the tags never float. Resolve overlays the end of the line in the same
   // cell, so it takes no space when hidden.
+  // As tall as Resolve whether or not the row has it (a resolved row, a row
+  // being renamed), so the place sits at one height on every row.
   line3: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     alignItems: 'center',
     minWidth: 0,
+    minHeight: sizes['--control-22'],
     marginTop: density['--density-row-line-gap'],
     color: colors['--foreground-muted'],
   },
