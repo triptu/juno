@@ -2,7 +2,8 @@
 // anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
 // header's title menu draws the topic again, the toast's Undo and ⌘Z put the
 // previous drawing back, and the menu has no Redraw art when no drawing can
-// be made: AI assist off, no OpenRouter key, or today's spend cap reached.
+// be made: AI assist off or no OpenRouter key. At the daily AI limit Redraw
+// art says so, and Change limit leads to the field in Settings › AI activity.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -62,7 +63,7 @@ test('with AI assist off, the topic menu has no Redraw art', async ({ juno, fake
   }
 })
 
-test('Redraw art shows only with an OpenRouter key and under the daily spend cap', async ({ fake, slackApp, userData }) => {
+test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ fake, slackApp, userData }) => {
   const KEY = 'fake-engine-test-key'
   const model = await startFakeOpenRouter({ key: KEY })
   const running = await launchApp(userData, {
@@ -86,16 +87,26 @@ test('Redraw art shows only with an OpenRouter key and under the daily spend cap
     await expect(page.getByText('Topic art and AI titles need an OpenRouter key.')).toHaveCount(0)
     await expect.poll(labels).toContain('Redraw art')
 
-    // Today's cap reached, then raised.
-    const cap = page.getByLabel('Daily cap in dollars')
-    await cap.fill('0')
-    await cap.press('Enter')
-    await expect(cap).toHaveValue('0')
-    await expect.poll(labels).not.toContain('Redraw art')
-    await cap.fill('2')
-    await cap.press('Enter')
-    await expect(cap).toHaveValue('2')
-    await expect.poll(labels).toContain('Redraw art')
+    // A low limit, reached: Redraw art says so and leads to the limit.
+    await juno.openSettings('AI activity')
+    const limit = page.getByLabel('Daily limit in dollars')
+    await expect(limit).toHaveValue('5')
+    await limit.fill('0')
+    await limit.press('Enter')
+    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $0.00 today')
+    await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
+    await row.chooseInMenu('redraw')
+    await juno.expectToast('Today’s AI limit of $0.00 is reached')
+    await running.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
+    await juno.tabs.expectActive('Settings')
+    await expect(limit).toBeVisible()
+
+    // Raised: the same app draws again.
+    await limit.fill('2')
+    await limit.press('Enter')
+    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
+    await row.chooseInMenu('redraw')
+    await juno.expectToast(`Redrawn · ${POSTGRES}`)
   } finally {
     await running.close()
     await model.close()

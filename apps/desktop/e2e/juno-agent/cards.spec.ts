@@ -129,8 +129,8 @@ test('after reading a hostile Slack message, a task becomes a card with a Becaus
 
 test('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {
   await ready(juno)
-  const settings = await openSettings(juno, 'Juno')
-  const cap = settings.getByLabel('Daily cap in dollars')
+  const settings = await openSettings(juno, 'AI activity')
+  const cap = settings.getByLabel('Daily limit in dollars')
   await cap.fill('0')
   await cap.press('Enter')
   await expect(cap).toHaveValue('0')
@@ -152,8 +152,8 @@ test('at the daily cap the Budget card appears, and Allow $1 more lets the answe
 
 test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stays quiet', async ({ juno, model }) => {
   await ready(juno)
-  const settings = await openSettings(juno, 'Juno')
-  const cap = settings.getByLabel('Daily cap in dollars')
+  const settings = await openSettings(juno, 'AI activity')
+  const cap = settings.getByLabel('Daily limit in dollars')
   await cap.fill('0')
   await cap.press('Enter')
   await expect(cap).toHaveValue('0')

@@ -199,8 +199,8 @@ test('a message at the send limit is kept when request framing makes it too larg
 
 test('with a $0 daily cap a message brings the Budget card', async ({ juno, model }) => {
   await ready(juno)
-  const settings = await openSettings(juno, 'Juno')
-  const cap = settings.getByLabel('Daily cap in dollars')
+  const settings = await openSettings(juno, 'AI activity')
+  const cap = settings.getByLabel('Daily limit in dollars')
   await cap.fill('0')
   await cap.press('Enter')
   await expect(cap).toHaveValue('0')

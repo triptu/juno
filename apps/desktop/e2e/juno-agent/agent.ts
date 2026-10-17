@@ -9,7 +9,7 @@ import { expect, JunoChatPane } from './chat'
 export type JunoPage = 'Scheduled' | 'What Juno remembers' | 'Memory of this chat' | 'Activity' | 'Connections'
 
 /** The sections of Settings the Juno Agent's flows use. */
-export type JunoSettingsSection = 'Juno' | 'Connections' | 'Backup & This Mac'
+export type JunoSettingsSection = 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac'
 
 /** Signs in, waits for the first sync and for the agent. */
 export async function ready(juno: Juno): Promise<void> {
