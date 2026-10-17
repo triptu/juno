@@ -53,8 +53,12 @@ export const chatCopy = {
     removeQuote: 'Remove quote',
     /** The context chips in the composer: what Juno sees with the next message. */
     contextLabel: (place: string) => `Juno sees ${place}`,
-    selection: 'Selection',
+    /** The selection chip's accessible name: "Selection, Maya: the deploy failed…". */
+    selectionLabel: (quoted: string) => `Selection, ${quoted}`,
     removeSelection: 'Remove selection',
+    /** The selection toolbar's button beside Quote (SPEC 7, Quoting). */
+    askJuno: 'Ask Juno',
+    askJunoTip: 'Ask Juno about the selection',
   },
   list: {
     newMessage: 'New message',

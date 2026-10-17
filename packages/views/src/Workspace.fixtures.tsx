@@ -98,7 +98,10 @@ const panel = (context: JunoPanelContextProps, items: Parameters<typeof JunoChat
 const junoPanel = panel({})
 // The owner's case: a Main in a channel with a long name.
 const longMainPanel = panel({ place: { tint: 'public', label: 'proj-trainingdata-pipeline-and-model-evaluation-review-q4 · Main' } })
-const selection = { text: 'We could use logical replication for the cutover and keep the old primary as a fallback.', sender: 'Leo Park' }
+// The chip quotes the selection: a short one whole, a long one cut at a word, several messages by count.
+const selection = { text: 'logical replication', sender: 'Leo', ts: '1712000000.000300' }
+const longSelection = { text: 'We could use logical replication for the cutover and keep the old primary as a fallback.', sender: 'Leo', ts: '1712000000.000300' }
+const multiSelection = { text: 'We could use logical replication for the cutover.\nAgreed, if the lag stays under a second.\nI can run the dry run on Thursday.', sender: 'Leo', ts: '1712000000.000300', messages: 3 }
 
 const junoPage = (
   <JunoChatFrame header={<JunoHeader banner={{ _tag: 'none' }} menuOpen={false} onMenu={noop} onOpenPage={noop} onResume={noop} />} composer={<JunoComposer value="" onChange={noop} onSend={noop} enabled />}>
@@ -157,11 +160,15 @@ export default defineFixtures(
       'juno-panel': workspace({ side: junoPanel }, postgresPanelPage, { width: 1200, height: 720 }),
       // Dragged wider, to 600px.
       'juno-panel-wide': workspace({ side: junoPanel, sideWidth: 600 }, postgresPanelPage, { width: 1440, height: 720 }),
-      // The chips in the composer say what Juno sees: the topic, and Selection while text is selected in it.
+      // The chips in the composer say what Juno sees: the topic, and the selection quoted while text is selected in it.
       'juno-panel-context': workspace({ side: panel({}) }, postgresPanelPage, { width: 1200, height: 720 }),
       // A long channel name cuts with an ellipsis inside the topic chip.
       'juno-panel-long-name': workspace({ side: longMainPanel }, engPanelPage, { width: 1200, height: 720 }),
       'juno-panel-selection': workspace({ side: panel({ selection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
+      'juno-panel-selection-long': workspace({ side: panel({ selection: longSelection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
+      'juno-panel-selection-messages': workspace({ side: panel({ selection: multiSelection, onRemoveSelection: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
+      // The panel at its narrowest: the topic chip gives way first.
+      'juno-panel-selection-narrow': workspace({ side: panel({ selection: longSelection, onRemoveSelection: noop }), sideWidth: 360 }, postgresPanelPage, { width: 1200, height: 720 }),
       // Ask Juno about a person: the line names them instead of the topic.
       'juno-panel-about': workspace({ side: panel({ about: { _tag: 'person', userId: 'U0MAYA', name: 'Maya Chen' }, onRemoveAbout: noop }) }, postgresPanelPage, { width: 1200, height: 720 }),
       // Nothing said yet: the empty chat with its suggestion chips.
