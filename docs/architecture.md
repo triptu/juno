@@ -121,7 +121,7 @@ flowchart TD
   store --> domain & slack_schema
   sync --> slack & store & domain & slack_schema
   topic_art[topic-art]
-  ai --> domain & topic_art
+  ai --> domain & topic_art & ai_failure[ai-failure]
   assistant --> ai & store & domain & contract
   notifications --> store & domain & ai
   files --> slack & store & sync
@@ -135,7 +135,7 @@ flowchart TD
   gallery[apps/gallery] --> views & ui & tokens
   gallery -.tests.-> testing[testing]
   agent_contract[agent-contract] --> agent_cards[agent-cards]
-  agent --> agent_memory[agent-memory] & agent_cards & agent_contract & ai
+  agent --> agent_memory[agent-memory] & agent_cards & agent_contract & ai_failure
   agent_juno[agent-juno] --> agent_contract & domain & contract
   agent_testing[agent-testing] --> agent & agent_contract
   engine --> agent_juno
@@ -144,7 +144,7 @@ flowchart TD
   desktop --> agent & agent_contract
 ```
 
-The bottom block is Juno Agent (section 10, ADR 0012). Its one edge to `ai` is `@juno/ai/failure`, the provider error kinds with no imports of their own, so the agent's guard and the engine's provider sort a refusal the same way. `state` reads the agent's renderer groups from `agent-contract` (`@juno/state/agent`); `views` take its chat view models.
+The bottom block is Juno Agent (section 10, ADR 0012). Its one edge outside the `agent-*` packages is `ai-failure`, a leaf with no dependencies that the engine's `ai` uses too, so the agent's guard and the engine's provider sort a refusal the same way; the agent does not reach `ai`, `domain` or `topic-art`. `state` reads the agent's renderer groups from `agent-contract` (`@juno/state/agent`); `views` take its chat view models.
 
 | Package | Rule it protects | Owns | Must not |
 | --- | --- | --- | --- |
@@ -158,6 +158,7 @@ The bottom block is Juno Agent (section 10, ADR 0012). Its one edge to `ai` is `
 | `@juno/sync` | Slack ↔ store | boot, discovery, backfill, merge rules, event application, read-state mirroring, outbox and its worker, reconnect reconciliation, `reindexTopics` calls | render, call AI |
 | `@juno/files` | authenticated bytes | upload staging and the upload flow, file metadata rows, thumbnail URL resolution, download requests to main | touch the renderer |
 | `@juno/topic-art` | no model text reaches a page | the topic art vocabulary: the whitelist parser for the model's recipe, the renderer that rebuilds SVG from the checked recipe with the `art` tokens' CSS variables, the Tide pebble placeholder | import anything |
+| `@juno/ai-failure` | one reading of a provider's error | the error kinds (`classifyFailure`), whether a kind is worth a retry or a fallback, and whether a failed request was billed | import anything |
 | `@juno/ai` | provider isolation | `AiProvider` with `PiAiProvider` and `FakeAiProvider`, task table (prompts, output schemas, tier) | touch the store |
 | `@juno/assistant` | AI policy | when tasks run, `ai_cache`, budget, concurrency, the off switch, Home items, the Juno chat with tools and cards | call OpenRouter directly |
 | `@juno/notifications` | one decision path | pipeline, today's log, presence job, `Notifier` interface | show anything itself |
