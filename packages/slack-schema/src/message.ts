@@ -33,6 +33,8 @@ export const File = S.Struct({
   mimetype: opt(S.String),
   filetype: opt(S.String),
   pretty_type: opt(S.String),
+  /** "slack_audio" or "slack_video" for a clip recorded in Slack. */
+  subtype: opt(S.String),
   user: opt(S.String),
   user_team: opt(S.String),
   size: opt(S.Number),
