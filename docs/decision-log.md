@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 20:37 · ci-fix-29 · Under reduced motion `global.css` sets every transition to 0s, not 0.01ms. With the default `transition-property: all`, a 0.01ms duration turned every style change into a transition that drew the old value for a frame or two: a switcher row under the pointer filled two frames late (gallery list-geometry spec). Animations keep 0.01ms so they still end. The toolbar slot's and TopicArt's `transition-property: none` workarounds are gone.
 - 10-17 20:10 · orchestrator · Juno never writes default notification hours into Slack's schedule: it writes only after the hours are set on that install or the switch is turned on (the hours are shown above it). The live check had applied the defaults on a Mac without the owner's hours; his previous schedule was restored exactly.
 - 10-17 20:05 · release-keeper · Merging cards-followup-drafts after automated-record-until-seen: the shared review sheet (HomeReview, useReview, ReviewList) is kept, with Automated's Dismiss, home.movesShown and home.movesSeen carried over; ReviewList's data-review-outcome already marks only the shown word.
 - 10-17 19:54 · live-fixes · The fake's `subscriptions.thread.getView` sends `unread_replies` for a thread with unread replies and `latest_replies` otherwise, never both, as seen live on 10-17 (one unread and two read threads); the sync already read either.
