@@ -94,22 +94,65 @@ export const ActivityScriptCall = Schema.Struct({
 })
 export type ActivityScriptCall = typeof ActivityScriptCall.Type
 
+/**
+ * What started a run, named so the owner knows it at a glance. A message is
+ * the owner's own words, cut short; `words` is empty once it was removed.
+ */
+export const ActivityTrigger = Schema.Union([
+  Schema.TaggedStruct('message', { words: Schema.String, files: Schema.Int }),
+  Schema.TaggedStruct('reaction', { emoji: Schema.String }),
+  Schema.TaggedStruct('schedule', { name: Schema.String }),
+  Schema.TaggedStruct('job', { name: Schema.String }),
+  /** An answer on a Question card: the question. */
+  Schema.TaggedStruct('answer', { question: Schema.String }),
+])
+export type ActivityTrigger = typeof ActivityTrigger.Type
+
+/** One tool call the run made, in order, with what it was given and what came back, both cut short. */
+export const ActivityStep = Schema.Struct({
+  /** "Read #eng", "Searched Slack", "Called Notion's create_page". */
+  label: Schema.String,
+  /** The arguments: "launch in:#eng". Absent when there were none, or a removal cleared them. */
+  input: Schema.optionalKey(Schema.String),
+  /** What came back: "12 lines", "Proposed a card", or an error's text. A read's result is counted, never kept. */
+  result: Schema.optionalKey(Schema.String),
+  /** `unfinished`: the run ended while the call ran, as after a crash. */
+  outcome: Schema.Literals(['done', 'failed', 'unfinished']),
+})
+export type ActivityStep = typeof ActivityStep.Type
+
 export const ActivityRun = Schema.Struct({
   id: RunId,
-  /** Who asked: "You", a schedule's name, a job's title. */
-  who: Schema.String,
+  trigger: ActivityTrigger,
   at: Schema.Number,
   outcome: RunOutcome,
   actions: Schema.Array(ActivityAction),
-  /** The folded read line: "Read 3 topics, looked back 4 times". */
+  /**
+   * What the run read from outside Juno, by name, in the order it first read
+   * them: "#eng", "Littlebird", "the topic beside the chat". Untrusted content.
+   */
+  sources: Schema.Array(Schema.String),
+  /** The folded read line of the run's scripts: "Ran 1 script: 4 reads, 1 cancelled". */
   reads: Schema.optionalKey(Schema.String),
   /** Every call the run's scripts made, in order. */
   scriptCalls: Schema.optionalKey(Schema.Array(ActivityScriptCall)),
-  /** The run was tainted by untrusted content from here on. */
+  /** The model's tool calls, in order, at most `ACTIVITY_STEPS_MAX`. */
+  steps: Schema.Array(ActivityStep),
+  /** Calls past `steps`. */
+  moreSteps: Schema.optionalKey(Schema.Int),
+  /** The run was tainted by untrusted content from here on, so it asked before acting. */
   tainted: Schema.Boolean,
+  /** "Claude Sonnet 5.5", or two names when a fallback answered. Absent when the run made no request. */
+  model: Schema.optionalKey(Schema.String),
+  /** What the run's requests cost in dollars. Absent while any cost is unknown. */
+  costUsd: Schema.optionalKey(Schema.Number),
 })
 export type ActivityRun = typeof ActivityRun.Type
 
+/** The most steps one run sends; the page says how many more there were. */
+export const ACTIVITY_STEPS_MAX = 30
+
+/** Runs newest first. `moreAbove`: older runs exist past the window. */
 export const ActivityPage = Schema.Struct({ runs: Schema.Array(ActivityRun), moreAbove: Schema.Boolean })
 export type ActivityPage = typeof ActivityPage.Type
 

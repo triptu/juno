@@ -157,7 +157,7 @@ it('What Juno remembers lists a pinned message, and edits and removes it with a 
   expect(changedMessage).toMatchObject({ _tag: 'Failure', failure: { reason: 'stale' } })
 })
 
-it('Activity lists each finished run: who asked, when, and how it ended', async () => {
+it('Activity lists each finished run, newest first: what started it and how it ended', async () => {
   const { h, client, follow } = await served()
   h.fake.script([reply(say('Here.')), reply('Nothing worth saying.'), rejectedKey()])
   for (const n of [1, 2, 3]) {
@@ -167,14 +167,14 @@ it('Activity lists each finished run: who asked, when, and how it ended', async 
   const activity = follow(client['agent.activity.page']({ window: { limit: 50 } }))
   const page = await activity.where((p) => p.runs.length === 3, 'three runs')
   expect(page.moreAbove).toBe(false)
-  expect(page.runs.map((r) => [r.who, r.outcome, r.tainted, r.actions])).toEqual([
-    ['You', 'replied', false, []],
-    ['You', 'stayedQuiet', false, []],
-    ['You', 'failed', false, []],
+  expect(page.runs.map((r) => [r.trigger, r.outcome, r.tainted, r.actions])).toEqual([
+    [{ _tag: 'message', words: 'message 3', files: 0 }, 'failed', false, []],
+    [{ _tag: 'message', words: 'message 2', files: 0 }, 'stayedQuiet', false, []],
+    [{ _tag: 'message', words: 'message 1', files: 0 }, 'replied', false, []],
   ])
 
-  const older = await first(client['agent.activity.page']({ window: { limit: 2, cursor: page.runs[2]!.id as never } }))
-  expect(older?.runs.map((r) => r.outcome)).toEqual(['replied', 'stayedQuiet'])
+  const older = await first(client['agent.activity.page']({ window: { limit: 2, cursor: page.runs[0]!.id as never } }))
+  expect(older?.runs.map((r) => r.outcome)).toEqual(['stayedQuiet', 'replied'])
   const newest = await first(client['agent.activity.page']({ window: { limit: 1 } }))
   expect(newest).toMatchObject({ runs: [{ outcome: 'failed' }], moreAbove: true })
 })
