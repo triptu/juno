@@ -20,7 +20,7 @@
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { homeMarkDone, homeView, homeVisit, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
+import { homeMarkDone, homeMovesSeen, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
@@ -282,6 +282,29 @@ export function startVisitLog(registry: Registry): () => void {
     unsubscribe()
     leave()
   }
+}
+
+/**
+ * Home showed Automated's record card: its moves are not shown again, and
+ * the card waits a day before showing newer ones (SPEC 12).
+ */
+export function markMovesSeen(registry: Registry, item: HomeItem): void {
+  const channels = item.topics.flatMap((topic) => (topic.moved === undefined ? [] : [topic.moved.channel.id]))
+  void runCommand(registry, homeMovesSeen, { channels })
+}
+
+/**
+ * A row of Automated's record: `act` reverses Juno's move (Move back, or
+ * Move to Automated for a move back out), `keep` makes Juno's move the
+ * user's own. Either has the usual toast with Undo, and resolves with the
+ * undo, which gives the channel back to the rules or Juno.
+ */
+export async function actOnMove(registry: Registry, topic: HomeTopic, action: 'act' | 'keep', toast: string): Promise<UndoCommand | undefined> {
+  const moved = topic.moved
+  if (moved === undefined) return undefined
+  const into = (moved.change === 'in') === (action === 'keep')
+  const exit = await runActionExit(registry, viewsSortChannel, { channel: moved.channel.id, to: into ? 'automated' : 'kept' }, { text: toast })
+  return Exit.isSuccess(exit) ? (exit.value as CommandResult).undo : undefined
 }
 
 /** Mark done on a Follow-up. No undo (inventory 11). */
