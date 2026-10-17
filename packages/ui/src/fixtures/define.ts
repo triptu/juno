@@ -38,6 +38,11 @@ export interface FixtureFrame {
    * so the shot holds the tooltip whatever the delay.
    */
   readonly tooltip?: string
+  /**
+   * Draw the state in this density (inventory 3.3). Default compact, the
+   * app's default; a `density` in the gallery address overrides it.
+   */
+  readonly density?: 'comfortable' | 'compact'
 }
 
 export interface Fixture<P> {
