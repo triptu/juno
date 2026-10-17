@@ -35,6 +35,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     photoless: new Set(),
     lateReactions: new Map(),
     fetchesInFlight: new Set(),
+    usersInFlight: new Map(),
     metadata: new Set(),
   }
   const state = {

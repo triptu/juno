@@ -21,7 +21,7 @@
 import { SlackEdge, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Effect, Queue } from 'effect'
+import { Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { reindexTopics } from './reindex'
 import { upsertUsers } from './write'
@@ -103,14 +103,42 @@ const photolessUserIds = (ctx: SyncContext): Effect.Effect<ReadonlyArray<string>
     return ids
   })
 
-/** Fetches `ids` in chunks on `lane`, stores them and re-indexes the topics that were waiting for a name. */
+/**
+ * Fetches `ids` in chunks on `lane`, stores them and re-indexes the topics
+ * that were waiting for a name. An id another call is already asking for is
+ * not asked again: this waits for that answer to be stored (or to fail), so
+ * two pages landing side by side cost one call. An interactive caller does
+ * not wait behind a background call, which can be seconds away.
+ */
 export const fetchUsers = (
   ctx: SyncContext,
-  ids: ReadonlyArray<string>,
+  requested: ReadonlyArray<string>,
   lane: Lane = 'background',
 ): Effect.Effect<void, SlackApiError | SqlError, UsersServices> =>
   Effect.gen(function* () {
-    if (ids.length === 0) return
+    const joinable = (id: string) => {
+      const out = ctx.usersInFlight.get(id)
+      return out !== undefined && (out.lane === 'interactive' || lane === 'background') ? out : undefined
+    }
+    const others = new Set(requested.flatMap((id) => joinable(id)?.stored ?? []))
+    const ids = requested.filter((id) => joinable(id) === undefined)
+    if (ids.length > 0) yield* fetchChunks(ctx, ids, lane)
+    for (const answer of others) yield* Deferred.await(answer)
+  })
+
+const fetchChunks = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane): Effect.Effect<void, SlackApiError | SqlError, UsersServices> =>
+  Effect.gen(function* () {
+    const out = { lane, stored: yield* Deferred.make<void>() }
+    for (const id of ids) ctx.usersInFlight.set(id, out)
+    yield* chunks(ctx, ids, lane).pipe(
+      Effect.ensuring(Effect.andThen(Effect.sync(() => {
+        for (const id of ids) if (ctx.usersInFlight.get(id) === out) ctx.usersInFlight.delete(id)
+      }), Deferred.succeed(out.stored, undefined))),
+    )
+  })
+
+const chunks = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane): Effect.Effect<void, SlackApiError | SqlError, UsersServices> =>
+  Effect.gen(function* () {
     const edge = yield* SlackEdge
     for (let i = 0; i < ids.length; i += ctx.config.usersChunk) {
       const chunk = ids.slice(i, i + ctx.config.usersChunk)
