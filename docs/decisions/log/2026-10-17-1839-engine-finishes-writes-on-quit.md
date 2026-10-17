@@ -1,0 +1,1 @@
+- 10-17 18:39 · ci-fix-28 · On quit main asks the engine to stop and waits for it, up to 3 s, instead of killing it, and `prefs.set` is uninterruptible, so a preference set just before a window closes or the app quits (the welcome card's Hide) is saved.

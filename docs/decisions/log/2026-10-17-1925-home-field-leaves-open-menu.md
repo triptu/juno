@@ -1,0 +1,1 @@
+- 10-17 19:25 · ci-fix-28 · Home's field does not take focus when it mounts while a menu or dialog outside Home is open, so the account menu opened during launch stays open.
