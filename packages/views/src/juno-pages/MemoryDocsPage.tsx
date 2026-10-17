@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocsPage as MemoryDocsPageModel, type MemoryEntryId, type MemoryEntryRow, type MemorySource } from '@juno/agent-contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
-import { Button, ListRow, Page, PageHeader, Section, Surface, Text, TextField } from '@juno/ui'
+import { Button, ListRow, Page, PageHeader, Section, Surface, Text, TextField, tooltip } from '@juno/ui'
 import { cell } from './cell'
 import { fullTime, messageTime } from '../time'
 
@@ -37,45 +36,50 @@ export const sourceLabel = (source: MemorySource): string => (source._tag === 'c
  * What Juno remembers (SPEC 13.8): Juno's notes about the owner, one
  * section per doc, each note with where it came from, then the pins, then
  * the recent changes. Every note can be edited or deleted; an edit makes it
- * the owner's words. Notes Juno wrote after reading Slack or a connection
- * say so.
+ * the owner's words. Edit and Delete show on hover and focus; Add sits on
+ * each doc's heading. Notes Juno wrote after reading Slack or a connection
+ * say so in a tooltip on their source.
  */
 export function MemoryDocsPage({ page, now, editing, onEditStart, onAddStart, onDraftChange, onSave, onCancel, onDelete, pinned }: MemoryDocsPageProps) {
   const field = { onDraftChange, onSave, onCancel }
   return (
     <Page>
       <PageHeader title={copy.title} subtitle={copy.subtitle} />
-      {page.docs.map((section) => (
-        <Section key={section.doc} heading={copy.titles[section.doc]} sub={copy.hints[section.doc]}>
-          <Surface kind="group" role="list" aria-label={copy.titles[section.doc]} data-memory-doc={section.doc}>
-            {section.entries.map((entry) =>
-              editing?._tag === 'edit' && editing.id === entry.id ? (
-                <EditRow key={entry.id} label={copy.entryLabel} editing={editing} {...field} />
-              ) : (
-                <EntryRow key={entry.id} entry={entry} now={now} onEditStart={onEditStart} onDelete={onDelete} />
-              ),
-            )}
-            {editing?._tag === 'add' && editing.doc === section.doc ? (
-              <EditRow label={copy.addLabel(copy.titles[section.doc])} editing={editing} {...field} last />
-            ) : (
-              <ListRow role="listitem" divider={false} data-memory-add={section.doc}>
-                <span {...stylex.props(styles.addRow)}>
-                  {section.entries.length === 0 ? (
-                    <Text variant="body" tone="muted">
-                      {copy.docEmpty}
-                    </Text>
-                  ) : (
-                    <span />
-                  )}
-                  <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(copy.titles[section.doc])} onClick={() => onAddStart(section.doc)}>
-                    {copy.add}
-                  </Button>
-                </span>
-              </ListRow>
-            )}
-          </Surface>
-        </Section>
-      ))}
+      {page.docs.map((section) => {
+        const adding = editing?._tag === 'add' && editing.doc === section.doc ? editing : undefined
+        const title = copy.titles[section.doc]
+        return (
+          <Section
+            key={section.doc}
+            heading={title}
+            sub={copy.hints[section.doc]}
+            action={
+              <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(title)} data-memory-add={section.doc} onClick={() => onAddStart(section.doc)}>
+                {copy.add}
+              </Button>
+            }
+          >
+            <Surface kind="group" role="list" aria-label={title} data-memory-doc={section.doc}>
+              {section.entries.map((entry, index) =>
+                editing?._tag === 'edit' && editing.id === entry.id ? (
+                  <EditRow key={entry.id} label={copy.entryLabel} editing={editing} last={adding === undefined && index === section.entries.length - 1} {...field} />
+                ) : (
+                  <EntryRow key={entry.id} entry={entry} now={now} last={adding === undefined && index === section.entries.length - 1} onEditStart={onEditStart} onDelete={onDelete} />
+                ),
+              )}
+              {adding !== undefined ? (
+                <EditRow label={copy.addLabel(title)} editing={adding} {...field} last />
+              ) : section.entries.length === 0 ? (
+                <ListRow role="listitem" divider={false} data-memory-empty="">
+                  <Text variant="body" tone="muted">
+                    {copy.docEmpty}
+                  </Text>
+                </ListRow>
+              ) : null}
+            </Surface>
+          </Section>
+        )
+      })}
       {pinned === undefined ? null : (
         <Section heading={copy.pinned} sub={copy.pinnedSub}>
           {pinned}
@@ -94,10 +98,26 @@ export function MemoryDocsPage({ page, now, editing, onEditStart, onAddStart, on
   )
 }
 
-function EntryRow({ entry, now, onEditStart, onDelete }: { readonly entry: MemoryEntryRow; readonly now: number } & Pick<MemoryDocsPageProps, 'onEditStart' | 'onDelete'>) {
+/**
+ * Where a note came from. One written after reading outside content says so
+ * in a tooltip on the source and to a screen reader, not in a line of its own.
+ */
+function Source({ source, outside }: { readonly source: MemorySource; readonly outside: boolean }) {
+  return outside ? (
+    <span data-memory-outside="" aria-description={copy.outside} {...tooltip(copy.outside)}>
+      {sourceLabel(source)}
+    </span>
+  ) : (
+    sourceLabel(source)
+  )
+}
+
+function EntryRow({ entry, now, last, onEditStart, onDelete }: { readonly entry: MemoryEntryRow; readonly now: number; readonly last: boolean } & Pick<MemoryDocsPageProps, 'onEditStart' | 'onDelete'>) {
   return (
     <ListRow
       role="listitem"
+      revealTrailing
+      divider={!last}
       data-memory-entry={entry.id}
       data-memory-source={entry.source._tag}
       trailing={
@@ -116,10 +136,9 @@ function EntryRow({ entry, now, onEditStart, onDelete }: { readonly entry: Memor
           {entry.text}
         </Text>
         <Text variant="meta" tone="muted" truncate>
-          {sourceLabel(entry.source)}
+          <Source source={entry.source} outside={entry.outside} />
           {' · '}
           <time title={fullTime(entry.at)}>{messageTime(entry.at, now)}</time>
-          {entry.outside ? ` · ${copy.outside}` : null}
         </Text>
       </span>
     </ListRow>
@@ -163,8 +182,7 @@ function ChangeRow({ change, now, last }: { readonly change: MemoryChange; reado
           </Text>
         )}
         <Text variant="meta" tone="muted" truncate>
-          {change.by === 'owner' ? copy.byOwner : sourceLabel(change.source)}
-          {change.outside ? ` · ${copy.outside}` : null}
+          {change.by === 'owner' ? copy.byOwner : <Source source={change.source} outside={change.outside} />}
           {' · '}
           <time title={fullTime(change.at)}>{messageTime(change.at, now)}</time>
           {change.undone ? ` · ${copy.undone}` : change.text === undefined ? ` · ${copy.deleted}` : null}
@@ -174,13 +192,3 @@ function ChangeRow({ change, now, last }: { readonly change: MemoryChange; reado
   )
 }
 
-const styles = stylex.create({
-  addRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing['--space-2'],
-    width: '100%',
-    minWidth: 0,
-  },
-})

@@ -89,6 +89,7 @@ function Row({
     <ListRow
       role="listitem"
       data-pin="pinned"
+      revealTrailing
       divider={!last}
       trailing={
         <span {...stylex.props(cell.controls)}>

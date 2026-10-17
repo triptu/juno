@@ -331,8 +331,8 @@ export const chatCopy = {
     subtitle: 'Short notes Juno keeps about you and updates as it learns. Edit or delete any of them.',
     docEmpty: 'Nothing yet.',
     source: { owner: 'Your words', slack: 'Slack' },
-    /** After the source, for a note written in a run that had read Slack or a connection. */
-    outside: 'Written after reading outside content',
+    /** The source's tooltip, for a note written in a run that had read Slack or a connection. */
+    outside: 'Juno wrote this after reading outside content',
     add: 'Add',
     addLabel: (doc: string) => `Add to ${doc}`,
     entryLabel: 'Note',
