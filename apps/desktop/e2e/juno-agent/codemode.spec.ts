@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { startFakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { launchApp } from '../fixtures'
-import { openChat, openPage, ready } from './agent'
+import { openChat, openPage, openRuns, ready } from './agent'
 import { expect, test as chatTest } from './chat'
 
 /** One script that searches and keeps only the matching line, then an answer citing it. */
@@ -62,6 +62,7 @@ test('a read-only script runs in the built app, its answer cites what it read, a
   await expect(chat.junoBubble('It is in the rollout checklist.').locator('[data-source]')).toHaveCount(1)
 
   const page = await openPage(juno, 'Activity')
+  await openRuns(page)
   await expect(page.getByText('Ran 1 script: 1 read', { exact: true })).toBeVisible()
   await expect(page.locator('[data-activity-script-call="done"]')).toContainText('slack_search {"query":"checklist 220 in:#perf-thread"}')
 })

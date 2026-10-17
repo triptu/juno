@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { Juno } from '../driver/juno'
 import { launchApp } from '../fixtures'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { agentReady, card, openChat, openPage, openSettings, ready } from './agent'
+import { agentReady, card, openChat, openPage, openRuns, openSettings, ready } from './agent'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -79,6 +79,7 @@ test(
     expect(posted).toHaveLength(1)
 
     const page = await openPage(juno, 'Activity')
+    await openRuns(page)
     const actions = page.locator('[data-activity-action]')
     await expect(actions).toHaveCount(2)
     await expect(page.locator('[data-activity-action="done"]')).toContainText('Approved')
@@ -86,7 +87,7 @@ test(
   },
 )
 
-test('Dismiss on a Send card sends nothing, and Activity records Dismissed', async ({ juno, fake, slack }) => {
+test('Dismiss on a Send card sends nothing, and Activity records it as declined', async ({ juno, fake, slack }) => {
   await ready(juno)
   const eng = slack.channel('eng')
   const chat = await openChat(juno)
@@ -100,9 +101,10 @@ test('Dismiss on a Send card sends nothing, and Activity records Dismissed', asy
   await expect(sendCard.getByText('Dismissed', { exact: true })).toBeVisible()
 
   const page = await openPage(juno, 'Activity')
+  await openRuns(page)
   const action = page.locator('[data-activity-action]')
   await expect(action).toHaveCount(1)
-  await expect(action).toContainText('Dismissed')
+  await expect(action).toContainText('Declined')
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
   expect(fake.messages(eng).filter((message) => message.text?.startsWith('the launch moved to Tuesday') === true)).toEqual([])
 })
@@ -124,7 +126,11 @@ test('after reading a hostile Slack message, a task becomes a card with a Becaus
   expect(model.inputs().filter((input) => input.includes(TASK))).toEqual([])
 
   const page = await openPage(juno, 'Activity')
-  await expect(page.locator('section[data-activity-run="replied"]').filter({ hasText: 'Read untrusted content' })).toHaveCount(1)
+  // The run says, in plain words, what it read and that it asked before acting.
+  const run = page.locator('[data-activity-run="replied"]').filter({ has: page.locator('[data-activity-summary]', { hasText: /^Read .*#eng/ }) })
+  await expect(run).toHaveCount(1)
+  await openRuns(page)
+  await expect(run.locator('[data-activity-tainted]')).toBeVisible()
 })
 
 test('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {

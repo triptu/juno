@@ -38,6 +38,12 @@ export async function openPage(juno: Juno, label: JunoPage): Promise<Locator> {
   return juno.win.locator('main')
 }
 
+/** Opens every run on the Activity page, so each shows its steps and actions. */
+export async function openRuns(page: Locator): Promise<void> {
+  const closed = page.locator('[data-activity-run] button[aria-expanded="false"]')
+  for (let n = await closed.count(); n > 0; n = await closed.count()) await closed.first().click()
+}
+
 /** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */
 export async function openSettings(juno: Juno, section: JunoSettingsSection): Promise<Locator> {
   await openChat(juno)
