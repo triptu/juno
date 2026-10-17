@@ -12,6 +12,8 @@ import { SqlClient } from 'effect/sql'
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
-  yield* sql`ALTER TABLE follow_ups ADD COLUMN match_kept_ts TEXT`
-  yield* sql`ALTER TABLE drafts ADD COLUMN kept_at TEXT`
+  // Run again safely: a store that already has a column keeps it.
+  const has = (table: string, column: string) => sql<{ name: string }>`SELECT name FROM pragma_table_info(${table})`.pipe(Effect.map((columns) => columns.some((c) => c.name === column)))
+  if (!(yield* has('follow_ups', 'match_kept_ts'))) yield* sql`ALTER TABLE follow_ups ADD COLUMN match_kept_ts TEXT`
+  if (!(yield* has('drafts', 'kept_at'))) yield* sql`ALTER TABLE drafts ADD COLUMN kept_at TEXT`
 })

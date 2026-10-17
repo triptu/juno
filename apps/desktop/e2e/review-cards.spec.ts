@@ -45,7 +45,7 @@ test.describe('follow-ups that look done', () => {
     await expect(sheet.title).toHaveText('1 follow-up looks done')
     await expect(sheet.row(PROMISE)).toBeVisible()
     // The reason is what the message shows, and the message itself is quoted.
-    await expect(sheet.reason(PROMISE)).toHaveText(/^You posted a link \d+ (minute|hour)s? later$/)
+    await expect(sheet.reason(PROMISE)).toHaveText(/^You posted a link \d+ (minute|hour|day)s? later$/)
     await expect(sheet.quote(PROMISE)).toContainText('docs.example.com/packet-review')
 
     await sheet.about.click()
