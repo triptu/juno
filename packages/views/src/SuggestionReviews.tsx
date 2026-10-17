@@ -68,7 +68,7 @@ export function unopenedEntries(topics: ReadonlyArray<HomeTopic>, unit: 'reply' 
     const why = topic.unopened
     if (why === undefined) return []
     const meta = metaLine(topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now))
-    return [{ id: topic.id, topicId: topic.id, title: topic.title, ...tileOf(topic), reason: unopenedReason(why, unit, now), meta }]
+    return [{ id: topic.id, title: topic.title, ...tileOf(topic), reason: unopenedReason(why, unit, now), meta }]
   })
 }
 
