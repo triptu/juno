@@ -1,0 +1,1 @@
+- 10-17 18:08 · release-keeper · Batch worktrees, helper worktrees and the packaging deploy copy go on /Volumes/AgentWork when it is mounted, chosen by one helper (scripts/worktree-folder.mjs), so their file churn stays off the main disk.

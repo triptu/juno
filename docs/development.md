@@ -63,11 +63,11 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 Agents work in their own git worktrees. Create and remove them with the helper:
 
 ```sh
-node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--no-install]
+node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
 node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
 ```
 
-`add` checks out `<branch>` (default `<name>`; an existing branch is reused, a new one starts at `--base`, default `origin/main`), runs `pnpm install --frozen-lockfile` and prints the path. Worktrees go in `/Volumes/AgentWork/worktrees/juno/` when that volume is mounted (file event logging and Spotlight are off there), else in `.claude/worktrees/`. The helper writes `.metadata_never_index` into that folder so Spotlight skips it, and waits to install while the load average is above 8. `remove` removes the worktree and, with `--delete-branch`, deletes its branch if it is merged.
+`add` checks out `<branch>` (default `<name>`; an existing branch is reused, a new one starts at `--base`, default `origin/main`; `--detach <ref>` checks out a commit with no branch, as for a DMG build), runs `pnpm install --frozen-lockfile` and prints the path. Worktrees go in `/Volumes/AgentWork/worktrees/juno/` when that volume is mounted (file event logging and Spotlight are off there), else in `.claude/worktrees/`. `scripts/worktree-folder.mjs` decides the folder (the volume counts as mounted when `/Volumes/AgentWork/.fseventsd/no_log` exists) and is shared by the helper, `batch-merge.mjs` and packaging; `JUNO_WORKTREE_DIR` overrides it. Older worktrees under `.claude/worktrees/` stay until their branches merge. The helper writes `.metadata_never_index` into that folder so Spotlight skips it, and waits to install while the load average is above 8. `remove` removes the worktree and, with `--delete-branch`, deletes its branch if it is merged.
 
 **The global virtual store.** `pnpm-workspace.yaml` sets `virtualStoreType: global`. Each package is written once into the store's `links` folder (`pnpm store path`, then `links/`), keyed by its version and its dependencies, and a project's `node_modules` holds only symlinks into it. Before, every worktree had its own `node_modules/.pnpm` with about 50,000 entries; creating and deleting those flooded macOS's `fseventsd` (about 260% CPU on 10-17) and froze the Mac. Measured on 10-17 (warm store, one install at a time):
 
@@ -84,7 +84,7 @@ What changes with it:
 
 - **A package resolves only what it declares.** Inside the store, a package sees its own dependencies and peers, not the workspace's hoisted packages. Three packages broke: `@phosphor-icons/react` imports React's types without depending on `@types/react`, Playwright's Electron API imports `electron`, and Quint's Apalache client requires `protobufjs` and `semver`. `packageExtensions` in `pnpm-workspace.yaml` declares them. Scripts run through `pnpm` get `NODE_PATH` and a resolve hook from pnpm that hide such gaps, but plain `node` (the remote image's Quint warm-up, for one) does not, so add a line there when something fails only because a dependency cannot see a package it does not declare.
 - **Electron's binary is shared.** Electron 44 has no install script: the first `require('electron')` downloads and unpacks it (about 600 files, 300 MB) next to the package. With the shared store that happens once per Electron version, not once per worktree. Two versions live in separate store folders.
-- **Packaging uses `pnpm deploy`.** electron-builder cannot find the dependencies of dependencies in the shared store (`pnpm list` reports paths that do not exist). `apps/desktop/build/package.cjs` first deploys the app's production dependencies as real files into a temporary folder and packages from there. electron-builder's native rebuild then writes only into that copy, never into the shared store. `files` in `apps/desktop/package.json` limits the deploy to `out/`.
+- **Packaging uses `pnpm deploy`.** electron-builder cannot find the dependencies of dependencies in the shared store (`pnpm list` reports paths that do not exist). `apps/desktop/build/package.cjs` first deploys the app's production dependencies as real files into a temporary folder and packages from there. That folder is under `/Volumes/AgentWork/tmp` when the volume is mounted, else in the system temp folder. electron-builder's native rebuild then writes only into that copy, never into the shared store. `files` in `apps/desktop/package.json` limits the deploy to `out/`.
 - **The app under test gets neither.** pnpm passes that `NODE_PATH` and resolve hook to everything it runs, Electron included. The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with them, a Home send to a DM did not arrive in one e2e test.
 - **Remote runs** install in their image the same way.
 
@@ -117,8 +117,9 @@ node scripts/batch-merge.mjs --continue batch-1
 node scripts/batch-merge.mjs --continue batch-1 --push
 ```
 
-The script creates `batch-N` from the current `origin/main` in
-`.claude/worktrees/batch-N`, pins the input branch tips, and merges them in order.
+The script creates `batch-N` from the current `origin/main` in the worktree
+folder (`/Volumes/AgentWork/worktrees/juno/batch-N` when that volume is
+mounted, else `.claude/worktrees/batch-N`; see "Worktrees and installs"), pins the input branch tips, and merges them in order.
 At a source conflict it prints the branch and files. Resolve and `git add` them
 in that worktree, then use `--continue batch-N` from the original worktree. You
 can also commit the resolution yourself. An aborted merge must be redone before
