@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 15:34 · mark-unread-stays · Mark as unread on the open topic holds until you leave it, as in Slack and Mail: the bottom-of-list read rule skips a topic whose `marked_unread` flag is set, so staying, refocusing and new messages leave it unread; showing the tab again, sending in it or Mark as read mark it read. The hold is the stored flag, not tab state, and it changes no sync rule, so `specs/readstate.qnt` is unchanged.
 - 10-17 15:30 · bundle-split · Duotone is not an `IconWeight`: a duotone icon is a wrapped icon from `packages/ui/src/duotone.ts`, the desktop build drops the duotone weight from every other icon (36.9 KB of initial JS), and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
 - 10-17 14:42 · topic-sidebar-review · A sidebar row's place line is as tall as Resolve on every row, so rows without Resolve (resolved, renaming) keep one rhythm; my reaction chip keeps its ring on hover and its fill steps up to `--hl-bubble`; the audience line starts its icon and text on the check bar's edge.
 - 10-17 14:30 · status-page · The status page puts decisions at full width, grouped by day with search and area filters; areas come from one keyword table in `scripts/status-areas.mjs`, and `needsYou` in now.json holds real blockers only, with optional checks in `later`.
