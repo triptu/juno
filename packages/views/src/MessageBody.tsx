@@ -350,6 +350,15 @@ const styles = stylex.create({
     textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
     textUnderlineOffset: sizes['--link-underline-offset'],
     cursor: 'pointer', // external-link-cursor
+    borderRadius: radii['--radius-xs'],
+    outlineStyle: {
+      default: 'none',
+      ':focus-visible': 'solid',
+    },
+    outlineWidth: sizes['--focus-ring-width'],
+    outlineOffset: sizes['--focus-ring-offset'],
+    scrollMargin: sizes['--focus-ring-room'],
+    outlineColor: accent['--focus-ring'],
   },
   bold: {
     fontWeight: weights['--weight-semibold'],
