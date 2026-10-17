@@ -31,7 +31,7 @@ test('keys typed right after ⌘N from a topic reach the new Home tab', async ({
 
   await tabs.expectCount(2)
   await tabs.expectActiveAt('Home', 0)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya Chen')
+  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
   await expect(write.composer).toHaveValue('Hi')
   await expect(write.composer).toBeFocused()
   await tabs.select(POSTGRES)
@@ -47,7 +47,7 @@ test('keys typed right after ⌘N on Home reach its destination list', async ({ 
   await newMessageAndType(juno)
 
   await tabs.expectCount(1)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya Chen')
+  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
   await expect(write.composer).toHaveValue('Hi')
   await expect(write.composer).toBeFocused()
 })
@@ -63,7 +63,7 @@ test('keys typed right after ⌘N on Home with a draft reach the new Home tab, a
 
   await tabs.expectCount(2)
   await tabs.expectActiveAt('Home', 1)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya Chen')
+  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
   await expect(write.composer).toHaveValue('Hi')
   await expect(write.composer).toBeFocused()
   await tabs.selectAt('Home', 0)
