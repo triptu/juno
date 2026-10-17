@@ -29,14 +29,15 @@ export const RouteCheckOutput = Type.Object({
  * Decision. Runs while typing pauses in a Main thread (spec section 8), and
  * Enter uses the answer only if it is already stored, so nobody waits on it.
  * Jev 1.13 answers in about 0.5 s (p95 0.9 s, plus about 0.3 s for a cold
- * connection); past 1.5 s there is no answer and the draft is unchecked. A
- * chat model in its place is slower than this budget.
+ * connection); a chat model in its place takes about 1.5 s. 5 s lets either
+ * answer, with room for one retry; an answer that comes after Enter is unused
+ * for that send, and Enter never waits for it.
  */
 export const routeCheck = defineStructuredTask<RouteCheckInput, typeof RouteCheckOutput>({
   name: 'routeCheck',
   version: 1,
   tier: 'decision',
-  timeoutMillis: 1500,
+  timeoutMillis: 5000,
   prompt,
   tool: { name: 'route', description: 'Report which topic the draft replies to, or null for Main.' },
   output: RouteCheckOutput,

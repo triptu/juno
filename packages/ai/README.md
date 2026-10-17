@@ -42,17 +42,7 @@ Ids in outputs are plain strings. The `accept` rule of each task guarantees they
 
 `typesafe/jev-1.13` for the classifier, `openai/gpt-6-luna` for chat decisions, `anthropic/claude-sonnet-5.5` for generation, `google/gemini-3.8-flash` for topic art and as the fallback (another maker than the chat defaults, $0.75 in and $3.75 out per million). Preferences override them; the fallback comes from Settings › Juno through the agent.
 
-| Task | Path | Timeout | Why |
-| --- | --- | --- | --- |
-| `routeCheck` | classifier | 1.5 s | Runs during typing pauses in Main; Enter reads only a ready result. |
-| `grammarCheck` | chat decision | 700 ms | One request after sending; show within one second on the same topic or discard. |
-| `urgencyGate` | classifier | 2 s | Per incoming message not settled by the owner's settings. A notification may be 2 s late; past that the message is decided as with AI assist off (DMs and mentions notify). Room for one retry. |
-| `settledScore` | classifier | 3 s | After 2 minutes idle; nobody waits. Room for one retry. |
-| `parseCommand` | chat decision | 4 s | ⌘K fallback after the grammar; search results show meanwhile. Luna p50 1.5 s, p95 2.3 s, the odd call near 3 s. |
-| `titleTopic` | generation | 20 s | Measured 1.6 to 1.9 s. |
-| `topicArt` | art | 15 s | Background, when a topic first enters the sidebar; nobody waits. The study measured a median of 2.3 s and a p90 of 4.8 s; the live check on 2026-10-14 saw 4.2 to 14.0 s per call (median 4.5 s, 9 of 10 valid first time, about $0.003 per icon), so there is room for one slow call. |
-| `followUps` | chat decision | 6 s | Background, for Home's Follow-up item; nobody waits. Extracts text, so a chat model answers. |
-| `homeTitle` | generation | 8 s | After Home paints; the plain title shows meanwhile and stays when the answer is late. |
+Each task's deadline, and why, is in `docs/architecture.md`, "AI call deadlines". Background tasks have generous ones (20 to 60 s); `urgencyGate`, `parseCommand` and Redraw keep short ones because someone waits.
 
 ## Measurements
 

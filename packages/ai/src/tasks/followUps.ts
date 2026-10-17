@@ -32,13 +32,13 @@ export const FollowUpsOutput = Type.Object({
 /**
  * Decision that extracts text, so a chat model answers. Home's Follow-up
  * item (SPEC section 12): runs in the background on topics the user wrote
- * in, never while anyone waits; 6 s leaves room for one slow call.
+ * in, never while anyone waits; 45 s leaves room for a slow call and a retry.
  */
 export const followUps = defineStructuredTask<FollowUpsInput, typeof FollowUpsOutput>({
   name: 'followUps',
   version: 1,
   tier: 'decision',
-  timeoutMillis: 6000,
+  timeoutMillis: 45_000,
   prompt,
   tool: { name: 'follow_ups', description: 'Report what the user said they would do and has not done yet.' },
   output: FollowUpsOutput,

@@ -10,7 +10,7 @@
  * a timeout, a provider error) stores nothing; the job tries again later.
  * A failed redraw stores nothing either, so the drawing shown stays.
  */
-import { AiProvider, cacheKeyOf, isFinal, tasks, type Decision, type TopicArtInput } from '@juno/ai'
+import { AiProvider, ART_REDRAW_TIMEOUT_MILLIS, cacheKeyOf, isFinal, tasks, type Decision, type TopicArtInput } from '@juno/ai'
 import type { StoredArt } from '@juno/contract'
 import { channelLabel, resolveTitle, type TopicId, slackLine } from '@juno/domain'
 import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@juno/store'
@@ -141,6 +141,8 @@ export const drawTopic = (
   Effect.gen(function* () {
     const provider = yield* AiProvider
     const { input, titleSource } = yield* artInputOf(row, selfId, options.avoid)
-    const decision = yield* provider.generate(tasks.topicArt, input)
+    // Redraw is asked for and watched, so it keeps the shorter deadline; the job's drawings wait longer.
+    const task = options.source === 'redraw' ? { ...tasks.topicArt, timeoutMillis: ART_REDRAW_TIMEOUT_MILLIS } : tasks.topicArt
+    const decision = yield* provider.generate(task, input)
     return yield* storeArt(row.topic_id, decision, cacheKeyOf(tasks.topicArt, input).inputHash, titleSource, options.source)
   })

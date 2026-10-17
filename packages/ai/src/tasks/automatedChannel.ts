@@ -38,7 +38,7 @@ export const automatedChannel = defineStructuredTask<AutomatedChannelInput, type
   name: 'automatedChannel',
   version: 2,
   tier: 'decision',
-  timeoutMillis: 3000,
+  timeoutMillis: 30_000,
   prompt,
   tool: { name: 'score_automated', description: 'Report how likely the conversation is automated.' },
   output: AutomatedChannelOutput,

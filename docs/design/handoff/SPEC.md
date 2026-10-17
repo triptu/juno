@@ -634,18 +634,21 @@ The read switch says: “When you read something in Juno, Slack shows it as read
 
 Split the AI work into two kinds. **Decisions** are fast, cheap and structured: a choice, a score or a probability, in well under a second. They can run on every message and every send. **Generation** is a language model producing text, used sparingly. A decision-model approach (such as TypeSafe's Jev) suits the first kind. A general model through OpenRouter suits the second. Show nothing unless a decision is confident, and use calibrated thresholds so the UI stays quiet.
 
-| Feature | Kind | When it runs | Shows when |
-| --- | --- | --- | --- |
-| Topic titles | Generation | New thread, and on drift | Always, with no marker |
-| Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for. 5 s deadline | Likely reply to one of them |
-| Local checks | Pure rules | Once a Juno send is accepted, according to each preference | Concrete fixes or a long sentence found, at once, as a line on the sent message |
-| Grammar check | Decision, minimal span edits | Once a Juno send is accepted, one request per exact text sent. 20 s deadline, no retry | Whenever the answer comes within two minutes of the send, on the unedited message, until reviewed or dismissed; clear errors only |
-| Audience check | Decision | Typing pause | Sensitivity does not fit the channel |
-| Settled, suggest resolve | Decision | Once a topic has been idle 2 minutes | High score, quiet for the time Settings › Tidy up sets, and nothing waiting on you; the reason shown comes from the last messages |
-| Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | Only as an outcome, and its short reason under "Why did this notify?" |
-| Command routing (⌘K) | Decision | As you type in ⌘K | Clear intent and target |
-| Home items | Both | When Home appears, from cached rules first | On Home: follow-ups, settled topics, and a sharper title line for an item |
-| Juno chat | Generation with tools | On request, and for schedules and jobs you set up | In chat, with action cards (section 13.3) |
+| Feature | Kind | When it runs | Deadline | Shows when |
+| --- | --- | --- | --- | --- |
+| Topic titles | Generation | New thread, and on drift | 60 s, background | Always, with no marker |
+| Wrong-place check | Decision | Typing pause in Main, against the last 3–4 topics; read on send, never waited for | 5 s | Likely reply to one of them |
+| Local checks | Pure rules | Once a Juno send is accepted, according to each preference | none, no model | Concrete fixes or a long sentence found, at once, as a line on the sent message |
+| Grammar check | Decision, minimal span edits | Once a Juno send is accepted, one request per exact text sent, no retry | 20 s, background | Whenever the answer comes within two minutes of the send, on the unedited message, until reviewed or dismissed; clear errors only |
+| Audience check | Decision | Typing pause | none: local rules for now | Sensitivity does not fit the channel |
+| Settled, suggest resolve | Decision | Once a topic has been idle 2 minutes | 30 s, background | High score, quiet for the time Settings › Tidy up sets, and nothing waiting on you; the reason shown comes from the last messages |
+| Notification gate | Decision, reading your What matters text | Each incoming message not settled by Every message or Never | 2 s, so a notification is not late | Only as an outcome, and its short reason under "Why did this notify?" |
+| Command routing (⌘K) | Decision | As you type in ⌘K | 4 s, while you wait | Clear intent and target |
+| Home items | Both | When Home appears, from cached rules first | 45 s for follow-ups and titles, 30 s for settled topics and Automated, background | On Home: follow-ups, settled topics, and a sharper title line for an item |
+| Topic art | Generation | When a topic enters the sidebar; Redraw from the topic menu | 60 s, background; 15 s for Redraw | The drawing replaces the placeholder |
+| Juno chat | Generation with tools | On request, and for schedules and jobs you set up | the agent's own | In chat, with action cards (section 13.3) |
+
+Background work keeps a generous deadline, since nobody waits on it; a timed-out call is tried again on a later pass. Every deadline and its reason is in `docs/architecture.md`, "AI call deadlines".
 
 Things AI must not do: send anything without a click, rewrite your voice (the one exception is the nudge draft when a reply watch runs out, 13.6), add "needs you" style labels to the sidebar, or create noise to look helpful. A global AI assist switch turns off every AI surface, the Juno chat included.
 

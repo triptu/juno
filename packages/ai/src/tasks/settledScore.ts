@@ -22,13 +22,13 @@ export const SettledScoreOutput = Type.Object({
 
 /**
  * Decision. Runs once a topic has been idle for 2 minutes, not per message, so
- * nobody waits. 3 s leaves room for one retry of a 0.9 s p95 classifier call.
+ * nobody waits. 30 s leaves room for a slow provider and one retry.
  */
 export const settledScore = defineStructuredTask<SettledScoreInput, typeof SettledScoreOutput>({
   name: 'settledScore',
   version: 2,
   tier: 'decision',
-  timeoutMillis: 3000,
+  timeoutMillis: 30_000,
   prompt,
   tool: { name: 'score_settled', description: 'Report how settled the conversation is.' },
   output: SettledScoreOutput,
