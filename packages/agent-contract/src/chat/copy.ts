@@ -360,10 +360,10 @@ export const chatCopy = {
     learn: {
       title: { setup: 'Let Juno learn how you work', connection: (name: string) => `Let Juno learn from ${name}` },
       body: (sources: ReadonlyArray<string>) =>
-        `Juno reads your own Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`} and keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
+        `Juno reads ${listed(['your own Slack messages', ...sources])}. It keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
       bodyConnection: (name: string) => `Juno reads ${name} and adds what it learns about you to its notes. You can edit or delete them in What Juno remembers.`,
       /** Home's meta line. */
-      meta: (sources: ReadonlyArray<string>) => `Reads your Slack messages${sources.length === 0 ? '' : ` and ${listed(sources)}`}`,
+      meta: (sources: ReadonlyArray<string>) => `Reads ${listed(['your Slack messages', ...sources])}`,
       metaConnection: (name: string) => `Reads ${name}`,
       start: 'Start',
       notNow: 'Not now',
