@@ -1,0 +1,64 @@
+// The first sync with the app's request pacing, on a seed shaped like a real workspace (docs/performance.md,
+// "First sync"). History is the longest step on a real workspace, so everything with a clock of its own runs
+// beside it: thread previews read replies while history reads channels, and user groups and emoji load beside
+// the boot rather than after it. A 429 on history pauses history only.
+import { largeSeed } from '@juno/fake-slack'
+import { afterEach, describe, expect, it } from 'vitest'
+import { startTestEngine, waitFor, type RunningEngine } from './harness'
+import { apiCalls, bootedEngine } from './scenario'
+
+const engines: Array<RunningEngine> = []
+afterEach(async () => {
+  for (const engine of engines.splice(0).toReversed()) await engine.stop()
+})
+
+const RETRY_AFTER = 3
+/** Ten conversations active in the window and 40 threads: history, previews and emoji all have work. */
+const SEED = () => largeSeed({ topics: 40, messages: 600, users: 80, days: 7, channels: { public: 6, private: 1, dms: 2, mpims: 1 } })
+
+describe('first sync, paced', () => {
+  it('reads thread previews and emoji beside history', async () => {
+    const engine = await bootedEngine(
+      engines,
+      {
+        paced: true,
+        initial: (fake) => fake.signIn(),
+        fakeOptions: { seed: SEED(), latencyMillis: 50 },
+      },
+      120_000,
+    )
+    const history = apiCalls(engine, 'conversations.history').filter((call) => call.args['_x_reason'] === 'history')
+    const previews = apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview')
+    const emoji = engine.fake.calls.filter((call) => call.method === 'emojis/list')
+    const lastHistory = Math.max(...history.map((call) => call.at))
+    expect(history.length).toBeGreaterThanOrEqual(8)
+    expect(previews.length).toBeGreaterThanOrEqual(4)
+    // Beside history, not after it: the first preview comes while history is still reading.
+    expect(Math.min(...previews.map((call) => call.at))).toBeLessThan(history[Math.floor(history.length / 2)]!.at)
+    // Emoji load beside the boot, not after it.
+    expect(emoji.length).toBeGreaterThan(0)
+    expect(Math.min(...emoji.map((call) => call.at))).toBeLessThan(lastHistory)
+  }, 150_000)
+
+  it('a 429 on history pauses history only: previews keep going, and the boot completes', async () => {
+    const engine = await startTestEngine({ paced: true, initial: (fake) => fake.signIn(), fakeOptions: { seed: SEED(), latencyMillis: 50 } })
+    engines.push(engine)
+    await engine.status('ready')
+    // Once history has read a few channels, so the previews have roots to read.
+    await waitFor(() => (apiCalls(engine, 'conversations.history').length >= 3 ? true : undefined), 30_000, 'three history pages')
+    engine.fake.force429({ method: 'conversations.history', retryAfter: RETRY_AFTER, times: 1 })
+    await engine.phase('live', 120_000)
+    await engine.syncIdle()
+    const history = apiCalls(engine, 'conversations.history')
+    const limited = history.find((call) => call.status === 429)
+    expect(limited).toBeDefined()
+    const pause = { from: limited!.at, to: limited!.at + RETRY_AFTER * 1000 }
+    // History waited out its Retry-After; replies went on meanwhile.
+    expect(history.filter((call) => call.at > pause.from && call.at < pause.to - 50)).toHaveLength(0)
+    const previews = apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview')
+    expect(previews.some((call) => call.at > pause.from && call.at < pause.to)).toBe(true)
+    // Every active conversation's history was still read.
+    const channels = new Set(history.filter((call) => call.status === 200 && call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
+    expect(channels.size).toBeGreaterThanOrEqual(8)
+  }, 150_000)
+})
