@@ -5,6 +5,7 @@ import { accent, colors, hues, motion, radii, sizes, spacing, tints, weights } f
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import type { HueName } from './internal/hue'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { ringRoom } from './ringRoom'
 import { variants as typeVariants } from './internal/type'
@@ -81,7 +82,7 @@ const iconBySize: Record<ChipSize, IconSize> = { 18: 12, 20: 12, 22: 13, 24: 13,
 
 // The inline mention chip is padded 0 5; there is no 5px step in the scale
 // and nothing else uses it.
-const MENTION_PADDING = '5px'
+const MENTION_PADDING = '5px' // tokens-allow: the inline mention chip's padding, between steps
 
 /**
  * Small inline label: tags, counts, status, decisions, reactions, mentions.
@@ -136,7 +137,7 @@ export function Chip(props: ChipProps) {
           interactive.reset,
           interactive.feedback,
           interactive.press,
-          interactive.focusRing,
+          focusRing.outside,
           ...shared,
           styles.button,
           pressed && styles.pressed,

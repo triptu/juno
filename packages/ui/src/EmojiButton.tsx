@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tooltip } from './Tooltip'
 
@@ -19,7 +20,7 @@ export interface EmojiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
 // The emoji is drawn a step larger than the toolbar's 18px icons, since a
 // glyph fills less of its box than a Phosphor icon. The button is the 28px
 // hover-toolbar control (radius 12 inside the toolbar's 16).
-const EMOJI_SIZE = '16px'
+const EMOJI_SIZE = '16px' // tokens-allow: an emoji glyph's size, not a control
 
 /**
  * A 28px ghost button whose icon is an emoji: the quick reactions in the
@@ -32,7 +33,7 @@ export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'butt
       aria-label={label}
       {...(noTooltip ? {} : tooltip(label))}
       {...rest}
-      {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base)}
+      {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base)}
     >
       {src === undefined ? (
         <span aria-hidden {...stylex.props(styles.glyph)}>

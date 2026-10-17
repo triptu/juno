@@ -63,6 +63,7 @@ export { firstGrapheme } from './internal/grapheme'
 export { pointerMoved } from './internal/pointer'
 export { activateHandlers, type ActivateEvent } from './internal/activate'
 export { revealFocus } from './internal/revealFocus'
+export { focusRing } from './focusRing'
 export { holdKeys, releaseKeys } from './internal/heldKeys'
 
 export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'

@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
 import { Avatar, type HueName } from './Avatar'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tooltip } from './Tooltip'
 
@@ -35,7 +36,7 @@ export function AvatarButton({ label, initials, hue = 'rose', src, open = false,
       aria-expanded={open}
       {...tooltip(label)}
       {...rest}
-      {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.button, open && styles.open)}
+      {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.button, open && styles.open)}
     >
       <Avatar label={initials} size={24} hue={hue} {...(src === undefined ? {} : { src })} />
     </button>

@@ -5,6 +5,7 @@ import { accentSwatches, colors, radii, sizes } from '@juno/tokens/tokens.stylex
 import { hueStyles } from './Avatar'
 import { Icon } from './Icon'
 import type { HueName } from './internal/hue'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tintFills, type IconTint } from './internal/tint'
 import { tooltip } from './Tooltip'
@@ -58,7 +59,7 @@ export function Swatch({ hue, accent, tint, label, selected = false, type = 'but
         interactive.reset,
         interactive.feedback,
         interactive.press,
-        interactive.focusRing,
+        focusRing.outside,
         styles.swatch,
         hue !== undefined && hueStyles[hue],
         accent !== undefined && accentStyles[accent],

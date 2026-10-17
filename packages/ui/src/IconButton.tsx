@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tintColors, type IconTint } from './internal/tint'
 import { tooltip } from './Tooltip'
@@ -113,7 +114,7 @@ export function IconButton({
         interactive.reset,
         interactive.feedback,
         interactive.press,
-        interactive.focusRing,
+        focusRing.outside,
         styles.base,
         sizeStyles[size],
         smallSizes.has(size) && styles.hitArea,

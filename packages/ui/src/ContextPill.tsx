@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { variants as typeVariants } from './internal/type'
 
@@ -60,7 +61,7 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
         title={kindLabel}
         aria-label={label}
         onClick={onClick}
-        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, interactive.focusRing, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
+        {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base, kind !== undefined && styles.withKind, typeVariants.pill, sizeStyles[size], tintStyles[tint], hoverStyles[tint])}
       >
         {content}
       </button>

@@ -1,9 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, type FocusEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
-import { accent, colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
+import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, Button, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, Button, focusRing, Icon, Surface, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { Files } from './FileCard'
 import { mediaOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
@@ -216,6 +216,7 @@ export const Message = memo(function Message({
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
+        focusRing.inset,
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
@@ -389,13 +390,6 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
-    outlineStyle: {
-      default: 'none',
-      ':focus-visible': 'solid',
-    },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
-    outlineColor: accent['--focus-ring'],
     // The toolbar and the gutter time read these: hidden until the pointer is
     // over the row, or keyboard focus is on the row or inside it. Only
     // opacity and display change on an absolutely placed toolbar, so nothing

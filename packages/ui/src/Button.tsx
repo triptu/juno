@@ -3,6 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { accent, colors, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { Kbd } from './Kbd'
+import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tintColors, type IconTint } from './internal/tint'
 import { variants as typeVariants } from './internal/type'
@@ -113,7 +114,7 @@ export function Button({
         interactive.reset,
         interactive.feedback,
         interactive.press,
-        interactive.focusRing,
+        focusRing.outside,
         styles.base,
         typeVariants[filter ? 'ui' : textBySize[effectiveSize]],
         styles.weightMedium,
