@@ -155,15 +155,22 @@ export function leftNote(left: ReadonlySet<JunoLeft>, where: 'home' | 'chat'): s
   return lines.length === 0 ? undefined : lines.join(' ')
 }
 
+/** Chip ids a send is taking now, so a second send while the first waits for a read does not take them again. */
+const taking = new Set<string>()
+
 /**
  * What a send to Juno takes from the composer of `key`: the files read for
  * it, with the text files cut to fit `JUNO_TEXT_LIMITS.total` together,
- * and the chip ids that leave. Files Juno cannot read stay.
+ * and the chip ids that leave. A chip still being read (`staging`, in the
+ * Juno chat) is waited for. Files Juno cannot read stay.
  */
 export async function takeForJuno(key: string, readsImages: boolean): Promise<{ readonly files: ReadonlyArray<JunoFileInput>; readonly ids: ReadonlyArray<string> }> {
-  const chips = registry.get(attachmentsAtom(key)).filter((chip) => chip.state === 'ready')
+  const chips = registry.get(attachmentsAtom(key)).filter((chip) => chip.state !== 'failed' && !taking.has(chip.id))
   const { taken } = junoTakes(chips, readsImages)
-  const results = await Promise.all(taken.map(async (chip) => ({ chip, input: await readForJuno(chip) })))
+  for (const chip of taken) taking.add(chip.id)
+  const results = await Promise.all(taken.map(async (chip) => ({ chip, input: await readForJuno(chip) }))).finally(() => {
+    for (const chip of taken) taking.delete(chip.id)
+  })
   let room = JUNO_TEXT_LIMITS.total
   const files: JunoFileInput[] = []
   const ids: string[] = []

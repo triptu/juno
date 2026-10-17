@@ -9,7 +9,9 @@ import { attachToJuno, leaveComposer, takeForJuno, useJunoFiles } from './junoFi
  * panel's stay with its topic tab: the attach button, the chips with any
  * line about files that stay, and the send. A send with no Juno files is
  * the plain one, in the same frame; with files it waits for them to be
- * read, which has usually happened since they were attached.
+ * read, which has usually happened since they were attached. An image
+ * still being read does not stop a send: one Juno takes is waited for,
+ * one that stays (the model reads text only) is left out.
  */
 export function useChatFiles(draftKey: string, draft: string, setDraft: (value: string) => void, send: (text: string, files?: ReadonlyArray<JunoFileInput>) => void) {
   const key = `juno:${draftKey}`
@@ -22,7 +24,6 @@ export function useChatFiles(draftKey: string, draft: string, setDraft: (value: 
     hasFiles: juno.hasFiles,
     send: () => {
       const text = draft.trim()
-      if (attachments.files.some((file) => file.state === 'staging')) return
       if (!juno.hasFiles) {
         if (text === '') return
         setDraft('')
