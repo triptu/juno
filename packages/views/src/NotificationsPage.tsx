@@ -5,9 +5,9 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useState, type ReactNode } from 'react'
-import type { Hours, NotificationPermission, NotifyTag, TodayRow } from '@juno/contract'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, Chip, DayToggles, Icon, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
+import type { Hours, NotificationPermission, NotifyTag, SlackScheduleView, TodayRow } from '@juno/contract'
+import { colors, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { Avatar, Button, Checkbox, Chip, DayToggles, Icon, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { clockLabel, hourLabel } from './time'
 
@@ -27,6 +27,12 @@ export interface NotificationsPageProps {
   /** The messages that notified today, newest first. */
   readonly today: ReadonlyArray<TodayRow>
   readonly onHoursChange: (which: HoursKind, hours: Hours) => void
+  /** Slack's own schedule; undefined until the engine answers. */
+  readonly slackSchedule: SlackScheduleView | undefined
+  /** On also applies the notification hours once, which is Use Juno's hours. */
+  readonly onSlackScheduleChange: (enabled: boolean) => void
+  /** Restore Slack's previous schedule. */
+  readonly onSlackScheduleRestore: () => void
   /** On blur, with the text as typed. */
   readonly onMattersSave: (text: string) => void
   /** Back to When it matters. */
@@ -52,15 +58,15 @@ const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
 const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'], PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
 
 /**
- * The Notifications page (SPEC 14, inventory 13): two sets of hours, what
- * matters in the owner's words, the channels and people set to Every
+ * The Notifications page (SPEC 14, inventory 13): two sets of hours, whether
+ * Slack's own schedule follows the notification hours, what matters in the owner's words, the channels and people set to Every
  * message or Never, one line for today with Show why, and a test
  * notification. Everything else is said to Juno or set from a channel's or
  * person's menu. While macOS does not let Juno notify, a line at the top
  * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slackSchedule, onSlackScheduleChange, onSlackScheduleRestore, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
@@ -77,6 +83,10 @@ export function NotificationsPage(props: NotificationsPageProps) {
             </Text>
           </div>
         </Surface>
+      </Section>
+
+      <Section heading="Slack on your phone">
+        <SlackScheduleCard schedule={slackSchedule} onChange={onSlackScheduleChange} onRestore={onSlackScheduleRestore} />
       </Section>
 
       <Section heading="What matters to you" sub="Juno reads this for every message. You can also just tell Juno.">
@@ -129,6 +139,46 @@ export function NotificationsPage(props: NotificationsPageProps) {
         <TestRow permission={permission} onSendTest={onSendTest} onOpenSettings={onOpenSettings} />
       </Section>
     </Page>
+  )
+}
+
+/**
+ * The switch for Slack's own schedule, on by default. While Slack's schedule
+ * was changed in Slack, one line says so with Use Juno's hours. Restore
+ * shows while Juno holds the schedule from before its first write.
+ */
+function SlackScheduleCard({ schedule, onChange, onRestore }: { readonly schedule: SlackScheduleView | undefined; readonly onChange: (enabled: boolean) => void; readonly onRestore: () => void }) {
+  const enabled = schedule?.enabled ?? true
+  return (
+    <Surface kind="group" padding="md" sx={styles.card}>
+      <Checkbox
+        role="switch"
+        label="Pause Slack outside your notification hours"
+        checked={enabled}
+        disabled={schedule === undefined}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        description="Juno sets Slack's own notification schedule to your notification hours, so your phone goes quiet too. Slack can't let a channel through, so Every message on a channel reaches only this Mac then."
+      />
+      {schedule === undefined || (!schedule.changedInSlack && !schedule.canRestore) ? null : (
+        <div {...stylex.props(styles.slackActions)} aria-live="polite">
+          {schedule.changedInSlack ? (
+            <>
+              <Text variant="meta" tone="muted">
+                Your schedule was changed in Slack. Juno leaves it until you change your hours here.
+              </Text>
+              <Button variant="secondary" size="sm" onClick={() => onChange(true)}>
+                Use Juno's hours
+              </Button>
+            </>
+          ) : null}
+          {schedule.canRestore ? (
+            <Button variant="ghost" size="sm" tone="subtle" onClick={onRestore}>
+              Restore Slack's previous schedule
+            </Button>
+          ) : null}
+        </div>
+      )}
+    </Surface>
   )
 }
 
@@ -353,6 +403,17 @@ const styles = stylex.create({
     paddingBlockStart: spacing['--space-2-5'],
     paddingBlockEnd: spacing['--space-3'],
     paddingInline: spacing['--space-3-5'],
+  },
+  card: {
+    paddingInline: spacing['--space-3-5'],
+  },
+  slackActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
+    minHeight: spacing['--space-8'],
+    paddingInlineStart: `calc(${sizes['--checkbox']} + ${spacing['--space-2-5']})`,
   },
   matters: {
     display: 'flex',

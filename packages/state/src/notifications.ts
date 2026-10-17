@@ -8,9 +8,11 @@ import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import {
   notificationsPage,
+  notificationsRestoreSlackSchedule,
   notificationsSetHours,
   notificationsSetMatters,
   notificationsSetPresence,
+  notificationsSetSlackSchedule,
   notificationsSettings,
   notificationsStatus,
   notificationsWhy,
@@ -21,6 +23,7 @@ import {
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
+import { showToast } from './undo'
 
 /** The settings as stored, with AI assist. The menus read the Notify me levels here. */
 export const notificationSettingsAtom = liveQuery(notificationsSettings)(undefined)
@@ -92,4 +95,15 @@ export function setMatters(registry: Registry, text: string): void {
 /** Set yourself away or active: holds until the next switch in the active hours. */
 export function setPresence(registry: Registry, presence: PresenceValue): void {
   void runCommand(registry, notificationsSetPresence, { presence })
+}
+
+/** Use the notification hours in Slack's own schedule, or stop. On applies them once at once. */
+export function setSlackSchedule(registry: Registry, enabled: boolean): void {
+  void runCommand(registry, notificationsSetSlackSchedule, { enabled })
+}
+
+/** Puts back the schedule Slack had before Juno first wrote it, and stops using the hours there. */
+export async function restoreSlackSchedule(registry: Registry): Promise<void> {
+  const exit = await runCommand(registry, notificationsRestoreSlackSchedule, {})
+  showToast(registry, { text: Exit.isSuccess(exit) ? "Restored Slack's schedule" : "Couldn't restore Slack's schedule. Try again." })
 }

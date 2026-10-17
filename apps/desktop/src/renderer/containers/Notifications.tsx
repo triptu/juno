@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import type { Hours, NotificationPermission, NotifyTag } from '@juno/contract'
-import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, sendTestNotification, setHours, setMatters } from '@juno/state'
+import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setMatters, setSlackSchedule } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
 
 function changeHours(which: HoursKind, hours: Hours): void {
   setHours(registry, which, hours)
+}
+
+function changeSlackSchedule(enabled: boolean): void {
+  setSlackSchedule(registry, enabled)
+}
+
+function restoreSlack(): void {
+  void restoreSlackSchedule(registry)
 }
 
 function saveMatters(text: string): void {
@@ -63,7 +71,7 @@ export function NotificationsPage() {
   const page = useAtomValue(notificationsPageAtom)
   const [permission, allow] = useNotificationPermission()
   if (settings._tag !== 'Success' || permission === undefined) return null
-  const lists = page._tag === 'Success' ? page.value : { every: [], never: [], interrupted: 0, held: 0, today: [] }
+  const lists = page._tag === 'Success' ? page.value : { every: [], never: [], interrupted: 0, held: 0, today: [], slackSchedule: undefined }
   return (
     <NotificationsPageView
       notificationHours={settings.value.notificationHours}
@@ -76,6 +84,9 @@ export function NotificationsPage() {
       held={lists.held}
       today={lists.today}
       onHoursChange={changeHours}
+      slackSchedule={lists.slackSchedule}
+      onSlackScheduleChange={changeSlackSchedule}
+      onSlackScheduleRestore={restoreSlack}
       onMattersSave={saveMatters}
       onRemove={remove}
       permission={permission}
