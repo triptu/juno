@@ -122,4 +122,3 @@ export function createReleaseFeed(config: UpdateConfig) {
     },
   }
 }
-export type ReleaseFeed = ReturnType<typeof createReleaseFeed>
