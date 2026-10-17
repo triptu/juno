@@ -124,20 +124,29 @@ function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
  * from before would leave the toolbar under the band. It rises above the
  * row's top edge unless that would put it under the header band at the
  * list's top, where the band's fade washes it out and the list clips it;
- * there it flips below the row, straddling the bottom edge the same way. The
- * answer is a custom property on the row, written only when it changes, so
- * nothing re-renders.
+ * there it flips below the row, straddling the bottom edge the same way. A
+ * row taller than the list has room for neither, as the last message is when
+ * its end sits on the composer: the toolbar then goes inside the row, at the
+ * top of the part in view, under the band. The answer is a custom property
+ * on the row, written only when it changes, so nothing re-renders.
  */
 export function placeToolbar(row: HTMLElement): void {
   const scroller = row.closest('[data-scroll-area]')
   if (scroller === null) return
   const box = row.getBoundingClientRect()
+  const list = scroller.getBoundingClientRect()
   const style = getComputedStyle(scroller)
-  const listTop = scroller.getBoundingClientRect().top + (Number.parseFloat(style.scrollPaddingTop) || 0)
+  const listTop = list.top + (Number.parseFloat(style.scrollPaddingTop) || 0)
   const toolbarHeight = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
   const rowStyle = getComputedStyle(row)
-  const straddle = (Number.parseFloat(rowStyle.paddingTop) || 0) - (Number.parseFloat(rowStyle.getPropertyValue('--space-0-5')) || 0)
-  const top = box.top + straddle - toolbarHeight >= listTop ? '' : `${Math.round(box.height - straddle)}px`
+  const gap = Number.parseFloat(rowStyle.getPropertyValue('--space-0-5')) || 0
+  const straddle = (Number.parseFloat(rowStyle.paddingTop) || 0) - gap
+  const top =
+    box.top + straddle - toolbarHeight >= listTop
+      ? ''
+      : box.bottom - straddle + toolbarHeight <= list.bottom
+        ? `${Math.round(box.height - straddle)}px`
+        : `${Math.round(Math.max(listTop - box.top, 0) + gap)}px`
   if (row.style.getPropertyValue('--row-toolbar-top') === top) return
   if (top === '') row.style.removeProperty('--row-toolbar-top')
   else row.style.setProperty('--row-toolbar-top', top)
@@ -542,7 +551,8 @@ const styles = stylex.create({
   },
   // At the row's top right, mostly above the row: its bottom edge comes
   // STRADDLE into the row, above the first line. placeToolbar flips it below
-  // a row whose top is under the header band. Paint containment would clip it
+  // a row whose top is under the header band, or inside a row too tall for
+  // either, under the band. Paint containment would clip it
   // outside the row, so the row's overflow-clip-margin lets it paint.
   toolbar: {
     display: 'var(--row-toolbar-display)',

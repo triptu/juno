@@ -26,7 +26,7 @@
  */
 import { Schema } from 'effect'
 import { RpcGroup } from 'effect/rpc'
-import { ChannelColor, ChannelIcon, ContextTint, ConversationKind } from '@juno/domain'
+import { ContextTint, ConversationKind } from '@juno/domain'
 import { liveValueRoute } from '../live'
 import { Person } from '../refs'
 
@@ -45,9 +45,13 @@ export const PickConversation = Schema.Struct({
   mainId: Schema.optionalKey(Schema.String),
   /** The other person, for a DM or a person with no DM yet. */
   person: Schema.optionalKey(Person),
-  /** A channel's tile, as its topic rows draw it (`defaultChannelStyle`). Absent for DMs and group DMs, which draw people. */
-  icon: Schema.optionalKey(ChannelIcon),
-  color: Schema.optionalKey(ChannelColor),
+  /**
+   * A channel's tile: its Main's art recipe, as the sidebar's Main row draws
+   * it. Absent until the art is drawn or while AI assist is off, when the
+   * tile is the Tide placeholder seeded by `mainId`. Never set for DMs and
+   * group DMs, which draw people.
+   */
+  art: Schema.optionalKey(Schema.String),
   /** Juno holds no message in it: "No messages yet" for a person. */
   empty: Schema.Boolean,
   /** With text, the parts of `name` the text matched, as [start, end) offsets, for the row to highlight. */

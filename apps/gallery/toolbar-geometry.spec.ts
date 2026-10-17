@@ -6,7 +6,10 @@ import { openState, type Route } from './support'
  * never covers the row's text (SPEC 7, inventory 6.5): not the name and time
  * of a header row, not the first line of a grouped row. Where there is no
  * room above, under the header band at the list's top, it flips below the
- * row. It never goes above the list's visible top, where the list clips it.
+ * row. A row taller than the list, as the last message is when its end sits
+ * on the composer, has room for neither, so the toolbar goes inside it, at
+ * the top of the part in view. It never goes above the list's visible top or
+ * below its bottom, where the list clips it.
  */
 
 const open = (page: Page, id: string) =>
@@ -21,6 +24,8 @@ interface Geometry {
   readonly textBottom: number
   /** Where the list stops showing rows: its top plus `scroll-padding-top`. */
   readonly listTop: number
+  /** The list's bottom edge, on the composer. */
+  readonly listBottom: number
 }
 
 /** Hovers `target` in the frame and measures the row it is in. */
@@ -58,6 +63,7 @@ async function read(row: Locator): Promise<Geometry> {
       textTop: Math.min(...tops),
       textBottom: Math.max(...bottoms),
       listTop: scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop),
+      listBottom: scroller.getBoundingClientRect().bottom,
     }
   })
 }
@@ -85,6 +91,18 @@ test('a row whose top is under the header band gets the toolbar below it, clear 
   expect(at.toolbar.top).toBeGreaterThanOrEqual(at.textBottom)
   expect(at.toolbar.top).toBeLessThan(at.row.bottom)
   expect(at.toolbar.bottom).toBeGreaterThan(at.row.bottom)
+})
+
+test('a last row taller than the list, ending on the composer, gets the toolbar inside it, in full view', async ({ page }) => {
+  await open(page, 'interaction/hover-toolbar-tall-last')
+  const at = await measure(page, '[data-message-row]:last-of-type [data-msg-text]')
+  expect(at.row.top).toBeLessThan(at.listTop)
+  // No room below either: a toolbar under the row would run past the list's bottom.
+  expect(at.row.bottom + (at.toolbar.bottom - at.toolbar.top)).toBeGreaterThan(at.listBottom)
+  expect(at.toolbar.top).toBeGreaterThanOrEqual(at.listTop)
+  expect(at.toolbar.bottom).toBeLessThanOrEqual(at.listBottom)
+  expect(at.toolbar.top).toBeGreaterThan(at.row.top)
+  expect(at.toolbar.bottom).toBeLessThan(at.row.bottom)
 })
 
 /** Scrolls the list to `top` and waits for `scrollend`. Returns where it was. */

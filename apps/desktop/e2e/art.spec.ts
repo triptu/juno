@@ -2,7 +2,8 @@
 // anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
 // header's title menu draws the topic again, the toast's Undo and ⌘Z put the
 // previous drawing back, and the menu has no Redraw art when no drawing can
-// be made: AI assist off or no OpenRouter key. At the daily AI limit Redraw
+// be made: AI assist off or no OpenRouter key. Home's Recent draws a
+// channel with its Main's art, as the sidebar does. At the daily AI limit Redraw
 // art says so, and Change limit leads to the field in Settings › AI activity.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -39,6 +40,18 @@ test('Redraw art draws a topic again, and Undo puts the previous drawing back', 
   await expect.poll(() => row.artMarkup()).not.toBe(first)
   await juno.undo()
   await expect.poll(() => row.artMarkup()).toBe(first)
+})
+
+test("a channel in Home's Recent shows the art its Main row shows in the sidebar", async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const markup = await juno.sidebar.row('#eng').artMarkup()
+  const tile = juno.write.recentRow('eng').locator('[data-topic-art]')
+  await expect(tile).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
+  // The sizes differ, so compare the drawing's hue: the ink colour every stroke starts from.
+  const ink = (svg: string) => /stroke="(var\([^"]+\))"/.exec(svg)?.[1]
+  expect(ink(markup)).toBeDefined()
+  expect(ink(await tile.innerHTML())).toBe(ink(markup))
 })
 
 test('with AI assist off, the topic menu has no Redraw art', async ({ juno, fake, slackApp, userData, running }) => {

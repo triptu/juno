@@ -22,10 +22,12 @@ import {
   uploadFailed,
   uploading,
   withDownloads,
+  window as messageWindow,
+  p,
   withFiles,
 } from './fixtures/messages'
 import { albumOf, mediaAndPdf, mixedMedia, singleImage, singleVideo } from './fixtures/media'
-import { NOW } from './fixtures/topics'
+import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { sevenQuickReactions } from './fixtures/quickReactions'
 import { InlineEdit } from './InlineEdit'
@@ -89,6 +91,27 @@ function ScrolledUnderBand() {
     scroller.scrollTop += row.getBoundingClientRect().top - listTop + 16
   }, [])
   return <MessageList {...base} items={thread} main={false} actions={noopActions} scrollRef={scrollRef} />
+}
+
+/** A long report last, taller than its frame, as a feedback channel's newest message often is. */
+const tallLast = messageWindow([
+  { ago: 40, from: people.maya, text: 'Posting the weekly report below.' },
+  { ago: 39, from: people.leo, text: 'Thanks.' },
+  { ago: 30, from: people.jonas, blocks: Array.from({ length: 40 }, (_, index) => p(`Point ${index + 1} of the report: what changed this week and what we try next.`)) },
+])
+
+/**
+ * The list at its end, as a topic opens, with a last message taller than the
+ * list: its top is under the band and its end on the composer, so the toolbar
+ * has room neither above nor below it and goes inside, at the top in view.
+ */
+function TallLastRow() {
+  const scrollRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    if (scroller != null) scroller.scrollTop = scroller.scrollHeight
+  }, [])
+  return <MessageList {...base} items={tallLast} main={false} actions={noopActions} scrollRef={scrollRef} />
 }
 
 function ReactionChanges() {
@@ -229,6 +252,8 @@ export default defineFixtures(
       'hover-toolbar-first': state({ items: thread, main: false, actions: noopActions }, { hover: ROW }),
       // A row whose top is under the band: the toolbar flips below it.
       'hover-toolbar-under-band': scene(() => <ScrolledUnderBand />, { hover: `${ROW} [data-msg-text]` }),
+      // The last row is taller than the list and ends on the composer: the toolbar goes inside it, under the band.
+      'hover-toolbar-tall-last': scene(() => <TallLastRow />, { hover: `${ROW}:last-of-type [data-msg-text]` }),
       'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),

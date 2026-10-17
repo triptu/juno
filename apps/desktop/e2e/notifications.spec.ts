@@ -135,8 +135,11 @@ test('Settings › Notifications saves hours and what matters, and Appearance ch
   await juno.openSettings('Appearance')
   await expect(juno.tabs.tab('Settings')).toHaveCount(1)
   await expect(juno.settings.themeRadio('System')).toHaveAttribute('aria-checked', 'true')
-  await juno.settings.densityRadio('Compact').click()
+  // Compact is the default for a user who never chose one.
+  await expect(juno.settings.densityRadio('Compact')).toHaveAttribute('aria-checked', 'true')
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('compact')
+  await juno.settings.densityRadio('Comfortable').click()
+  await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
   await juno.settings.show('Notifications')
   await expect(page.matters).toHaveValue('The launch and hiring.')
 })

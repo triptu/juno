@@ -33,7 +33,7 @@ function launchParam(name: string): string | undefined {
  * Main loads the page as `index.html?theme=<saved>&accent=<saved>&density=<saved>`,
  * so the first render already uses the theme the window was painted in,
  * the saved accent and the density (performance 2.1). System, Coral and
- * Comfortable when the page has no location (tests) or no parameter.
+ * Compact when the page has no location (tests) or no parameter.
  */
 function savedTheme(): Theme {
   const theme = launchParam('theme')
