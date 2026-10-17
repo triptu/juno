@@ -75,8 +75,10 @@ export const asksAtom = page<{ readonly asks: ReadonlyArray<ProactiveAsk> }>('ag
  * 13.6): "Let Juno learn how you work", with Not now and Start.
  */
 export const homeAsksAtom = Atom.make((get): ReadonlyArray<HomeItem> => {
+  // AI assist first, so Home opens no agent stream while it is off.
+  if (!get(aiAssistOnAtom)) return []
   const result = get(asksAtom)
-  if (result._tag !== 'Success' || !get(aiAssistOnAtom)) return []
+  if (result._tag !== 'Success') return []
   const learn = chatCopy.ask.learn
   return result.value.asks.filter((ask) => ask.status._tag === 'open').map((ask): HomeItem => ({
     id: `ask:${ask.id}`,
