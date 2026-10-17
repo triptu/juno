@@ -13,7 +13,7 @@ Pure product rules. No I/O, no Effect services, no React. The same code runs in 
 - The read-state merge rule and the notification decision order.
 - Clarity and audience checks before send, and which messages the checks read (`sendChecksApply`: not empty, at most 1,000 characters).
 - The composer's colon emoji: the query at the caret, custom emoji with aliases resolved, and ranking (`composer-emoji.ts`).
-- `frequentDestinations`: New chat’s six destinations, ranked by decayed own sends and filled by activity.
+- `frequentDestinations`: Home's Recent, five people then five channels, each ranked by decayed own sends and filled by activity.
 - `rankConversations`: the same ranking over any uses (own sends and topic visits), uncapped, for the ⌘K Conversations tab.
 - The command palette grammar (`parseCommand`, with `confidenceLabel`), mention detection, context menu item lists.
 

@@ -1,13 +1,14 @@
 /**
- * The New chat pickers' queries (spec section 9). Local only: they read the
- * conversations, people and topics the sync stored. Conversation search
+ * The destination queries for Home's composer and ⌘K (spec sections 10 and
+ * 12). Local only: they read the conversations, people and topics the sync
+ * stored. Conversation search
  * matches words in memory (`searchIndex.ts`). The statements that
  * read `topic_index` are in `pickerStatements`, so the plan test can check
  * that each one reads it through an index (performance 6).
  */
-import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations, type PickThread } from '@juno/contract'
-import { frequentDestinations, firstWords, parseTopicId, rankConversations, rankSearchResults, searchWords, tsToMillis, type Ts } from '@juno/domain'
-import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
+import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations } from '@juno/contract'
+import { frequentDestinations, parseTopicId, rankConversations, rankSearchResults, searchWords } from '@juno/domain'
+import { StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { UserRow } from '../topicRows'
 import { CONVERSATION_COLUMNS, peopleOf, pickOf, type ConversationRow } from './picks'
@@ -30,7 +31,7 @@ interface Statement {
  * threads of a channel or from everywhere, matching `match` (an FTS query)
  * when there is one.
  */
-export function pickerStatements(cutoff: string, channel: string | undefined, match: string | undefined): { readonly recent: Statement; readonly threads: Statement } {
+export function pickerStatements(cutoff: string): { readonly recent: Statement } {
   // Grouped by channel, the planner would walk the whole channel index; the activity index reads only the last RECENT_DAYS.
   const recent = {
     sql: `SELECT ${CONVERSATION_COLUMNS} FROM conversations c
@@ -40,34 +41,7 @@ export function pickerStatements(cutoff: string, channel: string | undefined, ma
       ORDER BY a.activity DESC, c.id LIMIT ?`,
     params: [cutoff, RECENT_CONVERSATIONS],
   }
-  const where = ["i.kind = 'thread'", 'c.is_member = 1', 'g.channel IS NULL']
-  const params: Array<string | number> = []
-  if (channel !== undefined) {
-    where.push('i.channel = ?')
-    params.push(channel)
-  } else if (match === undefined) {
-    where.push('i.last_activity_ts > ?')
-    params.push(cutoff)
-  }
-  if (match !== undefined) {
-    where.push(`i.topic_id IN (
-      SELECT t.topic_id FROM topic_titles_fts f JOIN topic_index t ON t.rowid = f.rowid WHERE topic_titles_fts MATCH ?
-      UNION SELECT o.topic_id FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?)`)
-    params.push(match, match)
-  }
-  params.push(PICK_LIMIT)
-  const threads = {
-    sql: `SELECT ${CONVERSATION_COLUMNS}, i.topic_id, i.root_ts, i.last_activity_ts, i.message_count,
-        COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
-        COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS root_text
-      FROM topic_index i JOIN conversations c ON c.id = i.channel
-      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-      LEFT JOIN ignored_channels g ON g.channel = i.channel
-      WHERE ${where.join(' AND ')}
-      ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`,
-    params,
-  }
-  return { recent, threads }
+  return { recent }
 }
 
 const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
@@ -88,7 +62,7 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
   const selfId = yield* selfIdOf(sql)
   const now = yield* Clock.currentTimeMillis
   if (searchWords(text).length === 0) {
-    const { recent } = pickerStatements(cutoffTs(now), undefined, undefined)
+    const { recent } = pickerStatements(cutoffTs(now))
     const rows = yield* sql.unsafe<ConversationRow>(recent.sql, recent.params)
     const users = yield* readUsers(sql, peopleOf(rows))
     return { recent: rows.map((row) => pickOf(row, users, selfId)), people: [], channels: [] } satisfies PickConversations
@@ -101,34 +75,7 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
   } satisfies PickConversations
 })
 
-interface ThreadRow extends ConversationRow {
-  readonly topic_id: string
-  readonly root_ts: string
-  readonly last_activity_ts: string | null
-  readonly message_count: number
-  readonly named_title: string | null
-  readonly root_text: string
-}
 
-/** The thread picker's rows for `channel` (or everywhere) and `text` (see `newChat.threads`). */
-export const queryThreads = Effect.fn('newChat.threads')(function* (channel: string | undefined, text: string) {
-  const sql = yield* StoreReader
-  const selfId = yield* selfIdOf(sql)
-  const terms = ftsQuery(text.trim())
-  const { threads } = pickerStatements(cutoffTs(yield* Clock.currentTimeMillis), channel, terms === '' ? undefined : `${terms}*`)
-  const rows = yield* sql.unsafe<ThreadRow>(threads.sql, threads.params)
-  const users = yield* readUsers(sql, peopleOf(rows))
-  return rows.map(
-    (row): PickThread => ({
-      id: row.topic_id,
-      rootTs: row.root_ts,
-      title: row.named_title || firstWords(row.root_text) || 'Thread',
-      replyCount: Math.max(0, row.message_count - 1),
-      lastActivityAt: row.last_activity_ts === null ? 0 : tsToMillis(row.last_activity_ts as Ts),
-      conversation: pickOf(row, users, selfId),
-    }),
-  )
-})
 
 /** Indexed own-message range used by Frequent, also checked by the plan gate. */
 export const frequentSendsStatement = (selfId: string, now: number) => ({

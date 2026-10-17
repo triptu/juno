@@ -8,7 +8,7 @@ import type { InvalidationKeys } from '@juno/store'
 import { Effect } from 'effect'
 import { serveWorkspaceValue } from '../protocol/live'
 import { Workspace } from '../workspace'
-import { queryConversations, queryThreads, queryFrequent, queryPaletteConversations } from './query'
+import { queryConversations, queryFrequent, queryPaletteConversations } from './query'
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'team', 'messages']
 const RANKED_KEYS: InvalidationKeys = ['conversations', 'users', 'ignored_channels', 'team', 'topic_visits']
@@ -20,7 +20,6 @@ export const NewChatHandlers = NewChatRoutes.toLayer(
     return {
       'newChat.frequent': () => live('newChat.frequent', queryFrequent()),
       'newChat.conversations': ({ query }) => live('newChat.conversations', queryConversations(query)),
-      'newChat.threads': ({ channel, query }) => live('newChat.threads', queryThreads(channel, query)),
       // Own sends re-rank it on the next open; a message event never re-runs it.
       'newChat.ranked': ({ query }) => serveWorkspaceValue(workspace.changes, 'newChat.ranked', RANKED_KEYS, queryPaletteConversations(query)),
     }

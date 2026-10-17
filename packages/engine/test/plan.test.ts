@@ -152,15 +152,9 @@ describe('query plans', () => {
       assert.deepStrictEqual(scans(yield* plan(sends.sql, sends.params)), [])
       const activity = activityStatement(['C0ENG', 'D0MAYA'])
       assert.deepStrictEqual(scans(yield* plan(activity.sql, activity.params)), [])
-      for (const channel of [undefined, 'C0ENG']) {
-        for (const match of [undefined, 'cutover*']) {
-          const { recent, threads } = pickerStatements('1700000000.000000', channel, match)
-          for (const statement of [recent, threads]) {
-            const lines = yield* plan(statement.sql, statement.params)
-            assert.deepStrictEqual(scans(lines), [], `${channel ?? 'everywhere'} ${match ?? ''}\n${lines.join('\n')}`)
-          }
-        }
-      }
+      const { recent } = pickerStatements('1700000000.000000')
+      const lines = yield* plan(recent.sql, recent.params)
+      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
     }).pipe(Effect.provide(freshStore)),
   )
 

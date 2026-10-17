@@ -24,16 +24,18 @@ describe('frequent destinations', () => {
     ], now)).toEqual(['newer', 'older'])
   })
 
-  it('fills with DMs before channels, newest activity first in each group', () => {
+  it('lists people before channels, newest activity first in each group', () => {
     expect(frequentDestinations([
       channel('channel', now), { id: 'dm', kind: 'im', lastActivityAt: 1 },
       { id: 'group', kind: 'mpim', lastActivityAt: 2 }, channel('older', 1),
     ], [], now)).toEqual(['group', 'dm', 'channel', 'older'])
   })
 
-  it('returns at most six destinations, including fill-ins', () => {
-    expect(frequentDestinations(Array.from({ length: 10 }, (_, i) => channel(String(i), i)), [{ channel: '0', at: now }], now))
-      .toEqual(['0', '9', '8', '7', '6', '5'])
+  it('returns at most five people and five channels, including fill-ins', () => {
+    const people = Array.from({ length: 7 }, (_, i) => ({ id: `dm${i}`, kind: 'im' as const, lastActivityAt: i }))
+    const channels = Array.from({ length: 7 }, (_, i) => channel(String(i), i))
+    expect(frequentDestinations([...channels, ...people], [{ channel: '0', at: now }], now))
+      .toEqual(['dm6', 'dm5', 'dm4', 'dm3', 'dm2', '0', '6', '5', '4', '3'])
   })
 })
 

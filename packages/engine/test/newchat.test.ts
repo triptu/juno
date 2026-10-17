@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { newChatConversations, newChatThreads, type PickConversations, type PickThread } from '@juno/contract'
+import { newChatConversations, type PickConversations } from '@juno/contract'
 import { liveQuery } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine } from './scenario'
@@ -22,8 +22,6 @@ function valueUntil<A>(engine: RunningEngine, atom: Parameters<RunningEngine['re
 const conversations = (engine: RunningEngine, query: string, predicate: (value: PickConversations) => boolean = () => true) =>
   valueUntil<PickConversations>(engine, liveQuery(newChatConversations)({ query }), predicate, `conversations "${query}"`)
 
-const threads = (engine: RunningEngine, payload: { channel?: string; query: string }, predicate: (value: ReadonlyArray<PickThread>) => boolean = () => true) =>
-  valueUntil<ReadonlyArray<PickThread>>(engine, liveQuery(newChatThreads)(payload), predicate, `threads ${JSON.stringify(payload)}`)
 
 describe('New chat', () => {
   it('lists recent conversations, then people and channels that match, with people never messaged', async () => {
@@ -54,17 +52,4 @@ describe('New chat', () => {
     }
   })
 
-  it('lists a channel’s threads, and recent threads everywhere with their conversation', async () => {
-    const engine = await bootedEngine(engines)
-    const inEng = await threads(engine, { channel: 'C0ENG', query: '' }, (rows) => rows.length > 0)
-    expect(inEng.every((row) => row.conversation.channelId === 'C0ENG')).toBe(true)
-    expect(inEng.map((row) => row.lastActivityAt)).toEqual(inEng.map((row) => row.lastActivityAt).toSorted((a, b) => b - a))
-
-    const everywhere = await threads(engine, { query: '' }, (rows) => rows.length > 0)
-    expect(new Set(everywhere.map((row) => row.conversation.key)).size).toBeGreaterThan(1)
-
-    const title = inEng[0]!.title.split(' ')[0]!
-    const matched = await threads(engine, { query: title }, (rows) => rows.length > 0)
-    expect(matched.map((row) => row.id)).toContain(inEng[0]!.id)
-  })
 })
