@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 19:30 · owner · A popover lines up with the control that opened it: the topic switcher starts at the title button's left edge, not the pill's, and moves in only at the window's edge. In a picker list only the keyboard or pointer row is filled; the current item is marked with accent text and a check.
 - 10-17 19:00 · owner · A control that opens a menu or popover keeps its hover fill while pressed and while open, so opening changes no colour; Button and IconButton take `expanded`, and a trigger is not also a toggle.
 - 10-17 18:44 · owner · Juno stays as the only row in the sidebar's nav list: it is a hero feature and keeps its own space (unread, ⌘J, busy sparkle); revisit the design only if it looks odd.
 - 10-17 18:44 · owner · This Mac is a spare the owner does not use, so agents may run perf, feel, e2e and gallery locally at any time, still through the heavy lock and the load limits.
