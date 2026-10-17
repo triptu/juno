@@ -126,11 +126,15 @@ function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
  * frame): a row can scroll or grow under a still pointer, and an answer kept
  * from before would leave the toolbar under the band. It rises above the
  * row's top edge unless that would put it under the header band at the
- * list's top, where the band's fade washes it out and the list clips it;
- * there it flips below the row, straddling the bottom edge the same way. A
- * row taller than the list has room for neither, as the last message is when
- * its end sits on the composer: the toolbar then goes inside the row, at the
- * top of the part in view, under the band. The answer is a custom property
+ * list's top, where the band's fade washes it out and the list clips it.
+ * A row whose top is in view then takes it inside its top edge, over the
+ * right of its header line, which keeps that room free: the first message at
+ * scroll top, which starts right at the band. A row whose top is under the
+ * band has it flip below, straddling the bottom edge the same way, so it
+ * stays near what is in view. A row taller than the list has room for
+ * neither, as the last message is when its end sits on the composer: the
+ * toolbar then goes inside the row, at the top of the part in view, under
+ * the band. The answer is a custom property
  * on the row, written only when it changes, so nothing re-renders.
  */
 export function placeToolbar(row: HTMLElement): void {
@@ -147,7 +151,9 @@ export function placeToolbar(row: HTMLElement): void {
   const top =
     box.top + straddle - toolbarHeight >= listTop
       ? ''
-      : box.bottom - straddle + toolbarHeight <= list.bottom
+      : box.top >= listTop
+        ? `${Math.round(gap)}px`
+        : box.bottom - straddle + toolbarHeight <= list.bottom
         ? `${Math.round(box.height - straddle)}px`
         : `${Math.round(Math.max(listTop - box.top, 0) + gap)}px`
   if (row.style.getPropertyValue('--row-toolbar-top') === top) return
