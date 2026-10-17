@@ -303,7 +303,7 @@ export const ReviewRule = Schema.Literals(['auto', 'always', 'never'])
 export type ReviewRule = typeof ReviewRule.Type
 export const ReviewIntent = Schema.Literals(['explicit', 'implied', 'notAsked'])
 export type ReviewIntent = typeof ReviewIntent.Type
-export const ReviewRisk = Schema.Literals(['reversible', 'write', 'delete', 'send'])
+export const ReviewRisk = Schema.Literals(['read', 'reversible', 'write', 'delete', 'send'])
 export type ReviewRisk = typeof ReviewRisk.Type
 export const ToolReview = Schema.Struct({
   rule: ReviewRule,

@@ -22,7 +22,7 @@
  * the other results as notes, because the memory rules pair one call id
  * with one entry; the guard still counts every byte sent.
  */
-import { isSchemaResult, pageMcpResult } from '../mcp/results'
+import { isSchemaResult, pageMcpResult, schemaNote } from '../mcp/results'
 import { buildRequest, type ActiveEntry, type Line, type Pins, type Source } from '@juno/agent-memory'
 import type { Ending } from '@juno/agent-contract'
 import { AdmissionError, providerFailure, type ProviderGuardApi, type StreamProgress } from '../providers'
@@ -162,9 +162,23 @@ function read(store: Store, h: number): Snapshot {
   const sourceOf = (row: Row): Source => ({ id: row.id, version: row.version, text: row.text, kind: row.kind, removed: row.redacted_gen !== null || removed.has(row.id) })
   return {
     rev: published.rev, gen: published.gen, pins, lines: published.lines, covered: published.covered, cutoff,
-    tail: rows(published.covered, h).map(sourceOf),
+    tail: noted(rows(published.covered, h)).map(sourceOf),
     active: activeEntries(store, rows(h, cutoff)),
   }
+}
+
+/**
+ * A schema an earlier run loaded is one line in the recent history, not the schema: its chunks after
+ * the first are left empty, so each archive row keeps its one tail entry.
+ */
+function noted(rows: ReadonlyArray<Row>): ReadonlyArray<Row> {
+  let schema: { entry: number; incarnation: string } | undefined
+  return rows.map((row) => {
+    if (schema !== undefined && row.entry_id === schema.entry && row.incarnation === schema.incarnation) return { ...row, text: '' }
+    const note = row.kind === 'tool' ? schemaNote(row.text) : undefined
+    schema = note === undefined ? undefined : { entry: row.entry_id, incarnation: row.incarnation }
+    return note === undefined ? row : { ...row, text: note }
+  })
 }
 
 /** One active entry per pi entry: its chunks are contiguous archive rows. */

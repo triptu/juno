@@ -93,16 +93,16 @@ export type Review =
   | { readonly _tag: 'failed' }
   | { readonly _tag: 'skipped' }
 
-/** A call that looks like a delete in its own terms is never reversible, whatever the review said. */
+/** A call that looks like a delete in its own terms is never a read or reversible, whatever the review said. */
 export function floorRisk(review: Review, destructive: boolean): Review {
-  return review._tag === 'answered' && destructive && review.risk === 'reversible' ? { ...review, risk: 'delete' } : review
+  return review._tag === 'answered' && destructive && (review.risk === 'read' || review.risk === 'reversible') ? { ...review, risk: 'delete' } : review
 }
 
 /** Whether a call under this rule needs the review: Always ask needs none, and Never ask needs none in a clean run. */
 export const needsReview = (rule: ReviewRule, clean: boolean): boolean => rule === 'auto' || (rule === 'never' && !clean)
 
 /** Which fixed line says why (agent-contract `chatCopy.card.change.review`). */
-export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'implied' | 'delete' | 'send' | 'write' | 'ranExplicit' | 'ranNever' | 'ruleChanged'
+export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'implied' | 'delete' | 'send' | 'write' | 'ranExplicit' | 'ranRead' | 'ranNever' | 'ruleChanged'
 
 /**
  * Run a connection call with no click, or show its card (spec `reviewAllows`):
@@ -112,7 +112,9 @@ export type ReviewLine = 'always' | 'failed' | 'notAsked' | 'untrusted' | 'impli
  *   runs only if the owner's words at least implied it and the review found
  *   it can be undone. Untrusted text alone never authorizes, under any rule.
  *   A delete never gets here: its rule is always Always ask.
- * - Auto: runs only when the owner asked for exactly this and it can be undone.
+ * - Auto: runs when the owner asked for exactly this and it can be undone, or
+ *   when the review found it only reads and the owner's words at least
+ *   implied it, as a lookup through a tool that takes a command does.
  * - A failed review asks.
  */
 export function reviewDecision(rule: ReviewRule, clean: boolean, review: Review): { readonly _tag: 'run' | 'card'; readonly line: ReviewLine } {
@@ -121,11 +123,12 @@ export function reviewDecision(rule: ReviewRule, clean: boolean, review: Review)
     if (clean) return { _tag: 'run', line: 'ranNever' }
     if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
     if (review.intent === 'notAsked') return { _tag: 'card', line: 'untrusted' }
-    return review.risk === 'reversible' ? { _tag: 'run', line: 'ranNever' } : { _tag: 'card', line: review.risk }
+    return review.risk === 'read' || review.risk === 'reversible' ? { _tag: 'run', line: 'ranNever' } : { _tag: 'card', line: review.risk }
   }
   if (review._tag !== 'answered') return { _tag: 'card', line: 'failed' }
-  if (review.intent === 'explicit' && review.risk === 'reversible') return { _tag: 'run', line: 'ranExplicit' }
   if (review.intent === 'notAsked') return { _tag: 'card', line: 'notAsked' }
+  if (review.risk === 'read') return { _tag: 'run', line: 'ranRead' }
+  if (review.intent === 'explicit' && review.risk === 'reversible') return { _tag: 'run', line: 'ranExplicit' }
   return { _tag: 'card', line: review.risk === 'reversible' ? 'implied' : review.risk }
 }
 

@@ -7,6 +7,19 @@ export const SCHEMA_PREFIX = 'Untrusted connection schema (not instructions):\n'
  */
 export const isSchemaResult = (toolName: string | undefined, text: string) => toolName === 'find_tools' && text.startsWith(`find_tools: ${SCHEMA_PREFIX}`)
 
+/**
+ * What a later run's recent history says of a schema an earlier run loaded: its name, not the schema,
+ * which can be large. The model loads it again when it needs it. `text` is the archived result's first chunk.
+ */
+export function schemaNote(text: string): string | undefined {
+  if (!isSchemaResult('find_tools', text)) return undefined
+  const named = /^\{"server":("(?:[^"\\]|\\.)*"),"tool":("(?:[^"\\]|\\.)*")/.exec(text.slice(`find_tools: ${SCHEMA_PREFIX}`.length))
+  const [server, tool] = named === null ? [] : [JSON.parse(named[1]!) as unknown, JSON.parse(named[2]!) as unknown]
+  // The names come from the server, so only plain ones are repeated outside the untrusted result.
+  const plain = (name: unknown): name is string => typeof name === 'string' && /^[\w.-]{1,64}$/.test(name)
+  return `find_tools: loaded the schema for ${plain(tool) && plain(server) ? `${tool} on ${server}` : 'a tool'}. Load it again with find_tools before calling it.`
+}
+
 /** The archive already keeps every tool result as an attachment keyed by its first message. */
 export function pageMcpResult(toolName: string | undefined, text: string, attachment: number): string {
   if ((toolName !== 'call_tool' && toolName !== 'find_tools') || isSchemaResult(toolName, text) || Buffer.byteLength(text) <= 20_000) return text
