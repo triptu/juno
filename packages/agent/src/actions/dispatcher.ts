@@ -30,7 +30,7 @@ import { transaction } from '../store/database'
 import { authorize, recordAttempt, recordReceipt, settleAuthorization, type JournalPosition } from '../store/ledger'
 import type { Store } from '../store/store'
 import { cardRow, expiry, memoryGen, payloadOf, settleCardOutcome, type IntentRow } from './cards'
-import type { Executor, ExecutorCall } from './executor'
+import type { Executor, ExecutorCall, ExecutorOutput } from './executor'
 
 export interface DispatcherOptions {
   readonly store: Store
@@ -42,6 +42,15 @@ export interface DispatcherOptions {
   /** A click's child settled and its card's outcome is recorded: done, failed or unknown. */
   readonly onSettled?: (cardId: string) => void
   readonly onReport?: (error: unknown) => void
+}
+
+/**
+ * What came back, kept with the outcome it belongs to and never before it: an attempt Juno lost
+ * after the server answered reads Failed with nothing from that answer.
+ */
+function keepOutput(store: Store, attemptId: string, output: ExecutorOutput | undefined): void {
+  if (output === undefined) return
+  store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line, shown) VALUES (?, ?, ?, ?)').run(attemptId, output.model ?? null, output.line ?? null, output.shown ?? null)
 }
 
 interface Pending {
@@ -160,25 +169,16 @@ export function createDispatcher(options: DispatcherOptions) {
       options.onReport?.(error)
       result = { _tag: 'unknown', detail: 'The action failed in Juno.' }
     }
-    // What came back is kept with the outcome it belongs to, never before it: an attempt Juno lost
-    // after the server answered reads Failed with nothing from that answer.
-    const keepOutput = () => {
-      if (result.output === undefined) return
-      store.db.prepare('INSERT OR IGNORE INTO action_outputs (attempt_id, model, line, shown) VALUES (?, ?, ?, ?)').run(attemptId, result.output.model ?? null, result.output.line ?? null, result.output.shown ?? null)
-    }
     switch (result._tag) {
       case 'done':
         crashPoint('attempt.beforeReceipt')
-        keepOutput()
+        keepOutput(store, attemptId, result.output)
         recordReceipt(store, attemptId, result.receipt)
         break
       case 'failed':
-        keepOutput()
-        settleAuthorization(store, authorized.id, 'failed', result.detail)
-        break
       case 'unknown':
-        keepOutput()
-        settleAuthorization(store, authorized.id, 'unknown', result.detail)
+        keepOutput(store, attemptId, result.output)
+        settleAuthorization(store, authorized.id, result._tag, result.detail)
         break
     }
     settleCard(item.cardId)
