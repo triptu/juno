@@ -35,6 +35,7 @@ import type {
   JunoBlock,
   OpId,
   Origin,
+  OwnerFile,
   Quote,
   Reaction,
   ReplyTarget,
@@ -133,7 +134,7 @@ function caches() {
     entries: keyedMemo<Entry>(),
     bubbleEntries: keyedMemo<Entry>(),
     ownerEntries: keyedMemo<Entry>(),
-    opData: new WeakMap<OpRow, { replyTo?: ReplyTarget; context?: SendContext } | undefined>(),
+    opData: new WeakMap<OpRow, { replyTo?: ReplyTarget; context?: SendContext; files?: ReadonlyArray<OwnerFile> } | undefined>(),
     removed: memo<{ readonly ops: ReadonlySet<string>; readonly bubbles: ReadonlySet<string> }>(),
     // A row with its group position, by the row it was made from.
     grouped: new WeakMap<ChatItem, { readonly position: GroupPosition; readonly item: ChatItem }>(),
@@ -441,7 +442,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
     }
     let data = cache.opData.get(op)
     if (data === undefined && !cache.opData.has(op)) {
-      data = parse<{ replyTo?: ReplyTarget; context?: SendContext }>(op.data)
+      data = parse<{ replyTo?: ReplyTarget; context?: SendContext; files?: ReadonlyArray<OwnerFile> }>(op.data)
       cache.opData.set(op, data)
     }
     const quote = data?.replyTo === undefined ? undefined : quoteOf(data.replyTo)
@@ -459,6 +460,7 @@ function buildItems(source: ChatSource, cache: Caches, revision: ReturnType<Retu
         delivery: waiting !== undefined ? { _tag: 'waiting', for: waiting } : { _tag: 'sent' },
         ...(quote === undefined ? {} : { replyTo: quote }),
         ...(data?.context === undefined ? {} : { about: aboutOf(data.context) }),
+        ...(data?.files === undefined || data.files.length === 0 ? {} : { files: data.files }),
         reactions,
       },
     })))

@@ -20,7 +20,7 @@ export interface InboxOp {
   readonly opId: string
   readonly kind: InboxKind
   readonly text: string
-  /** JSON: a reply's target, or a reaction's target and emoji. */
+  /** JSON: a reply's target and the files a message carried, or a reaction's target and emoji. */
   readonly data: string | null
   readonly at: number
   readonly state: InboxState
@@ -37,7 +37,8 @@ export type Accept =
   /** Nothing was written: AI is off (the composer is disabled), or the text is over 64 KB. */
   | { readonly _tag: 'refused'; readonly reason: 'off' | 'tooLong' }
 
-export function accept(store: Store, input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }): Accept {
+/** `written` runs in the same transaction, once the op is new: the files a message carries are durable with it. */
+export function accept(store: Store, input: { readonly opId: string; readonly kind: InboxKind; readonly text: string; readonly data?: unknown }, written?: () => void): Accept {
   if (Buffer.byteLength(input.text, 'utf8') > MAX_INPUT_BYTES) return { _tag: 'refused', reason: 'tooLong' }
   const result = transaction(store.db, (): Accept => {
     const existing = find(store, input.opId)
@@ -46,6 +47,7 @@ export function accept(store: Store, input: { readonly opId: string; readonly ki
     store.db
       .prepare("INSERT INTO inbox (op_id, kind, text, data, at, state) VALUES (?, ?, ?, ?, ?, 'accepted')")
       .run(input.opId, input.kind, input.text, input.data === undefined ? null : JSON.stringify(input.data), store.now())
+    written?.()
     return { _tag: 'accepted', op: find(store, input.opId)! }
   })
   if (result._tag === 'accepted') crashPoint('inbox.committed')

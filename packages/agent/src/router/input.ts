@@ -7,6 +7,7 @@
  *   <message id="n13"><quote from="juno">The deploy is green on staging.</quote>which deploy?</message>
  *   <reaction id="n14" emoji="🎉"><quote from="juno">The deploy is green on staging.</quote></reaction>
  *   <message id="n15"><about topic="T1" title="Postgres 16 plan" channel="#eng" kind="thread"/>is this settled?</message>
+ *   <message id="n16"><image n="0" name="chart.png" width="1200" height="800"/><file name="notes.md">…</file>what changed?</message>
  *
  * A reply or reaction carries the item it points at in full, so "this one"
  * is never a guess. The archive keeps what the model read, so memory sees
@@ -14,11 +15,13 @@
  * words are not escaped: they stay byte for byte, so a pin can point at
  * them (`ownerWords`). A message sent from the Juno panel or with an About
  * chip carries what it is about first; its names and the selection are
- * Slack's, so they are escaped.
+ * Slack's, so they are escaped. Images and text files come after the
+ * quote, before the words (`files.ts`).
  */
-import type { ReplyTarget, SendContext } from '@juno/agent-contract'
+import type { OwnerFile, ReplyTarget, SendContext } from '@juno/agent-contract'
 import type { InboxOp } from '../inbox/inbox'
 import type { Store } from '../store/store'
+import { fileElements } from './files'
 import { parseOutput } from './output'
 
 export const handleOf = (seq: number) => `n${seq}`
@@ -35,7 +38,7 @@ export function ownerOpOf(store: Store, handle: string): string | undefined {
 
 /** What a send's or a reaction's `data` holds. */
 export type InputData =
-  | { readonly replyTo?: ReplyTarget; readonly context?: SendContext }
+  | { readonly replyTo?: ReplyTarget; readonly context?: SendContext; readonly files?: ReadonlyArray<OwnerFile> }
   | { readonly target: Extract<ReplyTarget, { _tag: 'bubble' | 'card' }>; readonly emoji: string }
 
 /**
@@ -131,6 +134,12 @@ export function readsTopic(op: InboxOp): boolean {
   return 'context' in data && data.context?._tag === 'topic'
 }
 
+/** Whether a send carries images or text files: what is in them came from elsewhere, so the run is no longer clean either. */
+export function carriesFiles(op: InboxOp): boolean {
+  if (op.data === null) return false
+  const data = JSON.parse(op.data) as InputData
+  return 'files' in data && (data.files?.length ?? 0) > 0
+}
 
 /**
  * The text pi receives for `op`. `bubble` finds a bubble's text, live or
@@ -154,7 +163,8 @@ function opText(store: Store, op: InboxOp, bubble: (id: string) => string | unde
     case 'retry': {
       const about = 'context' in data && data.context !== undefined ? aboutElement(data.context) : ''
       const replyTo = 'replyTo' in data && data.replyTo !== undefined ? quote(store, data.replyTo, bubble, cards) : ''
-      return `<message id="${id}">${about}${replyTo}${op.text}</message>`
+      const files = 'files' in data && data.files !== undefined ? fileElements(store, op.opId, data.files) : ''
+      return `<message id="${id}">${about}${replyTo}${files}${op.text}</message>`
     }
     case 'react': {
       const reaction = data as Extract<InputData, { emoji: string }>
@@ -166,12 +176,12 @@ function opText(store: Store, op: InboxOp, bubble: (id: string) => string | unde
 }
 
 const OUTCOMES = /^(?:<card-outcome [^>]*>[^<]*<\/card-outcome>\n)*/
-const OPEN = /^<message id="n\d+">(?:<about[^>]*\/>|<about[^>]*>[\s\S]*?<\/about>)?(?:<quote[^>]*>[\s\S]*?<\/quote>)?/
+const OPEN = /^<message id="n\d+">(?:<about[^>]*\/>|<about[^>]*>[\s\S]*?<\/about>)?(?:<quote[^>]*>[\s\S]*?<\/quote>)?(?:<image [^>]*\/>|<file [^>]*>[^<]*<\/file>)*/
 const CLOSE = '</message>'
 
 /**
  * The byte range of the owner's own words in an archive `user` row: inside
- * the `<message>` wrapper and after any quote. A reaction row has none, so a
+ * the `<message>` wrapper and after any quote and files. A reaction row has none, so a
  * reaction can never become a pin. A row that is not wrapped is all words.
  */
 export function ownerWords(text: string): { readonly from: number; readonly to: number } {

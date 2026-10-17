@@ -12,11 +12,11 @@
  * extra reset entry, which is harmless while idle.
  *
  * A steer joins the running run and is never preceded by a reset. `text`
- * gives what the model reads for the op (the router wraps owner input); it
- * is read only when pi does not hold the op yet.
+ * gives what the model reads for the op (the router wraps owner input and
+ * adds a message's images); it is read only when pi does not hold the op yet.
  */
 import { crashPoint } from '../runtime/crash'
-import type { Journal } from '../runtime/journal'
+import type { InputContent, Journal } from '../runtime/journal'
 import type { Store } from '../store/store'
 import { markSubmitted, type InboxOp } from './inbox'
 
@@ -24,7 +24,7 @@ export async function deliver(
   store: Store,
   journal: Journal,
   op: InboxOp,
-  options: { readonly steer: boolean; readonly text?: () => string },
+  options: { readonly steer: boolean; readonly text?: () => InputContent },
 ): Promise<string> {
   let submissionId = await journal.submissionFor(op.opId)
   if (submissionId === undefined) {
@@ -32,7 +32,7 @@ export async function deliver(
       await journal.reset()
       crashPoint('bridge.reset')
     }
-    submissionId = await journal.submit({ opId: op.opId, text: options.text?.() ?? op.text, kind: op.kind, steer: options.steer })
+    submissionId = await journal.submit({ opId: op.opId, content: options.text?.() ?? op.text, kind: op.kind, steer: options.steer })
     crashPoint('bridge.submitted')
   }
   markSubmitted(store, op.opId, journal.incarnation, submissionId)

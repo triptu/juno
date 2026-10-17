@@ -3,7 +3,7 @@ import { resolveCodexModels } from './catalog'
 import { createHash } from 'node:crypto'
 import { Context as EffectContext, Effect, Layer } from 'effect'
 import { limits, upper } from '@juno/agent-memory'
-import type { Ending } from '@juno/agent-contract'
+import { imageSize, imageTokenBound, JUNO_IMAGE_LIMITS, type Ending } from '@juno/agent-contract'
 import {
   createAssistantMessageEventStream, createModels, createProvider, normalizeContext,
   type Api, type AssistantMessage, type Context, type Model, type Models, type SimpleStreamOptions,
@@ -71,7 +71,30 @@ export function readRevision(store: Store): Revision {
 // Spec `dispatchWith`: a redaction (gen) or a pin change makes a built request stale. A newer view (rev) does not.
 const sameRevision = (a: Revision, b: Revision) => a.gen === b.gen && a.pinRev === b.pinRev
 const hash = (model: Model<Api>, context: Context) => createHash('sha256').update(JSON.stringify([model.provider, model.id, normalizeContext(context).messages])).digest('hex')
-const rendered = (context: Context) => normalizeContext(context).messages.map(message => JSON.stringify(message))
+type Part = { readonly type: string; readonly data?: string }
+const partsOf = (context: Context): ReadonlyArray<Part> =>
+  normalizeContext(context).messages.flatMap(m => (Array.isArray(m.content) ? (m.content as ReadonlyArray<Part>) : []))
+/** Every image's base64, as the wire carries it. Counted by `imageTokens`, never as text. */
+const imageData = (context: Context): ReadonlyArray<string> => partsOf(context).flatMap(p => (p.type === 'image' && p.data ? [p.data] : []))
+/** The messages' text as sent, with each image's bytes left out. */
+const rendered = (context: Context) => normalizeContext(context).messages.map(message => JSON.stringify(message, (_key, value: unknown) =>
+  typeof value === 'object' && value !== null && (value as Part).type === 'image' ? { ...value, data: '' } : value))
+/**
+ * The most tokens the context's images can cost: each one's bound by its
+ * pixel size (`imageTokenBound`). An image whose size its header does not
+ * give, or one past the limits Juno scales to, is refused as too large.
+ */
+function imageTokens(context: Context): number {
+  let tokens = 0
+  for (const data of imageData(context)) {
+    const size = imageSize(Buffer.from(data, 'base64'))
+    if (size === undefined || Math.max(size.width, size.height) > JUNO_IMAGE_LIMITS.edge || size.width * size.height > JUNO_IMAGE_LIMITS.pixels * 1.01) {
+      throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
+    }
+    tokens += imageTokenBound(size.width, size.height)
+  }
+  return tokens
+}
 
 /** Cache writes and high-context tiers can cost more than ordinary input. */
 function reservationCost(model: Model<Api>, input: number): number {
@@ -170,11 +193,8 @@ export function createProviderGuard(options: GuardOptions) {
   const multiplier = (provider: string): 1 | 1.25 => store.db.prepare('SELECT 1 FROM provider_bounds WHERE provider = ?').get(provider) ? 1.25 : 1
   const check = (model: Model<Api>, context: Context, revision: Revision): number => {
     if (!sameRevision(revision, readRevision(store))) throw new AdmissionError({ _tag: 'interrupted' })
-    // The byte bound applies to text. Images need a separate measured bound.
-    if (normalizeContext(context).messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === 'image'))) {
-      throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
-    }
-    const input = upper(rendered(context), multiplier(model.provider))
+    // The byte bound applies to text; images have their own measured bound.
+    const input = upper(rendered(context), multiplier(model.provider)) + Math.ceil(imageTokens(context) * multiplier(model.provider))
     if (input + limits.reserve > model.contextWindow) throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
     return input
   }
@@ -219,9 +239,11 @@ export function createProviderGuard(options: GuardOptions) {
             if (wirePassed) throw new AdmissionError({ _tag: 'interrupted' })
             check(model, copy, stamp.revision)
             // Count the adapter's final JSON as well, including its extra fields.
-            const serialized = JSON.stringify(payload)
+            let serialized = JSON.stringify(payload)
             if (serialized === undefined) throw new AdmissionError({ _tag: 'interrupted' })
-            bound = Math.max(bound, upper([serialized, ...copy.messages.map(() => '')], multiplier(model.provider)))
+            // An image's base64 is counted by its pixel size, not as text.
+            for (const data of imageData(copy)) serialized = serialized.replaceAll(data, '')
+            bound = Math.max(bound, upper([serialized, ...copy.messages.map(() => '')], multiplier(model.provider)) + Math.ceil(imageTokens(copy) * multiplier(model.provider)))
             if (bound + limits.reserve > model.contextWindow) throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
             if (!spend.extend(held.id, reservationCost(model, bound))) throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
             wirePassed = true

@@ -48,9 +48,10 @@ import type { Journal, Settled } from '../runtime/journal'
 import { transaction } from '../store/database'
 import { mode, setMode, type Mode } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
-import { THUMBS_UP, type ReplyTarget } from '@juno/agent-contract'
+import { ownerFilesOf, THUMBS_UP, type JunoFileInput, type ReplyTarget } from '@juno/agent-contract'
 import type { Origin, RunState, TurnEvent } from './events'
-import { archivedBubble, modelText, ownerOpOf, readsTopic, runText, type CardText } from './input'
+import { admittedFiles, clearBodies, copyFiles, storeFiles, withImages } from './files'
+import { archivedBubble, carriesFiles, modelText, ownerOpOf, readsTopic, runText, type CardText } from './input'
 import { parseOutput } from './output'
 import { resolveSpans, sourceTable } from './sources'
 
@@ -137,6 +138,8 @@ export type Input =
       readonly data?: unknown
       /** A reply to a Juno bubble or card. Not a click. */
       readonly replyTo?: ReplyTarget
+      /** Images and text files for the model, stored with the op. */
+      readonly files?: ReadonlyArray<JunoFileInput>
     }
   | {
       readonly opId: string
@@ -228,6 +231,8 @@ class Router {
       this.store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(this.store.now(), JSON.stringify(ending), run.runId)
     })
     for (const opId of run.inputs.keys()) settle(this.store, opId, stateFor(ending), reasonFor(ending))
+    // Only the run a file arrived in sends it; Try again needs it after an interruption or a failure.
+    if (ending._tag === 'complete') clearBodies(this.store, [...run.inputs.keys()])
     if (this.current === run) this.current = undefined
     this.emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
     this.options.onRunEnded?.()
@@ -301,8 +306,8 @@ class Router {
     await this.session.catchUp()
     if (!this.admitting()) return undefined
     const origin = originOf(op.kind)
-    // A message sent beside a topic carries Slack content (SPEC 7): the run starts tainted.
-    const row = { id: uuidv7(this.store.now()), op_id: op.opId, origin, h: this.archiveLength(), clean: origin === 'owner' && !readsTopic(op) ? 1 : 0 }
+    // A message sent beside a topic carries Slack content (SPEC 7), and one with files carries their content: the run starts tainted.
+    const row = { id: uuidv7(this.store.now()), op_id: op.opId, origin, h: this.archiveLength(), clean: origin === 'owner' && !readsTopic(op) && !carriesFiles(op) ? 1 : 0 }
     if (!this.persistInput(op, () => {
       this.store.db
         .prepare('INSERT INTO runs (id, op_id, origin, h, clean, started_at) VALUES (?, ?, ?, ?, ?, ?)')
@@ -348,7 +353,7 @@ class Router {
   /** A bubble's text: from the live run, or from the archive. */
   private bubbleText = (id: string) => this.current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(this.store, id)
 
-  private inputText = (op: InboxOp) => modelText(this.store, op, this.bubbleText, this.options.cards)
+  private inputText = (op: InboxOp) => withImages(this.store, op.opId, modelText(this.store, op, this.bubbleText, this.options.cards))
 
   private recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
     const added = transaction(this.store.db, () =>
@@ -417,12 +422,12 @@ class Router {
       for (;;) {
         const op = nextAccepted(this.store)
         if (op === undefined || run.inputs.has(op.opId) || run !== this.current) return
-        const untrusted = originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op)
+        const untrusted = originOf(op.kind) === 'report' || originOf(op.kind) === 'wake' || readsTopic(op) || carriesFiles(op)
         if (!this.persistInput(op, () => {
           if (untrusted) this.store.db.prepare('UPDATE runs SET clean = 0 WHERE id = ?').run(run.runId)
           this.store.db.prepare('INSERT OR IGNORE INTO run_inputs (op_id, run_id, steer) VALUES (?, ?, 1)').run(op.opId, run.runId)
         })) continue
-        // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic.
+        // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic or with files.
         if (untrusted) run.clean = false
         run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op) }))
         this.emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
@@ -488,8 +493,14 @@ class Router {
   // ---- Input
 
   message = (input: Extract<Input, { kind: Exclude<InboxKind, 'react'> }>): Accept => {
-    const { replyTo, ...rest } = input
-    const result = accept(this.store, replyTo === undefined ? rest : { ...rest, data: { ...(rest.data as object | undefined), replyTo } })
+    const { replyTo, files, ...rest } = input
+    const kept = files === undefined ? [] : admittedFiles(files)
+    const extra = { ...(replyTo === undefined ? {} : { replyTo }), ...(kept.length === 0 ? {} : { files: ownerFilesOf(kept) }) }
+    const result = accept(
+      this.store,
+      Object.keys(extra).length === 0 ? rest : { ...rest, data: { ...(rest.data as object | undefined), ...extra } },
+      kept.length === 0 ? undefined : () => void storeFiles(this.store, rest.opId, kept),
+    )
     this.signal()
     return result
   }
@@ -558,7 +569,12 @@ class Router {
     if (earlier === undefined || !isMessage(earlier.kind) || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
       return { _tag: 'refused', reason: 'notRetryable' }
     }
-    const result = accept(this.store, { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId } })
+    const files = (earlier.data === null ? undefined : (JSON.parse(earlier.data) as { files?: unknown }).files) ?? undefined
+    const result = accept(
+      this.store,
+      { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId, ...(files === undefined ? {} : { files }) } },
+      files === undefined ? undefined : () => copyFiles(this.store, earlier.opId, input.opId),
+    )
     this.signal()
     return result
   }

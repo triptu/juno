@@ -60,4 +60,20 @@ const turns3 = [
   ) STRICT`,
 ]
 
-export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3] }
+const turns4 = [
+  // Images and text files an owner message gave Juno (SPEC 12, 13.1), by the message's op and their
+  // place in it. `body` is an image's base64 or a text file's text: what the model reads. It is
+  // cleared once the op's run is done, since only the run it arrived in sends it; `thumb` stays for
+  // the bubble. A removal deletes the rows.
+  `CREATE TABLE inbox_files (
+    op_id TEXT NOT NULL,
+    n INTEGER NOT NULL CHECK (n >= 0),
+    kind TEXT NOT NULL CHECK (kind IN ('image', 'text')),
+    mime TEXT,
+    thumb TEXT,
+    body TEXT,
+    PRIMARY KEY (op_id, n)
+  ) STRICT`,
+]
+
+export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3, turns4] }
