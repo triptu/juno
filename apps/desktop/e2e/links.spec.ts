@@ -103,7 +103,7 @@ test('a URL pasted over selected words links them, is sent as Slack sends it, an
   await pasteText(topic.composer, 'https://example.com/docs')
   await expect(topic.composerLinks).toHaveText('the docs')
   // A paste with no selection is the browser's own: the URL goes in as text, shown as a link.
-  await topic.composer.press('End')
+  await topic.caretToEnd()
   await juno.win.keyboard.insertText(' or example.org')
   await expect(topic.composer).toHaveValue('read the docs first or example.org')
   await expect(topic.composerLinks).toHaveText(['the docs', 'example.org'])
@@ -163,7 +163,7 @@ test('⌘K on selected words edits their link', async ({ juno, fake }) => {
   await expect(editor).toHaveCount(0)
 
   // ⌘K with nothing selected is still the palette.
-  await topic.composer.press('End')
+  await topic.caretToEnd()
   await juno.palette.open()
   await juno.palette.input.press('Escape')
 
