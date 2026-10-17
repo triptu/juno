@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
+    "eval:title-privacy": "node --import ../../scripts/ts-resolve-hooks.mjs eval/title-privacy.ts",
     "bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/bench.ts",
     "grammar:bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/grammar-bench.ts"
   },
