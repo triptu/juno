@@ -11,6 +11,7 @@ import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
+import type { LinkInfo } from './MessageLink'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
@@ -73,7 +74,9 @@ export interface MessageProps {
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
-  readonly onLink?: (url: string) => void
+  readonly onLink?: (url: string, event: ActivateEvent) => void
+  /** Which links open inside Juno, and where they go (`MessageBody`). Stable for the list's life. */
+  readonly linkInfo?: LinkInfo
   readonly onToggleReaction?: (ts: string, name: string) => void
   /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
   readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
@@ -192,6 +195,7 @@ export const Message = memo(function Message({
   onOpenThread,
   onChannel,
   onLink,
+  linkInfo,
   onToggleReaction,
   onSetReaction,
   onFocus,
@@ -288,7 +292,7 @@ export const Message = memo(function Message({
         {editor !== undefined ? (
           editor
         ) : message.kind === 'message' ? (
-          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabbable={tabbable} />
+          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} />
         ) : (
           <Text variant="body" tone="muted" as="p" sx={styles.placeholder}>
             {message.kind === 'deleted' ? 'This message was deleted.' : 'Loading message'}

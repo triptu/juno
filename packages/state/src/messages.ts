@@ -30,6 +30,7 @@ import {
   messagesList,
   messagesLoadOlder,
   messagesLocate,
+  peopleLocate,
   THREADS_WINDOW_MAX,
   topicsGet,
   topicsOpen,
@@ -130,8 +131,12 @@ export const messageListAtom = Atom.family((view: string) =>
 /** Fetches what the store lacks for a topic a tab now shows. Never in a prefetch. */
 export const openTopic = (registry: Registry, id: string) => runCommand(registry, topicsOpen, { id })
 
-/** The topic that holds a message (its thread, or Main), for a Juno source link. */
-export const locateMessage = (registry: Registry, channel: string, ts: string) => runCommand(registry, messagesLocate, { channel, ts })
+/** The topic that holds a message (its thread, or Main), for a Juno source link or a Slack link in a message. */
+export const locateMessage = (registry: Registry, channel: string, ts: string | undefined, threadTs?: string) =>
+  runCommand(registry, messagesLocate, { channel, ...(ts === undefined ? {} : { ts }), ...(threadTs === undefined ? {} : { threadTs }) })
+
+/** A person a Slack profile link names, and your DM with them when you have one. */
+export const locatePerson = (registry: Registry, user: string) => runCommand(registry, peopleLocate, { user })
 
 /**
  * A view's window asked for again: its own subscription can start while the

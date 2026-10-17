@@ -1,12 +1,13 @@
 import { memo, useEffect, useRef } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, openExternal, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
+import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
 import { closeTabById, openTopic, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
+import { messageLinkInfo, openMessageLink } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { downloadMessageFile, useTopicFiles } from './topic/files'
@@ -198,7 +199,8 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
-      onLink={openExternal}
+      onLink={openMessageLink}
+      linkInfo={messageLinkInfo}
       onDownload={downloadMessageFile}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
       {...(readOnly ? {} : rowActions(list, messageActions, files.setViewing))}

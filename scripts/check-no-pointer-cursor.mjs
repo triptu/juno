@@ -12,7 +12,7 @@ const skip = new Set(['node_modules', 'out', 'dist', 'release', 'test-results', 
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.css', '.html'])
 const pattern = /cursor\s*:\s*['"]?pointer\b/i
 // Only message links that open in the browser may use the hand cursor.
-const allowlist = new Map([['packages/views/src/MessageBody.tsx', '// external-link-cursor']])
+const allowlist = new Map([['packages/views/src/MessageLink.tsx', '// external-link-cursor']])
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {

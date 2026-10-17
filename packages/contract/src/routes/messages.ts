@@ -23,6 +23,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { TopicKind } from '@juno/domain'
 import { MessageBody } from '../body'
+import { Person } from '../refs'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { RowChannel, TitleSource, TopicStatus } from './topics'
@@ -352,12 +353,30 @@ export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
  * The topic that holds a message, from the store: its thread when it is a
  * reply or a thread's root, else the channel's Main. A message the store
  * does not have is placed in Main. For a Juno source link (SPEC 13.1), which
- * names only the channel and the message.
+ * names only the channel and the message, and a Slack link in a message
+ * (SPEC 8, "Links"), which may also name the thread.
  */
 export const messagesLocate = Rpc.make('messages.locate', {
-  payload: { channel: Schema.String, ts: Schema.String },
-  success: Schema.Struct({ topicId: Schema.String }),
+  /** Without `ts`, a link to the channel: its Main. */
+  payload: { channel: Schema.String, ts: Schema.optionalKey(Schema.String), threadTs: Schema.optionalKey(Schema.String) },
+  success: Schema.Struct({
+    topicId: Schema.String,
+    /** The store holds the message, so the topic can open at it without asking Slack. */
+    stored: Schema.Boolean,
+    /** "#eng", "Maya Chen": the conversation's label. Absent when the store does not know the conversation, so Juno cannot open it. */
+    place: Schema.optionalKey(Schema.String),
+  }),
   error: NotSignedIn,
 })
 
-export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLocate)
+/**
+ * A person a Slack profile link names (SPEC 8, "Links"): your DM with them
+ * when you have one. `person` is absent when the store does not know them.
+ */
+export const peopleLocate = Rpc.make('people.locate', {
+  payload: { user: Schema.String },
+  success: Schema.Struct({ person: Schema.optionalKey(Person), mainId: Schema.optionalKey(Schema.String) }),
+  error: NotSignedIn,
+})
+
+export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLocate, peopleLocate)

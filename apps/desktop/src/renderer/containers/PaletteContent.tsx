@@ -53,13 +53,7 @@ import { closePalette } from './paletteActions'
 import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { scopeToChannel, showChannelMenu, type MenuChannel } from './placeMenus'
-
-/** The ts just after `ts`, so a page fetched "before" it includes it. */
-function justAfter(ts: string): string {
-  const [seconds = '0', micros = '0'] = ts.split('.')
-  const next = Number(micros) + 1
-  return next >= 1_000_000 ? `${Number(seconds) + 1}.000000` : `${seconds}.${String(next).padStart(6, '0')}`
-}
+import { justAfter } from './slackLinks'
 
 /**
  * A message result: its topic, opened at it, and it flashes. A match only

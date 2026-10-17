@@ -427,6 +427,8 @@ The shared mention suggestion list also shows local emoji matches: glyph or work
 
 In messages a link shows its label, with the URL as its tooltip, and a click opens it in the default browser (http, https and mailto only). It is the one place the pointer cursor is allowed.
 
+[built slack links] A Slack link to the signed-in workspace (permalink, app.slack.com, `slack://`, profile link; `parseSlackLink` in `@juno/state`) opens inside Juno instead (`containers/slackLinks.ts`, SPEC 8 "Links"): it keeps the arrow cursor and the same look (`MessageBody` `linkInfo`, `data-in-app`), and on hover its tooltip becomes the place and kind, "#eng · Thread", "#eng · Main" or the person's name, from `messages.locate` / `people.locate` (local queries). Click: a new tab at the message, which flashes; ⌘-click: the tab behind the current one; a tab already showing the topic is reused. A message the store lacks is fetched with the page that ends at it (`messages.loadOlder`) before the tab opens. A conversation the store does not know, or one Slack refuses, opens in the browser (or Slack for `slack://`) with the toast "Juno cannot reach that conversation · Opened in the browser" ("· Opened in Slack"); an unknown person, "Juno does not know that person · …".
+
 ### 7.2 Audience warning
 
 While typing in a **public** channel, if the draft matches hiring/people terms (offer, salary, comp, candidate, layoffs, performance review, headcount, fired, onsite), a line appears at the top of the box: margin `8 8 0`, padding 6 10, radius 6, bg warning-14% over surface, text warning-45% over fg, 12px, `sparkles` 13: "This reads like hiring or people detail. eng is a public channel." Disappears as soon as the draft stops matching. Not a block.
@@ -837,7 +839,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | ⌘, | anywhere | Settings, at General (shown in the avatar menu) |
 | Esc | anywhere | Close palette, picker, menus, popovers; dismiss send check; cancel rename; close the Juno panel from its empty composer |
 | Enter / Space | any `role="button"` (tabs, menu items, palette rows, Juno topic links) and the sidebar rows | Activate |
-| ⌘ click / ⌘ Enter | rows, tabs, links, palette, cards' Open topic | Open in a new tab |
+| ⌘ click / ⌘ Enter | rows, tabs, links, palette, cards' Open topic | Open in a new tab (a Slack link in a message: the tab behind the current one, since its click already opens a new tab) |
 | Enter / Shift Enter | composer, Juno input | Send / newline |
 | Enter / Esc | while a send check is shown | First option / back to editing |
 | ↑ ↓, Enter or Tab, Esc | @ and # suggestions | Move, insert, close |

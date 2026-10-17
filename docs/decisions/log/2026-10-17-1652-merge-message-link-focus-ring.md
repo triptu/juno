@@ -1,0 +1,1 @@
+- 10-17 16:52 · release-keeper · Merging slack-links-in-juno: message links render through MessageLink, which now takes the shared focus ring and the link underline token from main.

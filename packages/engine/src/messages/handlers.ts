@@ -30,11 +30,12 @@ import {
   ThreadSummary,
   type FetchOutcome,
 } from '@juno/contract'
-import { mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
+import { channelLabel, mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import type { SlackApiError } from '@juno/slack'
 import { Invalidation, liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import type { FetchReport } from '@juno/sync'
 import { pendingThread, resolveStartedThread } from '../startedThreads'
+import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { SyncLink } from '../syncLink'
@@ -42,6 +43,22 @@ import { Workspace, type StoreServices } from '../workspace'
 import { channelThreads, topicDetail } from './detail'
 import { forgetLookups, listMessages, makeMessageCache } from './query'
 import type { WindowTarget } from './window'
+
+/** A conversation's label ("#eng", "Maya Chen"), or undefined when the store does not know it or you are not in it. */
+const placeLabel = (channel: string) =>
+  Effect.gen(function* () {
+    const sql = yield* StoreReader
+    const rows = yield* sql<{ kind: 'public' | 'private' | 'im' | 'mpim'; name: string | null; user_id: string | null; member_ids_json: string | null; is_member: number }>`SELECT kind, name, user_id, member_ids_json, is_member FROM conversations WHERE id = ${channel}`
+    const row = rows[0]
+    if (row === undefined || (row.kind !== 'public' && row.is_member === 0)) return undefined
+    const people = row.kind === 'im' ? (row.user_id === null ? [] : [row.user_id]) : row.kind === 'mpim' ? parseIds(row.member_ids_json) : []
+    const self = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id
+    const others = people.filter((id) => id !== self)
+    const users = others.length === 0 ? [] : yield* sql<UserRow>`SELECT id, name, COALESCE(NULLIF(real_name, ''), NULLIF(display_name, '')) AS display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(others)}`
+    const nameOf = (id: string) => userName(id, users.find((user) => user.id === id))
+    if (row.kind === 'im') return others[0] === undefined ? row.name ?? channel : nameOf(others[0])
+    return channelLabel({ kind: row.kind, name: row.name ?? channel, memberNames: others.map(nameOf) })
+  })
 
 const encodeMessage = Schema.encodeSync(Schema.toCodecJson(MessageView))
 const encodeThread = Schema.encodeSync(Schema.toCodecJson(ThreadSummary))
@@ -154,18 +171,32 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           const { outcome } = yield* fetch((fetcher) => fetcher.open(payload.id))
           return { outcome }
         }),
-      'messages.locate': ({ channel, ts }) =>
+      'messages.locate': ({ channel, ts, threadTs }) =>
         Effect.gen(function* () {
           const open = yield* workspace.current
           if (open === undefined) return yield* new NotSignedIn()
-          const rows = yield* Effect.gen(function* () {
+          const { row, place } = yield* Effect.gen(function* () {
             const sql = yield* StoreReader
-            return yield* sql<{ thread_ts: string | null; reply_count: number }>`SELECT thread_ts, reply_count FROM messages WHERE channel = ${channel} AND ts = ${ts}`
+            const rows = ts === undefined ? [] : yield* sql<{ thread_ts: string | null; reply_count: number }>`SELECT thread_ts, reply_count FROM messages WHERE channel = ${channel} AND ts = ${ts}`
+            return { row: rows[0], place: yield* placeLabel(channel) }
           }).pipe(Effect.provide(open.context), Effect.orDie)
-          const row = rows[0]
-          // A reply names its thread; a root with replies is its own thread's first message.
-          const thread = row?.thread_ts ?? (row !== undefined && row.reply_count > 0 ? ts : undefined)
-          return { topicId: thread === undefined ? mainTopicId(channel as ChannelId) : threadTopicId(channel as ChannelId, thread as Ts) }
+          // A link may name the thread; else a reply names its thread, and a root with replies is its own thread's first message.
+          const thread = (threadTs !== undefined && threadTs !== ts ? threadTs : undefined) ?? row?.thread_ts ?? (row !== undefined && row.reply_count > 0 ? ts : undefined)
+          const topicId = thread === undefined ? mainTopicId(channel as ChannelId) : threadTopicId(channel as ChannelId, thread as Ts)
+          return { topicId, stored: row !== undefined, ...(place === undefined ? {} : { place }) }
+        }),
+      'people.locate': ({ user }) =>
+        Effect.gen(function* () {
+          const open = yield* workspace.current
+          if (open === undefined) return yield* new NotSignedIn()
+          return yield* Effect.gen(function* () {
+            const sql = yield* StoreReader
+            const users = yield* sql<UserRow>`SELECT id, name, COALESCE(NULLIF(real_name, ''), NULLIF(display_name, '')) AS display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id = ${user} AND deleted = 0`
+            if (users[0] === undefined) return {}
+            const dms = yield* sql<{ id: string }>`SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = ${user} AND d.is_member = 1
+              AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1`
+            return { person: personFrom(user, users[0]), ...(dms[0] === undefined ? {} : { mainId: mainTopicId(dms[0].id as ChannelId) }) }
+          }).pipe(Effect.provide(open.context), Effect.orDie)
         }),
       'messages.loadOlder': (payload) =>
         Effect.gen(function* () {

@@ -454,6 +454,26 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
   openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts, { anchorKey: ts, offset: MESSAGE_TOP })
 }
 
+/**
+ * ⌘-click on a Slack link in a message (SPEC 8, "Links"): the topic in a new
+ * tab after the current one, which stays active, as `openTopicInBackground`.
+ * The new tab takes the window around the message and starts at it, and the
+ * message flashes when the tab is first shown.
+ */
+export function openTopicAtInBackground(id: string, ts: string): void {
+  flushSidebar(registry)
+  flashMessage(registry, id, ts)
+  queue = queue.then(() => {
+    const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
+    const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true }))
+    const tab = next.tabs.find((each) => !before.has(each.id))
+    if (tab === undefined) return
+    const view = topicView(id, tab.id)
+    registry.set(messageWindowSpecAtom(view), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+    registry.set(scrollSnapshotAtom(view), { anchorKey: ts, offset: MESSAGE_TOP })
+  })
+}
+
 /** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes. */
 export async function openSlackMessage(channel: string, ts: string, options: OpenOptions = {}): Promise<void> {
   const located = await locateMessage(registry, channel, ts)

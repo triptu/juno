@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
-import type { MouseEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
-import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
-import { Chip, CodeBlock, Divider, focusRing, Text, type HueName } from '@juno/ui'
+import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
+import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
+import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -14,8 +15,10 @@ export interface MessageBodyProps {
   readonly hueOf: (id: string) => HueName
   /** A `#channel` chip was clicked: scope the sidebar to it. */
   readonly onChannel?: (id: string) => void
-  /** A link was clicked: open it in the browser. */
-  readonly onLink?: (url: string) => void
+  /** A link was clicked: open it, inside Juno for a Slack link to this workspace, else in the browser. */
+  readonly onLink?: (url: string, event: ActivateEvent) => void
+  /** Which links open inside Juno, and where they go. Without it every link opens outside. */
+  readonly linkInfo?: LinkInfo
   /**
    * The message row is the list's tabbable one (roving tabindex). The
    * #channel chips and links follow it, so Tab does not stop at every chip
@@ -44,17 +47,18 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
 
 /**
  * Draws a `MessageBody`: paragraphs, quotes, code, lists, headings and
- * rules, with mentions as chips, links that open outside, emoji and dates.
+ * rules, with mentions as chips, links (Slack links to this workspace open
+ * inside Juno, the rest outside), emoji and dates.
  * Files are not drawn here; the message draws them from its `files`. Text
  * is selectable and follows its own direction.
  */
-export function MessageBody({ body, now, hueOf, onChannel, onLink, tabbable = false }: MessageBodyProps) {
+export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tabbable = false }: MessageBodyProps) {
   const jumbo = isEmojiOnly(body)
   const tabIndex = tabbable ? 0 : -1
   return (
     <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo)}>
       {body.blocks.map((block, index) => (
-        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
+        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
       ))}
     </div>
   )
@@ -65,34 +69,35 @@ interface BlockProps {
   readonly now: number
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
-  readonly onLink: ((url: string) => void) | undefined
+  readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
+  readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
 }
 
-function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
+function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: BlockProps) {
   switch (block.kind) {
     case 'attachment':
       return <AttachmentCard attachment={block} tabbable={tabIndex === 0}
-        title={<Inlines inlines={block.title} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />}
-        footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />}>
-        {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />)}
+        title={<Inlines inlines={block.title} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />}
+        footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />}>
+        {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)}
       </AttachmentCard>
     case 'image':
       return <AttachmentImage image={block} />
     case 'fields':
-      return <AttachmentFields items={block.items} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />} />
+      return <AttachmentFields items={block.items} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />} />
     case 'context':
-      return <div {...stylex.props(styles.context)}><Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} /></div>
+      return <div {...stylex.props(styles.context)}><Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} /></div>
     case 'paragraph':
       return (
         <p dir="auto" {...stylex.props(styles.paragraph)}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
         </p>
       )
     case 'quote':
       return (
         <blockquote dir="auto" {...stylex.props(styles.quote)}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
         </blockquote>
       )
     case 'code':
@@ -115,7 +120,7 @@ function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
                 </span>
               ) : null}
               <span {...stylex.props(checklist && block.style === 'checked' && styles.done)}>
-                <Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
+                <Inlines inlines={item} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
               </span>
             </li>
           ))}
@@ -125,7 +130,7 @@ function Block({ block, now, hueOf, onChannel, onLink, tabIndex }: BlockProps) {
     case 'heading':
       return (
         <Text variant="heading" tone="default" as="p" dir="auto" selectable sx={styles.heading}>
-          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />
+          <Inlines inlines={block.children} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
         </Text>
       )
     case 'divider':
@@ -145,12 +150,13 @@ interface InlinesProps {
   readonly now: number
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
-  readonly onLink: ((url: string) => void) | undefined
+  readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
+  readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
 }
 
-function Inlines({ inlines, now, hueOf, onChannel, onLink, tabIndex }: InlinesProps) {
-  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} tabIndex={tabIndex} />)
+function Inlines({ inlines, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: InlinesProps) {
+  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)
 }
 
 interface InlineProps {
@@ -158,25 +164,17 @@ interface InlineProps {
   readonly now: number
   readonly hueOf: (id: string) => HueName
   readonly onChannel: ((id: string) => void) | undefined
-  readonly onLink: ((url: string) => void) | undefined
+  readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
+  readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
 }
 
-function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps) {
+function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: InlineProps) {
   switch (inline.kind) {
     case 'text':
       return styled(inline.text, inline.style)
-    case 'link': {
-      const open = (event: MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault()
-        onLink?.(inline.url)
-      }
-      return (
-        <a href={inline.url} title={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, focusRing.outside)}>
-          {styled(inline.text, inline.style)}
-        </a>
-      )
-    }
+    case 'link':
+      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex}>{styled(inline.text, inline.style)}</Link>
     // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
     // right-to-left paragraph (otherwise the "@" jumps to the other end).
     case 'user':
@@ -231,15 +229,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, tabIndex }: InlineProps
       const label = slackDate(inline.timestamp, inline.format, now)
       const time = <time dateTime={new Date(inline.timestamp * 1000).toISOString()}>{label}</time>
       if (inline.url === undefined) return time
-      const open = (event: MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault()
-        onLink?.(inline.url ?? '')
-      }
-      return (
-        <a href={inline.url} onClick={open} draggable={false} tabIndex={tabIndex} {...stylex.props(styles.link, focusRing.outside)}>
-          {time}
-        </a>
-      )
+      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex}>{time}</Link>
     }
   }
 }
@@ -343,14 +333,6 @@ const styles = stylex.create({
   },
   rule: {
     marginBlock: spacing['--space-1'],
-  },
-  link: {
-    color: accent['--hl-text'],
-    textDecorationLine: 'underline',
-    textDecorationColor: colors['--link-underline'],
-    textUnderlineOffset: sizes['--link-underline-offset'],
-    cursor: 'pointer', // external-link-cursor
-    borderRadius: radii['--radius-xs'],
   },
   bold: {
     fontWeight: weights['--weight-semibold'],
