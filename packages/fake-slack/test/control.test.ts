@@ -211,7 +211,10 @@ describe('control API', () => {
     expect(marked.subscription.thread_ts).toBe(thread.root_msg.ts)
     expect(marked.subscription.last_read).toBe(thread.root_msg.latest_reply)
     const after = await client.ok('subscriptions.thread.getView', { limit: 50 })
-    expect(after.threads.find((t) => t.root_msg.ts === thread.root_msg.ts)?.unread_replies).toHaveLength(0)
+    // Read, the view carries the latest replies and no unread ones, as live.
+    const read = after.threads.find((t) => t.root_msg.ts === thread.root_msg.ts)
+    expect(read?.unread_replies).toBeUndefined()
+    expect(read?.latest_replies?.length).toBeGreaterThan(0)
     socket.close()
   })
 

@@ -122,7 +122,10 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     const latest = root.latest_reply!
     expect(await client.ok('subscriptions.thread.mark', { channel: root.channel, thread_ts: root.thread_ts, ts: latest, read: true })).toEqual({ ok: true })
     const after = await client.allThreadViews()
-    expect(after.find((t) => t.root_msg.ts === root.ts)?.unread_replies).toHaveLength(0)
+    // Read, the view carries the latest replies and no unread ones, as live.
+    const read = after.find((t) => t.root_msg.ts === root.ts)
+    expect(read?.unread_replies).toBeUndefined()
+    expect(read?.latest_replies?.length).toBeGreaterThan(0)
 
     const removed = await client.ok('subscriptions.thread.remove', { channel: root.channel, thread_ts: root.thread_ts, last_read: latest })
     expect(removed.subscription?.active).toBe(false)

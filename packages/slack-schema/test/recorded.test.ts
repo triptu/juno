@@ -67,7 +67,9 @@ describe('recorded responses', () => {
       expect(thread.root_msg.channel).toMatch(/^[CDG]/)
       expect(thread.root_msg.thread_ts).toBe(thread.root_msg.ts)
       expect(thread.root_msg.reply_count).toBeGreaterThan(0)
-      expect(thread.latest_replies?.length).toBeGreaterThan(0)
+      // An unread thread carries its unread replies in place of the latest ones.
+      expect((thread.latest_replies ?? thread.unread_replies)?.length).toBeGreaterThan(0)
+      expect(thread.latest_replies === undefined || thread.unread_replies === undefined).toBe(true)
     }
   })
 
