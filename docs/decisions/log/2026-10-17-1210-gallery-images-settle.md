@@ -1,0 +1,1 @@
+- 10-17 12:10 · ci-fix-21 · Gallery tests open a state only once its images have loaded or failed (`openState`), so a failed unfurl image collapsing its box is part of the state, not of the first touch. The collapse itself stays, as decided on 10-16.

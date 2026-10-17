@@ -861,6 +861,8 @@ Causes found so far (2026-10-15):
 
 - **Boxes measured before the web fonts.** A gallery test that compares boxes must wait for the fonts, as `openState` in `apps/gallery/support.ts` does. In a fallback font the Home title is 37 px wider and each meta line 2 px taller.
 
+- **An image that failed after the state looked drawn.** `AttachmentCard/failed-image` draws its preview's box, then the image fails to decode and the card removes the box, as unfurls do (decision 10-16, avatars-unfurls): the footer moves up 197 px. That happens on every open, about 15 ms after the frame shows; under load it landed in the shift guard's first hover, which reported the footer going from `0x0` to drawn (3 runs on 10-17, on the Mac and on Linux; 0 of 20 walks on a quiet machine). `openState` now also waits until the frame's images have loaded or failed, and two frames, before a test touches the state. The held Avatar photo and lazy images out of view are not waited for.
+
 - **A dropped first value in a live query trigger.** `notifications.status` dropped the first value of the presence stream as if the first run had already read it, but the two start together. When the launch schedule set presence in between, the menu never learned it and "Set yourself away" did nothing visible (103 of 300 runs, 8 workers). A trigger that carries state must not drop its first value.
 
 - **A row drawn at its estimate next to a held row.** When an older page went in above the rows in view, its rows were laid out at their size estimate; the one between the top of the view and the held row grew a frame later and moved what was on screen (the long-thread topic test, 12 of 200). The page's rows above the held row are now laid out in full (`eagerRows` in `containers/topic/scroll.ts`).
