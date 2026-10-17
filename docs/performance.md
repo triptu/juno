@@ -25,7 +25,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the sidebar box's inline `width` changes, at most once per frame; nothing re-renders until the drag ends. A custom property on the shell cost 4.7 ms of style recalculation per frame, because every element under it inherits it. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
 | Sidebar filter or scope change | 50 ms | Query, delta, render. The old list stays on screen until the new one is ready. |
 | ⌘K open | 50 ms | Input focused and recent rows painted. |
-| Media viewer open | 50 ms | `pointerdown` on a picture in a message → the viewer painted with the item's thumbnail in its final box and the filmstrip. The budget of the other overlays (⌘K). The chunk is preloaded once a topic has painted; strip images load lazily and the full image fades in later. Measured by `media viewer open` in `perf.spec.ts`. |
+| Media viewer open | 50 ms | `click` on a picture in a message (its activating event; a press is held about 60 ms before it) → the viewer painted with the item's thumbnail in its final box and the filmstrip. The budget of the other overlays (⌘K). The chunk is preloaded once a topic has painted; strip images load lazily and the full image fades in later. Measured by `media viewer open` in `perf.spec.ts`. |
 | ⌘K keystroke → results painted | 100 ms, typing never blocked | Local FTS only. The AI command parse arrives later and never delays results. |
 | Keystroke → character painted (composer, ⌘K, any text field) | Within one refresh interval of a bare `<input>` measured in the same run (8.3 ms at 120 Hz, 16.7 ms at 60 Hz), p95; zero long animation frames while typing | Input event timestamp to its frame's presentation feedback; see 7.1. Until 10-15 this was an absolute 16 ms, which the bare input misses too. Event Timing is diagnostic only. The @ and # suggestions keep to it: each keystroke narrows the last answer in the renderer and the engine's answer follows (`mentions.people`, `mentions.channels`, local only). Measured by `mention typing` in `perf.spec.ts` (each keystroke of "@ma ", against the bare input as the keystroke controls are) and checked by the `mention-typing` feel scenario. |
 | Send (Enter) → pending message painted | 50 ms | Only ready wrong-place routing may stop a send; Enter never waits for a model. Text fixes show after sending; the grammar request starts on the typing pause, so its answer is usually ready by send. Results paint within one second on the same topic or are dropped. The suggestion is an overlay with no reserved space. |
@@ -149,7 +149,7 @@ Why TanStack Virtual over the others (versions as of 2026-10-12). `@tanstack/rea
 - A row's height never depends on its place in the window. The engine decides a row's header (`groupStart`) from the message before it, reading one row past the window's oldest for the first row, and only the topic's first message sits flush (no top margin). Before this, the window's first row always had a header and no margin, so an older page arriving above it took both away and moved everything below it by about 20 px.
 - Rows are a whole number of pixels tall. A row laid out for the first time above the view grows from the 56 px estimate, and scroll anchoring moves `scrollTop` by the difference, but `scrollTop` lands on device pixels. With text at 23.2 px a line, the difference was fractional, so the rows in view were left up to a quarter pixel off and their text jumped a device pixel for a frame (the feel suite's long-thread flicker). The message's content box rounds its height up to a whole pixel (`height: calc-size(auto, round(up, size, 1px))`), so this holds for any content; `apps/gallery/behaviour.spec.ts` checks every message row in the gallery.
 - Window cap: 500 rows. Beyond it, the end furthest from the viewport is dropped from the subscription window. Dropping rows at the bottom clears `isAtBottom`; "Jump to bottom" re-anchors the window at the end and scrolls there.
-- Partial message caches carry `meta.windowCovered` from the message query. An isolated socket or search result does not establish the initial scroll position. The header and empty body still paint within the 50 ms uncached budget; the list waits for history coverage around the read pointer or the fetch outcome. Offline fetches expose the available cache. The divider keeps its eager rows after the deferred rows mount.
+- Partial message caches carry `meta.windowCovered` from the message query. An isolated socket or search result does not establish the initial scroll position. A thread counts as covered only by replies stored in full: a reply a search match stored (`messages.partial`) has no reactions or files yet, so a window painted from it grew when the open's replies page landed (fixed 10-17, section 8.6). The header and empty body still paint within the 50 ms uncached budget; the list waits for history coverage around the read pointer or the fetch outcome. Offline fetches expose the available cache. The divider keeps its eager rows after the deferred rows mount.
 - Messages reserve space only for content they already have (SPEC 7, "Stable geometry"): images and files of known size, and reactions or a thread link the row lists, whose chips and link are a fixed height before their images load. Nothing is held for a reaction, thread link or name that might arrive. From 10-15 to 10-16 every row held a reaction line and, in Main, a thread-link line, and every name a 128px slot; on real data that was 60px or more of empty space under each message and a time far from its name. A first chip or link grows its row at the bottom: rows above the view are absorbed by scroll anchoring, and at the bottom the stick-to-bottom effect holds the end before paint. A name that resolves late moves the time along its line. `apps/gallery/message-geometry.spec.ts` checks that rows hold no empty space, that senders sit the group gap apart and runs touch, and that the time follows the name. The Threads counter reserves its button width.
 - Late-loading images never change layout: every image box gets `aspect-ratio` and a max size from Slack's `thumb_w`/`thumb_h` (or `original_w`/`original_h`) before the bytes arrive. A file with no dimensions renders as a fixed-height card. The catch-up card and the grouping suggestion arrive after the first paint; they insert above the anchor and scroll anchoring absorbs them, but they must still have no entering animation that changes height.
 - Messages set `content-visibility: auto; contain-intrinsic-size: auto 56px` and `contain: content`. Text is selectable (`user-select: text` on bodies, `none` on chrome). Because rows stay in flow, selection and ⌘F behave like a normal page for the whole window.
@@ -919,6 +919,102 @@ last row of a 30-row sidebar its art while the row is skipped, waits past
 the fade, scrolls it into view and reads the placeholder in the first
 frame drawn: opacity 0 and no running animation, with and without reduced
 motion. On the old code it read opacity 0.94 with a running transition.
+
+### 8.6 A quiet-Mac pass after the 10-17 merges (10-17)
+
+Full `pnpm perf` and `pnpm test:feel` runs on the shared M2 (60 Hz, so a
+one-frame budget is 24.7 ms), at night with no other agent's job holding
+the lock. "Before" is main at `10317936`; "after" is this pass's branch on
+main at `4574f250`, which also keeps the engine's background AI jobs off in
+tests (`49a76117`). Load was 2 to 5.5, except warm start in the first run
+(7.7). ms, p95 unless marked.
+
+| Metric | Before | After | Budget |
+| --- | --- | --- | --- |
+| Topic open, uncached | 38.3 | 36.0 | 50 |
+| Topic open, cached / prefetched | 18.0 / 20.2 | 18.1 / 19.5 | 50 / 24.7 |
+| Tab switch, mounted / unmounted | 18.4 / 19.2 | 19.0 / 18.0 | 24.7 / 50 |
+| Peek open | 12.1 | 15.5 | 24.7 |
+| Home open, including after idle | **116.5** | **65.1** | 50 |
+| Media viewer open | did not run | 11.0, from the click | 50 |
+| Filter change | 21.8 | 21.8 | 50 |
+| ⌘K open / keystroke to rows | 12.7 / 30.8 | 18.2 / 29.4 | 50 / 100 |
+| Send / send in Main | 35.1 / 41.7 | 35.7 / 39.0 | 50 |
+| Live update, sidebar / open thread | 15.8 / 26.3 | 19.4 / 28.1 | 50 |
+| Row hover | 13.1 | 7.5 | 24.7 |
+| Juno panel open / chat send to bubble | 18.7 / 21.2 | 17.8 / 22.3 | 24.7 |
+| New chat open | 18.1 | 18.0 | 24.7 |
+| All topics open | 23.6 | 19.5 | 50 |
+| First opens in a second app (account, switcher, emoji, Settings) | 16.3, 15.5, 34.0, 20.6 | 16.8, 16.2, 33.1, 18.1 | 50 |
+| Warm start to shell / rows, median | 375.6 / 490.6 | 385.7 / 438.8 | 400 / 500 |
+| Sidebar drag, work per frame | 6.7 | 6.4 | 8.3 |
+| Sidebar scroll, continuous / held-clock | 5.0 / 4.2, **2 long frames** | 5.7 / 4.0 | 8.3 / 7 |
+| All topics scroll | 6.6 / 5.2 | 5.7 / 4.7 | 8.3 / 7 |
+| Message scroll and prepend | **stopped at 250 rows** | 6.4 / 3.5, 0 px shift | 8.3 / 7 |
+| Chat scroll | 5.2 / 3.6 | 4.8 / 3.6 | 8.3 / 7 |
+
+Keystrokes stayed within one refresh interval of the same run's bare
+input in every surface (after: composer 51.8 against a 56.1 budget, emoji
+58.4 against 71.2). The initial JS is 1,047.0 KB of 1,100 KB.
+
+The first run passed 21 of 25 scenarios, the after run 24 of 25. The feel
+suite went from 14 of 18 to 18 of 18.
+
+- **Uncached topic open was load.** The 195 ms reading on 10-16 was taken
+  with about 14 agents on the Mac. Quiet, it measured 38.3 and 36.0 ms,
+  within 50.
+- **Media viewer (test fixed).** The scenario timed out: `#eng` opens at
+  its divider, so the injected message sat under the composer and the
+  press missed the picture. Once it was in view, the open measured
+  84.6 ms, because a tile opens the viewer on `click` and the measure
+  started at `pointerdown`, holding the driver's 60 ms press. It is now
+  timed from the click, as the first-open popovers are (decision log,
+  10-17 05:17); the budget is unchanged.
+- **Open at the bottom jumped 31 px (fixed).** A bisect over the merges
+  found `5820838d` (engine-small-1017). Since `893855e8`, a reply that a
+  search match stored is `partial` and the open fetches the thread's
+  replies again, which is how its reaction is first stored. But the
+  message query still counted partial replies as covering the window, so
+  the topic painted the search matches and the reaction grew the message
+  a frame later. The coverage check now counts only full replies, as the
+  open's own check does, so the body waits for the replies page like any
+  partial cache (3.3). A thread known only from search now shows its header and an
+  empty body until Slack answers, where before it showed incomplete rows.
+  The feel scenario opens the thread once first, so its recorded open
+  reads a full cache. A peek at such a thread waits for the same fetch
+  before it paints (it would otherwise paint an empty list and grow); a
+  warmed, covered topic still peeks in one frame.
+- **Palette feel scenario (test fixed).** Since ⌘K opened on Conversations
+  (`36fc9db2`), its six recent topics are on the Messages tab; the
+  scenario now waits for the Frequent rows.
+- **Not reproduced.** The first run's prepend that stopped at 250 rows
+  and the sidebar's two long frames (234 and 361 ms, no scripts and no
+  blocking time, the shape of the first wheel step after idle in 8.5)
+  passed on two reruns each, on both the old build and the new main. So
+  did the feel failures of the long thread with late images (an icon in
+  the header moved 40 px in frame 126) and of the tab restore (its row was
+  not found within 30 s at load 8.8).
+- **Open miss: Home open after idle.** Six runs of the same code read
+  116.5, 38.9, 43.0, 31.9, 65.1 and 72.2 ms; every miss is in the five
+  opens that follow a 31 s idle gap, when Home's subscription has expired.
+  Traced, the slow ones keep the main thread busy for the whole measure
+  (94.2 of 94.9 ms, 71.9 of 72.2 ms): taking down the topic (16 ms of
+  `removeChild`), mounting Home (layout 16 ms, paint 11 ms, text shaping
+  4 ms) and script. A quick open does the same work in about 10 ms. It
+  never waits on the engine, so warming `home.view` on hover would not
+  help; this is the low clock after an idle gap (8.5), which this
+  scenario meets on purpose. It was red on 10-16 too (79.8 ms). Next: a
+  held-clock reading of the same opens, as the scroll gates have, to
+  separate the clock from the work.
+- **Initial JS grew.** From 997.1 KB at `90928615` to 1,047.0 KB. Before
+  minification the entry gained about 99 KB, spread over the day's
+  features: the topic container's hooks (41 KB), the media grid (11 KB),
+  the workspace strip (9 KB), tooltips (8 KB), the reactors popover
+  (8 KB) and composer links (16 KB with their editor and rules), while
+  the topic view and the pickers shrank. No single dependency stands out.
+  Warm start passed; the 53 KB left is the room for the next features.
+
+Logs are under `.juno-status/perf-pass-1017/`.
 
 ### Engine speed measurements (2026-10-15)
 

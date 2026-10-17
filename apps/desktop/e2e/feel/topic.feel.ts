@@ -6,9 +6,15 @@ import { count, edgeKey, header, paneRegions, sidebarReorder, topicProbes } from
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 
-test('open a topic at its divider, then another at its bottom', async ({ juno, feel }) => {
+test('open a topic at its divider, then another at its bottom', async ({ juno, win, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
+  // After sign-in the thread's replies are search matches, which do not cover its window (performance.md 3.3);
+  // the first open brings them in full. Its subscription then expires, so the recorded open reads the cache.
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectMessage('Booked 2–4pm')
+  await juno.home.open()
+  await win.waitForTimeout(31_000)
 
   await feel.run(
     {

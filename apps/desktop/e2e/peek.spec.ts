@@ -127,12 +127,22 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
   await expect(link.root).toBeVisible()
   slack.resetCalls()
 
-  // Over the "6 replies" link: the thread shows at its message, and nothing on screen moves.
-  await expectNoLayoutShift(juno.win, async () => {
-    await link.peek()
-    await peek.expectShowing(POSTGRES)
-  })
+  // Over the "6 replies" link: the thread shows at its message, and nothing in the topic moves. Its replies
+  // are search matches until the peek's fetch brings them in full, which may also change the channel's
+  // sidebar row (its preview gives way to what lands at its end), so the check covers the topic.
+  await expectNoLayoutShift(
+    juno.win,
+    async () => {
+      await link.peek()
+      await peek.expectShowing(POSTGRES)
+    },
+    { root: '[data-topic-view]' },
+  )
+  // The peek paints whole: it waits for the full replies rather than growing when they land.
+  const first = await peek.root.boundingBox()
   await peek.expectMessage('Booked 2–4pm')
+  await juno.win.waitForTimeout(300)
+  expect(await peek.root.boundingBox()).toEqual(first)
   await topic.expectTitle('Main')
   await tabs.expectCount(1)
   // Beside the message, not over it, and only as tall as the thread.

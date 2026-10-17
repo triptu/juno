@@ -19,8 +19,10 @@ export const windowCovered = (target: WindowTarget, first: string | undefined) =
       SELECT reply_count, user_id, text, blocks_json FROM messages WHERE channel = ${target.channel} AND ts = ${target.threadTs}`
     const root = roots[0]
     if (root === undefined || (root.user_id === null && root.text === '' && root.blocks_json === null)) return false
+    // Only full replies count, as the open's own check does (`@juno/sync` open.ts): a search match lacks
+    // reactions and files, so a window painted from it grows when the replies page lands.
     const counts = yield* sql<{ n: number }>`SELECT count(*) AS n FROM messages
-      WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} AND ts <> ${target.threadTs} AND deleted = 0`
+      WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} AND ts <> ${target.threadTs} AND deleted = 0 AND partial = 0`
     if ((counts[0]?.n ?? 0) >= root.reply_count) return true
     const cursors = yield* sql<{ complete_from: string | null }>`SELECT complete_from FROM thread_cursors
       WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs}`

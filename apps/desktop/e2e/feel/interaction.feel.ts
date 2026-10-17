@@ -101,13 +101,13 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   })
 })
 
-test('palette opens with recent topics and holds still', async ({ juno, win, feel }) => {
+test('palette opens with frequent conversations and holds still', async ({ juno, win, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   const dialog = '[role="dialog"][aria-label="Search and commands"]'
   await feel.run({
     name: 'palette-open',
-    title: 'Open search with recent topics',
+    title: 'Open search with frequent conversations',
     probes: [
       { kind: 'rect', name: 'dialog', selector: dialog },
       { kind: 'box', name: 'dialogBox', selector: dialog },
@@ -117,7 +117,8 @@ test('palette opens with recent topics and holds still', async ({ juno, win, fee
   }, async (rec) => {
     await rec.mark('press')
     await juno.palette.open()
-    await expect(juno.palette.section('Recent').getByRole('option')).toHaveCount(6)
+    // ⌘K opens on Conversations, with the frequent ones first (palette.spec.ts).
+    await expect(juno.palette.section('Frequent').getByRole('option').first()).toBeVisible()
   })
   await win.keyboard.press('Escape')
   await juno.palette.expectClosed()
