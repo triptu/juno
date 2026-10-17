@@ -4,6 +4,10 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 18:44 · owner · Juno stays as the only row in the sidebar's nav list: it is a hero feature and keeps its own space (unread, ⌘J, busy sparkle); revisit the design only if it looks odd.
+- 10-17 18:44 · owner · This Mac is a spare the owner does not use, so agents may run perf, feel, e2e and gallery locally at any time, still through the heavy lock and the load limits.
+- 10-17 18:44 · owner · Auto-update reads a separate private repo (triptu/juno-releases) through a token scoped read-only to that repo; the changelog lives there and is fetched on demand.
+- 10-17 18:44 · owner · Juno's Slack sends to other people always need a click on their card; they never go through auto-review, since Slack messages cannot be unsent.
 - 10-17 18:08 · release-keeper · Batch worktrees, helper worktrees and the packaging deploy copy go on /Volumes/AgentWork when it is mounted, chosen by one helper (scripts/worktree-folder.mjs), so their file churn stays off the main disk.
 - 10-17 18:05 · ci-fix-26 · A Juno chat send no longer does nothing while an attached image is still being read: it waits for an image Juno takes and leaves out one that stays, as a send already waited for files that were read.
 - 10-17 17:55 · gallery-compact · The gallery draws states in Compact, the app's default density, so reviews and screenshots show what people see. A state can ask for Comfortable with `frame.density` (Appearance settings, the Appearance page, one message list, one topic row), and `density=comfortable` or `density=compact` in the address overrides both. The geometry specs expect Compact sizes; in Compact the message toolbar meets the row's edge instead of coming 2px into it.
