@@ -8,6 +8,9 @@ import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
+test.use({ sidebarTrace: true })
+
 // Every test signs in and waits for the sync before it looks at rows.
 test.describe.configure({ timeout: 60_000 })
 

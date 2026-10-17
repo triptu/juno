@@ -77,22 +77,34 @@ const unknownConversations = (ids: ReadonlyArray<string>): Effect.Effect<Readonl
     return ids.filter((id) => !known.has(id))
   })
 
+/** The last tier Home waits for: unread followed threads. */
+const HOME_TIER = 3
+
 interface Active {
   readonly id: string
   readonly latest: Ts
 }
 
 /**
- * The cold boot's history order (owner, 2026-10-16): DMs and group DMs
- * first, then conversations with an unread mention of the user (in Main or
- * a followed thread), then those with unread replies in a followed thread,
- * then the ones where the store already holds the user's own messages (most
- * first), then the rest. Newest first within each tier. Order only: every
- * conversation is still read once.
+ * The cold boot's history order: the owner's order of 2026-10-16, with
+ * unread before read inside it (10-18), since each page makes its
+ * conversation's unread count exact. DMs and group DMs, the unread ones
+ * first; then conversations with an unread mention of the user (in Main or
+ * a followed thread); then those with unread replies in a followed thread;
+ * then the other unread channels; then the ones where the store already
+ * holds the user's own messages (most first); then the rest. Newest first
+ * within each tier. Order only: every conversation is still read once.
+ * `home` counts the leading conversations of the first three tiers (DMs,
+ * mentions, unread followed threads): Home is ready once they are read
+ * (owner, 10-18).
  */
-export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, counts: Counts): Effect.Effect<ReadonlyArray<Active>, SqlError, StoreWriter> =>
+export const historyOrder = (
+  ctx: SyncContext,
+  active: ReadonlyArray<Active>,
+  counts: Counts,
+): Effect.Effect<{ readonly order: ReadonlyArray<Active>; readonly home: number }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
-    if (active.length === 0) return active
+    if (active.length === 0) return { order: active, home: 0 }
     const sql = yield* StoreWriter
     const ids = active.map((conversation) => conversation.id)
     const kinds = new Map((yield* sql<{ id: string; kind: string }>`SELECT id, kind FROM conversations WHERE id IN ${sql.in(ids)}`).map((row) => [row.id, row.kind]))
@@ -101,14 +113,17 @@ export const historyOrder = (ctx: SyncContext, active: ReadonlyArray<Active>, co
     const entries = new Map(counts.entries.map((entry) => [entry.id, entry]))
     const tier = (id: string): number => {
       const kind = kinds.get(id)
-      if (kind === 'im' || kind === 'mpim') return 0
       const entry = entries.get(id)
-      if ((entry?.has_unreads === true && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 1
-      if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 2
-      return own.has(id) ? 3 : 4
+      const unread = entry?.has_unreads === true
+      if (kind === 'im' || kind === 'mpim') return unread ? 0 : 1
+      if ((unread && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 2
+      if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 3
+      if (unread) return 4
+      return own.has(id) ? 5 : 6
     }
     // A stable sort: `active` is newest first, and stays so within a tier.
-    return active.toSorted((a, b) => tier(a.id) - tier(b.id) || (tier(a.id) === 3 ? (own.get(b.id) ?? 0) - (own.get(a.id) ?? 0) : 0))
+    const order = active.toSorted((a, b) => tier(a.id) - tier(b.id) || (tier(a.id) === 5 ? (own.get(b.id) ?? 0) - (own.get(a.id) ?? 0) : 0))
+    return { order, home: order.filter((conversation) => tier(conversation.id) <= HOME_TIER).length }
   })
 
 /** Member conversations with activity inside the window, newest first. */

@@ -1,0 +1,1 @@
+- 10-18 03:45 · release-keeper · Every DMG built from a keeper-green commit is also published to triptu/juno-releases as the next patch version (0.1.1 first, from 66828cf7), with a "Release x.y.z" commit on main and 3–8 changelog lines. Why: no release had ever been published and every DMG was 0.1.0, so installs were never offered an update.

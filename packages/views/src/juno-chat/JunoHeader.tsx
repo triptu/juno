@@ -178,7 +178,8 @@ const styles = stylex.create({
   context: {
     display: { default: 'inline', [MINIMUM]: 'none' },
     flexShrink: 0,
-    color: colors['--foreground-muted'],
+    // Subtle, not muted: muted is 4.4:1 on the trigger's hover and open fill (tokens.md 1.7).
+    color: colors['--foreground-subtle'],
     whiteSpace: 'pre',
   },
   chipLine: {

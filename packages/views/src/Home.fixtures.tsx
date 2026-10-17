@@ -191,6 +191,9 @@ export default defineFixtures(
       'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
       // Mid-sync: the rows that landed so far, with room kept for the rest.
       'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      // Home is ready while the rest of history lands: no line, the rows shown, and room kept for one that lands later.
+      // Recent still keeps its room until the sync ends.
+      'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3, composer: write({ syncing: true }) }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },

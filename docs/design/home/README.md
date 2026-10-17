@@ -87,7 +87,7 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
 - Resolved, unfollowed and muted topics never appear.
-- Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer. During the first sync, rows are only added, into empty slots (see "Performance").
+- Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer. During the first sync, before and after Home is ready, rows are only added, into empty slots (see "Performance").
 
 ## Accessibility
 

@@ -15,11 +15,13 @@ export interface WorkspaceProps extends WorkspaceStripProps {
   /** What shows with no page, null for nothing. Default the empty state. */
   readonly empty?: ReactNode
   /**
-   * The Juno panel: a floating inspector on the right of the page below the
+   * The Juno panel or the web panel: a floating inspector on the right of the page below the
    * strip, inset by the header islands' gap. It gives way to keep the page
    * 480px wide, down to its minimum; under that it covers the page.
    */
   readonly side?: ReactNode
+  /** What `side` holds, which names its box. Default the Juno panel. */
+  readonly sideKind?: 'juno' | 'web'
   /** The panel's width in CSS pixels, 360 to 640. Default 440. */
   readonly sideWidth?: number
   /** A drag on the panel's edge ended at `width`. */
@@ -32,7 +34,7 @@ export interface WorkspaceProps extends WorkspaceStripProps {
 const COVER = '@container workspace-body (width < 856px)'
 
 /** The right pane: the tab strip (a window drag region, `WorkspaceStrip`) over the page. */
-export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onMoveTab, onTabContextMenu, leading, fullScreen, children, nothingShown = false, empty, side, sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
+export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onMoveTab, onTabContextMenu, leading, fullScreen, children, nothingShown = false, empty, side, sideKind = 'juno', sideWidth = JUNO_PANEL_WIDTH.default, onSideResize, onSideResetWidth }: WorkspaceProps) {
   return (
     <section aria-label="Workspace" {...stylex.props(styles.root)}>
       <WorkspaceStrip tabs={tabs} activeId={activeId} onSelectTab={onSelectTab} onCloseTab={onCloseTab} onNewTab={onNewTab} onMoveTab={onMoveTab} onTabContextMenu={onTabContextMenu} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} />
@@ -42,7 +44,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
           {children == null || nothingShown ? (empty === undefined ? <WorkspaceEmpty /> : empty) : null}
         </main>
         {side == null ? null : (
-          <SidePanel width={sideWidth} onResize={onSideResize} onReset={onSideResetWidth}>
+          <SidePanel kind={sideKind} width={sideWidth} onResize={onSideResize} onReset={onSideResetWidth}>
             {side}
           </SidePanel>
         )}
@@ -52,6 +54,7 @@ export function Workspace({ tabs = [], activeId, onSelectTab, onCloseTab, onNewT
 }
 
 interface SidePanelProps {
+  readonly kind: 'juno' | 'web'
   readonly width: number
   readonly onResize: ((width: number) => void) | undefined
   readonly onReset: (() => void) | undefined
@@ -67,7 +70,7 @@ const clampSide = (width: number) => Math.round(Math.min(JUNO_PANEL_WIDTH.max, M
  * a double-click asks for the default. The box's max-width keeps the page
  * at its minimum, so a wide panel gives way in a narrow window.
  */
-function SidePanel({ width, onResize, onReset, children }: SidePanelProps) {
+function SidePanel({ kind, width, onResize, onReset, children }: SidePanelProps) {
   const box = useRef<HTMLElement>(null)
   const drag = useRef<{ readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
   useLayoutEffect(() => {
@@ -106,7 +109,7 @@ function SidePanel({ width, onResize, onReset, children }: SidePanelProps) {
   }
 
   return (
-    <aside ref={box} aria-label="Juno" data-juno-panel="" {...stylex.props(styles.side)}>
+    <aside ref={box} {...(kind === 'juno' ? { 'aria-label': 'Juno', 'data-juno-panel': '' } : { 'aria-label': 'Web page' })} {...stylex.props(styles.side)}>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -170,12 +173,12 @@ const styles = stylex.create({
   // islands, so the page's header variables are set for the panel's own
   // top here: the row at 0, the band and list inset 8px shorter.
   side: {
-    // Not drawn until its chat or Juno page has mounted (the Juno chunk
-    // loads lazily), so the topic reflows and the panel appears in the same
-    // frame, never as an empty floating box.
+    // Not drawn until its chat, Juno page or web panel has mounted (the Juno
+    // chunk loads lazily), so the topic reflows and the panel appears in the
+    // same frame, never as an empty floating box.
     display: {
       default: 'flex',
-      ':not(:has([data-juno-chat], [data-juno-page]))': 'none',
+      ':not(:has([data-juno-chat], [data-juno-page], [data-web-panel]))': 'none',
     },
     position: {
       default: 'relative',

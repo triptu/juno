@@ -84,6 +84,7 @@ const context = (): Effect.Effect<SyncContext> =>
       photoless: new Set(),
       lateReactions: new Map(),
       fetchesInFlight: new Set(),
+      usersInFlight: new Map(),
       metadata: new Set(),
     } as SyncContext
   })

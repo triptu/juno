@@ -13,6 +13,7 @@ export {
   memoryPageAtom,
   PAGE_MAX,
   PAGE_ROWS,
+  rememberedAtom,
   remembersPageAtom,
   reviewPageAtom,
   scheduledPageAtom,

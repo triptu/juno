@@ -1,7 +1,8 @@
 /**
  * Slack links in messages (SPEC 8, "Links"). A link to a message, a channel
- * or a person in the signed-in workspace opens inside Juno; any other link
- * opens outside, as before.
+ * or a person in the signed-in workspace opens inside Juno. Any other web
+ * link opens in the web panel beside the topic, or in the browser with ⌘
+ * (`openWebLink`).
  *
  * - A message opens in its topic, at the message, which flashes, the way a
  *   search result lands: a reply in its thread, any other message in its
@@ -20,6 +21,7 @@ import {
   loadOlderMessages,
   openExternal,
   openInSlack,
+  openWebPanel,
   parseSlackLink,
   registry,
   showToast,
@@ -134,7 +136,13 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
   }
 }
 
-/** A click on a link in a message: inside Juno for a Slack link to this workspace, else outside. */
+/** A web link: in the web panel, or in the browser with ⌘ (SPEC 8). */
+export function openWebLink(url: string, event: ActivateEvent): void {
+  if (event.metaKey) openExternal(url)
+  else openWebPanel(registry, url)
+}
+
+/** A click on a link in a message: inside Juno for a Slack link to this workspace, else in the web panel or outside. */
 export function openMessageLink(url: string, event: ActivateEvent): void {
   const match = read(url)
   if (match?.ours === true) {
@@ -146,7 +154,9 @@ export function openMessageLink(url: string, event: ActivateEvent): void {
     openInSlack({ teamId: match.teamId, channelId: match.target.channel })
     return
   }
-  openExternal(url)
+  // Another workspace's web link needs its own Slack sign-in, which the browser has.
+  if (match !== undefined) openExternal(url)
+  else openWebLink(url, event)
 }
 
 /** For `MessageBody`: which links open inside Juno, and where they go. One object for the app's life (performance 5.1). */

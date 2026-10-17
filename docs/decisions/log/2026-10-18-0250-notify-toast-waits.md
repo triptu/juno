@@ -1,0 +1,1 @@
+- 10-18 02:50 · notify-toast-waits · A Notify me change shows its toast only once the notification settings live query holds the new level (at most one second after the command). Why: the command replies before the live query updates, so a menu opened right after the toast could show the old level, which the toast had already announced as changed.

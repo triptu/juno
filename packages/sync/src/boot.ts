@@ -13,11 +13,14 @@
  * conversations a preview within seconds. The other `getView` pages (10 per page
  * live, back to the quiet window) then run beside one history page per
  * active conversation (`historyOrder`: DMs, mentions, unread followed
- * threads and the user's own channels first, then newest first; background lane, skipping
+ * threads, other unread channels and the user's own channels first, then newest first; background lane, skipping
  * conversations an interrupted boot already covered), and beside history,
  * once the `getView` pages are stored, a latest-reply fetch for the
  * unfollowed threads it finds with the most recent activity, so their rows
- * have a preview. After history, beside the
+ * have a preview. Once the DMs, mentions and unread followed threads have
+ * their history, the `getView` pages are stored and the preview search is
+ * done, the Home marker (`HOME_READY_KEY`): Home is ready while the rest of
+ * history goes on. After history, beside the
  * previews still running: unknown users from the edge, then the discovery
  * sweep over the window, so Main knows about replies to roots older than
  * the window.
@@ -68,6 +71,14 @@ export const BOOT_KEY = 'boot'
  * the sidebar's rows are its own and it shows them while the rest fills in.
  */
 export const QUICK_START_KEY = 'quickStart'
+/**
+ * `sync_state.homeReady`: the cold boot has read what Home is made of (the
+ * history of DMs, mentions and unread followed threads, every `getView`
+ * page and the preview search), so Home is ready and its checks may start
+ * while the rest of history fills in (owner, 10-18). A finished boot
+ * (`BOOT_KEY`) means the same.
+ */
+export const HOME_READY_KEY = 'homeReady'
 /** `sync_state.me`: the user and their user groups, so a command outside the sync re-indexes with the same mention rules. */
 export const ME_KEY = 'me'
 
@@ -456,17 +467,23 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     )
     const threads = loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive', afterFirstPage: quickStart })
     // Once rows show, the newest messages of the workspace give the busiest channels a preview before their history lands.
+    const previewsDone = yield* Deferred.make<void>()
     const previews = Deferred.await(quickStarted).pipe(
       Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: bootTs })) : Effect.void),
+      Effect.ensuring(Deferred.succeed(previewsDone, undefined)),
     )
     // Each history page wakes the thread previews beside it.
     const landed = yield* Queue.sliding<void>(1)
     const historyDone = yield* Deferred.make<void>()
+    const homeHistoryDone = yield* Deferred.make<void>()
     const history = Effect.gen(function* () {
       yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
       let done = 0
-      // DMs, mentions and unread followed threads first; the user's own channels next; the rest by recency.
-      for (const conversation of yield* historyOrder(ctx, active, counts)) {
+      // DMs, mentions and unread followed threads first, which is what Home waits for; then the other unread channels,
+      // the user's own channels and the rest by recency.
+      const { order, home } = yield* historyOrder(ctx, active, counts)
+      for (const conversation of order) {
+        if (done === home) yield* Deferred.succeed(homeHistoryDone, undefined)
         // A boot that failed half way left ranges behind; what they cover is not fetched again.
         if (!(yield* covered(conversation.id, start, conversation.latest))) {
           yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
@@ -476,8 +493,13 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
         yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
         yield* Effect.yieldNow
       }
-    }).pipe(Effect.ensuring(Deferred.succeed(historyDone, undefined)))
+    }).pipe(Effect.ensuring(Effect.andThen(Deferred.succeed(homeHistoryDone, undefined), Deferred.succeed(historyDone, undefined))))
     const threadsDone = yield* Deferred.make<void>()
+    // Home is ready once what it is made of is stored; the rest of history goes on beside it.
+    const homeReady = Effect.all([Deferred.await(homeHistoryDone), Deferred.await(threadsDone), Deferred.await(previewsDone)], { discard: true }).pipe(
+      Effect.andThen(Clock.currentTimeMillis),
+      Effect.flatMap((at) => transaction(setSyncState(HOME_READY_KEY, { at }))),
+    )
     const pages = Effect.gen(function* () {
       yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2, discard: true })
       yield* fillUsers(ctx)
@@ -487,7 +509,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
     const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
-    const [discovered] = yield* Effect.all([rest, previews], { concurrency: 2 })
+    const [discovered] = yield* Effect.all([rest, previews, homeReady], { concurrency: 3 })
     yield* fillUsers(ctx)
     const state: BootState = {
       quietDays,

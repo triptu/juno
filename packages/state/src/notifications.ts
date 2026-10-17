@@ -57,8 +57,14 @@ export function currentNotificationSettings(registry: Registry): NotificationSet
   return result._tag === 'Success' ? result.value : undefined
 }
 
-/** The settings once they have arrived: after the first value, or undefined after a second. */
-export function loadNotificationSettings(registry: Registry): Promise<NotificationSettingsView | undefined> {
+/**
+ * The settings once they have arrived: the first value `accept` takes (by
+ * default the first value), or undefined after a second.
+ */
+export function loadNotificationSettings(
+  registry: Registry,
+  accept: (settings: NotificationSettingsView) => boolean = () => true,
+): Promise<NotificationSettingsView | undefined> {
   return new Promise((resolve) => {
     let done = false
     let release: (() => void) | undefined
@@ -72,7 +78,7 @@ export function loadNotificationSettings(registry: Registry): Promise<Notificati
     const timer = setTimeout(() => finish(undefined), 1_000)
     const check = () => {
       const result = registry.get(notificationSettingsAtom)
-      if (result._tag === 'Success') finish(result.value)
+      if (result._tag === 'Success' && accept(result.value)) finish(result.value)
     }
     release = registry.subscribe(notificationSettingsAtom, check, { immediate: true })
   })

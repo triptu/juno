@@ -4,7 +4,7 @@
  */
 import type { MetadataFence } from './metadata'
 import type { Me } from '@juno/domain'
-import { Clock, Effect, Queue } from 'effect'
+import { Clock, Deferred, Effect, Queue } from 'effect'
 import type { SyncConfigShape } from './config'
 
 export interface RootFetch {
@@ -59,6 +59,8 @@ export interface SyncContext {
   readonly photoless: Set<string>
   /** Page fetches outside the work permit (opened topics, root fetches) in flight, with when each was requested. */
   readonly fetchesInFlight: Set<{ readonly at: number }>
+  /** User ids an edge `users/info` call is out for, with its lane and the moment its answer is stored: a page that names them waits for it instead of asking again. */
+  readonly usersInFlight: Map<string, { readonly lane: 'interactive' | 'background'; readonly stored: Deferred.Deferred<void> }>
 }
 
 /** Runs a page fetch outside the work permit, so the recheck can wait for it (`awaitEarlierFetches`). */

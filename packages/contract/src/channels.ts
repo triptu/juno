@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme } from './shell'
+import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
-export type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme } from './shell'
+export type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
 export const Channels = {
   updatesGet: 'updates.get',
@@ -80,6 +80,14 @@ export const Channels = {
   notificationsRequestPermission: 'notifications.requestPermission',
   /** Opens System Settings at Juno's notifications. */
   notificationsOpenSettings: 'notifications.openSettings',
+  /** Shows the web panel at `bounds` with `url`, loading it unless the panel already shows it. */
+  webPanelShow: 'webPanel.show',
+  /** Moves the shown web panel to new bounds. */
+  webPanelBounds: 'webPanel.bounds',
+  /** Hides the web panel and keeps its page, for ⌘K or another tab. */
+  webPanelHide: 'webPanel.hide',
+  /** Closes the web panel and frees its page. */
+  webPanelClose: 'webPanel.close',
 } as const
 
 /** main -> preload messages sent with `webContents.postMessage`. */
@@ -99,6 +107,8 @@ export const Events = {
   privacyChanged: 'privacy.changed',
   /** The window entered or left macOS full screen, with a boolean: true in full screen. */
   windowFullScreen: 'window.fullScreen',
+  /** The web panel's page changed, with a `WebPanelState`. */
+  webPanelState: 'webPanel.state',
 } as const
 
 /**
@@ -335,5 +345,14 @@ export interface JunoBridge {
     readonly requestPermission: () => Promise<unknown>
     /** Opens System Settings at Juno's notifications. */
     readonly openSettings: () => Promise<unknown>
+  }
+  /** The web panel (SPEC 7): one page per window, drawn by main over the panel's place in the layout. */
+  readonly webPanel: {
+    readonly show: (url: string, bounds: WebPanelBounds) => Promise<unknown>
+    readonly setBounds: (bounds: WebPanelBounds) => Promise<unknown>
+    readonly hide: () => Promise<unknown>
+    readonly close: () => Promise<unknown>
+    /** Calls `listener` with each `WebPanelState`, undecoded. Returns the unsubscribe. */
+    readonly onState: (listener: (state: unknown) => void) => () => void
   }
 }

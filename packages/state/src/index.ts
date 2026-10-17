@@ -35,6 +35,7 @@ export {
   sidebarRowAtom,
   sidebarSectionsAtom,
   setSidebarEngaged,
+  traceSidebarHold,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
@@ -219,10 +220,10 @@ export {
   setJunoPanelOpen,
   setJunoPanelWidth,
 } from './junoPanel'
+export { closeWebPanel, followWebPanel, openWebPanel, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelStateAtom } from './webPanel'
 export {
   fillHome,
   freezeHome,
-  homeGreeting,
   homeShownAtom,
   homeViewAtom,
   markFollowUpDone,
@@ -240,6 +241,7 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
+export { homeGreeting } from './homeScene'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,

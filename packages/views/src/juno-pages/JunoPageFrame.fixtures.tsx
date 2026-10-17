@@ -4,10 +4,11 @@ import { chat } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { JunoHeader, JunoPanelActions, type JunoView } from '../juno-chat/JunoHeader'
 import { ActivityPage } from './ActivityPage'
-import { activity, memory, NOW, remembers, scheduled } from './fixtures'
+import { activity, docs, memory, NOW, remembers, scheduled } from './fixtures'
 import { JunoPageFrame } from './JunoPageFrame'
 import { MemoryPage } from './MemoryPage'
-import { RemembersPage } from './RemembersPage'
+import { MemoryDocsPage } from './MemoryDocsPage'
+import { PinList } from './PinList'
 import { ScheduledPage } from './ScheduledPage'
 
 const noop = () => {}
@@ -66,7 +67,22 @@ export default defineFixtures(
     'Other pages': {
       scheduled: scene(() => framed('scheduled', <ScheduledPage page={scheduled} now={NOW} onPause={noop} onResume={noop} onEdit={noop} onDelete={noop} />), tab),
       remembers: scene(
-        () => framed('remembers', <RemembersPage page={remembers} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} />, 'panel'),
+        () =>
+          framed(
+            'remembers',
+            <MemoryDocsPage
+              page={docs}
+              now={NOW}
+              onEditStart={noop}
+              onAddStart={noop}
+              onDraftChange={noop}
+              onSave={noop}
+              onCancel={noop}
+              onDelete={noop}
+              pinned={<PinList page={remembers} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} />}
+            />,
+            'panel',
+          ),
         panel,
       ),
       memory: scene(() => framed('memory', <MemoryPage page={memory} now={NOW} />), tab),

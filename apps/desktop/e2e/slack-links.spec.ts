@@ -2,8 +2,8 @@
 // the signed-in workspace opens inside Juno, in a new tab, at the message,
 // which flashes; a reply's link opens its thread; a message Juno has not
 // stored is fetched first; ⌘-click opens the tab behind the current one; a
-// conversation Juno cannot reach, and another workspace's link, open in the
-// browser.
+// conversation Juno cannot reach opens in the browser, and another
+// workspace's link is handled as any web link.
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -139,8 +139,8 @@ test('a conversation Juno cannot reach, and another workspace, open in the brows
   await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
   await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}`)
 
-  // Another workspace's link opens in the browser, as any link does, with no toast.
-  await link('elsewhere').click()
+  // Another workspace's link is any web link: ⌘-click opens it in the browser, with no toast.
+  await link('elsewhere').click({ modifiers: ['Meta'] })
   await expect.poll(() => juno.browserLinks()).toContain(OTHER)
   await juno.tabs.expectCount(1)
 })

@@ -10,6 +10,7 @@ import { chat, colors, motion, opacity, radii, sizes, spacing, text } from '@jun
 import { Button, IconButton, Surface, Text, type PhosphorIcon } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
+import { ShowResult, type ResultToggle } from './ShowResult'
 
 export interface ChatCardProps {
   readonly id: CardId
@@ -171,25 +172,6 @@ function Detail({ text }: { readonly text: string | undefined }) {
     <>
       {' · '}
       <span data-card-result dir="auto">{text}</span>
-    </>
-  )
-}
-
-interface ResultToggle {
-  readonly shown: boolean
-  readonly toggle: () => void
-}
-
-/** "Show result" after the line, a quiet disclosure for everything a connection call gave back. */
-function ShowResult({ toggle }: { readonly toggle: ResultToggle | undefined }) {
-  if (toggle === undefined) return null
-  const copy = chatCopy.card.change.result
-  return (
-    <>
-      {' · '}
-      <TextButton aria-expanded={toggle.shown} onClick={toggle.toggle}>
-        {toggle.shown ? copy.hide : copy.show}
-      </TextButton>
     </>
   )
 }

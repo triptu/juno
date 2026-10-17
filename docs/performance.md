@@ -18,8 +18,11 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → first sidebar rows (quick start) | 5 s | Empty cache, large seed, 300 ms per Slack call, production pacing. The rows are the cold boot's quick steps (`userBoot`, `prefs`, `counts`, DM names, the first `getView` page): followed threads titled from their first words, and channels and DMs from `client.counts`. History, replies, search and users fill in after, with no reload. Asserted by `quick start` in `perf.spec.ts` (slowest of three); `quick-start.spec.ts` checks the flow on a fifth of the large seed with a 30 s ceiling and records the time, because a timing budget cannot hold inside a loaded remote plan. `pnpm bench:sync -- --latency 300` prints the engine side. |
 | First sign-in → channel previews | 10 s after the quick start | Same setup. One or two newest-first searches after the quick start (`searchPreviews`, `@juno/sync` discovery) give the busiest channels a preview before their history is read. Asserted by `quick-start.spec.ts` with history held. |
 | First sign-in → every active conversation in the sidebar | 30 s | Every member conversation with activity in the window has its row, from `client.counts` (a provisional Main until its history lands). Live 23 to 25 s on 147 conversations (10-17). Measured by `pnpm sync:timeline`, live; not asserted in CI. |
-| First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, DMs, mentions and unread followed threads first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
-| Last history page → first sync ended | 30 s | The boot is recorded (Home ready, AI titles and Home's checks may start) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
+| First sign-in → unread counts exact for unread DMs and mentions | 1.6 s per DM, group DM and channel that mentions you, after the quick start | DMs and group DMs are read first, the unread ones first, then the channels that mention you (`historyOrder`: the owner's order of 10-16 with unread before read inside it), and each page makes its count exact. Live the 3 unread DMs were exact at 6.4 s and the mention, behind 51 read DMs, at 84.8 s (10-18). Measured by `pnpm sync:timeline` (`unreadDmsAndMentionsRight`), live; the order is asserted by `sync.test.ts`. |
+| First sign-in → no unread count left as a dot | 1.6 s per DM, group DM and unread conversation after the quick start | The unread followed threads and the other unread channels come next. Live 111.7 s for 73 conversations (10-18), 170.7 s with the 10-16 order. |
+| First sign-in → Home ready | 1.6 s per DM, group DM, conversation with an unread mention and conversation with unread followed threads, after the quick start | Home is ready once those have history, the `getView` pages are stored and the preview search is done (`sync_state.homeReady`, owner 10-18): the syncing line goes and Home's checks and AI titles start, while the rest of history fills in. Live 86.1 s, behind 54 DMs and 1 mention, instead of 235.9 s at the boot's end (10-18). Measured by `pnpm sync:timeline` (`homeReady`), live; `quick-start.spec.ts` checks on the fake that Home is ready before the last history page. |
+| First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, DMs, mentions, unread followed threads and other unread channels first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
+| Last history page → first sync ended | 30 s | The boot is recorded (Automated's job and its record may start; Home was ready before) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
 | Home open (the sidebar's Home button, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts` over the opens that follow 300 ms after the last action. |
@@ -46,7 +49,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
 | Idle CPU after sync: the engine, nothing happening | under 3 % of one core, averaged over 20 s | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time. Asserted by `idle-cpu.spec.ts` (the built app, engine) and `idle.test.ts` (the engine on a 3 000-message channel, where that spin costs about 7 %). On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. |
 | Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`. Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
-| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 990.7 KB of JS (333.4 KB gzip) and 140.3 KB of CSS, minified (2026-10-17, with the React Compiler on; 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
+| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS, minified (2026-10-18, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
 
 ### Startup bundle split (2026-10-16)
@@ -1344,6 +1347,40 @@ After queueing at the 24-vCPU cap, final remote checks used the supported
 The sidebar holds its first list on an empty cache until the cold boot's quick start (membership, DM names, the first page of followed threads) is stored, then shows rows as the sync stores them. Clear bot channels are sorted into Automated as each one's history lands. Cached rows still paint immediately. Topic-row timestamps and status tags reserve their widths; the participant stack, the @ and the unread count keep no slot and take only their own width at the preview line's end, so one arriving cuts the preview shorter and moves nothing else (updated 10-16); New view stays beside Unread only while view pills fill.
 
 All topics holds its first cold rows until the quick start is stored, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
+
+### History order for unread counts (2026-10-18)
+
+Until a conversation's history page lands, its unread count is a dot (`client.counts` says only that it is unread). The owner's order of 10-16 reads every DM and group DM first, then channels with an unread mention, then channels with unread followed threads, then the user's own channels, then the rest; an unread channel with no mention sat among the channels by recency. The 10-18 order keeps it and puts unread before read inside it: the unread DMs and group DMs before the read ones, and a new tier for the other unread channels, after the unread followed threads and before the user's own channels. Pacing and calls are unchanged.
+
+A first version read every unread conversation before the read DMs. It was measured once, but the owner's order keeps all DMs first, so it was not kept.
+
+`JUNO_LIVE=1 pnpm sync:timeline` on the same workspace (147 active conversations), 1.51 s apart. The final order read 3 unread DMs, 51 read DMs, 1 channel with a mention, 18 other unread channels, then 74 others.
+
+| Seconds from start | 10-17 (10-16 order) | Unread first (not kept) | 10-18 (final) |
+| --- | --- | --- | --- |
+| Unread DMs and mentions exact | about 83, estimated | 7.8 | 84.8 |
+| No unread count left as a dot | 170.7 | 35.6 | 111.7 |
+| Last history page | 221.8 | 222.2 | 222.8 |
+| First sync ended | 242.9 | 235.1 | 235.9 |
+| Calls | 366 | 367 | 368 |
+
+The unread DMs were exact at 6.4 s. The mention waits behind the read DMs, as the owner's order says, so it lands where the 10-16 order put it; the 10-17 figure was not a milestone of those runs but that place (position 53 of 146) times the measured spacing. The other unread channels now come before the user's own channels and the rest, which takes the last dot from 171 s to 112 s. No 429 in either run. The tests that check these orders and the paced first sync run at a tenth of the app's spacing (`fakeSlackPaceScale`, `scaledPacing` in `@juno/slack`): every method's spacing, the total ceiling and the interactive refill divided alike, so the ratios hold and the two paced tests take 9 s instead of 174 s.
+
+### Home ready before the first sync ends (2026-10-18)
+
+Home used to wait for the whole first sync. With the history order of 10-18, the conversations Home is made of are read first: DMs and group DMs, conversations with an unread mention, then those with unread followed threads. Home is ready once they have history, the `getView` pages are stored and the preview search is done (`sync_state.homeReady`). The syncing line goes, Home's checks and AI titles start, and the rest of history fills in behind it. Until the first sync ends, an item a later conversation brings fills a free reserved slot below the rows shown, so nothing painted moves; a caught-up Home stays so for the visit. Recent, Automated's job and its record still wait for the boot.
+
+`JUNO_LIVE=1 pnpm sync:timeline`, the same workspace (147 active conversations), one run on each side:
+
+| Seconds from start | Before (first-sync-order) | After |
+| --- | --- | --- |
+| Home ready | 235.9 | 86.1 |
+| Unread DMs and mentions exact | 84.8 | 86.1 |
+| Last history page | 222.8 | 224.0 |
+| First sync ended | 235.9 | 236.9 |
+| Calls | 368 | 368 |
+
+Home was ready right after the last of the 54 DMs and the one channel with a mention; no channel had only unread followed threads. No 429. Unread counts settled at 268.8 s in the second run, after the sync had ended, which looks like a message arriving in the live workspace, not a sync change.
 
 ### First sync timeline (2026-10-17)
 

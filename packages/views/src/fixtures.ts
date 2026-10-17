@@ -73,7 +73,7 @@ import JunoSettingsPage from './juno-pages/JunoSettingsPage.fixtures'
 import MemoryPage from './juno-pages/MemoryPage.fixtures'
 import MemoryDocsPage from './juno-pages/MemoryDocsPage.fixtures'
 import ProviderSection from './juno-pages/ProviderSection.fixtures'
-import RemembersPage from './juno-pages/RemembersPage.fixtures'
+import PinList from './juno-pages/PinList.fixtures'
 import ReviewPage from './juno-pages/ReviewPage.fixtures'
 import ScheduledPage from './juno-pages/ScheduledPage.fixtures'
 
@@ -143,7 +143,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   RecoveryPhraseSheet: phraseSheet,
   Reactions,
   ReactorsCard,
-  RemembersPage,
+  PinList,
   RemoveCard: removeCard,
   RemoveSheet,
   ResolveCard: resolveCard,

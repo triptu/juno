@@ -6,8 +6,8 @@
  * shows an item with no current title rewrite asks the assistant for one
  * in the background (`homeTitle`, once per item and activity, inside
  * Home's budget); the answer lands in `ai_cache`, which re-runs the query.
- * So rewrites are asked for only while Home is on screen, and only after
- * the first sync, when the people they name are known.
+ * So rewrites are asked for only while Home is on screen, and only once
+ * Home is ready, when the people they name are known.
  *
  * `home.visit`, `home.markDone`, `home.movesShown` and `home.movesSeen` are
  * small local writes, as are the reviews' commands on follow-ups and drafts; each of

@@ -47,7 +47,7 @@ Run these from the repo root.
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
-| `JUNO_LIVE=1 pnpm sync:timeline` | The first sync timeline (`scripts/first-sync-live.ts`): the whole engine signed in from an empty data folder on the cached session, read-only (every write refused before it leaves, no AI key). Prints when the sidebar, Home and every conversation first show, when unread counts settle, history ends and the sync ends; Slack calls by method with retries, 429s and `Retry-After`; CPU and SQLite time. `--out FILE` writes the timeline as JSON (method names, counts and times only). `-- --fake` runs it on the large fake seed with the app's pacing, `--fake --small` on 16 conversations. See performance.md, "First sync timeline". |
+| `JUNO_LIVE=1 pnpm sync:timeline` | The first sync timeline (`scripts/first-sync-live.ts`): the whole engine signed in from an empty data folder on the cached session, read-only (every write refused before it leaves, no AI key). Prints when the sidebar, Home and every conversation first show, when unread counts settle (all, and those of unread DMs and mentions), where each kind of conversation fell in the history order, history ends and the sync ends; Slack calls by method with retries, 429s and `Retry-After`; CPU and SQLite time. `--out FILE` writes the timeline as JSON (method names, counts and times only). `-- --fake` runs it on the large fake seed with the app's pacing, `--fake --small` on 16 conversations. See performance.md, "First sync timeline". |
 | `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
 | `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
@@ -977,6 +977,8 @@ Causes found so far (2026-10-15):
 
 - **A count that changed digits in its fixed box.** Home's syncing line right-aligns the count in a box as wide as the total's digits (`HomeSyncLine`). When the count goes from 9 to 10, the text starts one digit further left in a box that stays put, and Chromium reports a `layout-shift` entry (value 0.0000028) whose only source is that box, with the same box before and after. `expectStableAnchor` failed the Home first-sync test on it (28 of 30 at 16 workers; in 9 of them the same entry also named a sidebar row the test skips, which kept the region filter from dropping it). The probe now drops the sources inside `outside` and counts an entry only if one of the rest moved, as the feel suite's `noLayoutShift` does; an entry with no sources still counts (0 of 30 after).
 
+- **A toast shown before the live query that a menu reads.** A command replies before its change reaches the renderer's live queries, and `runAction` showed the toast on the reply. After "#alerts-prod: Never", the test right-clicked the row while `notifications.settings` still held the old level, so Notify me showed When it matters (2 of 30 runs, 16 workers). The app now waits for the settings to hold the new level before the toast (`shown` in `runAction`, up to one second), so the toast never names a change a menu cannot show yet (0 of 30).
+
 ## Machine shapes
 
 Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.
@@ -1200,6 +1202,25 @@ line. The script:
 `--prerelease` publishes a pre-release, which the updater never offers, and
 leaves `CHANGELOG.md` alone; use it to test the upload, then delete it with
 `gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
+
+### The release keeper's releases
+
+Every DMG the release keeper builds from a commit the CI keeper reported green
+is also a published release, so installs get it as an update:
+
+1. Run `pnpm release:version patch` on main, commit only
+   `apps/desktop/package.json` as "Release x.y.z", fetch, rebase onto
+   `origin/main` and push. Build from that commit, or from the green commit with
+   only that change applied.
+2. Package in a detached worktree with `JUNO_UPDATE_TOKEN` read from the
+   keychain into the variable (never printed), then verify the DMG, launch it
+   once and quit it by PID. Copy it to the Desktop; the one it replaces becomes
+   `-previous`.
+3. Write 3–8 changelog lines for what changed for the person using Juno since
+   the last release, in the style of SPEC section 17, in a file outside the
+   repository.
+4. Run `pnpm release:publish --notes <file> --dry-run`, then without
+   `--dry-run`, from the worktree that holds the build.
 
 ### Updates in the app
 

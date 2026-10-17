@@ -57,8 +57,9 @@ export function ListRow({
   return (
     <div
       {...rest}
-      // After `rest`, so an owner cannot undo the row's semantics by accident.
-      role={isButton ? 'button' : undefined}
+      // After `rest`, so an owner cannot undo a selectable row's semantics by accident;
+      // any other row keeps the owner's role (a `listitem` in a `role="list"` group).
+      role={isButton ? 'button' : rest.role}
       tabIndex={isButton ? 0 : undefined}
       aria-pressed={isButton && selected ? true : undefined}
       {...activateHandlers<HTMLDivElement>(onSelect)}

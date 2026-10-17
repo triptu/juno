@@ -197,7 +197,7 @@ test('the topic chip in the panel composer names the topic Juno sees', async ({ 
   await juno.tabs.menu('juno')
   const line = juno.win.locator('[data-panel-sees]')
   await expect(line).toHaveText(/^eng · Draft plan is in the doc/)
-  await expect(line).toHaveAttribute('title', /^Juno sees eng · Draft plan is in the doc/)
+  await expect(line).toHaveAttribute('data-tooltip', /^Juno sees eng · Draft plan is in the doc/)
 })
 
 test('the panel is open in one tab and closed in another, and each keeps its state across a tab switch', async ({ juno }) => {
