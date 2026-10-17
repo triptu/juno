@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asksUser, isQuestion, rankHomeItems, settledEvidence, type HomeCandidate } from '../src/home'
+import { asksUser, draftFirstLine, followUpDelivery, isOldDraft, isQuestion, OLD_DRAFT_MILLIS, rankHomeItems, settledEvidence, type HomeCandidate, type LaterMessage } from '../src/home'
 
 const item = (kind: HomeCandidate<string>['kind'], ...topicIds: string[]): HomeCandidate<string> => ({ kind, topicIds, value: `${kind}:${topicIds.join(',')}` })
 
@@ -80,5 +80,71 @@ describe('Why a topic looks settled', () => {
   it('reads only messages people wrote', () => {
     expect(settledEvidence([msg(null, 'joined the channel')], me, false)).toBeUndefined()
     expect(settledEvidence([msg(null, 'Deploy finished'), msg('U0DEV', 'Shipped')], me, false)).toEqual({ kind: 'done', by: 'U0DEV' })
+  })
+})
+
+describe('A follow-up that looks done', () => {
+  const PROMISE = '1760000000.000100'
+  const mine = (ts: string, text: string, files = 0): LaterMessage => ({ ts, user_id: 'U0ME', text, files })
+
+  it('takes your first later message with a file, a link, or words that hand it over', () => {
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'deck-v3', 1)], 'U0ME')).toEqual({ ts: '1760000100.000000', kind: 'file' })
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Draft: <https://docs.example.com/d/42|plan>')], 'U0ME')).toEqual({ ts: '1760000100.000000', kind: 'link' })
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', "Here's the deck, slide 4 has the numbers")], 'U0ME')).toMatchObject({ kind: 'said' })
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Done.')], 'U0ME')).toMatchObject({ kind: 'said' })
+    const two = [mine('1760000300.000000', 'Attached'), mine('1760000200.000000', 'Sent it over')]
+    expect(followUpDelivery(PROMISE, two, 'U0ME')?.ts).toBe('1760000200.000000')
+  })
+
+  it("ignores other people's messages, messages before the promise, denials and questions", () => {
+    expect(followUpDelivery(PROMISE, [{ ts: '1760000100.000000', user_id: 'U0DEV', text: "Here's mine", files: 1 }], 'U0ME')).toBeUndefined()
+    expect(followUpDelivery(PROMISE, [mine('1759999999.000000', 'Here it is', 1)], 'U0ME')).toBeUndefined()
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Not done yet, sorry')], 'U0ME')).toBeUndefined()
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Here is the thing: should it include Q3?')], 'U0ME')).toBeUndefined()
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Doneness is subjective')], 'U0ME')).toBeUndefined()
+    expect(followUpDelivery(PROMISE, [mine('1760000100.000000', 'Working on it')], 'U0ME')).toBeUndefined()
+  })
+
+  it('after Not done, proposes only a newer match', () => {
+    const messages = [mine('1760000100.000000', 'Here you go', 1), mine('1760000400.000000', 'Here is the final one', 1)]
+    expect(followUpDelivery(PROMISE, messages, 'U0ME', '1760000100.000000')?.ts).toBe('1760000400.000000')
+    expect(followUpDelivery(PROMISE, messages.slice(0, 1), 'U0ME', '1760000100.000000')).toBeUndefined()
+  })
+})
+
+describe('An old draft', () => {
+  const NOW = 1_800_000_000_000
+  const DAY = 86_400_000
+
+  it('is untouched for two weeks, in a topic that moved on since', () => {
+    const updatedAt = NOW - 15 * DAY
+    expect(isOldDraft({ updatedAt }, updatedAt + DAY, NOW)).toBe(true)
+    expect(isOldDraft({ updatedAt: NOW - OLD_DRAFT_MILLIS + 1 }, NOW, NOW)).toBe(false)
+    // Nothing happened in the topic after it: the draft may still be the next thing to say.
+    expect(isOldDraft({ updatedAt }, updatedAt - DAY, NOW)).toBe(false)
+    expect(isOldDraft({ updatedAt }, undefined, NOW)).toBe(false)
+  })
+
+  it('stays kept until the draft changes', () => {
+    const updatedAt = NOW - 20 * DAY
+    expect(isOldDraft({ updatedAt, keptAt: updatedAt }, NOW, NOW)).toBe(false)
+    expect(isOldDraft({ updatedAt, keptAt: updatedAt - DAY }, NOW, NOW)).toBe(true)
+  })
+
+  it('shows its first line with words', () => {
+    expect(draftFirstLine('\n  Thanks for the notes, I think\nsecond line')).toBe('Thanks for the notes, I think')
+    expect(draftFirstLine('   ')).toBe('')
+  })
+})
+
+describe('Ranking the review cards', () => {
+  it('puts them after Tidy up, and keeps one with a single topic left', () => {
+    const ranked = rankHomeItems([item('oldDrafts', 'a', 'b'), item('doneFollowUps', 'c'), item('waiting', 'a')])
+    expect(ranked.map((row) => [row.kind, row.topicIds])).toEqual([
+      ['waiting', ['a']],
+      ['doneFollowUps', ['c']],
+      ['oldDrafts', ['b']],
+    ])
+    expect(rankHomeItems([item('waiting', 'a'), item('oldDrafts', 'a')])).toHaveLength(1)
   })
 })
