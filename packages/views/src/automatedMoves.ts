@@ -1,7 +1,7 @@
 import type { HomeTopic } from '@juno/contract'
 import type { ReviewAbout } from './ReviewSheet'
 import { tileOf } from './tileModel'
-import type { ReviewEntry, ReviewVerbs, ReviewWords } from './reviewModel'
+import { metaLine, type ReviewEntry, type ReviewVerbs, type ReviewWords } from './reviewModel'
 import { relativeTime } from './time'
 
 /** The words Automated's record uses (SPEC 12, "Automated, with a record"). */
@@ -35,7 +35,7 @@ export function movedEntries(topics: ReadonlyArray<HomeTopic>, now: number): Rea
     title: topic.title,
     ...tileOf(topic),
     ...(topic.moved?.reason === undefined ? {} : { reason: topic.moved.reason }),
-    meta: [topic.moved?.detail, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
+    meta: metaLine(topic.moved?.detail, topic.at === undefined ? undefined : relativeTime(topic.at, now)),
     words: topic.moved?.change === 'out' ? OUT : IN,
   }))
 }

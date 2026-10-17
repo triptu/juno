@@ -1,7 +1,7 @@
 import { defineFixtures, fixture } from '@juno/ui'
 import { docs, docsEmpty, NOW, remembers } from './fixtures'
 import { MemoryDocsPage, type MemoryDocsPageProps } from './MemoryDocsPage'
-import { PinList } from './RemembersPage'
+import { PinList } from './PinList'
 
 const noop = () => {}
 const pins = <PinList page={remembers} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} />

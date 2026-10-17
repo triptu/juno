@@ -1,0 +1,1 @@
+- 10-18 02:38 · listrow-keeps-role · `ListRow` keeps the role its owner gives it unless it is selectable (then it is a button). Why: it dropped every `role="listitem"`, so the Juno pages' lists had no items for VoiceOver.

@@ -3,8 +3,8 @@ import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import type { FollowUpMatch, HomeTopic, OldDraft } from '@juno/contract'
 import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
 import { tileOf } from './tileModel'
-import type { ReviewEntry, ReviewVerbs } from './reviewModel'
-import { quietSpan } from './settled'
+import { metaLine, type ReviewEntry, type ReviewVerbs } from './reviewModel'
+import { quietSpan, settledCopy } from './settled'
 import { relativeTime } from './time'
 
 /**
@@ -13,7 +13,6 @@ import { relativeTime } from './time'
  * cards 4 and 5; SPEC 12). Both say what happens in Slack: nothing.
  */
 
-const SETTINGS = 'Tidy up settings'
 
 /** The words of the review of follow-ups that look done. */
 export const doneFollowUpsCopy = {
@@ -26,7 +25,7 @@ export const doneFollowUpsCopy = {
       'Juno matched a later message of yours in the same topic: one with a file, a link, or words like "Here\'s" or "Done".',
       'Not done keeps the promise in Follow-up. Juno suggests it again only for a newer message.',
     ],
-    settings: SETTINGS,
+    settings: settledCopy.settings,
   } satisfies ReviewAbout,
   verbs: { act: 'Mark done', actIcon: Check, actKey: 'D', decline: 'Not done', declineKey: 'N', done: 'Marked done', declined: 'Kept in Follow-up' } satisfies ReviewVerbs,
 } as const
@@ -42,7 +41,7 @@ export const oldDraftsCopy = {
       'Undo puts it back as it was.',
       'Keep stops Juno suggesting this draft. Editing it starts the two weeks again.',
     ],
-    settings: SETTINGS,
+    settings: settledCopy.settings,
   } satisfies ReviewAbout,
   verbs: { act: 'Delete', actIcon: Trash, actKey: 'D', decline: 'Keep', declineKey: 'K', done: 'Deleted', declined: 'Kept' } satisfies ReviewVerbs,
 } as const
@@ -60,7 +59,6 @@ export function deliveryReason(match: FollowUpMatch): string {
   }
 }
 
-const metaLine = (...parts: ReadonlyArray<string | undefined>) => parts.filter((part) => part !== undefined && part !== '').join(' · ')
 
 /** The promises as review rows: the promise, why it looks done, the matching message, and where and when it was made. */
 export function doneFollowUpEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {

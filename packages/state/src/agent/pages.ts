@@ -62,6 +62,11 @@ export async function junoSettingsNow(registry: Registry): Promise<JunoSettingsP
 export const remembersPageAtom = page<{ readonly page: RemembersPage; readonly revisions: ReadonlyArray<{ readonly id: PinId; readonly revision: Revision }> }>('agent.remembers.page')
 /** Juno's memory of the owner: the docs, the recent changes, and each entry's revision for an edit. */
 export const docsPageAtom = page<{ readonly page: MemoryDocsPage; readonly revisions: ReadonlyArray<{ readonly id: MemoryEntryId; readonly revision: Revision }> }>('agent.docs.page')
+/** What Juno remembers draws its notes and its pins together: Initial until both have answered. */
+export const rememberedAtom = Atom.make((get) => {
+  const docs = get(docsPageAtom)
+  return docs._tag === 'Initial' ? docs : get(remembersPageAtom)
+})
 /** Juno's proactive asks, for Home's card. */
 export const asksAtom = page<{ readonly asks: ReadonlyArray<ProactiveAsk> }>('agent.asks.list')
 
@@ -70,8 +75,10 @@ export const asksAtom = page<{ readonly asks: ReadonlyArray<ProactiveAsk> }>('ag
  * 13.6): "Let Juno learn how you work", with Not now and Start.
  */
 export const homeAsksAtom = Atom.make((get): ReadonlyArray<HomeItem> => {
+  // AI assist first, so Home opens no agent stream while it is off.
+  if (!get(aiAssistOnAtom)) return []
   const result = get(asksAtom)
-  if (result._tag !== 'Success' || !get(aiAssistOnAtom)) return []
+  if (result._tag !== 'Success') return []
   const learn = chatCopy.ask.learn
   return result.value.asks.filter((ask) => ask.status._tag === 'open').map((ask): HomeItem => ({
     id: `ask:${ask.id}`,
@@ -116,7 +123,7 @@ function viewAtom(view: JunoView): Atom.Atom<{ readonly _tag: string }> | undefi
     case 'memory':
       return memoryPageAtom(PAGE_MAX)
     case 'remembers':
-      return remembersPageAtom
+      return rememberedAtom
     case 'scheduled':
       return scheduledPageAtom
     case 'review':

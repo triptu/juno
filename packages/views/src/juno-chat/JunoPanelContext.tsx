@@ -124,7 +124,7 @@ interface ChipProps {
 
 function Chip({ icon, label, title, data, remove }: ChipProps) {
   return (
-    <span {...data} title={title} {...stylex.props(styles.chip, remove !== undefined && styles.removable)}>
+    <span {...data} {...tooltip(title)} {...stylex.props(styles.chip, remove !== undefined && styles.removable)}>
       <span {...stylex.props(styles.icon)}>
         <Icon icon={icon} size={12} />
       </span>

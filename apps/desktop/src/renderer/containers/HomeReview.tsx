@@ -16,8 +16,11 @@ function runFor(item: HomeItem): (topic: HomeTopic, yes: boolean) => Promise<Und
     case 'unfollow':
     case 'ignore':
       return (topic, yes) => actOnSuggested(registry, item.kind === 'unfollow' ? 'unfollow' : 'ignore', topic, yes ? 'act' : 'keep')
-    default:
+    case 'doneFollowUps':
       return (topic, yes) => actOnDoneFollowUp(registry, topic, yes ? 'done' : 'notDone')
+    default:
+      // Not a review card: no row of it can be acted on.
+      return () => Promise.resolve(undefined)
   }
 }
 
@@ -74,8 +77,8 @@ export function HomeReview({ item, now, onClose }: { readonly item: HomeItem; re
       <UnfollowReview {...props} />
     ) : item.kind === 'ignore' ? (
       <IgnoreReview {...props} />
-    ) : (
+    ) : item.kind === 'doneFollowUps' ? (
       <DoneFollowUpsReview {...props} />
-    )
-  return <SheetLayer onClose={close}>{sheet}</SheetLayer>
+    ) : null
+  return sheet === null ? null : <SheetLayer onClose={close}>{sheet}</SheetLayer>
 }

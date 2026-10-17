@@ -82,7 +82,7 @@ export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProp
           />
           <Checkbox
             label="Threads you never open"
-            description="A followed thread with two weeks of replies you have not read. Unfollow also unfollows in Slack."
+            description="A followed thread with two weeks of replies you have not read. Unfollow applies in Slack."
             checked={prefs.unfollow}
             onChange={(event) => onChange({ ...prefs, unfollow: event.currentTarget.checked })}
           />
