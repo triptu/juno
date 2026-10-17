@@ -9,7 +9,8 @@ import { AudienceWarning } from './AudienceWarning'
 import { Composer } from './Composer'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { LinkEditor } from './LinkEditor'
-import { MentionSuggestions, mentionRowId } from './MentionSuggestions'
+import { MentionSuggestions } from './MentionSuggestions'
+import { mentionRowId } from './mentionRowId'
 import { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
 const noop = () => {}

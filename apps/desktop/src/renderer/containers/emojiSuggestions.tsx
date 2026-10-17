@@ -2,9 +2,10 @@ import { useEffect, useId, useMemo, useState, type KeyboardEvent, type RefObject
 import { customEmoji, EMOJI_QUERY_MIN, emojiQueryAt, matchEmoji, mergeEmoji } from '@juno/contract'
 import { composerEmojiAtom, quickReactionsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { MentionSuggestions, mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
+import { mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
 import { noteRecentEmoji, recentEmoji } from './recentEmoji'
 import { editField, listKey } from './suggestionKeys'
+import { SuggestionList, useSuggestionList } from './suggestionList'
 
 interface Options {
   readonly text: string
@@ -39,6 +40,7 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   const typed = emojiQueryAt(text, Math.min(caret, text.length))
   const loading = typed !== undefined && (/^[a-z]/.test(typed.text) || typed.text.length >= EMOJI_QUERY_MIN)
   const catalog = useEmojiRows(loading && typed.start !== dismissed)
+  const listReady = useSuggestionList(loading)
   const query = typed === undefined || typed.start === dismissed || typed.text.length < EMOJI_QUERY_MIN ? undefined : typed
   const quick = useAtomValue(quickReactionsAtom)
   const rows = query === undefined ? [] : matchEmoji(catalog, query.text, recentEmoji(), quick)
@@ -78,7 +80,7 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
     marks: [],
     mention: query === undefined ? undefined : {
       anchorAt: query.start, listId, activeId,
-      list: rows.length === 0 ? null : <MentionSuggestions kind="emoji" rows={rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} />,
+      list: rows.length === 0 || !listReady ? null : <SuggestionList kind="emoji" rows={rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} />,
       onDismiss: () => setDismissed(query.start),
     } satisfies ComposerMention,
   }

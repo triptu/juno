@@ -16,10 +16,11 @@ import {
 } from '@juno/contract'
 import { mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { hueFor, MentionSuggestions, mentionRowId, type ComposerMention } from '@juno/views'
+import { hueFor, mentionRowId, type ComposerMention } from '@juno/views'
 
 import { editField, listKey } from './suggestionKeys'
 import { useEmojiSuggestions } from './emojiSuggestions'
+import { SuggestionList, useSuggestionList } from './suggestionList'
 
 type Rows =
   | { readonly kind: 'person'; readonly rows: ReadonlyArray<MentionPerson>; readonly groups: ReadonlyArray<MentionGroup> }
@@ -77,6 +78,7 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
   const ids = listed.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const open = query !== undefined && listed.length > 0
+  const listReady = useSuggestionList(query !== undefined)
 
   /** Puts `picked` in place of the query `at`, and keeps it with the picks. */
   const insertPick = (at: MentionQuery, picked: MentionPick) => {
@@ -135,7 +137,7 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
             anchorAt: typed.start,
             listId,
             activeId: open ? activeId : undefined,
-            list: open && rows !== undefined ? <MentionSuggestions {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
+            list: open && rows !== undefined && listReady ? <SuggestionList {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
             onDismiss: () => setDismissed(typed.start),
           } satisfies ComposerMention,
         }),
