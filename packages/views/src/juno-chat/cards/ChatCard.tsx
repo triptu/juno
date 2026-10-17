@@ -135,29 +135,41 @@ function AfterLine({ id, status, actions, result }: { readonly id: CardId; reado
           {copy.expired} · <TextButton onClick={() => actions.onCard(id, { _tag: 'askAgain' })}>{copy.askAgain}</TextButton>
         </After>
       )
-    case 'done':
+    case 'done': {
+      // Undo, Open and Show result sit after the line and never cut: a long result line takes the ellipsis first.
+      const ends = status.undo === true || status.open !== undefined || result !== undefined
       return (
-        <After truncate={status.detail !== undefined} trailing={<ShowResult toggle={result} />}>
+        <After
+          truncate={status.detail !== undefined}
+          trailing={
+            ends ? (
+              <>
+                {status.undo ? (
+                  <>
+                    {' · '}
+                    <TextButton onClick={() => actions.onCard(id, { _tag: 'undo' })}>{chatCopy.note.undo}</TextButton>
+                  </>
+                ) : null}
+                {status.open !== undefined ? (
+                  <>
+                    {' · '}
+                    <OpenButton target={status.open} actions={actions} />
+                  </>
+                ) : null}
+                <ShowResult toggle={result} />
+              </>
+            ) : undefined
+          }
+        >
           {status.line}
           <Detail text={status.detail} />
-          {status.undo ? (
-            <>
-              {' · '}
-              <TextButton onClick={() => actions.onCard(id, { _tag: 'undo' })}>{chatCopy.note.undo}</TextButton>
-            </>
-          ) : null}
-          {status.open !== undefined ? (
-            <>
-              {' · '}
-              <OpenButton target={status.open} actions={actions} />
-            </>
-          ) : null}
         </After>
       )
+    }
     case 'failed':
       // The card runs once: no retry and no "can't tell" row (SPEC 13.3).
       return (
-        <After truncate={status.detail !== undefined} trailing={<ShowResult toggle={result} />}>
+        <After truncate={status.detail !== undefined} trailing={result === undefined ? undefined : <ShowResult toggle={result} />}>
           {status.line}
           <Detail text={status.detail} />
         </After>
@@ -231,6 +243,9 @@ export function DangerGhost({ children, onClick, disabled }: { readonly children
     </span>
   )
 }
+
+/** The result box's height in lines before it scrolls. */
+const RESULT_LINES = 12
 
 const appear = stylex.keyframes({
   from: { opacity: 0 },
@@ -346,9 +361,10 @@ const styles = stylex.create({
     flexShrink: 0,
     whiteSpace: 'pre',
   },
-  // About twelve lines, then the box scrolls. It opens only on a click, never while the card enters.
+  // Twelve lines, then the box scrolls: the text's own line height times twelve, plus the padding.
+  // It opens only on a click, never while the card enters.
   result: {
-    maxHeight: `calc(12 * 1.5 * ${text['--text-meta-size']} + 2 * ${spacing['--space-2-5']})`,
+    maxHeight: `calc(${RESULT_LINES} * ${text['--text-ui-leading']} * ${text['--text-meta-size']} + 2 * ${spacing['--space-2-5']})`,
     boxSizing: 'border-box',
     overflowY: 'auto',
     paddingBlock: spacing['--space-2-5'],
@@ -357,7 +373,9 @@ const styles = stylex.create({
     backgroundColor: colors['--background'],
     minWidth: 0,
   },
+  // A set line height, so the box's cap is exactly twelve of its lines.
   resultText: {
+    lineHeight: text['--text-ui-leading'],
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
   },

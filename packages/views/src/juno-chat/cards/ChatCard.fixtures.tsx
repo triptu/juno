@@ -62,6 +62,8 @@ const frame = { width: 600, padded: true } as const
 
 const IMPLIED = { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." } as const
 const ALWAYS = { rule: 'always', line: 'Asked because your rule for this tool is Always ask.' } as const
+const LONG_LINE = 'Offsite agenda for the Lisbon week, with travel, rooms, the Thursday dinner and who presents what on each of the three days'
+const LONG_RESULT = Array.from({ length: 30 }, (_, i) => `row ${i + 1}: event ${1000 + i}, pageview, /pricing`).join('\n')
 const PAGE_RESULT = 'page:\n  id: 2f1c9a7e\n  title: Offsite agenda\n  url: https://notion.example/offsite-agenda\ncreated: 2026-10-18'
 const SEARCH_RESULT = 'results:\n  • Prefers short messages\n  • Works on the Juno desktop app\n  • Reviews pull requests in the morning\n  • Writes in plain English'
 
@@ -211,6 +213,10 @@ export const changeCard = defineFixtures(
       'call-failed': card(connectionCall('c9', 'create', failed('Failed', 'Notes are full for this workspace.', 'error: Notes are full for this workspace.\ncode: quota_exceeded'), IMPLIED)),
       // Everything the call gave back, as a person reads it, under "Hide result".
       'call-result-shown': scene(() => <ChangeCard card={connectionCall('c12', 'create', done('Done', { detail: 'Offsite agenda', result: PAGE_RESULT }), IMPLIED)} actions={noopActions} enter={false} resultShown />),
+      // A long result line cuts first: Open and Show result stay whole at the end.
+      'call-long-line': card(connectionCall('c14', 'create', done('Done', { detail: LONG_LINE, result: PAGE_RESULT, open: { _tag: 'url', url: 'https://notion.example/offsite', label: 'Open' } }), IMPLIED)),
+      // A long result shows twelve lines, then its box scrolls.
+      'call-result-long': scene(() => <ChangeCard card={connectionCall('c15', 'create', done('Done', { detail: 'Found 30 results', result: LONG_RESULT }), IMPLIED)} actions={noopActions} enter={false} resultShown />),
       // Argument values as a person reads them: strings bare, short lists on one line, the rest as indented lines.
       'call-arguments': card(connectionCall('c13', 'nested', open, IMPLIED)),
       // A read the owner's rule asked about.
