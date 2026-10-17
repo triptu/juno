@@ -39,7 +39,9 @@ async function cutsOf(badge: Locator): Promise<ReadonlyArray<string>> {
       const paint = /paint|content|strict/.test(style.contain) || style.contentVisibility === 'auto'
       if (!scrolls && !paint) continue
       const margin = scrolls ? 0 : Number.parseFloat(style.overflowClipMargin) || 0
-      if (outside(node.getBoundingClientRect(), margin)) cuts.push(`${node.tagName.toLowerCase()}${[...node.attributes].filter((a) => a.name.startsWith('data-')).map((a) => `[${a.name}]`).join('')}`)
+      const r = node.getBoundingClientRect()
+      const at = (b: { top: number; bottom: number; left: number; right: number }) => `${Math.round(b.left)},${Math.round(b.top)} to ${Math.round(b.right)},${Math.round(b.bottom)}`
+      if (outside(r, margin)) cuts.push(`${node.tagName.toLowerCase()}${[...node.attributes].filter((a) => a.name.startsWith('data-')).map((a) => `[${a.name}]`).join('')}: badge ${at(box)}, clip ${at(r)} + ${margin}`)
     }
     for (const island of el.closest('[data-juno-chat]')?.querySelectorAll('[data-juno-header] [data-island]') ?? []) {
       const r = island.getBoundingClientRect()
@@ -56,11 +58,12 @@ async function expectBadgesWhole(chat: JunoChatPane, count: number): Promise<Rea
   const scroller = (await chat.root.locator('[data-scroll]').boundingBox())!
   const seen: string[] = []
   for (const badge of await badges.all()) {
+    // On screen by more than a pixel: a badge past the fold is scrolled away, not cut.
     const box = await badge.boundingBox()
-    if (box === null || box.y + box.height <= scroller.y || box.y >= scroller.y + scroller.height) continue
+    if (box === null || box.y + box.height <= scroller.y + 1 || box.y >= scroller.y + scroller.height - 1) continue
     const name = (await badge.getAttribute('data-reactions')) ?? ''
     seen.push(name)
-    expect(await cutsOf(badge), name).toEqual([])
+    expect.soft(await cutsOf(badge), name).toEqual([])
   }
   expect(seen.length).toBeGreaterThan(0)
   return seen
@@ -72,36 +75,71 @@ async function scrollTo(chat: JunoChatPane, where: 'top' | 'bottom'): Promise<vo
   await expect.poll(() => scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)).toBe(true)
 }
 
+/** Puts a bubble's row at the top of the list, under the header, as revealing a row does (`scrollIntoView`, the list's `scroll-padding-top`). */
+async function toTop(chat: JunoChatPane, bubble: string): Promise<void> {
+  await chat.junoBubble(bubble).evaluate((row) => row.scrollIntoView({ block: 'start', behavior: 'instant' }))
+}
+
 async function shoot(chat: JunoChatPane, name: string): Promise<void> {
   const path = test.info().outputPath(`${name}.png`)
   await chat.root.screenshot({ path, animations: 'disabled' })
   await test.info().attach(name, { path, contentType: 'image/png' })
 }
 
-test('a Juno bubble takes a quick reaction and any emoji from the picker, and its badge shows whole at every width and in both themes', async ({ juno, model }) => {
-  await ready(juno)
-  await setWindowSize(juno, 1400, 640)
+/** Opens the panel beside the topic and drags its edge right as far as it goes: the panel at its narrowest. */
+async function narrowestPanel(juno: Juno): Promise<JunoChatPane> {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
   await expect(panel.composer).toBeFocused()
-
-  // The panel at its narrowest: drag its edge to the right as far as it goes.
-  const edge = juno.win.locator('[data-juno-panel-edge]')
-  const at = (await edge.boundingBox())!
+  const at = (await juno.win.locator('[data-juno-panel-edge]').boundingBox())!
   await juno.win.mouse.move(at.x + at.width / 2, at.y + at.height / 2)
   await juno.win.mouse.down()
   await juno.win.mouse.move(at.x + 300, at.y + at.height / 2, { steps: 5 })
   await juno.win.mouse.up()
-  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
+  await expectPanelWidth(juno, 360)
+  return panel
+}
+
+async function expectPanelWidth(juno: Juno, width: number): Promise<void> {
+  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(width)
+}
+
+/**
+ * The places a badge must show whole: the first reacted bubble and the wide
+ * one each revealed right under the header, and the last bubble at the
+ * bottom. Each is shot before it is checked.
+ */
+async function expectWholeEverywhere(chat: JunoChatPane, name: string): Promise<void> {
+  await toTop(chat, 'Answering quote me first')
+  await shoot(chat, `${name}-top`)
+  expect(await expectBadgesWhole(chat, 4)).toContain('owner:🎉')
+  await toTop(chat, 'Here is the long one')
+  await shoot(chat, `${name}-top-wide`)
+  expect(await expectBadgesWhole(chat, 4)).toContain('owner:✅')
+  await scrollTo(chat, 'bottom')
+  await shoot(chat, `${name}-bottom`)
+  expect(await expectBadgesWhole(chat, 4)).toContain('owner:👍')
+}
+
+test('a Juno bubble takes a quick reaction and any emoji from the picker, and its badge shows whole at every width and in both themes', async ({ juno, model }) => {
+  await ready(juno)
+  await setWindowSize(juno, 1400, 640)
+  const panel = await narrowestPanel(juno)
 
   // An answer right under the message it answers still quotes it: you may have sent several.
   await panel.send('quote me first')
   await panel.expectJuno('Answering quote me first')
   await expect(panel.root.locator('[data-chat-juno]').filter({ hasText: 'Answering quote me first' }).locator('[data-quote="owner"]')).toContainText('quote me first')
 
-  // Enough for the list to scroll, so the first bubble sits right under the header at the top.
+  // A wide bubble: its badge sits at the right, under the panel's Open in tab and Close when the row is at the top.
+  await panel.send('the long one')
+  await panel.expectJuno('Here is the long one')
+  await panel.react('Here is the long one', '✅')
+  await expect(panel.junoBubble('Here is the long one').getByLabel('Reacted ✅')).toBeVisible()
+
+  // Enough for the list to scroll, so a bubble can sit right under the header.
   for (const n of [2, 3, 4, 5, 6]) {
     await panel.send(`note ${n}`)
     await panel.expectJuno(`You said: note ${n}`)
@@ -118,16 +156,11 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await expect(panel.junoBubble('You said: note 5').getByLabel('Reacted 🚀')).toBeVisible()
   await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="🚀"'))).toBe(true)
 
-  // The first bubble in the list, right under the header once scrolled to the top.
+  // The first bubble in the list, picked from the top of the list.
   await scrollTo(panel, 'top')
   await panel.reactWithPicker('Answering quote me first', 'tada', 'tada')
   await expect(panel.junoBubble('Answering quote me first').getByLabel('Reacted 🎉')).toBeVisible()
-  await scrollTo(panel, 'top')
-  expect(await expectBadgesWhole(panel, 3)).toContain('owner:🎉')
-  await shoot(panel, 'panel-360-light-top')
-  await scrollTo(panel, 'bottom')
-  await expectBadgesWhole(panel, 3)
-  await shoot(panel, 'panel-360-light-bottom')
+  await expectWholeEverywhere(panel, 'panel-360-light')
 
   // Picking the same quick reaction again removes it.
   await panel.react('You said: note 6', '👍')
@@ -135,25 +168,17 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await panel.react('You said: note 6', '👍')
   await expect(panel.junoBubble('You said: note 6').getByLabel('Reacted 👍')).toBeVisible()
 
-  // Dark, then the wide Juno tab.
-  // Settings takes the tab, so the topic comes back with the panel closed; it opens at the width it was left at.
+  // Dark: Settings takes the tab, so the topic comes back with the panel closed; it opens at the width it was left at.
   await juno.setTheme('Dark')
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.menu('juno')
   await expect(panel.composer).toBeFocused()
-  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
-  await scrollTo(panel, 'top')
-  expect(await expectBadgesWhole(panel, 3)).toContain('owner:🎉')
-  await shoot(panel, 'panel-360-dark-top')
-  await scrollTo(panel, 'bottom')
-  await expectBadgesWhole(panel, 3)
-  await shoot(panel, 'panel-360-dark-bottom')
+  await expectPanelWidth(juno, 360)
+  await expectWholeEverywhere(panel, 'panel-360-dark')
 
+  // The wide Juno tab.
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   await juno.tabs.expectActive('Juno')
-  const tab = JunoChatPane.tab(juno.win)
-  await scrollTo(tab, 'top')
-  await expectBadgesWhole(tab, 3)
-  await shoot(tab, 'tab-wide-dark-top')
+  await expectWholeEverywhere(JunoChatPane.tab(juno.win), 'tab-wide-dark')
 })

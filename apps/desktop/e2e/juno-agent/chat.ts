@@ -16,6 +16,7 @@ export function answer(request: OpenRouterRequest): string {
   const words = input.replace(/<about[^>]*\/>|<about[\s\S]*?<\/about>|<quote[\s\S]*?<\/quote>|<[^>]*>/g, '').trim()
   if (/\breact\b/.test(words) && id !== undefined) return `<react to="${id}">🎉</react><say>Reacted to ${words}</say>`
   if (/\bquote me\b/.test(words) && id !== undefined) return `<say reply-to="${id}">Answering ${words}</say>`
+  if (/\blong one\b/.test(words)) return '<say>Here is the long one: the deploy moved to Thursday, Maya owns the migration, and Leo reviews it before the freeze.</say>'
   if (/\bformatting\b/.test(words)) return '<say>**Staging** is green, and <b>deploys</b> run at 14:00.</say>'
   return `<say>You said: ${words}</say>`
 }
