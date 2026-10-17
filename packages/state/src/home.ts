@@ -20,7 +20,7 @@
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { homeMarkDone, homeMovesSeen, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
+import { homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
@@ -284,10 +284,12 @@ export function startVisitLog(registry: Registry): () => void {
   }
 }
 
-/**
- * Home showed Automated's record card: its moves are not shown again, and
- * the card waits a day before showing newer ones (SPEC 12).
- */
+/** Home showed Automated's record card: it waits a day before it shows again (SPEC 12). Its moves stay. */
+export function markMovesShown(registry: Registry): void {
+  void runCommand(registry, homeMovesShown, {})
+}
+
+/** The user opened Automated's record or dismissed its card: its moves are not listed again (SPEC 12). */
 export function markMovesSeen(registry: Registry, item: HomeItem): void {
   const channels = item.topics.flatMap((topic) => (topic.moved === undefined ? [] : [topic.moved.channel.id]))
   void runCommand(registry, homeMovesSeen, { channels })

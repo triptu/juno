@@ -2472,7 +2472,7 @@ export class HomePane {
     await this.item(kind).getByRole('link').click()
   }
 
-  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all' | 'Move' | 'Keep in All'): Locator {
+  button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all' | 'Move' | 'Keep in All' | 'Dismiss'): Locator {
     return this.item(kind).getByRole('button', { name, exact: true })
   }
 

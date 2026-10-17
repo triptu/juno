@@ -2,9 +2,10 @@
  * Automated's record on Home (SPEC 12, "Automated's record"): the moves the
  * rules and Juno made (`automated_moves`, written by `automatedView.ts`) that
  * Home has not shown yet, where the conversation is still where the move put
- * it and the user has not settled it since. The card shows at most once a
- * day: `home.movesSeen` marks the moves seen and keeps the time in
- * `MOVES_SEEN_PREF`.
+ * it and the user has not settled it since. A move stays on the card until
+ * the user opens the record or dismisses the card (`home.movesSeen`). The
+ * card shows at most once a day: `home.movesShown` keeps the time Home last
+ * showed it in `MOVES_SHOWN_PREF`.
  */
 import { AUTOMATED_VIEW_ID, automatedReason, movedBackReason } from '@juno/domain'
 import { prefs, StoreReader, type SqlError } from '@juno/store'
@@ -14,7 +15,7 @@ import { Effect } from 'effect'
 const MOVES_SHOWN = 20
 const DAY = 24 * 60 * 60 * 1000
 /** When Home last showed the record card, epoch millis. The card waits a day after it. */
-export const MOVES_SEEN_PREF = 'automatedMovesSeenAt'
+export const MOVES_SHOWN_PREF = 'automatedMovesShownAt'
 
 /** A move, as stored. */
 export interface MoveRow {
@@ -75,8 +76,8 @@ export const readMoves = <R extends { readonly channel: string; readonly topic_i
   mains: (channels: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<R>, SqlError, StoreReader>,
 ) =>
   Effect.gen(function* () {
-    const seenAt = yield* prefs.get<number>(MOVES_SEEN_PREF).pipe(Effect.catch(() => Effect.succeed(undefined)))
-    if (typeof seenAt === 'number' && now - seenAt < DAY) return undefined
+    const shownAt = yield* prefs.get<number>(MOVES_SHOWN_PREF).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    if (typeof shownAt === 'number' && now - shownAt < DAY) return undefined
     const sql = yield* StoreReader
     const statement = movesStatements.unseen()
     const moves = yield* sql.unsafe<MoveRow>(statement.sql, statement.params)

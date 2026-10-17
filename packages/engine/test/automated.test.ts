@@ -4,7 +4,7 @@
 // ambiguous channel is asked about on Home, answers stick, a hand-placed
 // channel is never moved, and a deleted view stays deleted.
 import { afterEach, describe, expect, it } from 'vitest'
-import { homeMovesSeen, homeView, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
+import { homeMovesSeen, homeMovesShown, homeView, prefsSet, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { liveQuery, runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
@@ -140,7 +140,14 @@ describe("Automated's record", () => {
       expect.objectContaining({ change: 'in', channel: expect.objectContaining({ id: 'C0BUILDS', label: '#builds' }), reason: expect.stringMatching(/^Apps wrote \d+ of the last \d+ top-level messages$/) }),
     ])
 
-    // Shown once: then it waits.
+    // Shown: the card waits a day, and the move stays.
+    valueOf(await runCommand(engine.registry, homeMovesShown, {}))
+    await homeUntil(engine, (view) => !view.items.some((item) => item.kind === 'automatedMoves'), 'the card waiting a day')
+    valueOf(await runCommand(engine.registry, prefsSet, { key: 'automatedMovesShownAt', value: 0 }))
+    const again = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automatedMoves'), 'the record a day later')
+    expect(again.items.find((item) => item.kind === 'automatedMoves')!.topics.map((topic) => topic.moved?.channel.id)).toEqual(['C0BUILDS'])
+
+    // Opened or dismissed: the move is not listed again, whenever the card may next show.
     valueOf(await runCommand(engine.registry, homeMovesSeen, { channels: ['C0BUILDS'] }))
     await homeUntil(engine, (view) => !view.items.some((item) => item.kind === 'automatedMoves'), 'the record seen')
   })

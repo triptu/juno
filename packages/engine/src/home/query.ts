@@ -18,7 +18,7 @@
  *   no view, while the user has not deleted the Automated view.
  * - Automated's record: the moves the rules and Juno made (`automated_moves`)
  *   that Home has not shown yet and the user has not settled since, once
- *   the first sync is done and at most once a day (`MOVES_SEEN_PREF`).
+ *   the first sync is done and at most once a day (`MOVES_SHOWN_PREF`).
  *
  * "Followed" is a thread Slack follows or a DM's Main. Resolved topics and
  * ignored channels never appear. `rankHomeItems` keeps at most one of each

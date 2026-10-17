@@ -3,7 +3,8 @@
 // and Home's card explains it with the counts that decided; Move back puts it
 // in All and Undo gives it back to Automated; a channel where people start
 // the conversations stays in All however much a bot replies in its threads;
-// and a channel people take over goes back out, which the card says.
+// and a channel people take over goes back out, which the card says, with
+// Dismiss to see it without opening the record.
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
@@ -75,7 +76,7 @@ test('a bot channel joined later moves by itself, the card says why, and Move ba
   await sidebar.selectView('Automated')
   await sidebar.row(CI_BUILDS).expectVisible()
 
-  // Shown once: Home does not list the move again.
+  // Opened: Home does not list the move again.
   await sidebar.filter('All')
   await sidebar.row(POSTGRES).open()
   await home.open()
@@ -119,6 +120,9 @@ test('a channel people take over goes back to All, and the card says people star
 
   await homeShowsRecord(juno)
   await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel out of Automated')
+  // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
+  await home.button('automatedMoves', 'Dismiss').click()
+  await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
   const sheet = await home.reviewMoves()
   await expect(sheet.reason(ALERTS)).toHaveText('Moved back: people start most conversations here')
   await expect(sheet.row(ALERTS)).toContainText('People wrote 21 of the last 30 top-level messages')

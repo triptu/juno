@@ -9,7 +9,7 @@
  * So rewrites are asked for only while Home is on screen, and only after
  * the first sync, when the people they name are known.
  *
- * `home.visit`, `home.markDone` and `home.movesSeen` are small local writes.
+ * `home.visit`, `home.markDone`, `home.movesShown` and `home.movesSeen` are small local writes.
  */
 import { AiProvider, tasks } from '@juno/ai'
 import { HomeRoutes, NotSignedIn } from '@juno/contract'
@@ -20,7 +20,7 @@ import { aiJobsOn } from '../ai'
 import { aiWakes } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
-import { MOVES_SEEN_PREF } from './moves'
+import { MOVES_SHOWN_PREF } from './moves'
 import { readHome, type HomeRun } from './query'
 
 const KEYS: InvalidationKeys = [
@@ -138,13 +138,19 @@ export const HomeHandlers = HomeRoutes.toLayer(
             yield* (yield* Invalidation).invalidate(keys.followUps)
           }),
         ),
+      'home.movesShown': () =>
+        write(
+          Effect.gen(function* () {
+            yield* prefs.set(MOVES_SHOWN_PREF, yield* Clock.currentTimeMillis)
+          }),
+        ),
       'home.movesSeen': ({ channels }) =>
         write(
           Effect.gen(function* () {
+            if (channels.length === 0) return
             const sql = yield* StoreWriter
             const now = yield* Clock.currentTimeMillis
-            if (channels.length > 0) yield* sql`UPDATE automated_moves SET seen_at = ${String(now)} WHERE channel IN ${sql.in(channels)} AND seen_at IS NULL`
-            yield* prefs.set(MOVES_SEEN_PREF, now)
+            yield* sql`UPDATE automated_moves SET seen_at = ${String(now)} WHERE channel IN ${sql.in(channels)} AND seen_at IS NULL`
             yield* (yield* Invalidation).invalidate(keys.automatedMoves)
           }),
         ),

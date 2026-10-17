@@ -152,10 +152,10 @@ export const homeView = liveValueRoute('home.view', { value: HomeView })
  */
 export const homeVisit = Rpc.make('home.visit', { payload: { id: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-/**
- * Home showed Automated's record card with these conversations' moves: they
- * are not shown again, and the card waits a day before it shows newer ones.
- */
+/** Home showed Automated's record card: it does not show again for a day. Its moves stay until they are seen. */
+export const homeMovesShown = Rpc.make('home.movesShown', { payload: {}, success: Schema.Void, error: NotSignedIn })
+
+/** The user opened Automated's record or dismissed its card: these conversations' moves are not listed again. */
 export const homeMovesSeen = Rpc.make('home.movesSeen', { payload: { channels: Schema.Array(Schema.String) }, success: Schema.Void, error: NotSignedIn })
 
 /** Mark done on a Follow-up: that promise does not come back. No undo. */
@@ -165,4 +165,4 @@ export const homeMarkDone = Rpc.make('home.markDone', {
   error: NotSignedIn,
 })
 
-export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesSeen)
+export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen)

@@ -229,6 +229,7 @@ export {
   actOnSettled,
   actOnMove,
   markMovesSeen,
+  markMovesShown,
   setTidyUpPrefs,
   startVisitLog,
   tidyUpPrefsAtom,
