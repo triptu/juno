@@ -981,7 +981,9 @@ suite went from 14 of 18 to 18 of 18.
   partial cache (3.3). A thread known only from search now shows its header and an
   empty body until Slack answers, where before it showed incomplete rows.
   The feel scenario opens the thread once first, so its recorded open
-  reads a full cache.
+  reads a full cache. A peek at such a thread waits for the same fetch
+  before it paints (it would otherwise paint an empty list and grow); a
+  warmed, covered topic still peeks in one frame.
 - **Palette feel scenario (test fixed).** Since ⌘K opened on Conversations
   (`36fc9db2`), its six recent topics are on the Messages tab; the
   scenario now waits for the Frequent rows.
