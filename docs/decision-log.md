@@ -6,6 +6,8 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
 - 10-17 15:30 · bundle-split · Duotone is not an `IconWeight`: a duotone icon is a wrapped icon from `packages/ui/src/duotone.ts`, the desktop build drops the duotone weight from every other icon (36.9 KB of initial JS), and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
 - 10-17 12:45 · bundle-split · A part that shows only after input (peek, suggestion list, sync cards, edit field, link editor) is a chunk preloaded when idle and drawn only once loaded (`usePreloaded`), so it never suspends; initial JS 1,054.6 KB to 1,027.6 KB after the unified Home merge.
+- 10-17 12:23 · break-pass-c · Files attached while Juno is Home's destination keep their chips with one muted line under them, "Juno reads text only. Pick a person or channel to send files."; a send to Juno takes the text and the files stay. ⌘N with the destination list open still empties its search, as decided.
+- 10-17 12:22 · break-pass-c · A character typed on Home's closed destination chip goes into the field and focus moves there, as in a token field; Space, Enter and the arrows keep the chip's keys. The orchestrator decided it for the owner.
 - 10-17 12:15 · break-pass-b · A paste while keys are held after ⌘N, ⌘T or a waiting Enter is held too and goes in its place among them.
 - 10-17 12:14 · break-pass-b · A `Popover` that opens upward is capped at the room above its anchor, so Home's destination list keeps its search in view in a 480px window; downward panels are unchanged.
 - 10-17 12:13 · break-pass-b · Every `Textarea` puts the caret at the end of the text it opens with, so a restored Home or Juno draft takes typing after it; the topic composer's own fix moved into the primitive.
