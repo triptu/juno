@@ -118,7 +118,8 @@ test('Home fills reserved slots during the first sync without moving painted con
     await rec.mark('remaining history')
     fake.release({ method })
     await expect.poll(() => fake.heldCount({ method: replies }), { timeout: 30_000 }).toBeGreaterThan(0)
-    await expect(home).toHaveAttribute('data-home-loading', '')
+    // Home may be ready by now, with the sync still running (owner, 10-18): the probes above cover that step too.
+    await expect(juno.sidebar.syncStatus).toBeVisible()
     await rec.mark('finish sync')
     fake.release({ method: replies })
     await expect(home).not.toHaveAttribute('data-home-loading', { timeout: 30_000 })
