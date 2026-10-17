@@ -135,7 +135,7 @@ flowchart TD
   gallery[apps/gallery] --> views & ui & tokens
   gallery -.tests.-> testing[testing]
   agent_contract[agent-contract] --> agent_cards[agent-cards]
-  agent --> agent_memory[agent-memory] & agent_cards & agent_contract
+  agent --> agent_memory[agent-memory] & agent_cards & agent_contract & ai
   agent_juno[agent-juno] --> agent_contract & domain & contract
   agent_testing[agent-testing] --> agent & agent_contract
   engine --> agent_juno
@@ -144,7 +144,7 @@ flowchart TD
   desktop --> agent & agent_contract
 ```
 
-The bottom block is Juno Agent (section 10, ADR 0012). `state` reads the agent's renderer groups from `agent-contract` (`@juno/state/agent`); `views` take its chat view models.
+The bottom block is Juno Agent (section 10, ADR 0012). Its one edge to `ai` is `@juno/ai/failure`, the provider error kinds with no imports of their own, so the agent's guard and the engine's provider sort a refusal the same way. `state` reads the agent's renderer groups from `agent-contract` (`@juno/state/agent`); `views` take its chat view models.
 
 | Package | Rule it protects | Owns | Must not |
 | --- | --- | --- | --- |
@@ -256,6 +256,7 @@ sent_posts      (client_msg_id PK, channel, user_id, ts /*first copy stored*/, s
 ai_calls        (id PK AUTOINCREMENT, at, last_at, repeats, source 'engine'|'agent', feature, subject_kind, subject_id,
                  provider, model, outcome 'ok'|'error'|'blocked'|'cancelled'|'timeout', kind, message, duration_ms,
                  input_tokens, output_tokens, cost_usd, summary)  -- AI activity log, newest 500, no prompt or answer text
+ai_refusals     (task, key, input_hash, kind, at; PK task, key)  -- the last input a model refused for good, not sent again until it changes
 kept_copies     (channel, ts, client_msg_id, reason, hidden, kept_at; PK channel, ts)  -- copies not deleted, and why; file copies stay hidden (ADR 0014)
 prefs[notifications] (notificationHours, presenceHours, matters, channels, people, threads?)
 notification_log     (id PK, at, channel, ts, UNIQUE(channel, ts), topic_id, preview, outcome /*now|hold*/,
