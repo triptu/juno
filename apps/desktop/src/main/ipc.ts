@@ -1,15 +1,17 @@
-import { isT3ThreadUrl } from '@juno/agent-contract'
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type ContextMenuLeaf, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
+import { openInBrowser } from './browser'
 import type { CodexHome } from './codex'
+import { popupContextMenu } from './contextMenu'
 import type { EngineSupervisor } from './engine'
 import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
+import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 
 /**
  * Registers a request/response handler for one contract route. The input is
@@ -44,41 +46,16 @@ function isAppUrl(url: string): boolean {
   return Boolean(devUrl && url.startsWith(devUrl))
 }
 
-/**
- * Native menus are out of Playwright's reach. Under JUNO_E2E a test sets the
- * item the next context menu picks; that menu answers at once without
- * showing, and keeps the labels it was asked to show and where.
- */
-/** How a test reads a menu item: "-" for a separator, "(label)" when disabled, "label ✓" when checked, "label · sublabel" with a second line; submenu items start with "> ". */
-function testLabel(item: ContextMenuLeaf): string {
-  if ('separator' in item) return '-'
-  const label = item.enabled === false ? `(${item.label})` : item.label
-  const lines = item.sublabel === undefined ? label : `${label} · ${item.sublabel}`
-  return item.checked === true ? `${lines} ✓` : lines
-}
-
-export const contextMenuForTests: {
-  next: string | null | undefined
-  lastLabels: ReadonlyArray<string>
-  lastAt: { readonly x: number; readonly y: number } | null
-  /** Keeps the next menu open, as if the user were still reading it, until `release` is called. */
-  hold: boolean
-  release: (() => void) | undefined
-} = {
-  next: undefined,
-  lastLabels: [],
-  lastAt: null,
-  hold: false,
-  release: undefined,
-}
+// The other test seams main's index reads, beside this file's own.
+export { browserLinksForTests } from './browser'
+export { contextMenuForTests } from './contextMenu'
+export { webPanelForTests } from './webPanel'
 
 /** Under JUNO_E2E the folder picker is out of Playwright's reach too: a test sets the folder the next one picks. */
 export const folderForTests: { next: string | null | undefined } = { next: undefined }
 
 /** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
 export const slackLinksForTests: string[] = []
-/** Under JUNO_E2E, links for the browser are recorded here instead of opening it. */
-export const browserLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 
 export interface IpcDeps {
@@ -202,49 +179,9 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))
 
   // A native menu at the pointer, or at `at`. The answer is the chosen item's id, or null.
-  handle(
-    Channels.contextMenuPopup,
-    ({ items, at }, event) =>
-      new Promise<string | null>((resolve) => {
-        if (contextMenuForTests.next !== undefined) {
-          const next = contextMenuForTests.next
-          contextMenuForTests.next = undefined
-          contextMenuForTests.lastAt = at ?? null
-          contextMenuForTests.lastLabels = items.flatMap((item) => ('submenu' in item ? [item.label, ...item.submenu.map((sub) => `> ${testLabel(sub)}`)] : [testLabel(item)]))
-          if (!contextMenuForTests.hold) return resolve(next)
-          contextMenuForTests.hold = false
-          contextMenuForTests.release = () => {
-            contextMenuForTests.release = undefined
-            resolve(next)
-          }
-          return
-        }
-        let chosen: string | null = null
-        const leaf = (item: ContextMenuLeaf): MenuItemConstructorOptions =>
-          'separator' in item
-            ? { type: 'separator' }
-            : {
-                label: item.label,
-                enabled: item.enabled ?? true,
-                ...(item.checked === undefined ? {} : { type: 'checkbox', checked: item.checked }),
-                ...(item.sublabel === undefined ? {} : { sublabel: item.sublabel }),
-                // Shown only: the app menu owns the shortcut.
-                ...(item.accelerator === undefined ? {} : { accelerator: item.accelerator, registerAccelerator: false }),
-                click: () => (chosen = item.id),
-              }
-        const menu = Menu.buildFromTemplate(items.map((item) => ('submenu' in item ? { label: item.label, submenu: item.submenu.map(leaf) } : leaf(item))))
-        const window = BrowserWindow.fromWebContents(event.sender) ?? undefined
-        const point = at === undefined ? {} : { x: Math.round(at.x), y: Math.round(at.y) }
-        // The item's click runs before the menu reports it closed.
-        menu.popup({ ...(window === undefined ? {} : { window }), ...point, callback: () => setImmediate(() => resolve(chosen)) })
-      }),
-  )
+  handle(Channels.contextMenuPopup, ({ items, at }, event) => popupContextMenu(items, BrowserWindow.fromWebContents(event.sender) ?? undefined, at))
 
-  handle(Channels.shellOpenExternal, ({ url }) => {
-    if (!isWebUrl(url) && !isT3ThreadUrl(url)) return
-    if (e2e) browserLinksForTests.push(url)
-    else void shell.openExternal(url)
-  })
+  handle(Channels.shellOpenExternal, ({ url }) => openInBrowser(url))
 
   // Built here from ids, so the renderer can never open an arbitrary slack:// link.
   handle(Channels.shellOpenInSlack, ({ teamId, channelId }) => {
@@ -270,14 +207,22 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.notificationsViewing, ({ topicId }) => {
     setViewing(topicId)
   })
-}
 
-/** Links from messages open outside only when they are http, https or mailto. */
-function isWebUrl(url: string): boolean {
-  try {
-    const protocol = new URL(url).protocol
-    return protocol === 'https:' || protocol === 'http:' || protocol === 'mailto:'
-  } catch {
-    return false
-  }
+  // The web panel of the calling window (webPanel.ts).
+  handle(Channels.webPanelShow, ({ url, bounds }, event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) showWebPanel(window, url, bounds)
+  })
+  handle(Channels.webPanelBounds, (bounds, event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) setWebPanelBounds(window, bounds)
+  })
+  handle(Channels.webPanelHide, (_input, event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) hideWebPanel(window)
+  })
+  handle(Channels.webPanelClose, (_input, event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) closeWebPanel(window)
+  })
 }

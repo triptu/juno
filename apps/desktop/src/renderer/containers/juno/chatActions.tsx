@@ -4,12 +4,13 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
 import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
-import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } from '@juno/state'
+import { copyText, junoFocusAtom, popupContextMenu, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionPickerAt, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
+import { openWebLink } from '../slackLinks'
 import { junoCommands } from './actions'
 import { scrollToRow } from './chatScroll'
 import { latest, type Window } from './chatWindow'
@@ -147,7 +148,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
           case 'message':
             return void openSlackMessage(target.channelId, target.ts, { newTab: event.metaKey })
           case 'url':
-            return openExternal(target.url)
+            return openWebLink(target.url, event)
           case 'page':
             return openPageRef.current(target.page)
         }

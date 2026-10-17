@@ -146,6 +146,19 @@ const bridge: JunoBridge = {
     requestPermission: () => ipcRenderer.invoke(Channels.notificationsRequestPermission),
     openSettings: () => ipcRenderer.invoke(Channels.notificationsOpenSettings),
   },
+  webPanel: {
+    show: (url, bounds) => ipcRenderer.invoke(Channels.webPanelShow, { url, bounds }),
+    setBounds: (bounds) => ipcRenderer.invoke(Channels.webPanelBounds, bounds),
+    hide: () => ipcRenderer.invoke(Channels.webPanelHide),
+    close: () => ipcRenderer.invoke(Channels.webPanelClose),
+    onState: (listener) => {
+      const forward = (_event: unknown, state: unknown) => listener(state)
+      ipcRenderer.on(Events.webPanelState, forward)
+      return () => {
+        ipcRenderer.off(Events.webPanelState, forward)
+      }
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('juno', bridge)

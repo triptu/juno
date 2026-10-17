@@ -11,7 +11,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
-import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
@@ -365,6 +365,7 @@ if (e2e) {
       folder: folderForTests,
       slackLinks: slackLinksForTests,
       browserLinks: browserLinksForTests,
+      webPanel: () => webPanelForTests(appWindow()),
       downloads: downloadsForTests,
       opened: openedForTests,
       copiedImages: () => copiedForTests.images,

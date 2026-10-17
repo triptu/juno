@@ -175,6 +175,36 @@ export type NotificationPermission = typeof NotificationPermission.Type
 export const DownloadResult = Schema.Literals(['saved', 'failed'])
 export type DownloadResult = typeof DownloadResult.Type
 
+/** Where the web panel sits, in CSS pixels from the window's top left. Main scales it by the page zoom. */
+export const WebPanelBounds = Schema.Struct({ x: Schema.Number, y: Schema.Number, width: Schema.Number, height: Schema.Number })
+export type WebPanelBounds = typeof WebPanelBounds.Type
+
+/** What the web panel's page shows now. `favicon` is the page's icon url, or null before it has one. */
+export const WebPanelState = Schema.Struct({
+  url: Schema.String,
+  title: Schema.String,
+  favicon: Schema.NullOr(Schema.String),
+  loading: Schema.Boolean,
+})
+export type WebPanelState = typeof WebPanelState.Type
+
+/** Google refuses sign-in in embedded browsers, so its apps open in the browser. */
+const BROWSER_ONLY_HOSTS = ['accounts.google.com', 'docs.google.com', 'drive.google.com', 'mail.google.com', 'calendar.google.com', 'meet.google.com']
+
+/**
+ * Whether a link may open in the web panel: https, or http on this Mac, and
+ * not a site that only works in a real browser. Others open in the browser.
+ */
+export function webPanelCanShow(url: string): boolean {
+  const match = /^(https?):\/\/([a-z0-9.-]+)(?::\d+)?(?:[/?#]|$)/i.exec(url)
+  if (match === null) return false
+  const [, scheme, host] = match as unknown as [string, string, string]
+  const hostname = host.toLowerCase().replace(/\.$/, '')
+  const local = hostname === 'localhost' || hostname === '127.0.0.1'
+  if (scheme.toLowerCase() !== 'https' && !local) return false
+  return !BROWSER_ONLY_HOSTS.includes(hostname)
+}
+
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
 export const ShellRoutes = {
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
@@ -226,6 +256,10 @@ export const ShellRoutes = {
   [Channels.notificationsPermission]: { input: Schema.Void, output: NotificationPermission },
   [Channels.notificationsRequestPermission]: { input: Schema.Void, output: NotificationPermission },
   [Channels.notificationsOpenSettings]: { input: Schema.Void, output: Schema.Void },
+  [Channels.webPanelShow]: { input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(8192)), bounds: WebPanelBounds }), output: Schema.Void },
+  [Channels.webPanelBounds]: { input: WebPanelBounds, output: Schema.Void },
+  [Channels.webPanelHide]: { input: Schema.Void, output: Schema.Void },
+  [Channels.webPanelClose]: { input: Schema.Void, output: Schema.Void },
 } as const
 
 export type ShellRoutes = typeof ShellRoutes

@@ -4,6 +4,7 @@ import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
 import { startupMark } from './startupMarks'
+import { refitWebPanel } from './webPanel'
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
 const TITLEBAR_HEIGHT = 44
@@ -180,6 +181,7 @@ function zoom(window: BaseWindow | undefined, step: number | 'reset'): void {
   const level = step === 'reset' ? 0 : Math.min(ZOOM_LEVELS.max, Math.max(ZOOM_LEVELS.min, contents.getZoomLevel() + step))
   contents.setZoomLevel(level)
   fitMinimumSizeToZoom(target)
+  refitWebPanel(target)
 }
 
 /** Hands a menu command to the app page of `window`. In any other window ⌘W closes it and ⌘Z is the plain undo. */

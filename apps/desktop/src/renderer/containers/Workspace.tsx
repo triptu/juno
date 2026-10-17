@@ -3,7 +3,9 @@ import { chatCopy } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
 import {
   activeTab,
+  closeWebPanel,
   currentPlace,
+  followWebPanel,
   fullScreenAtom,
   junoAvailableAtom,
   junoPanelOpenAtom,
@@ -21,6 +23,7 @@ import {
   type Tab,
   type Tabs,
   type TabSummary,
+  webPanelAtom,
 } from '@juno/state'
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
@@ -34,6 +37,7 @@ import { AllTopicsPage, closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, 
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicTab } from './TopicView'
+import { WebPanel } from './WebPanel'
 
 // Settings warms on idle after the first paint, outside the startup bundle.
 const settings = chunk(() => import('./Settings'))
@@ -218,6 +222,7 @@ function useWorkspaceEffects(active: string | undefined): void {
     return () => window.removeEventListener('keydown', holdKeysAfterNewShortcut, true)
   }, [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  useEffect(() => followWebPanel(registry), [])
   useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
   useEffect(() => startVisitLog(registry), [])
@@ -268,8 +273,16 @@ export function Workspace() {
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelWidth = useAtomValue(junoPanelWidthAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
+  // The web panel takes the same slot, in the tab it was opened in (SPEC 7).
+  const webPanel = useAtomValue(webPanelAtom)
+  const webShown = webPanel !== undefined && webPanel.tabId === state.active
 
   useWorkspaceEffects(state.active)
+  // A closed tab takes its web panel with it.
+  const webTabOpen = webPanel === undefined || state.tabs.some((tab) => tab.id === webPanel.tabId)
+  useEffect(() => {
+    if (!webTabOpen) closeWebPanel(registry)
+  }, [webTabOpen])
 
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
 
@@ -288,12 +301,15 @@ export function Workspace() {
       nothingShown={state.active === undefined}
       empty={null}
       side={
-        agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
+        webShown ? (
+          <WebPanel key={webPanel.opened} url={webPanel.url} />
+        ) : agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>
             <JunoPanel tabId={state.active} topicId={panelTopic} />
           </Suspense>
         ) : undefined
       }
+      sideKind={webShown ? 'web' : 'juno'}
       sideWidth={panelWidth}
       onSideResize={resizePanel}
       onSideResetWidth={resetPanelWidth}

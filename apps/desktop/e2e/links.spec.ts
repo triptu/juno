@@ -1,7 +1,8 @@
 // Links (spec section 8): URLs sent from the composer show as links before
 // and after Slack's echo, a URL pasted over selected words links them and
 // goes to Slack as Slack's client sends it, ⌘K on a selection edits the
-// link, and a click opens it in the browser.
+// link, and ⌘-click opens it in the browser (a plain click opens the web
+// panel, web-panel.spec.ts).
 import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
 
@@ -73,9 +74,9 @@ test('URLs and domains sent from the composer show as links before and after the
   const posted = fake.calls.filter((call) => call.method === 'chat.postMessage').at(-1)
   expect(posted?.args['text']).toBe('see <http://example.com|example.com> and <https://slack.com/help>')
 
-  // A click opens the link in the browser, with the URL on hover.
+  // ⌘-click opens the link in the browser, with the URL on hover.
   await expect(links.last()).toHaveAttribute('title', 'https://slack.com/help')
-  await links.last().click()
+  await links.last().click({ modifiers: ['Meta'] })
   await expect.poll(() => juno.browserLinks()).toEqual(['https://slack.com/help'])
 })
 
