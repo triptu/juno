@@ -1,12 +1,12 @@
 import { defineFixtures, fixture } from '@juno/ui'
 import { NOW, remembers, remembersFull } from './fixtures'
-import { RemembersPage, type RemembersPageProps } from './RemembersPage'
+import { PinList, type PinListProps } from './PinList'
 
 const noop = () => {}
-const page = (props: Pick<RemembersPageProps, 'page'> & Partial<RemembersPageProps>) => fixture<RemembersPageProps>({ now: NOW, onEditStart: noop, onDraftChange: noop, onSave: noop, onCancel: noop, onRemove: noop, ...props })
+const page = (props: Pick<PinListProps, 'page'> & Partial<PinListProps>) => fixture<PinListProps>({ now: NOW, onEditStart: noop, onDraftChange: noop, onSave: noop, onCancel: noop, onRemove: noop, ...props })
 
 export default defineFixtures(
-  RemembersPage,
+  PinList,
   {
     Pins: {
       list: page({ page: remembers }),
@@ -16,5 +16,5 @@ export default defineFixtures(
       empty: page({ page: { pins: [], usedBytes: 0, budgetBytes: 4096 } }),
     },
   },
-  { width: 960, height: 640, padded: false },
+  { width: 640, height: 480 },
 )

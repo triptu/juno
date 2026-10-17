@@ -396,7 +396,14 @@ export const chatCopy = {
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },
-    remembers: { changed: 'This changed. Check it and save again.', full: 'Juno remembers as much as it can. Remove a line to add another.' },
+    remembers: {
+      changed: 'This changed. Check it and save again.',
+      full: 'Juno remembers as much as it can. Delete a line to add another.',
+      empty: 'Nothing pinned yet. Say "remember that …" in the chat, or choose Remember this on one of your messages.',
+      label: 'Pin',
+      fromMessage: 'From your message',
+      edited: 'Edited',
+    },
     review: {
       title: 'Check what was pending',
       body: 'Juno restored from a backup. These actions were waiting. Each may already have happened. Approve the ones you still want, then activate Juno.',
