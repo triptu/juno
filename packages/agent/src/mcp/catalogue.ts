@@ -4,7 +4,7 @@ import type { Tool } from '@earendil-works/pi-mcp'
 import type { Store } from '../store/store'
 import { transaction } from '../store/database'
 import { ReviewRule } from '@juno/agent-contract'
-import { ConnectionConfig, T3, deletes, forbidden } from './types'
+import { ConnectionConfig, McpError, T3, deletes, forbidden } from './types'
 
 const Row = Schema.Struct({
   name: Schema.String, definition: Schema.String, hash: Digest,
@@ -87,10 +87,40 @@ export function discover(store: Store, config: ConnectionConfig, tools: Readonly
   })
 }
 
-/** Unsupported schema features fail closed; server patterns are never evaluated. */
-export function validateArguments(definition: string, args: unknown): void {
+/** How much of a schema or argument error the model reads. */
+const REASON_LIMIT = 500
+const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error)).slice(0, REASON_LIMIT)
+
+/** Draft-07 `#/definitions/` references, as the draft 2020-12 `#/$defs/` the importer reads. */
+function refsAsDefs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(refsAsDefs)
+  if (typeof value !== 'object' || value === null) return value
+  return Object.fromEntries(Object.entries(value).map(([key, inner]) =>
+    [key, key === '$ref' && typeof inner === 'string' ? inner.replace(/^#\/definitions\//, '#/$defs/') : refsAsDefs(inner)]))
+}
+
+/**
+ * The tool's argument schema as a decoder. Unsupported schema features fail
+ * closed with an `invalid` error that names them; server patterns are never
+ * evaluated. The schema's own `$defs` (or draft-07 `definitions`) resolve its
+ * `$ref`s.
+ */
+export function argumentDecoder(definition: string) {
   const tool = parseObject(JSON.parse(definition))
-  const input = parseObject(tool.inputSchema ?? { type: 'object' })
-  const schema = SchemaRepresentation.fromJsonSchemaDocument({ dialect: 'draft-2020-12', schema: input, definitions: {} })
-  Schema.decodeUnknownSync(Schema.toEncoded(schema), { onExcessProperty: 'error' })(args)
+  const { $defs, definitions, ...input } = parseObject(refsAsDefs(tool.inputSchema ?? { type: 'object' }))
+  try {
+    const defs = $defs ?? definitions
+    const schema = SchemaRepresentation.fromJsonSchemaDocument({ dialect: 'draft-2020-12', schema: input, definitions: Object.fromEntries(Object.entries(defs === undefined ? {} : parseObject(defs)).map(([key, value]) => [key, parseObject(value)])) })
+    return Schema.decodeUnknownSync(Schema.toEncoded(schema), { onExcessProperty: 'error' })
+  } catch (error) {
+    throw new McpError({ reason: 'invalid', message: `Juno can't use this tool: its argument schema is not one Juno can check (${reasonOf(error)}).` })
+  }
+}
+
+/** Arguments that do not match fail with an `invalid` error that says why, so the model can fix the call. */
+export function validateArguments(definition: string, args: unknown): void {
+  const decode = argumentDecoder(definition)
+  try { decode(args) } catch (error) {
+    throw new McpError({ reason: 'invalid', message: `These arguments do not match the tool's schema: ${reasonOf(error)}` })
+  }
 }

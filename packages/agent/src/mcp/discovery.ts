@@ -1,18 +1,25 @@
 /**
  * What `find_tools` tells the model, one step at a time (docs/research/codemode.md, "Is this
  * progressive disclosure?"): the connected servers and their tool counts; then tools matching a
- * query, one line each; then one tool's argument schema, only when the model names it. Tools the
+ * query, one line each; then one tool's full description and argument schema, only when the model
+ * names it. That answer is never cut: it is sent whole up to `SCHEMA_LIMIT`, and past it, or when the
+ * schema is not one Juno can check, the model is told in one line that the tool can't be used. Tools the
  * owner turned off never appear. Internal ids, schema hashes and addresses never reach the model:
  * a server is named by its handle (`McpManagerApi.handles`).
  */
 import type { McpManagerApi } from './manager'
 import { hintOf } from './manager'
-import { parseObject } from './catalogue'
+import { argumentDecoder, parseObject } from './catalogue'
+import { SCHEMA_PREFIX } from './results'
 import { McpError } from './types'
 
 /** At most this many tools for a query or a server's list; `more` says how many were left out. */
 const LIMIT = 20
-const ABOUT_LIMIT = 1000
+/**
+ * The largest schema answer the model gets: the request builder's whole-result limit (`limits.wholeResult`
+ * in `@juno/agent-memory`, 48 KB), which leaves room in the 64 KB active run. PostHog's `exec` is about 40 KB.
+ */
+export const SCHEMA_LIMIT = 49_152
 
 /** The connection behind a handle the model used, or an internal id a test or an older turn used. */
 export function resolveServer(manager: McpManagerApi, name: string): string {
@@ -50,14 +57,23 @@ export function findTools(manager: McpManagerApi, input: { readonly server?: str
   return { tools: found.slice(0, LIMIT), ...(found.length > LIMIT ? { more: found.length - LIMIT } : {}) }
 }
 
-/** One tool's description and argument schema, for the call the model is about to make. */
-export function toolSchema(manager: McpManagerApi, server: string, name: string) {
+/**
+ * One tool's description and argument schema, for the call the model is about to make, as the text
+ * the model reads. Whole, or a one-line error when it can't be used.
+ */
+export function toolSchema(manager: McpManagerApi, server: string, name: string): { readonly text: string; readonly isError?: true } {
   const id = resolveServer(manager, server)
   const tool = manager.tool(id, name)
+  // Fails with a one-line `invalid` error when Juno could not check arguments against the schema.
+  argumentDecoder(tool.definition)
   const definition = parseObject(JSON.parse(tool.definition))
-  const about = typeof definition.description === 'string' ? definition.description.trim().slice(0, ABOUT_LIMIT) : undefined
-  return {
+  const about = typeof definition.description === 'string' ? definition.description.trim() : undefined
+  const text = SCHEMA_PREFIX + JSON.stringify({
     server: handleOf(manager, id), tool: name, ...(about ? { about } : {}), ...(tool.tier === 0 ? { read: true } : {}),
     inputSchema: definition.inputSchema ?? { type: 'object' },
-  }
+  })
+  // Measured as the archive keeps it, after the tool's name, which is what the builder pages.
+  const bytes = Buffer.byteLength(`find_tools: ${text}`)
+  if (bytes > SCHEMA_LIMIT) return { text: `Juno can't use this tool: its description and argument schema are ${Math.ceil(bytes / 1024)} KB, more than the ${SCHEMA_LIMIT / 1024} KB Juno can read.`, isError: true }
+  return { text }
 }

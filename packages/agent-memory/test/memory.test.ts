@@ -151,7 +151,7 @@ describe('pure safety properties', () => {
         expect(result.messages[2]).toBe(text);
         expect(result.pinRev).toBe(3);
         expect(result.active.map(e => ({ ...e, text: '' }))).toEqual(active.map(e => ({ ...e, text: '' })));
-        for (const e of result.active) if (e.kind === 'tool-result') expect(utf8Bytes(e.text)).toBeLessThanOrEqual(limits.toolResult);
+        for (const e of result.active) if (e.kind === 'tool-result') expect(utf8Bytes(e.text)).toBeLessThanOrEqual(e.whole ? limits.wholeResult : limits.toolResult);
         if (result.omitted) expect(result.omitted).toEqual(p.tail);
       } else expect(result.reason).toBe('budget');
     }));
@@ -197,6 +197,27 @@ test('due order agrees with rollback push at every t from 0 through 20,000', () 
     expect(lines.map(l => l.kind === 'node' ? l.node.ref.a : l.key.a), `t=${t}`).toEqual(starts);
   }
 }, 30000);
+
+test('a whole tool result is sent in full up to its own limit, and paged past it', () => {
+  const at = (text: string, whole?: boolean) => buildRequest({ rev: 1, gen: 1, pins: { revision: 0, active: [] }, lines: [], covered: 0, h: 0, cutoff: 2,
+    tail: [], systemAndTools: ['system'], parents: [], contextWindow: 1_000_000,
+    active: [{ kind: 'tool-call', callId: 'c', sourcePos: 0, sourceEnd: 1, text: '{}', metadata: '' },
+      { kind: 'tool-result', callId: 'c', sourcePos: 1, sourceEnd: 2, text, metadata: '', ...(whole === undefined ? {} : { whole }) }] });
+  const result = (text: string, whole?: boolean) => {
+    const built = at(text, whole);
+    if (built.kind !== 'admitted') throw new Error('Expected admitted');
+    return built.active[1]!.text;
+  };
+  const schema = 's'.repeat(30_000);
+  expect(result(schema, true)).toBe(schema);
+  expect(utf8Bytes(result(schema))).toBeLessThanOrEqual(limits.toolResult);
+  expect(result(schema)).toContain('(paged: zoom 1)');
+  const huge = 's'.repeat(limits.wholeResult + 1);
+  expect(utf8Bytes(result(huge, true))).toBeLessThanOrEqual(limits.wholeResult);
+  expect(result(huge, true)).toContain('(paged: zoom 1)');
+  // The active run's cap still holds a whole result.
+  expect(limits.wholeResult).toBeLessThan(limits.active);
+});
 
 describe('compaction task text', () => {
   test('leaf task contains a byte ruler, the bounded original and raw context', () => {
