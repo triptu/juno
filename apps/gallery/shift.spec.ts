@@ -629,7 +629,7 @@ test.describe('Juno chat', () => {
 
   test('the banner chip changes without moving the title', async ({ page }) => {
     await open(page, 'JunoHeader', 'shift/banner-cycles')
-    const title = page.getByRole('heading', { name: 'Juno' })
+    const title = page.getByRole('button', { name: 'Juno', exact: true })
     const titleBox = await title.boundingBox()
     const seen = new Set<string>()
     for (let round = 0; round < 7; round++) {
