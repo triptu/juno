@@ -251,6 +251,12 @@ export const NO_LIMIT_USD = 1_000_000
 export const JunoSettingsPage = Schema.Struct({
   chatModels: Schema.Array(ModelChoice),
   compactionModels: Schema.Array(ModelChoice),
+  /**
+   * The model asked once when the chat model or an AI job's model refuses a
+   * request under its own policy or is unavailable, one row per OpenRouter
+   * family; none selected is off. Absent on a custom endpoint.
+   */
+  fallbackModels: Schema.optionalKey(Schema.Array(ModelChoice)),
   /** Today's spend as the ledger counts it against the limit: reported costs, plus calls under way or of unknown cost at their reserved amount. */
   spentTodayUsd: Schema.Number,
   /** The daily limit the owner set, for today and later days. `NO_LIMIT_USD` or more is no limit. */

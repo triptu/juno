@@ -415,6 +415,9 @@ importers:
       '@juno/agent-memory':
         specifier: workspace:*
         version: link:../agent-memory
+      '@juno/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@openai/codex-sdk':
         specifier: 0.162.1
         version: 0.162.1

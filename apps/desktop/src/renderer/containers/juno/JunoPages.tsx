@@ -93,6 +93,7 @@ export function JunoSettings() {
         change({ chat: key }, { _tag: 'model', purpose: 'chat', provider: choice?.provider ?? provider, family: choice?.family ?? key })
       }}
       onCompactionModel={(family) => change({ compaction: family }, { _tag: 'model', purpose: 'compaction', provider, family })}
+      onFallbackModel={(family) => change({ fallback: family }, { _tag: 'model', purpose: 'fallback', provider: 'openrouter', family })}
       onOpenLimit={() => openSettings('ai-activity')}
       onPaused={(value) => change({ paused: value }, { _tag: 'paused', value })}
     />
@@ -234,6 +235,8 @@ interface Shown {
   readonly paused?: boolean
   readonly chat?: string
   readonly compaction?: string
+  /** The fallback family, '' for none. */
+  readonly fallback?: string
 }
 
 const selectedFamily = (models: JunoSettingsPageModel['chatModels']) => {
@@ -246,11 +249,13 @@ function unconfirmed(page: JunoSettingsPageModel, shown: Shown): Shown {
   const paused = shown.paused !== undefined && shown.paused === page.paused
   const chat = shown.chat !== undefined && shown.chat === selectedFamily(page.chatModels)
   const compaction = shown.compaction !== undefined && shown.compaction === selectedFamily(page.compactionModels)
-  if (!paused && !chat && !compaction) return shown
+  const fallback = shown.fallback !== undefined && shown.fallback === (selectedFamily(page.fallbackModels ?? []) ?? '')
+  if (!paused && !chat && !compaction && !fallback) return shown
   return {
     ...(paused || shown.paused === undefined ? {} : { paused: shown.paused }),
     ...(chat || shown.chat === undefined ? {} : { chat: shown.chat }),
     ...(compaction || shown.compaction === undefined ? {} : { compaction: shown.compaction }),
+    ...(fallback || shown.fallback === undefined ? {} : { fallback: shown.fallback }),
   }
 }
 
@@ -261,6 +266,7 @@ function withShown(page: JunoSettingsPageModel, shown: Shown): JunoSettingsPageM
     ...(shown.paused === undefined ? {} : { paused: shown.paused }),
     chatModels: pick(page.chatModels, shown.chat),
     compactionModels: pick(page.compactionModels, shown.compaction),
+    ...(page.fallbackModels === undefined ? {} : { fallbackModels: pick(page.fallbackModels, shown.fallback) }),
   }
 }
 

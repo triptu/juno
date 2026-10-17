@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { httpError, lostStream, rateLimited, rejectedKey, reply, serverError } from '@juno/agent-testing'
-import { AdmissionError, createCompactionProvider, dollars, providerFailure } from '../src/index'
+import { AdmissionError, createCompactionProvider, createProviderGuard, dollars, providerFailure } from '../src/index'
+import type { GuardCall } from '../src/providers/guard'
 import { providerHarness, request } from './providers-harness'
 
 let h: Awaited<ReturnType<typeof providerHarness>>
@@ -82,4 +83,32 @@ it('distinguishes a missing key from a rejected key and a rate limit', () => {
   expect(providerFailure(new Error('No API key'))).toEqual({ ending: { _tag: 'failed', reason: 'missingKey' }, rateLimited: false })
   expect(providerFailure('JUNO:failed:missingKey').ending).toEqual({ _tag: 'failed', reason: 'missingKey' })
   expect(providerFailure('JUNO:failed:rateLimited:429')).toEqual({ ending: { _tag: 'failed', reason: 'rateLimited' }, rateLimited: true })
+})
+
+it('asks the fallback model once when the model refuses under its policy, and logs both requests', async () => {
+  h.fake.script([httpError(403, 'Input was flagged by moderation'), reply('hello')])
+  const fallback = h.fake.model('google/gemini-3.8-flash')
+  const guard = createProviderGuard({ store: h.core.store, transport: h.fake.models, fallback: () => fallback })
+  const calls: GuardCall[] = []
+  guard.onCall((call) => { calls.push(call) })
+  const { revision, context } = request()
+  const result = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, context))
+  expect(result).toMatchObject({ stopReason: 'stop', model: 'google/gemini-3.8-flash' })
+  expect(h.fake.requests.map((sent) => sent.model)).toEqual(['anthropic/claude-sonnet-5.5', 'google/gemini-3.8-flash'])
+  for (let tries = 0; tries < 50 && calls.length < 2; tries++) await new Promise((resolve) => setTimeout(resolve, 10))
+  expect(calls.map((call) => [call.model, call.outcome, call.kind, call.message])).toEqual([
+    ['anthropic/claude-sonnet-5.5', 'error', 'policy.fallback', 'HTTP 403'],
+    ['google/gemini-3.8-flash', 'ok', '', ''],
+  ])
+  // The refusal came before output, so only the fallback's cost stays in the ledger.
+  expect(guard.spend.snapshot()).toMatchObject({ reserved: 0, unknown: 0, actual: dollars(result.usage.cost.total) })
+})
+
+it('ends a policy refusal with no fallback as refused, sends it once and does not ask a model by the same maker', async () => {
+  h.fake.script([httpError(400, "This request triggered restrictions on violative cyber content and was blocked under Anthropic's Usage Policy."), reply('hello')])
+  const guard = createProviderGuard({ store: h.core.store, transport: h.fake.models, fallback: () => h.fake.model('anthropic/claude-haiku-5.5') })
+  const { revision, context } = request()
+  const result = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, context))
+  expect(ending(result)).toEqual({ _tag: 'failed', reason: 'refused' })
+  expect(h.fake.requests).toHaveLength(1)
 })

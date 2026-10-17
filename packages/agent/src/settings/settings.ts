@@ -14,6 +14,10 @@
  *   a refresh that brings a newer model, reaches the engine through
  *   `setModels`: the chat model from the next run, the compaction model
  *   from the next compaction job.
+ * - Fallback on OpenRouter: one row per family, or none. The guard asks it
+ *   once when the chat model refuses under its policy or is unavailable,
+ *   and the engine's AI jobs use the slug it resolves to (`fallbackSlug`,
+ *   told to the host by `tellFallback`).
  * - A model with no prices (most custom endpoints) costs $0 in the ledger,
  *   so the cap cannot track it (`spendUntracked`).
  * - Spend: today's spend from the WP9 ledger, counted as it is checked
@@ -46,7 +50,8 @@ import { DOLLAR, dollars } from '../spend'
 import { ownerRules, setOwnerRules } from '../actions/rules'
 import { defaultBackupFolder } from '../backup/backup'
 import { backupFailure } from '../backup/errors'
-import { modelFor, save, type Purpose } from './store'
+import { fallbackModel, modelFor, save, type Purpose } from './store'
+import { NO_FALLBACK } from '../providers/catalog'
 
 /** How often the catalogue is checked; it is read at most once a day. */
 const REFRESH_CHECK_MS = 60 * 60_000
@@ -155,6 +160,21 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
       }), ...codex]
   }
 
+  /** Every OpenRouter family, as a fallback. The saved one is selected; none is when it is off. */
+  const fallbackChoices = (): ReadonlyArray<ModelChoice> => {
+    const all = rows()
+    const chosen = fallbackModel(store, picker)?.choice.family
+    return pickerFamilies.map((family) => {
+      const row = all.find((r) => r.choice.family === family.family && r.choice.provider === 'openrouter')
+      return {
+        family: family.label,
+        ...(row === undefined ? {} : { resolved: shortName(row.model.name), ...priceText(row) }),
+        provider: 'openrouter' as const,
+        selected: row !== undefined && family.family === chosen,
+      }
+    })
+  }
+
   const ownership = (): Ownership => {
     const owner = turns.ownership.owner()
     switch (owner.state) {
@@ -180,6 +200,7 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
     return {
       chatModels: choices('chat'),
       compactionModels: choices('compaction'),
+      ...(custom ? {} : { fallbackModels: fallbackChoices() }),
       // The same rows the ledger checks a reservation against (`spend/index.ts` `fits`).
       spentTodayUsd: (spend.reserved + spend.actual) / DOLLAR,
       capUsd: spend.cap / DOLLAR,
@@ -218,6 +239,18 @@ export function createJunoSettings(options: SettingsOptions): JunoSettings {
           if (id === '' || next.purpose !== 'chat') return { _tag: 'refused', reason: 'invalid', message: 'Enter a model id.' }
           save(store, { customModel: id, chat: 'sonnet' })
           apply()
+          break
+        }
+        if (next.purpose === 'fallback') {
+          if (next.family === '') {
+            save(store, { fallback: NO_FALLBACK })
+            break
+          }
+          const chosen = pickerFamilies.find((f) => f.label === next.family)
+          if (chosen === undefined || !rows().some((r) => r.choice.family === chosen.family && r.choice.provider === 'openrouter')) {
+            return { _tag: 'refused', reason: 'invalid', message: `${next.family} is not available.` }
+          }
+          save(store, { fallback: chosen.family })
           break
         }
         const family = pickerFamilies.find((f) => f.label === next.family && f.path === next.purpose)

@@ -8,6 +8,7 @@ import {
   createAssistantMessageEventStream, createModels, createProvider, normalizeContext,
   type Api, type AssistantMessage, type Context, type Model, type Models, type SimpleStreamOptions,
 } from '@earendil-works/pi-ai'
+import { classifyFailure, failureStatus, fallbackHelps, modelMaker, refusedBeforeOutput } from '@juno/ai/failure'
 import { createSpend, dollars, type SpendLedger, type SpendPath } from '../spend'
 import type { Store } from '../store/store'
 
@@ -31,18 +32,15 @@ export class AdmissionError extends Error {
 type Reason = Exclude<Ending, { _tag: 'complete' }>
 /** The guard's failures travel through pi as `errorMessage`. Only this fixed code is kept, never a provider's error body. */
 const code = (ending: Ending, rateLimited = false) => `JUNO:${ending._tag}${'reason' in ending ? `:${ending.reason}` : ''}${rateLimited ? ':429' : ''}`
-const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|missingKey|rateLimited|keyRejected|codexSignedOut|codexMissing|codexQuota|codexCrash|offline))(:429)?$/
+const CODE = /^JUNO:(interrupted|blocked:(?:tooLarge|budget)|failed:(?:provider|refused|missingKey|rateLimited|keyRejected|codexSignedOut|codexMissing|codexQuota|codexCrash|offline))(:429)?$/
 function decode(match: string): Reason {
   const [tag, reason] = match.split(':')
   if (tag === 'interrupted') return { _tag: 'interrupted' }
   if (tag === 'blocked') return { _tag: 'blocked', reason: reason === 'budget' ? 'budget' : 'tooLarge' }
-  return { _tag: 'failed', reason: reason === 'missingKey' || reason === 'rateLimited' || reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'codexMissing' || reason === 'codexQuota' || reason === 'codexCrash' || reason === 'offline' ? reason : 'provider' }
+  return { _tag: 'failed', reason: reason === 'refused' || reason === 'missingKey' || reason === 'rateLimited' || reason === 'keyRejected' || reason === 'codexSignedOut' || reason === 'codexMissing' || reason === 'codexQuota' || reason === 'codexCrash' || reason === 'offline' ? reason : 'provider' }
 }
 /** SDK errors start with the status ("401 …", "429: {…}"); pi's prefixed form is "Provider (503): …". */
-const httpStatus = (text: string): number | undefined => {
-  const found = /^([1-5]\d\d)\b/.exec(text) ?? /^[^\n(]*\(([1-5]\d\d)\):/.exec(text)
-  return found ? Number(found[1]) : undefined
-}
+const httpStatus = failureStatus
 const failed = (reason: Extract<Ending, { _tag: 'failed' }>['reason'], rateLimited = false): ProviderFailure =>
   ({ ending: { _tag: 'failed', reason }, rateLimited })
 
@@ -56,14 +54,17 @@ export function providerFailure(error: unknown): ProviderFailure {
   if (status === 429 || /rate.?limit/i.test(text)) return failed('rateLimited', true)
   if (/not logged in|signed out/i.test(text)) return failed('codexSignedOut')
   if (/no api key|missing .*key/i.test(text)) return failed('missingKey')
+  // The model's own policy, or a moderation 403: another try sends the same words and gets the same answer.
+  if (classifyFailure(text) === 'policy') return failed('refused')
   if (status === 401 || status === 403 || /api key auth (?:check )?failed/i.test(text)) return failed('keyRejected')
   if (status !== undefined) return failed('provider')
   if (/terminated|fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|offline|socket|timed? ?out/i.test(text)) return failed('offline')
   return failed('provider')
 }
-/** The provider refused the request before doing any work, so it billed nothing. */
-const refused = (failure: ProviderFailure) => failure.rateLimited ||
-  (failure.ending._tag === 'failed' && (failure.ending.reason === 'keyRejected' || failure.ending.reason === 'missingKey'))
+/** The provider refused the request before doing any work, so it billed nothing: a rate limit, a key, or any 4xx status before output. */
+const refused = (failure: ProviderFailure, error: unknown) => failure.rateLimited ||
+  (failure.ending._tag === 'failed' && (failure.ending.reason === 'keyRejected' || failure.ending.reason === 'missingKey')) ||
+  (!(error instanceof AdmissionError) && refusedBeforeOutput(error instanceof Error ? error.message : String(error)))
 export function readRevision(store: Store): Revision {
   const row = store.db.prepare('SELECT gen, pin_rev FROM memory_head WHERE singleton = 1').get()!
   return { gen: Number(row.gen), pinRev: Number(row.pin_rev) }
@@ -137,11 +138,18 @@ function doneCall(base: CallBase, message: AssistantMessage): GuardCall {
   }
 }
 
-/** A request that did not finish. Of a provider's error only the HTTP status is kept. */
+/**
+ * A request that did not finish. Of a provider's error only the HTTP status
+ * is kept, and its kind (`classifyFailure`), so the log can say a policy
+ * refusal from another error.
+ */
 function failedCall(base: CallBase, failure: ProviderFailure, error: unknown): GuardCall {
-  const status = error === undefined || error instanceof AdmissionError ? undefined : httpStatus(error instanceof Error ? error.message : String(error))
+  const text = error === undefined || error instanceof AdmissionError ? undefined : error instanceof Error ? error.message : String(error)
+  const status = text === undefined ? undefined : httpStatus(text)
+  const outcome = failureOutcome(failure)
+  const sorted = text !== undefined && failure.ending._tag === 'failed' && (failure.ending.reason === 'provider' || failure.ending.reason === 'refused') && !CODE.test(text)
   return {
-    ...base, durationMs: Date.now() - base.at, ...failureOutcome(failure), message: status === undefined ? '' : `HTTP ${status}`,
+    ...base, durationMs: Date.now() - base.at, ...outcome, ...(sorted ? { kind: classifyFailure(text) } : {}), message: status === undefined ? '' : `HTTP ${status}`,
     inputTokens: null, outputTokens: null, costUsd: null, outputChars: 0, toolCalls: 0,
   }
 }
@@ -160,13 +168,29 @@ export interface GuardOptions {
   readonly spend?: SpendLedger
   readonly codex?: { readonly agentDir: string; readonly executable: string }
   readonly onFailure?: (failure: ProviderFailure) => void
+  /** The model asked once when a request is refused under the model's policy or the model is unavailable (Settings › Juno). */
+  readonly fallback?: () => Model<Api> | undefined
+}
+
+/** What the trusted builder stamped a request with: what it was built against, its spend path and who watches it stream. */
+type Stamp = { revision: Revision; path: SpendPath; observe?: Observer }
+
+/** How far one request got, so its failure settles and falls back correctly. */
+interface Attempt {
+  reservation?: string
+  partial?: AssistantMessage
+  started: boolean
+  bound: number
+  localFailure?: AdmissionError
+  wirePassed: boolean
+  definitelyNotSent: boolean
 }
 
 /** The transport is private. Give only these models to pi-durable. */
 export function createProviderGuard(options: GuardOptions) {
   const { store, transport } = options
   const spend = options.spend ?? createSpend(store)
-  const stamps = new Map<string, Array<{ revision: Revision; path: SpendPath; observe?: Observer }>>()
+  const stamps = new Map<string, Array<Stamp>>()
   const multiplier = (provider: string): 1 | 1.25 => store.db.prepare('SELECT 1 FROM provider_bounds WHERE provider = ?').get(provider) ? 1.25 : 1
   const check = (model: Model<Api>, context: Context, revision: Revision): number => {
     if (!sameRevision(revision, readRevision(store))) throw new AdmissionError({ _tag: 'interrupted' })
@@ -189,6 +213,20 @@ export function createProviderGuard(options: GuardOptions) {
       }
     }
   }
+  /**
+   * The fallback for a request to `model` that failed with `error`, when
+   * another maker's model may answer it: a refusal under the model's own
+   * policy, or the model not found or unavailable. Never for the guard's own
+   * refusals, Codex, or a model by the same maker.
+   */
+  const fallbackOf = (model: Model<Api>, error: unknown): Model<Api> | undefined => {
+    if (error instanceof AdmissionError || model.provider === 'openai-codex') return undefined
+    const text = error instanceof Error ? error.message : String(error)
+    if (CODE.test(text) || !fallbackHelps(classifyFailure(text))) return undefined
+    const other = options.fallback?.()
+    if (other === undefined || modelMaker(other.id) === modelMaker(model.id)) return undefined
+    return transport.getModel(other.provider, other.id)
+  }
   const stream = (requested: Model<Api>, context: Context, streamOptions?: SimpleStreamOptions) => {
     const outer = createAssistantMessageEventStream()
     // Copy synchronously: callers cannot mutate the admitted request while auth awaits.
@@ -198,81 +236,100 @@ export function createProviderGuard(options: GuardOptions) {
     const stamp = pending?.shift()
     if (!pending?.length) stamps.delete(key)
     const base: CallBase = { path: stamp?.path ?? 'chat', sessionId: streamOptions?.sessionId, provider: requested.provider, model: requested.id, at: Date.now() }
-    void (async (): Promise<GuardCall> => {
-      let reservation: string | undefined
-      let partial: AssistantMessage | undefined
-      let started = false
-      let bound = 0
-      let localFailure: AdmissionError | undefined
-      let wirePassed = false
-      let definitelyNotSent = false
+    /** `outer` had its `start`: a fallback's is not sent again. */
+    let opened = false
+    /** One reserved request to `model`, streamed into `outer`. Throws on failure, with what it got to in `state`. */
+    const request = async (model: Model<Api>, call: CallBase, admitted: Stamp, state: Attempt): Promise<GuardCall> => {
+      const held = spend.reserve(admitted.path, reservationCost(model, state.bound))
+      if (held.kind === 'blocked') throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
+      state.reservation = held.id
+      const wireCheck = (payload: unknown): undefined => {
+        try {
+          if (state.wirePassed) throw new AdmissionError({ _tag: 'interrupted' })
+          check(model, copy, admitted.revision)
+          // Count the adapter's final JSON as well, including its extra fields.
+          const serialized = JSON.stringify(payload)
+          if (serialized === undefined) throw new AdmissionError({ _tag: 'interrupted' })
+          state.bound = Math.max(state.bound, upper([serialized, ...copy.messages.map(() => '')], multiplier(model.provider)))
+          if (state.bound + limits.reserve > model.contextWindow) throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
+          if (!spend.extend(held.id, reservationCost(model, state.bound))) throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
+          state.wirePassed = true
+          return undefined
+        } catch (error) {
+          state.definitelyNotSent = !state.wirePassed
+          if (error instanceof AdmissionError) state.localFailure = error
+          throw error
+        }
+      }
+      // Never forward arbitrary sampling parameters, hooks, auth or output overrides.
+      const inner = transport.streamSimple({ ...model, maxTokens: Math.min(model.maxTokens, limits.reserve), samplingParams: undefined, samplingParamsByThinkingLevel: undefined }, copy, {
+        maxTokens: Math.min(model.maxTokens, limits.reserve), maxRetries: 0,
+        cacheRetention: 'short', sessionId: streamOptions?.sessionId,
+        signal: streamOptions?.signal, onPayload: wireCheck,
+      })
+      for await (const event of inner) {
+        if (event.type === 'error') {
+          state.partial = event.error
+          throw state.localFailure ?? new Error(event.error.errorMessage ?? 'Provider failed')
+        }
+        if (event.type === 'done') {
+          const usage = event.message.usage
+          const observed = usage.input + usage.cacheRead + usage.cacheWrite
+          if (observed > state.bound) store.db.prepare('INSERT OR IGNORE INTO provider_bounds(provider, multiplier) VALUES (?, 1.25)').run(model.provider)
+          const cost = usage.cost.total
+          // A zero report from an interrupted or missing-usage stream is not a receipt.
+          spend.settle(held.id, usage.totalTokens > 0 && Number.isFinite(cost) && cost >= 0 ? dollars(cost) : undefined)
+          admitted.observe?.(progressOf(event.message))
+          outer.push(event)
+          outer.end(event.message)
+          return doneCall(call, event.message)
+        }
+        state.partial = event.partial
+        state.started = true
+        admitted.observe?.(progressOf(event.partial))
+        if (event.type === 'start' && opened) continue
+        opened = true
+        outer.push(event)
+      }
+      throw new Error('terminated')
+    }
+    /**
+     * One request, with its own reservation. A failure before any output
+     * may go once to the fallback model (`mayFall`), whose events continue
+     * `outer`. Resolves with the records of the requests made, in order.
+     */
+    const send = async (requested: Model<Api>, call: CallBase, mayFall: boolean): Promise<ReadonlyArray<GuardCall>> => {
+      const state: Attempt = { bound: 0, started: false, wirePassed: false, definitelyNotSent: false }
       try {
         const model = requested.provider === 'openai-codex' && harness ? requested : transport.getModel(requested.provider, requested.id)
         if (!model || !stamp) throw new AdmissionError({ _tag: 'interrupted' })
-        bound = check(model, copy, stamp.revision)
-        if (model.provider === 'openai-codex' && harness) return answerWhole(outer, base, harness.response(model, copy, stamp.revision, stamp.observe))
-        const held = spend.reserve(stamp.path, reservationCost(model, bound))
-        if (held.kind === 'blocked') throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
-        reservation = held.id
-        const wireCheck = (payload: unknown): undefined => {
-          try {
-            if (wirePassed) throw new AdmissionError({ _tag: 'interrupted' })
-            check(model, copy, stamp.revision)
-            // Count the adapter's final JSON as well, including its extra fields.
-            const serialized = JSON.stringify(payload)
-            if (serialized === undefined) throw new AdmissionError({ _tag: 'interrupted' })
-            bound = Math.max(bound, upper([serialized, ...copy.messages.map(() => '')], multiplier(model.provider)))
-            if (bound + limits.reserve > model.contextWindow) throw new AdmissionError({ _tag: 'blocked', reason: 'tooLarge' })
-            if (!spend.extend(held.id, reservationCost(model, bound))) throw new AdmissionError({ _tag: 'blocked', reason: 'budget' })
-            wirePassed = true
-            return undefined
-          } catch (error) {
-            definitelyNotSent = !wirePassed
-            if (error instanceof AdmissionError) localFailure = error
-            throw error
-          }
-        }
-        // Never forward arbitrary sampling parameters, hooks, auth or output overrides.
-        const inner = transport.streamSimple({ ...model, maxTokens: Math.min(model.maxTokens, limits.reserve), samplingParams: undefined, samplingParamsByThinkingLevel: undefined }, copy, {
-          maxTokens: Math.min(model.maxTokens, limits.reserve), maxRetries: 0,
-          cacheRetention: 'short', sessionId: streamOptions?.sessionId,
-          signal: streamOptions?.signal, onPayload: wireCheck,
-        })
-        for await (const event of inner) {
-          if (event.type === 'error') {
-            partial = event.error
-            throw localFailure ?? new Error(event.error.errorMessage ?? 'Provider failed')
-          }
-          if (event.type === 'done') {
-            const usage = event.message.usage
-            const observed = usage.input + usage.cacheRead + usage.cacheWrite
-            if (observed > bound) store.db.prepare('INSERT OR IGNORE INTO provider_bounds(provider, multiplier) VALUES (?, 1.25)').run(model.provider)
-            const cost = usage.cost.total
-            // A zero report from an interrupted or missing-usage stream is not a receipt.
-            spend.settle(held.id, usage.totalTokens > 0 && Number.isFinite(cost) && cost >= 0 ? dollars(cost) : undefined)
-            stamp.observe?.(progressOf(event.message))
-            outer.push(event)
-            outer.end(event.message)
-            return doneCall(base, event.message)
-          }
-          partial = event.partial
-          started = true
-          stamp.observe?.(progressOf(event.partial))
-          outer.push(event)
-        }
-        throw new Error('terminated')
+        state.bound = check(model, copy, stamp.revision)
+        if (model.provider === 'openai-codex' && harness) return [answerWhole(outer, call, harness.response(model, copy, stamp.revision, stamp.observe))]
+        return [await request(model, call, stamp, state)]
       } catch (error) {
         const failure = providerFailure(error)
         // Anything else may have been billed: keep the whole reservation.
-        const unbilled = (localFailure && definitelyNotSent) || (!started && refused(failure))
-        if (reservation) spend.settle(reservation, unbilled ? 0 : undefined)
-        const message = failedMessage(requested, failure, partial)
+        const unbilled = (state.localFailure && state.definitelyNotSent) || (!state.started && refused(failure, error))
+        if (state.reservation) spend.settle(state.reservation, unbilled ? 0 : undefined)
+        const record = failedCall(call, failure, error)
+        // Nothing was shown yet, so another maker's model can still answer the same request.
+        const other = mayFall && state.localFailure === undefined && streamOptions?.signal?.aborted !== true && (state.partial === undefined || state.partial.content.length === 0)
+          ? fallbackOf(requested, error)
+          : undefined
+        if (other !== undefined) {
+          const next = await send(other, { ...call, provider: other.provider, model: other.id, at: Date.now() }, false)
+          return [{ ...record, kind: `${record.kind}.fallback` }, ...next]
+        }
+        const message = failedMessage(requested, failure, state.partial)
         outer.push({ type: 'error', reason: 'error', error: message })
         outer.end(message)
         options.onFailure?.(failure)
-        return failedCall(base, failure, error)
+        return [record]
       }
-    })().then(tell)
+    }
+    void send(requested, base, true).then((calls) => {
+      for (const call of calls) tell(call)
+    })
     return outer
   }
   const admitHarness = (revision: Revision, model: Model<Api>, prompt: string): string => {

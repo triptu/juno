@@ -21,6 +21,13 @@ const decodeEntry = Schema.decodeUnknownOption(CatalogueEntry)
 export const COMPACTION_MIN_WINDOW = 131_072
 export const DEFAULT_CHAT_FAMILY = 'sonnet'
 export const DEFAULT_COMPACTION_FAMILY = 'haiku'
+/**
+ * The fallback until the owner picks one: Gemini Flash, from another maker than the default
+ * chat (Claude) and the engine's default models (Claude, GPT), a fifth of Sonnet's price, with
+ * tool calling and a 1M window. `NO_FALLBACK` turns it off.
+ */
+export const DEFAULT_FALLBACK_FAMILY = 'flash'
+export const NO_FALLBACK = 'none'
 const families = [
   { family: 'sonnet', label: 'Claude Sonnet', pattern: /^anthropic\/claude-sonnet-\d+(?:\.\d+)*$/, path: 'chat' },
   { family: 'opus', label: 'Claude Opus', pattern: /^anthropic\/claude-opus-\d+(?:\.\d+)*$/, path: 'chat' },
