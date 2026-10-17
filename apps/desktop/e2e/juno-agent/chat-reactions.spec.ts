@@ -128,9 +128,13 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await expect(panel.junoBubble('You said: note 6').getByLabel('Reacted 👍')).toBeVisible()
 
   // Dark, then the wide Juno tab.
+  // Settings takes the tab, so the topic comes back with the panel closed; it opens at the width it was left at.
   await juno.setTheme('Dark')
   await juno.sidebar.row(POSTGRES).open()
-  await expect(panel.composer).toBeVisible()
+  await juno.topic.expectTitle(POSTGRES)
+  await juno.tabs.menu('juno')
+  await expect(panel.composer).toBeFocused()
+  await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
   await scrollTo(panel, 'top')
   await expectBadgesWhole(panel, 3)
   await shoot(panel, 'panel-360-dark-top')
