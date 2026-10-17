@@ -10,7 +10,7 @@ import { openState, readRoutes } from './support'
 const cases = [
   { component: 'TopicHeader', state: 'switcher-thread', trigger: 'h1 button', panel: '[aria-label="Topics in this channel"]' },
   { component: 'TopicHeader', state: 'switcher-main', trigger: 'h1 button', panel: '[aria-label="Topics in this channel"]' },
-  { component: 'JunoHeader', state: 'open', trigger: 'h1 button', panel: '[aria-label="Juno menu"]' },
+  { component: 'JunoHeader', state: 'open', trigger: 'button[aria-haspopup="menu"]', panel: '[aria-label="Juno menu"]' },
   { component: 'Home', state: 'chip-open', trigger: 'button[aria-label="Send to: Juno"]', panel: '[aria-label="Send to"]' },
 ] as const
 

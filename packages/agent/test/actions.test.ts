@@ -358,7 +358,7 @@ it('Change: Apply runs the registered executor once with exactly the stored payl
   click(h, view)
   await settle(h)
   expect(runs).toEqual([{ title: 'Q4' }])
-  expect(statusOf(only(h))).toEqual({ _tag: 'done', line: 'Applied', open: { _tag: 'url', url: 'https://notion.invalid/page', label: 'Page' } })
+  expect(statusOf(only(h))).toEqual({ _tag: 'done', line: 'Done', open: { _tag: 'url', url: 'https://notion.invalid/page', label: 'Page' } })
 })
 
 it('Change: a tool with no executor fails on the click and nothing runs', async () => {

@@ -14,6 +14,8 @@ export interface PanelPlace {
   readonly tint: PlaceTint
   /** "eng · Main", or "eng · Postgres 16 migration plan". The kind icon stands for the "#". */
   readonly label: string
+  /** The place alone, "eng": the chip's text when a selection shares a short row. */
+  readonly name: string
 }
 
 export interface JunoPanelContextProps {
@@ -41,18 +43,21 @@ const aboutIcon = (about: Exclude<About, { _tag: 'topic' }>): PhosphorIcon => (a
 export function JunoPanelContext({ place, selection, onRemoveSelection, about, onRemoveAbout }: JunoPanelContextProps) {
   const label = about !== undefined ? `${chatCopy.about.prefix}${aboutLabel(about)}` : place?.label
   const icon = about !== undefined ? aboutIcon(about) : place === undefined ? undefined : tintIcons[place.tint]
+  const quoted = about === undefined && selection !== undefined
   return (
     <div data-panel-context="" {...stylex.props(styles.row)}>
       {label !== undefined && icon !== undefined ? (
         <Chip
           icon={icon}
           label={label}
+          // With a selection beside it in a short row, the place alone; the full title stays in the tooltip.
+          {...(quoted && place !== undefined ? { short: place.name } : {})}
           title={chatCopy.panel.contextLabel(label)}
           data={about !== undefined ? { 'data-panel-sees': '', 'data-about-chip': about._tag } : { 'data-panel-sees': '' }}
           remove={about !== undefined && onRemoveAbout !== undefined ? <IconButton icon={X} label={chatCopy.about.remove} size={20} radius="full" iconSize={12} tone="muted" onClick={onRemoveAbout} /> : undefined}
         />
       ) : null}
-      {about === undefined && selection !== undefined ? <SelectionChip selection={selection} {...(onRemoveSelection === undefined ? {} : { onRemove: onRemoveSelection })} /> : null}
+      {quoted ? <SelectionChip selection={selection} {...(onRemoveSelection === undefined ? {} : { onRemove: onRemoveSelection })} /> : null}
     </div>
   )
 }
@@ -117,22 +122,38 @@ function SelectionChip({ selection, onRemove }: { readonly selection: Selection;
 interface ChipProps {
   readonly icon: PhosphorIcon
   readonly label: string
+  /** Shown instead of `label` while the row is short. */
+  readonly short?: string
   readonly title: string
   readonly data: Readonly<Record<`data-${string}`, string>>
   readonly remove: ReactNode
 }
 
-function Chip({ icon, label, title, data, remove }: ChipProps) {
+function Chip({ icon, label, short, title, data, remove }: ChipProps) {
   return (
     <span {...data} {...tooltip(title)} {...stylex.props(styles.chip, remove !== undefined && styles.removable)}>
       <span {...stylex.props(styles.icon)}>
         <Icon icon={icon} size={12} />
       </span>
-      <span {...stylex.props(styles.label)}>{label}</span>
+      {short === undefined ? (
+        <span {...stylex.props(styles.label)}>{label}</span>
+      ) : (
+        <>
+          <span data-panel-sees-full="" {...stylex.props(styles.label, styles.wide)}>
+            {label}
+          </span>
+          <span data-panel-sees-short="" {...stylex.props(styles.label, styles.short)}>
+            {short}
+          </span>
+        </>
+      )}
       {remove}
     </span>
   )
 }
+
+/** The context row is short (the panel under about 420px): the topic's title would leave the selection too little room. */
+const SHORT_ROW = '@container panel-context (width < 360px)'
 
 const styles = stylex.create({
   // Inside the field, above the textarea: 8px under the field's top edge and, with the textarea's own
@@ -148,6 +169,8 @@ const styles = stylex.create({
     paddingInlineStart: spacing['--space-1'],
     paddingInlineEnd: spacing['--space-1-5'],
     userSelect: 'none',
+    containerType: 'inline-size',
+    containerName: 'panel-context',
   },
   // A pill: 12px corners, concentric with the field's 20px corner 8px out.
   chip: {
@@ -187,6 +210,13 @@ const styles = stylex.create({
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  // A short row (the panel at its narrower widths) with a selection: the place alone.
+  wide: {
+    display: { default: 'inline', [SHORT_ROW]: 'none' },
+  },
+  short: {
+    display: { default: 'none', [SHORT_ROW]: 'inline' },
   },
   // "Maya:" a step stronger than the quote, so who is read first.
   source: {

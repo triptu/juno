@@ -209,9 +209,9 @@ export const chatCopy = {
     connect: { connect: 'Connect', skip: 'Skip', connected: 'Connected' },
     change: {
       apply: 'Apply',
-      applied: 'Applied',
-      /** A connection call that only looks something up, or that no review judged a change, once it ran. */
+      /** Any change once it ran, whatever its button said, before the line of what came back. */
       done: 'Done',
+      undone: 'Undone',
       /** A connection call's result: its one line, and the disclosure for the rest. */
       result: {
         found: (count: number) => (count === 0 ? 'Found nothing' : count === 1 ? 'Found 1 result' : `Found ${count} results`),
@@ -331,8 +331,8 @@ export const chatCopy = {
     subtitle: 'Short notes Juno keeps about you and updates as it learns. Edit or delete any of them.',
     docEmpty: 'Nothing yet.',
     source: { owner: 'Your words', slack: 'Slack' },
-    /** After the source, for a note written in a run that had read Slack or a connection. */
-    outside: 'Written after reading outside content',
+    /** The source's tooltip, for a note written in a run that had read Slack or a connection. */
+    outside: 'Juno wrote this after reading outside content',
     add: 'Add',
     addLabel: (doc: string) => `Add to ${doc}`,
     entryLabel: 'Note',
@@ -382,7 +382,7 @@ export const chatCopy = {
       stopped: { owner: 'Stopped', paused: 'Stopped when Juno paused', interrupted: 'Stopped when Juno closed' },
       /** After a line for a pass that ended early: " · Kept 4 notes". */
       kept: (written: number) => (written === 0 ? '' : ` · Kept ${written === 1 ? '1 note' : `${written} notes`}`),
-      dismissed: 'Not now',
+      dismissed: 'Dismissed',
       started: 'Juno is learning how you work',
     },
   },
@@ -401,8 +401,26 @@ export const chatCopy = {
       moreSteps: (n: number) => `${n} more ${n === 1 ? 'step' : 'steps'}`,
       older: 'Show older runs',
       copyDetails: 'Copy details',
+      /** A message of yours with no words, only files. */
+      files: (count: number) => (count === 1 ? 'An attached file' : `${count} attached files`),
+      /** After the actions a closed row names: "2 more". */
+      moreActions: (count: number) => `${count} more`,
+      /** The owner's decision on an action. */
+      decision: { noClick: 'Ran without asking', approved: 'Approved', dismissed: 'Declined', expired: 'Expired', refused: 'Refused' },
+      /** How an action, a script's read or a step ended. */
+      ended: { done: 'Done', failed: 'Failed', unknown: "Can't tell", pending: 'Pending', cancelled: 'Cancelled', refused: 'Refused', unfinished: 'Did not finish' },
     },
-    memory: { beingUpdated: 'being updated' },
+    memory: {
+      subtitle: 'What Juno keeps of the conversation, as a summary that grows denser with age. The full text stays on this Mac.',
+      empty: { title: 'Nothing summarised yet', body: 'Juno summarises the chat as it grows. Recent messages are kept in full.' },
+      label: 'Memory',
+      beingUpdated: 'being updated',
+      /** "Mon – Wed", and the full times as its title: "Oct 13, 9:02 to Oct 15, 18:40". */
+      span: (from: string, to: string) => `${from} – ${to}`,
+      spanTitle: (from: string, to: string) => `${from} to ${to}`,
+      /** "Messages after Wednesday are not summarised yet." */
+      notYet: (day: string) => `Messages after ${day} are not summarised yet.`,
+    },
     remembers: {
       changed: 'This changed. Check it and save again.',
       full: 'Juno remembers as much as it can. Delete a line to add another.',

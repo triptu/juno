@@ -35,16 +35,22 @@ export interface HeaderTitleButtonProps {
   readonly popup?: 'menu' | 'dialog'
   /** Right-click and the context-menu key, when they open something else than a click: the topic menu. */
   readonly onMenu?: (at: MenuAnchor) => void
+  /**
+   * Wrap the button in the page's `h1`. Default true (the topic title). The
+   * Juno switcher passes false: it is a menu button, and a Juno page has
+   * its own `h1` under it.
+   */
+  readonly heading?: boolean
   readonly ref?: Ref<HTMLButtonElement>
 }
 
 /**
- * The page title as a menu button, inside the page's `h1` (inventory 5):
+ * The page title as a menu button, inside the page's `h1` unless `heading` is false (inventory 5):
  * the title on one line, then a chevron. It opens the page's menu: the
  * topic's row menu, or the Juno menu. A cut-off title shows in full on
  * hover, as the thread link and sender name do.
  */
-export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'menu', onMenu, ref }: HeaderTitleButtonProps) {
+export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'menu', onMenu, heading = true, ref }: HeaderTitleButtonProps) {
   const under = (target: HTMLElement): MenuAnchor => {
     const island = (target.closest('[data-island]') ?? target).getBoundingClientRect()
     return { x: target.getBoundingClientRect().left, y: island.bottom + MENU_GAP }
@@ -60,8 +66,9 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
     if (onMenu === undefined) open(event.currentTarget)
     else onMenu(under(event.currentTarget))
   }
+  const Wrapper = heading ? 'h1' : 'div'
   return (
-    <h1 {...stylex.props(styles.heading)}>
+    <Wrapper {...stylex.props(styles.heading)}>
       <button
         ref={ref}
         type="button"
@@ -80,7 +87,7 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
           <Icon icon={CaretDown} size={12} weight="bold" />
         </span>
       </button>
-    </h1>
+    </Wrapper>
   )
 }
 

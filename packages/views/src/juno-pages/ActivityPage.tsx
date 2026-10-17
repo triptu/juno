@@ -29,7 +29,7 @@ function trigger(run: ActivityRun): { readonly kind?: string; readonly text: str
   switch (t._tag) {
     case 'message':
       if (t.words !== '') return { text: t.words }
-      return t.files > 0 ? { text: t.files === 1 ? 'An attached file' : `${t.files} attached files` } : { text: copy.trigger.removed, removed: true }
+      return t.files > 0 ? { text: copy.files(t.files) } : { text: copy.trigger.removed, removed: true }
     case 'reaction':
       return { kind: copy.trigger.reaction, text: t.emoji }
     case 'schedule':
@@ -51,7 +51,7 @@ function readLine(run: ActivityRun): string | undefined {
 function summary(run: ActivityRun): string {
   const decided = run.actions.slice(0, ACTIONS_SHOWN).map((action) => `${action.label}: ${decisionLabel[action.decision]}`)
   const more = run.actions.length - decided.length
-  return [readLine(run), copy.outcome[run.outcome], ...decided, ...(more > 0 ? [`${more} more`] : [])].filter((part) => part !== undefined).join(' · ')
+  return [readLine(run), copy.outcome[run.outcome], ...decided, ...(more > 0 ? [copy.moreActions(more)] : [])].filter((part) => part !== undefined).join(' · ')
 }
 
 /** Runs grouped by the day they started, newest first, as the agent sends them. */

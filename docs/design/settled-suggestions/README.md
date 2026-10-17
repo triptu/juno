@@ -44,7 +44,7 @@ The same reading also blocks a proposal outright: a topic where someone asked yo
 
 **A · Sheet.** The card opens a sheet over Home, the way a Mac app reviews a batch: Mail's "Review" sheets, System Settings' sheets. Every proposal is a row: art, title, the reason, the place and the last activity, then Keep open and Resolve. The rows are one Tab stop: ↑ ↓ move, Enter opens the topic (⌘Enter in a new tab, so the review stays), R resolves, K keeps open, ⌘Z undoes the current row, Esc closes. Done and Resolve all sit at the bottom right; Resolve all takes only the rows still open. The info button in the header opens What Resolve does with a link to Settings.
 
-**B · In place.** The card grows into a panel on Home with the same rows, the info and a collapse caret.
+**B · In place.** The card grows into a panel on Home with the same rows, the info and a collapse caret. Its gallery states and code were removed on 10-18; the `b-in-place` shots stay here as the record.
 
 **Recommendation: A, the sheet.** It is the one that fits Home and the Mac:
 

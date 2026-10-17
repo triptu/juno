@@ -14,8 +14,6 @@ export interface ReviewRowProps {
   readonly verbs: ReviewVerbs
   /** The row is the list's current one: its link is the Tab stop, and the keys act on it. */
   readonly active: boolean
-  /** A row in a narrow card: no art, smaller gaps. */
-  readonly compact?: boolean
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
   readonly onAct: (id: string) => void
   readonly onDecline: (id: string) => void
@@ -29,12 +27,12 @@ export interface ReviewRowProps {
  * is and says what happened, with Undo in the same slot, so nothing under
  * the pointer moves.
  */
-export function ReviewRow({ entry, status, verbs, active, compact = false, onOpen, onAct, onDecline, onUndo, onFocusRow }: ReviewRowProps) {
+export function ReviewRow({ entry, status, verbs, active, onOpen, onAct, onDecline, onUndo, onFocusRow }: ReviewRowProps) {
   const handlers = activateHandlers<HTMLAnchorElement>((event) => onOpen(entry.topicId, event))
   const handled = status !== 'open'
   const words = entry.words ?? verbs
   return (
-    <li data-review-row={entry.id} data-review-status={status} {...stylex.props(styles.row, compact && styles.rowCompact)}>
+    <li data-review-row={entry.id} data-review-status={status} {...stylex.props(styles.row)}>
       <a
         href={`#topic/${encodeURIComponent(entry.topicId)}`}
         tabIndex={active ? 0 : -1}
@@ -45,13 +43,11 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
           handlers.onClick(event)
         }}
         onFocus={() => onFocusRow(entry.id)}
-        {...stylex.props(styles.link, compact && styles.linkCompact)}
+        {...stylex.props(styles.link)}
       >
-        {compact ? null : (
-          <span {...stylex.props(styles.art, handled && styles.dim)}>
-            <PlaceTile tile={entry} />
-          </span>
-        )}
+        <span {...stylex.props(styles.art, handled && styles.dim)}>
+          <PlaceTile tile={entry} />
+        </span>
         <span {...stylex.props(styles.lines)}>
           <Text variant="ui" weight="medium" tone={handled ? 'subtle' : 'default'} truncate tooltipWhenTruncated data-review-title="">
             {entry.title}
@@ -73,7 +69,7 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
           </Text>
         </span>
       </a>
-      {/* Both sets share one cell, so the slot is as wide as the wider and nothing moves when one replaces the other. */}
+      {/* The row's own buttons set the slot's width; once acted on, the outcome and Undo take the same box, so the text keeps its room and nothing moves. */}
       <span {...stylex.props(styles.slot)}>
         <span {...stylex.props(styles.cell, handled && styles.hidden)} aria-hidden={handled || undefined}>
           <Button variant="ghost" tone="muted" size="sm" tabIndex={active && !handled ? 0 : -1} onClick={() => onDecline(entry.id)} data-review-decline="">
@@ -83,17 +79,16 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
             {words.act}
           </Button>
         </span>
-        <span {...stylex.props(styles.cell, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
-          {/* Both outcomes share one cell too, so the slot is as wide as the widest of all four and never changes. */}
+        <span {...stylex.props(styles.cell, styles.over, !handled && styles.hidden)} aria-hidden={!handled || undefined} aria-live="polite">
           <span {...stylex.props(styles.outcomes)}>
             <span {...stylex.props(styles.done, styles.outcome, status !== 'done' && styles.hidden)} aria-hidden={status !== 'done' || undefined} data-review-outcome={status === 'done' ? '' : undefined}>
               {words.actIcon === undefined ? null : <Icon icon={words.actIcon} size={13} />}
-              <Text variant="bodySmall" tone="subtle">
+              <Text variant="bodySmall" tone="subtle" truncate tooltipWhenTruncated>
                 {words.done}
               </Text>
             </span>
             <span {...stylex.props(styles.done, styles.outcome, status !== 'declined' && styles.hidden)} aria-hidden={status !== 'declined' || undefined} data-review-outcome={status === 'declined' ? '' : undefined}>
-              <Text variant="bodySmall" tone="subtle">
+              <Text variant="bodySmall" tone="subtle" truncate tooltipWhenTruncated>
                 {words.declined}
               </Text>
             </span>
@@ -112,11 +107,12 @@ export interface ReviewListProps {
   readonly statuses: ReadonlyMap<string, ReviewStatus>
   readonly verbs: ReviewVerbs
   readonly label: string
-  readonly compact?: boolean
   /** The row whose link takes focus first. The gallery passes one to show a focused row. */
   readonly initialActive?: string
   /** Focus the first row when the list appears, as a sheet does with its first control. */
   readonly autoFocus?: boolean
+  /** The current row changed: the sheet's key hints name its buttons. */
+  readonly onActiveChange?: (id: string) => void
   readonly onOpen: ReviewRowProps['onOpen']
   readonly onAct: ReviewRowProps['onAct']
   readonly onDecline: ReviewRowProps['onDecline']
@@ -128,8 +124,12 @@ export interface ReviewListProps {
  * Enter opens (⌘Enter in a new tab), and the verbs' two keys act. ⌘Z is
  * Edit › Undo, which undoes the last action; the container follows it.
  */
-export function ReviewList({ entries, statuses, verbs, label, compact = false, initialActive, autoFocus = false, onOpen, onAct, onDecline, onUndo }: ReviewListProps) {
-  const [active, setActive] = useState(initialActive ?? entries[0]?.id)
+export function ReviewList({ entries, statuses, verbs, label, initialActive, autoFocus = false, onActiveChange, onOpen, onAct, onDecline, onUndo }: ReviewListProps) {
+  const [active, setCurrent] = useState(initialActive ?? entries[0]?.id)
+  const setActive = (id: string) => {
+    setCurrent(id)
+    onActiveChange?.(id)
+  }
   const list = useRef<HTMLUListElement>(null)
   const focusRow = (id: string) => list.current?.querySelector<HTMLElement>(`[data-review-row="${CSS.escape(id)}"] a`)?.focus()
   const first = useRef(autoFocus ? active : undefined)
@@ -173,7 +173,6 @@ export function ReviewList({ entries, statuses, verbs, label, compact = false, i
           status={statuses.get(entry.id) ?? 'open'}
           verbs={verbs}
           active={entry.id === active}
-          compact={compact}
           onOpen={onOpen}
           onAct={onAct}
           onDecline={onDecline}
@@ -208,9 +207,6 @@ const styles = stylex.create({
       ':has(a:focus-visible)': colors['--surface-hover'],
     },
   },
-  rowCompact: {
-    paddingInlineEnd: spacing['--space-1-5'],
-  },
   link: {
     display: 'flex',
     alignItems: 'center',
@@ -227,9 +223,6 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: `calc(-1 * ${sizes['--focus-ring-width']})`,
     outlineColor: accent['--focus-ring'],
-  },
-  linkCompact: {
-    paddingBlock: spacing['--space-1-5'],
   },
   art: {
     display: 'inline-flex',
@@ -255,6 +248,7 @@ const styles = stylex.create({
     backgroundColor: colors['--quote-fill'],
   },
   slot: {
+    position: 'relative',
     display: 'grid',
     flexShrink: 0,
     // Narrow: on its own line, under the text (the art's 40, the link's 8 and its 12 gap).
@@ -267,20 +261,29 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: spacing['--space-1'],
+    minWidth: 0,
   },
+  // The outcome and Undo lie over the buttons' box and never widen it: a long outcome cuts.
+  over: {
+    position: 'absolute',
+    inset: 0,
+  },
+  // No padding of its own: Undo's padding is the space after it, and the slot's edge before it.
   done: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
-    paddingInline: spacing['--space-2'],
+    minWidth: 0,
     color: colors['--foreground-subtle'],
   },
   outcomes: {
     display: 'grid',
     justifyItems: 'end',
+    minWidth: 0,
   },
   outcome: {
     gridArea: '1 / 1',
+    maxWidth: '100%',
   },
   hidden: {
     visibility: 'hidden',

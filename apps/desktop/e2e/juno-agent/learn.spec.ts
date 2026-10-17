@@ -65,14 +65,15 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
   await expect(passNote).toContainText('Updated memory · People, Writing style')
   expect(model.requests.filter((request) => request.input.startsWith(PASS)).map((request) => request.toolResult === undefined)).toEqual([true, false, false, false])
 
-  // Each note with where it came from, marked as written after reading Slack.
+  // Each note with where it came from; its source's tooltip says Juno wrote it after reading Slack.
   let page = await openPage(juno, 'What Juno remembers')
   const style = page.locator('[data-memory-doc="style"] [data-memory-entry]')
   await expect(style).toHaveCount(1)
   await expect(style).toContainText(STYLE)
   await expect(style).toHaveAttribute('data-memory-source', 'slack')
   await expect(style).toContainText('Slack · ')
-  await expect(style).toContainText('Written after reading outside content')
+  await expect(style.locator('[data-memory-outside]')).toHaveAttribute('data-tooltip', 'Juno wrote this after reading outside content')
+  await expect(style).not.toContainText('outside content')
   await expect(page.locator('[data-memory-doc="people"] [data-memory-entry]')).toContainText(PEOPLE)
   await expect(page.locator('[data-memory-change="add"]')).toHaveCount(2)
 

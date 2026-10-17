@@ -83,6 +83,8 @@ export function JunoHeader({ banner, menuOpen, onMenu, current = 'chat', onOpenP
               }
               expanded={menuOpen}
               onOpen={() => onMenu(!menuOpen)}
+              // A menu button, not a heading: a Juno page's serif title is its one h1.
+              heading={false}
             />
           }
         >

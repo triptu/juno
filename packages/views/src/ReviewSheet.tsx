@@ -29,17 +29,15 @@ export interface ReviewAbout {
   readonly settings?: string
 }
 
-export interface ReviewExplainerProps {
+interface ReviewExplainerProps {
   readonly about: ReviewAbout
   readonly onSettings?: (() => void) | undefined
-  /** Over the list, under the sheet's head: the sheet keeps its size, so nothing moves when it opens. */
-  readonly floating?: boolean
 }
 
-/** What the action does, and the way to its settings. */
-export function ReviewExplainer({ about, onSettings, floating = false }: ReviewExplainerProps) {
+/** What the action does, and the way to its settings, over the list under the sheet's head: the sheet keeps its size, so nothing moves when it opens. */
+function ReviewExplainer({ about, onSettings }: ReviewExplainerProps) {
   return (
-    <Surface kind={floating ? 'popover' : 'inset'} padding="md" sx={[styles.explainer, floating && styles.floating]} data-review-explainer="">
+    <Surface kind="popover" padding="md" sx={styles.explainer} data-review-explainer="">
       <Text variant="ui" weight="medium">
         {about.label}
       </Text>
@@ -98,6 +96,9 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
   const titleId = useId()
   const aboutId = useId()
   const [showAbout, setShowAbout] = useState(initialAbout)
+  // The hints name the current row's buttons: Automated's record has rows that move back and rows that move in.
+  const [activeId, setActiveId] = useState(initialActive ?? entries[0]?.id)
+  const words = entries.find((entry) => entry.id === activeId)?.words ?? verbs
   const left = entries.filter((entry) => (statuses.get(entry.id) ?? 'open') === 'open').length
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal padding="none" sx={styles.sheet} data-sheet={name}>
@@ -116,10 +117,10 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
         {/* The info opens over the list, not above it, so the sheet keeps its size and nothing moves. */}
         {showAbout ? (
           <div id={aboutId} {...stylex.props(styles.aboutLayer)}>
-            <ReviewExplainer about={about} onSettings={onSettings} floating />
+            <ReviewExplainer about={about} onSettings={onSettings} />
           </div>
         ) : null}
-        <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
+        <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onActiveChange={setActiveId} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
       </div>
       <div {...stylex.props(styles.foot)}>
         <span {...stylex.props(styles.keys)} aria-hidden>
@@ -128,9 +129,9 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
           <Kbd>↵</Kbd>
           <Text variant="meta" tone="muted">{reviewCopy.open}</Text>
           <Kbd>{verbs.actKey}</Kbd>
-          <Text variant="meta" tone="muted">{verbs.act}</Text>
+          <Hint current={words.act} all={entries.map((entry) => (entry.words ?? verbs).act)} data-review-hint-act="" />
           <Kbd>{verbs.declineKey}</Kbd>
-          <Text variant="meta" tone="muted">{verbs.decline}</Text>
+          <Hint current={words.decline} all={entries.map((entry) => (entry.words ?? verbs).decline)} />
         </span>
         <span {...stylex.props(styles.buttons)}>
           <Button variant={all === undefined ? 'primary' : 'secondary'} size="md" onClick={onClose} data-review-close="">
@@ -147,7 +148,30 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
   )
 }
 
+/** A key's word in the hints: the current row's, in a cell as wide as the widest row's, so moving between rows moves nothing. */
+function Hint({ current, all, ...data }: { readonly current: string; readonly all: ReadonlyArray<string> } & Readonly<Record<`data-${string}`, string>>) {
+  const labels = [...new Set([current, ...all])]
+  return (
+    <span {...data} {...stylex.props(styles.hint)}>
+      {labels.map((label) => (
+        <Text key={label} variant="meta" tone="muted" aria-hidden={label !== current || undefined} sx={[styles.hintLabel, label !== current && styles.hintHidden]}>
+          {label}
+        </Text>
+      ))}
+    </span>
+  )
+}
+
 const styles = stylex.create({
+  hint: {
+    display: 'inline-grid',
+  },
+  hintLabel: {
+    gridArea: '1 / 1',
+  },
+  hintHidden: {
+    visibility: 'hidden',
+  },
   sheet: {
     containerType: 'inline-size',
     containerName: 'review',
@@ -182,10 +206,6 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-2'],
-    marginTop: spacing['--space-2'],
-  },
-  floating: {
-    marginTop: 0,
   },
   // Over the top of the list, inset as the head's text is; a tall one scrolls with the list.
   aboutLayer: {

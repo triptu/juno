@@ -46,6 +46,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--accent-foreground-muted` | `hsla(48, 20%, 70%, 1)` | #BDB8A3 | css | |
 | `--selection-background` | `hsla(200, 50%, 80%, 1)` | #B3D4E6 | css | `::selection`; prototype also uses it for the focus ring (see 1.7) |
 | `--input-border` | `hsla(48, 14%, 82%, 1)` | #D8D5CB | proto | Composer, text fields, selects, search fields, send-card textarea |
+| `--border-control` | `hsla(48, 8%, 53%, 1)` | #918D7E | review 10-18 | The edge of an empty control with no other shape: the welcome card's unticked circle. 3.2:1 on a card (WCAG 1.4.11) |
 | `--tab-strip` | `hsla(48, 26%, 94%, 1)` | #F4F2EC | redesign 10-16 | The tab strip and inactive tabs. 1.08:1 under the active tab, so tabs read apart (inventory 4) |
 | `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
 | `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
@@ -77,6 +78,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--border-strong` | #3C3A37 | 0.35 | 1.37:1 on a card | redesign |
 | `--border-strongest` | #4C4A47 | 0.41 | 1.99:1 on the page | redesign |
 | `--input-border` | #464541 | 0.39 | 1.62:1 on the composer | redesign |
+| `--border-control` | #75736C | | 3.3:1 on a card | review 10-18 |
 | `--tab-strip` | #0D0C0A | 0.15 | 1.12:1 under the active tab | redesign 10-16 |
 | `--tab-hover` | #151411 | 0.19 | 1.06:1 over the strip, 1.05:1 under the page; label 10.6:1 | redesign 10-16 |
 | `--tab-divider` | #3A3835 | 0.37 | 1.67:1 on the strip | redesign 10-16 |

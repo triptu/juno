@@ -95,11 +95,11 @@ test('an approved call runs once, the card shows its result, and Juno goes on wi
   await asked.screenshot({ path: test.info().outputPath('card-before.png') })
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'done')
-  await expect(asked).toContainText('Applied')
+  await expect(asked).toContainText('Done')
   // A plain line, never the server's JSON; all of it is behind Show result.
   await expect(asked.locator('[data-card-result]')).toHaveText('Saved')
   expect(await asked.innerText()).not.toContain('{"')
-  await asked.screenshot({ path: test.info().outputPath('card-applied.png') })
+  await asked.screenshot({ path: test.info().outputPath('card-done.png') })
   await asked.getByRole('button', { name: 'Show result' }).click()
   await expect(asked.locator('[data-card-result-full]')).toHaveText('id: note-1\nsaved: true')
   await asked.screenshot({ path: test.info().outputPath('card-after.png') })

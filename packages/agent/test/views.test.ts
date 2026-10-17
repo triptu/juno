@@ -62,7 +62,7 @@ it.each([false, true])('creates the requested view with Undo; Slack read = %s', 
   expect([...local.views.values()], JSON.stringify({ messages: h.turns.messages(), reports: h.reports, authorizations: h.turns.store.db.prepare('SELECT * FROM authorizations').all() })).toEqual([expect.objectContaining({ name: 'Bots', channels: ['C_ALERTS', 'C_BOT'], keepOutOfAll: false })])
   if (!tainted) expect(h.turns.actions.approve('no-second-apply', card!.binding!.identity, card!.binding!.children)).toEqual({ _tag: 'refused', reason: 'stale' })
   const [applied] = h.turns.actions.views()
-  expect(applied?.card).toMatchObject({ status: { _tag: 'done', line: 'Applied', undo: true } })
+  expect(applied?.card).toMatchObject({ status: { _tag: 'done', line: 'Done', undo: true } })
   expect((await run(client['agent.cards.undo']({ opId: OpId.make('undo-view'), identity: applied!.binding!.identity })))._tag).toBe('Success')
   expect((await run(client['agent.cards.undo']({ opId: OpId.make('undo-view'), identity: applied!.binding!.identity })))._tag).toBe('Success')
   expect(local.views.size).toBe(0)

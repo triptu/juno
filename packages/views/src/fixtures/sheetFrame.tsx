@@ -3,9 +3,9 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 
-/** The fixture frame's size: its first child fills it. `scroll` lets a page taller than the frame scroll. */
-export function FixtureWindow({ scroll = false, children }: { readonly scroll?: boolean; readonly children: ReactNode }) {
-  return <div {...stylex.props(styles.window, scroll && styles.scroll)}>{children}</div>
+/** The fixture frame's size: its first child fills it. */
+function FixtureWindow({ children }: { readonly children: ReactNode }) {
+  return <div {...stylex.props(styles.window)}>{children}</div>
 }
 
 /** Home under the sheet's layer, as the window shows it: the layer dims the page and the sheet sits in the middle. */
@@ -27,9 +27,6 @@ const styles = stylex.create({
     height: '720px', // tokens-allow: the fixture frame's height
     overflow: 'hidden',
     backgroundColor: colors['--background'],
-  },
-  scroll: {
-    overflowY: 'auto',
   },
   // The `SheetLayer` look, inside the frame instead of the whole window.
   layer: {

@@ -2555,7 +2555,7 @@ export class ReviewSheetPane {
     return this.row(title).locator('[data-review-decline]')
   }
 
-  /** What the row says once acted on: "Resolved", "Moved back to All", "Kept in Follow-up". */
+  /** What the row says once acted on: "Resolved", "Moved back", "Kept in Follow-up". */
   outcome(title: string): Locator {
     return this.row(title).locator('[data-review-outcome]')
   }
