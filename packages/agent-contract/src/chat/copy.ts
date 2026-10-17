@@ -273,9 +273,8 @@ export const chatCopy = {
     /** The sender beside a quote of a Juno bubble or card, and of one of yours. */
     juno: 'Juno',
     you: 'You',
-    /** The reaction picker's name and its field for any emoji (the system picker works there too). */
+    /** The quick reactions' toolbar, over a bubble or card. */
     picker: 'Reactions',
-    anyEmoji: 'Any emoji',
     /** A reaction's accessible name: "Reacted 🎉". */
     reacted: (emoji: string) => `Reacted ${emoji}`,
     /** The composer's close button on a quote. */

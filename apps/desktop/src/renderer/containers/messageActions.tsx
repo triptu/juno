@@ -18,7 +18,7 @@
  * list shows it from the engine's next window. The edit field stays until
  * that window has the new text, so the old text never flashes back.
  */
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { editMessage, junoAvailableAtom, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -27,7 +27,8 @@ import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
 import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
 import { useSentSuggestions } from './topic/sentSuggestion'
-import { floatingOf, preloadPicker, usePickerDismiss, useSelectionQuote } from './topic/messageOverlays'
+import { preloadPicker, usePickerDismiss } from './emojiPicker'
+import { floatingOf, useSelectionQuote } from './topic/messageOverlays'
 
 // The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
 const editField = chunk(() => import('./EditFieldPanel'))
@@ -121,7 +122,8 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)
-  usePickerDismiss(picker, setPicker)
+  const dismissPicker = useCallback(() => setPicker(undefined), [])
+  usePickerDismiss(picker !== undefined, dismissPicker)
   const editReady = usePreloaded(editField, editing !== undefined)
 
   // The edit field in place of the row's body, once its chunk is here. Saving keeps it until the window has the new text.

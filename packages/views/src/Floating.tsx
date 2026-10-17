@@ -8,11 +8,11 @@ import { Button, SparkleDuotone, Surface, tooltip } from '@juno/ui'
 
 /**
  * Where a floating element sits, in CSS pixels from the top left of the
- * topic's message area (`TopicView`'s `floating` slot), which the container
- * measured.
+ * list area (`TopicView`'s and `JunoChatFrame`'s `floating` slot), which the
+ * container measured.
  *
  * - `below-end`: under `y`, its right edge at `x` (the emoji picker under
- *   the toolbar's More reactions button).
+ *   the toolbar's More reactions button, the Juno chat's reactions under React).
  * - `above-end`: over `y`, its right edge at `x` (the picker near the
  *   bottom of the list).
  * - `above-center`: centred on `x`, its bottom `--space-2` over `y` (the

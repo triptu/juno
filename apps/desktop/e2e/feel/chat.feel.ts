@@ -87,6 +87,47 @@ test('open the Juno tab, send, and the first bubble arrives', async ({ juno, fee
       await juno.win.locator(`${TAB} [data-chat-juno]`).waitFor({ timeout: 15_000 })
     },
   )
+
+})
+
+test('react to a Juno bubble in the Juno tab', async ({ juno, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const composer = juno.win.locator(`${TAB} textarea`)
+  await composer.fill('what is on today?')
+  await composer.press('Enter')
+  await juno.win.locator(`${TAB} [data-chat-juno]`).waitFor({ timeout: 15_000 })
+
+  const bubble = juno.win.locator(`${TAB} [data-chat-juno]`).first()
+  await bubble.hover()
+  await feel.run(
+    {
+      name: 'juno-react',
+      title: "React to Juno's bubble: the quick reactions open at the React button and stay, and the badge lands on the bubble without moving anything",
+      probes: [
+        { kind: 'rect', name: 'reactions', selector: `${TAB} [data-juno-reactions]` },
+        { kind: 'count', name: 'badge', within: TAB, selector: '[data-reactions]' },
+      ],
+      regions: { chat: `${TAB} [data-scroll]` },
+      checks: [
+        happened('the reaction showed', (r) => r.frames.some((f) => f.values['badge'] === 1)),
+        landsAndStays('reactions', 'the quick reactions', { from: 'open' }),
+        noFlicker('chat', 'the chat'),
+        noLayoutShift({ from: 'open', region: 'chat', includeInput: true }),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('open')
+      await bubble.getByRole('button', { name: 'React' }).click()
+      const thumbs = juno.win.locator(`${TAB} [data-juno-reactions]`).getByRole('button', { name: 'React 👍' })
+      await thumbs.waitFor()
+      await rec.mark('react')
+      await thumbs.click()
+      await juno.win.locator(`${TAB} [data-reactions]`).waitFor()
+    },
+  )
 })
 
 test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {

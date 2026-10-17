@@ -557,6 +557,16 @@ export const unusualReactions: ReadonlyArray<ChatItem> = [
   ...juno('m-123', 'Both have the pager app.', { group: 'last', at: NOW - 3 * MINUTE, reactions: [reacted('owner', '1️⃣')] }),
 ]
 
+/**
+ * Badges at the list's very top, where the first bubble meets the scroll
+ * area's edge: a Juno bubble, a card and an owner bubble, each reacted.
+ */
+export const reactionsAtTop: ReadonlyArray<ChatItem> = [
+  ...juno('m-160', 'Two things in #eng this morning.', { at: NOW - 6 * MINUTE, reactions: [reacted('owner', '👍')], cards: [sendMessage('c-160')], cardReactions: { 'c-160': [reacted('owner', '🎉')] } }),
+  owner('m-161', 'ok', 'single', { _tag: 'sent' }, NOW - 5 * MINUTE, { reactions: [reacted('juno', '✅')] }),
+  ...juno('m-162', 'Done.', { at: NOW - 4 * MINUTE, reactions: [reacted('owner', '🚀')] }),
+]
+
 const firstBubble = bubbleId('m-130')
 
 /** The owner replies to a Juno bubble, to a card, and to a bubble that was removed since. */

@@ -60,7 +60,6 @@ import JunoChatList from './juno-chat/JunoChatList.fixtures'
 import JunoComposer from './juno-chat/JunoComposer.fixtures'
 import JunoHeader from './juno-chat/JunoHeader.fixtures'
 import OwnerBubble from './juno-chat/OwnerBubble.fixtures'
-import ReactionPicker from './juno-chat/ReactionPicker.fixtures'
 import RemoveSheet from './juno-chat/RemoveSheet.fixtures'
 import StatusBubble from './juno-chat/StatusBubble.fixtures'
 import ActivityPage from './juno-pages/ActivityPage.fixtures'
@@ -142,7 +141,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ProviderCard: providerCard,
   QuestionCard: questionCard,
   RecoveryPhraseSheet: phraseSheet,
-  ReactionPicker,
   Reactions,
   ReactorsCard,
   PinList,

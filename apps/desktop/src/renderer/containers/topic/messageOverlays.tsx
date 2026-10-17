@@ -6,23 +6,11 @@
 import { Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, QuickReaction } from '@juno/contract'
 import { Floating, SelectionToolbar } from '@juno/views'
-import { chunk } from '../chunks'
+import { EmojiPickerPanel } from '../emojiPicker'
 import { askJunoAboutSelection } from '../juno/actions'
 import type { ComposerHandle } from '../messageActions'
 import { frequentEmoji } from '../recentEmoji'
 import { focusRow, middleOf, type Picker } from './messageCommands'
-
-const emojiPicker = chunk(() => import('../EmojiPickerPanel'))
-const EmojiPickerPanel = emojiPicker.component((module) => module.default)
-
-/** Fetch the picker's chunk once a topic has painted, so the first open does not wait for it. */
-let pickerLoaded = false
-const loadPicker = () => void emojiPicker.load()
-export function preloadPicker(): void {
-  if (pickerLoaded) return
-  pickerLoaded = true
-  window.requestIdleCallback(loadPicker)
-}
 
 /** The node is inside a message's text in this list. */
 const inMessageText = (node: Node | null, scroller: HTMLElement) => (node instanceof Element ? node : node?.parentElement)?.closest('[data-msg-text]') != null && scroller.contains(node)
@@ -67,23 +55,6 @@ export function useSelectionQuote(scrollRef: RefObject<HTMLElement | null>) {
     }
   }, [scrollRef])
   return [selection, setSelection] as const
-}
-
-/** The picker closes on a press outside it and when the list scrolls under it. */
-export function usePickerDismiss(picker: Picker | undefined, setPicker: Dispatch<SetStateAction<Picker | undefined>>): void {
-  'use no memo'
-  useEffect(() => {
-    if (picker === undefined) return
-    const outside = (event: Event) => {
-      if (!(event.target instanceof Element) || event.target.closest('[data-floating="picker"]') === null) setPicker(undefined)
-    }
-    document.addEventListener('pointerdown', outside, true)
-    document.addEventListener('wheel', outside, { capture: true, passive: true })
-    return () => {
-      document.removeEventListener('pointerdown', outside, true)
-      document.removeEventListener('wheel', outside, true)
-    }
-  }, [picker, setPicker])
 }
 
 /** The emoji picker or the selection's toolbar, for `TopicView`'s floating slot. Ask Juno shows only while `juno` (AI assist on). */

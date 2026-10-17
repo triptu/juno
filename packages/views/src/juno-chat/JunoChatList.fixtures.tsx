@@ -3,7 +3,7 @@ import type { AskId, AskStatus, Banner, ChatItem, Ending } from '@juno/agent-con
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { noopActions } from './commands'
 import { useFixtureControl } from './fixtures/control'
-import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, richReply, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
+import { bubbles, budget, conversation, day, essay, failedSend, jobs, juno, junoReplies, longText, manyCards, messageId, NOW, owner, ownerReplies, reacted, reactions, reactionsAtTop, richReply, rightToLeft, scheduled, sourced, status, unusualReactions, withNewDivider } from './fixtures/data'
 import { JunoChatList, type JunoChatListProps } from './JunoChatList'
 
 const noop = () => {}
@@ -148,6 +148,10 @@ export default defineFixtures(
     Reactions: {
       'both-ways': list(reactions),
       'unusual-emoji': list(unusualReactions),
+      // Nothing above the first bubble: its badge meets the scroll area's top edge.
+      'at-top': list(reactionsAtTop),
+      // The Juno panel at its narrowest.
+      'panel-narrowest': list([...reactionsAtTop, ...unusualReactions.slice(1)], { column: 'panel' }, { width: 360, height: 800, padded: false }),
     },
     Replies: {
       'owner-replies': list(ownerReplies),
