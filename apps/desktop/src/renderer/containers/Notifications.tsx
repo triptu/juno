@@ -84,9 +84,7 @@ export function NotificationsPage() {
       held={lists.held}
       today={lists.today}
       onHoursChange={changeHours}
-      slackSchedule={lists.slackSchedule}
-      onSlackScheduleChange={changeSlackSchedule}
-      onSlackScheduleRestore={restoreSlack}
+      slack={{ schedule: lists.slackSchedule, onChange: changeSlackSchedule, onRestore: restoreSlack }}
       onMattersSave={saveMatters}
       onRemove={remove}
       permission={permission}

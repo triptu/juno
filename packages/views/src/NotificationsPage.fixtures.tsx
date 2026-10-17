@@ -26,9 +26,7 @@ export const notificationsBase: NotificationsPageProps = {
     { id: 2, at: at(13, 12), place: 'Maya Chen', sender: 'Maya Chen', text: 'Draft is up. Cross-posting to leadership once you have looked.', reason: 'Maya Chen is set to Every message' },
   ],
   onHoursChange: noop,
-  slackSchedule: { enabled: true, canRestore: true, changedInSlack: false },
-  onSlackScheduleChange: noop,
-  onSlackScheduleRestore: noop,
+  slack: { schedule: { enabled: true, canRestore: true, changedInSlack: false }, onChange: noop, onRestore: noop },
   onMattersSave: noop,
   onRemove: noop,
   permission: 'allowed',
@@ -46,8 +44,8 @@ export default defineFixtures(
       'same-hours': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
     },
     'Slack schedule': {
-      'changed-in-slack': fixture({ ...notificationsBase, slackSchedule: { enabled: true, canRestore: true, changedInSlack: true } }),
-      off: fixture({ ...notificationsBase, slackSchedule: { enabled: false, canRestore: false, changedInSlack: false } }),
+      'changed-in-slack': fixture({ ...notificationsBase, slack: { ...notificationsBase.slack, schedule: { enabled: true, canRestore: true, changedInSlack: true } } }),
+      off: fixture({ ...notificationsBase, slack: { ...notificationsBase.slack, schedule: { enabled: false, canRestore: false, changedInSlack: false } } }),
     },
     Permission: {
       denied: fixture({ ...notificationsBase, permission: 'denied' }),
