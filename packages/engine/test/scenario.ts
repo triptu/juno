@@ -15,12 +15,15 @@ import { sleep, startTestEngine, waitFor, type EngineOptions, type RunningEngine
 const MINUTE = 60_000
 export const DAY = 24 * 60 * MINUTE
 
-/** Starts an engine on a fresh fake and waits for `live` and the follow pass. `track` collects engines for `afterEach` to stop. */
-export async function bootedEngine(track: Array<RunningEngine>, options: EngineOptions = {}): Promise<RunningEngine> {
+/**
+ * Starts an engine on a fresh fake and waits for `live` and the follow pass. `track` collects engines for `afterEach` to stop.
+ * The default seed is live in 0.5 to 2.6 s even on a loaded machine; a larger seed passes a longer `liveMillis`.
+ */
+export async function bootedEngine(track: Array<RunningEngine>, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const engine = await startTestEngine({ initial: (fake) => fake.signIn(), ...options })
   track.push(engine)
   await engine.status('ready')
-  await engine.phase('live', 30_000)
+  await engine.phase('live', liveMillis)
   await engine.syncIdle()
   return engine
 }

@@ -124,10 +124,16 @@ describe("Main's new threads", () => {
 
 describe('the outbox', () => {
   it('five marks in a row make one call with the last intent', async () => {
-    const engine = await bootedEngine()
+    // The app's 400 ms window is shorter than five commands take on a loaded machine (up to 1.2 s at
+    // ten busy processes per core), and then a second call is right. A longer window keeps all five in one.
+    const windowMillis = 3_000
+    const engine = await boot(engines, { markDelayMillis: windowMillis })
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread')
     engine.fake.resetCalls()
+    const started = Date.now()
     for (const mark of [markRead, markUnread, markRead, markUnread, markRead]) valueOf(await mark(engine, ALERTS_MAIN))
+    expect(Date.now() - started, 'the five marks took longer than the window').toBeLessThan(windowMillis)
+    expect(marks(engine)).toEqual([])
     await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
     await sleep(800)
     await quiet(engine)
