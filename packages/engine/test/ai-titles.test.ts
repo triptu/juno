@@ -100,7 +100,8 @@ it('takes the fallback model\'s title when the main model refuses, and logs both
       { model: 'fake', outcome: 'error', kind: 'policy.fallback' },
       { model: 'google/gemini-3.8-flash', outcome: 'ok', kind: 'fallback' },
     ])
-    expect(db.prepare('SELECT count(*) AS n FROM ai_refusals').get()).toEqual({ n: 0 })
+    // The title was answered, so nothing is kept for it. Its art was refused too, with no fallback for art, and that is kept.
+    expect(db.prepare("SELECT task FROM ai_refusals WHERE key = ? ORDER BY task").all(id).map((row) => (row as { task: string }).task)).toEqual(['topicArt'])
   } finally {
     db.close()
   }

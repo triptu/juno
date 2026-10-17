@@ -27,13 +27,14 @@ test('a refused title is answered by the fallback model, and with no fallback it
     const page = running.win.getByRole('main')
     const calls = page.getByRole('list', { name: 'AI calls' })
     const titles = calls.locator('[data-ai-call-feature="titleTopic"]')
+    const titlesThat = (outcome: string) => calls.locator(`[data-ai-call-feature="titleTopic"][data-ai-call="${outcome}"]`)
 
     // The main model refuses; the fallback, Gemini Flash by default, writes the title.
     const answered = post('::refuse:: Kya kar rahe hain idhar bhai')
     await expect(answered).toHaveAttribute('data-title-source', 'ai', { timeout: 30_000 })
     await juno.openSettings('AI activity')
     await expect(titles.filter({ hasText: 'Refused by the model’s policy. Sent to the fallback model.' })).toHaveCount(1)
-    const fallback = titles.locator('[data-ai-call="ok"]').filter({ hasText: 'Answered by the fallback model' })
+    const fallback = titlesThat('ok').filter({ hasText: 'Answered by the fallback model' })
     await expect(fallback).toHaveCount(1)
     await expect(fallback).toContainText('google/')
 
@@ -48,7 +49,7 @@ test('a refused title is answered by the fallback model, and with no fallback it
 
     const refused = post('::refuse:: Billing export for October')
     await juno.openSettings('AI activity')
-    const notRetried = titles.locator('[data-ai-call="error"]').filter({ hasText: 'Refused by the model’s policy. Not retried.' })
+    const notRetried = titlesThat('error').filter({ hasText: 'Refused by the model’s policy. Not retried.' })
     await expect(notRetried).toHaveCount(1, { timeout: 30_000 })
     const sent = await titleCalls()
 
