@@ -895,6 +895,8 @@ Causes found so far (2026-10-15):
 
 - **A speed budget asserted inside a loaded plan.** `quick-start.spec.ts` failed its 5 s sign-in-to-rows budget in a plan at 96% busy. On a quiet remote machine it takes about 2.7 s, the same before and after the tour (10 runs each: 2,687 to 2,738 ms at `480da939^1`, 2,681 to 2,782 ms at `480da939`). Budgets belong to `perf.spec.ts` on the Mac; the e2e test keeps the flow with a ceiling and records the time.
 
+- **A placement decided once on pointer enter.** The message toolbar's place (above the row, or below it when the row's top is under the header band) was decided only on `pointerenter`. A row that scrolled or grew while the pointer stayed inside it kept the old answer: `toolbar-geometry.spec.ts` read the toolbar at 42 px, above a row under the band, in two full runs (Mac and a remote plan), but in none of 240 runs of the test alone or 534 runs of the whole gallery suite. In the gallery, a row that scrolled 52 px under a still pointer gave the same 42 px every time. The row now decides again on `pointermove` and the list's `scrollend` (`placeToolbar` in `Message.tsx`). Work decided on enter must be redone when the element can move under a still pointer.
+
 ## Machine shapes
 
 Every script runs on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.

@@ -1,0 +1,1 @@
+- 10-17 12:18 · toolbar-replace · The message toolbar's place (above the row, or below it under the header band) is decided again on pointer move over the row and on the list's `scrollend`, not only on pointer enter and focus, and written only when it changes: a row that scrolled under a still pointer kept the toolbar above it, under the band. Nothing runs per scroll frame.
