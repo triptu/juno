@@ -40,7 +40,13 @@ test('the hover toolbar is one Tab stop: arrows, Home and End move along it, and
 
 test('Esc in the toolbar goes back to its message', async ({ page }) => {
   await open(page, 'Message', 'interaction/focus')
+  // As from the keyboard: the message takes focus, which shows its toolbar, then a button in it does.
+  await page.locator('[data-message-row]').first().focus()
+  // Keyboard focus, so :focus-visible matches and the toolbar shows: tab away and back.
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
   await page.locator('[data-message-row] [role="toolbar"] button[aria-label="Quote"]').focus()
+  expect(await focusedName(page)).toBe('Quote')
   await page.keyboard.press('Escape')
   expect(await page.evaluate(() => document.activeElement?.hasAttribute('data-message-row'))).toBe(true)
 })
