@@ -1,0 +1,1 @@
+- 10-17 16:00 · settled-suggestions · Tidy up's card opens a review sheet over Home, not a panel in place: Home keeps its three fixed rows, the sheet is the Mac pattern for reviewing a batch, and single-key R and K are safe away from the composer (`docs/design/settled-suggestions/`).
