@@ -1,7 +1,8 @@
 // The web panel: a plain click on a web link in a message opens it in a
 // panel beside the topic; ⌘-click, Google apps and a window too narrow for
-// the panel open it in the browser. ⌘K hides the page while the palette is
-// open, the panel belongs to its tab, and close takes it away.
+// the panel open it in the browser, as does every link with Open links in
+// Juno off. ⌘K hides the page while the palette is open, the panel belongs
+// to its tab, and close takes it away.
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -78,6 +79,29 @@ test('a click opens a link in the web panel; ⌘-click and Google apps open the 
   await juno.win.getByTestId('web-panel-close').click()
   await expect(panel).toHaveCount(0)
   await expect.poll(() => juno.webPanel()).toEqual({ url: null, visible: false })
+})
+
+test('with Open links in Juno off, the open panel closes and a click opens the browser', async ({ juno, fake }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
+  const panel = juno.win.getByTestId('web-panel')
+  await link('the fake page').click()
+  await expect(panel).toBeVisible()
+
+  await juno.openSettings('General')
+  const toggle = juno.settings.root.getByRole('switch', { name: 'Open links in Juno' })
+  await expect(toggle).toBeChecked()
+  await toggle.uncheck()
+  await expect(toggle).not.toBeChecked()
+  await expect.poll(() => juno.webPanel()).toEqual({ url: null, visible: false })
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  await expect(panel).toHaveCount(0)
+
+  await link('the fake page').click()
+  await expect.poll(() => juno.browserLinks()).toEqual([page(fake)])
+  await expect(panel).toHaveCount(0)
 })
 
 test('in a window too narrow for the panel beside the topic, a click opens the browser', async ({ juno, fake }) => {
