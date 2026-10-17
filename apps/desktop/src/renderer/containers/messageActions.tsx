@@ -11,7 +11,8 @@
  *   edits, and Delete or Backspace asks to delete; Enter confirms and Esc
  *   cancels.
  * - Quote: the whole message from the toolbar, or the selected text from
- *   the floating Quote button, as "> " lines at the end of the draft.
+ *   the selection's floating toolbar, as "> " lines at the end of the draft.
+ *   Its Ask Juno takes the selection to the Juno panel instead.
  *
  * Every change is a command that writes locally and answers at once; the
  * list shows it from the engine's next window. The edit field stays until
@@ -19,7 +20,7 @@
  */
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { editMessage, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
+import { editMessage, junoAvailableAtom, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
@@ -60,7 +61,7 @@ export interface MessageActionsOutput {
   readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
   /** ↑ in an empty composer. */
   readonly selectNewest: () => void
-  /** The emoji picker or the selection's Quote button, for `TopicView`'s floating slot. */
+  /** The emoji picker or the selection's toolbar, for `TopicView`'s floating slot. */
   readonly floating: ReactNode
 }
 
@@ -114,6 +115,8 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage })
   // The rows re-render only when the quick reactions change.
   const quick = useAtomValue(quickReactionsAtom)
+  // Ask Juno on a selection shows only while AI assist is on.
+  const juno = useAtomValue(junoAvailableAtom)
   const actions = useMemo(() => ({ ...commands, quickReactions: quick }), [commands, quick])
   const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
@@ -164,6 +167,6 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
-    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, quick),
+    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, quick, juno),
   }
 }

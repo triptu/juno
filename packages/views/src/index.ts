@@ -21,7 +21,7 @@ export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaVi
 
 export { type MessageActions, type MessageProps } from './Message'
 export { InlineEdit, type InlineEditProps } from './InlineEdit'
-export { Floating, SelectionQuote } from './Floating'
+export { Floating, SelectionToolbar } from './Floating'
 
 export { MessageList, type MessageListItem, type MessageListStatus, type OlderStatus } from './MessageList'
 export type { LinkInfo } from './MessageLink'

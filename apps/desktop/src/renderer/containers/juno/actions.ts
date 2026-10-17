@@ -7,6 +7,8 @@
  *   tab when no topic tab is active) with an About chip;
  * - Tell Juno in the why popover, which opens the panel the same way with
  *   the message quoted.
+ * - Ask Juno on text selected in a topic's messages (the selection toolbar,
+ *   or ⌘J while there is one), which opens the panel with the selection.
  *
  * Each of these asks the composer it brings on screen for focus. Each
  * decides between the panel and the tab once a topic open asked for
@@ -25,10 +27,12 @@ import {
   registry,
   setJunoPanelOpen,
   tabsAtom,
+  tabTopic,
   tickWelcome,
 } from '@juno/state'
 import { chatActions, junoPageActions } from '@juno/state/agent'
 import { afterNavigation, openJuno } from '../navigation'
+import { clearTopicSelection, topicSelection } from './topicContext'
 
 export { openJunoPage } from '../navigation'
 
@@ -86,13 +90,37 @@ export function moveJunoToTab(): void {
   openJunoTab()
 }
 
-/** View › Juno (⌘J): the panel in a topic tab, the Juno tab elsewhere. Nothing while the agent is off. */
+/**
+ * View › Juno (⌘J): the panel in a topic tab, the Juno tab elsewhere.
+ * With text selected in the topic's messages it asks about the selection,
+ * as the selection toolbar's Ask Juno does, and never closes the panel.
+ * Nothing while the agent is off.
+ */
 export function runJunoShortcut(): void {
   if (!registry.get(junoAvailableAtom)) return
+  if (askJunoAboutSelection()) return
   afterNavigation(() => {
     if (topicTabActive()) toggleJunoPanel()
     else openJunoTab()
   })
+}
+
+/**
+ * Ask Juno on the selection (SPEC 7, Quoting): the panel beside the topic
+ * opens if it is closed, with the selection as its chip and the composer
+ * focused. The highlight clears, as after Quote. False when no text is
+ * selected in the active topic's messages.
+ */
+export function askJunoAboutSelection(): boolean {
+  const tab = activeTab(registry.get(tabsAtom))
+  const topicId = tab === undefined ? undefined : tabTopic(tab)
+  const selection = topicId === undefined ? undefined : topicSelection()
+  if (topicId === undefined || selection === undefined || !registry.get(junoAvailableAtom)) return false
+  clearTopicSelection()
+  registry.set(junoAboutAtom(aboutKey()), undefined)
+  quoteInJuno(registry, topicId, selection)
+  openPanel()
+  return true
 }
 
 /** Ask Juno in a person's or channel's menu (SPEC 7, plan v3 §19.3). */
