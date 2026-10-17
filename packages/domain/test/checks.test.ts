@@ -2,18 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { audienceCheck, clarityCheck, sendChecksApply } from '../src/index'
 import { eng, hiring, maya } from './fixtures'
 
-describe('clarity check', () => {
-  it('sends clean text without a check', () => {
-    expect(clarityCheck('Friday works for me.')).toBeUndefined()
-    expect(clarityCheck('Can you take a look?')).toBeUndefined()
-  })
-
-  it('fixes typos from the table, keeping the capital', () => {
-    const r = clarityCheck('Did you recieve it? Recieve again.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['recieve → receive', 'Recieve → Receive'])
-    expect(r?.fixed).toBe('Did you receive it? Receive again.')
-  })
-
+describe('doubled words', () => {
   it('removes doubled words', () => {
     const r = clarityCheck('I think the the plan is fine.')
     expect(r?.fixes.map((f) => f.label)).toEqual(['the the → the'])
@@ -42,6 +31,19 @@ describe('clarity check', () => {
     // A quote or code line on either side is left alone.
     expect(clarityCheck('> I think the\nthe build is green.')).toBeUndefined()
     expect(clarityCheck('I think `the`\nthe build is green.')).toBeUndefined()
+  })
+})
+
+describe('clarity check', () => {
+  it('sends clean text without a check', () => {
+    expect(clarityCheck('Friday works for me.')).toBeUndefined()
+    expect(clarityCheck('Can you take a look?')).toBeUndefined()
+  })
+
+  it('fixes typos from the table, keeping the capital', () => {
+    const r = clarityCheck('Did you recieve it? Recieve again.')
+    expect(r?.fixes.map((f) => f.label)).toEqual(['recieve → receive', 'Recieve → Receive'])
+    expect(r?.fixed).toBe('Did you receive it? Receive again.')
   })
 
   it('capitalises a lone lowercase i only when asked to', () => {
