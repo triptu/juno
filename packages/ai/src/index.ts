@@ -1,4 +1,5 @@
 export * from './config'
+export * from './failure'
 export * from './provider'
 export * from './schema'
 export * from './task'

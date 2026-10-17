@@ -7,7 +7,11 @@
  * is one tool call whose parameters are the task's output schema: forced on the
  * decision tier, asked for by instruction (tool choice auto) on the generation
  * tier, where some models reject a forced choice. Answers are validated,
- * retried once, and otherwise the result is no decision. Every failure is a value.
+ * retried once, and otherwise the result is no decision. A provider error is
+ * sorted into a kind (`failure.ts`) and retried only when trying again can
+ * help. When a chat model refuses under its own policy or is unavailable, the
+ * fallback model, from another maker, is asked once, with its own
+ * reservation. Every failure is a value.
  */
 import {
   hasApi,
@@ -16,18 +20,21 @@ import {
   type Context as PiContext,
   type Message as PiMessage,
   type Model,
-  type ModelCost,
   type Static,
   type Tool,
   type TSchema,
 } from '@earendil-works/pi-ai'
 import { Effect, Layer, Option } from 'effect'
-import { classifierFor, modelFor, type AiConfig, type Tier } from '../config'
+import { classifierFor, fallbackFor, modelFor, type AiConfig, type Tier } from '../config'
+import { classifyFailure, fallbackHelps, isRetryable, type AiFailureKind } from '../failure'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision, type NoDecisionReason } from '../provider'
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
-import { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels } from './models'
+import { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels, type ResolvedModel } from './models'
+
+import { admitted, attemptBounds, type Progress } from './spend'
 
 export { OPENROUTER, openRouterModels, type PiModels } from './models'
+export { upperUsd } from './spend'
 
 const DECISION_MAX_TOKENS = 1024
 const GENERATION_MAX_TOKENS = 2048
@@ -35,17 +42,13 @@ const GENERATION_MAX_TOKENS = 2048
 const ART_MAX_TOKENS = 4096
 /** The output cap of a request per tier, which bounds what it can cost. */
 export const MAX_TOKENS: Record<Tier, number> = { decision: DECISION_MAX_TOKENS, generation: GENERATION_MAX_TOKENS, art: ART_MAX_TOKENS }
-/** A slug outside pi-ai's price table reserves this much per call and settles as unknown, so it still counts against the cap. */
-const UNPRICED_RESERVATION_USD = 0.05
-/** Tokens of framing per message, as in the agent's bound (`@juno/agent-memory` `upper`). */
-const FRAMING_TOKENS = 64
-/** Room for a retry's message with the checker's reason. */
-const RETRY_MESSAGE_BYTES = 2048
+/** A fallback with less of the task's time left than this is not asked: it could not answer in time. */
+const FALLBACK_MIN_MILLIS = 500
 
 type Outcome<A> =
   | { readonly kind: 'ok'; readonly value: A }
-  /** `raw` is the answer that failed, so a retry can show it back with the reason. */
-  | { readonly kind: NoDecisionReason; readonly detail?: string; readonly raw?: string }
+  /** `raw` is the answer that failed, so a retry can show it back with the reason. `failure` sorts a provider error. */
+  | { readonly kind: NoDecisionReason; readonly detail?: string; readonly raw?: string; readonly failure?: AiFailureKind }
 
 /** How the tool call is asked for. `forced` is fastest; `auto` relies on the prompt's "answer by calling the tool". */
 export type ToolChoiceMode = 'forced' | 'auto'
@@ -68,11 +71,6 @@ interface Usage {
   output: number
 }
 
-/** How far a call got: the attempts started so far. */
-interface Progress {
-  attempts: number
-}
-
 /** One decision: up to two attempts inside the task's timeout, then a `Decision` with its meta. */
 interface Call<A> {
   readonly modelId: string
@@ -89,6 +87,18 @@ interface Call<A> {
 /** The provider said the model does not take a forced tool choice. The retry then asks with `auto`. */
 function rejectsForcedToolChoice(outcome: Outcome<unknown> | undefined): boolean {
   return outcome?.kind === 'provider-error' && outcome.detail !== undefined && /tool_choice/i.test(outcome.detail)
+}
+
+/** A provider error as an outcome, with its kind. */
+function providerError<A>(detail: string | undefined): Outcome<A> {
+  return { kind: 'provider-error', ...(detail === undefined ? {} : { detail }), failure: classifyFailure(detail ?? '') }
+}
+
+/** Whether a failed first attempt gets a second: invalid output, a retryable provider error, or a forced tool choice the model rejects. */
+function worthRetry(first: Outcome<unknown>): boolean {
+  if (first.kind === 'invalid-output') return true
+  if (first.kind !== 'provider-error') return false
+  return rejectsForcedToolChoice(first) || isRetryable(first.failure ?? 'unknown')
 }
 
 /**
@@ -138,12 +148,12 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       Effect.gen(function* () {
         const toolChoice = rejectsForcedToolChoice(previous) ? 'auto' : request.toolChoice
         const result = yield* Effect.result(complete(request, apiKey, toolChoice, retryContext(request, previous)))
-        if (result._tag === 'Failure') return { kind: 'provider-error', detail: String(result.failure.cause) } as Outcome<A>
+        if (result._tag === 'Failure') return providerError<A>(String(result.failure.cause))
         const message = result.success
         usage.usd += message.usage.cost.total
         usage.input += message.usage.input + message.usage.cacheRead + message.usage.cacheWrite
         usage.output += message.usage.output
-        if (message.stopReason === 'error') return { kind: 'provider-error', detail: message.errorMessage } as Outcome<A>
+        if (message.stopReason === 'error') return providerError<A>(message.errorMessage)
         if (message.stopReason === 'aborted') return { kind: 'timeout' } as Outcome<A>
         return request.read(message)
       })
@@ -155,12 +165,12 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
       Effect.gen(function* () {
         const mapping = task.classify!
         const result = yield* Effect.result(Effect.tryPromise((signal) => models.classify(model, mapping.ask(input), { apiKey, signal, maxRetries: 0 })))
-        if (result._tag === 'Failure') return { kind: 'provider-error', detail: String(result.failure.cause) } as Outcome<Static<S>>
+        if (result._tag === 'Failure') return providerError<Static<S>>(String(result.failure.cause))
         const answer = result.success
         usage.usd += answer.usage?.cost.total ?? 0
         usage.input += (answer.usage?.input ?? 0) + (answer.usage?.cacheRead ?? 0) + (answer.usage?.cacheWrite ?? 0)
         usage.output += answer.usage?.output ?? 0
-        if (answer.stopReason === 'error') return { kind: 'provider-error', detail: answer.errorMessage } as Outcome<Static<S>>
+        if (answer.stopReason === 'error') return providerError<Static<S>>(answer.errorMessage)
         if (answer.stopReason === 'aborted') return { kind: 'timeout' } as Outcome<Static<S>>
         const checked = validateOutput(task, input, mapping.read(answer.answers, input))
         return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
@@ -179,130 +189,86 @@ export function makePiAiProvider(readConfig: Effect.Effect<AiConfig>, models: Pi
         return yield* admitted(config, model.id, priced, bounds, (progress) =>
           run<Static<S>>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: classifyAttempt(task, input, model, apiKey) }))
       }
-      const { model, priced } = resolveModel(models, modelFor(task.tier, config))
-      if (!config.apiKey) return noKey(model.id, started)
+      const main = resolveModel(models, modelFor(task.tier, config))
+      if (!config.apiKey) return noKey(main.model.id, started)
       const apiKey = config.apiKey
       const tool: Tool = { name: task.tool.name, description: task.tool.description, parameters: task.output }
-      const request: Request<Static<S>> = {
-        model,
-        tool,
-        toolChoice: task.tier === 'decision' ? 'forced' : 'auto',
-        maxTokens: task.maxTokens ?? (task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS),
-        context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))], tools: [tool] },
-        read: (message) => {
-          const call = message.content.find((c) => c.type === 'toolCall' && c.name === tool.name)
-          if (!call || call.type !== 'toolCall') return { kind: 'invalid-output', detail: 'the model did not call the tool' }
-          const checked = validateOutput(task, input, call.arguments)
-          return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
-        },
+      const call = ({ model, priced }: ResolvedModel, timeoutMillis: number, from: number) => {
+        const request: Request<Static<S>> = {
+          model,
+          tool,
+          toolChoice: task.tier === 'decision' ? 'forced' : 'auto',
+          maxTokens: task.maxTokens ?? (task.tier === 'decision' ? DECISION_MAX_TOKENS : GENERATION_MAX_TOKENS),
+          context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))], tools: [tool] },
+          read: (message) => {
+            const call = message.content.find((c) => c.type === 'toolCall' && c.name === tool.name)
+            if (!call || call.type !== 'toolCall') return { kind: 'invalid-output', detail: 'the model did not call the tool' }
+            const checked = validateOutput(task, input, call.arguments)
+            return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message }
+          },
+        }
+        return admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
+          run<Static<S>>({ progress, modelId: model.id, priced, timeoutMillis, maxAttempts: task.maxAttempts, started: from, attempt: chatAttempt(request, apiKey) }))
       }
-      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
-        run<Static<S>>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, apiKey) }))
+      return yield* withFallback(config, main, task, started, call)
     })
 
   const generate: AiProviderShape['generate'] = <I>(task: TextTask<I>, input: I) =>
     Effect.gen(function* () {
       const started = Date.now()
       const config = yield* readConfig
-      const { model, priced } = resolveModel(models, modelFor(task.tier, config))
-      if (!config.apiKey) return noKey(model.id, started)
+      const main = resolveModel(models, modelFor(task.tier, config))
+      if (!config.apiKey) return noKey(main.model.id, started)
       const apiKey = config.apiKey
-      const request: Request<string> = {
-        model,
-        toolChoice: 'auto',
-        maxTokens: task.tier === 'art' ? ART_MAX_TOKENS : GENERATION_MAX_TOKENS,
-        context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))] },
-        retry: task.retry,
-        read: (message) => {
-          const raw = textOf(message)
-          const text = cleanText(task, raw)
-          if (text === undefined) return { kind: 'invalid-output', detail: 'empty answer', raw }
-          if (task.check === undefined) return { kind: 'ok', value: text }
-          const checked = task.check(text, input)
-          return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
-        },
+      const call = ({ model, priced }: ResolvedModel, timeoutMillis: number, from: number) => {
+        const request: Request<string> = {
+          model,
+          toolChoice: 'auto',
+          maxTokens: task.tier === 'art' ? ART_MAX_TOKENS : GENERATION_MAX_TOKENS,
+          context: { systemPrompt: task.prompt, messages: [userMessage(task.render(input))] },
+          retry: task.retry,
+          read: (message) => {
+            const raw = textOf(message)
+            const text = cleanText(task, raw)
+            if (text === undefined) return { kind: 'invalid-output', detail: 'empty answer', raw }
+            if (task.check === undefined) return { kind: 'ok', value: text }
+            const checked = task.check(text, input)
+            return checked.ok ? { kind: 'ok', value: checked.value } : { kind: 'invalid-output', detail: checked.message, raw }
+          },
+        }
+        return admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
+          run<string>({ progress, modelId: model.id, priced, timeoutMillis, maxAttempts: task.maxAttempts, started: from, attempt: chatAttempt(request, apiKey) }))
       }
-      return yield* admitted(config, model.id, priced, attemptBounds(model.cost, priced, JSON.stringify(request.context), request.maxTokens), (progress) =>
-        run<string>({ progress, modelId: model.id, priced, timeoutMillis: task.timeoutMillis, maxAttempts: task.maxAttempts, started, attempt: chatAttempt(request, apiKey) }))
+      // Art is drawn by a model chosen for it; another maker's drawing is not asked for.
+      return yield* (task.tier === 'art' ? call(main, task.timeoutMillis, started) : withFallback(config, main, task, started, call))
+    })
+
+  /**
+   * The main model's call, then, when it failed in a way another maker's
+   * model may not (a policy refusal, the model not found or unavailable),
+   * one call to the fallback in the time the task has left. The fallback's
+   * answer carries the failed call in `fallbackFor`, so the log shows both.
+   */
+  const withFallback = <A>(
+    config: AiConfig,
+    main: ResolvedModel,
+    task: { readonly timeoutMillis: number },
+    started: number,
+    call: (model: ResolvedModel, timeoutMillis: number, from: number) => Effect.Effect<Decision<A>>,
+  ): Effect.Effect<Decision<A>> =>
+    Effect.gen(function* () {
+      const first = yield* call(main, task.timeoutMillis, started)
+      if (first._tag === 'Decided' || first.reason !== 'provider-error' || first.kind === undefined || !fallbackHelps(first.kind)) return first
+      const slug = fallbackFor(config, main.model.id)
+      const left = task.timeoutMillis - (Date.now() - started)
+      if (slug === undefined || left < FALLBACK_MIN_MILLIS) return first
+      const from = Date.now()
+      const second = yield* call(resolveModel(models, slug), left, from)
+      const failed = { meta: first.meta, kind: first.kind, ...(first.detail === undefined ? {} : { detail: first.detail }) }
+      return { ...second, meta: { ...second.meta, fallbackFor: failed } }
     })
 
   return { decide, generate }
-}
-
-/**
- * The most a call's two attempts can cost: every input byte as a token at the
- * dearest input rate, the retry's copy of the first answer and its message,
- * and both outputs at the cap. Rounded up by the ledger.
- */
-export function upperUsd(cost: ModelCost, priced: boolean, input: string, maxTokens: number): number {
-  return attemptBounds(cost, priced, input, maxTokens).total
-}
-
-/** The most each attempt of a call can cost, and both together (`upperUsd`). */
-export interface AttemptBounds {
-  readonly first: number
-  readonly total: number
-}
-
-export function attemptBounds(cost: ModelCost, priced: boolean, input: string, maxTokens: number): AttemptBounds {
-  if (!priced) return { first: UNPRICED_RESERVATION_USD, total: UNPRICED_RESERVATION_USD }
-  const rates = [cost, ...(cost.tiers ?? [])]
-  const inputRate = Math.max(...rates.flatMap((rate) => [rate.input, rate.cacheRead, rate.cacheWrite]))
-  const outputRate = Math.max(...rates.map((rate) => rate.output))
-  const first = new TextEncoder().encode(input).length + 2 * FRAMING_TOKENS
-  const retry = first + 4 * maxTokens + RETRY_MESSAGE_BYTES + 2 * FRAMING_TOKENS
-  return {
-    first: (first * inputRate + maxTokens * outputRate) / 1_000_000,
-    total: ((first + retry) * inputRate + 2 * maxTokens * outputRate) / 1_000_000,
-  }
-}
-
-/** A 401, 403 or 429 comes before any output, so nothing was billed for that attempt. */
-function refusedBeforeOutput(detail: string | undefined): boolean {
-  if (detail === undefined) return false
-  return /^(401|403|429)\b/.test(detail) || /\((401|403|429)\):/.test(detail) || /rate.?limit/i.test(detail)
-}
-
-/**
- * What to settle: the reported cost when it is known. A call that ended in
- * its first attempt without a report (a timeout, a lost request) never sent
- * the retry, so it settles at the first attempt's bound, which is at least
- * what it can have been billed. Otherwise `undefined`, which keeps the
- * whole reservation.
- */
-export function settledUsd<A>(decision: Decision<A>, priced: boolean, bounds: AttemptBounds): number | undefined {
-  if (!priced) return undefined
-  if (decision._tag === 'Decided' || decision.reason === 'invalid-output') return decision.meta.costUsd
-  if (decision.reason === 'provider-error' && refusedBeforeOutput(decision.detail)) return decision.meta.costUsd ?? 0
-  if ((decision.reason === 'timeout' || decision.reason === 'provider-error') && decision.meta.attempts === 1) return bounds.first
-  return undefined
-}
-
-/**
- * What to settle for a call stopped before it ended (its job restarted, the
- * key changed, the app quit). Before any attempt nothing was sent. In the
- * first attempt the retry was never sent, so the first attempt's bound is at
- * least what it can have been billed, as for a timeout. Later, `undefined`
- * keeps the whole reservation.
- */
-export function stoppedUsd(priced: boolean, bounds: AttemptBounds, attempts: number): number | undefined {
-  if (attempts === 0) return 0
-  if (!priced) return undefined
-  return attempts === 1 ? bounds.first : undefined
-}
-
-/** Reserves the call's upper cost when the config has a cap, and settles it however the call ends. */
-function admitted<A>(config: AiConfig, modelId: string, priced: boolean, bounds: AttemptBounds, call: (progress: Progress) => Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> {
-  const admit = config.admit
-  const progress: Progress = { attempts: 0 }
-  if (admit === undefined) return call(progress)
-  return Effect.gen(function* () {
-    const started = Date.now()
-    const admission = yield* admit(bounds.total)
-    if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', detail: admission.reason ?? 'cap', meta: { model: modelId, latencyMillis: Date.now() - started, attempts: 0 } } as Decision<A>
-    return yield* call(progress).pipe(Effect.onExit((exit) =>
-      admission.settle(exit._tag === 'Success' ? settledUsd(exit.value, priced, bounds) : stoppedUsd(priced, bounds, progress.attempts))))
-  })
 }
 
 /** Two attempts at most, inside the task's timeout. */
@@ -318,7 +284,7 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
       })
     const twice = Effect.gen(function* () {
       const first = yield* once(undefined)
-      if (call.maxAttempts === 1 || first.kind === 'ok' || first.kind === 'timeout') return first
+      if (call.maxAttempts === 1 || first.kind === 'ok' || !worthRetry(first)) return first
       return yield* once(first)
     })
     const outcome = yield* Effect.timeoutOption(twice, call.timeoutMillis)
@@ -332,7 +298,7 @@ function run<A>(call: Call<A>): Effect.Effect<Decision<A>> {
     if (Option.isNone(outcome)) return { _tag: 'NoDecision', reason: 'timeout', meta }
     const value = outcome.value
     if (value.kind === 'ok') return { _tag: 'Decided', value: value.value, meta }
-    return { _tag: 'NoDecision', reason: value.kind, detail: value.detail, meta }
+    return { _tag: 'NoDecision', reason: value.kind, detail: value.detail, ...(value.failure === undefined ? {} : { kind: value.failure }), meta }
   })
 }
 

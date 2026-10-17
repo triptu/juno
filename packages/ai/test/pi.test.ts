@@ -6,13 +6,15 @@ import { createModels, createProvider, fauxAssistantMessage, fauxProvider, fauxT
 import { createFauxCore } from '@earendil-works/pi-ai/providers/faux'
 import { Effect, Fiber } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { OPENROUTER, defineStructuredTask, defineTextTask, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
+import { OPENROUTER, defineStructuredTask, defineTextTask, isFinal, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
 import { NOW, postgres, stagingBill } from './fixtures'
 
 const DECISION = 'test/decider'
 const GENERATION = 'test/writer'
 const CLASSIFIER = 'test/classifier'
-const FAUX = { provider: OPENROUTER, api: 'openai-completions', models: [{ id: DECISION }, { id: GENERATION }], tokensPerSecond: 1_000_000 }
+/** From another maker than the two above, so it may stand in for them. */
+const FALLBACK = 'other/writer'
+const FAUX = { provider: OPENROUTER, api: 'openai-completions', models: [{ id: DECISION }, { id: GENERATION }, { id: FALLBACK }], tokensPerSecond: 1_000_000 }
 
 /** Chat models only: the classifier slug is empty, so every decision is a tool call. */
 const chatConfig: AiConfig = { apiKey: 'test-key', models: { classifier: '', decision: DECISION, generation: GENERATION } }
@@ -312,5 +314,69 @@ describe('PiAiProvider generation', () => {
     const { provider } = scripted([fauxAssistantMessage('<svg data-hue="teal"><text>a</text></svg>'), fauxAssistantMessage('<svg data-hue="teal"><circle cx="20" cy="20" r="5" fill="#f00"/></svg>')], artConfig)
     const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
     expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'fill must be one of ink, soft, accent, accent2, none; got "#f00"', meta: { attempts: 2 } })
+  })
+})
+
+describe('PiAiProvider on errors that trying again cannot change', () => {
+  const REFUSAL = "This request triggered restrictions on violative cyber content and was blocked under Anthropic's Usage Policy."
+  const titleInput = { topicId: postgres.id, channel: '#eng', messages: postgres.recent }
+  const withFallback = (fallback: string): AiConfig => ({ ...chatConfig, models: { ...chatConfig.models, fallback } })
+
+  it('does not retry a policy refusal, and gives a final answer when there is no fallback', async () => {
+    const { provider, faux } = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: REFUSAL }), fauxAssistantMessage('Postgres migration plan')], withFallback(''))
+    const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, titleInput))
+    expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'provider-error', kind: 'policy', meta: { model: GENERATION, attempts: 1 } })
+    expect(isFinal(decision)).toBe(true)
+    expect(faux.state.callCount).toBe(1)
+  })
+
+  it('does not retry a bad request or a context too long', async () => {
+    for (const errorMessage of ['400 {"error":{"code":400,"message":"tools.0: invalid schema"}}', "400 {\"error\":{\"code\":400,\"message\":\"This endpoint's maximum context length is 128000 tokens.\"}}"]) {
+      const { provider, faux } = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage }), fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))])
+      const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
+      expect(noDecision(decision)).toEqual({ reason: 'provider-error', attempts: 1 })
+      expect(faux.state.callCount).toBe(1)
+    }
+  })
+
+  it('asks the fallback model once after a policy refusal, and says which model answered', async () => {
+    const asked: string[] = []
+    const reply = (message: ReturnType<typeof fauxAssistantMessage>): FauxResponseStep => (_context, _options, _state, model) => {
+      asked.push(model.id)
+      return message
+    }
+    const { provider } = scripted([reply(fauxAssistantMessage('', { stopReason: 'error', errorMessage: REFUSAL })), reply(fauxAssistantMessage('Postgres migration plan'))], withFallback(FALLBACK))
+    const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, titleInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', value: 'Postgres migration plan', meta: { model: FALLBACK, attempts: 1, fallbackFor: { kind: 'policy', detail: REFUSAL, meta: { model: GENERATION, attempts: 1 } } } })
+    expect(asked).toEqual([GENERATION, FALLBACK])
+  })
+
+  it('reserves and settles the fallback on its own, in the same ledger', async () => {
+    const settled: Array<number | undefined> = []
+    const admit = (_upper: number) => Effect.succeed({ _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) })
+    const { provider } = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: `403 {"error":{"code":403,"message":"Input was flagged by moderation"}}` }), fauxAssistantMessage('Postgres migration plan')], { ...withFallback(FALLBACK), admit })
+    const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, titleInput))
+    expect(decision._tag).toBe('Decided')
+    // The refusal came before any output, so it settles at nothing; the fallback at what it reported.
+    expect(settled).toHaveLength(2)
+    expect(settled[0]).toBe(0)
+  })
+
+  it('does not ask a fallback from the same maker, or for a request error', async () => {
+    const same = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: REFUSAL }), fauxAssistantMessage('Postgres migration plan')], withFallback(DECISION))
+    expect(await Effect.runPromise(same.provider.generate(tasks.titleTopic, titleInput))).toMatchObject({ _tag: 'NoDecision', kind: 'policy' })
+    expect(same.faux.state.callCount).toBe(1)
+    const bad = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: '402 {"error":{"code":402,"message":"Insufficient credits"}}' }), fauxAssistantMessage('Postgres migration plan')], withFallback(FALLBACK))
+    expect(await Effect.runPromise(bad.provider.generate(tasks.titleTopic, titleInput))).toMatchObject({ _tag: 'NoDecision', kind: 'credits' })
+    expect(bad.faux.state.callCount).toBe(1)
+  })
+
+  it('still retries an error that may pass, and asks the fallback when the model stays unavailable', async () => {
+    const down = '502 {"error":{"code":502,"message":"Upstream error from Anthropic: Overloaded"}}'
+    const { provider, faux } = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: down }), fauxAssistantMessage('', { stopReason: 'error', errorMessage: down }), fauxAssistantMessage('Postgres migration plan')], withFallback(FALLBACK))
+    const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, titleInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', meta: { model: FALLBACK, fallbackFor: { kind: 'unavailable', meta: { attempts: 2 } } } })
+    expect(faux.state.callCount).toBe(3)
+    expect(isFinal(decision)).toBe(false)
   })
 })

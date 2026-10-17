@@ -1,4 +1,5 @@
 import type { Effect } from 'effect'
+import { modelMaker } from './failure'
 
 /**
  * What the provider needs from the outside: the key, in memory, and the model
@@ -20,6 +21,12 @@ export interface ModelPrefs {
   readonly generation: string
   /** OpenRouter slug for topic art: a model that draws well in the SVG vocabulary (`docs/design/topic-art/v2`). */
   readonly art: string
+  /**
+   * OpenRouter slug asked once when a chat model refuses a request under its
+   * own policy or is unavailable. It must come from another maker than the
+   * model that failed; '' turns the fallback off.
+   */
+  readonly fallback: string
 }
 
 /**
@@ -35,6 +42,10 @@ export const defaultModelPrefs: ModelPrefs = {
   generation: 'anthropic/claude-sonnet-5.5',
   // The topic art study (docs/design/topic-art/v2, 2026-10-13): 35 of 35 valid drawings, median 2.3 s, about $0.006 per icon.
   art: 'google/gemini-3.8-flash',
+  // From another maker than the generation (Anthropic) and decision (OpenAI) defaults, so it covers both; $0.75 in and
+  // $3.75 out per million, a fifth of Sonnet 5.5; tool calling and a 1M window; the art study showed it keeps a strict
+  // format. Settings › Juno changes it (the agent's Gemini Flash family). It is not asked for art, which it draws already.
+  fallback: 'google/gemini-3.8-flash',
 }
 
 /**
@@ -59,6 +70,13 @@ export interface AiConfig {
 
 export function modelFor(tier: Tier, config: AiConfig): string {
   return config.models?.[tier] ?? defaultModelPrefs[tier]
+}
+
+/** The fallback slug for a call to `main`, or undefined when it is off or made by the same maker as `main`. */
+export function fallbackFor(config: AiConfig, main: string): string | undefined {
+  const slug = config.models?.fallback ?? defaultModelPrefs.fallback
+  if (slug === '' || modelMaker(slug) === modelMaker(main)) return undefined
+  return slug
 }
 
 /** The decision model slug, or undefined when the preference turns decision models off. */
