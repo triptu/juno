@@ -66,7 +66,7 @@ export function doneFollowUpEntries(topics: ReadonlyArray<HomeTopic>, now: numbe
   return topics.flatMap((topic) => {
     const match = topic.followUp
     if (match === undefined) return []
-    return [{ id: topic.id, topicId: topic.id, title: match.promise, ...(topic.art === undefined ? {} : { art: topic.art }), reason: deliveryReason(match), quote: match.text, meta: metaLine(topic.title, topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)) }]
+    return [{ id: topic.id, topicId: topic.id, title: match.promise, ...(topic.art === undefined ? {} : { art: topic.art }), reason: deliveryReason(match), quote: match.text, meta: metaLine(topic.title, topic.place === topic.title ? undefined : topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)) }]
   })
 }
 
