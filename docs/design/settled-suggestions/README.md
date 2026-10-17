@@ -14,12 +14,15 @@ SPEC §12 (Home, Tidy up), §14 (Settings › Tidy up) and §15 decide behaviour
 | `a-sheet-about-*.png` | The info button open: What Resolve does, and Tidy up settings, over the top of the list so the sheet keeps its size |
 | `a-sheet-minimum-*.png` | The minimum window: the buttons go under each row's text |
 | `b-in-place-*.png`, `b-in-place-many-*.png` | Direction B, the card opening in place on Home |
-| `settings-light.png`, `settings-dark.png` | Settings › Tidy up |
+| `settings-light.png`, `settings-dark.png` | Settings › Tidy up, with its Other cards switches |
 | `automated-card-*.png`, `automated-card-mixed-*.png` | Card 3, Automated's record on Home: "Juno moved 2 channels to Automated", and with a move back |
 | `automated-sheet-*.png` | Its sheet: each channel with the fact that decided the move, Keep and Move back (Move to Automated for a move back out) |
 | `automated-sheet-acted-*.png` | One moved back, one kept, each with Undo in place |
 | `automated-sheet-about-*.png` | The info button open: What Automated is |
 | `automated-sheet-minimum-*.png` | The minimum window |
+| `unfollow-ignore-card-*.png` | Cards 1 and 6 on Home, under a mention in an ignored channel ("Maya mentioned you in #deploys") |
+| `unfollow-sheet-*.png`, `unfollow-sheet-acted-*.png`, `unfollow-sheet-about-*.png` | Card 1's review: the lead says Unfollow also unfollows in Slack and that a mention follows again; one unfollowed and one kept, with Undo; What Unfollow does |
+| `ignore-sheet-*.png`, `ignore-sheet-acted-*.png`, `ignore-sheet-about-*.png` | Card 6's review: nothing changes in Slack; What Ignore does, including that a mention of you still breaks through |
 
 Shoot again with `GALLERY_SHOTS_ONLY=SettledReview,AutomatedReview,SettingsPage pnpm gallery:shots` and copy from `apps/gallery/shots/`.
 
@@ -79,17 +82,29 @@ The preference is one workspace value, `tidyUp` (`TidyUpPrefs` in `@juno/contrac
 
 ## More self-management
 
-Cards in the same spirit, each opening the same review sheet (`ReviewSheet` and `ReviewList` in `@juno/views`, which Tidy up's review is built on; `HomeReview` and `useReview`, the one container for every card): every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). Built: 3 (SPEC §12, "Automated's record"), and 4 and 5, each with a switch in Settings › Tidy up; shots in `apps/gallery/shots/ReviewCards/`.
+Cards in the same spirit, each opening the same review sheet (`ReviewSheet` and `ReviewList` in `@juno/views`, which Tidy up's review is built on; `HomeReview` and `useReview`, the one container for every card): every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). Built: 3 (SPEC §12, "Automated's record"), and 1, 4, 5 and 6, each with a switch in Settings › Tidy up; shots in `apps/gallery/shots/ReviewCards/` and `apps/gallery/shots/SuggestionReviews/`.
 
 | # | Card | Signal | What it does | Staying transparent | Value | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | **Unfollow threads you never open** | A followed thread with replies over two weeks that you have not opened or been mentioned in ("14 replies since you joined, never opened") | Notify me Never: unfollows it in Slack, so it leaves the sidebar and stops notifying on every device | The sheet says it unfollows in Slack and that a mention follows again; Undo follows again | High | Medium: it writes to Slack |
+| 1 | **Unfollow threads you never open** (built) | A followed thread with replies over two weeks that you have not opened or been mentioned in ("14 replies since you joined, never opened") | Notify me Never: unfollows it in Slack, so it leaves the sidebar and stops notifying on every device | The sheet says it unfollows in Slack and that a mention follows again; Undo follows again | High | Medium: it writes to Slack |
 | 2 | **Quiet a channel you always mark read** | A channel whose Main you marked read without opening five times in two weeks | Notify me Never on the channel, in Juno only | "You marked #deploys read 7 times without opening it"; Keep notifying; Undo | High | Low |
 | 3 | **Automated, with a record** (built) | Every move the rules or Juno make after the first sync, in or back out, with the counts that decided it | A once-a-day card "Juno moved 2 channels to Automated" with the same review sheet (`AutomatedReview`): each channel's reason ("Apps wrote 24 of the last 30 top-level messages"), Move back and Keep | Silent moves become visible once, then stop; the info says what Automated is and that nothing changes in Slack | Medium | Low |
 | 4 | **Mark a follow-up done by itself** (built) | A promise in Follow-up ("I'll send the deck") followed by your own message in the same topic with a file or link, or opening with words that hand it over ("Here's", "Attached", "Done"): `followUpDelivery`, rules only, no model call | Mark done, with the matching message quoted in the row | "You shared a file 3 hours later" and the message itself; Not done keeps it in Follow-up until a newer match; Undo; nothing in Slack | Medium | Low |
 | 5 | **Clear old drafts** (built) | A topic draft untouched for 14 days, in a topic with activity since (`isOldDraft`) | Deletes the draft in Juno | "Untouched for 3 weeks · 12 messages since" and the draft's first line; Undo restores it with its time; Keep stops it until the draft is edited; nothing in Slack | Medium | Low |
-| 6 | **Ignore a channel you never read** | A channel you are in that you have not opened for 30 days, with more than 50 messages since | Ignore channel (hidden everywhere in Juno, nothing in Slack) | "312 messages since you last opened it, 5 weeks ago"; Settings › Ignored lists it; Undo | Medium | Medium: hides content |
+| 6 | **Ignore a channel you never read** (built) | A channel you are in that you have not opened for 30 days, with more than 50 messages since | Ignore channel (hidden everywhere in Juno, nothing in Slack) | "312 messages since you last opened it, 5 weeks ago"; Settings › Ignored lists it; Undo | Medium | Medium: hides content |
 | 7 | **Pin what you open every day** | A topic opened on five of the last seven days | Pin | "Opened 6 of the last 7 days"; Unpin | Low | Low |
 | 8 | **Close tabs** | Exists as Settings › General › Close tabs not viewed in, without a card | No card: the setting already does it quietly and ⌘⇧T reopens | | Low | Low |
 
 The common rules, so trust carries from one card to the next: the reason is always a fact from the data, never a guess dressed as one; the row never moves after you act; Undo is always there; anything that writes to Slack says so in the sheet; and a "no" stops that suggestion until something changes.
+
+## Built: Unfollow and Ignore
+
+Cards 1 and 6 are `UnfollowReview` and `IgnoreReview` (`SuggestionReviews.tsx`) on the shared sheet, opened by `HomeReview`, with AI assist on or off. SPEC §12 has the behaviour; the rules are `unfollowEvidence` and `ignoreEvidence` in `@juno/domain`, unit tested.
+
+- **What the reason can say.** Juno holds only the quiet window's history and the replies it saw arrive, so the reason says what it holds: "14 replies, never opened", "9 replies since the last one you read, 2 weeks ago", "312 messages since the last one you read, 5 weeks ago", with "At least" when the count is partial. It says "the last one you read", not "since you last opened it": the read pointer is the time of a message, not of a visit.
+- **Unfollow needs the oldest unread reply.** Juno must hold an unread reply two weeks old. A cold sync stores a followed thread's unread replies from Slack's thread list, and later replies arrive live, so this holds in normal use.
+- **No action on all rows.** Unfollow writes to Slack and Ignore hides content: each row is its own decision.
+- **The no.** Keep following and Keep showing store when you said no (`topic_overlay.unfollow_kept_ts`, `ignore_kept_ts`), and the rule waits its full time again from then.
+- **Follow sync is unchanged.** Unfollow is Notify me › Never, the existing command. A mention following a thread again is Slack's own write, which Juno reads as any other (`officialFollow` in `specs/follow.qnt`).
+- **A mention breaks through an ignored channel.** A mention of you by name or of a group you are in notifies by your settings, shows on Home ("Maya mentioned you in #deploys") and opens the topic. The channel stays hidden otherwise. @here and @channel do not break through.
+

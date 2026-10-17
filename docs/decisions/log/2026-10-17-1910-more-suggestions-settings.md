@@ -1,0 +1,1 @@
+- 10-17 19:10 · cards-unfollow-ignore · Settings › Tidy up's Other cards gets one switch per new card (Threads you never open, Channels you never read), both on, in the same `tidyUp` preference. The thresholds are not settings; both cards work with AI assist off.
