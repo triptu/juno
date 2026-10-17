@@ -19,7 +19,8 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → channel previews | 10 s after the quick start | Same setup. One or two newest-first searches after the quick start (`searchPreviews`, `@juno/sync` discovery) give the busiest channels a preview before their history is read. Asserted by `quick-start.spec.ts` with history held. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
-| Home open (the sidebar's Home item, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts`, over quick opens and opens after 31 s idle ("Home open after idle", section 8). |
+| Home open (the sidebar's Home item, from a topic) | 50 ms | `pointerdown` → Home painted with its greeting and rows from the local cache. A tab switch to a mounted Home is the tab switch budget. Asserted by `home open` in `perf.spec.ts` over the opens that follow 300 ms after the last action. |
+| Home open after idle | 150 ms | The same open after 31 s with no input. The owner set this separate budget on 10-17: after idle the CPU clock on the reference Mac drops and the same work takes 5 to 13 times as long (observed 32 to 121 ms before the prefetch below, 11 to 134 ms after). Asserted by `home open` in `perf.spec.ts` over its five idle opens ("Home open after idle", section 8). |
 | Peek open | 16 ms | Peek key `keydown` over a hovered row → the peeked messages painted. The hover warmed the topic's query, so this is a prefetched open. Asserted by `peek` in `perf.spec.ts` on the topic300 seed. |
 | Tab switch | 16 ms | One frame. Recently used tabs stay mounted (section 4.3). Unmounted tabs: 50 ms including scroll restore. |
 | Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the sidebar box's inline `width` changes, at most once per frame; nothing re-renders until the drag ends. A custom property on the shell cost 4.7 ms of style recalculation per frame, because every element under it inherits it. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
@@ -750,14 +751,18 @@ prefetches is warmed again when the pointer enters the item.
 | 3 | 24.9, 26.1, 22.2, 13.4, 23.9 | 24.9, passed |
 | traced | 11.2, 11.9, 14.0, 85.5, 17.2 | 19.1, passed |
 
-**What is left.** 3 of 20 idle opens still took 85 to 134 ms. The traced
+**Budget.** 3 of 20 idle opens still took 85 to 134 ms. The traced
 one (85.5 ms) waited on nothing: the pointerdown took 50 ms (React 16 ms,
 then the press's hit test forced the layout, 18.6 ms against 1.4 ms on a
 quick open), a paint frame 11.8 ms and the compositor commit 20 ms. That
 is the same work 5 to 13 times slower, which points at the CPU state
-after idle rather than at Juno's work. The gate is unchanged and passes 3
-of 4 runs. Not tried: rendering Home on pointer enter, so the press only
-swaps it in, which helps only if the pointer rests on the item first.
+after idle rather than at Juno's work. The owner set a separate budget
+for these opens on 10-17, 150 ms p95, because the CPU clock drops after
+idle on this Mac; quick opens keep 50 ms (section 1). The scenario gates
+its 15 quick opens at 50 ms and its 5 idle opens at 150 ms; with five
+samples the p95 is the slowest one, so a single idle open over 150 ms
+fails the run. Not tried: rendering Home on pointer enter, so the press
+only swaps it in, which helps only if the pointer rests on the item first.
 
 ### 8.5 Scroll frame work beyond JavaScript (10-17)
 
