@@ -1203,6 +1203,25 @@ line. The script:
 leaves `CHANGELOG.md` alone; use it to test the upload, then delete it with
 `gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
 
+### The release keeper's releases
+
+Every DMG the release keeper builds from a commit the CI keeper reported green
+is also a published release, so installs get it as an update:
+
+1. Run `pnpm release:version patch` on main, commit only
+   `apps/desktop/package.json` as "Release x.y.z", fetch, rebase onto
+   `origin/main` and push. Build from that commit, or from the green commit with
+   only that change applied.
+2. Package in a detached worktree with `JUNO_UPDATE_TOKEN` read from the
+   keychain into the variable (never printed), then verify the DMG, launch it
+   once and quit it by PID. Copy it to the Desktop; the one it replaces becomes
+   `-previous`.
+3. Write 3–8 changelog lines for what changed for the person using Juno since
+   the last release, in the style of SPEC section 17, in a file outside the
+   repository.
+4. Run `pnpm release:publish --notes <file> --dry-run`, then without
+   `--dry-run`, from the worktree that holds the build.
+
 ### Updates in the app
 
 Updates are off by default and unavailable in a build without the token, in

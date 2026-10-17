@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 03:45 · release-keeper · Every DMG built from a keeper-green commit is also published to triptu/juno-releases as the next patch version (0.1.1 first, from 66828cf7), with a "Release x.y.z" commit on main and 3–8 changelog lines. Why: no release had ever been published and every DMG was 0.1.0, so installs were never offered an update.
 - 10-18 03:01 · web-panel-setting · Settings › General › Open links in Juno (on by default) is a workspace preference (`webPanel`); off, `openWebPanel` sends every web link to the default browser and an open panel closes. `followWebPanel` holds the preference so a click reads the saved value without waiting.
 - 10-18 02:50 · notify-toast-waits · A Notify me change shows its toast only once the notification settings live query holds the new level (at most one second after the command). Why: the command replies before the live query updates, so a menu opened right after the toast could show the old level, which the toast had already announced as changed.
 - 10-18 02:50 · ci-fix-33 · A connection card's Show result is growth the user asks for, so it is marked `data-expands-in-place` like Show more; its label reserves the width of the other label, so the after-line keeps its width when it toggles. Why: the gallery shift walk failed on the toggle, and the card's own state cannot be drawn static without a gallery-only branch.
