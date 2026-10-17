@@ -3,7 +3,8 @@
 // OpenRouter (`../juno-agent/chat.ts`).
 import { test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
-import { happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
+import { chart, drop } from '../attach'
+import { firstFrameRight, happened, keepsSize, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
 import { Feel } from './feel'
 import { Studio } from './studio'
 
@@ -122,6 +123,82 @@ test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
       await rec.mark('press')
       await juno.tabs.menu('juno')
       await juno.win.locator(`${PANEL} textarea`).waitFor()
+    },
+  )
+})
+
+test('attach an image in the Juno tab and send it: the chip and the thumbnail keep their boxes', async ({ juno, feel }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const composer = juno.win.locator(`${TAB} [data-juno-composer]`)
+  await composer.locator('textarea').waitFor()
+  const CHIP = `${TAB} [data-juno-composer] [data-attachment]`
+
+  await feel.run(
+    {
+      name: 'juno-image-attach',
+      title: 'Drop an image on the Juno composer: its chip shows with the picture, in a box that never changes, and the field keeps its place',
+      probes: [
+        { kind: 'box', name: 'chip', selector: CHIP },
+        { kind: 'images', name: 'chipImage', within: CHIP },
+        { kind: 'text', name: 'state', selector: `${CHIP}[data-attachment="ready"]` },
+        { kind: 'box', name: 'field', selector: `${TAB} [data-juno-composer] textarea` },
+        { kind: 'rect', name: 'composer', selector: `${TAB} [data-juno-composer]` },
+      ],
+      regions: { composer: `${TAB} [data-juno-composer]` },
+      checks: [
+        happened('the chip got ready', (r) => r.frames.some((f) => f.values['state'] !== null)),
+        landsAndStays('chip', 'the chip', { tolerance: 0 }),
+        // The picture is in the chip from the frame the chip shows.
+        firstFrameRight('the chip shows its picture in its first frame', (v) => v['chip'] !== null, (v) => (Number(v['chipImage']) > 0 ? null : 'no picture')),
+        ({ recording }) => {
+          // The composer grows up to make room for the chip: its bottom edge, where the field sits, stays.
+          const boxes = recording.frames.map((f) => f.values['composer']).filter((v): v is { x: number; y: number; width: number; height: number } => typeof v === 'object' && v !== null && 'height' in v)
+          const bottoms = new Set(boxes.map((b) => Math.round(b.y + b.height)))
+          const name = "the composer's bottom edge stays"
+          return { name, status: bottoms.size <= 1 ? 'pass' : 'fail', detail: `bottoms ${[...bottoms].join(', ')}`, shots: [] }
+        },
+        noFlicker('composer', 'the composer'),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('drop')
+      await drop(composer, [chart()])
+      await juno.win.locator(`${CHIP}[data-attachment="ready"] img`).waitFor()
+    },
+  )
+
+  const THUMB = `${TAB} [data-chat-owner] [data-owner-image="0"]`
+  await feel.run(
+    {
+      name: 'juno-image-send',
+      title: 'Send the image: the bubble shows with the picture\'s box reserved, the picture fills it without a move, and the chip leaves in one step',
+      probes: [
+        { kind: 'rect', name: 'thumb', selector: THUMB },
+        { kind: 'images', name: 'thumbImage', within: THUMB },
+        { kind: 'rect', name: 'owner', selector: `${TAB} [data-chat-owner]` },
+        { kind: 'count', name: 'chips', within: TAB, selector: '[data-juno-composer] [data-attachment]' },
+        { kind: 'rect', name: 'composer', selector: `${TAB} [data-juno-composer]` },
+      ],
+      regions: { chat: `${TAB} [data-scroll]` },
+      settleMs: 1000,
+      checks: [
+        happened('the picture loaded in the bubble', (r) => r.frames.some((f) => Number(f.values['thumbImage']) > 0)),
+        keepsSize('thumb', 'the picture'),
+        // Juno's answer moves your bubble up the list; what must not change is its size as the picture loads.
+        keepsSize('owner', 'your bubble'),
+        switchesOnce('the chip', (v) => (Number(v['chips']) > 0 ? 'chip' : 'none'), { from: 'send' }),
+        neverBlank('chat', 'the chat'),
+        noFlicker('chat', 'the chat'),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('send')
+      await composer.locator('textarea').press('Enter')
+      await juno.win.locator(`${THUMB} img`).waitFor({ timeout: 15_000 })
+      await juno.win.locator(`${TAB} [data-chat-juno]`).waitFor({ timeout: 15_000 })
     },
   )
 })
