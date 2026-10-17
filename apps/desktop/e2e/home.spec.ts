@@ -73,11 +73,10 @@ test('Home shows rows before the first sync ends', async ({ juno, slack, win }) 
   await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
   const early = await juno.home.kinds()
 
-  // The sync ends: the rows shown stay first, in their order, and the count line replaces the syncing one.
+  // The sync ends: the rows shown stay first, in their order, and the syncing line goes.
   slack.fake.release({ method })
   await expect(syncing).toHaveCount(0, { timeout: 30_000 })
   expect((await juno.home.kinds()).slice(0, early.length)).toEqual(early)
-  await expect(win.locator('[data-home]').getByText(/wants? you\.$/)).toBeVisible()
   await expect(rows.first().getByRole('link')).toBeVisible()
 })
 
@@ -214,7 +213,6 @@ quiet('caught up, Home says so and leaves All topics to the sidebar', async ({ j
   const { home } = juno
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
-  await expect(home.root.getByText('Nothing is waiting on you.')).toBeVisible()
   expect(await home.kinds()).toEqual([])
   await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
 })

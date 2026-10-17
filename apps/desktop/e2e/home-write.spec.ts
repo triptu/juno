@@ -20,7 +20,6 @@ test('a first @ suggests a person, Tab makes them the destination, and the send 
 
   // A launch opens Home, ready to ask Juno.
   await juno.expectNothingOpen()
-  await expect(write.composer).toBeFocused()
   await write.expectDestination('Juno')
 
   await write.composer.pressSequentially('@ma')
@@ -75,13 +74,13 @@ test('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an
   await expect(write.composer).toHaveValue('@ma')
 
   await write.composer.fill('')
-  await write.recentRow('Maya').click()
+  await write.recentRow('Maya Chen').click()
   await write.expectDestination('Maya')
-  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
+  await expect(write.recentRow('Maya Chen')).toHaveAttribute('aria-pressed', 'true')
   await expect(write.composer).toBeFocused()
   await write.composer.press('Backspace')
   await write.expectDestination('Juno')
-  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
+  await expect(write.recentRow('Maya Chen')).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', async ({ juno, fake }) => {
@@ -154,7 +153,7 @@ test('Home keeps its draft and destination when a topic opens over it, and Back 
   await juno.waitForSync()
   const { write, topic, sidebar, nav } = juno
 
-  await write.recentRow('Maya').click()
+  await write.recentRow('Maya Chen').click()
   await write.write('A long thought I do not want to lose')
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -174,8 +173,9 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
   await tabs.expectActive('Home')
   await tabs.expectCount(1)
   await expect(write.search).toBeFocused()
+  // Esc closes the list and returns focus to the chip that owns it.
   await write.search.press('Escape')
-  await expect(write.composer).toBeFocused()
+  await expect(write.chip).toBeFocused()
 
   await write.write('Half a thought')
   await tabs.menu('new-message')

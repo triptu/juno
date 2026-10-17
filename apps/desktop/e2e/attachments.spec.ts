@@ -204,7 +204,7 @@ test('Home keeps its files through a change of destination and sends them to the
 
   await write.send()
   await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').map((call) => call.args['channel'])).toEqual(['C0PRODUCT'])
-  await tabs.expectActive('Home')
+  await tabs.expectActiveAt('Home', 1)
   await expect(briefChip).toHaveCount(0)
 })
 
