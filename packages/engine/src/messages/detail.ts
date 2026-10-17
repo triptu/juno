@@ -112,8 +112,9 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const memberIds = tileMemberIds(columns, selfId)
     const { partnerId: _partnerId, memberIds: _memberIds, ...bare } = channelRefOf(info, partnerId, memberIds)
     const channel = memberIds.length === 0 ? bare : { ...bare, members: memberIds.map((member) => personFrom(member, users.get(member))) }
-    const reads = yield* sql<{ last_read_ts: string | null }>`SELECT last_read_ts FROM topic_reads WHERE topic_id = ${id}`
+    const reads = yield* sql<{ last_read_ts: string | null; marked_unread: number }>`SELECT last_read_ts, marked_unread FROM topic_reads WHERE topic_id = ${id}`
     const lastReadTs = reads[0]?.last_read_ts ?? undefined
+    const markedUnread = reads[0]?.marked_unread === 1
     const title = resolveTitle(topic, { user: nameOf })
     const status = topicStatus(topic, ctx)
     const art = artRefOf(row, aiAssist)
@@ -137,6 +138,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       unreadExact: topic.activity.unreadExact !== false,
       mentionsMe: topic.activity.mentionsMe,
       ...(lastReadTs === undefined ? {} : { lastReadTs }),
+      ...(markedUnread ? { markedUnread } : {}),
       ...(row.last_activity_ts === null ? {} : { lastActivityTs: row.last_activity_ts }),
       ...(target.kind === 'thread' ? { rootTs: target.threadTs } : {}),
       ...(threadCount === undefined ? {} : { threadCount }),
