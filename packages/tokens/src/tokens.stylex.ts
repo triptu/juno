@@ -54,6 +54,9 @@ export const colors = stylex.defineVars({
   '--border-strong': 'hsla(48, 30%, 88%, 1)',
   '--border-strongest': 'hsla(48, 30%, 82%, 1)',
   '--input-border': 'hsla(48, 14%, 82%, 1)',
+  // The edge of an empty control that has no other shape (the welcome card's
+  // unticked circle): 3:1 on a card, as a non-text control must be.
+  '--border-control': 'hsla(48, 8%, 53%, 1)',
 
   // The tab strip, a step below the sidebar so the page-coloured active tab
   // stands out of it, as in Safari and Finder. Inactive tabs are the strip;

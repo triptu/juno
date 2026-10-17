@@ -40,6 +40,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--border-strong': '#3C3A37',
   '--border-strongest': '#4C4A47',
   '--input-border': '#464541',
+  '--border-control': '#75736C',
 
   // Below the sidebar (L 0.15); the hover at the sidebar's step (0.19), below the page (0.215), so the
   // active tab stays the brightest. Contrast: docs/design/tokens.md 1.2.

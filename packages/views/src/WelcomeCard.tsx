@@ -21,7 +21,7 @@ export const welcomeCopy = {
       ? `Hold ${peekKey === 'space' ? 'Space' : '⌥'} over a topic to read it without opening it`
       : hint === 'tab'
         ? '⌘-click a topic to open it in a new tab'
-        : 'Ask Juno below. It sends nothing until you click.',
+        : 'Ask Juno below. Nothing goes to Slack until you approve it.',
   progress: (count: number) => `${count} of 3 done`,
 } as const
 
@@ -145,7 +145,8 @@ const styles = stylex.create({
     borderRadius: radii['--radius-full'],
     borderWidth: spacing['--space-pixel'],
     borderStyle: 'solid',
-    borderColor: colors['--border-strong'],
+    // 3:1 on the card, so an unticked circle reads as a control.
+    borderColor: colors['--border-control'],
     color: accent['--hl-fg'],
     transitionProperty: 'background-color, border-color',
     transitionDuration: motion['--duration-fast'],

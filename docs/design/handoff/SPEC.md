@@ -72,7 +72,7 @@ A first look at Juno should feel calmer than Slack, not like a diagram to learn.
 
 - Hold ⌥ over a topic to read it without opening it. With Space chosen as the peek key in Settings › General, it says Space.
 - ⌘-click a topic to open it in a new tab.
-- Ask Juno below. It sends nothing until you click.
+- Ask Juno below. Nothing goes to Slack until you approve it.
 
 - **Ticks.** A hint ticks when you do it anywhere in the app, not only from Home: any peek, any topic opened in a new tab from a row (⌘-click, ⌘ Enter or Open in new tab), and any question sent to Juno (from Home, the Juno tab, the panel or ⌘K). The ticks are saved, so they survive a relaunch. When all three are ticked, the heading says "You're all set" and Hide becomes **Done**. The card stays until Done, or until the next launch, which counts it as seen.
 - **When.** Once per workspace: whenever the workspace has not seen it and the sidebar has rows. After a first sign-in that is once "Set up Juno" is done or skipped and the first sync has brought rows; until then Home keeps the card's room empty, so nothing moves when it fills. An install from before the card shows it on its first launch after the update. Hide or Done records the workspace preference `tourSeen`, which signing out keeps, so a relaunch or a later sign-in never shows it again.
