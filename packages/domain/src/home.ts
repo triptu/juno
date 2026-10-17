@@ -5,15 +5,17 @@
  */
 
 /** Ranked in this order. */
-export type HomeKind = 'waiting' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'doneFollowUps' | 'oldDrafts' | 'automatedMoves'
+export type HomeKind = 'waiting' | 'mentioned' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore' | 'automatedMoves'
 
 /**
- * Automated's question comes before Tidy up: it is asked once, and an
- * unanswered one keeps a channel in the wrong place. The other review
- * cards come after it: nothing is lost while they wait. Automated's record
- * comes last: it reports what Juno already did.
+ * A mention in an ignored channel comes right after a question: it is the
+ * one way that channel reaches the user. Automated's question comes before
+ * Tidy up: it is asked once, and an unanswered one keeps a channel in the
+ * wrong place. The other review cards come after it: nothing is lost while
+ * they wait; Unfollow and Ignore, which change more, after the others.
+ * Automated's record comes last: it reports what Juno already did.
  */
-export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'automatedMoves']
+export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'mentioned', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves']
 
 /** Moved a lot: a followed topic with at least this many new messages. */
 export const MOVED_A_LOT_MIN = 8
@@ -21,7 +23,7 @@ export const MOVED_A_LOT_MIN = 8
 export const SETTLED_MIN_SCORE = 0.8
 export const TIDY_UP_MIN_TOPICS = 2
 /** The cards that open a review sheet, and the fewest topics each needs once the rows above took theirs. */
-export const REVIEW_MIN_TOPICS: Partial<Record<HomeKind, number>> = { tidyUp: TIDY_UP_MIN_TOPICS, doneFollowUps: 1, oldDrafts: 1 }
+export const REVIEW_MIN_TOPICS: Partial<Record<HomeKind, number>> = { tidyUp: TIDY_UP_MIN_TOPICS, doneFollowUps: 1, oldDrafts: 1, unfollow: 1, ignore: 1 }
 /** At most this many rows; on a window shorter than `HOME_SHORT_WINDOW` px, `HOME_SHORT_LIMIT`. */
 export const HOME_LIMIT = 3
 

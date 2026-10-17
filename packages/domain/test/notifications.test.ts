@@ -64,6 +64,16 @@ describe('notification decision', () => {
     expect(decideNotification(message, settings, context, judgement)).toEqual(expected)
   })
 
+  it('lets a direct mention through an ignored channel, then decides it by the usual settings', () => {
+    const named = candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: true })
+    expect(decideNotification(named, settings, aiOff)).toEqual({ outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' })
+    expect(decideNotification({ ...named, at: at(SAT, 12) }, settings, aiOff)).toMatchObject({ outcome: 'hold', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' })
+    expect(decideNotification({ ...named, senderId: 'U0SAM' as never }, settings, ai)).toEqual({ outcome: 'hold', reason: 'Sam Okafor is set to Never' })
+    // @here and @channel mention everyone, so they stay held.
+    expect(decideNotification(candidate({ channel: alerts, mentionsMe: true }), settings, aiOff)).toEqual({ outcome: 'hold', reason: '#alerts-prod is ignored' })
+    expect(decideWithCause(candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: false }), settings, ai)).toMatchObject({ cause: { kind: 'ignored' } })
+  })
+
   it('applies thread overrides, with Every message winning over Never anywhere', () => {
     const topicId = 't:C0HIRING:1.000001'
     const message = candidate({ topicId })

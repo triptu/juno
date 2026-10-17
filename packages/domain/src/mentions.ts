@@ -25,3 +25,13 @@ export function messageMentionsMeDirectly(body: MessageBody, me: Me): boolean {
   }
   return false
 }
+
+/**
+ * `messageMentionsMeDirectly` on a message's raw mrkdwn text, for queries
+ * that read stored text without rendering it: `<@U…>` or a user group the
+ * user is in, `<!subteam^S…>`. Never @here or @channel.
+ */
+export function textMentionsMeDirectly(text: string, me: Me): boolean {
+  if (text.includes(`<@${me.userId}>`) || text.includes(`<@${me.userId}|`)) return true
+  return (me.usergroupIds ?? []).some((id) => text.includes(`<!subteam^${id}>`) || text.includes(`<!subteam^${id}|`))
+}

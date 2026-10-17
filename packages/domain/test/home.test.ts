@@ -37,6 +37,12 @@ describe('Home items', () => {
     expect(ranked[1]).toMatchObject({ kind: 'tidyUp', topicIds: ['b', 'c'] })
   })
 
+  it('ranks a mention in an ignored channel after a question, and the other suggestions after Tidy up, each from one topic', () => {
+    const ranked = rankHomeItems([item('ignore', 'm'), item('unfollow', 't'), item('mentioned', 'x'), item('waiting', 'a')], 9)
+    expect(ranked.map((row) => row.kind)).toEqual(['waiting', 'mentioned', 'unfollow', 'ignore'])
+    expect(rankHomeItems([item('tidyUp', 'a', 'b'), item('unfollow', 'a')], 9).map((row) => row.kind)).toEqual(['tidyUp'])
+  })
+
   it("asks Automated's question after a follow-up and before Tidy up", () => {
     const ranked = rankHomeItems([item('tidyUp', 'x', 'y'), item('automated', 'm'), item('followUp', 'c'), item('waiting', 'd')])
     expect(ranked.map((row) => row.value)).toEqual(['waiting:d', 'followUp:c', 'automated:m'])
