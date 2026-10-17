@@ -47,16 +47,37 @@ async function pageWhen(engine: RunningEngine, predicate: (view: SlackScheduleVi
   }
 }
 
-describe("Slack's notification schedule", () => {
-  it('on first run writes the notification hours once, after reading the schedule, and not again on restart', async () => {
+describe("Slack's notification schedule: when Juno writes", () => {
+  it('never writes default hours: nothing until the owner sets the hours or turns the switch on', async () => {
     const engine = await withSchedule(before)
+    await settled(engine)
+    expect(writes(engine)).toEqual([])
+    expect(dnd(engine)).toMatchObject(before)
+    expect(await pageWhen(engine, (view) => view.waitingForHours, 'waiting for hours')).toEqual({ enabled: true, canRestore: false, changedInSlack: false, waitingForHours: true })
+    // A restart with the defaults still writes nothing.
+    const next = await restart(engines, engine)
+    await next.phase('live', 30_000)
+    await settled(next)
+    expect(writes(next)).toEqual([])
+
+    // Setting the hours on the page applies them.
+    valueOf(await setHours(next, { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 19 * 60 }))
+    await waitFor(() => (writes(next).length > 0 ? true : undefined), 10_000, 'the write')
+    await settled(next)
+    expect(writes(next)).toEqual([weekdays])
+  })
+
+  it('turning the switch on writes the hours once, after reading the schedule, and not again on restart', async () => {
+    const engine = await withSchedule(before)
+    await settled(engine)
+    valueOf(await runCommand(engine.registry, notificationsSetSlackSchedule, { enabled: true }))
     await waitFor(() => (writes(engine).length > 0 ? true : undefined), 15_000, 'the first write')
     await settled(engine)
     expect(writes(engine)).toEqual([weekdays])
     // The schedule itself was read first, not taken from the cache.
     expect(apiCalls(engine, 'users.prefs.get').some((call) => call.args['prefs']?.includes('dnd_days') === true)).toBe(true)
     expect(dnd(engine)).toMatchObject(weekdays)
-    expect(await pageWhen(engine, (view) => view.canRestore, 'Restore offered')).toEqual({ enabled: true, canRestore: true, changedInSlack: false })
+    expect(await pageWhen(engine, (view) => view.canRestore, 'Restore offered')).toEqual({ enabled: true, canRestore: true, changedInSlack: false, waitingForHours: false })
 
     const next = await restart(engines, engine)
     await next.phase('live', 30_000)
@@ -66,6 +87,7 @@ describe("Slack's notification schedule", () => {
 
   it('writes nothing when Slack already holds the hours', async () => {
     const engine = await withSchedule(weekdays)
+    valueOf(await runCommand(engine.registry, notificationsSetSlackSchedule, { enabled: true }))
     await settled(engine)
     expect(writes(engine)).toEqual([])
     expect(apiCalls(engine, 'users.prefs.get').filter((call) => call.args['prefs'] !== undefined)).toEqual([])
@@ -87,15 +109,19 @@ describe("Slack's notification schedule", () => {
     expect(writes(engine)).toEqual([])
   })
 
+})
+
+describe("Slack's notification schedule: Restore and changes made in Slack", () => {
   it('Restore puts the saved schedule back and turns the switch off; off, hours stay in Juno', async () => {
     const engine = await withSchedule(before)
+    valueOf(await runCommand(engine.registry, notificationsSetSlackSchedule, { enabled: true }))
     await pageWhen(engine, (view) => view.canRestore, 'Restore offered')
     await settled(engine)
     engine.fake.resetCalls()
     valueOf(await runCommand(engine.registry, notificationsRestoreSlackSchedule, {}))
     expect(writes(engine)).toEqual([before])
     expect(dnd(engine)).toMatchObject(before)
-    expect(await pageWhen(engine, (view) => !view.enabled, 'the switch off')).toEqual({ enabled: false, canRestore: false, changedInSlack: false })
+    expect(await pageWhen(engine, (view) => !view.enabled, 'the switch off')).toEqual({ enabled: false, canRestore: false, changedInSlack: false, waitingForHours: false })
 
     valueOf(await setHours(engine, { days: [0, 1, 2, 3, 4, 5, 6], from: 7 * 60, to: 23 * 60 }))
     await settled(engine)
@@ -110,6 +136,8 @@ describe("Slack's notification schedule", () => {
 
   it('a change made in Slack is left alone and shown, until Use Juno’s hours', async () => {
     const engine = await withSchedule(weekdays)
+    valueOf(await runCommand(engine.registry, notificationsSetSlackSchedule, { enabled: true }))
+    await pageWhen(engine, (view) => !view.waitingForHours, 'the hours applied')
     await settled(engine)
     engine.fake.resetCalls()
     engine.fake.workspace.prefs = { ...engine.fake.workspace.prefs, dnd_end_hour: '10:00' }

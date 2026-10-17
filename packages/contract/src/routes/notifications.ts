@@ -74,6 +74,8 @@ export const SlackScheduleView = Schema.Struct({
   canRestore: Schema.Boolean,
   /** The schedule was changed in Slack after Juno wrote it. Juno leaves it until the hours change in Juno. */
   changedInSlack: Schema.Boolean,
+  /** On, but the hours are still Juno's defaults on this install: nothing is written until they are set or the switch is turned on again. */
+  waitingForHours: Schema.Boolean,
 })
 export type SlackScheduleView = typeof SlackScheduleView.Type
 

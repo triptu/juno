@@ -439,6 +439,7 @@ With the owner's approval, on the owner's own account only, `JUNO_LIVE=1 node --
 - `users.prefs.set` with `prefs={"dnd_enabled":true,"dnd_days":"weekdays","dnd_start_hour":"19:00","dnd_end_hour":"09:00"}` answered `{ ok: true }` and nothing else, so the answer does not carry the stored values.
 - **The server normalises times.** `09:00` was sent and `9:00` read back, so the missing leading zero seen before is the server's form, not an older client's. A reader must compare padded times (`slackScheduleMatches` does).
 - **Changing `dnd_days` leaves the per-day keys as they were.** After the switch from `custom` to `weekdays`, the fourteen `dnd_before_<day>` / `dnd_after_<day>` values and the seven `dnd_enabled_<day>` values were unchanged. Restoring a `custom` schedule therefore needs only `dnd_days: "custom"`, but Juno writes the whole saved copy back.
+- The hours written were Juno's defaults, not the owner's (that Mac had none of his), so the previous schedule was written back the same day with `--restore` and read back identical, every-day fields included. Since then Juno writes only hours set on that install (SPEC 14).
 - The owner's previous schedule used `custom` with `23:59` as the stop on weekdays, which is how the official page spells "until midnight". Juno uses the same value when a custom day's hours cross midnight.
 
 ## 8. Recommended minimal API surface for Juno v1

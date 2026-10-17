@@ -33,6 +33,11 @@ export function SlackScheduleSection({ schedule, onChange, onRestore }: SlackSch
         />
         {/* Always there, so Restore or the line going away moves nothing below. */}
         <div {...stylex.props(styles.actions)} aria-live="polite">
+          {schedule?.waitingForHours === true ? (
+            <Text variant="meta" tone="muted">
+              Slack's schedule changes once you set your notification hours above.
+            </Text>
+          ) : null}
           {schedule?.changedInSlack === true ? (
             <>
               <Text variant="meta" tone="muted">
