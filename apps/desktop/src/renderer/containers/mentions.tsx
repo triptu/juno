@@ -77,8 +77,7 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
   const listed = picksOf(rows)
   const ids = listed.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
-  const open = query !== undefined && listed.length > 0
-  const listReady = useSuggestionList(query !== undefined)
+  const open = useSuggestionList(query !== undefined) && query !== undefined && listed.length > 0
 
   /** Puts `picked` in place of the query `at`, and keeps it with the picks. */
   const insertPick = (at: MentionQuery, picked: MentionPick) => {
@@ -137,7 +136,7 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
             anchorAt: typed.start,
             listId,
             activeId: open ? activeId : undefined,
-            list: open && rows !== undefined && listReady ? <SuggestionList {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
+            list: open && rows !== undefined ? <SuggestionList {...rows} id={listId} activeId={activeId} onActivate={setChosen} onPick={pick} /> : null,
             onDismiss: () => setDismissed(typed.start),
           } satisfies ComposerMention,
         }),
