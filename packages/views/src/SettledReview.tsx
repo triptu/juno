@@ -1,6 +1,7 @@
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import type { HomeTopic } from '@juno/contract'
 import { ReviewSheet, type ReviewAbout, type ReviewSheetProps } from './ReviewSheet'
+import { tileOf } from './tileModel'
 import type { ReviewEntry, ReviewVerbs } from './reviewModel'
 import { settledCopy, settledReason } from './settled'
 import { relativeTime } from './time'
@@ -21,9 +22,8 @@ export const settledAbout: ReviewAbout = { label: settledCopy.about, lines: sett
 export function settledEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
   return topics.map((topic) => ({
     id: topic.id,
-    topicId: topic.id,
     title: topic.title,
-    ...(topic.art === undefined ? {} : { art: topic.art }),
+    ...tileOf(topic),
     ...(topic.settled === undefined ? {} : { reason: settledReason(topic.settled, topic.at, now) }),
     meta: [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
   }))

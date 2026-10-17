@@ -24,9 +24,9 @@ export function metaOf(item: HomeItem, now: number): string {
   // A mention in an ignored channel: the title names the person and the channel, so the meta line has the thread and the time.
   if (item.kind === 'mentioned') return [topic?.title === item.channel?.label ? undefined : topic?.title, item.at === undefined ? undefined : relativeTime(item.at, now)].filter((part) => part !== undefined && part !== '').join(' · ')
   const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
-  const first = topic?.title
-  const place = topic?.place
-  return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
+  // A Main's title is the place ("Maya Chen", "#eng"), so it is said once: "Maya Chen · 7h".
+  const place = topic?.main === true ? undefined : topic?.place
+  return [topic?.title, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
 }
 
 /** A row's buttons: Mark done, Resolve all, Automated's Keep in All and Move, or Dismiss on Automated's record. */

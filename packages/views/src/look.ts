@@ -11,8 +11,8 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import type { ConversationKind } from '@juno/contract'
-import { channelIconNames, firstGrapheme, hueForId, hueNames, type ChannelIconName, type HueName, type PhosphorIcon } from '@juno/ui'
+import type { ConversationKind, Person } from '@juno/contract'
+import { channelIconNames, firstGrapheme, hueForId, hueNames, type AvatarStackPerson, type ChannelIconName, type HueName, type PhosphorIcon } from '@juno/ui'
 
 const icons: Readonly<Record<string, ChannelIconName>> = {
   hash: 'hash',
@@ -113,4 +113,15 @@ export function titleMatches(title: string, query: string): boolean {
   if (words.length === 0) return true
   const titleWords = title.toLowerCase().split(/[^\p{L}\p{N}]+/u)
   return words.every((word) => titleWords.some((each) => each.startsWith(word)))
+}
+
+/** A person as the stack (18px, the 48px photo) or a group DM's pair (the 72px photo) draws them. */
+export function stackPerson(person: Person, large = false): AvatarStackPerson {
+  return {
+    id: person.id,
+    initials: initials(person.name),
+    name: person.name,
+    hue: hueFor(person.color, person.id),
+    ...(person.avatarUrl === undefined ? {} : { src: (large ? undefined : person.avatarSmallUrl) || person.avatarUrl }),
+  }
 }
