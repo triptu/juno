@@ -195,7 +195,7 @@ async function countsMatchRows(engine: RunningEngine): Promise<TopicCounts> {
 }
 
 describe('the mention branches, end to end', () => {
-  it('a mention in a thread Slack said nothing about brings the thread in, and the counts go up', async () => {
+  it('a mention in a thread Slack said nothing about follows it, as in Slack: the thread comes in, and the counts go up', async () => {
     const engine = await liveEngine()
     await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const before = await countsMatchRows(engine)
@@ -205,13 +205,14 @@ describe('the mention branches, end to end', () => {
     const id = `t:C0ENG:${root.ts}`
 
     const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the mentioned thread')
-    expect(rows.find((r) => r.id === id)).toMatchObject({ kind: 'thread', mentionsMe: true, subscribed: false, section: 'recent' })
+    // SPEC 5: you follow a thread when you are mentioned in it.
+    expect((await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed), 'the mentioned thread followed')).find((r) => r.id === id)).toMatchObject({ kind: 'thread', mentionsMe: true, subscribed: true, section: 'recent' })
     expect(rows.find((r) => r.id === id)!.unreadCount).toBeGreaterThan(0)
     const after = await countsMatchRows(engine)
     expect(after.channelsUnread).toBeGreaterThan(before.channelsUnread)
   })
 
-  it('a mention after an explicit unfollow keeps the thread hidden and out of the counts', async () => {
+  it('a mention after an explicit unfollow follows the thread again: it comes back with its mention, and the counts match the rows', async () => {
     const engine = await liveEngine()
     const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
     const root = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('Draft plan is in the doc.'))!
@@ -222,12 +223,11 @@ describe('the mention branches, end to end', () => {
     await engine.rowsUntil((list) => !list.some((r) => r.id === id), 'the unfollowed thread gone')
     const before = await countsMatchRows(engine)
 
+    // SPEC 5: as in Slack, a later mention of you follows it again.
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: `<@${SELF_ID}> one more thing on the plan.`, threadTs: root.ts })
-    // Events apply in order: once a later message has reached its row, the mention has been applied too.
-    engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'Unrelated, later.' })
-    const after = await engine.rowsUntil((list) => list.some((r) => r.preview.text === 'Unrelated, later.'), 'the later message')
-    expect(after.some((r) => r.id === id)).toBe(false)
+    const after = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed), 'the thread followed again')
+    expect(after.find((r) => r.id === id)).toMatchObject({ subscribed: true, mentionsMe: true, section: 'recent' })
     const counts = await countsMatchRows(engine)
-    expect(counts.channelsUnread).toBe(before.channelsUnread)
+    expect(counts.channelsUnread).toBeGreaterThanOrEqual(before.channelsUnread)
   })
 })

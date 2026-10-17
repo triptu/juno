@@ -444,6 +444,7 @@ export class Workspace {
     if (input.silent === true) return message
 
     // Posting marks the sender's own view read, and replying follows the thread (Slack says so with `thread_subscribed`).
+    // A reply that mentions self by name follows it for self too, also after an unfollow (SPEC 5, "Notify me on a thread").
     let followed: Subscription | undefined
     if (input.user === this.selfId) {
       if (root === undefined) this.reads.set(input.channel, ts)
@@ -452,6 +453,8 @@ export class Workspace {
         followed = this.#subscribe(input.channel, root.ts, ts, false)
         if (before) followed = undefined
       }
+    } else if (root !== undefined && text.includes(`<@${this.selfId}>`) && this.subscription(input.channel, root.ts)?.subscribed !== true) {
+      followed = this.#subscribe(input.channel, root.ts, undefined, false)
     }
 
     this.emit({ ...message, ...(input.eventFiles === undefined ? {} : { files: input.eventFiles }), type: 'message', channel: input.channel, event_ts: ts })
