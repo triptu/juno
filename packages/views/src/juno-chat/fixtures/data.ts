@@ -567,3 +567,29 @@ export const essay: ReadonlyArray<ChatItem> = [
   owner('m-150', 'Write up the migration plan for the doc', 'single', { _tag: 'sent' }, NOW - 9 * MINUTE),
   ...juno('m-151', `${paragraph}\n\n${paragraph}\n\n${paragraph}`, { at: NOW - 6 * MINUTE }),
 ]
+
+/** The bubbles of one long answer, numbered, as Juno splits it: lists, code and long paragraphs among short lines. */
+const answerParts = (turn: number): ReadonlyArray<ReadonlyArray<JunoBlock>> => [
+  [para(text(`${turn}. Here is where things stand.`))],
+  [para(text(`${turn}.1 The migration plan has three phases.`)), { _tag: 'list', ordered: true, items: [[text('A dual-write window where both schemas get every write')], [text('A backfill in 200-row batches, so the sync never blocks')], [text('A cutover that flips the read path behind a flag')]] }],
+  [para(text(paragraph))],
+  [para(text(`${turn}.2 To check the lock waits, run this on staging:`)), { _tag: 'codeBlock', text: "SELECT pid, wait_event\nFROM pg_stat_activity\nWHERE state = 'active';" }],
+  [para(text(`${turn}.3 What needs you:`)), { _tag: 'list', ordered: false, items: [[text('Review '), code('migrate.ts'), text(' before Thursday')], [text('Answer Leo about the cache TTL on staging, which he asked about twice this week')]] }],
+  [para(text('Nothing else needs you today.'))],
+]
+
+const groupOf = (index: number, count: number): GroupPosition => (count === 1 ? 'single' : index === 0 ? 'first' : index === count - 1 ? 'last' : 'middle')
+
+/** A long chat: forty turns, each a question and a long answer split into numbered bubbles of every kind. */
+export const longChat: ReadonlyArray<ChatItem> = [
+  day(1),
+  ...Array.from({ length: 40 }, (_, turn) => {
+    const at = NOW - (40 - turn) * 10 * MINUTE
+    const parts = answerParts(turn + 1)
+    return [
+      owner(`m-lc-${turn}`, turn % 3 === 0 ? 'Give me the long version of the migration plan, with the commands and what needs me' : 'And again, for the next phase?', 'single', { _tag: 'sent' }, at),
+      // One run, as the bubbles of one answer are.
+      ...parts.flatMap((body, index) => juno(`m-lc-${turn}-${index}`, body, { group: groupOf(index, parts.length), at: at + MINUTE })).map((item) => (item._tag === 'juno' ? { ...item, runId: runId(`run-m-lc-${turn}`) } : item)),
+    ]
+  }).flat(),
+]

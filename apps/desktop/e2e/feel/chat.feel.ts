@@ -1,9 +1,10 @@
-// The Juno chat: opening the Juno tab, the first bubble after a send, and
-// opening the Juno panel beside a topic. The agent runs against the fake
-// OpenRouter (`../juno-agent/chat.ts`).
-import { test as agentTest } from '../juno-agent/chat'
+// The Juno chat: opening the Juno tab, the first bubble after a send,
+// opening the Juno panel beside a topic, and scrolling a long chat. The agent
+// runs against the fake OpenRouter (`../juno-agent/chat.ts`).
+import { startFakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
+import { answer, test as agentTest } from '../juno-agent/chat'
 import { expect, hooks } from '../fixtures'
-import { happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysDrawn, switchesOnce } from './checks'
+import { contentHoldsStill, evenGaps, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, noLongFrames, scrollsOneWay, staysDrawn, switchesOnce } from './checks'
 import { Feel } from './feel'
 import { Studio } from './studio'
 
@@ -122,6 +123,109 @@ test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
       await rec.mark('press')
       await juno.tabs.menu('juno')
       await juno.win.locator(`${PANEL} textarea`).waitFor()
+    },
+  )
+})
+
+/** One long answer in numbered bubbles, as Juno splits one: short lines, a list, a long paragraph, code. */
+const LONG_ANSWER = [
+  'Here is the long version, in five parts.',
+  '1. **The plan.** It has three phases:\n- A dual-write window where both schemas get every write\n- A backfill in 200-row batches, so the sync never blocks\n- A cutover that flips the read path behind a flag',
+  '2. **The review.** Maya wants a reviewer for the backfill, because the index rebuild takes about forty minutes on the large workspace and the plan has it running inside the dual-write window. The flake on the sidebar test is unrelated: the fake server sometimes answers the second page before the first, and the test asserts on the order. Leo has a fix in a branch but has not opened the PR.',
+  "3. **The lock waits.** Run this on staging:\n```\nSELECT pid, wait_event\nFROM pg_stat_activity\nWHERE state = 'active';\n```",
+  '4. **What needs you.** Review `migrate.ts` before Thursday, and answer Leo about the cache TTL on staging, which he asked about twice this week.',
+  '5. Nothing else needs you today.',
+].map((text) => `<say>${text}</say>`)
+
+/** Lets the last long answer go when the test says, then streams its bubbles 300 ms apart, as a model does. */
+let releaseLast: () => void = () => {}
+
+const longTest = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  model: async ({}, use) => {
+    const model = await startFakeOpenRouter({
+      answer: async (request: OpenRouterRequest) => {
+        if (/\bonce more\b/.test(request.input)) {
+          await new Promise<void>((resolve) => (releaseLast = resolve))
+          return { chunks: LONG_ANSWER, gapMs: 300 }
+        }
+        return /\blong version\b/.test(request.input) ? LONG_ANSWER.join('') : answer(request)
+      },
+    })
+    await use(model)
+    await model.close()
+  },
+})
+
+longTest('a long chat: jump to the bottom, then scroll up through it', async ({ juno, feel }) => {
+  longTest.setTimeout(240_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const composer = juno.win.locator(`${TAB} textarea`)
+  const scroller = juno.win.locator(`${TAB} [data-scroll]`)
+  const bubbles = juno.win.locator(`${TAB} [data-chat-juno]`)
+
+  // Twelve long answers, each read as it lands at the bottom.
+  for (let i = 0; i < 12; i++) {
+    await composer.fill(`the long version, part ${i + 1}`)
+    await composer.press('Enter')
+    await expect(bubbles).toHaveCount((i + 1) * LONG_ANSWER.length, { timeout: 15_000 })
+  }
+  await expect(juno.win.getByTitle(/unread from Juno$/)).toHaveCount(0, { timeout: 10_000 })
+
+  // One more lands while scrolled up, and only its first two bubbles are read, as when reading down into it.
+  await composer.fill('the long version once more')
+  await composer.press('Enter')
+  await expect(juno.win.locator(`${TAB} [data-chat-owner]`).filter({ hasText: 'once more' })).toBeVisible()
+  const box = (await scroller.boundingBox())!
+  await juno.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  for (let i = 0; i < 8; i++) await juno.win.mouse.wheel(0, -300)
+  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeGreaterThan(1500)
+  releaseLast()
+  await expect(bubbles).toHaveCount(13 * LONG_ANSWER.length, { timeout: 15_000 })
+  await expect(juno.win.getByTitle('6 unread from Juno')).toBeVisible()
+  await scroller.evaluate((el, count) => {
+    const rows = [...el.querySelectorAll('[data-chat-juno]')]
+    const second = rows.at(-count + 1)!
+    el.scrollTop += second.getBoundingClientRect().bottom + 24 - el.getBoundingClientRect().bottom
+  }, LONG_ANSWER.length)
+  await expect(juno.win.getByTitle('4 unread from Juno')).toBeVisible({ timeout: 5_000 })
+
+  const pill = juno.win.locator(TAB).getByRole('button', { name: /New message/ })
+  await feel.run(
+    {
+      name: 'juno-long-chat-scroll',
+      title: 'In a long chat read partway into the newest answer, jump to the bottom, then wheel up through it: bubbles of one answer stay 2 px apart in every frame, and nothing on screen moves on its own',
+      probes: [
+        { kind: 'rows', name: 'bubbles', scroller: `${TAB} [data-scroll]`, row: '[data-chat-juno]', part: '[data-chat-run]', key: 'data-chat-run' },
+        { kind: 'edge', name: 'top', scroller: `${TAB} [data-scroll]`, rowKey: 'data-chat-juno', side: 'top' },
+        { kind: 'scroll', name: 'scroll', selector: `${TAB} [data-scroll]` },
+      ],
+      regions: { chat: `${TAB} [data-scroll]` },
+      checks: [
+        happened('the jump reached the bottom', (r) => r.frames.some((f) => ((f.values['scroll'] as { fromBottom?: number } | null)?.fromBottom ?? Infinity) <= 2)),
+        evenGaps('bubbles', 'bubbles of one answer', 2),
+        contentHoldsStill('top', { from: 'landed', to: 'scroll' }),
+        scrollsOneWay('top', 'up', { from: 'scroll' }),
+        noLongFrames({ from: 'scroll' }),
+        neverBlank('chat', 'the chat'),
+        noFlicker('chat', 'the chat', { from: 'scroll' }),
+      ],
+    },
+    async (rec) => {
+      await rec.mark('jump')
+      await pill.click()
+      await juno.win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      await rec.mark('landed')
+      // Long enough for the bubbles in view to be read.
+      await juno.win.waitForTimeout(1_800)
+      await rec.mark('scroll')
+      for (let i = 0; i < 40; i++) {
+        await juno.win.mouse.wheel(0, -300)
+        await juno.win.waitForTimeout(40)
+      }
     },
   )
 })

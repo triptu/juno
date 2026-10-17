@@ -45,6 +45,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
       {/* Paint containment clips at the row's edge, and React and Reply end it: room for their rings. */}
       <div {...stylex.props(rowStyles.row, rowStyles.contained, ringRoom.inline, eager && rowStyles.eager)}>
         <div
+          data-chat-run={item.runId}
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...(compact ? tooltip(fullTime(item.at)) : {})}
           {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
