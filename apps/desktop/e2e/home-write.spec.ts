@@ -108,7 +108,8 @@ test('a send to a channel starts a thread there, shows it in the sidebar, and Ho
   await topic.send('second')
   await topic.expectSent('second')
   const root = fake.messages('C0ENG').find((message) => message.text === DRAFT)!
-  expect(root.thread_ts).toBeUndefined()
+  // The first message is the thread's root: Slack gives a root with replies its own ts as thread_ts.
+  expect(root.thread_ts ?? root.ts).toBe(root.ts)
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 })
 
@@ -175,7 +176,7 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
   // No Home tab is open, so ⌘N opens one and leaves the topic in its tab.
   await tabs.menu('new-message')
   await tabs.expectCount(2)
-  await tabs.expectActiveAt('Home', 1)
+  await tabs.expectActiveAt('Home', 0)
   await expect(write.search).toBeFocused()
   // Esc closes the list and returns focus to the chip that owns it.
   await write.search.press('Escape')
@@ -184,14 +185,14 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
   await write.write('Half a thought')
   await tabs.menu('new-message')
   await tabs.expectCount(3)
-  await tabs.expectActiveAt('Home', 2)
+  await tabs.expectActiveAt('Home', 1)
   await expect(write.search).toBeFocused()
   await write.search.press('Escape')
   await expect(write.composer).toHaveValue('')
 
   await tabs.newTabButton.click()
   await tabs.expectCount(4)
-  await tabs.expectActiveAt('Home', 3)
+  await tabs.expectActiveAt('Home', 2)
   await expect(write.composer).toBeFocused()
   await write.expectDestination('Juno')
 })

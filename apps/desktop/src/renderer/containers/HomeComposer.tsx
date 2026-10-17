@@ -111,7 +111,7 @@ function sendToMention(sendTo: ReturnType<typeof useSendTo>, listId: string): Co
 }
 
 /** ⌘N, ⌘T and "+" ask this Home to focus its field, and with ⌘N to open its destination list. */
-function useFocusRequest(tabId: string, focusField: () => void, openList: () => void): void {
+function useFocusRequest(tabId: string, focusField: () => void, openList: () => void, focusList: () => void): void {
   const request = useAtomValue(homeFocusAtom)
   const active = useAtomValue(tabsAtom, (tabs) => tabs.active === tabId)
   // Taken during render, so the list is open in the same frame; the focus moves once it has painted.
@@ -125,9 +125,11 @@ function useFocusRequest(tabId: string, focusField: () => void, openList: () => 
     const request = registry.get(homeFocusAtom)
     if (taken === undefined || request?.seq !== taken) return
     registry.set(homeFocusAtom, undefined)
-    // The list's search takes focus itself; moving it to the field would close the list.
-    if (!request.list) focusField()
-  }, [taken, focusField])
+    // With the list, focus goes to its search: its own autoFocus can run while a new tab is still hidden, and
+    // moving focus to the field would close the list.
+    if (request.list) focusList()
+    else focusField()
+  }, [taken, focusField, focusList])
 }
 
 /** Sends the draft where it goes: Juno opens its chat with the question; a person or channel gets it in its Main and Home stays. */
@@ -224,9 +226,10 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const files = useAttachments(tabId, { tabbable: false })
   const listId = useId()
   const focusField = useCallback(() => inputRef.current?.focus(), [])
+  const focusList = useCallback(() => inputRef.current?.closest('[data-home]')?.querySelector<HTMLElement>('[role="dialog"][aria-label="Send to"] input')?.focus(), [])
   const destination = useDestination(tabId, focusField)
   const sendTo = useSendTo(draft, (conversation) => destination.choose(conversation, true))
-  useFocusRequest(tabId, focusField, destination.openList)
+  useFocusRequest(tabId, focusField, destination.openList, focusList)
 
   // Shown again: the field takes focus, so keys typed after ⌘T or a click on Home reach it.
   useLayoutEffect(() => {
