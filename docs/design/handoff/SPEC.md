@@ -420,7 +420,7 @@ Juno is also the assistant's name. It is one long chat with one assistant that r
 ### 13.2 Working
 
 - **Acknowledge at once.** Your bubble appears before the send is stored. The status bubble appears within a tenth of a second: three looping dots, like someone typing.
-- **Status text.** A tool call gives the status bubble a line that names real things ("Reading 3 topics", "Looking back through March"). "Thinking" and percentages never appear.
+- **Status text.** A tool call gives the status bubble a line that names real things ("Reading 3 topics", "Looking back through March"). A connection call names the connection and what the tool does, as its card would ("Searching Notion", "Creating a page in Notion"), or "Checking with Littlebird" when the tool's name gives no clear verb. Calls in a row change the line in place; the bubble does not move. "Thinking" and percentages never appear.
 - **Bubbles arrive whole.** Each Juno bubble appears complete, as a text does, never word by word. It takes the status bubble's place, and the dots show again below it while Juno is still working, until the run ends.
 - **One status bubble, for runs only.** It exists while Juno is answering you, a schedule or a job report, and clears when that run ends. Work that goes on in the background (a T3 Code session, a delegate) never shows as the typing bubble; it has a Task card (13.4) and the sparkle on the sidebar's Juno row.
 - **No Stop.** There is no Stop button and no key that stops Juno. To change course, send another message ("stop", "do X instead"); Juno reads it at its next step and answers it. A background job stops only from its Task card (13.4).
