@@ -4,7 +4,6 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Notification } from '@phosphor-icons/react/dist/icons/Notification'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
@@ -94,13 +93,6 @@ export interface SidebarProps {
   readonly accountMenu?: ReactNode
   readonly onAccountMenu: (open: boolean) => void
   readonly onSearch: () => void
-  /** The New chat button: a New chat in a new tab. */
-  readonly onNewChat: () => void
-  /**
-   * The unified Home (proposal, `docs/design/home-merged/round-4`): All topics
-   * takes the New chat button's place in the title bar and leaves the nav list.
-   */
-  readonly allTopicsInTitlebar?: boolean
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   /** Right-click on a page item: its menu (Open in new tab). */
@@ -140,7 +132,7 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search, New chat and the account button, the nav items, a
+ * space, Search, All topics and the account button, the nav items (Home and Juno), a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
  * while there is something to say: the sync status card, and, while
@@ -160,8 +152,6 @@ export function Sidebar({
   accountMenu,
   onAccountMenu,
   onSearch,
-  onNewChat,
-  allTopicsInTitlebar = false,
   onNavigate,
   onNavigateMenu,
   onFilterKind,
@@ -201,18 +191,14 @@ export function Sidebar({
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
             <IconButton icon={MagnifyingGlass} label="Search" shortcut={menuKeys('palette.toggle')} size={30} onClick={onSearch} />
-            {allTopicsInTitlebar ? (
-              <IconButton
-                icon={ListBullets}
-                label="All topics"
-                size={30}
-                current={activeNav === 'all-topics'}
-                {...activateHandlers<HTMLButtonElement>((event) => onNavigate('all-topics', event))}
-                onContextMenu={navMenu('all-topics')}
-              />
-            ) : (
-              <IconButton icon={NotePencil} label="New chat" shortcut={menuKeys('chat.new')} size={30} onClick={onNewChat} />
-            )}
+            <IconButton
+              icon={ListBullets}
+              label="All topics"
+              size={30}
+              current={activeNav === 'all-topics'}
+              {...activateHandlers<HTMLButtonElement>((event) => onNavigate('all-topics', event))}
+              onContextMenu={navMenu('all-topics')}
+            />
             <span {...stylex.props(styles.account)}>
               <Popover
                 open={accountMenuOpen}
@@ -243,11 +229,6 @@ export function Sidebar({
         <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')}>
           Home
         </NavItem>
-        {allTopicsInTitlebar ? null : (
-          <NavItem icon={ListBullets} active={activeNav === 'all-topics'} onSelect={(event) => onNavigate('all-topics', event)} onContextMenu={navMenu('all-topics')}>
-            All topics
-          </NavItem>
-        )}
         <NavItem
           icon={Sparkle}
           iconWeight={junoBusy ? 'duotone' : undefined}

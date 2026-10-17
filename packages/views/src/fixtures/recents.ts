@@ -1,58 +1,27 @@
-/** People and channels you wrote to, and composer states, for the merged Home proposals (rounds 2 and 3). */
-import type { ChannelIconName } from '@juno/ui'
-import type { Recent, WriteState } from '../HomeWrite'
+/** Home's Recent and its composer states, for the fixtures: the people and channels the fake workspace would rank. */
+import type { PickConversation } from '@juno/contract'
+import { conversations } from './newChat'
 import { people as who } from './topics'
 
-export const dm = (person: (typeof who)[keyof typeof who], at: string, preview: string): Recent => ({ key: `D:${person.id}`, name: person.name, kind: 'im', person, at, preview })
-export const channel = (id: string, name: string, icon: ChannelIconName | undefined, at: string, preview: string, kind: 'public' | 'private' = 'public'): Recent => ({
-  key: id,
-  name,
-  kind,
-  channel: { id, ...(icon === undefined ? {} : { icon }) },
-  at,
-  preview,
-})
+const dm = (person: (typeof who)[keyof typeof who]): PickConversation => ({ key: `D:${person.id}`, name: person.name, kind: 'im', tint: 'dm', channelId: `D:${person.id}`, mainId: `m:D:${person.id}`, person, empty: false })
+const channel = (key: string, name: string, icon: NonNullable<PickConversation['icon']>, color: NonNullable<PickConversation['color']>, kind: 'public' | 'private' = 'public'): PickConversation => ({ key, name, kind, tint: kind, channelId: key, mainId: `m:${key}`, icon, color, empty: false })
 
-export const maya = dm(who.maya, '2h', 'You: Thursday works for me')
-export const people: ReadonlyArray<Recent> = [
-  maya,
-  dm(who.dev, '4h', 'Dev: Replica lag is under a second now'),
-  dm(who.sam, 'Yesterday', 'You: Sending the packet tonight'),
-  dm(who.leo, 'Yesterday', 'Leo: Can you look at the offsite list?'),
-  dm(who.priya, 'Mon', 'Priya: Notes from the vendor call'),
-  { key: 'G:OFFSITE', name: 'Maya, Leo', kind: 'mpim', people: [who.maya, who.leo], at: 'Tue', preview: 'Maya: Wednesday afternoon then' },
-]
-export const eng = channel('C0ENG', 'eng', 'code', '1h', 'Dev: Booked 2–4pm. Will post results here.')
-export const channels: ReadonlyArray<Recent> = [
+export const maya = conversations.maya
+export const eng = channel('C0ENG', 'eng', 'code', 'emerald')
+
+export const recentPeople: ReadonlyArray<PickConversation> = [maya, dm(who.dev), dm(who.sam), dm(who.leo), dm(who.priya)]
+export const recentChannels: ReadonlyArray<PickConversation> = [
   eng,
-  channel('C0HIRING', 'hiring', 'briefcase', '3h', 'Elena: Rina finished the onsite', 'private'),
-  channel('C0BILLING', 'billing-ops', 'truck', 'Yesterday', 'You: The invoice run moved to Friday'),
-  channel('C0DESIGNREV', 'design-review', 'camera', 'Mon', 'Priya: Icon refresh is in'),
-  channel('C0INCIDENTS', 'incidents', 'bug', 'Mon', 'Grafana: p95 back to normal'),
-  channel('C0PRODUCT', 'product', 'compass', 'Sep 30', 'Maya: Proposal for Q4 is up'),
+  channel('C0HIRING', 'hiring', 'shield', 'midnight', 'private'),
+  channel('C0BILLING', 'billing-ops', 'globe', 'claret'),
+  channel('C0DESIGNREV', 'design-review', 'star', 'plum'),
+  channel('C0INCIDENTS', 'incidents', 'bug', 'rose'),
 ]
 
-export const juno = (draft = '', extra: Partial<WriteState> = {}): WriteState => ({ destination: 'juno', draft, ...extra })
-
-export const personPicker: WriteState = juno('@ma', {
-  picker: {
-    kind: 'person',
-    active: maya.key,
-    rows: [maya, people[5]!, { key: 'D:U0MARTA', name: 'Marta Nowak', kind: 'im', person: { id: 'U0MARTA', name: 'Marta Nowak', color: 'plum' }, at: '' }],
-  },
-})
-export const channelPicker: WriteState = juno('#en', {
-  picker: {
-    kind: 'channel',
-    active: eng.key,
-    rows: [eng, channel('C0ENGONCALL', 'eng-oncall', 'lightning', '', ''), channel('C0DESIGNENG', 'design-engineering', undefined, '', '')],
-  },
-})
-// "#eng" is part of a question for Juno: Space closed the list, the channel is a mention in the text.
-export const junoHash = juno('#eng what happened today?', { marks: [{ start: 0, end: 4, look: 'channel' }] })
+/** What a first "@ma" suggests. */
+export const atMa: ReadonlyArray<PickConversation> = [maya, conversations.group, { key: 'u:U0MARTA', name: 'Marta Nowak', kind: 'im', tint: 'dm', person: { id: 'U0MARTA', name: 'Marta Nowak', color: 'plum' }, empty: true }]
+/** What a first "#en" suggests. */
+export const hashEn: ReadonlyArray<PickConversation> = [eng, channel('C0ENGONCALL', 'eng-oncall', 'lightning', 'cyan'), channel('C0DESIGNENG', 'design-engineering', 'wrench', 'jordy')]
 
 export const DRAFT = 'Can we move the cutover to Thursday night? Dev needs one more day on the replica check.'
-export const writing: WriteState = { destination: maya, draft: DRAFT }
-
-/** People and channels in one list, newest first, as the one-list variants order them. */
-export const mixed: ReadonlyArray<Recent> = [channels[0]!, people[0]!, channels[1]!, people[1]!, people[2]!, channels[2]!, people[3]!, channels[3]!, people[4]!, channels[4]!, people[5]!, channels[5]!]
+export const MULTILINE = "Can we move the cutover to Thursday night?\nDev needs one more day on the replica check, and support asked for a heads-up before 6pm.\nI'll post the plan in #eng once you confirm."

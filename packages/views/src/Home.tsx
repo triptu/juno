@@ -2,20 +2,19 @@ import * as stylex from '@stylexjs/stylex'
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
-import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, Icon, Kbd, Text, TopicArt, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { relativeTime } from './time'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
-  /** "Morning, Tushar." */
+  /** "Morning, Tushar.", or "All caught up." */
   readonly title: string
-  /** "Two things want you." */
-  readonly line: string
+  /** Under the greeting only while the first sync runs: "Syncing with Slack." Never a count. */
+  readonly line?: string | undefined
   /** Already ranked and capped. */
   readonly items: ReadonlyArray<HomeItem>
   /** Items whose button was used: the button is gone, its slot stays. */
@@ -31,75 +30,67 @@ export interface HomeProps {
   readonly onSort: (itemId: string, to: Exclude<AutomatedPlace, 'ask'>) => void
   /** Right-click on Automated's row: the conversation's menu, with Ignore. */
   readonly onItemMenu: (itemId: string) => void
-  /** Opens the Juno chat. Absent with AI assist off, which leaves the field out. */
-  readonly onAsk?: () => void
-  /** A running job's state line, shown in the field in place of "Ask Juno…" (SPEC 13.4). */
-  readonly askLine?: string
   /** The first sync is still running: `line` says so and items fill in as they land. */
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
   readonly reservedItems?: number
-  /** Closes the column, under the ask field: the merged Home's writing block (proposal fixtures). */
-  readonly below?: ReactNode
+  /** Pinned at the bottom, where a topic's composer is: Recent, the destination and the field (`HomeWrite` and a `Composer`). */
+  readonly composer?: ReactNode
 }
 
 /**
- * Home, layout A (SPEC section 12, `docs/design/home/`): the scene over the
- * greeting, up to three rows in a fixed column, and the Ask Juno field.
- * Every size is fixed before data arrives, so nothing moves when a title
- * line is rewritten: a title is one ellipsised line in a 52px row.
+ * Home (SPEC section 12): the scene over the greeting and up to three rows
+ * in a centred column, and the composer at the bottom, where every topic's
+ * composer is. Every size is fixed before data arrives, so nothing moves
+ * when a title line is rewritten: a title is one ellipsised line in a 52px
+ * row. The column scrolls on its own, so the composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, onAsk, askLine, loading = false, reservedItems = 0, below }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu, loading = false, reservedItems = 0, composer }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   return (
     <div data-home="" data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
-      <div {...stylex.props(styles.column)}>
-        <div {...stylex.props(...part())}>
-          <HomeScene name={scene} />
+      <div {...stylex.props(styles.scroll)}>
+        <div {...stylex.props(styles.column)}>
+          <div {...stylex.props(...part())}>
+            <HomeScene name={scene} />
+          </div>
+          <div {...stylex.props(styles.greeting, ...part())}>
+            <h2 id={headingId} {...stylex.props(styles.title)}>
+              {title}
+            </h2>
+            {line === undefined ? null : (
+              <Text variant="body" tone="muted" as="p" sx={styles.line}>
+                {line}
+              </Text>
+            )}
+          </div>
+          {items.length === 0 && reservedItems === 0 ? null : (
+            <ul aria-labelledby={headingId} {...stylex.props(styles.items, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
+              {items.map((item) => (
+                <HomeRow
+                  key={item.id}
+                  item={item}
+                  done={done?.has(item.id) === true}
+                  now={now}
+                  onOpen={onOpen}
+                  onMarkDone={onMarkDone}
+                  onResolveAll={onResolveAll}
+                  onSort={onSort}
+                  onItemMenu={onItemMenu}
+                />
+              ))}
+            </ul>
+          )}
         </div>
-        <div {...stylex.props(styles.greeting, ...part())}>
-          <h2 id={headingId} {...stylex.props(styles.title)}>
-            {title}
-          </h2>
-          <Text variant="body" tone="muted" as="p" sx={styles.line}>
-            {line}
-          </Text>
-        </div>
-        {items.length === 0 && reservedItems === 0 ? null : (
-          <ul aria-labelledby={headingId} {...stylex.props(styles.items, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
-            {items.map((item) => (
-              <HomeRow
-                key={item.id}
-                item={item}
-                done={done?.has(item.id) === true}
-                now={now}
-                onOpen={onOpen}
-                onMarkDone={onMarkDone}
-                onResolveAll={onResolveAll}
-                onSort={onSort}
-                onItemMenu={onItemMenu}
-              />
-            ))}
-          </ul>
-        )}
-        {onAsk === undefined ? null : (
-          <button type="button" aria-label="Ask Juno" aria-keyshortcuts="Meta+J" onClick={onAsk} {...stylex.props(styles.ask, ...part())}>
-            <Icon icon={Sparkle} size={16} weight="duotone" />
-            <span data-ask-line={askLine === undefined ? undefined : ''} {...stylex.props(styles.askText)}>
-              {askLine ?? 'Ask Juno…'}
-            </span>
-            <Kbd look="key">⌘J</Kbd>
-          </button>
-        )}
-        {below}
       </div>
+      {composer}
     </div>
   )
 }
 
-export interface HomeRowProps {
+interface HomeRowProps {
   readonly item: HomeItem
   readonly done: boolean
   readonly now: number
@@ -129,7 +120,7 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  * in All and Move. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-export function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
+function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onSort, onItemMenu }: HomeRowProps) {
   const topic = item.topics[0]
   const tileIcon = item.kind === 'tidyUp' ? Broom : item.kind === 'automated' ? Robot : undefined
   const body = (
@@ -221,12 +212,19 @@ const styles = stylex.create({
     flexDirection: 'column',
     flexGrow: 1,
     minHeight: 0,
-    overflowY: 'auto',
     userSelect: 'none',
     // A size container has no width of its own: it takes the page's.
     width: '100%',
     containerType: 'inline-size',
     containerName: 'home',
+  },
+  // The greeting and the rows scroll on their own, so the composer under them never moves.
+  scroll: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: 'auto',
   },
   // Centred in the page, and scrolls from the top when the window is shorter than it.
   column: {
@@ -366,46 +364,6 @@ const styles = stylex.create({
     gap: spacing['--space-0-5'],
     flexShrink: 0,
     opacity: 'var(--home-action-opacity)',
-  },
-  ask: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2-5'],
-    width: '100%',
-    maxWidth: layout['--home-width'],
-    height: sizes['--control-40'],
-    marginTop: spacing['--space-6'],
-    paddingInlineStart: spacing['--space-3-5'],
-    paddingInlineEnd: spacing['--space-3'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: colors['--input-border'],
-    borderRadius: radii['--radius-pill'],
-    backgroundColor: {
-      default: colors['--surface-default'],
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
-    },
-    color: colors['--foreground-subtle'],
-    fontFamily: text['--text-body-family'],
-    fontSize: text['--text-body-size'],
-    textAlign: 'start',
-    cursor: 'default',
-    outlineStyle: { default: 'none', ':focus-visible': 'solid' },
-    outlineWidth: sizes['--focus-ring-width'],
-    outlineOffset: sizes['--focus-ring-offset'],
-    scrollMargin: sizes['--focus-ring-room'],
-    outlineColor: accent['--focus-ring'],
-    transitionProperty: 'background-color',
-    transitionDuration: motion['--duration-fast'],
-  },
-  // One line: a long job line takes an ellipsis instead of moving the page.
-  askText: {
-    flexGrow: 1,
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    color: colors['--foreground-muted'],
   },
   rise: {
     animationName: rise,

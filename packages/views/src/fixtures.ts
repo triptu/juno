@@ -16,22 +16,17 @@ import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
 import Home from './Home.fixtures'
-import { calmCentre as HomeCalmA, calmFoot as HomeCalmB } from './HomeCalm.fixtures'
-import { quietColumnsRefined as HomeQuietRefined, quietColumns as HomeQuiet1, quietList as HomeQuiet2, quietPills as HomeQuiet3, quietNames as HomeQuiet4 } from './HomeQuiet.fixtures'
-import { addressBookRefined as HomeWriteRefined1, shelfRefined as HomeWriteRefined2, addressBook as HomeWrite1, shelf as HomeWrite2, mosaic as HomeWrite3, inbox as HomeWrite4, dock as HomeWrite5 } from './HomeWrite.fixtures'
-import { foot as HomeMergedB, oneField as HomeMergedA, split as HomeMergedC } from './HomeMerged.fixtures'
 import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
-import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
-import NewTabSetting from './NewTabSetting.fixtures'
+import TabExpirySetting from './TabExpirySetting.fixtures'
 import TopicSwitcher from './TopicSwitcher.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
@@ -104,23 +99,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   EngineStatusView,
   MediaViewer,
   Home,
-  HomeMergedA,
-  HomeMergedB,
-  HomeMergedC,
-  HomeWrite1,
-  HomeWrite2,
-  HomeWrite3,
-  HomeWrite4,
-  HomeWrite5,
-  HomeWriteRefined1,
-  HomeWriteRefined2,
-  HomeQuiet1,
-  HomeQuiet2,
-  HomeQuiet3,
-  HomeQuiet4,
-  HomeQuietRefined,
-  HomeCalmA,
-  HomeCalmB,
   HoverToolbar,
   JunoChatList,
   JunoComposer,
@@ -132,12 +110,11 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MessageList,
   CommandPalette,
   MoveSheet: moveSheet,
-  NewChat,
   NewDivider,
   NewMessagesPill,
   SendCheckBar,
   NotificationsPage,
-  NewTabSetting,
+  TabExpirySetting,
   TopicSwitcher,
   PeekKeySetting,
   QuickReactionsSetting,

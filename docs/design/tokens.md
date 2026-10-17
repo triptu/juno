@@ -441,7 +441,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--tour-shot-width` / `--tour-shot-height` | 720px / 480px: a tour screenshot, the window at its minimum size at 1x (the files are 1440 × 960). `--tour-width` 760px is the sheet: the picture and 20px each side. On a short window the picture shrinks by its aspect ratio so the sheet keeps `--tour-chrome-height` 340px for the step's text, the dots, the buttons and the dimmed layer's padding (inventory 1.2) |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--tooltip-max-width` | 280px; a longer tooltip wraps |
-| `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--menu-width-picker` 340px New chat pickers |
+| `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--send-to-width` 320px Home's "Send to" list for a first @ or #, `--menu-width-picker` 340px Home's destination list and All topics' place list |
 | `--reactors-min-width` | 160px: the narrowest the reaction chip's card of who reacted gets; it grows to `--menu-width` |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |

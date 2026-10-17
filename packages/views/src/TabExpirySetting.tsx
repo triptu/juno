@@ -2,35 +2,6 @@ import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Segmented, Text } from '@juno/ui'
 
-/** What a new tab opens: a New chat, the default, or Home. */
-export type NewTabPageName = 'newChat' | 'home'
-
-export interface NewTabSettingProps {
-  readonly value: NewTabPageName
-  readonly onChange: (page: NewTabPageName) => void
-}
-
-const options: ReadonlyArray<{ readonly value: NewTabPageName; readonly label: string }> = [
-  { value: 'newChat', label: 'New chat' },
-  { value: 'home', label: 'Home' },
-]
-
-/**
- * The new tab preference (Settings › General, SPEC 6): one row laid out as
- * Appearance's, "New tabs open" beside a segmented control. It covers "+",
- * ⌘T and the tab that replaces the last one closed.
- */
-export function NewTabSetting({ value, onChange }: NewTabSettingProps) {
-  return (
-    <div {...stylex.props(styles.row)}>
-      <Text variant="ui" tone="default" weight="medium" sx={styles.label}>
-        New tabs open
-      </Text>
-      <Segmented options={options} value={value} onChange={onChange} label="New tabs open" />
-    </div>
-  )
-}
-
 /** How long a tab can go unseen before it closes by itself (SPEC 6). */
 export type TabExpiryName = 'never' | '1d' | '3d' | '7d'
 
@@ -46,7 +17,7 @@ const expiryOptions: ReadonlyArray<{ readonly value: TabExpiryName; readonly lab
   { value: '7d', label: '7 days' },
 ]
 
-/** "Close tabs not viewed in", the row under "New tabs open". */
+/** "Close tabs not viewed in" (Settings › General, Tabs). */
 export function TabExpirySetting({ value, onChange }: TabExpirySettingProps) {
   return (
     <div {...stylex.props(styles.row)}>

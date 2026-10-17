@@ -1,14 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import type { ConversationKind, PickConversation } from '@juno/contract'
+import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, useOptionListKeys } from '@juno/ui'
 import { Highlighted } from './Highlighted'
 import { hueFor, initials, kindIcon } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
-import { relativeTime } from './time'
-import type { DestinationPickersProps, PickerName } from './DestinationPickers'
 
 const kindLabels: Record<ConversationKind, string> = {
   public: 'Public channel',
@@ -21,15 +20,9 @@ const kindLabels: Record<ConversationKind, string> = {
 const conversationSub = (conversation: PickConversation): string =>
   conversation.kind === 'im' && conversation.empty ? 'No messages yet' : kindLabels[conversation.kind]
 
-/** "#eng", "Maya Chen": where a thread lives, in its row's meta line. */
-const placeLabel = (conversation: PickConversation): string =>
-  conversation.kind === 'public' || conversation.kind === 'private' ? `#${conversation.name}` : conversation.name
-
-const replies = (count: number) => (count === 1 ? '1 reply' : `${count} replies`)
-
-const MAIN_ID = 'pick-main'
-const ANYWHERE_ID = 'pick-anywhere'
-const rowId = (picker: PickerName, key: string) => `pick-${picker}-${key}`
+const ANYWHERE_ID = 'pick-anywhere' as const
+const JUNO_ID = 'pick-juno' as const
+const rowId = (key: string) => `pick-conversation-${key}`
 
 /**
  * Enter while the rows for the typed query are still loading (none yet, or
@@ -65,16 +58,24 @@ function useActive(ids: ReadonlyArray<string>): readonly [string | undefined, (i
   return [chosen !== undefined && ids.includes(chosen) ? chosen : ids[0], setChosen]
 }
 
-export interface ConversationListProps extends Pick<DestinationPickersProps, 'query' | 'onQuery' | 'conversations' | 'onPickConversation'> {
+export interface ConversationListProps {
+  /** The search text. */
+  readonly query: string
+  readonly onQuery: (query: string) => void
+  /** The sections; undefined while they load. */
+  readonly conversations: PickConversations | undefined
+  readonly onPickConversation: (conversation: PickConversation) => void
   readonly loading?: boolean | undefined
   readonly onClose: () => void
   /** An Anywhere row first, which clears a place filter (All topics). It shows while the query is empty or starts "anywhere". */
   readonly onAnywhere?: () => void
-  /** With `onAnywhere`: the picked place's channel id, drawn as the current row; none is Anywhere. */
+  /** A Juno row first, Home's default destination. It shows while the query is empty or starts "juno". */
+  readonly onJuno?: () => void
+  /** The current row: with `onAnywhere` the place's channel id (none is Anywhere), with `onJuno` a conversation's key or `juno`. */
   readonly selected?: string | undefined
 }
 
-export function ConversationList({ query, onQuery, conversations, loading = false, onPickConversation, onClose, onAnywhere, selected }: ConversationListProps) {
+export function ConversationList({ query, onQuery, conversations, loading = false, onPickConversation, onClose, onAnywhere, onJuno, selected }: ConversationListProps) {
   const sections: ReadonlyArray<readonly [string, ReadonlyArray<PickConversation>]> =
     conversations === undefined
       ? []
@@ -84,12 +85,16 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
           ['Channels', conversations.channels],
         ]
   const rows = sections.flatMap(([, items]) => items)
-  const showAnywhere = onAnywhere !== undefined && 'anywhere'.startsWith(query.trim().toLowerCase())
-  const ids = [...(showAnywhere ? [ANYWHERE_ID] : []), ...rows.map((row) => rowId('conversation', row.key))]
+  const typed = query.trim().toLowerCase()
+  const showAnywhere = onAnywhere !== undefined && 'anywhere'.startsWith(typed)
+  const showJuno = onJuno !== undefined && 'juno'.startsWith(typed)
+  const first = showAnywhere ? [ANYWHERE_ID] : showJuno ? [JUNO_ID] : []
+  const ids = [...first, ...rows.map((row) => rowId(row.key))]
   const [activeId, setActive] = useActive(ids)
   const pick = (id: string) => {
     if (id === ANYWHERE_ID) return onAnywhere?.()
-    const row = rows[ids.indexOf(id) - (showAnywhere ? 1 : 0)]
+    if (id === JUNO_ID) return onJuno?.()
+    const row = rows[ids.indexOf(id) - first.length]
     if (row !== undefined) onPickConversation(row)
   }
   const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose })
@@ -99,31 +104,21 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
       <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search people and channels" onKeyDown={search.onKeyDown} activeId={activeId} />
       <div {...stylex.props(styles.scroll)}>
         <OptionList label="Conversations" {...(activeId === undefined ? {} : { activeId })}>
-          {showAnywhere ? (
-            <OptionRow
-              id={ANYWHERE_ID}
-              size={36}
-              active={activeId === ANYWHERE_ID}
-              selected={selected === undefined}
-              leading={<Icon icon={Globe} size={15} />}
-              label="Anywhere"
-              onSelect={onAnywhere}
-              onActivate={() => setActive(ANYWHERE_ID)}
-            />
-          ) : null}
+          {showAnywhere && onAnywhere !== undefined ? <FirstRow id={ANYWHERE_ID} activeId={activeId} selected={selected === undefined} onSelect={onAnywhere} onActivate={setActive} /> : null}
+          {showJuno && onJuno !== undefined ? <FirstRow id={JUNO_ID} activeId={activeId} selected={selected === 'juno'} onSelect={onJuno} onActivate={setActive} /> : null}
           {sections.map(([title, items]) =>
             items.length === 0 ? null : (
               <div key={title} role="group" aria-label={title}>
                 <OptionGroupLabel>{title}</OptionGroupLabel>
                 {items.map((row) => {
-                  const id = rowId('conversation', row.key)
+                  const id = rowId(row.key)
                   return (
                     <OptionRow
                       key={id}
                       id={id}
                       size={36}
                       active={id === activeId}
-                      selected={onAnywhere !== undefined && row.channelId !== undefined && row.channelId === selected}
+                      selected={onJuno !== undefined ? row.key === selected : onAnywhere !== undefined && row.channelId !== undefined && row.channelId === selected}
                       leading={<ConversationMark conversation={row} />}
                       label={<Highlighted text={row.name} ranges={row.highlight} />}
                       sub={conversationSub(row)}
@@ -142,57 +137,24 @@ export function ConversationList({ query, onQuery, conversations, loading = fals
   )
 }
 
-export function ThreadList({ query, onQuery, conversation, threads, loading = false, now, onPickThread, onOpen }: DestinationPickersProps) {
-  const main = conversation !== undefined && 'main'.startsWith(query.trim().toLowerCase())
-  const rows = threads ?? []
-  const ids = [...(main ? [MAIN_ID] : []), ...rows.map((row) => rowId('thread', row.id))]
-  const [activeId, setActive] = useActive(ids)
-  const pick = (id: string) => (id === MAIN_ID ? onPickThread(undefined) : onPickThread(rows[ids.indexOf(id) - (main ? 1 : 0)]))
-  const keys = useOptionListKeys({ ids, activeId, onActiveChange: setActive, onSelect: pick, onClose: () => onOpen(undefined) })
-  const search = usePendingEnter(loading || threads === undefined, ids, pick, keys, onQuery)
+/** The row before the conversations: Anywhere (All topics' place filter) or Juno (Home's destination). */
+function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly id: typeof ANYWHERE_ID | typeof JUNO_ID; readonly activeId: string | undefined; readonly selected: boolean; readonly onSelect: () => void; readonly onActivate: (id: string) => void }) {
+  const juno = id === JUNO_ID
   return (
-    <>
-      <PickerSearch query={query} onQuery={search.onQuery} placeholder="Search threads" onKeyDown={search.onKeyDown} activeId={activeId} />
-      <div {...stylex.props(styles.scroll)}>
-        <OptionList label="Threads" {...(activeId === undefined ? {} : { activeId })}>
-          {conversation === undefined ? <OptionGroupLabel>Recent threads</OptionGroupLabel> : null}
-          {main ? (
-            <OptionRow
-              id={MAIN_ID}
-              size={44}
-              active={activeId === MAIN_ID}
-              label="Main"
-              sub="Messages outside threads"
-              subPlacement="below"
-              onSelect={() => onPickThread(undefined)}
-              onActivate={() => setActive(MAIN_ID)}
-            />
-          ) : null}
-          {rows.map((row) => {
-            const id = rowId('thread', row.id)
-            const meta = [...(conversation === undefined ? [placeLabel(row.conversation)] : []), replies(row.replyCount), relativeTime(row.lastActivityAt, now)].join(' · ')
-            return (
-              <OptionRow
-                key={id}
-                id={id}
-                size={44}
-                active={id === activeId}
-                label={row.title}
-                sub={meta}
-                subPlacement="below"
-                onSelect={() => onPickThread(row)}
-                onActivate={() => setActive(id)}
-              />
-            )
-          })}
-          {threads !== undefined && ids.length === 0 ? <PickerNoMatch /> : null}
-        </OptionList>
-      </div>
-    </>
+    <OptionRow
+      id={id}
+      size={36}
+      active={activeId === id}
+      selected={selected}
+      leading={juno ? <Icon icon={Sparkle} size={15} weight="duotone" /> : <Icon icon={Globe} size={15} />}
+      label={juno ? 'Juno' : 'Anywhere'}
+      {...(juno ? { sub: 'Ask Juno' } : {})}
+      onSelect={onSelect}
+      onActivate={() => onActivate(id)}
+    />
   )
 }
 
-/** A person's avatar, or the conversation's kind icon. */
 function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
   const person = conversation.person
   if (person === undefined) return <Icon icon={kindIcon(conversation.kind)} size={15} />

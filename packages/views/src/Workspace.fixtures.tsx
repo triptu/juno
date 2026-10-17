@@ -33,15 +33,12 @@ const tabs = {
   pinnedEng: { id: 'tab-pinned-eng', title: 'eng', icon: 'hash', pinned: true, tile: { kind: 'art', topicId: 'm:C0ENG', recipe: art.bell } } satisfies WorkspaceTab,
   pinnedMaya: { id: 'tab-pinned-maya', title: 'Offsite: Wednesday afternoon slot', icon: 'user', pinned: true, unread: true, tile: mayaTile } satisfies WorkspaceTab,
   densityUnread: { id: 'tab-density-unread', title: 'Thread list density', icon: 'hash', unread: true, tile: { kind: 'art', topicId: 't:C0DESIGNREV:1759900000.000900', recipe: art.people } } satisfies WorkspaceTab,
-  newChat: { id: 'tab-new-chat', title: 'New chat', icon: 'new-chat' } satisfies WorkspaceTab,
-  // A New chat with a destination picked keeps its icon and takes the destination's name.
-  newChatPicked: { id: 'tab-new-chat', title: 'Postgres 16 cutover window', icon: 'new-chat' } satisfies WorkspaceTab,
   home: { id: 'tab-home', title: 'Home', icon: 'home' } satisfies WorkspaceTab,
   juno: { id: 'tab-juno', title: 'Juno', icon: 'juno' } satisfies WorkspaceTab,
 } as const
 
 /** Topic art, a placeholder, DM photos, initials, a group DM and pages side by side. */
-const mixedTabs = [tabs.home, tabs.postgres, tabs.maya, tabs.hiring, tabs.dev, tabs.group, tabs.newChat]
+const mixedTabs = [tabs.home, tabs.postgres, tabs.maya, tabs.hiring, tabs.dev, tabs.group, tabs.juno]
 
 const browserTabs = [tabs.pinnedEng, tabs.pinnedMaya, tabs.postgres, tabs.densityUnread, tabs.hiring]
 const sidebarControls = <TitlebarNav sidebarHidden canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
@@ -143,7 +140,6 @@ export default defineFixtures(
       'many-tabs': workspace({ tabs: [tabs.pinnedEng, tabs.postgres, tabs.hiring, tabs.densityUnread], activeId: tabs.postgres.id }, postgresPage),
       overflowing: workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 960, height: 480 }),
       'one-topic-in-two-tabs': workspace({ tabs: [tabs.postgres, { ...tabs.postgres, id: 'tab-postgres-2' }, tabs.home, { ...tabs.home, id: 'tab-home-2' }], activeId: 'tab-postgres-2' }, postgresPage),
-      'new-tab-opens-home': workspace({ tabs: [tabs.postgres], activeId: tabs.postgres.id, newTabLabel: 'New tab' }, postgresPage, { hover: '[aria-label="New tab ⌘T"]' }),
     },
     Page: {
       // Only before the saved tabs have been read: there is otherwise always a tab.
@@ -154,8 +150,6 @@ export default defineFixtures(
       'minimum-window': workspace({ tabs: [tabs.postgres, tabs.hiring, tabs.eng, tabs.density, tabs.maya], activeId: tabs.eng.id }, engPage, { width: 720, height: 480 }),
       'pinned-and-unread': workspace({ tabs: browserTabs, activeId: tabs.postgres.id }, postgresPage),
       'pinned-active': workspace({ tabs: browserTabs, activeId: tabs.pinnedEng.id }, engPage),
-      'new-chat-tab': workspace({ tabs: [tabs.postgres, tabs.newChat], activeId: tabs.newChat.id }),
-      'new-chat-picked': workspace({ tabs: [tabs.postgres, tabs.newChatPicked], activeId: tabs.newChatPicked.id }),
       // Home's content is the empty workspace until the Home page is built.
       'home-tab': workspace({ tabs: [tabs.home, tabs.postgres], activeId: tabs.home.id }),
       'juno-tab': workspace({ tabs: [tabs.postgres, tabs.juno], activeId: tabs.juno.id }, junoPage),
@@ -194,7 +188,7 @@ export default defineFixtures(
     Interaction: {
       'hover-tab': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(2) [role="tab"]' }),
       'hover-close': workspace({}, postgresPage, { hover: '[data-tab]:nth-of-type(1) button' }),
-      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New chat ⌘T"]' }),
+      'hover-new-tab': workspace({}, postgresPage, { hover: '[aria-label="New tab ⌘T"]' }),
       'focus-tab': workspace({}, postgresPage, { focus: '[data-tab]:nth-of-type(2) [role="tab"]' }),
     },
   },

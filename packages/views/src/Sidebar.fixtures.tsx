@@ -26,7 +26,6 @@ const chrome: Omit<SidebarProps, 'children'> = {
   accountMenuOpen: false,
   onAccountMenu: noop,
   onSearch: noop,
-  onNewChat: noop,
   onNavigate: noop,
   onFilterKind: noop,
   onToggleUnread: noop,
@@ -176,20 +175,6 @@ export default defineFixtures(
         full({ filter: { kind: 'all', unreadOnly: true } }, { sections: [{ id: 'pinned', ids: [rows.offsite.id] }, { id: 'recent', ids: [rows.alertsMain.id, rows.hiring.id, rows.roadmap.id, rows.pricing.id, rows.flags.id] }] }),
       ),
     },
-    // The unified Home (docs/design/home-merged/round-4): All topics in the New chat button's place; Home and Juno left in the nav.
-    'Unified Home': {
-      'all-topics-button': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'home' })),
-      'all-topics-current': scene(() => full({ allTopicsInTitlebar: true, activeNav: 'all-topics' })),
-      'all-topics-tooltip': scene(
-        () => (
-          <>
-            {full({ allTopicsInTitlebar: true, activeNav: 'home' })}
-            <TooltipLayer />
-          </>
-        ),
-        { tooltip: '[aria-label="All topics"]' },
-      ),
-    },
     // The filter row as scrollable pills (inventory 2.3): it never grows taller than the row of three.
     Views: {
       overflowing: scene(() => full(viewChrome)),
@@ -254,6 +239,7 @@ export default defineFixtures(
     Nav: {
       // Home tab active, or no tab open.
       'home-active': scene(() => full({ activeNav: 'home' })),
+      // All topics is the title bar's button: it takes the nav's active look.
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
       'juno-active': scene(() => full({ activeNav: 'juno' })),
       'juno-unread': scene(() => full({ junoUnread: 3 })),
@@ -284,6 +270,15 @@ export default defineFixtures(
           </>
         ),
         { tooltip: '[aria-label="Back ⌘["]' },
+      ),
+      'all-topics': scene(
+        () => (
+          <>
+            {full()}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[aria-label="All topics"]' },
       ),
       'view-pill': scene(
         () => (

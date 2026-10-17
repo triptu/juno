@@ -6,7 +6,7 @@ import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@jun
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { QuietWindowSetting } from './QuietWindowSetting'
-import { NewTabSetting, TabExpirySetting, type NewTabPageName, type TabExpiryName } from './NewTabSetting'
+import { TabExpirySetting, type TabExpiryName } from './TabExpirySetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
@@ -34,8 +34,6 @@ export interface SettingsGeneralProps {
   readonly grammarUnavailable?: string | undefined
   readonly onCheckChange: (key: SendCheckPref, enabled: boolean) => void
   /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
-  readonly newTabPage: NewTabPageName
-  readonly onNewTabPageChange: (page: NewTabPageName) => void
   /** How long a tab can go unseen before it closes by itself. */
   readonly tabExpiry: TabExpiryName
   readonly onTabExpiryChange: (expiry: TabExpiryName) => void
@@ -59,7 +57,7 @@ export interface SettingsGeneralProps {
 }
 
 /** General: topic recency, tabs, peek, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNewTabPageChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -70,7 +68,6 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, newTabPage, onNe
       </Section>
       <Section heading="Tabs" sub="What the + button, ⌘T and closing the last tab open, and when tabs you left close. Tabs with a draft stay; ⌘⇧T reopens one.">
         <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
-          <NewTabSetting value={newTabPage} onChange={onNewTabPageChange} />
           <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
         </Surface>
       </Section>

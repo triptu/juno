@@ -1,14 +1,14 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { NewTabSetting } from './NewTabSetting'
+import { TabExpirySetting } from './TabExpirySetting'
 
 const noop = () => {}
 
 export default defineFixtures(
-  NewTabSetting,
+  TabExpirySetting,
   {
     Page: {
-      'new-chat': fixture({ value: 'newChat', onChange: noop }),
-      home: fixture({ value: 'home', onChange: noop }),
+      'one-day': fixture({ value: '1d', onChange: noop }),
+      never: fixture({ value: 'never', onChange: noop }),
     },
   },
   { width: 300 },

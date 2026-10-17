@@ -4,7 +4,6 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
@@ -15,7 +14,7 @@ import { Avatar, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type P
 import { hueFor, initials } from './look'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'new-chat' | 'home' | 'all-topics' | 'juno' | 'settings'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'home' | 'all-topics' | 'juno' | 'settings'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -49,10 +48,8 @@ export interface WorkspaceStripProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onSelectTab?: ((id: string, event: ActivateEvent) => void) | undefined
   readonly onCloseTab?: ((id: string) => void) | undefined
-  /** The "+" button: a new tab, with a New chat or Home (Settings › General). */
+  /** The "+" button: a new tab with Home. */
   readonly onNewTab?: (() => void) | undefined
-  /** The "+" button's name, after what a new tab opens. Default "New chat". */
-  readonly newTabLabel?: string
   /**
    * A tab dragged, or moved with ⌃⇧← and ⌃⇧→, to `index` in the strip. The
    * strip keeps pinned tabs among themselves; the owner clamps too.
@@ -71,7 +68,6 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   lock: Lock,
   user: User,
   users: Users,
-  'new-chat': NotePencil,
   home: House,
   'all-topics': ListBullets,
   juno: Sparkle,
@@ -126,7 +122,7 @@ function stepIndex(key: string, index: number, count: number): number | undefine
  * it, and ⌃⇧← and ⌃⇧→ move it, which a screen reader hears as its new
  * position. A tab also drags to a new place.
  */
-export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, newTabLabel = 'New chat', onMoveTab, onTabContextMenu, leading, fullScreen }: WorkspaceStripProps) {
+export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, onNewTab, onMoveTab, onTabContextMenu, leading, fullScreen }: WorkspaceStripProps) {
   const status = useRef<HTMLSpanElement>(null)
   // The tab a move asked for and how many moves there were, so the same position is read again after a second move.
   const [moved, setMoved] = useState<{ readonly id: string; readonly count: number } | undefined>(undefined)
@@ -172,7 +168,7 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
   }
   return (
     <>
-      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} trailing={<IconButton icon={Plus} label={newTabLabel} shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} trailing={<IconButton icon={Plus} label="New tab" shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
