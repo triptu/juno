@@ -18,6 +18,8 @@ const BACKOFF_BASE_MS = 1_000
 const BACKOFF_CAP_MS = 30_000
 const CRASH_WINDOW_MS = 120_000
 const CRASH_LIMIT = 5
+/** How long a quit waits for the engine to finish and exit before it is killed. */
+const QUIT_TIMEOUT_MS = 3_000
 
 export type SupervisorState = 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
 
@@ -104,10 +106,30 @@ export class EngineSupervisor {
     return 'sent'
   }
 
-  /** Ends the engine for good, on app quit. */
-  stop(): void {
+  /**
+   * Ends the engine for good, on app quit. The engine finishes the requests in
+   * flight, such as a preference written just before ⌘Q, and exits; after
+   * QUIT_TIMEOUT_MS it is killed. Resolves once it has exited; undefined when
+   * no engine runs.
+   */
+  stop(): Promise<void> | undefined {
     this.state = 'stopped'
-    this.end()
+    if (this.restartTimer) clearTimeout(this.restartTimer)
+    this.restartTimer = undefined
+    const child = this.child
+    this.child = undefined
+    if (child === undefined) return undefined
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill()
+        resolve()
+      }, QUIT_TIMEOUT_MS)
+      child.once('exit', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+      child.postMessage({ _tag: 'quit' } satisfies MainToEngine)
+    })
   }
 
   /** Starts the engine again after the supervisor gave up on it, with a fresh crash count. Does nothing otherwise. */

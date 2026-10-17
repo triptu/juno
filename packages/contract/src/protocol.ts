@@ -88,6 +88,8 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('wake', {}),
   /** The owner used the Mac in the last 20 s and the screen is not locked. Sent every 10 s while so. */
   Schema.TaggedStruct('active', {}),
+  /** The app quits: finish the requests in flight, close the databases and exit. */
+  Schema.TaggedStruct('quit', {}),
 ])
 export type MainToEngine = typeof MainToEngine.Type
 

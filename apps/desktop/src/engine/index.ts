@@ -5,9 +5,9 @@
  * the one parentPort listener and the two Electron-backed seams the engine
  * needs; everything else is `@juno/engine`, which never imports Electron.
  *
- * - `Host`: every parentPort message that is not `config` or `port` goes to
- *   the engine's `HostLink`; messages that arrive before it subscribes are
- *   kept in order.
+ * - `Host`: every parentPort message that is not `config`, a port or `quit`
+ *   goes to the engine's `HostLink`; messages that arrive before it
+ *   subscribes are kept in order. `quit` stops the engine, then the process.
  * - `agentTransport`: ports main brokers to the agent utility process, on
  *   which the engine serves the AgentHost group (ADR 0012).
  * - `HttpTransport.ElectronNet`: `net.fetch` on this process's session (ADR
@@ -19,7 +19,7 @@ import '../coverage'
 import { net } from 'electron'
 import { Effect, Layer, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
-import { electronTransport, startEngine, type Host } from '@juno/engine'
+import { electronTransport, startEngine, type EngineHandle, type Host } from '@juno/engine'
 import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slack'
 
 const parent = process.parentPort
@@ -66,7 +66,7 @@ const ElectronNet: Layer.Layer<HttpTransport> = Layer.succeed(HttpTransport, {
     }),
 })
 
-let started = false
+let engine: Promise<EngineHandle> | undefined
 parent.on('message', (event) => {
   let message: MainToEngine
   try {
@@ -77,9 +77,9 @@ parent.on('message', (event) => {
   }
   switch (message._tag) {
     case 'config': {
-      if (started) return
-      started = true
-      startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled' }).then(
+      if (engine !== undefined) return
+      engine = startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled' })
+      engine.then(
         () => send({ _tag: 'ready' }),
         (cause: unknown) => {
           console.error('engine: failed to start', cause)
@@ -91,6 +91,14 @@ parent.on('message', (event) => {
     case 'port': {
       const port = event.ports[0]
       if (port) transport.add(port)
+      return
+    }
+    case 'quit': {
+      // Closing the engine's scope waits for uninterruptible requests, such as a preference write.
+      void (engine ?? Promise.resolve(undefined))
+        .then((handle) => handle?.stop())
+        .catch((cause: unknown) => console.error('engine: failed to stop', cause))
+        .finally(() => process.exit(0))
       return
     }
     case 'agentPort': {

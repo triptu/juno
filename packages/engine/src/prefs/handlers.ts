@@ -29,12 +29,14 @@ export const PrefsHandlers = PrefsRoutes.toLayer(
         )
         return serveLiveValue(runs).pipe(retryFirstRun('prefs.get'), Stream.orDie)
       },
+      // Uninterruptible: the renderer does not wait for it, so a window that closes or an app
+      // that quits just after (Hide, then ⌘Q) would otherwise drop the write.
       'prefs.set': ({ key, value }) => Effect.gen(function* () {
         const open = yield* workspace.current
         if (open === undefined) return yield* new NotSignedIn()
         yield* transaction(prefs.set(key, value)).pipe(Effect.provide(open.context), Effect.orDie)
         if (key === MIRROR_READS_PREF) yield* worker.wake
-      }),
+      }).pipe(Effect.uninterruptible),
     }
   }),
 )

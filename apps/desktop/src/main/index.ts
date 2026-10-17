@@ -318,21 +318,27 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+/** The engine finishing its last requests as the app quits; undefined once it has exited. */
+let engineStopping: Promise<void> | undefined
+
 app.on('before-quit', () => {
   activity.stop()
   screenWatch.stop()
   updates.stop()
-  supervisor.stop()
+  engineStopping ??= supervisor.stop()?.finally(() => {
+    engineStopping = undefined
+  })
   agent.stop()
 })
 
 // The window's close writes its bounds as the app quits; a process that
 // exits mid-write would leave launch.json empty and lose every choice in it.
+// The engine may still be writing too: a preference set just before ⌘Q.
 app.on('will-quit', (event) => {
-  const pending = launchFile.pending()
-  if (pending === undefined) return
+  const pending = [launchFile.pending(), engineStopping].filter((each) => each !== undefined)
+  if (pending.length === 0) return
   event.preventDefault()
-  void pending.then(() => app.quit())
+  void Promise.all(pending).then(() => app.quit())
 })
 
 // The packaged smoke test (JUNO_E2E_SCREEN_PROBE): the real probe loads once from the asar and
