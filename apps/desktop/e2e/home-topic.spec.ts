@@ -81,7 +81,7 @@ test('the topic chip hides for Juno and goes back to Main when the destination c
   await write.pickConversation('maya', 'Maya')
   await write.expectDestination('Maya')
   await write.expectTopic('Main')
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya Chen')
+  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
 
   // Juno: the chip leaves, and the destination chip and the field stay where they were.
   await write.composer.press('Backspace')
