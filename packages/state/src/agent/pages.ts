@@ -62,6 +62,11 @@ export async function junoSettingsNow(registry: Registry): Promise<JunoSettingsP
 export const remembersPageAtom = page<{ readonly page: RemembersPage; readonly revisions: ReadonlyArray<{ readonly id: PinId; readonly revision: Revision }> }>('agent.remembers.page')
 /** Juno's memory of the owner: the docs, the recent changes, and each entry's revision for an edit. */
 export const docsPageAtom = page<{ readonly page: MemoryDocsPage; readonly revisions: ReadonlyArray<{ readonly id: MemoryEntryId; readonly revision: Revision }> }>('agent.docs.page')
+/** What Juno remembers draws its notes and its pins together: Initial until both have answered. */
+export const rememberedAtom = Atom.make((get) => {
+  const docs = get(docsPageAtom)
+  return docs._tag === 'Initial' ? docs : get(remembersPageAtom)
+})
 /** Juno's proactive asks, for Home's card. */
 export const asksAtom = page<{ readonly asks: ReadonlyArray<ProactiveAsk> }>('agent.asks.list')
 
@@ -116,7 +121,7 @@ function viewAtom(view: JunoView): Atom.Atom<{ readonly _tag: string }> | undefi
     case 'memory':
       return memoryPageAtom(PAGE_MAX)
     case 'remembers':
-      return remembersPageAtom
+      return rememberedAtom
     case 'scheduled':
       return scheduledPageAtom
     case 'review':

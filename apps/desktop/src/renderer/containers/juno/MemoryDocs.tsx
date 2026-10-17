@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { MemoryEntryId, PinId } from '@juno/agent-contract'
 import { nowAtom, registry } from '@juno/state'
-import { docsPageAtom, junoPageActions, remembersPageAtom } from '@juno/state/agent'
+import { docsPageAtom, junoPageActions, rememberedAtom, remembersPageAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { MemoryDocsPage, PinList, type DocEditing } from '@juno/views'
 
@@ -20,9 +20,11 @@ const useNow = () => useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP
  */
 export function MemoryDocs() {
   const result = useAtomValue(docsPageAtom)
+  // The pins draw in the same frame as the notes, so their section never fills in late.
+  const pinsAnswered = useAtomValue(rememberedAtom)._tag !== 'Initial'
   const now = useNow()
   const [editing, setEditing] = useState<DocEditing | undefined>(undefined)
-  if (result._tag !== 'Success') return null
+  if (result._tag !== 'Success' || !pinsAnswered) return null
   const { page, revisions } = result.value
   const revisionOf = (id: MemoryEntryId) => revisions.find((entry) => entry.id === id)?.revision ?? 0
   const textOf = (id: MemoryEntryId) => page.docs.flatMap((section) => section.entries).find((entry) => entry.id === id)?.text ?? ''
