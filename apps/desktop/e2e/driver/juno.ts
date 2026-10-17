@@ -750,6 +750,11 @@ export class Juno {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { browserLinks: string[] } }).junoTest.browserLinks])
   }
 
+  /** The web panel's page as main has it: its url, or null with no panel, and whether it is drawn. */
+  webPanel(): Promise<{ url: string | null; visible: boolean }> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { webPanel: () => { url: string | null; visible: boolean } } }).junoTest.webPanel())
+  }
+
   /** The `slack://` links Open in Slack opened, oldest first. */
   slackLinks(): Promise<string[]> {
     return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
