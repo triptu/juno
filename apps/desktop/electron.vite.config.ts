@@ -38,24 +38,33 @@ function contentSecurityPolicy(): Plugin {
 }
 
 // The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
-const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill', 'duotone'])
+const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill'])
+
+// The icons that draw duotone: the ones packages/ui/src/duotone.ts imports, the only way to draw it.
+const DUOTONE_ICONS = new Set(
+  Array.from(readFileSync(resolve(__dirname, '../../packages/ui/src/duotone.ts'), 'utf8').matchAll(/@phosphor-icons\/react\/dist\/icons\/([A-Za-z0-9]+)'/g), (match) => match[1]),
+)
+if (!DUOTONE_ICONS.has('Sparkle')) throw new Error('juno:phosphor-weights: found no duotone icons in packages/ui/src/duotone.ts')
 
 /**
- * Drops the icon weights Juno never draws (thin and light) from each
- * Phosphor icon module. Every icon ships all six weights as one `Map`
- * built when the module loads, so tree shaking cannot remove the unused
- * ones; they were about a third of the icons' share of the first bundle.
+ * Drops the icon weights Juno never draws from each Phosphor icon module:
+ * thin and light everywhere, and duotone from every icon `duotone.ts` does
+ * not import. Every icon ships all six weights as one `Map` built when the
+ * module loads, so tree shaking cannot remove the unused ones. Thin and
+ * light were about a third of the icons' share of the first bundle
+ * (10-15), duotone about 40 KB more (10-17).
  */
 function phosphorWeights(): Plugin {
-  const defs = /@phosphor-icons\/react\/dist\/defs\/[A-Za-z0-9]+\.es\.js$/
+  const defs = /@phosphor-icons\/react\/dist\/defs\/([A-Za-z0-9]+)\.es\.js$/
   return {
     name: 'juno:phosphor-weights',
     enforce: 'pre',
     transform(code, id) {
-      if (!defs.test(id)) return undefined
+      const icon = defs.exec(id)?.[1]
+      if (icon === undefined) return undefined
       let out = code
-      for (const weight of ['thin', 'light']) {
-        if (ICON_WEIGHTS.has(weight)) continue
+      for (const weight of ['thin', 'light', 'duotone']) {
+        if (ICON_WEIGHTS.has(weight) || (weight === 'duotone' && DUOTONE_ICONS.has(icon))) continue
         const start = out.search(new RegExp(`\\[\\s*"${weight}",`))
         if (start < 0) continue
         // The entry ends at the bracket that closes it; path data holds no brackets or quotes.
