@@ -14,9 +14,10 @@
  * live, back to the quiet window) then run beside one history page per
  * active conversation (`historyOrder`: DMs, mentions, unread followed
  * threads and the user's own channels first, then newest first; background lane, skipping
- * conversations an interrupted boot already covered), and beside history a
- * latest-reply fetch for the unfollowed threads it finds with the most
- * recent activity, so their rows have a preview. After history, beside the
+ * conversations an interrupted boot already covered), and beside history,
+ * once the `getView` pages are stored, a latest-reply fetch for the
+ * unfollowed threads it finds with the most recent activity, so their rows
+ * have a preview. After history, beside the
  * previews still running: unknown users from the edge, then the discovery
  * sweep over the window, so Main knows about replies to roots older than
  * the window.
@@ -360,17 +361,21 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
  * Rows for unfollowed threads discovered through history have only the root;
  * fetch the latest reply for a preview, for at most `previewThreads` of them,
  * the most recently active first. Runs beside history: `replies` has its own
- * clock on the background lane, so the previews cost the boot no time. Each
- * history page offers to `landed`; with no root waiting, it waits for the
- * next page, and ends once `historyDone` is set and none is left.
+ * clock on the background lane, so the previews cost the boot no time. It
+ * starts once the `getView` pass is stored (`threads`), so a followed thread
+ * is never taken for an unfollowed one. Each history page offers to
+ * `landed`; with no root waiting, it waits for the next page, and ends once
+ * `historyDone` is set and none is left.
  */
 const loadThreadPreviews = (
   ctx: SyncContext,
   seedReadBefore: string,
+  threads: Deferred.Deferred<void>,
   landed: Queue.Queue<void>,
   historyDone: Deferred.Deferred<void>,
 ): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
+    yield* Deferred.await(threads)
     const sql = yield* StoreWriter
     const api = yield* SlackApi
     const tried = new Set<string>()
@@ -472,14 +477,15 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
         yield* Effect.yieldNow
       }
     }).pipe(Effect.ensuring(Deferred.succeed(historyDone, undefined)))
+    const threadsDone = yield* Deferred.make<void>()
     const pages = Effect.gen(function* () {
-      yield* Effect.all([threads, history], { concurrency: 2, discard: true })
+      yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2, discard: true })
       yield* fillUsers(ctx)
       // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
       return yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
     })
     // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
-    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
+    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
     const [discovered] = yield* Effect.all([rest, previews], { concurrency: 2 })
     yield* fillUsers(ctx)
