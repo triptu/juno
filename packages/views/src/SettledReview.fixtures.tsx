@@ -11,7 +11,9 @@ import { manySettled, settledTopics, tidyUpItem } from './fixtures/settled'
 import { NOW } from './fixtures/topics'
 import { Home } from './Home'
 import { HomeScene } from './HomeScene'
-import { ResolveExplainer, SettledList, SettledReview, settledCopy, type SettledReviewProps, type SettledStatus } from './SettledReview'
+import { settledCopy, type SettledStatus } from './settled'
+import { SettledList } from './SettledList'
+import { ResolveExplainer, SettledReview, type SettledReviewProps } from './SettledReview'
 
 const noop = () => {}
 

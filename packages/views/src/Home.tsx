@@ -7,7 +7,7 @@ import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { relativeTime } from './time'
+import { metaOf, rowButtons } from './homeRows'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -107,24 +107,6 @@ interface HomeRowProps {
   readonly onItemMenu: HomeProps['onItemMenu']
 }
 
-/** The meta line: plain data, the same with and without AI. */
-function metaOf(item: HomeItem, now: number): string {
-  if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
-  if (item.kind === 'tidyUp') return placesLine(item.topics.map((topic) => topic.place))
-  const topic = item.topics[0]
-  const last = item.kind === 'moved' ? `${item.newCount ?? 0} new` : item.at === undefined ? undefined : relativeTime(item.at, now)
-  const first = topic?.title
-  const place = topic?.place
-  return [first, place, last].filter((part) => part !== undefined && part !== '').join(' · ')
-}
-
-/** Tidy up's meta line: where the topics are, "eng, incidents and 3 more". Titles made from a first message's words read badly in a list. */
-export function placesLine(places: ReadonlyArray<string>): string {
-  const unique = [...new Set(places.filter((place) => place !== ''))]
-  if (unique.length <= 3) return unique.length <= 1 ? (unique[0] ?? '') : `${unique.slice(0, -1).join(', ')} and ${unique.at(-1)}`
-  return `${unique.slice(0, 2).join(', ')} and ${unique.length - 2} more`
-}
-
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
 /**
@@ -156,17 +138,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       </span>
     </>
   )
-  const buttons =
-    item.kind === 'followUp'
-      ? [{ label: 'Mark done', run: () => onMarkDone(item.id) }]
-      : item.kind === 'tidyUp'
-        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id) }]
-        : item.kind === 'automated'
-          ? [
-              { label: 'Keep in All', run: () => onSort(item.id, 'kept') },
-              { label: 'Move', run: () => onSort(item.id, 'automated') },
-            ]
-          : []
+  const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort)
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
   const menu =
     item.kind === 'automated'

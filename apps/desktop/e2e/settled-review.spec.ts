@@ -12,9 +12,8 @@ test.describe.configure({ timeout: 150_000 })
 test.use({ aiJobs: true })
 
 const INCIDENT = 'p95 on /v2/search jumped'
-const KEYS = 'Rotate the staging deploy keys'
+const KEYS = 'The staging deploy keys need rotating'
 const POSTGRES = 'Draft plan is in the doc'
-const HOUR = 60 * 60_000
 
 /** Home reads its items when it appears: show a topic, then Home again. */
 async function freshHome(juno: Juno): Promise<string[]> {
@@ -25,9 +24,10 @@ async function freshHome(juno: Juno): Promise<string[]> {
 }
 
 test('the review shows why each topic looks settled; Resolve, Undo, Keep open and Resolve all work per row', async ({ juno, fake, win }) => {
-  // A thread the user started two hours ago, closed by Dev's thanks an hour later.
-  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: SELF_ID, text: 'Rotate the staging deploy keys before Friday', at: fake.now() - 3 * HOUR })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Rotated and merged, thanks', at: fake.now() - 2 * HOUR })
+  // Dev's thread: the user answered, and Dev thanked them two hours ago.
+  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
   await juno.signIn()
   await juno.waitForSync()
 
@@ -53,7 +53,7 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   // One Resolve: the row stays and says so, the topic leaves the sidebar, and the row's Undo brings it back.
   await sheet.resolve(KEYS).click()
   await expect(sheet.row(KEYS)).toHaveAttribute('data-settled-status', 'resolved')
-  await juno.expectToast('Resolved · Rotate the staging deploy keys')
+  await juno.expectToast('Resolved · The staging deploy keys need rotating')
   await juno.sidebar.row(KEYS).expectAbsent()
   await sheet.undo(KEYS).click()
   await expect(sheet.row(KEYS)).toHaveAttribute('data-settled-status', 'open')
@@ -83,8 +83,9 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
 })
 
 test('Enter opens a proposal in the tab and closes the review; Tidy up settings opens Settings', async ({ juno, fake, win }) => {
-  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: SELF_ID, text: 'Rotate the staging deploy keys before Friday', at: fake.now() - 3 * HOUR })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Rotated and merged, thanks', at: fake.now() - 2 * HOUR })
+  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
   await juno.signIn()
   await juno.waitForSync()
   await juno.openSettings('Tidy up')

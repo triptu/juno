@@ -23,7 +23,7 @@ async function freshHome(juno: Juno, via: string): Promise<string[]> {
 const RINA = 'Rina finished the onsite'
 const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
-const KEYS = 'Rotate the staging deploy keys'
+const KEYS = 'The staging deploy keys need rotating'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 test('During the first sync Home greets and says it is syncing, and the sidebar shows how far it got', async ({ juno, slack, win }) => {
@@ -130,9 +130,10 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
 })
 
 test('Mark done clears a follow-up, and Resolve all resolves the settled topics with Undo', async ({ juno, fake, win }) => {
-  // A second settled thread: the user's, closed by Dev's thanks two hours ago.
-  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: SELF_ID, text: 'Rotate the staging deploy keys before Friday', at: fake.now() - 3 * 60 * 60_000 })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Rotated and merged, thanks', at: fake.now() - 2 * 60 * 60_000 })
+  // A second settled thread: the user answered Dev, and Dev thanked them two hours ago.
+  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar } = juno

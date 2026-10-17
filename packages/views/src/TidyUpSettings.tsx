@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { TidyUpPrefs, TidyUpQuiet } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Segmented, Surface, Text } from '@juno/ui'
-import { settledCopy } from './SettledReview'
+import { settledCopy } from './settled'
 
 const quietOptions: ReadonlyArray<{ readonly value: TidyUpQuiet; readonly label: string }> = [
   { value: '1h', label: '1 hour' },
