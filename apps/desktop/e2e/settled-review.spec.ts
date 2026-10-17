@@ -49,6 +49,8 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   // What Resolve does says what happens in Slack, and leads to Settings.
   await sheet.about.click()
   await expect(sheet.explainer).toContainText('Nothing is posted to Slack.')
+  // The info covers the top of the list; the button closes it again.
+  await sheet.about.click()
 
   // One Resolve: the row stays and says so, the topic leaves the sidebar, and the row's Undo brings it back.
   await sheet.resolve(KEYS).click()

@@ -103,7 +103,7 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
           <Text variant="heading" as="h2" id={titleId} truncate data-review-heading="">
             {title}
           </Text>
-          <IconButton icon={Info} label={about.label} size={28} pressed={showAbout} expanded={showAbout} aria-controls={aboutId} onClick={() => setShowAbout(!showAbout)} data-review-about="" />
+          <IconButton icon={Info} label={about.label} size={28} pressed={showAbout} expanded={showAbout} aria-controls={showAbout ? aboutId : undefined} onClick={() => setShowAbout(!showAbout)} data-review-about="" />
         </span>
         <Text variant="bodySmall" tone="subtle" as="p" sx={styles.lead}>
           {lead}
@@ -111,7 +111,11 @@ export function ReviewSheet({ name, title, lead, about, verbs, entries, statuses
       </div>
       <div {...stylex.props(styles.scroll, ringRoom.inline)}>
         {/* The info opens over the list, not above it, so the sheet keeps its size and nothing moves. */}
-        <div id={aboutId} {...stylex.props(styles.aboutLayer)}>{showAbout ? <ReviewExplainer about={about} onSettings={onSettings} floating /> : null}</div>
+        {showAbout ? (
+          <div id={aboutId} {...stylex.props(styles.aboutLayer)}>
+            <ReviewExplainer about={about} onSettings={onSettings} floating />
+          </div>
+        ) : null}
         <ReviewList entries={entries} statuses={statuses} verbs={verbs} label={title} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onAct={onAct} onDecline={onDecline} onUndo={onUndo} />
       </div>
       <div {...stylex.props(styles.foot)}>

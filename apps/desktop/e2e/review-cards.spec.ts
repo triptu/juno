@@ -50,6 +50,8 @@ test.describe('follow-ups that look done', () => {
 
     await sheet.about.click()
     await expect(sheet.explainer).toContainText('Nothing is posted to Slack.')
+    // The info covers the top of the list; the button closes it again.
+    await sheet.about.click()
 
     // Mark done: the row stays and says so; its Undo brings it back.
     await sheet.act(PROMISE).click()
@@ -116,6 +118,8 @@ test.describe('old drafts', () => {
       await expect(sheet.quote(POSTGRES)).toHaveText('Can we move the cutover to')
       await sheet.about.click()
       await expect(sheet.explainer).toContainText('nothing changes in Slack')
+      // The info covers the top of the list; the button closes it again.
+      await sheet.about.click()
 
       // Delete, then the row's Undo puts the draft back.
       await sheet.act(ENG_MAIN).click()
