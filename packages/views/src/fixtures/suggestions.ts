@@ -12,8 +12,8 @@ export const unfollowTopics: ReadonlyArray<HomeTopic> = [
 ]
 
 export const ignoreTopics: ReadonlyArray<HomeTopic> = [
-  { id: 'm:C0DEPLOYS', title: '#deploys', place: 'deploys', at: NOW - 40 * 60_000, unopened: { count: 312, atLeast: true, lastRead: NOW - 36 * DAY } },
-  { id: 'm:C0ALERTSPROD', title: '#alerts-prod', place: 'alerts-prod', art: art.bell, at: NOW - 3 * HOUR, unopened: { count: 58, atLeast: false, lastRead: NOW - 45 * DAY } },
+  { id: 'm:C0DEPLOYS', title: '#deploys', place: 'deploys', main: true, at: NOW - 40 * 60_000, unopened: { count: 312, atLeast: true, lastRead: NOW - 36 * DAY } },
+  { id: 'm:C0ALERTSPROD', title: '#alerts-prod', place: 'alerts-prod', main: true, art: art.bell, at: NOW - 3 * HOUR, unopened: { count: 58, atLeast: false, lastRead: NOW - 45 * DAY } },
 ]
 
 export const unfollowItem: HomeItem = { id: 'unfollow', kind: 'unfollow', title: '3 threads you never open', topics: unfollowTopics }

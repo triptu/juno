@@ -33,7 +33,7 @@ export const conversations = {
   onboarding: channel('C0JONAS', 'jonas-onboarding', 'private'),
   maya: dm('D0MAYA', people.maya),
   sam: dm('D0SAM', people.sam),
-  group: { key: 'G0OFFSITE', name: 'Maya, Leo', kind: 'mpim', tint: 'dm', channelId: 'G0OFFSITE', mainId: 'm:G0OFFSITE', empty: false },
+  group: { key: 'G0OFFSITE', name: 'Maya, Leo', kind: 'mpim', tint: 'dm', channelId: 'G0OFFSITE', mainId: 'm:G0OFFSITE', members: [people.maya, people.leo], empty: false },
   /** A person never messaged: no DM yet. */
   jonas: { key: 'u:U0JONAS', name: people.jonas.name, kind: 'im', tint: 'dm', person: people.jonas, empty: true },
   long: channel('C0LONG', 'incident-2026-10-14-payments-ledger-reconciliation-follow-up'),

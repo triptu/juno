@@ -124,6 +124,10 @@ export default defineFixtures(
       automated: state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { hover: '[data-home-item=automated]' }),
       // Juno's reason in place of the count; in a narrow window the meta line takes an ellipsis.
       'automated-juno': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.automatedByJuno] }, { width: 720, height: 520, padded: false, hover: '[data-home-item=automated]' }),
+      // A DM, a group DM and a channel (SPEC 12): the sidebar's Main tile, and the place named once on the meta line.
+      places: state({ scene: 'night', title: 'Still up, Tushar.', items: [homeItems.dm, homeItems.groupDm, homeItems.channelMain] }),
+      // A DM with someone who has no photo, beside a thread in a channel.
+      'places-no-photo': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.dmNoPhoto, homeItems.waiting] }),
       one: state({ scene: 'friday', title: 'Happy Friday, Tushar.', items: [homeItems.resume] }),
       // The minimum window with the sidebar shown: the page is 336 by 436; the column keeps 24 on each side and Recent stacks.
       'minimum-window': state({}, { width: 336, height: 436, padded: false }),

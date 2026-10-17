@@ -1,6 +1,6 @@
 /** The follow-ups that look done and the old drafts, for the fixtures: made-up topics in the fake workspace. */
 import type { HomeItem, HomeTopic } from '@juno/contract'
-import { art, NOW } from './topics'
+import { art, NOW, people } from './topics'
 
 const HOUR = 60 * 60_000
 const DAY = 24 * HOUR
@@ -23,7 +23,7 @@ export const doneFollowUpTopics: ReadonlyArray<HomeTopic> = [
 
 export const oldDraftTopics: ReadonlyArray<HomeTopic> = [
   { id: 't:C0FINANCE:1759980000.001400', title: 'Q4 vendor invoices', place: 'finance', art: art.coins, draft: { text: 'I think we should hold the Northwind invoice until', at: NOW - 23 * DAY, since: 14 } },
-  { id: 'm:D0JONAS', title: 'Jonas Weber', place: 'Jonas Weber', draft: { text: 'Thanks for the notes on the offsite plan, one thing', at: NOW - 16 * DAY, since: 3 } },
+  { id: 'm:D0JONAS', title: 'Jonas Weber', place: 'Jonas Weber', main: true, person: people.jonas, draft: { text: 'Thanks for the notes on the offsite plan, one thing', at: NOW - 16 * DAY, since: 3 } },
   { id: 't:C0HIRING:1759980000.001500', title: 'Onsite loop for the staff designer role', place: 'hiring', art: art.people, draft: { text: 'Can we move the portfolio review to', at: NOW - 40 * DAY, since: 50, more: true } },
 ]
 
