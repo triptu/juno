@@ -28,11 +28,23 @@ Two scenarios did not run as written (suite problems, fixed):
 
 ## Missing scenarios
 
-- Tidy up: open the sheet from Home, act on a row, and check the sheet opens whole and its rows never move.
-- Sidebar order hold: a reply lands in another conversation while the pointer is over the list, and nothing in view moves until the pointer leaves.
-- Juno images: send an image to Juno, and check the bubble keeps its box while the image loads.
-- Compact and Comfortable: switch density in Settings, and check the open topic keeps the row at the top of the view.
-- Home's title bar icon: press it from a topic, and check the press shows in the next frame and Home replaces the topic once.
-- Lazy parts: open each lazy part (send check bar, peek, suggestions, sync cards, edit field, link editor) first thing after launch, and check it opens whole.
-- The welcome card: open and dismiss it, and check Home's rows do not move.
-- First sync sidebar: record the sidebar, not only Home, through a held history, and check painted rows never leave or move.
+All but the first-sync sidebar one (`sidebar-first-sync`, added earlier) are now in the suite; see the next section.
+
+## The new surfaces' scenarios (10-17 evening)
+
+The `feel-new-surfaces` branch adds 35 scenarios: `reviews` (each review sheet: open, act on a row, close), `sidebar-hold`, `settings` (density), `home` (the Home icon), `chat` (Juno images), `lazy` (each lazy part's first open after a relaunch) and `welcome`. Two new checks: `answersWithin` and `keepsSize`. Every check of the new scenarios was also run on its real run 1 recording with the bug it guards put back (a delayed part, a moved row, an entrance played again, a third state between two), and failed there: 44 of 44.
+
+- Run 1: `89111e14` plus the branch, 10-17 at 22:15 IST, 3.5 minutes, load 3.6 to 5.8. 8 of 19 tests passed; most failures were the suite's own.
+- Run 2: 10-17 at 22:28, 4.5 minutes, load 3.3 to 6.1. 11 of 19 tests passed, 32 of 41 scenarios (`juno-image-send` did not record: the attach step before it timed out). The fixes for the image chip and the Home row press came after this build, so no feel run has recorded them yet.
+
+| What a person sees | Scenario, frames | Check | Cause | State |
+| --- | --- | --- | --- | --- |
+| An image dropped on the Juno composer shows as a file chip ("chart.png 5 KB", 132 px wide), then shrinks to an empty 44 px square, then the picture | `juno-image-attach` #5 to #11, #12, #13 (run 1) | `the chip lands and stays`, `the chip shows its picture in its first frame` | The chip had no preview until the file was read and re-encoded (`readForJuno`); a first fix with an object URL was blocked by the page's CSP (no `blob:` in `img-src`, run 2) | Fixed: a chip-sized copy is made and decoded before the chip is added; not yet recorded |
+| Holding the mouse down on a Home row, or on a review card, shows nothing until release | `review-*-open` #3 to #7 (run 1 and 2) | `the card press shows in the next frame` | Home's rows had no press style; then a plain `:active` lost to the hover's doubled class (`.x.x:hover`) | Fixed: `:active` nested under `@media (hover: hover)` like the hover; checked in the built CSS, not yet recorded. `SuggestionChip` had the same bug; the StyleX skill's example had it too |
+| Move back on Automated's record puts `#ci-builds` in All behind the open sheet, and the sidebar rows below it drop 60 px | `review-automated-act` #10 (run 1), #11 (run 2) | `no layout shift` (score 0.0124) | By design the channel goes back to All at once; the sidebar does not hold its order while a sheet is open | Open: the owner decides whether the hold should cover an open sheet |
+| After Enter on a reply typed into Main, nothing changes for two frames, then the check bar shows | `lazy-send-check` #5 to #7 | Seen in the filmstrip; the bar's `answers within 3 frames` passes | The bar waits for the engine's check of the draft (`checkMessage`), not for its chunk | Minor |
+| Home's syncing count reports a layout shift with the same box before and after | `home-first-sync` #14, `welcome-appear` #10 (run 1) | `no layout shift` (score 0.0000) | A text change inside the fixed-width count | Suite: propose counting only sources whose box moved; `welcome-appear` checks the card's room instead |
+
+Suite problems found and fixed: a `boxes` probe reads `[]` before its element exists, so the review sheets' rows needed `where: sheet shown`; the density radio acts on the press, so its switch check now reads the whole recording; the link editor's check named a count probe as its text; a probe tagged in one topic was read in another; the send check probed the field's box, which grows upwards to hold the bar, in place of the textarea; the sync card leaves by design when the first sync ends.
+
+The switcher's rows now lead with the topic's art (`TopicSwitcher`), as Home's topic list does.
