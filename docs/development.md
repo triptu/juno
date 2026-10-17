@@ -85,7 +85,8 @@ What changes with it:
 - **A package resolves only what it declares.** Inside the store, a package sees its own dependencies and peers, not the workspace's hoisted packages. Three packages broke: `@phosphor-icons/react` imports React's types without depending on `@types/react`, Playwright's Electron API imports `electron`, and Quint's Apalache client requires `protobufjs` and `semver`. `packageExtensions` in `pnpm-workspace.yaml` declares them. Scripts run through `pnpm` get `NODE_PATH` and a resolve hook from pnpm that hide such gaps, but plain `node` (the remote image's Quint warm-up, for one) does not, so add a line there when something fails only because a dependency cannot see a package it does not declare.
 - **Electron's binary is shared.** Electron 44 has no install script: the first `require('electron')` downloads and unpacks it (about 600 files, 300 MB) next to the package. With the shared store that happens once per Electron version, not once per worktree. Two versions live in separate store folders.
 - **Packaging uses `pnpm deploy`.** electron-builder cannot find the dependencies of dependencies in the shared store (`pnpm list` reports paths that do not exist). `apps/desktop/build/package.cjs` first deploys the app's production dependencies as real files into a temporary folder and packages from there. electron-builder's native rebuild then writes only into that copy, never into the shared store. `files` in `apps/desktop/package.json` limits the deploy to `out/`.
-- **Remote runs** install in their image the same way; nothing there depends on the layout.
+- **The app under test gets neither.** pnpm passes that `NODE_PATH` and resolve hook to everything it runs, Electron included. The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with them, a Home send to a DM did not arrive in one e2e test.
+- **Remote runs** install in their image the same way.
 
 ## Decision log
 
