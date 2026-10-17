@@ -354,7 +354,7 @@ it('Change: Apply runs the registered executor once with exactly the stored payl
   } as CardPayload
   h.turns.actions.propose({ runId: 'run-c', callId: 'c-1', payload })
   const view = only(h)
-  expect(view.card).toMatchObject({ _tag: 'change', fields: [{ name: 'title', after: '"Q4"' }] })
+  expect(view.card).toMatchObject({ _tag: 'change', fields: [{ name: 'title', after: 'Q4' }] })
   click(h, view)
   await settle(h)
   expect(runs).toEqual([{ title: 'Q4' }])

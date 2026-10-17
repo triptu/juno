@@ -11,6 +11,8 @@ export interface ChangeCardProps {
   readonly card: ChangeCardModel
   readonly actions: ChatActions
   readonly enter?: boolean
+  /** Start with the call's full result shown (the gallery). */
+  readonly resultShown?: boolean
 }
 
 /**
@@ -18,7 +20,7 @@ export interface ChangeCardProps {
  * and after, rendered from the payload. Its button is the action's verb ("Create note"), or Apply
  * on a card made before cards had one; Dismiss.
  */
-export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
+export function ChangeCard({ card, actions, enter, resultShown }: ChangeCardProps) {
   const copy = chatCopy.card.change
   return (
     <ChatCard
@@ -26,6 +28,7 @@ export function ChangeCard({ card, actions, enter }: ChangeCardProps) {
       kind="change"
       actions={actions}
       enter={enter}
+      resultShown={resultShown}
       {...(card.title !== undefined
         ? { label: card.title }
         : {

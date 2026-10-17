@@ -188,8 +188,8 @@ export const working: CardStatus = { _tag: 'working' }
 export const mayHaveHappened: CardStatus = { _tag: 'open', mayHaveHappened: true }
 export const dismissed: CardStatus = { _tag: 'dismissed' }
 export const expired: CardStatus = { _tag: 'expired' }
-export const done = (line: string, extra: { readonly undo?: true; readonly open?: OpenTarget; readonly detail?: string } = {}): CardStatus => ({ _tag: 'done', line, ...extra })
-export const failed = (line: string, detail?: string): CardStatus => ({ _tag: 'failed', line, ...(detail === undefined ? {} : { detail }) })
+export const done = (line: string, extra: { readonly undo?: true; readonly open?: OpenTarget; readonly detail?: string; readonly result?: string } = {}): CardStatus => ({ _tag: 'done', line, ...extra })
+export const failed = (line: string, detail?: string, result?: string): CardStatus => ({ _tag: 'failed', line, ...(detail === undefined ? {} : { detail }), ...(result === undefined ? {} : { result }) })
 
 /* Cards ------------------------------------------------------------------- */
 
@@ -316,11 +316,17 @@ export const change = (id: string, cardStatus: CardStatus = open, long = false, 
 })
 
 /** A connection call named by what it does (SPEC 13.3): "Create page in Notion", or a search of Littlebird. */
-export const connectionCall = (id: string, kind: 'create' | 'search', cardStatus: CardStatus = open, review?: Extract<Card, { _tag: 'change' }>['review']): Card => ({
+export const connectionCall = (id: string, kind: 'create' | 'search' | 'nested', cardStatus: CardStatus = open, review?: Extract<Card, { _tag: 'change' }>['review']): Extract<Card, { _tag: 'change' }> => ({
   _tag: 'change',
   id: cardId(id),
   status: cardStatus,
-  ...(kind === 'create'
+  ...(kind === 'nested'
+    ? { server: 'Notion', target: 'notion-create-pages', title: 'Create pages in Notion', verb: 'Create pages', fields: [
+        { name: 'pages', after: '• title: Offsite agenda\n  tags: planning, offsite\n• title: Offsite travel\n  tags: travel' },
+        { name: 'parent', after: 'database_id: 2f1c9a\ntype: database' },
+        { name: 'notify', after: 'Maya Chen, Sam Ortiz' },
+      ] }
+    : kind === 'create'
     ? { server: 'Notion', target: 'notion-create-pages', title: 'Create page in Notion', verb: 'Create page', fields: [{ name: 'title', after: 'Offsite agenda' }, { name: 'content', after: 'Morning: roadmap. Afternoon: hiring retro.' }] }
     : { server: 'Littlebird', target: 'search_user_context', title: 'Search Littlebird', verb: 'Search', fields: [{ name: 'query', after: 'What I work on and how I like to work' }] }),
   ...(review === undefined ? {} : { review }),

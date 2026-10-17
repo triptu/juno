@@ -80,8 +80,10 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('working', {}),
   Schema.TaggedStruct('done', {
     line: Schema.String,
-    /** One short line of what came back ("3 results", a new page's id), for a connection call. */
+    /** One plain line of what came back ("Found 3 results", a new page's title), for a connection call. */
     detail: Schema.optionalKey(Schema.String),
+    /** All of what came back, as a person reads it and trimmed, behind "Show result". */
+    result: Schema.optionalKey(Schema.String),
     /** "Undo" after a resolve or a remember. */
     undo: Schema.optionalKey(Schema.Literal(true)),
     open: Schema.optionalKey(OpenTarget),
@@ -89,8 +91,8 @@ export const CardStatus = Schema.Union([
   Schema.TaggedStruct('dismissed', {}),
   /** After 7 days, or when the source changed: "Expired · Ask again". */
   Schema.TaggedStruct('expired', {}),
-  /** `detail`: the destination's error, in one short line, for a connection call. */
-  Schema.TaggedStruct('failed', { line: Schema.String, detail: Schema.optionalKey(Schema.String) }),
+  /** `detail`: the destination's error, in one short line, and `result` all of it, for a connection call. */
+  Schema.TaggedStruct('failed', { line: Schema.String, detail: Schema.optionalKey(Schema.String), result: Schema.optionalKey(Schema.String) }),
 ])
 export type CardStatus = typeof CardStatus.Type
 

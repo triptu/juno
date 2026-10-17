@@ -440,7 +440,7 @@ class Router {
     if (tool?.taints) this.taint(run)
     // A script's own calls are in `script_calls`; the run log keeps the model's.
     if (call.parent === undefined && call.id !== undefined) this.steps.started({ runId: run.runId, callId: call.id, tool: call.name, args: call.arguments })
-    this.showStatus(run, tool?.status(count) ?? 'Working')
+    this.showStatus(run, tool?.status(count, call.arguments) ?? 'Working')
   }
 
   private toolEnded = (call: ToolHookCall, result: ToolResult) => {

@@ -325,6 +325,20 @@ function clickOutputOf(store: Store, cardId: string): string | undefined {
   return row?.model
 }
 
+/**
+ * Whether a Change card's call made a change: "Applied" then, else "Done". A connection call made a
+ * change only when its auto-review judged it one (`risk`); a call the review judged a read, or that
+ * had no review (Always ask), claims nothing, except a delete, which Juno's own check marks with
+ * its fixed line. A server's own read-only mark never decides this. A Change card that is not a
+ * connection call (a correction, 13.10) always made one.
+ */
+function changes(payload: Extract<CardPayload, { _tag: 'change' }>): boolean {
+  const review = payload.review
+  if (review === undefined) return true
+  if (review.line === chatCopy.card.change.review.delete) return true
+  return review.risk !== undefined && review.risk !== 'read'
+}
+
 /** One line on what a card asks, for the model: its outcome, or the quote in a reply to it. Rendered from the stored payload. */
 export function summaryOf(payload: CardPayload): string {
   switch (payload._tag) {
@@ -425,8 +439,7 @@ function doneLine(payload: CardPayload, receipt: unknown): { readonly line: stri
       return { line: copy.connect.connected }
     case 'change': {
       const open = (receipt as { open?: unknown } | null)?.open
-      // The auto-review judged it only reads: nothing was applied.
-      const line = payload.review?.risk === 'read' ? copy.change.done : copy.change.applied
+      const line = changes(payload) ? copy.change.applied : copy.change.done
       return Schema.is(OpenTarget)(open) ? { line, open } : { line }
     }
     case 'remove':
@@ -485,27 +498,35 @@ function statusOf(store: Store, card: CardRow, payload: CardPayload, evidences: 
   const outcomes = evidences.map((e) => (e.attempts.some((a) => a.outcome === 'done') ? 'done' : e.attempts.some((a) => a.outcome === 'consumed' || a.outcome === 'submitted' || a.outcome === 'cancel-requested') || e.attempts.length === 0 ? 'working' : 'failed'))
   if (outcomes.every((o) => o === 'done')) {
     const receipt = receiptOf(store, evidences[0])
-    const detail = payload._tag === 'change' ? outputOf(store, evidences[0]?.attempts.find((a) => a.outcome === 'done')?.id)?.line : undefined
-    return { _tag: 'done', ...doneLine(payload, receipt), ...(detail ? { detail } : {}) }
+    const output = payload._tag === 'change' ? resultOf(store, evidences[0]?.attempts.find((a) => a.outcome === 'done')?.id) : {}
+    return { _tag: 'done', ...doneLine(payload, receipt), ...output }
   }
   if (outcomes.includes('working')) return { _tag: 'working' }
   // A connection call says what went wrong: the server's error, else what Juno recorded.
-  const detail = payload._tag === 'change' ? failureOf(store, evidences.flatMap((e) => e.attempts).at(-1)?.id) : undefined
-  return { _tag: 'failed', line: chatCopy.card.failed, ...(detail ? { detail } : {}) }
+  const output = payload._tag === 'change' ? failureOf(store, evidences.flatMap((e) => e.attempts).at(-1)?.id) : {}
+  return { _tag: 'failed', line: chatCopy.card.failed, ...output }
 }
 
 /** What a connection call a click ran gave back (`action_outputs`), by its attempt. */
-function outputOf(store: Store, attemptId: string | undefined): { readonly model: string | null; readonly line: string | null } | undefined {
+function outputOf(store: Store, attemptId: string | undefined): { readonly model: string | null; readonly line: string | null; readonly shown: string | null } | undefined {
   if (attemptId === undefined) return undefined
-  return store.db.prepare('SELECT model, line FROM action_outputs WHERE attempt_id = ?').get(attemptId) as { model: string | null; line: string | null } | undefined
+  return store.db.prepare('SELECT model, line, shown FROM action_outputs WHERE attempt_id = ?').get(attemptId) as { model: string | null; line: string | null; shown: string | null } | undefined
 }
 
-function failureOf(store: Store, attemptId: string | undefined): string | undefined {
-  if (attemptId === undefined) return undefined
-  const line = outputOf(store, attemptId)?.line
-  if (line) return line
+/** The card's result line and its "Show result" text. A line kept before lines were plain, raw JSON, is left out. */
+function resultOf(store: Store, attemptId: string | undefined): { readonly detail?: string; readonly result?: string } {
+  const row = outputOf(store, attemptId)
+  const line = row?.line && !/^\s*[[{]/.test(row.line) ? row.line : undefined
+  return { ...(line ? { detail: line } : {}), ...(row?.shown ? { result: row.shown } : {}) }
+}
+
+/** What went wrong: the server's error, else what Juno recorded. */
+function failureOf(store: Store, attemptId: string | undefined): { readonly detail?: string; readonly result?: string } {
+  if (attemptId === undefined) return {}
+  const output = resultOf(store, attemptId)
+  if (output.detail !== undefined) return output
   const row = store.db.prepare('SELECT action_results.detail FROM attempts JOIN action_results ON action_results.authorization_id = attempts.authorization_id WHERE attempts.id = ?').get(attemptId) as { detail: string } | undefined
-  return row?.detail
+  return row === undefined ? output : { ...output, detail: row.detail }
 }
 
 function receiptOf(store: Store, child: ChildEvidence | undefined): unknown {
