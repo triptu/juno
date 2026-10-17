@@ -5,8 +5,9 @@
  * whether trying again can help, and whether a model from another provider
  * might answer instead.
  *
- * Plain functions with no imports, so the engine's provider (`@juno/ai`) and
- * the agent's guard (`@juno/ai/failure`) sort errors the same way.
+ * Plain functions with no imports, in a package of their own, so the
+ * engine's provider (`@juno/ai`) and the agent's guard (`@juno/agent`) sort
+ * errors the same way.
  */
 
 export type AiFailureKind =

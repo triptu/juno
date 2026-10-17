@@ -1,0 +1,22 @@
+{
+  "name": "@juno/ai-failure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "What kind of failure a model provider's error is, and what that means for the next try: retry, fallback, billed or not. Pure functions, no dependencies, shared by the engine's AI provider and the agent's guard.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

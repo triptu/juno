@@ -26,7 +26,7 @@ import {
 } from '@earendil-works/pi-ai'
 import { Effect, Layer, Option } from 'effect'
 import { classifierFor, fallbackFor, modelFor, type AiConfig, type Tier } from '../config'
-import { classifyFailure, fallbackHelps, isRetryable, type AiFailureKind } from '../failure'
+import { classifyFailure, fallbackHelps, isRetryable, type AiFailureKind } from '@juno/ai-failure'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision, type NoDecisionReason } from '../provider'
 import { cleanText, validateOutput, type StructuredTask, type TextTask } from '../task'
 import { OPENROUTER, openRouterModels, resolveClassifier, resolveModel, type PiModels, type ResolvedModel } from './models'

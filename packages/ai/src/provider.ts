@@ -4,7 +4,7 @@
  */
 import type { Static, TSchema } from '@earendil-works/pi-ai'
 import { Context, type Effect } from 'effect'
-import { isRetryable, type AiFailureKind } from './failure'
+import { isRetryable, type AiFailureKind } from '@juno/ai-failure'
 import type { StructuredTask, TextTask } from './task'
 
 export type NoDecisionReason =

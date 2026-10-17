@@ -1,5 +1,5 @@
 import type { Effect } from 'effect'
-import { modelMaker } from './failure'
+import { modelMaker } from '@juno/ai-failure'
 
 /**
  * What the provider needs from the outside: the key, in memory, and the model

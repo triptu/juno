@@ -5,7 +5,7 @@
 import type { ModelCost } from '@earendil-works/pi-ai'
 import { Effect } from 'effect'
 import type { AiConfig } from '../config'
-import { refusedBeforeOutput } from '../failure'
+import { refusedBeforeOutput } from '@juno/ai-failure'
 import type { Decision } from '../provider'
 
 /** A slug outside pi-ai's price table reserves this much per call and settles as unknown, so it still counts against the cap. */

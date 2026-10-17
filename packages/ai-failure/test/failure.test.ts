@@ -5,7 +5,7 @@
  * OpenRouter's (`{ error: { code, message, metadata } }`); none is real.
  */
 import { describe, expect, it } from 'vitest'
-import { classifyFailure, fallbackHelps, isRetryable, modelMaker, refusedBeforeOutput } from '../src/failure'
+import { classifyFailure, fallbackHelps, isRetryable, modelMaker, refusedBeforeOutput } from '../src/index'
 
 const body = (code: number, message: string, metadata?: object) => JSON.stringify({ error: { code, message, ...(metadata ? { metadata } : {}) } })
 

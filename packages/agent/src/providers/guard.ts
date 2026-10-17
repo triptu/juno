@@ -8,7 +8,7 @@ import {
   createAssistantMessageEventStream, createModels, createProvider, normalizeContext,
   type Api, type AssistantMessage, type Context, type Model, type Models, type SimpleStreamOptions,
 } from '@earendil-works/pi-ai'
-import { classifyFailure, failureStatus, fallbackHelps, modelMaker, refusedBeforeOutput } from '@juno/ai/failure'
+import { classifyFailure, failureStatus, fallbackHelps, modelMaker, refusedBeforeOutput } from '@juno/ai-failure'
 import { createSpend, dollars, type SpendLedger, type SpendPath } from '../spend'
 import type { Store } from '../store/store'
 

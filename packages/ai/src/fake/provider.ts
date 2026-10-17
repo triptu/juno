@@ -10,7 +10,7 @@
  */
 import type { Static, TSchema } from '@earendil-works/pi-ai'
 import { Effect, Layer } from 'effect'
-import { modelMaker } from '../failure'
+import { modelMaker } from '@juno/ai-failure'
 import type { Admission, Tier } from '../config'
 import { MAX_TOKENS, upperUsd } from '../pi/provider'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision } from '../provider'

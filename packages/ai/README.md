@@ -8,7 +8,7 @@ Plain data in, plain data out. The package never touches the store, Electron or 
 
 - `AiProvider`: the service. `decide(task, input)` runs a structured task and resolves to a `Decision<Output>`. `generate(task, input)` runs a text task and resolves to a `Decision<string>`. Nothing fails: every effect has error type `never`. The Juno chat is not here: it is the Juno Agent (`@juno/agent`), which runs in its own process.
 - `Decision<A>`: `{ _tag: 'Decided', value, meta }` or `{ _tag: 'NoDecision', reason, detail?, kind?, meta }`. Reasons: `missing-key`, `timeout`, `invalid-output`, `provider-error`, `budget`. A `provider-error` has `kind`, an `AiFailureKind`. `meta` has the model slug, latency, attempts and the cost in USD when pi-ai knows the model's price, and `fallbackFor` (the main model's failed call: its meta, kind and detail) when the fallback model answered. `isFinal(decision)` says the same input will fail the same way, so a job keeps it and does not send it again until the input changes.
-- `@juno/ai/failure` (also re-exported from the root): `classifyFailure(text)` sorts a provider error's text (the SDK's status first, then OpenRouter's code and words) into `policy`, `bad-request`, `context-length`, `model-not-found`, `auth`, `credits`, `rate-limited`, `unavailable`, `server`, `timeout`, `network` or `unknown`; `isRetryable(kind)`, `fallbackHelps(kind)`, `refusedBeforeOutput(text)` (a 4xx before output, not billed) and `modelMaker(slug)`. It imports nothing, so the agent's guard uses it too.
+- The error kinds of `@juno/ai-failure`, re-exported: `classifyFailure(text)`, `isRetryable(kind)`, `fallbackHelps(kind)`, `refusedBeforeOutput(text)` and `modelMaker(slug)`. They live in that leaf package so the agent's guard sorts errors the same way without depending on this one.
 - `tasks`: `titleTopic`, `routeCheck`, `grammarCheck`, `settledScore`, `urgencyGate`, `parseCommand`, `topicArt`, `followUps`, `homeTitle`. Each is a `StructuredTask` (has `output`, a TypeBox schema, and `tool`; optionally `classify`, a decision-model mapping) or a `TextTask` (has `maxChars`, and may have `check`, a validation that can rewrite the text to a canonical form, and `retry`, the message a retry sends with the failure's reason). All have `name`, `version`, `tier`, `timeoutMillis`, `prompt`, `render(input)` and `key(input)`. `decisionTasks` lists the structured ones.
 - `cacheKeyOf(task, input)`: `{ task, key, inputHash }` for the assistant's `ai_cache`. The hash covers the task version and the canonical input (sorted keys, `undefined` dropped), so equal inputs hash the same and a prompt change is made visible by bumping `version`.
 - `validateOutput(task, input, args)`: the schema check (pi-ai's validator) plus the task's `accept` rule and optional `clean` filter for individual findings. Both providers use it, for tool calls and for classifier answers.
@@ -100,7 +100,7 @@ What the numbers say:
 
 ## Tests
 
-`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, no retry of a refusal, the fallback model and its reservation); error kinds from OpenRouter-shaped bodies (`failure.test.ts`); cache key stability. No test depends on prompt wording.
+`pnpm --filter @juno/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, no retry of a refusal, the fallback model and its reservation); cache key stability. No test depends on prompt wording.
 
 ## Open questions
 
@@ -110,7 +110,7 @@ What the numbers say:
 
 ## Must not
 
-- Import the store, the engine, Electron or `@juno/contract`. The `@juno` dependencies are `@juno/domain`, for types, and `@juno/topic-art`, the vocabulary `topicArt` checks its output against.
+- Import the store, the engine, Electron or `@juno/contract`. The `@juno` dependencies are `@juno/domain`, for types, `@juno/topic-art`, the vocabulary `topicArt` checks its output against, and `@juno/ai-failure`, the error kinds.
 - Read the key from disk or the environment. Only `eval/run.ts` and `eval/bench.ts` read `OPENROUTER_API_KEY`, and only for the manual eval and bench.
 - Hard-code a model slug anywhere but `defaultModelPrefs` (and the bench's setup list).
 - Throw. A failure is a `NoDecision` or a `failed` event.
