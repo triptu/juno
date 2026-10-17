@@ -36,6 +36,7 @@ import {
   SlackEdge,
   SlackSession,
   SlackSocket,
+  scaledPacing,
   slackConfigLayer,
   SocketHandshake,
   type SlackSessionShape,
@@ -102,7 +103,9 @@ export class Session extends Context.Service<
                       // test the 19 s tickle spacing (presence.spec.ts; the pacing itself is tested in @juno/slack).
                       socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000, tickleSpacingMillis: 2_000 },
                       // The fake has no rate limits; spacing background calls would only slow tests, unless a test times a real first sync.
-                      ...(config.fakeSlackPaced === true ? {} : { lanes: { backgroundMinIntervalMillis: 0, interactiveRefillIntervalMillis: 0 } }),
+                      ...(config.fakeSlackPaced !== true
+                        ? { lanes: { backgroundMinIntervalMillis: 0, interactiveRefillIntervalMillis: 0 } }
+                        : config.fakeSlackPaceScale === undefined ? {} : { lanes: scaledPacing(config.fakeSlackPaceScale) }),
                     },
               ),
             ),

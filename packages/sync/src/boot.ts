@@ -13,7 +13,7 @@
  * conversations a preview within seconds. The other `getView` pages (10 per page
  * live, back to the quiet window) then run beside one history page per
  * active conversation (`historyOrder`: DMs, mentions, unread followed
- * threads and the user's own channels first, then newest first; background lane, skipping
+ * threads, other unread channels and the user's own channels first, then newest first; background lane, skipping
  * conversations an interrupted boot already covered), and beside history,
  * once the `getView` pages are stored, a latest-reply fetch for the
  * unfollowed threads it finds with the most recent activity, so their rows

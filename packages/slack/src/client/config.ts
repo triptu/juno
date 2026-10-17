@@ -153,6 +153,23 @@ export function makeSlackConfig(overrides: SlackConfigOverrides = {}): SlackConf
   }
 }
 
+/**
+ * Tests only: the default pacing with every spacing divided by `scale`, the
+ * total ceiling, each method's and the interactive refill alike, so a paced
+ * first sync runs `scale` times faster and its methods keep their real ratios.
+ */
+export function scaledPacing(scale: number): Partial<SlackConfigShape['lanes']> {
+  const pacing = defaultSlackConfig.lanes.backgroundPacing
+  return {
+    backgroundPacing: {
+      totalMillis: pacing.totalMillis / scale,
+      methodMillis: pacing.methodMillis / scale,
+      methods: Object.fromEntries(Object.entries(pacing.methods).map(([method, millis]) => [method, millis / scale])),
+    },
+    interactiveRefillIntervalMillis: 500 / scale,
+  }
+}
+
 /** A layer that replaces the defaults for the parts given. */
 export const slackConfigLayer = (overrides: SlackConfigOverrides = {}): Layer.Layer<never> =>
   Layer.succeed(SlackConfig, makeSlackConfig(overrides))

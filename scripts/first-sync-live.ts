@@ -43,6 +43,7 @@ import { HttpTransport } from '@juno/slack'
 import { configureConnection, engineStatusAtom, homeViewAtom, makeRegistry, sessionStatusAtom, topicListAtom, type PortLike } from '@juno/state'
 import { memoryHost, startEngine } from '../packages/engine/src/index.ts'
 import { memoryTransport, type MessagePortLike } from '../packages/engine/src/protocol/transport.ts'
+import { hash, report, type Call, type Sample } from './first-sync-report.ts'
 import { readCachedSession, type CachedSession } from './live-common.ts'
 
 const flag = (name: string) => {
@@ -131,18 +132,6 @@ for (const name of ['all', 'get', 'run', 'iterate'] as const) {
   }
 }
 
-interface Call {
-  /** Method name, `edge:<path>` for edge calls. */
-  readonly m: string
-  readonly reason?: string
-  readonly s: number
-  e?: number
-  status?: number
-  retry?: number
-  retryAfter?: number
-  /** A rate-limit `error` code in an ok:false answer. Codes only. */
-  limited?: string
-}
 const calls: Array<Call> = []
 const refused = new Map<string, number>()
 
@@ -165,6 +154,8 @@ const guarded = async (input: Parameters<typeof fetch>[0], init: Parameters<type
     s: now(),
     ...(retry === null ? {} : { retry: Number(retry) }),
   }
+  const channel = body instanceof FormData ? body.get('channel') : null
+  if (api === 'conversations.history' && reason === 'history' && typeof channel === 'string') call.channel = channel
   calls.push(call)
   const headers = { ...(init?.headers as Record<string, string>), cookie }
   try {
@@ -225,30 +216,6 @@ const query = <A>(sql: string): Array<A> => {
   }
 }
 
-interface Sample {
-  readonly t: number
-  readonly phase: string
-  readonly syncing: boolean
-  readonly sidebarRows: number
-  readonly sidebarUnread: number
-  readonly homeReady: boolean
-  readonly homeItems: number
-  readonly mainRows: number
-  readonly threadRows: number
-  readonly unreadTopics: number
-  readonly unreadDots: number
-  /** A hash of every unread topic's id and count: when it stops changing, the counts are settled. */
-  readonly unreadHash: number
-  readonly historyChannels: number
-  readonly messages: number
-  readonly bootDone: boolean
-  readonly quickStart: boolean
-}
-const hash = (text: string) => {
-  let h = 0
-  for (let i = 0; i < text.length; i++) h = (Math.imul(h, 31) + text.charCodeAt(i)) | 0
-  return h
-}
 const samples: Array<Sample> = []
 const sample = (): Sample => {
   const status = registry.get(engineStatusAtom)
@@ -274,6 +241,9 @@ const sample = (): Sample => {
     threadRows: n(`SELECT count(*) AS n FROM topic_index WHERE kind = 'thread'`),
     unreadTopics: unread.length,
     unreadDots: unread.filter((row) => row.unread_exact === 0).length,
+    priorityDots: n(`SELECT count(*) AS n FROM topic_index i JOIN conversations c ON c.id = i.channel LEFT JOIN channel_reads r ON r.channel = i.channel
+      WHERE i.kind = 'main' AND c.is_member = 1 AND i.unread_count > 0 AND i.unread_exact = 0
+        AND (c.kind IN ('im', 'mpim') OR i.mentions_me = 1 OR r.mention_count > 0)`),
     unreadHash: hash(unread.map((row) => `${row.topic_id}:${row.unread_count}:${row.unread_exact}`).join(',')),
     historyChannels: n('SELECT count(DISTINCT channel) AS n FROM synced_ranges'),
     messages: n('SELECT count(*) AS n FROM messages'),
@@ -301,96 +271,56 @@ const cpu = process.cpuUsage(cpuStart)
 const elu = performance.eventLoopUtilization(eluStart)
 const ended = now()
 
+// Each history call's class, from the store before it goes: what kind of conversation, and what `client.counts` said.
+// Without the thread counts, which the store does not keep by channel, so a channel with only unread followed threads
+// is `other`.
+const facts = new Map(
+  query<{ id: string; kind: string; has_unreads: number | null; mention_count: number | null }>(
+    `SELECT c.id, c.kind, r.has_unreads, r.mention_count
+     FROM conversations c LEFT JOIN channel_reads r ON r.channel = c.id WHERE c.is_member = 1`,
+  ).map((row) => [row.id, row]),
+)
+for (const c of calls) {
+  if (c.channel === undefined) continue
+  const f = facts.get(c.channel)
+  const direct = f?.kind === 'im' || f?.kind === 'mpim'
+  const unread = f?.has_unreads === 1
+  const mention = unread && (f?.mention_count ?? 0) > 0
+  c.cls = direct ? (unread ? 'dm-unread' : 'dm-read') : mention ? 'mention' : unread ? 'unread' : 'other'
+  delete c.channel
+}
 for (const unmount of unmounts) unmount()
 db?.close()
 await handle.stop()
 await fake?.close()
 await rm(userData, { recursive: true, force: true })
 
-// The timeline.
-const first = (test: (s: Sample) => boolean) => samples.find(test)?.t
-const final = samples.at(-1)!
-/** The first sample from which `value` stays at its final value. */
-const settled = <A>(value: (s: Sample) => A) => {
-  const target = value(final)
-  let at: number | undefined
-  for (const s of samples) {
-    if (value(s) === target) at ??= s.t
-    else at = undefined
-  }
-  return at
-}
-const phaseChanges: Array<{ t: number; phase: string; syncing: boolean }> = []
-for (const s of samples) {
-  const prev = phaseChanges.at(-1)
-  if (prev === undefined || prev.phase !== s.phase || prev.syncing !== s.syncing) phaseChanges.push({ t: s.t, phase: s.phase, syncing: s.syncing })
-}
-
-interface MethodStat { n: number; ms: number; first: number; last: number; retries: number; limited: number; retryAfter: Array<number>; reasons: Record<string, number> }
-const byMethod = new Map<string, MethodStat>()
-for (const c of calls) {
-  const m = byMethod.get(c.m) ?? { n: 0, ms: 0, first: c.s, last: 0, retries: 0, limited: 0, retryAfter: [], reasons: {} }
-  m.n++
-  m.ms += (c.e ?? ended) - c.s
-  m.last = Math.max(m.last, c.e ?? ended)
-  if (c.retry !== undefined) m.retries++
-  if (c.status === 429 || c.limited !== undefined) m.limited++
-  if (c.retryAfter !== undefined) m.retryAfter.push(c.retryAfter)
-  const reason = c.reason ?? '-'
-  m.reasons[reason] = (m.reasons[reason] ?? 0) + 1
-  byMethod.set(c.m, m)
-}
-const lastOf = (test: (c: Call) => boolean) => calls.filter(test).reduce((at, c) => Math.max(at, c.e ?? 0), 0) || undefined
-
-const milestones = {
-  quickStartStored: first((s) => s.quickStart),
-  firstSidebarRows: first((s) => s.sidebarRows > 0),
-  homeReady: first((s) => s.homeReady),
-  firstHomeRows: first((s) => s.homeReady && s.homeItems > 0),
-  allConversationsListed: settled((s) => s.mainRows),
-  unreadCountsSettled: settled((s) => s.unreadHash),
-  noUnreadDots: settled((s) => s.unreadDots),
-  historyAllChannels: settled((s) => s.historyChannels),
-  lastHistoryCall: lastOf((c) => c.m === 'conversations.history'),
-  lastRepliesCall: lastOf((c) => c.m === 'conversations.replies'),
-  lastSearchCall: lastOf((c) => c.m === 'search.modules.messages'),
-  bootRecorded: first((s) => s.bootDone),
-  firstSyncEnded: first((s) => s.bootDone && s.phase === 'live' && !s.syncing),
-  lastCall: lastOf(() => true),
-}
+const { milestones, phases, final, byMethod, buckets, callLog, historyOrder } = report(samples, calls, ended)
 const timeline = {
   target: useFake ? 'fake large seed' : 'live workspace',
   endedAt: ended,
   milestones,
-  phases: phaseChanges,
+  phases,
   final: { ...final, unreadHash: undefined },
   calls: Object.fromEntries([...byMethod].toSorted((a, b) => b[1].n - a[1].n)),
   totalCalls: calls.length,
   refused: Object.fromEntries(refused),
   cpu: { userMs: Math.round(cpu.user / 1000), systemMs: Math.round(cpu.system / 1000), eventLoopUtilization: Number(elu.utilization.toFixed(3)), eventLoopActiveMs: Math.round(elu.active) },
   sqlite: Object.fromEntries([...sqlTime].map(([k, v]) => [k, { n: v.n, ms: Math.round(v.ms) }])),
-  /** Calls started per 10 s bucket, by method: the shape of the sync over time. */
-  buckets: (() => {
-    const buckets: Record<string, Record<string, number>> = {}
-    for (const c of calls) {
-      const key = String(Math.floor(c.s / 10_000) * 10)
-      buckets[key] ??= {}
-      buckets[key][c.m] = (buckets[key][c.m] ?? 0) + 1
-    }
-    return buckets
-  })(),
-  /** Per call, compact: method, reason, start, end. For the gaps between history calls. */
-  callLog: calls.map((c) => [c.m, c.reason ?? '', c.s, c.e ?? -1, c.status ?? 0]),
+  buckets,
+  callLog,
+  historyOrder,
 }
 
 const s = (ms: number | undefined) => (ms === undefined ? 'never' : `${(ms / 1000).toFixed(1)} s`)
 console.log(`first-sync-live: ${timeline.target}, ${calls.length} calls, stopped at ${s(ended)}`)
 for (const [name, at] of Object.entries(milestones)) console.log(`  ${name.padEnd(24)} ${s(at)}`)
-console.log('  phases: ' + phaseChanges.map((p) => `${s(p.t)} ${p.phase}${p.syncing ? ' syncing' : ''}`).join(', '))
+console.log('  phases: ' + phases.map((p) => `${s(p.t)} ${p.phase}${p.syncing ? ' syncing' : ''}`).join(', '))
 console.log('calls by method (n, summed ms, first start, last end, retries, rate limited, Retry-After)')
 for (const [method, m] of byMethod) {
   console.log(`  ${method.padEnd(30)} ${String(m.n).padStart(4)}  ${s(m.ms).padStart(8)}  ${s(m.first)} .. ${s(m.last)}  r${m.retries} l${m.limited}${m.retryAfter.length > 0 ? ` RA ${m.retryAfter.join(',')}` : ''}  ${JSON.stringify(m.reasons)}`)
 }
+console.log(`history order: ${JSON.stringify(timeline.historyOrder)}`)
 console.log(`refused: ${JSON.stringify(timeline.refused)}`)
 console.log(`cpu: ${JSON.stringify(timeline.cpu)}`)
 console.log(`sqlite: ${JSON.stringify(timeline.sqlite)}`)
