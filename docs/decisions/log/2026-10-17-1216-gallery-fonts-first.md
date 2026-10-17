@@ -1,0 +1,1 @@
+- 10-17 12:16 · ci-fix-20 · The gallery loads its bundled fonts before its first render, so no fixture is laid out in a fallback font; an off-screen message row kept that size through `content-visibility` and the shift guard reported it settling (26 of 1300). The guard still compares every box, off screen or not.
