@@ -7,7 +7,7 @@
 import { createModels, createProvider, type Api, type Model } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openrouterProvider } from '@earendil-works/pi-ai/providers/openrouter'
-import { capOf, modelFor, servedModels } from '../settings/store'
+import { capOf, fallbackModel, modelFor, servedModels } from '../settings/store'
 import { createSpend } from '../spend'
 import type { Store } from '../store/store'
 import type { PickerModel } from './catalog'
@@ -71,7 +71,11 @@ export function providerTurns(connection: ProviderConnection, picker: ModelPicke
 } {
   return {
     provider: (store) =>
-      createProviderGuard({ store, transport: createProviderTransport(connection, () => servedModels(store, picker)), spend: createSpend(store, () => capOf(store)), ...(picker.codex ? { codex: picker.codex } : {}) }),
+      createProviderGuard({
+        store, transport: createProviderTransport(connection, () => servedModels(store, picker)), spend: createSpend(store, () => capOf(store)),
+        fallback: () => fallbackModel(store, picker)?.model,
+        ...(picker.codex ? { codex: picker.codex } : {}),
+      }),
     model: (store) => ref(modelFor(store, picker, 'chat')) ?? NO_MODEL,
     compaction: (store) => ref(modelFor(store, picker, 'compaction')),
     picker,

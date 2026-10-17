@@ -4,58 +4,9 @@ import { NO_LIMIT_USD } from '@juno/agent-contract'
 import type { AiActivity, AiCallOutcome, AiCallRow } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Chip, EmptyState, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
+import { featureLabel, kindLabel, OUTCOMES } from './aiActivityLabels'
 import { cell } from './juno-pages/cell'
 import { fullTime, messageTime } from './time'
-
-/** What each call was for, in plain words. A feature not listed shows its code. */
-const FEATURES: Record<string, string> = {
-  titleTopic: 'Title for a thread',
-  topicArt: 'Topic art',
-  'topicArt.redraw': 'Topic art, redrawn',
-  homeTitle: 'Title for Home',
-  settledScore: 'Settled check for Home',
-  followUps: 'Follow-ups for Home',
-  automatedChannel: 'Automated channel check',
-  parseCommand: 'Search command',
-  routeCheck: 'Wrong-place check',
-  urgencyGate: 'Notification check',
-  chat: 'Juno chat turn',
-  subagent: 'Juno background job',
-  compaction: 'Juno chat compaction',
-}
-
-/** The feature of a call, in plain words. */
-const featureLabel = (feature: string): string => FEATURES[feature] ?? feature
-
-const OUTCOMES: Record<AiCallOutcome, string> = {
-  ok: 'OK',
-  error: 'Error',
-  blocked: 'Blocked',
-  cancelled: 'Cancelled',
-  timeout: 'Timed out',
-}
-
-/** Why a call was not ok, in plain words. A code not listed shows as it is. */
-const KINDS: Record<string, string> = {
-  'no-key': 'No OpenRouter key',
-  cap: 'Daily AI limit reached',
-  'no-agent': 'Juno’s agent was not running to check the daily limit',
-  'no-answer': 'Juno’s agent did not answer the daily limit check in time',
-  'assist-off': 'AI assist is off',
-  'too-large': 'The request was too large',
-  'key-changed': 'The key changed during the call',
-  interrupted: 'Stopped before it finished',
-  stopped: 'Stopped before it finished',
-  timeout: 'The model took too long',
-  'provider-error': 'The model service returned an error',
-  'invalid-output': 'The answer could not be used',
-  provider: 'The model service returned an error',
-  rateLimited: 'Rate limited by the model service',
-  keyRejected: 'The key was rejected',
-  offline: 'Could not reach the model service',
-}
-
-const kindLabel = (kind: string): string => KINDS[kind] ?? kind
 
 const ALL = 'all'
 
@@ -298,7 +249,7 @@ function Call({ call, now, open, divider, onToggle, onCopyDetails }: CallProps) 
               {messageTime(call.lastAt, now)}
             </Text>
             <Text variant="meta" tone="muted" truncate>
-              {call.outcome === 'ok' ? call.model : `${call.model === '' ? '' : `${call.model} · `}${kindLabel(call.kind)}`}
+              {call.outcome === 'ok' && call.kind === '' ? call.model : `${call.model === '' ? '' : `${call.model} · `}${kindLabel(call.kind)}`}
             </Text>
           </span>
         </span>

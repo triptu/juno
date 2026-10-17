@@ -22,4 +22,10 @@ const settings2 = [
   'ALTER TABLE juno_settings ADD COLUMN custom_model TEXT',
 ]
 
-export const SETTINGS_MIGRATIONS: MigrationSet = { name: 'settings', steps: [settings1, settings2] }
+const settings3 = [
+  // The fallback family on OpenRouter, asked once when the model refuses under its policy or is
+  // unavailable, by Juno's chats and the engine's AI jobs; 'none' turns it off.
+  "ALTER TABLE juno_settings ADD COLUMN fallback_family TEXT NOT NULL DEFAULT 'flash'",
+]
+
+export const SETTINGS_MIGRATIONS: MigrationSet = { name: 'settings', steps: [settings1, settings2, settings3] }

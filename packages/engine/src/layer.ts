@@ -9,6 +9,7 @@ import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
 import { OwnerActivity } from './activity'
 import { JunoHostLive, PhaseSource } from './agent-host/host'
+import { AiFallback } from './aiFallback'
 import { AiWarmup } from './aiWarmup'
 import { TitleJob } from './titleJob'
 import { AiProviderLive } from './ai'
@@ -97,6 +98,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
   Layer.provideMerge(AiSpend.layer),
+  Layer.provideMerge(AiFallback.layer),
   Layer.provideMerge(AiAudit.layer),
   Layer.provideMerge(OwnerActivity.layer),
   Layer.provideMerge(NotificationControl.layer),

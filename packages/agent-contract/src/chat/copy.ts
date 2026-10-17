@@ -79,6 +79,7 @@ export const chatCopy = {
     },
     failed: {
       provider: "Juno didn't answer. Give it a moment and try again.",
+      refused: 'The model refused this under its usage policy, and no fallback model answered. Try other words, or another model in Settings.',
       missingKey: 'Add an OpenRouter key in Settings to send this message.',
       rateLimited: 'The provider is busy. Your message is kept. Try again shortly.',
       keyRejected: 'OpenRouter rejected the key. Check it in Settings.',

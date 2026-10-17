@@ -38,6 +38,7 @@ import { rendererServer } from './serve/server'
 import { CHAT_MIGRATIONS } from './serve/schema'
 import { createJunoSettings } from './settings/settings'
 import { capOf } from './settings/store'
+import { tellFallback } from './settings/engine'
 import { createSpend } from './spend'
 import { answerEngineSpend } from './spend/engine'
 import { forwardAiCalls } from './providers/audit'
@@ -154,6 +155,9 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                 (opened) => Effect.sync(opened.close),
               ).pipe(Scope.provide(scope))
             : undefined
+        if (settings !== undefined && engine?._tag === 'running' && picker !== undefined) {
+          yield* tellFallback(settings, engine.store, picker, bound.presenceChanges).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
+        }
         if (renderer !== undefined) {
           yield* Layer.buildWithScope(
             rendererServer(renderer, { turns: engine, presence: bound.presence, presenceChanges: bound.presenceChanges, ...(engine?._tag === 'running' ? { schedule: { scheduler: engine.scheduler, host: bound.schedule } } : {}), ...(settings ? { settings } : {}), ...(manager ? { connections: manager } : {}), ...(turns?.onReport ? { report: turns.onReport } : {}) }),

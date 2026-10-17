@@ -92,7 +92,11 @@ export class JunoHost extends Context.Service<
       readonly room: Effect.Effect<void>
     }
     /** Records one of the agent's model calls in the AI activity log. Never fails; a record with no workspace open is dropped. */
-    readonly ai?: { readonly record: (call: HostAiCall) => Effect.Effect<void> }
+    readonly ai?: {
+      readonly record: (call: HostAiCall) => Effect.Effect<void>
+      /** The fallback model's slug from Settings › Juno, '' for none. */
+      readonly fallback?: (model: string) => Effect.Effect<void>
+    }
     readonly schedule?: {
       readonly check: (conversation: typeof WatchConversation.Type, refresh: boolean) => Effect.Effect<typeof WatchSnapshot.Type, AgentHostError>
       readonly hours: Effect.Effect<typeof WatchHours.Type, AgentHostError>

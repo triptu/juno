@@ -6,6 +6,7 @@ import { fakeActionHost, rejectedKey, reply, TEST_CHANNEL } from '@juno/agent-te
 import { Revision } from '@juno/agent-cards'
 import type { ChatItem, ChatPage, JunoSettingsPage, OpId, PinId, ScheduleId } from '@juno/agent-contract'
 import { providerTurns } from '../src/index'
+import { fallbackSlug } from '../src/settings/store'
 import { run, served } from './serve-harness'
 import { say } from './turns-harness'
 
@@ -243,4 +244,22 @@ it('Activity lists each run\'s actions with the decision and outcome', async () 
     ['Message to #test-0001', 3, 'approved', 'unknown', 'Juno could not confirm it went through.'],
     ['Message to #test-0001', 3, 'dismissed', 'none', undefined],
   ])
+})
+
+it('offers every family as the fallback, Gemini Flash by default, and tells the engine the slug it resolves to or none', async () => {
+  const { h, client, follow, picker } = await served()
+  const settings = follow(client['agent.settings.page']())
+  const fallback = (page: JunoSettingsPage) => page.fallbackModels?.find((m) => m.selected)?.family
+  const first = await settings.where(() => true, 'a page')
+  expect(first.fallbackModels?.map((m) => m.family)).toEqual(['Claude Sonnet', 'Claude Opus', 'Muse', 'GPT Sol', 'Grok', 'Claude Haiku', 'Gemini Flash'])
+  expect(fallback(first)).toBe('Gemini Flash')
+  expect(fallbackSlug(h.turns.store, picker)).toBe('google/gemini-3.8-flash')
+
+  await run(client['agent.settings.change']({ opId: 'op-1' as OpId, change: { _tag: 'model', purpose: 'fallback', provider: 'openrouter', family: 'GPT Sol' } }))
+  await settings.where((p) => fallback(p) === 'GPT Sol', 'GPT Sol chosen')
+  expect(fallbackSlug(h.turns.store, picker)).toBe('openai/gpt-6.1-sol')
+
+  await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'model', purpose: 'fallback', provider: 'openrouter', family: '' } }))
+  await settings.where((p) => fallback(p) === undefined, 'no fallback')
+  expect(fallbackSlug(h.turns.store, picker)).toBe('')
 })

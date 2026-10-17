@@ -4,9 +4,12 @@ import { JunoSettingsPage } from '../chat'
 import { Accepted, AgentCommandError, operation } from './common'
 
 export const SettingsChange = Schema.Union([
-  /** On a custom endpoint `family` is the model id, listed or typed; only `chat` applies there. */
+  /**
+   * On a custom endpoint `family` is the model id, listed or typed; only `chat` applies there.
+   * For `fallback`, '' turns the fallback off.
+   */
   Schema.TaggedStruct('model', {
-    purpose: Schema.Literals(['chat', 'compaction']),
+    purpose: Schema.Literals(['chat', 'compaction', 'fallback']),
     provider: Schema.Literals(['openrouter', 'codex', 'custom']),
     family: Schema.String.check(Schema.isMaxLength(256)),
   }),

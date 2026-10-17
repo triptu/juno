@@ -4,13 +4,13 @@
  *
  * What is stored (`topic_art`, user.db): every finished attempt. A valid,
  * confident drawing is `ok` and shown. A drawing the model marked not
- * confident is `unsure`, a reply outside the vocabulary twice is `failed`;
- * both keep the placeholder and stop the topic being asked about again
+ * confident is `unsure`; a reply outside the vocabulary twice, or a
+ * refusal trying again cannot change (`isFinal`), is `failed`; both keep the placeholder and stop the topic being asked about again
  * until a redraw or its first AI title. A call that did not finish (no key,
  * a timeout, a provider error) stores nothing; the job tries again later.
  * A failed redraw stores nothing either, so the drawing shown stays.
  */
-import { AiProvider, cacheKeyOf, tasks, type Decision, type TopicArtInput } from '@juno/ai'
+import { AiProvider, cacheKeyOf, isFinal, tasks, type Decision, type TopicArtInput } from '@juno/ai'
 import type { StoredArt } from '@juno/contract'
 import { channelLabel, resolveTitle, type TopicId, slackLine } from '@juno/domain'
 import { Invalidation, keys, StoreReader, StoreWriter, type SqlError } from '@juno/store'
@@ -98,7 +98,8 @@ const storeArt = (
 ): Effect.Effect<ArtOutcome, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     if (decision._tag === 'NoDecision' && decision.reason === 'budget' && (decision.detail === 'no-agent' || decision.detail === 'no-answer')) return 'no-agent'
-    if (decision._tag === 'NoDecision' && decision.reason !== 'invalid-output') return decision.reason
+    // A drawing the model refused for good is a finished attempt, as an invalid one is: the job does not ask again.
+    if (decision._tag === 'NoDecision' && decision.reason !== 'invalid-output' && !isFinal(decision)) return decision.reason
     const value = decision._tag === 'Decided' ? decision.value : undefined
     const parsed = value === undefined ? undefined : parseRecipe(value)
     const recipe = parsed?.ok === true ? value! : ''

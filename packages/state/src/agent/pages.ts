@@ -74,7 +74,7 @@ export const activityPageAtom = (limit: number) => activityFamily(limit)
 /** A model family, the cap, Pause, the rules and the backup folder: what Settings › Juno changes. */
 export type JunoSettingsChange =
   /** On a custom endpoint `family` is the model id, listed or typed. */
-  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction'; readonly provider: 'openrouter' | 'codex' | 'custom'; readonly family: string }
+  | { readonly _tag: 'model'; readonly purpose: 'chat' | 'compaction' | 'fallback'; readonly provider: 'openrouter' | 'codex' | 'custom'; readonly family: string }
   | { readonly _tag: 'cap'; readonly usd: number }
   | { readonly _tag: 'paused'; readonly value: boolean }
   /** The whole list, in order. */

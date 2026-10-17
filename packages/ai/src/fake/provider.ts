@@ -4,9 +4,13 @@
  * real provider's, so a broken rule shows up as no decision, never as a crash.
  * `delayMillis` makes every answer that late, and like the real provider it
  * gives up at the task's timeout, so tests can watch a slow model.
+ * Input that holds `::refuse::` is refused under the model's policy, as a
+ * live model may refuse it; the `fallback` model then answers it, except for
+ * art, which the live provider does not send to a fallback either.
  */
 import type { Static, TSchema } from '@earendil-works/pi-ai'
 import { Effect, Layer } from 'effect'
+import { modelMaker } from '@juno/ai-failure'
 import type { Admission, Tier } from '../config'
 import { MAX_TOKENS, upperUsd } from '../pi/provider'
 import { AiProvider, type AiCallMeta, type AiProviderShape, type Decision } from '../provider'
@@ -17,6 +21,10 @@ import { fakeGrammarCheck } from './grammar'
 import { fakeAutomatedChannel, fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
 
 export const FAKE_MODEL = 'fake'
+/** In a task's input, the fake's main model refuses it under its policy. */
+export const FAKE_REFUSE = '::refuse::'
+/** The refusal's text, shaped like the one Anthropic sends through OpenRouter. */
+const REFUSAL = 'This request triggered restrictions on prohibited content and was blocked under the usage policy of the model.'
 /** The fake's price per million tokens, so cost shows in the AI activity log and the ledger as it would live. */
 const FAKE_INPUT_USD = 1
 const FAKE_OUTPUT_USD = 4
@@ -56,6 +64,8 @@ export interface FakeAiOptions {
    * worked out as the real provider does (`upperUsd`). Blocked gives `budget`.
    */
   readonly admit?: (upperUsd: number) => Effect.Effect<Admission>
+  /** The fallback model's slug, read on every refusal; undefined or '' is none. */
+  readonly fallback?: Effect.Effect<string | undefined>
 }
 
 export class FakeAiProvider extends AiProvider {
@@ -68,7 +78,23 @@ export function makeFakeAiProvider(options: FakeAiOptions = {}): AiProviderShape
   const delay = options.delayMillis ?? 0
   const admit = options.admit
 
-  const late = <A>(task: { readonly timeoutMillis: number; readonly tier: Tier; readonly prompt: string }, rendered: string, answer: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> =>
+  type TaskInfo = { readonly timeoutMillis: number; readonly tier: Tier; readonly prompt: string }
+
+  /** The main model's answer, or its refusal and then the fallback's answer. */
+  const late = <A>(task: TaskInfo, rendered: string, answer: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> => {
+    if (!rendered.includes(FAKE_REFUSE)) return admitted(task, rendered, answer)
+    const refused: Decision<A> = { _tag: 'NoDecision', reason: 'provider-error', kind: 'policy', detail: REFUSAL, meta: { ...meta, costUsd: 0 } }
+    return Effect.gen(function* () {
+      const first: Decision<A> = yield* admitted<A>(task, rendered, Effect.succeed(refused))
+      const slug = task.tier === 'art' || options.fallback === undefined ? undefined : yield* options.fallback
+      if (first !== refused || slug === undefined || slug === '' || modelMaker(slug) === modelMaker(FAKE_MODEL)) return first
+      const second: Decision<A> = yield* admitted<A>(task, rendered, answer)
+      const fallbackFor = { meta: first.meta, kind: 'policy' as const, detail: REFUSAL }
+      return { ...second, meta: { ...second.meta, model: slug, fallbackFor } } as Decision<A>
+    })
+  }
+
+  const admitted = <A>(task: TaskInfo, rendered: string, answer: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> =>
     admit === undefined ? timed(task.timeoutMillis, answer) : Effect.gen(function* () {
       const admission = yield* admit(upperUsd(FAKE_COST, true, task.prompt + rendered, MAX_TOKENS[task.tier]))
       if (admission._tag === 'Blocked') return { _tag: 'NoDecision', reason: 'budget', detail: admission.reason ?? 'cap', meta: { ...meta, attempts: 0 } } as Decision<A>

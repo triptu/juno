@@ -185,6 +185,7 @@ const models = (selected: string, provider: 'openrouter' | 'codex' = 'openrouter
 export const settings: JunoSettingsPage = {
   chatModels: models('Claude Sonnet'),
   compactionModels: models('Muse'),
+  fallbackModels: [...models(''), { family: 'Gemini Flash', resolved: 'Gemini 3.8 Flash', provider: 'openrouter', price: '$0.75 in, $3.75 out per million tokens', selected: true }],
   spentTodayUsd: 0.35,
   capUsd: 2,
   limitTodayUsd: 2,
