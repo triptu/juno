@@ -125,8 +125,8 @@ export const messageListAtom = Atom.family((view: string) =>
 export const openTopic = (registry: Registry, id: string) => runCommand(registry, topicsOpen, { id })
 
 /** The topic that holds a message (its thread, or Main), for a Juno source link or a Slack link in a message. */
-export const locateMessage = (registry: Registry, channel: string, ts: string, threadTs?: string) =>
-  runCommand(registry, messagesLocate, threadTs === undefined ? { channel, ts } : { channel, ts, threadTs })
+export const locateMessage = (registry: Registry, channel: string, ts: string | undefined, threadTs?: string) =>
+  runCommand(registry, messagesLocate, { channel, ...(ts === undefined ? {} : { ts }), ...(threadTs === undefined ? {} : { threadTs }) })
 
 /** A person a Slack profile link names, and your DM with them when you have one. */
 export const locatePerson = (registry: Registry, user: string) => runCommand(registry, peopleLocate, { user })

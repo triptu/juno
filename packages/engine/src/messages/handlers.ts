@@ -177,7 +177,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (open === undefined) return yield* new NotSignedIn()
           const { row, place } = yield* Effect.gen(function* () {
             const sql = yield* StoreReader
-            const rows = yield* sql<{ thread_ts: string | null; reply_count: number }>`SELECT thread_ts, reply_count FROM messages WHERE channel = ${channel} AND ts = ${ts}`
+            const rows = ts === undefined ? [] : yield* sql<{ thread_ts: string | null; reply_count: number }>`SELECT thread_ts, reply_count FROM messages WHERE channel = ${channel} AND ts = ${ts}`
             return { row: rows[0], place: yield* placeLabel(channel) }
           }).pipe(Effect.provide(open.context), Effect.orDie)
           // A link may name the thread; else a reply names its thread, and a root with replies is its own thread's first message.

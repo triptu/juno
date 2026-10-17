@@ -357,7 +357,8 @@ export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
  * (SPEC 8, "Links"), which may also name the thread.
  */
 export const messagesLocate = Rpc.make('messages.locate', {
-  payload: { channel: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) },
+  /** Without `ts`, a link to the channel: its Main. */
+  payload: { channel: Schema.String, ts: Schema.optionalKey(Schema.String), threadTs: Schema.optionalKey(Schema.String) },
   success: Schema.Struct({
     topicId: Schema.String,
     /** The store holds the message, so the topic can open at it without asking Slack. */
