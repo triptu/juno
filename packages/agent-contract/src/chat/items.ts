@@ -12,6 +12,7 @@
  */
 import { Schema } from 'effect'
 import { Card } from './cards'
+import { OwnerFile } from './files'
 import { BubbleId, CardId, ChatMessageId, OpId, RunId, ScheduleId } from './ids'
 import { About, JobRef } from './place'
 
@@ -119,6 +120,8 @@ export const OwnerMessageItem = Schema.TaggedStruct('owner', {
   replyTo: Schema.optionalKey(Quote),
   /** Sent from the Juno panel or with an About chip: the "About …" line over the bubble. */
   about: Schema.optionalKey(About),
+  /** Images and text files the message carried, in order: thumbnails over the bubble, then file names. */
+  files: Schema.optionalKey(Schema.Array(OwnerFile)),
   /** Juno may react instead of replying. */
   reactions: Schema.Array(Reaction),
   group: GroupPosition,

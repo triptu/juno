@@ -1,5 +1,10 @@
 import { useState } from 'react'
+import { chatCopy } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
+import { AttachButton } from '../AttachButton'
+import { AttachmentChips, type AttachmentChip } from '../AttachmentChips'
+import { chips } from '../AttachmentChips.fixtures'
+import { AttachmentNote } from '../AttachmentNote'
 import { bubbleId, cardId, quoteOf } from './fixtures/data'
 import { JunoComposer, type JunoComposerProps } from './JunoComposer'
 
@@ -21,6 +26,14 @@ function Live() {
 
 const frame: FixtureFrame = { width: 816, padded: false }
 
+/** The attach button and the chips, as the Juno tab and the panel show them. */
+const files = (list: ReadonlyArray<AttachmentChip>, note?: string): Partial<JunoComposerProps> => {
+  const shown = <AttachmentChips files={list} onRemove={noop} />
+  return { leading: <AttachButton onFiles={noop} />, onFiles: noop, hasFiles: true, attachments: note === undefined ? shown : <AttachmentNote chips={shown} note={note} /> }
+}
+const notes: AttachmentChip = { id: 'c-notes', name: 'cutover-notes.md', size: 6_120, mimetype: 'text/markdown', state: 'ready' }
+const reading: AttachmentChip = { id: 'c-reading', name: 'IMG_2041.png', size: 2_418_221, mimetype: 'image/png', state: 'staging' }
+
 export default defineFixtures(
   JunoComposer,
   {
@@ -34,6 +47,16 @@ export default defineFixtures(
       'quote-bubble': composer({ value: 'which deploy?', quote: quoteOf({ _tag: 'bubble', id: bubbleId('b1') }, 'The deploy is green on staging. Production goes at 4.'), onClearQuote: noop }),
       'quote-card': composer({ quote: quoteOf({ _tag: 'card', id: cardId('c1') }, 'Send message · #eng'), onClearQuote: noop }),
       'quote-removed': composer({ quote: quoteOf({ _tag: 'bubble', id: bubbleId('b2') }, '', true), onClearQuote: noop }),
+    },
+    Files: {
+      attach: composer({ leading: <AttachButton onFiles={noop} />, onFiles: noop }),
+      'image-attached': composer({ value: 'What does this dashboard show?', ...files([chips.image]) }),
+      'image-only': composer(files([chips.image])),
+      'image-reading': composer({ value: 'And this one?', ...files([reading]) }),
+      'image-and-text-file': composer({ value: 'Do these agree?', ...files([chips.image, notes]) }),
+      'model-cannot-read': composer({ value: 'What does this show?', ...files([chips.image], chatCopy.composer.filesLeft.images), hasFiles: false }),
+      'file-stays': composer({ value: 'Summarise the runbook', ...files([chips.image, chips.pdf], chatCopy.composer.filesLeft.otherHere) }),
+      panel: composer({ column: 'panel', placeholder: chatCopy.composer.panelPlaceholder, value: 'Is this the same error?', ...files([chips.image]) }, { width: 400, padded: false }),
     },
     Interaction: {
       focus: composer({}, { ...frame, focus: 'textarea' }),

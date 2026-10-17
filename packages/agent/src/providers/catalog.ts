@@ -11,7 +11,9 @@ const CatalogueEntry = Schema.Struct({
   id: Schema.String, name: Schema.optionalKey(Schema.String), created: Schema.Number,
   context_length: Schema.Number,
   supported_parameters: Schema.Array(Schema.String),
-  architecture: Schema.optionalKey(Schema.Struct({ output_modalities: Schema.optionalKey(Schema.Array(Schema.String)) })),
+  architecture: Schema.optionalKey(Schema.Struct({
+    input_modalities: Schema.optionalKey(Schema.Array(Schema.String)), output_modalities: Schema.optionalKey(Schema.Array(Schema.String)),
+  })),
   top_provider: Schema.optionalKey(Schema.Struct({ max_completion_tokens: Schema.optionalKey(Schema.NullOr(Schema.Number)) })),
   pricing: Schema.Struct({ prompt: Schema.String, completion: Schema.String,
     input_cache_read: Schema.optionalKey(Schema.String), input_cache_write: Schema.optionalKey(Schema.String) }),
@@ -79,8 +81,11 @@ export function resolveCatalogue(body: unknown, options: CatalogueOptions): read
     const known = pi.find(m => m.id === picked.id)
     const input = rate(picked.pricing.prompt)!
     const output = rate(picked.pricing.completion)!
+    // OpenRouter says what the model reads; pi-ai's entry is the fallback, then text alone.
+    const reads = picked.architecture?.input_modalities
     const model: Model<Api> = {
       ...(known ?? { api: 'openai-completions', baseUrl: 'https://openrouter.ai/api/v1', reasoning: false, input: ['text'] }),
+      ...(reads === undefined ? {} : { input: reads.includes('image') ? ['text', 'image'] : ['text'] }),
       provider: 'openrouter', id: picked.id, name: picked.name ?? picked.id,
       contextWindow: picked.context_length, maxTokens: picked.top_provider?.max_completion_tokens ?? known?.maxTokens ?? limits.reserve,
       cost: {

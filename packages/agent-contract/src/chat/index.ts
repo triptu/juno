@@ -1,6 +1,7 @@
 export * from './cards'
 export type * from './commands'
 export * from './copy'
+export * from './files'
 export * from './ids'
 export * from './items'
 export * from './page'

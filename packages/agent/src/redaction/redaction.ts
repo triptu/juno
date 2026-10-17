@@ -10,7 +10,7 @@
  *    the record ahead of the data, which blocks older backups.
  * 2. **The removal transaction**: the messages are tombstoned and `gen`
  *    moves (`redactMemory`), their attachments are deleted, the inbox ops'
- *    text is cleared, pins sourced from them are deactivated and cleared
+ *    text and files are cleared, pins sourced from them are deactivated and cleared
  *    (bumping `pin_rev`), the previews of remove cards that name them are
  *    cleared, quotes of them in later replies and reactions become the
  *    "Removed" placeholder, grants minted by runs that saw the messages are revoked (the
@@ -38,6 +38,7 @@ import { invalidateChatCaches } from '../serve/chat'
 import { checkpointTruncate, transaction } from '../store/database'
 import { purgeNodes, redactMemory } from '../store/memory'
 import type { Store } from '../store/store'
+import { deleteFiles } from '../router/files'
 import { clearQuotes, movePins, removedBubbles } from './quotes'
 import { removalScope, runsThatSaw, type ArchiveRow, type OpRow, type RunRow, type Scope } from './scope'
 
@@ -147,7 +148,8 @@ function commit(store: Store, input: RemoveInput, expected: number): Committed |
   const ids = memory.removed
   db.prepare(`DELETE FROM attachments WHERE message_id IN (${placeholders(ids.length)})`).run(...ids)
   if (scope.ops.length > 0) {
-    db.prepare(`UPDATE inbox SET text = '' WHERE op_id IN (${placeholders(scope.ops.length)})`).run(...scope.ops)
+    db.prepare(`UPDATE inbox SET text = '', data = json_remove(data, '$.files') WHERE op_id IN (${placeholders(scope.ops.length)})`).run(...scope.ops)
+    deleteFiles(store, scope.ops)
     const removedOp = db.prepare('INSERT OR IGNORE INTO removed_ops (op_id, gen) VALUES (?, ?)')
     for (const op of scope.ops) removedOp.run(op, memory.gen)
   }

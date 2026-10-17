@@ -56,6 +56,7 @@ import { backupFailure } from '../backup/errors'
 import { connectionHandlers } from '../mcp/pages'
 import type { McpManagerApi } from '../mcp/manager'
 import type { JunoSettings } from '../settings/settings'
+import { thumbOf } from '../router/files'
 import { createChatCache, chatSummary, readMarkOf, windowOf, type ChatWindow } from './chat'
 import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } from './pages'
 import { runnerPlatform, type RendererTransport } from './runner'
@@ -291,6 +292,19 @@ const answer = (opId: string, write: () => Accepted) =>
     }
   })
 
+const READS_RECHECK = '2 seconds'
+
+/**
+ * Whether the chat model takes images, as OpenRouter's catalogue (or pi-ai's,
+ * or a custom endpoint's row) says. Codex turns go as text, so not there.
+ */
+function readsImages(turns: Turns | undefined): boolean {
+  if (turns === undefined) return false
+  const chat = turns.models().chat
+  if (chat.provider === 'openai-codex') return false
+  return turns.guard.models.getModel(chat.provider, chat.modelId)?.input.includes('image') ?? false
+}
+
 export function agentHandlers(host: ChatHost) {
   return AgentRpcs.toLayer(
     Effect.gen(function* () {
@@ -310,9 +324,18 @@ export function agentHandlers(host: ChatHost) {
             Stream.map(() => ({ ...chatSummary(state.items(), state.turns?.jobs.active() ?? []), mayAuthorize: state.turns !== undefined && host.presence()?.aiEnabled !== false && mayAuthorize(authorityOf(state.turns.store)) })),
             Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
           ),
-        'agent.chat.send': ({ opId, text, context, replyTo }) =>
+        'agent.chat.send': ({ opId, text, context, replyTo, files }) =>
           Effect.flatMap(engine(state, host), (turns) =>
-            changed(answer(opId, () => turns.accept({ opId, kind: 'send', text, ...(replyTo ? { replyTo } : {}), ...(context ? { data: { context } } : {}) }))),
+            changed(answer(opId, () => turns.accept({
+              opId, kind: 'send', text, ...(replyTo ? { replyTo } : {}), ...(context ? { data: { context } } : {}), ...(files !== undefined && files.length > 0 ? { files } : {}),
+            }))),
+          ),
+        'agent.chat.image': ({ opId, n }) => Effect.sync(() => (state.turns === undefined ? null : (thumbOf(state.turns.store, opId, n) ?? null))),
+        // A model change in Settings is not a chat change: look again every few seconds too.
+        'agent.chat.reads': () =>
+          Stream.merge(state.changes, Stream.tick(READS_RECHECK)).pipe(
+            Stream.map(() => ({ images: readsImages(state.turns) })),
+            Stream.changesWith((a, b) => a.images === b.images),
           ),
         'agent.chat.react': ({ opId, target, emoji }) =>
           Effect.flatMap(engine(state, host), (turns) => changed(answer(opId, () => turns.accept({ opId, kind: 'react', target, emoji })))),

@@ -150,7 +150,7 @@ test('keys typed on the destination chip go into the field; arrows and Space sti
   await expect(write.composer).toHaveValue('What changed today?')
 })
 
-test('files attached with Juno chosen say Juno reads text only, until a person or channel is chosen', async ({ juno }) => {
+test('a file Juno cannot read, attached with Juno chosen, says so until a person or channel is chosen', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { write } = juno
@@ -159,7 +159,7 @@ test('files attached with Juno chosen say Juno reads text only, until a person o
   await write.write('Brief for the launch')
   await paste(write.composer, [brief()])
   await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
-  await expect(note).toHaveText('Juno reads text only. Pick a person or channel to send files.')
+  await expect(note).toHaveText('Juno reads images and text files. Pick a person or channel to send the others.')
   await write.pickConversation('eng', 'eng')
   await expect(note).toHaveCount(0)
   await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()

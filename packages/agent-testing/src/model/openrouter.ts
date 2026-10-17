@@ -28,6 +28,8 @@ export interface OpenRouterRequest {
   readonly input: string
   /** When the request follows a tool call: the tool's result text. */
   readonly toolResult?: string
+  /** The image parts the request's user messages carried, by type and size in bytes. */
+  readonly images: ReadonlyArray<{ readonly mimeType: string; readonly bytes: number }>
 }
 
 /** One tool call instead of text; the next request carries its result in `toolResult`. */
@@ -75,7 +77,7 @@ export function openRouterCatalogue() {
       created: 1_790_000_000 + index,
       context_length: model.contextWindow,
       supported_parameters: ['tools', 'tool_choice', 'max_tokens'],
-      architecture: { output_modalities: ['text'] },
+      architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
       top_provider: { max_completion_tokens: model.maxTokens },
       pricing: { prompt: String((model.cost?.input ?? 0) / 1e6), completion: String((model.cost?.output ?? 0) / 1e6) },
     })),
@@ -98,6 +100,18 @@ const textOf = (content: unknown): string =>
 
 const event = (res: ServerResponse, name: string | undefined, data: unknown) =>
   res.write(`${name === undefined ? '' : `event: ${name}\n`}data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`)
+
+/** Image parts in user messages: Anthropic `image` blocks with a base64 source, or chat completions `image_url` data URLs. */
+function imagesOf(messages: ReadonlyArray<WireMessage>): OpenRouterRequest['images'] {
+  return messages
+    .filter((message) => message.role === 'user' && Array.isArray(message.content))
+    .flatMap((message) => message.content as ReadonlyArray<{ type?: unknown; source?: { media_type?: unknown; data?: unknown }; image_url?: { url?: unknown } }>)
+    .flatMap((part) => {
+      if (part.type === 'image' && typeof part.source?.data === 'string') return [{ mimeType: String(part.source.media_type), bytes: Buffer.from(part.source.data, 'base64').byteLength }]
+      const url = part.type === 'image_url' && typeof part.image_url?.url === 'string' ? /^data:([^;]+);base64,(.*)$/.exec(part.image_url.url) : null
+      return url === null ? [] : [{ mimeType: url[1]!, bytes: Buffer.from(url[2]!, 'base64').byteLength }]
+    })
+}
 
 /** A tool call's id, unique within the fake's life. */
 let toolCalls = 0
@@ -185,7 +199,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
       const messages = body.messages ?? []
       const users = messages.filter((message) => message.role === 'user').map((message) => textOf(message.content)).filter((text) => text !== '')
       const result = toolResultOf(messages)
-      const request: OpenRouterRequest = { path, model, key, compaction: COMPACTION_MODELS.includes(model), input: users.at(-1) ?? '', ...(result === undefined ? {} : { toolResult: result }) }
+      const request: OpenRouterRequest = { path, model, key, compaction: COMPACTION_MODELS.includes(model), input: users.at(-1) ?? '', images: imagesOf(messages), ...(result === undefined ? {} : { toolResult: result }) }
       requests.push(request)
       if (options.key !== undefined && key !== options.key) {
         res.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: { message: 'User not found.', code: 401 } }))

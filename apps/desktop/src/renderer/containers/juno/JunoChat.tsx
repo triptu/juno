@@ -7,6 +7,7 @@ import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@jun
 import { useChatActions, useChatSend, useFocusRequest, useReactionPicker, useRemoval } from './chatActions'
 import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
+import { useChatFiles } from './chatFiles'
 
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
@@ -43,7 +44,9 @@ export interface JunoChatProps {
  * - A Juno bubble fully on screen for a second in the focused window is read.
  *   A hidden tab sits in `<Activity>` with its effects gone, so it reads
  *   nothing and takes no focus until shown.
- * - Sends show at once (`chatItemsAtom` holds them as `sending`).
+ * - Sends show at once (`chatItemsAtom` holds them as `sending`). Files
+ *   attached here are Juno's only: they are read in the renderer and go
+ *   with the message to the agent, never staged for Slack (`junoFiles`).
  * - The empty state enters staggered in the tab only. The panel lands in
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
@@ -72,6 +75,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
   useFocusRequest(column, inputRef)
   const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
+  const files = useChatFiles(draftKey, draft, setDraft, send)
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
   const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval })
@@ -91,18 +95,16 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
           onCaret={emojiSuggestions.onCaret}
           onFieldKey={emojiSuggestions.onFieldKey}
           {...(emojiSuggestions.mention === undefined ? {} : { mention: emojiSuggestions.mention })}
-          onSend={() => {
-            const text = draft.trim()
-            if (text === '') return
-            setDraft('')
-            send(text)
-          }}
+          onSend={files.send}
           {...(onEscape === undefined ? {} : { onEscape })}
           {...(quote === undefined ? {} : { quote, onClearQuote: () => setQuote(undefined) })}
           enabled={page.composerEnabled}
           {...(column === 'panel' ? { placeholder: chatCopy.composer.panelPlaceholder } : {})}
           inputRef={inputRef}
           context={composerContext}
+          {...(page.composerEnabled ? files.composer : {})}
+          {...(files.chips === undefined ? {} : { attachments: files.chips })}
+          hasFiles={files.hasFiles}
         />
       }
       {...(pickerAt === undefined ? {} : { picker: pickerAt })}

@@ -4,7 +4,7 @@ import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
 import { layout, opacity, spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Textarea } from '@juno/ui'
-import { mentionProps, type ComposerMention } from '../Composer'
+import { mentionProps, transfers, type ComposerMention } from '../Composer'
 import { QuoteStub } from './QuoteStub'
 
 export interface JunoComposerProps {
@@ -32,6 +32,14 @@ export interface JunoComposerProps {
   readonly column?: 'page' | 'panel'
   /** In the field's top, above the text, in the panel: the context chips. */
   readonly context?: ReactNode
+  /** Before the text: the attach button (`AttachButton`), as in the topic composer. */
+  readonly leading?: ReactNode
+  /** The chips of the files going to Juno, inside the field above the text, and any line about them (`AttachmentNote`). */
+  readonly attachments?: ReactNode
+  /** Files pasted into the field or dropped on the composer. */
+  readonly onFiles?: (files: ReadonlyArray<File>) => void
+  /** Files Juno will take are attached: Enter sends with no text too. */
+  readonly hasFiles?: boolean
 }
 
 /**
@@ -39,9 +47,10 @@ export interface JunoComposerProps {
  * the textarea growing to 160px, and the round send button, dimmed while the
  * draft is empty and never disabled by a run. Enter sends, Shift Enter adds a line.
  */
-export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, mention, onFieldKey, onCaret }: JunoComposerProps) {
+export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, mention, onFieldKey, onCaret, leading, attachments, onFiles, hasFiles = false }: JunoComposerProps) {
   const panel = column === 'panel'
-  const canSend = enabled && value.trim().length > 0
+  const canSend = enabled && (value.trim().length > 0 || hasFiles)
+  const files = transfers(enabled ? onFiles : undefined, undefined)
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (onFieldKey?.(event) === true) return
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -54,15 +63,22 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
     }
   }
   return (
-    <div data-juno-composer={column} {...stylex.props(styles.outer, panel && styles.outerPanel)}>
+    <div
+      data-juno-composer={column}
+      onDragOver={onFiles === undefined || !enabled ? undefined : files.onDragOver}
+      onDrop={onFiles === undefined || !enabled ? undefined : files.onDrop}
+      {...stylex.props(styles.outer, panel && styles.outerPanel)}
+    >
       {quote !== undefined ? (
         <div data-composer-quote="" {...stylex.props(styles.quote, panel && styles.wide)}>
           <QuoteStub quote={quote} {...(onClearQuote ? { onClear: onClearQuote } : {})} />
         </div>
       ) : null}
-      <Surface kind="field" data-composer-field="" sx={[styles.box, panel && styles.wide, !enabled && styles.off]}>
-        {context}
+      <Surface kind="field" data-composer-field="" sx={[styles.box, leading !== undefined && styles.boxWithLeading, panel && styles.wide, !enabled && styles.off]}>
+        {context !== undefined && leading !== undefined ? <div {...stylex.props(styles.contextWithLeading)}>{context}</div> : context}
+        {attachments !== undefined ? <div {...stylex.props(styles.attachments)}>{attachments}</div> : null}
         <div {...stylex.props(styles.row)}>
+          {leading}
           <Textarea
             ref={inputRef}
             variant="inline"
@@ -74,6 +90,7 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
             onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
             {...mentionProps([], mention, onCaret)}
+            onPaste={onFiles === undefined || !enabled ? undefined : files.onPaste}
             dir="auto"
           />
           <span {...stylex.props(styles.send)}>
@@ -139,6 +156,19 @@ const styles = stylex.create({
     minWidth: 0,
     gap: spacing['--space-1'],
     marginBlock: '-1px', // tokens-allow: Overlap the composer border by one pixel.
+  },
+  // A 28px leading control sits 6px in, as the send button does at the end; the context chips keep their place.
+  boxWithLeading: {
+    paddingInlineStart: spacing['--space-1-5'],
+  },
+  contextWithLeading: {
+    paddingInlineStart: spacing['--space-2'],
+  },
+  // Over the text: the chips start 6px in, under the attach button, as in the topic composer.
+  attachments: {
+    display: 'flex',
+    paddingTop: spacing['--space-1-5'],
+    minWidth: 0,
   },
   send: {
     display: 'inline-flex',

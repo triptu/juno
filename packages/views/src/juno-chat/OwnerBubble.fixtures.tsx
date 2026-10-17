@@ -1,12 +1,21 @@
 import * as stylex from '@stylexjs/stylex'
 import { accent, colors, spacing } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, fixture, scene, Text } from '@juno/ui'
-import { noopActions } from './commands'
+import { picture } from '../fixtures/messages'
+import { noopActions, type ChatActions } from './commands'
+import { OwnerImage } from './OwnerFiles'
 import { aboutChannel, aboutMain, aboutPerson, aboutTopic, bubbleId, NOW, owner, quoteOf, reacted } from './fixtures/data'
 import { OwnerBubble, type OwnerBubbleProps } from './OwnerBubble'
 
 const MINUTE = 60_000
 const at = NOW - 4 * MINUTE
+
+/** Thumbnails drawn as the container draws them, from a picture of the image's own shape. */
+const withImages: ChatActions = { ...noopActions, renderOwnerImage: (_opId, file) => <OwnerImage file={file} src={picture(file.width, file.height, '#8EB5C9')} /> }
+const image = (n: number, width: number, height: number, name = 'replica-lag-dashboard.png') => ({ _tag: 'image' as const, n, name, width, height })
+const textFile = (n: number, name: string) => ({ _tag: 'text' as const, n, name })
+const withFiles = (id: string, text: string, files: NonNullable<ReturnType<typeof owner>['files']>, actions: ChatActions = withImages) =>
+  fixture<OwnerBubbleProps>({ item: owner(id, text, 'single', { _tag: 'sent' }, at, { files }), now: NOW, actions })
 
 const bubble = (overrides: Partial<Parameters<typeof owner>> = []) => fixture<OwnerBubbleProps>({ item: owner('m-1', overrides[1] ?? 'What did I miss in #eng this morning?', overrides[2] ?? 'single', overrides[3] ?? { _tag: 'sent' }, at), now: NOW, actions: noopActions })
 
@@ -98,6 +107,15 @@ export default defineFixtures(
           <OwnerBubble item={owner('m-a7', 'and who owns the cutover?', 'last', { _tag: 'sent' }, at, { about: aboutTopic })} now={NOW} actions={noopActions} />
         </>
       )),
+    },
+    Files: {
+      image: withFiles('m-f1', 'What does this dashboard show?', [image(0, 1568, 882)]),
+      'image-only': withFiles('m-f2', '', [image(0, 1568, 882)]),
+      portrait: withFiles('m-f3', 'Is this the same error?', [image(0, 750, 1334, 'IMG_2041.png')]),
+      'four-images': withFiles('m-f4', 'Which of these is the regression?', [image(0, 1568, 882), image(1, 1200, 1200), image(2, 750, 1334), image(3, 1568, 600)]),
+      'image-and-text-file': withFiles('m-f5', 'Do these agree?', [image(0, 1568, 882), textFile(1, 'cutover-notes.md')]),
+      // Before the thumbnail is in, the box holds the image's shape.
+      loading: withFiles('m-f6', 'What does this show?', [image(0, 1568, 882)], noopActions),
     },
     Reactions: {
       'juno-reacted': fixture<OwnerBubbleProps>({ item: owner('m-x1', 'thanks!', 'single', { _tag: 'sent' }, at, { reactions: [reacted('juno', '👍')] }), now: NOW, actions: noopActions }),

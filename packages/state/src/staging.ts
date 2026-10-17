@@ -5,7 +5,7 @@
  * attached, not with the first bundle.
  */
 import { filesStage, filesUnstage, MAX_FILE_BYTES, MAX_FILES_PER_MESSAGE, STAGE_CHUNK_BYTES, type StagedFile } from '@juno/contract'
-import { attachmentsAtom, firstChunks, update, type Attachment } from './attachments'
+import { attachedFiles, attachmentsAtom, firstChunks, update, type Attachment } from './attachments'
 import { runCommand } from './atoms'
 import type { Registry } from './client'
 
@@ -33,6 +33,7 @@ export async function attachFiles(registry: Registry, key: string, files: Readon
   const taken = files.filter((file) => file.size > 0 && file.size <= MAX_FILE_BYTES).slice(0, Math.max(0, room))
   const added = taken.map((file) => ({ file, attachment: { id: crypto.randomUUID(), name: nameOf(file), size: file.size, mimetype: file.type || 'application/octet-stream', state: 'staging' as const } }))
   if (added.length === 0) return
+  for (const { file, attachment } of added) attachedFiles.set(attachment.id, file)
   update(registry, key, (current) => [...current, ...added.map((each) => each.attachment)])
   await Promise.all(
     added.map(async ({ file, attachment }) => {

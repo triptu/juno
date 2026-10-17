@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
 import {
+  attachmentsAtom,
   emptyHomeDraft,
   homeDraftAtom,
   homeFocusAtom,
@@ -16,7 +17,7 @@ import {
   untouched,
   type HomeDraft,
 } from '@juno/state'
-import { junoNavAtom } from '@juno/state/agent'
+import { junoNavAtom, junoReadsImagesAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AttachmentNote, Composer, destinationLabel, holdKeys, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
@@ -24,13 +25,11 @@ import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
+import { leaveComposer, takeForJuno, useJunoFiles } from './juno/junoFiles'
 import { useMentions } from './mentions'
 import { openJuno } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
-
-/** Under files attached while Juno is chosen (SPEC 12): Juno's send takes the text, and the files stay. */
-const JUNO_FILES_NOTE = 'Juno reads text only. Pick a person or channel to send files.'
 
 /** A key typed on the chip goes into the field, as a token field does, and focus stays there. */
 function typeIn(field: HTMLTextAreaElement | null, text: string): void {
@@ -180,7 +179,11 @@ function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefi
   }, [taken, field, search])
 }
 
-/** Sends the draft where it goes: Juno opens its chat with the question; a person or channel gets it in its Main or the thread chosen, and Home stays. */
+/**
+ * Sends the draft where it goes: Juno opens its chat with the question and
+ * the files it reads (the rest stay, SPEC 12); a person or channel gets it
+ * in its Main or the thread chosen, and Home stays.
+ */
 async function deliver(tabId: string, body: string, to: Destination, junoOn: boolean, openList: () => void): Promise<boolean> {
   const current = registry.get(homeDraftAtom(tabId))
   const here = sendTarget(current)
@@ -189,9 +192,22 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
       openList()
       return false
     }
-    if (body.trim() === '') return false
-    junoCommands.send(body)
+    if (registry.get(attachmentsAtom(tabId)).length === 0) {
+      if (body.trim() === '') return false
+      junoCommands.send(body)
+      setHomeDraft(registry, tabId, emptyHomeDraft)
+      openJuno()
+      return true
+    }
+    // The field empties at once, so what is typed while an image is still being read is kept.
     setHomeDraft(registry, tabId, emptyHomeDraft)
+    const { files, ids } = await takeForJuno(tabId, registry.get(junoReadsImagesAtom))
+    if (body.trim() === '' && files.length === 0) {
+      if (untouched(registry.get(homeDraftAtom(tabId)))) setHomeDraft(registry, tabId, current)
+      return false
+    }
+    junoCommands.send(body, files.length === 0 ? {} : { files })
+    leaveComposer(tabId, ids)
     openJuno()
     return true
   }
@@ -251,6 +267,13 @@ function useSend(tabId: string, hasFiles: boolean, junoOn: boolean, openList: ()
   return { sending, send }
 }
 
+/** Home's files: the chips, with a line under them while Juno is chosen and some are files a send to Juno leaves. */
+function useHomeFiles(tabId: string, toJuno: boolean) {
+  const files = useAttachments(tabId, { tabbable: false })
+  const juno = useJunoFiles(tabId, files.files, toJuno, 'home')
+  return { ...files, slot: files.chips !== undefined && juno.note !== undefined ? <AttachmentNote chips={files.chips} note={juno.note} /> : files.chips }
+}
+
 export interface HomeComposerProps {
   readonly tabId: string
 }
@@ -274,7 +297,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const junoOn = useAtomValue(junoAvailableAtom)
   const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const files = useAttachments(tabId, { tabbable: false })
+  const files = useHomeFiles(tabId, draft.conversation === undefined && junoOn)
   const listId = useId()
   const focusField = useCallback(() => inputRef.current?.focus(), [])
   const field = useCallback(() => inputRef.current, [])
@@ -339,8 +362,8 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       notices={checks.notices}
       onEscape={checks.clear}
       inputRef={inputRef}
-      {...(toSlack ? { leading: files.leading } : {})}
-      attachments={files.chips !== undefined && !toSlack && junoOn ? <AttachmentNote chips={files.chips} note={JUNO_FILES_NOTE} /> : files.chips}
+      leading={files.leading}
+      attachments={files.slot}
       onFiles={files.onFiles}
       above={<WriteTop tabId={tabId} draft={draft} junoOn={junoOn} destination={destination} focusField={focusField} onType={(text) => typeIn(inputRef.current, text)} />}
     />

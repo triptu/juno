@@ -43,7 +43,8 @@ For the e2e tests, where the agent runs in its own process with the real OpenRou
 - `POST /api/v1/systemone` is the decision model the auto-review asks (TypeSafe's System One protocol, as OpenRouter serves Jev). It answers with `options.review`, by default `fakeReview`: intent `explicit` when an owner message names the tool's action word (`update` for `notion-update-page`), `implied` for other owner words, `notAsked` with none; risk `delete` or `send` for tools named so, else `reversible`. `reviews` lists what it was asked.
 - `POST /api/v1/messages` (Claude, Anthropic Messages) and `POST /api/v1/chat/completions` (the rest) stream `answer`, by default one `<say>` bubble. `answer` may be a function of the request, to answer what was sent. It may return `{ toolCall: { name, arguments } }` instead of text; the request after the call carries the tool's result in `toolResult`. A request to a compaction model gets the compactor's answer instead, as with `fakeProvider()`.
 - `key`: a request carrying another key gets 401, as a rejected key does.
-- `requests` records each chat request's path, model, key, whether it was a compaction, and `input`, the last user message. `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
+- `requests` records each chat request's path, model, key, whether it was a compaction, `input`, the last user message, and `images`, the image parts its user messages carried (type and size). `inputs()` lists the inputs of the chat requests that were not compactions. `catalogueReads()` counts list reads.
+- The catalogue lists every model as reading text and images (`architecture.input_modalities`); a test that needs a text-only model rewrites the list.
 
 ## OpenAI-compatible endpoint over HTTP: `startFakeOpenAi(options?)`
 

@@ -3,12 +3,12 @@
  * requests, the remove sheet, the reaction picker and the row callbacks.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, junoText, type ChatItem, type ChatPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
 import { copyText, junoFocusAtom, openExternal, popupContextMenu, registry } from '@juno/state'
-import { messageActions } from '@juno/state/agent'
+import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type ReactionPickerAt, type ReactionTarget } from '@juno/views'
+import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionPickerAt, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
 import { junoCommands, openJunoPage } from './actions'
 import { scrollToRow } from './chatScroll'
@@ -42,12 +42,12 @@ export function useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, new
     if (scroller !== null) scroller.scrollTop = scroller.scrollHeight
   }
 
-  const send = (text: string) => {
+  const send = (text: string, files: ReadonlyArray<JunoFileInput> = []) => {
     const at = performance.now()
     sentAtRef.current = { at, newest: newestBubbleId }
     afterPaint(() => measure('juno.chat-send', at))
     const context = contextOf?.()
-    junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }) })
+    junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }), ...(files.length === 0 ? {} : { files }) })
     setQuote(undefined)
     toBottom()
     onSent?.(context)
@@ -67,6 +67,14 @@ export function useFocusRequest(column: 'page' | 'panel', inputRef: RefObject<HT
     return () => cancelAnimationFrame(frame)
   }, [column, focusRequest, inputRef])
 }
+
+/** An owner image's thumbnail, from the agent or from the send that is on its way. */
+function OwnerThumb({ opId, file }: { readonly opId: OpId; readonly file: OwnerImageFile }) {
+  const src = useAtomValue(junoThumbAtom(`${opId}:${file.n}`), (result) => (result._tag === 'Success' && result.value !== null ? result.value : undefined))
+  return <OwnerImage file={file} src={src} />
+}
+
+const renderOwnerImage = (opId: OpId, file: OwnerImageFile) => <OwnerThumb opId={opId} file={file} />
 
 /** The remove sheet a message's menu opens, and the removal it confirms. */
 export function useRemoval(now: number) {
@@ -162,6 +170,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
           inputRef.current?.focus()
         })
       },
+      renderOwnerImage,
     }),
     [scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval],
   )

@@ -1,5 +1,6 @@
 export { acquireAgentPort, agentConnectionStateAtom, configureAgentConnection } from './client'
 export { chatActions, chatItemsAtom, chatSummaryAtom, junoNavAtom, MAX_SEND_BYTES } from './chat'
+export { junoReadsImagesAtom, junoThumbAtom } from './files'
 export {
   activityPageAtom,
   connectionsPageAtom,

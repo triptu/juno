@@ -28,9 +28,15 @@ const ctx = BACKGROUND_CONTEXT
 type HarnessOptions = Parameters<typeof Harness.open>[1]
 type HarnessInstance = Awaited<ReturnType<typeof Harness.open>>
 type Root = Awaited<ReturnType<HarnessInstance['root']>>
+type UserContent = Extract<Parameters<Root['submit']>[0], { readonly type: 'input' }>['content']
 /** pi-ai's model access. WP9's providers supply it; this folder may not import pi-ai. */
 export type JournalModels = HarnessOptions['models']
 export type Extension = Parameters<ReturnType<typeof createRegistry>['install']>[0]
+
+/** A user input as pi takes it: text, or text and images (pi-ai's `TextContent` and `ImageContent`). */
+export type InputContent =
+  | string
+  | ReadonlyArray<{ readonly type: 'text'; readonly text: string } | { readonly type: 'image'; readonly data: string; readonly mimeType: string }>
 
 export const journalFileName = (incarnation: string) => `pi-${incarnation}.sqlite`
 export const JOURNAL_FILE = /^pi-(.+)\.sqlite(-wal|-shm|-journal)?$/
@@ -141,7 +147,7 @@ export interface Journal {
    * Admits input with `requestId = opId` (spec `submit`). pi returns the existing submission for
    * an op it already has, so a resubmit after a crash adds nothing. `steer` joins the running run.
    */
-  readonly submit: (input: { readonly opId: string; readonly text: string; readonly kind: string; readonly steer: boolean }) => Promise<string>
+  readonly submit: (input: { readonly opId: string; readonly content: InputContent; readonly kind: string; readonly steer: boolean }) => Promise<string>
   /** The submission pi holds for `opId`, if it was admitted. */
   readonly submissionFor: (opId: string) => Promise<string | undefined>
   /** Resolves when the submission is answered or given up. */
@@ -183,9 +189,9 @@ async function startJournal(db: NodeSqliteDatabase, incarnation: string, setting
     reset: () => root.reset(undefined, ctx),
     model: async () => (await root.agent(ctx)).model,
     setModel: (model) => root.configure({ model }, ctx),
-    submit: async ({ opId, text, kind, steer }) => {
+    submit: async ({ opId, content, kind, steer }) => {
       const submission = await root.submit(
-        { type: 'input', content: text, requestId: opId, entry: { kind: INPUT_ENTRY, data: { opId, kind } }, ...(steer ? { whenBusy: 'steer' as const } : {}) },
+        { type: 'input', content: content as UserContent, requestId: opId, entry: { kind: INPUT_ENTRY, data: { opId, kind } }, ...(steer ? { whenBusy: 'steer' as const } : {}) },
         ctx,
       )
       return String(submission.id)

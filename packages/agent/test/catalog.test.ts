@@ -69,3 +69,13 @@ it('limits Codex choices to the listing and uses the catalogue only when listing
   expect(resolveCodexModels([], { systemAndTools: [] })).toBeUndefined()
   expect(resolveCodexModels([fallback!.model.id], { systemAndTools: [] })?.model.id).toBe(fallback!.model.id)
 })
+
+it("takes what a model reads from OpenRouter's input modalities, over pi-ai's entry", () => {
+  const fake = fakeProvider()
+  const reads = (input_modalities?: ReadonlyArray<string>) =>
+    resolveCatalogue({ data: [{ ...row('anthropic/claude-sonnet-5.5', 20), architecture: { output_modalities: ['text'], ...(input_modalities ? { input_modalities } : {}) } }] }, { systemAndTools: [], piModels: fake.models.getModels() })[0]!.model.input
+  expect(reads(['text', 'image', 'file'])).toEqual(['text', 'image'])
+  expect(reads(['text'])).toEqual(['text'])
+  // Without OpenRouter's word, pi-ai's entry decides.
+  expect(reads()).toEqual(fake.model('anthropic/claude-sonnet-5.5').input)
+})

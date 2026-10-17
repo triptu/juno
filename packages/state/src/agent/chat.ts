@@ -33,13 +33,14 @@ import type {
   ChatPageSnapshot,
   ChatSummary,
   ChatWindow,
+  JunoFileInput,
   OpId,
   OwnerMessageItem,
   ReplyTarget,
   Card,
   SendContext,
 } from '@juno/agent-contract'
-import { aboutOf, junoText } from '@juno/agent-contract'
+import { aboutOf, junoText, ownerFilesOf } from '@juno/agent-contract'
 import type { Registry } from '../client'
 import { agentProviderAtom } from './provider'
 import { AgentClient } from './client'
@@ -102,6 +103,9 @@ export const junoNavAtom = Atom.make((get): ChatSummary => {
   return AsyncResult.isSuccess(summary) ? summary.value : quiet
 })
 
+/** Thumbnails of images sent from here, by `<opId>:<n>`: the bubble shows them before the agent has stored them (`junoThumbAtom`). */
+export const sentThumbs = new Map<string, string>()
+
 /** An owner send the agent has not stored yet, or could not. */
 export interface PendingSend {
   readonly opId: OpId
@@ -109,6 +113,8 @@ export interface PendingSend {
   readonly at: number
   readonly context?: SendContext
   readonly replyTo?: ReplyTarget
+  /** Images and text files for Juno, as the composer prepared them. */
+  readonly files?: ReadonlyArray<JunoFileInput>
   readonly delivery: OwnerMessageItem['delivery']
 }
 
@@ -157,6 +163,7 @@ export function withPending(page: ChatPage, pending: ReadonlyArray<PendingSend>)
         delivery: send.delivery,
         ...(send.replyTo ? { replyTo: quoteIn(page.items, send.replyTo) } : {}),
         ...(send.context ? { about: aboutOf(send.context) } : {}),
+        ...(send.files !== undefined && send.files.length > 0 ? { files: ownerFilesOf(send.files) } : {}),
         reactions: [],
         group: 'single',
       }
@@ -273,6 +280,7 @@ export function chatActions(registry: Registry) {
       text: send.text,
       ...(send.context ? { context: send.context } : {}),
       ...(send.replyTo ? { replyTo: send.replyTo } : {}),
+      ...(send.files !== undefined && send.files.length > 0 ? { files: send.files } : {}),
     })
     if (Exit.isSuccess(exit)) {
       // Stored: the bubble stays until a page shows the agent's row (`landed`), which can arrive after this acknowledgement.
@@ -295,9 +303,12 @@ export function chatActions(registry: Registry) {
 
   return {
     /** The composer's send. Returns the new op id, the row's key from the first frame. */
-    send: (text: string, options: { readonly context?: SendContext; readonly replyTo?: ReplyTarget } = {}): OpId => {
+    send: (text: string, options: { readonly context?: SendContext; readonly replyTo?: ReplyTarget; readonly files?: ReadonlyArray<JunoFileInput> } = {}): OpId => {
       prune()
       const send: PendingSend = { opId: uuidv7() as OpId, text, at: Date.now(), ...options, delivery: { _tag: 'sending' } }
+      send.files?.forEach((file, n) => {
+        if (file._tag === 'image') sentThumbs.set(`${send.opId}:${n}`, file.thumb)
+      })
       if (byteLength(text) > MAX_SEND_BYTES) setPending(send.opId, { ...send, delivery: { _tag: 'failed', reason: 'tooLong' } })
       else void deliver(send)
       return send.opId

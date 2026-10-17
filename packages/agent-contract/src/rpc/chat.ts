@@ -3,6 +3,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { Revision } from '@juno/agent-cards'
 import { CardBinding } from './identity'
 import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
+import { JUNO_IMAGE_LIMITS, JUNO_TEXT_LIMITS, JunoFileInput } from '../chat/files'
 import { Emoji, ReplyTarget, RemoveSheet } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
 import { SendContext } from '../chat/place'
@@ -29,12 +30,24 @@ export const chatPage = Rpc.make('agent.chat.page', { payload: { window: ChatWin
 export const chatSummary = Rpc.make('agent.chat.summary', { success: ChatSummary, stream: true })
 /**
  * A message, maybe a reply to a Juno bubble or card. While a run is live it joins the run at its next
- * step; otherwise it starts one. A reply to a card is not a click.
+ * step; otherwise it starts one. A reply to a card is not a click. `files` are images (scaled, with
+ * their thumbnails) and text files (already cut), at most `JUNO_IMAGE_LIMITS.count` and
+ * `JUNO_TEXT_LIMITS.count` of each; they go to the chat model only, never to Slack.
  */
 export const chatSend = Rpc.make('agent.chat.send', {
-  payload: { ...operation, text: Schema.String, context: Schema.optionalKey(SendContext), replyTo: Schema.optionalKey(ReplyTarget) },
+  payload: {
+    ...operation, text: Schema.String, context: Schema.optionalKey(SendContext), replyTo: Schema.optionalKey(ReplyTarget),
+    files: Schema.optionalKey(Schema.Array(JunoFileInput).check(Schema.isMaxLength(JUNO_IMAGE_LIMITS.count + JUNO_TEXT_LIMITS.count))),
+  },
   success: Accepted, error: AgentCommandError,
 })
+/** An owner message's image thumbnail, by the message's op and the file's place in it; null once removed. */
+export const chatImage = Rpc.make('agent.chat.image', {
+  payload: { opId: OpId, n: Schema.Int }, success: Schema.NullOr(Schema.String), error: AgentCommandError,
+})
+/** What the chat model reads besides text, now and on every change: the composer keeps images it cannot read. */
+export const ChatReads = Schema.Struct({ images: Schema.Boolean })
+export const chatReads = Rpc.make('agent.chat.reads', { success: ChatReads, stream: true })
 /**
  * The owner's reaction on a Juno bubble or card; `emoji: null` removes it. A thumbs up or a removal is
  * only recorded. Any other emoji is queued to Juno like a message, and Juno may ignore it. Never a click.
@@ -59,4 +72,4 @@ export const MessageMenu = Schema.Struct({ messageId: ChatMessageId, revision: R
 export const chatMessage = Rpc.make('agent.chat.message', {
   payload: { target: ReplyTarget }, success: Schema.NullOr(MessageMenu), error: AgentCommandError,
 })
-export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatReact, chatRetry, chatRead, chatRemove, chatMessage)
+export const ChatRpcs = RpcGroup.make(chatPage, chatSummary, chatSend, chatImage, chatReads, chatReact, chatRetry, chatRead, chatRemove, chatMessage)
