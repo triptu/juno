@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, type MouseEvent, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { accent, colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
+import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -24,14 +25,6 @@ export interface MessageBodyProps {
    * in every message. Default false.
    */
   readonly tabbable?: boolean
-}
-
-/** What a message's links do, for those that open inside Juno (SPEC 8, "Links"). */
-export interface LinkInfo {
-  /** The link opens inside Juno: it keeps the arrow cursor, as other links inside the app do. */
-  readonly inApp: (url: string) => boolean
-  /** Where an in-app link goes ("#eng · Thread"), asked for on hover; undefined keeps the URL as the hover text. */
-  readonly describe: (url: string) => Promise<string | undefined>
 }
 
 // An emoji-only message (one to three emoji and nothing else) is drawn
@@ -150,37 +143,6 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: Blo
       // Drawn by the message from its `files`, which carry the thumbnail.
       return null
   }
-}
-
-interface LinkProps {
-  readonly url: string
-  readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
-  readonly linkInfo: LinkInfo | undefined
-  readonly tabIndex: 0 | -1
-  readonly children: ReactNode
-}
-
-/**
- * A link in a message. The URL shows on hover; a Slack link that opens
- * inside Juno shows where it goes instead, once known, and keeps the arrow
- * cursor. Only links that leave the app get the pointer.
- */
-function Link({ url, onLink, linkInfo, tabIndex, children }: LinkProps) {
-  const inApp = linkInfo?.inApp(url) === true
-  const [described, setDescribed] = useState<{ readonly url: string; readonly place: string }>()
-  const title = described?.url === url ? described.place : url
-  const open = (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault()
-    onLink?.(url, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: event.detail === 0 ? 'keyboard' : 'pointer' })
-  }
-  const describe = () => {
-    if (inApp && described?.url !== url) void linkInfo?.describe(url).then((place) => place === undefined || setDescribed({ url, place }))
-  }
-  return (
-    <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, inApp ? styles.inAppLink : styles.outLink, styles.focusRing)}>
-      {children}
-    </a>
-  )
 }
 
 interface InlinesProps {
@@ -371,19 +333,6 @@ const styles = stylex.create({
   },
   rule: {
     marginBlock: spacing['--space-1'],
-  },
-  link: {
-    color: accent['--hl-text'],
-    textDecorationLine: 'underline',
-    textDecorationColor: 'color-mix(in oklch, currentColor 35%, transparent)',
-    textUnderlineOffset: sizes['--link-underline-offset'],
-    borderRadius: radii['--radius-xs'],
-  },
-  outLink: {
-    cursor: 'pointer', // external-link-cursor
-  },
-  inAppLink: {
-    cursor: 'default',
   },
   bold: {
     fontWeight: weights['--weight-semibold'],

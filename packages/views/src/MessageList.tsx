@@ -5,7 +5,7 @@ import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
 import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
-import type { LinkInfo } from './MessageBody'
+import type { LinkInfo } from './MessageLink'
 import { NewDivider } from './NewDivider'
 import { messageTime } from './time'
 
