@@ -105,6 +105,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
               name={channel.name}
               kindLabel={kind}
               size={24}
+              iconWhenNarrow
               {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
             />
           </span>
@@ -140,7 +141,8 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
 }
 
 const styles = stylex.create({
-  // The full name up to 160px, then an ellipsis; it gives way only once the title is at its floor.
+  // The full name up to 160px, then an ellipsis; it gives way only once the
+  // title is at its floor. Under 480px it is its icon alone (ContextPill).
   pill: {
     display: 'flex',
     flexShrink: 1,
