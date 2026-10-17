@@ -23,6 +23,7 @@ async function freshHome(juno: Juno, via: string): Promise<string[]> {
 const RINA = 'Rina finished the onsite'
 const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
+const KEYS = 'Rotate the staging deploy keys'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 test('During the first sync Home greets and says it is syncing, and the sidebar shows how far it got', async ({ juno, slack, win }) => {
@@ -128,17 +129,20 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await tabs.expectCount(1)
 })
 
-test('Mark done clears a follow-up, and Resolve all resolves the settled topics with Undo', async ({ juno, fake, slack }) => {
-  // A second settled thread: a closing reply five minutes ago, idle long enough to score.
-  const staging = slack.root(STAGING)
-  fake.workspace.post({ channel: staging.channel, threadTs: staging.ts as never, user: 'U0JONAS', text: 'Reaper is live. Done, thanks all.', at: fake.now() - 5 * 60_000 })
+test('Mark done clears a follow-up, and Resolve all resolves the settled topics with Undo', async ({ juno, fake, win }) => {
+  // A second settled thread: the user's, closed by Dev's thanks two hours ago.
+  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: SELF_ID, text: 'Rotate the staging deploy keys before Friday', at: fake.now() - 3 * 60 * 60_000 })
+  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Rotated and merged, thanks', at: fake.now() - 2 * 60 * 60_000 })
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar } = juno
+  // Tidy up waits four hours of quiet by default; the incident thread went quiet 70 minutes ago.
+  await juno.openSettings('Tidy up')
+  await win.getByRole('radio', { name: '1 hour' }).click()
 
   await expect.poll(() => freshHome(juno, OFFSITE), { timeout: 30_000 }).toEqual(['waiting', 'followUp', 'tidyUp'])
   await expect(home.title('tidyUp')).toHaveText('2 topics look settled')
-  await expect(home.meta('tidyUp')).toContainText('Unrelated: has anyone looked at the…')
+  await expect(home.meta('tidyUp')).toHaveText('incidents')
 
   await home.button('followUp', 'Mark done').click()
   await juno.expectToast('Follow-up done')
@@ -148,9 +152,9 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
 
   await home.button('tidyUp', 'Resolve all').click()
   await juno.expectToast('Resolved 2 topics')
-  await sidebar.row(STAGING).expectAbsent()
+  await sidebar.row(KEYS).expectAbsent()
   await juno.undoFromToast()
-  await sidebar.row(STAGING).expectVisible()
+  await sidebar.row(KEYS).expectVisible()
 
   // Home again: the follow-up is gone.
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
