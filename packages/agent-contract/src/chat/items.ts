@@ -317,27 +317,6 @@ export function endGroupsAtDividers(items: ReadonlyArray<ChatItem>): ReadonlyArr
 }
 
 /**
- * A reply's quote is there so you can tell what it answers (SPEC 13.1).
- * Right under the message it answers, with only a day separator or the
- * "New" divider between them, it repeats what is just above, so the row
- * shows without it. Anything else between them (another message, a reply,
- * a card, a note) keeps the quote.
- */
-export function answersPrevious(items: ReadonlyArray<ChatItem>, end: number, target: ReplyTarget): boolean {
-  let index = end - 1
-  while (index >= 0 && (items[index]!._tag === 'day' || items[index]!._tag === 'newDivider')) index--
-  const previous = items[index]
-  switch (target._tag) {
-    case 'owner':
-      return previous?._tag === 'owner' && previous.opId === target.opId
-    case 'bubble':
-      return previous?._tag === 'juno' && previous.id === target.id
-    case 'card':
-      return previous?._tag === 'card' && previous.card.id === target.id
-  }
-}
-
-/**
  * The local Remove sheet, opened from a message's context menu. It is not a
  * card: it works in every state (paused, offline, AI off, recovery), and
  * the click is the owner's redaction (plan v3 §4.5). A `remove` card exists
