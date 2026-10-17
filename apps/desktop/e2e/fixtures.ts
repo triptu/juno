@@ -106,8 +106,12 @@ function coverageDir(): string | undefined {
  */
 export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
   const env: Record<string, string> = {}
+  // pnpm's global virtual store gives the scripts it runs NODE_PATH and a
+  // NODE_OPTIONS resolve hook. The app is bundled and the packaged app gets
+  // neither, so the app under test does not either.
+  const dropped = new Set(['ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'NODE_PATH'])
   for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && key !== 'ELECTRON_RUN_AS_NODE') env[key] = value
+    if (value !== undefined && !dropped.has(key)) env[key] = value
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
