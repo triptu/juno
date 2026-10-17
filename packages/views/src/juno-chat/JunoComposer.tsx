@@ -110,13 +110,13 @@ const styles = stylex.create({
   wide: {
     maxWidth: 'none',
   },
-  // The chat column's width less its 32px padding each side, so the field lines up with the bubbles and the header island.
+  // The topic composer's width (SPEC 12): a question sent from Home opens this tab with the field where Home's was.
   box: {
     anchorName: '--composer-box',
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
-    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,
+    maxWidth: layout['--composer-width'],
     marginInline: 'auto',
     paddingInlineStart: spacing['--space-3-5'],
     paddingInlineEnd: spacing['--space-1-5'],
@@ -125,7 +125,7 @@ const styles = stylex.create({
   // Above the field, lined up with its text.
   quote: {
     display: 'flex',
-    maxWidth: `calc(${layout['--page-width']} - ${spacing['--space-16']})`,
+    maxWidth: layout['--composer-width'],
     marginInline: 'auto',
     marginBottom: spacing['--space-1-5'],
     paddingInline: spacing['--space-3-5'],
