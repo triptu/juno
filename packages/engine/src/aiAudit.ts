@@ -23,9 +23,14 @@ const QUEUE_CAPACITY = 1000
 /** An error's text is cut here. */
 const MESSAGE_CHARS = 300
 
-/** Removes anything shaped like an API key or a bearer token from an error's text, and cuts it short. */
+/**
+ * Removes anything shaped like an API key or a bearer token from an error's
+ * text, and the part of the input a moderation error quotes back
+ * (OpenRouter's `flagged_input`), and cuts it short.
+ */
 export const cleanMessage = (text: string): string =>
   text
+    .replace(/(\\?"flagged_input\\?"\s*:\s*)\\?"(?:[^"\\]|\\.)*?\\?"/g, '$1"[removed]"')
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[key]')
     .replace(/Bearer\s+\S+/gi, 'Bearer [key]')
     .replace(/\s+/g, ' ')

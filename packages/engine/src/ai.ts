@@ -8,21 +8,26 @@
  * agent's daily cap (`AiSpend`); a key change or removal cancels calls under
  * way. `fakeAiRequiresKey` puts the fake behind the same key and cap.
  * Every call, and every one refused, goes to the AI activity log
- * (`AiAudit`) with what it was for (`AiPurpose`), never its text.
+ * (`AiAudit`) with what it was for (`AiPurpose`), never its text; a call a
+ * fallback model answered is two rows, the main model's failure and the
+ * fallback's answer. An input a model refused for good (`isFinal`) is kept in
+ * `ai_refusals` and not sent again until it changes: the same task, key and
+ * input hash get that refusal back at once, with no call and no row.
  *
  * A top-level module, like `workspace.ts`: the art job uses it now and the
  * assistant features will, and feature folders do not import each other.
  */
 import { Clock, Context, Effect, Exit, Layer, Stream } from 'effect'
 import type { HostAiCall } from '@juno/agent-contract'
-import { AiProvider, FAKE_MODEL, FakeAiProvider, modelFor, PiAiProvider, type AiConfig, type Decision, type ModelPrefs, type Tier } from '@juno/ai'
+import { AiProvider, cacheKeyOf, FAKE_MODEL, FakeAiProvider, fallbackFor, isFinal, modelFor, PiAiProvider, type AiConfig, type AiFailureKind, type Decision, type ModelPrefs, type Task, type Tier } from '@juno/ai'
 import { parseTopicId } from '@juno/domain'
-import { prefs } from '@juno/store'
+import { prefs, StoreReader, StoreWriter, transaction, type Invalidation } from '@juno/store'
 import { EngineConfig } from './config'
 import { Workspace } from './workspace'
 import { AiCredentials } from './aiCredentials'
 import { AiBackground, AiSpend } from './aiSpend'
 import { AiAudit } from './aiAudit'
+import { AiFallback } from './aiFallback'
 import { HostLink } from './protocol/host'
 
 /** The `prefs` key holding `Partial<ModelPrefs>`: the slug per tier the owner changed. */
@@ -47,9 +52,9 @@ const summaryOf = (task: string, value: unknown): string => {
   return ''
 }
 
-/** The log's outcome for a decision: blocked when nothing was sent, else what came back. */
+/** The log's outcome for a decision: blocked when nothing was sent, else what came back. An answer from the fallback model is `ok` of kind `fallback`. */
 const outcomeOf = (decision: Decision<unknown>): Pick<HostAiCall, 'outcome' | 'kind' | 'message'> => {
-  if (decision._tag === 'Decided') return { outcome: 'ok', kind: '', message: '' }
+  if (decision._tag === 'Decided') return { outcome: 'ok', kind: decision.meta.fallbackFor === undefined ? '' : 'fallback', message: '' }
   switch (decision.reason) {
     case 'missing-key':
       return { outcome: 'blocked', kind: 'no-key', message: '' }
@@ -57,14 +62,17 @@ const outcomeOf = (decision: Decision<unknown>): Pick<HostAiCall, 'outcome' | 'k
       return { outcome: 'blocked', kind: decision.detail ?? 'cap', message: '' }
     case 'timeout':
       return { outcome: 'timeout', kind: 'timeout', message: '' }
+    case 'provider-error':
+      return { outcome: 'error', kind: decision.kind ?? decision.reason, message: decision.detail ?? '' }
     default:
       return { outcome: 'error', kind: decision.reason, message: decision.detail ?? '' }
   }
 }
 
-/** What the log needs of a task. */
+/** What the log and the refusal record need of a task. */
 interface TaskInfo {
   readonly name: string
+  readonly version: number
   readonly tier: Tier
   readonly key: (input: never) => string
 }
@@ -102,8 +110,25 @@ const audited = (audit: AiAudit['Service'], provider: string, modelOf: (tier: Ti
         yield* audit.record({ ...base, model, outcome: 'cancelled', kind: 'key-changed', message: '', ...empty })
         return MISSING as Decision<A>
       }
+      // The main model's failure, before the fallback that answered it: its own row, newest below the fallback's.
+      const failed = meta.fallbackFor
+      if (failed !== undefined) {
+        yield* audit.record({
+          ...base,
+          durationMs: failed.meta.latencyMillis,
+          model: failed.meta.model,
+          outcome: 'error',
+          kind: `${failed.kind}.fallback`,
+          message: failed.detail ?? '',
+          inputTokens: failed.meta.inputTokens ?? null,
+          outputTokens: failed.meta.outputTokens ?? null,
+          costUsd: failed.meta.costUsd ?? null,
+          summary: '',
+        })
+      }
       yield* audit.record({
         ...base,
+        ...(failed === undefined ? {} : { at: base.at + failed.meta.latencyMillis, durationMs: Math.max(0, durationMs - failed.meta.latencyMillis) }),
         model,
         ...outcomeOf(decision),
         inputTokens: meta.inputTokens ?? null,
@@ -114,7 +139,49 @@ const audited = (audit: AiAudit['Service'], provider: string, modelOf: (tier: Ti
       return decision
     }).pipe(Effect.uninterruptible)
 
-export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Workspace | AiCredentials | AiSpend | AiAudit | HostLink> = Layer.unwrap(
+/** The refusal kept for a task's key, if any (`ai_refusals`). */
+interface Refusal {
+  readonly input_hash: string
+  readonly kind: string
+}
+
+/**
+ * The refused inputs of the open workspace. Reads and writes that fail, or
+ * run with no workspace open, do nothing: at worst an input is sent again.
+ */
+const refusalsOf = (workspace: Workspace['Service']) => {
+  const inOpen = <A>(effect: Effect.Effect<A, unknown, StoreReader | StoreWriter | Invalidation>, otherwise: A): Effect.Effect<A> => Effect.gen(function* () {
+    const open = yield* workspace.current
+    if (open === undefined) return otherwise
+    return yield* effect.pipe(Effect.provide(open.context), Effect.catch(() => Effect.succeed(otherwise)))
+  })
+  return {
+    find: (task: string, key: string) => inOpen(Effect.gen(function* () {
+      const sql = yield* StoreReader
+      return (yield* sql<Refusal>`SELECT input_hash, kind FROM ai_refusals WHERE task = ${task} AND key = ${key}`)[0]
+    }), undefined),
+    remember: (task: string, key: string, hash: string, kind: AiFailureKind, at: number) => inOpen(transaction(Effect.gen(function* () {
+      const sql = yield* StoreWriter
+      yield* sql`INSERT INTO ai_refusals (task, key, input_hash, kind, at) VALUES (${task}, ${key}, ${hash}, ${kind}, ${at})
+        ON CONFLICT (task, key) DO UPDATE SET input_hash = excluded.input_hash, kind = excluded.kind, at = excluded.at`
+    })), undefined),
+    forget: (task: string, key: string) => inOpen(transaction(Effect.gen(function* () {
+      const sql = yield* StoreWriter
+      yield* sql`DELETE FROM ai_refusals WHERE task = ${task} AND key = ${key}`
+    })), undefined),
+  }
+}
+
+/** The answer for an input refused before: the same refusal, with no call made. */
+const refusedBefore = (refusal: Refusal): Decision<never> => ({
+  _tag: 'NoDecision',
+  reason: 'provider-error',
+  kind: refusal.kind as AiFailureKind,
+  detail: 'refused before; not sent again until the input changes',
+  meta: { model: '', latencyMillis: 0, attempts: 0 },
+})
+
+export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Workspace | AiCredentials | AiSpend | AiAudit | AiFallback | HostLink> = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* EngineConfig
     const audit = yield* AiAudit
@@ -122,6 +189,8 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
     const spend = yield* AiSpend
     const host = yield* HostLink
     const workspace = yield* Workspace
+    const fallback = yield* AiFallback
+    const refusals = refusalsOf(workspace)
     const readConfig: Effect.Effect<AiConfig> = Effect.gen(function* () {
       const open = yield* workspace.current
       const models =
@@ -133,11 +202,18 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
               Effect.catch(() => Effect.succeed(undefined)),
             )
       const apiKey = yield* credentials.key
-      return { ...(apiKey === undefined ? {} : { apiKey }), ...(models === undefined ? {} : { models }), admit: spend.admit }
+      // The agent's word on the fallback (Settings › Juno) wins over a slug in the preference.
+      const chosen = yield* fallback.current
+      const all = chosen === undefined ? models : { ...models, fallback: chosen }
+      return { ...(apiKey === undefined ? {} : { apiKey }), ...(all === undefined ? {} : { models: all }), admit: spend.admit }
     })
     const gated = config.ai === 'live' || config.fakeAiRequiresKey === true
     const implementation = config.ai === 'fake'
-      ? FakeAiProvider.layerWith({ delayMillis: config.fakeAiDelayMillis ?? 0, ...(gated ? { admit: spend.admit } : {}) })
+      ? FakeAiProvider.layerWith({
+          delayMillis: config.fakeAiDelayMillis ?? 0,
+          ...(gated ? { admit: spend.admit } : {}),
+          fallback: readConfig.pipe(Effect.map((current) => fallbackFor(current, FAKE_MODEL))),
+        })
       : PiAiProvider.layer(readConfig)
     return Layer.effect(AiProvider, Effect.gen(function* () {
       const provider = yield* AiProvider
@@ -145,7 +221,19 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
       const modelOf = (tier: Tier): Effect.Effect<string> =>
         config.ai === 'fake' ? Effect.succeed(FAKE_MODEL) : readConfig.pipe(Effect.map((current) => modelFor(tier, current)))
       const logged = audited(audit, providerName, modelOf)
-      const run = <A>(task: TaskInfo, input: unknown, request: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> => logged(task, input, Effect.gen(function* () {
+      /** Sends the input unless it was refused for good before; keeps a new final refusal, and forgets one after an answer. */
+      const remembered = <A>(task: TaskInfo, input: unknown, request: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> => Effect.gen(function* () {
+        const key = task.key(input as never)
+        const hash = cacheKeyOf(task as Task, input).inputHash
+        const known = yield* refusals.find(task.name, key)
+        if (known !== undefined && known.input_hash === hash) return refusedBefore(known) as Decision<A>
+        const decision = yield* request
+        if (decision._tag === 'NoDecision' && decision.kind !== undefined && decision.meta.attempts > 0 && isFinal(decision)) {
+          yield* refusals.remember(task.name, key, hash, decision.kind, yield* Clock.currentTimeMillis)
+        } else if (decision._tag === 'Decided' && known !== undefined) yield* refusals.forget(task.name, key)
+        return decision
+      })
+      const run = <A>(task: TaskInfo, input: unknown, request: Effect.Effect<Decision<A>>): Effect.Effect<Decision<A>> => remembered(task, input, logged(task, input, Effect.gen(function* () {
         // Home's tasks are backlog work; the art job says per topic.
         const asked = BACKGROUND_TASKS.has(task.name) ? request.pipe(Effect.provideService(AiBackground, true)) : request
         // Tests count the calls that reached the fake model; one the cap blocked made no attempt.
@@ -158,7 +246,7 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
         // A replacement or removal interrupts the request, including its AbortSignal.
         const changed = credentials.revisions.pipe(Stream.filter(value => value !== revision), Stream.runHead, Effect.as(KEY_CHANGED))
         return yield* Effect.raceFirst(call, changed)
-      }))
+      })))
       return AiProvider.of({
         decide: (task, input) => run(task, input, provider.decide(task, input)),
         generate: (task, input) => run(task, input, provider.generate(task, input)),
