@@ -66,7 +66,13 @@ function remove(nameOrPath) {
   const path = nameOrPath.includes('/') ? resolve(nameOrPath) : join(folder, nameOrPath)
   const branch = execFileSync('git', ['-C', path, 'branch', '--show-current'], { encoding: 'utf8' }).trim()
   git('-C', main, 'worktree', 'remove', ...(rest.includes('--force') ? ['--force'] : []), path)
-  // -d, not -D: a branch with commits not merged anywhere is kept.
-  if (rest.includes('--delete-branch') && branch) git('-C', main, 'branch', '-d', branch)
   console.log(`removed ${path}`)
+  if (!rest.includes('--delete-branch') || !branch) return
+  // -d, not -D: a branch with commits not merged into the main checkout's branch is kept.
+  try {
+    execFileSync('git', ['-C', main, 'branch', '-d', branch], { stdio: 'ignore' })
+    console.log(`deleted branch ${branch}`)
+  } catch {
+    console.log(`kept branch ${branch}: it is not merged`)
+  }
 }
