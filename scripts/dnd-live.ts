@@ -22,7 +22,7 @@
  * cookie, id or other pref.
  */
 import { apiBaseFromWorkspace, slackRoute } from '@juno/slack'
-import { defaultNotificationSettings, slackScheduleFor, slackScheduleKeys, slackScheduleMatches, type Hours, type SlackSchedulePrefs, type Weekday } from '@juno/domain'
+import { defaultNotificationSettings, slackScheduleFor, slackScheduleKeys, slackScheduleMatches, type Hours, type SlackSchedulePrefs, type Weekday } from '../packages/domain/src/index.ts'
 import { readCachedSession } from './live-common.ts'
 
 if (process.env.JUNO_LIVE !== '1') {
