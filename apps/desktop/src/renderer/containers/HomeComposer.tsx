@@ -30,6 +30,12 @@ import { openJuno, openTopic } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
 
+/** A key typed on the chip goes into the field, as a token field does, and focus stays there. */
+function typeIn(field: HTMLTextAreaElement | null, text: string): void {
+  field?.focus()
+  if (field !== null && field === document.activeElement) document.execCommand('insertText', false, text)
+}
+
 /** A first @ or # with what follows it, and nothing else typed yet. */
 const FIRST = /^([@#])([^\s@#]*)$/
 
@@ -333,7 +339,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       {...(toSlack ? { leading: files.leading } : {})}
       attachments={files.chips}
       onFiles={files.onFiles}
-      above={<HomeWriteTop recent={<Recent chosen={draft.conversation?.key} onPick={destination.choose} />} chip={<Chip destination={draft.conversation} junoOn={junoOn} {...destination.chip} />} />}
+      above={<HomeWriteTop recent={<Recent chosen={draft.conversation?.key} onPick={destination.choose} />} chip={<Chip destination={draft.conversation} junoOn={junoOn} onType={(text) => typeIn(inputRef.current, text)} {...destination.chip} />} />}
     />
   )
 })
@@ -364,11 +370,12 @@ interface ChipProps {
   readonly onQuery: (query: string) => void
   readonly onOpen: (open: boolean) => void
   readonly onPick: (conversation: PickConversation | undefined) => void
+  readonly onType: (text: string) => void
 }
 
 /** The destination chip, with its list's live query while it is open. */
-function Chip({ destination, junoOn, open, query, onQuery, onOpen, onPick }: ChipProps) {
+function Chip({ destination, junoOn, open, query, onQuery, onOpen, onPick, onType }: ChipProps) {
   const list = useAtomValue(pickConversationsAtom(open ? query : undefined))
   const conversations = useHeld(list._tag === 'Success' ? list.value : undefined, open)
-  return <DestinationChip destination={destination} juno={junoOn} open={open} onOpen={onOpen} query={query} onQuery={onQuery} conversations={conversations.value} loading={conversations.loading} onPick={onPick} />
+  return <DestinationChip destination={destination} juno={junoOn} open={open} onOpen={onOpen} query={query} onQuery={onQuery} conversations={conversations.value} loading={conversations.loading} onPick={onPick} onType={onType} />
 }

@@ -123,3 +123,28 @@ test('text pasted right after ⌘T goes into the new Home, in order with the key
   await tabs.select(POSTGRES)
   await expect(topic.composer).toHaveValue('')
 })
+
+test('keys typed on the destination chip go into the field; arrows and Space still drive the chip', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs, win } = juno
+
+  await tabs.menu('new-message')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.chip).toBeFocused()
+  await win.keyboard.type('What changed today?')
+  await expect(write.composer).toBeFocused()
+  await expect(write.composer).toHaveValue('What changed today?')
+  await write.expectDestination('Juno')
+
+  await win.keyboard.press('Shift+Tab')
+  await expect(write.chip).toBeFocused()
+  await win.keyboard.press('ArrowDown')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await win.keyboard.press('Space')
+  await expect(write.search).toBeFocused()
+  await write.search.press('Escape')
+  await expect(write.composer).toHaveValue('What changed today?')
+})

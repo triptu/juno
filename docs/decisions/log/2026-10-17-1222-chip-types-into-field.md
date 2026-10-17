@@ -1,0 +1,1 @@
+- 10-17 12:22 · break-pass-c · A character typed on Home's closed destination chip goes into the field and focus moves there, as in a token field; Space, Enter and the arrows keep the chip's keys. The orchestrator decided it for the owner.
