@@ -1080,6 +1080,50 @@ Only `electron-updater`, koffi and their runtime dependencies ship as node_modul
 Source maps are excluded. Codex uses the separately installed `codex` executable;
 its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
 
+Only English Chromium locale packs ship (`electronLanguages: [en, en_GB]` in
+`electron-builder.yml`). Electron 44 has 220 `*.lproj` folders in its framework
+(55 languages, each also in `_FEMININE`, `_MASCULINE` and `_NEUTER` forms) and
+55 empty ones in the app's `Resources`, which tell macOS which languages the app
+has. Juno's UI is English only. Measured on 10-18 with unsigned packages of
+`65f9d7fd`:
+
+| | All languages | English only |
+| --- | --- | --- |
+| `Juno.app` | 308.3 MB | 259.0 MB |
+| Electron Framework `Resources` | 76.4 MB | 27.2 MB |
+| DMG | 129.5 MB | 117.1 MB |
+| ZIP | 129.5 MB | 116.8 MB |
+
+What the packs held: Chromium's own strings (form validation messages, the
+defaults for `<input>` and `<select>`, accessibility labels), and through them
+the app locale, which sets `navigator.language`, the default `Intl` locale and
+the spellchecker's default dictionary. Juno's menus, dialogs and context menus
+use its own English labels and format dates with an explicit `en` locale, so
+they do not change. Launched with `-AppleLanguages` and a fresh profile:
+
+- **English (US) or another language with no pack** (German was checked): the
+  app locale falls back to `en-US`, and Chromium's strings are in English, not
+  blank. Before, a German Mac got German validation messages and German default
+  formats (`So., 20:35`, `1.234.567,5`) inside an English app.
+- **English (UK)**: `en_GB` is kept, so default formats stay British (`Sun 20:35`).
+- AppKit's own items (the Services menu, Start Dictation, Emoji & Symbols, open
+  and save panels) follow the app's languages too, so they are now English.
+- The spellchecker on macOS is the system one and is not given a language, so
+  it still checks what the user types in any language.
+
+macOS never loads the gendered packs (`ui/base/resource/resource_bundle_mac.mm`
+looks up only `<locale>.lproj`), so they are not kept. To add a language, add
+its folder name to `electronLanguages`.
+
+What else is in the bundle, kept on purpose: the Electron Framework binary
+(201.5 MB); `libvk_swiftshader.dylib` and `vk_swiftshader_icd.json` (16.6 MB), the
+software GPU used when the GPU is unavailable or blocked; `libffmpeg.dylib`
+(2.3 MB) for audio and video; `icudtl.dat` (10.9 MB) for `Intl` and text
+breaking; `resources.pak`, `chrome_100_percent.pak` (non-Retina screens),
+`chrome_200_percent.pak` and the V8 snapshot; and Squirrel, Mantle and
+ReactiveObjC, which the updater needs. Juno's own code is about 8 MB
+(`app.asar` 6.8 MB, koffi's unpacked binary 1.2 MB).
+
 ### What the owner provides
 
 - A **Developer ID Application** certificate with its private key, exported as a

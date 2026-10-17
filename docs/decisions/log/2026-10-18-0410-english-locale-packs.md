@@ -1,0 +1,1 @@
+- 10-18 04:10 · trim-languages · The app ships only Chromium's `en` and `en_GB` locale packs (`electronLanguages`): the app drops from 308 to 259 MB and the DMG from 129.5 to 117.1 MB. Juno's UI is English only; on a Mac in another language, Chromium's own strings and default formats fall back to US English instead of mixing that language into an English app.

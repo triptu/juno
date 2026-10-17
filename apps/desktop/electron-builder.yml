@@ -16,6 +16,12 @@ files:
   - "!**/node_modules/koffi/**/*.{cc,hh,inc,def,d.ts}"
   - "!**/node_modules/koffi/**/{CMakeLists.txt,CHANGELOG.md,README.md,cnoke.cjs}"
 asar: true
+# Juno's UI is English only, so ship only Chromium's English locale packs; the others are 49 MB.
+# en_GB keeps British date and number formats on a Mac set to English (UK). Any other language
+# falls back to en (en-US). macOS never loads the gendered packs (docs/development.md, "Releasing").
+electronLanguages:
+  - en
+  - en_GB
 mac:
   category: public.app-category.productivity
   target:
