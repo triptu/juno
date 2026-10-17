@@ -8,8 +8,8 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 40,
-    "oversizedFunctions": 132
+    "oversizedFiles": 41,
+    "oversizedFunctions": 131
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -46,6 +46,7 @@
     "packages/tokens/src/tokens.stylex.ts",
     "packages/views/src/AllTopics.tsx",
     "packages/views/src/Message.tsx",
+    "packages/views/src/MessageList.tsx",
     "packages/views/src/Sidebar.tsx",
     "packages/views/src/TopicRow.tsx",
     "packages/views/src/juno-chat/fixtures/data.ts",
@@ -175,7 +176,6 @@
     "packages/views/src/CommandPalette.tsx:CommandPalette#1",
     "packages/views/src/EmojiPicker.tsx:EmojiPicker#1",
     "packages/views/src/Message.tsx:Message/memo/Message#1",
-    "packages/views/src/MessageBody.tsx:Inline#1",
     "packages/views/src/MessageList.tsx:MessageList#1",
     "packages/views/src/Sidebar.tsx:Sidebar#1",
     "packages/views/src/TopicRow.tsx:TopicRow/memo/TopicRow#1",
