@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { closeTab, expireTabs, newChatPlace, noTabs, openPlace, parseTabs, reopenClosedTab, savedTabs, stampViewed, tabExpiryMs, tabTopic, topicPlace, type Tabs } from '../src/tabs'
+import { closeTab, expireTabs, homePlace, noTabs, openPlace, parseTabs, reopenClosedTab, savedTabs, stampViewed, tabExpiryMs, tabTopic, topicPlace, type Tabs } from '../src/tabs'
 
 const HOUR = 60 * 60 * 1000
 const DAY = tabExpiryMs['1d']
 const open = (tabs: Tabs, topicId: string) => openPlace(tabs, topicPlace(topicId), { newTab: true })
-const shown = (tabs: Tabs) => tabs.tabs.map((tab) => tabTopic(tab) ?? 'new')
+const shown = (tabs: Tabs) => tabs.tabs.map((tab) => tabTopic(tab) ?? 'home')
 const idOf = (tabs: Tabs, topicId: string) => tabs.tabs.find((tab) => tabTopic(tab) === topicId)!.id
 
 /** Tabs a, b, c with c active; a viewed two days ago, b an hour ago, c now. */
@@ -37,9 +37,9 @@ describe('tab expiry', () => {
   })
 
   it('gives a tab saved without a time the full time from now', () => {
-    const unstamped = openPlace(open(noTabs, 'a'), newChatPlace, { newTab: true })
+    const unstamped = openPlace(open(noTabs, 'a'), homePlace, { newTab: true })
     const swept = expireTabs(unstamped, now, DAY)
-    expect(shown(swept)).toEqual(['a', 'new'])
+    expect(shown(swept)).toEqual(['a', 'home'])
     expect(swept.tabs.every((tab) => tab.lastViewedAt === now)).toBe(true)
   })
 

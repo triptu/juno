@@ -105,9 +105,9 @@ export const Events = {
  * the Tour, which opens the tour (SPEC 4).
  */
 export type MenuCommand =
-  /** ⌘T: a new tab with what Settings › General chooses. */
+  /** ⌘T: a new tab with Home. */
   | 'tab.new'
-  /** ⌘N: a New chat in a new tab. */
+  /** ⌘N: write a message from Home, with the destination list open. */
   | 'chat.new'
   | 'tab.close'
   | 'tab.reopen'

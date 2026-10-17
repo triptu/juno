@@ -252,10 +252,10 @@ function setAppMenu(state: MenuState, rebuild = false): void {
     { type: 'separator' },
     { role: 'togglefullscreen' },
   ]
-  // ⌘N and ⌘T both open a new tab (a New chat, spec section 9). ⌘W closes
-  // the tab, not the window; ⌘⇧W closes the window.
+  // ⌘N writes a message from Home and ⌘T opens a new tab with Home (spec
+  // sections 6 and 12). ⌘W closes the tab, not the window; ⌘⇧W closes the window.
   const file: MenuItemConstructorOptions[] = [
-    command('new-chat', 'New Chat', menuShortcuts['chat.new'], 'chat.new'),
+    command('new-message', 'New Message', menuShortcuts['chat.new'], 'chat.new'),
     command('new-tab', 'New Tab', menuShortcuts['tab.new'], 'tab.new'),
     command('reopen-tab', 'Reopen Closed Tab', menuShortcuts['tab.reopen'], 'tab.reopen'),
     { type: 'separator' },

@@ -9,7 +9,6 @@ import {
   junoPanelOpenAtom,
   junoPanelWidthAtom,
   mountedTabs,
-  newTabPageAtom,
   onMenuCommand,
   registry,
   setJunoPanelWidth,
@@ -32,7 +31,6 @@ import { runJunoShortcut } from './juno/actions'
 import { JunoPageTab, JunoPanel, JunoTab, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
 import { AllTopicsPage, closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
-import { NewChatTab } from './NewChat'
 import { runUndoCommand } from './topicActions'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicTab } from './TopicView'
@@ -76,9 +74,7 @@ function stripTab(summary: TabSummary): WorkspaceTab {
   const { detail, place } = summary
   const base = { id: summary.id, pinned: summary.pinned }
   const tab: WorkspaceTab =
-    place.kind === 'newChat'
-      ? { ...base, title: summary.chatTitle ?? 'New chat', icon: 'new-chat' }
-      : place.kind === 'home'
+    place.kind === 'home'
         ? { ...base, title: 'Home', icon: 'home' }
         : place.kind === 'allTopics'
           ? { ...base, title: 'All topics', icon: 'all-topics' }
@@ -105,10 +101,8 @@ function Page({ tab }: { readonly tab: Tab }) {
   switch (place.kind) {
     case 'topic':
       return <TopicTab key={place.viewId ?? place.topicId} tabId={tab.id} id={place.viewId ?? place.topicId} />
-    case 'newChat':
-      return <NewChatTab key="new-chat" tabId={tab.id} />
     case 'home':
-      return <HomePage key="home" />
+      return <HomePage key="home" tabId={tab.id} />
     case 'juno':
       return (
         <Suspense key="juno" fallback={null}>
@@ -244,8 +238,7 @@ function useWorkspaceEffects(active: string | undefined): void {
  * active stay mounted in `<Activity>` (performance 4.3), so a switch is a
  * display toggle; older tabs unmount and come back at their scroll
  * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
- * topic they bring back, and a New chat that sends becomes its topic in one
- * commit. There is always a tab (`ensureTab`); until the saved tabs have
+ * topic they bring back. There is always a tab (`ensureTab`); until the saved tabs have
  * been read the page is blank. While the sidebar is hidden the strip
  * starts with its controls.
  */
@@ -260,7 +253,6 @@ export function Workspace() {
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelWidth = useAtomValue(junoPanelWidthAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
-  const newTabPage = useAtomValue(newTabPageAtom)
 
   useWorkspaceEffects(state.active)
 
@@ -280,7 +272,6 @@ export function Workspace() {
       fullScreen={fullScreen}
       nothingShown={state.active === undefined}
       empty={null}
-      newTabLabel={newTabPage === 'home' ? 'New tab' : 'New chat'}
       side={
         agentOn && panelOpen && panelTopic !== undefined && state.active !== undefined ? (
           <Suspense fallback={null}>

@@ -6,8 +6,8 @@ import { AudienceWarning } from '@juno/views'
 import SendCheckPanel from './SendCheckPanel'
 import { afterCheck, choose, type CheckBar, type Destination, type Outcome } from './sendChecks'
 
-/** Checks use only a channel already picked. Enter reads cached findings, never a model. */
-export function useNewChatChecks(text: string, target: SendTarget | undefined, deliver: (text: string, to: Destination) => void, conversation: PickConversation | undefined) {
+/** Home's send checks (SPEC 8): only on a channel already chosen. Enter reads cached findings, never a model. */
+export function useHomeSendChecks(text: string, target: SendTarget | undefined, deliver: (text: string, to: Destination) => void, conversation: PickConversation | undefined) {
   const enabled = useAtomValue(aiAssistOnAtom)
   const wrongPlace = useAtomValue(sendCheckPrefsAtom).some((check) => check.key === 'wrongPlace' && check.enabled)
   const checking = useRef<object | undefined>(undefined)

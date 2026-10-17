@@ -14,8 +14,6 @@ import {
   junoPagePlace,
   junoPlace,
   mountedTabs,
-  newChatPlace,
-  newTabPlace,
   noTabs,
   openPlace,
   openSettingsSection,
@@ -23,7 +21,6 @@ import {
   reopenClosedTab,
   savedTabs,
   setPinned,
-  settleNewChat,
   stepHistory,
   tabByNumber,
   tabTopic,
@@ -33,11 +30,11 @@ import {
 } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)
-/** What each tab shows, left to right: a topic id, "new" for a New chat, "home" or "juno". */
+/** What each tab shows, left to right: a topic id, "home" or "juno". */
 const placeName = (tab: Tabs['tabs'][number]) => {
   const kind = tab.history.entries[tab.history.index]!.kind
   const place = tab.history.entries[tab.history.index]!
-  return tabTopic(tab) ?? (place.kind === 'junoPage' ? place.page : kind === 'newChat' ? 'new' : kind)
+  return tabTopic(tab) ?? (place.kind === 'junoPage' ? place.page : kind)
 }
 const shown = (tabs: Tabs) => tabs.tabs.map(placeName)
 const activeShows = (tabs: Tabs) => {
@@ -88,12 +85,12 @@ describe('opening', () => {
     expect(back.active).toBe(second)
   })
 
-  it('a New chat opens in a new tab, and the next open in that tab replaces it', () => {
-    const chat = openPlace(three, newChatPlace, { newTab: true })
-    expect(shown(chat)).toEqual(['a', 'b', 'new', 'c'])
-    const filled = open(chat, 'd')
+  it('a new tab with Home stays in its history when a topic opens in it, so Back returns to Home', () => {
+    const home = openPlace(three, homePlace, { newTab: true })
+    expect(shown(home)).toEqual(['a', 'b', 'home', 'c'])
+    const filled = open(home, 'd')
     expect(shown(filled)).toEqual(['a', 'b', 'd', 'c'])
-    expect(historyTarget(filled, -1)).toBeUndefined()
+    expect(historyTarget(filled, -1)).toEqual(homePlace)
   })
 })
 
@@ -177,46 +174,6 @@ describe('Settings', () => {
   })
 })
 
-describe('a New chat left for a topic', () => {
-  it('is replaced when empty, and kept for Back when it has a draft', () => {
-    const chat = openPlace(noTabs, newChatPlace)
-    expect(historyTarget(open(chat, 'a'), -1)).toBeUndefined()
-    const kept = openPlace(chat, topicPlace('a'), { keepNewChat: true })
-    expect(shown(kept)).toEqual(['a'])
-    expect(historyTarget(kept, -1)).toEqual(newChatPlace)
-  })
-})
-
-describe('a New chat that sends', () => {
-  it('becomes the topic in place of its own entry, so Back goes to what the tab showed before', () => {
-    const chat = openPlace(open(noTabs, 'a'), newChatPlace)
-    expect(historyTarget(chat, -1)).toEqual(topicPlace('a'))
-    const sent = settleNewChat(chat, chat.active!, 'd')
-    expect(shown(sent)).toEqual(['d'])
-    expect(historyTarget(sent, -1)).toEqual(topicPlace('a'))
-    expect(historyTarget(stepHistory(sent, -1), 1)).toEqual(topicPlace('d'))
-  })
-
-  it('stays and shows the topic when another tab already shows it too', () => {
-    const chat = openPlace(three, newChatPlace, { newTab: true })
-    const sent = settleNewChat(chat, chat.active!, 'c')
-    expect(shown(sent)).toEqual(['a', 'b', 'c', 'c'])
-    expect(sent.active).toBe(chat.active)
-    expect(activeShows(sent)).toBe('c')
-  })
-
-  it('changes nothing once the tab shows something else', () => {
-    expect(settleNewChat(three, three.active!, 'd')).toBe(three)
-  })
-
-  it('a tab closed while sending comes back showing the topic', () => {
-    const chat = openPlace(three, newChatPlace, { newTab: true })
-    const closed = closeTab(chat, chat.active!)
-    const sent = settleNewChat(closed, chat.active!, 'd')
-    expect(shown(reopenClosedTab(sent))).toEqual(['a', 'b', 'd', 'c'])
-  })
-})
-
 describe('history', () => {
   it('Back and Forward move through what the tab showed', () => {
     const tabs = open(open(open(noTabs, 'a'), 'b'), 'c')
@@ -263,17 +220,16 @@ describe('closing', () => {
     expect(activeShows(closed)).toBe('b')
   })
 
-  it('closing the last tab leaves one that shows what a new tab opens, and ⌘⇧T can still bring the closed one back', () => {
+  it('closing the last tab leaves one that shows Home, and ⌘⇧T can still bring the closed one back', () => {
     const one = open(noTabs, 'a')
     const none = closeTab(one, one.tabs[0]!.id)
     expect(none.tabs).toEqual([])
-    const chat = ensureTab(none, newTabPlace('newChat'))
-    expect(shown(chat)).toEqual(['new'])
-    expect(chat.active).toBe(chat.tabs[0]!.id)
-    expect(chat.active).not.toBe(one.tabs[0]!.id)
-    expect(shown(ensureTab(none, newTabPlace('home')))).toEqual(['home'])
-    expect(shown(reopenClosedTab(chat))).toEqual(['a', 'new'])
-    expect(ensureTab(three, newTabPlace('home'))).toBe(three)
+    const home = ensureTab(none, homePlace)
+    expect(shown(home)).toEqual(['home'])
+    expect(home.active).toBe(home.tabs[0]!.id)
+    expect(home.active).not.toBe(one.tabs[0]!.id)
+    expect(shown(reopenClosedTab(home))).toEqual(['a', 'home'])
+    expect(ensureTab(three, homePlace)).toBe(three)
   })
 
   it('close other, to the right and all leave pinned tabs open', () => {

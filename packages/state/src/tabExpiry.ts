@@ -13,7 +13,7 @@ import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import { prefsGet, prefsSet } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
-import { newChatAtom, untouched } from './newChat'
+import { homeDraftAtom, untouched } from './homeDraft'
 import { draftAtom } from './send'
 import { currentPlace, expireTabs, TAB_EXPIRY_DEFAULT, tabExpiryMs, tabsAtom, updateTabs, type Tab, type TabExpiry } from './tabs'
 
@@ -39,10 +39,10 @@ async function settled<A>(registry: Registry, atom: Atom.Atom<AsyncResult.AsyncR
   return Exit.isSuccess(exit) ? exit.value : undefined
 }
 
-/** Whether a tab holds something unsent: a New chat with a draft or a destination, or a topic with a draft. A draft that cannot be read counts. */
+/** Whether a tab holds something unsent: a Home with a draft or a destination, or a topic with a draft. A draft that cannot be read counts. */
 async function holdsDraft(registry: Registry, tab: Tab): Promise<boolean> {
   const place = currentPlace(tab)
-  if (place.kind === 'newChat') return !untouched(registry.get(newChatAtom(tab.id)))
+  if (place.kind === 'home') return !untouched(registry.get(homeDraftAtom(tab.id)))
   if (place.kind !== 'topic') return false
   const draft = await settled(registry, draftAtom(place.topicId))
   return draft === undefined || draft.trim() !== ''

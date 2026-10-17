@@ -5,7 +5,7 @@
  * when the text matches them, or all of them after a leading ">". Each
  * reuses the action the rest of the app runs: the sidebar's pages, the Juno
  * menu's pages, Settings by section, the theme and accent of Settings ›
- * Appearance, the tab and New chat commands, the account menu's presence
+ * Appearance, the New tab and New message commands, the account menu's presence
  * and privacy, and the topic menu.
  */
 import { AccentSchema, type Accent, type SettingsSection, type Theme } from '@juno/contract'
@@ -30,7 +30,7 @@ import {
 import { chatCopy } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { closeJunoPanel, openPanel } from './juno/actions'
-import { openAllTopics, openHome, openJuno, openJunoPage, openNewChat, openNewTab, openSettings, openTopic } from './navigation'
+import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
@@ -121,7 +121,6 @@ function pageRows(): ReadonlyArray<CommandRow> {
     row('page-home', 'home', 'Home', 'start greeting', openHome, page),
     row('page-all-topics', 'all-topics', 'All topics', 'everything browse list threads', openAllTopics, page),
     row('page-juno', 'juno', 'Juno', 'ai assistant chat ask', openJuno, juno),
-    row('new-chat', 'new-chat', 'New chat', 'message write compose dm', openNewChat, { group: 'pages', family: 'pages go', hint: '⌘N' }),
     junoPage('scheduled', 'schedule reminders later'),
     junoPage('remembers', 'memory remember facts'),
     ...(junoChatOpen() ? [junoPage('memory', 'chat')] : []),
@@ -145,6 +144,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     ...themes.map((option) => row(`theme-${option.theme}`, option.icon, `Theme: ${option.label}`, 'appearance mode', () => setTheme(option.theme), { ...stays, family: 'theme', ...(option.theme === theme ? { sub: 'Current' } : {}) })),
     ...AccentSchema.literals.map((name) => row(`accent-${name}`, 'theme-system', `Accent: ${accentLabels[name]}`, 'appearance', () => setAccent(name), { ...stays, family: 'accent colour color', accent: name, ...(name === accent ? { sub: 'Current' } : {}) })),
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
+    // ⌘N: Home's composer with the destination list open (SPEC 12).
+    row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: '⌘N' }),
     // The tour (SPEC 4), as Help › Show the Tour opens it.
     row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTour(registry)),
     privacy

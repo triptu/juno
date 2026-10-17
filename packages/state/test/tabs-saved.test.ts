@@ -17,11 +17,11 @@ import {
 } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)
-/** What each tab shows, left to right: a topic id, "new" for a New chat, "home" or "juno". */
+/** What each tab shows, left to right: a topic id, "home" or "juno". */
 const placeName = (tab: Tabs['tabs'][number]) => {
   const kind = tab.history.entries[tab.history.index]!.kind
   const place = tab.history.entries[tab.history.index]!
-  return tabTopic(tab) ?? (place.kind === 'junoPage' ? place.page : kind === 'newChat' ? 'new' : kind)
+  return tabTopic(tab) ?? (place.kind === 'junoPage' ? place.page : kind)
 }
 const shown = (tabs: Tabs) => tabs.tabs.map(placeName)
 const activeShows = (tabs: Tabs) => {
@@ -62,6 +62,21 @@ describe('saved tabs', () => {
     const restored = parseTabs({ tabs: [{ id: 'tab-1', pinned: true, stealth: true, place: { kind: 'topic', topicId: 'a' } }], active: 'tab-1', recent: [] })
     expect(shown(restored)).toEqual(['a'])
     expect(restored.tabs[0]!.pinned).toBe(true)
+  })
+
+  it('a New chat tab saved before Home took its place reads back as Home', () => {
+    const restored = parseTabs({ tabs: [{ id: 'tab-1', pinned: false, place: { kind: 'newChat' }, newChat: { draft: 'hi', mentions: [] } }], active: 'tab-1', recent: [] })
+    expect(shown(restored)).toEqual(['home'])
+  })
+
+  it('saves a Home tab’s draft and destination with the tab, and nothing for an empty one', () => {
+    const tabs = openPlace(noTabs, homePlace)
+    const id = tabs.active!
+    const draft = { draft: 'Thursday works', mentions: [], conversation: { key: 'D0MAYA', name: 'Maya Chen', kind: 'im' as const, tint: 'dm' as const, channelId: 'D0MAYA', mainId: 'm:D0MAYA', empty: false } }
+    const saved = JSON.parse(JSON.stringify(savedTabs(tabs, (tabId) => (tabId === id ? draft : undefined))))
+    expect(saved.tabs[0].homeDraft).toEqual(draft)
+    const empty = JSON.parse(JSON.stringify(savedTabs(tabs, () => ({ draft: ' ', mentions: [], conversation: undefined }))))
+    expect(empty.tabs[0].homeDraft).toBeUndefined()
   })
 
   it('anything unreadable is no tabs, and a lost active tab falls back to the first', () => {
