@@ -1,0 +1,1 @@
+- 10-17 07:00 · perf-idle-clock · Home open after 31 s idle is measured as a person meets it, with no held clock (holding it made the engine slower in two of three runs); pointer enter or focus on the sidebar's Home item warms `home.view`, so the open renders cached data instead of waiting on a new subscription.
