@@ -43,7 +43,8 @@ test('mention a person in a reply: Backspace removes it whole, and it posts as <
   await expect(topic.composer).toHaveValue('Thanks @Maya')
   await expect(topic.composerChips).toHaveText(['@Maya'])
 
-  await topic.composer.press('End')
+  // Undo leaves the name it brought back selected, as native undo does; move past it.
+  await topic.caretToEnd()
   await topic.composer.pressSequentially(' the plan works.')
   await topic.composer.press('Enter')
   await topic.expectSent('Thanks')
@@ -153,7 +154,7 @@ test('a draft keeps its mentions across tab switches', async ({ juno, fake }) =>
   await topic.expectTitle(POSTGRES)
   await expect(topic.composer).toHaveValue('Ask @Priya ')
   await expect(topic.composerChips).toHaveText(['@Priya'])
-  await topic.composer.press('End')
+  // Typing goes on at the end of the draft it came back with.
   await topic.composer.pressSequentially('about the copy.')
   await topic.composer.press('Enter')
   await topic.expectSent('Ask')

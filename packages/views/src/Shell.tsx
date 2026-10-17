@@ -112,6 +112,8 @@ function SidebarEdge({ width, onResize, onReset, onCollapse }: SidebarEdgeProps)
     drag.current = undefined
     if (current.frame !== undefined) cancelAnimationFrame(current.frame)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    // Where the button came up decides, even when the last moves before it were not delivered.
+    if (event.type === 'pointerup') current.raw = width + event.clientX - current.startX
     if (event.type === 'pointerup' && current.raw < COLLAPSE_BELOW) {
       write(current.box, width)
       onCollapse?.()

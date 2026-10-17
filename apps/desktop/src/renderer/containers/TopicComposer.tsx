@@ -103,6 +103,11 @@ function LoadedComposer({
   const [waiting, setWaiting] = useState(false)
   // A quote just went in: the caret goes after it once it is drawn.
   const [quotedAt, setQuotedAt] = useState(0)
+  // A saved draft comes back with the caret at its end, so typing goes on after it, not before.
+  useLayoutEffect(() => {
+    const element = field.current
+    if (element !== null) element.setSelectionRange(element.value.length, element.value.length)
+  }, [])
   useLayoutEffect(() => {
     const element = field.current
     if (quotedAt === 0 || element === null) return

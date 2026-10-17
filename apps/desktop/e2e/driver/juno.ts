@@ -1408,6 +1408,11 @@ export class TopicPane {
     return this.root.locator('[data-composer] textarea')
   }
 
+  /** Moves the composer's caret to the end of its text: ⌘↓ on macOS, where End only scrolls, and Ctrl+End elsewhere. */
+  async caretToEnd(): Promise<void> {
+    await this.composer.press(process.platform === 'darwin' ? 'Meta+ArrowDown' : 'Control+End')
+  }
+
   /** The @ or # suggestions above the composer (inventory 7.1). */
   get suggestions(): Locator {
     return this.root.locator('[data-mention-suggestions]')
