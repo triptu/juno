@@ -29,7 +29,7 @@ Juno should feel as stable as a native macOS app: nothing moves unless the user 
 | what is on screen holds still | the row at the top (or bottom) edge of the view moves between two frames while the user is not scrolling |
 | scrolling never jumps back | content moves against the wheel while scrolling |
 | a painted row stays in All and never moves up, a bot channel never shows in All | during the first sync (`sidebar-first-sync`), a sidebar row leaves All or rises, or a row of a channel the Automated rules move shows in All; rows that land above and push painted rows down only warn, as `no layout shift` |
-| no layout shift | the browser reports a `layout-shift` entry (shifts within 500 ms of a press are left out where the press replaces the pane) |
+| no layout shift | the browser reports a `layout-shift` entry that moved a box (shifts within 500 ms of a press are left out where the press replaces the pane; an entry whose every box is where it was, as a text change can give, does not count) |
 | shows in the next frame | hover or press feedback is not in the first frame after the event |
 | opens whole, opens at its anchor | a popover is empty in its first frame, disappears and comes back, or opens away from its button |
 | switches once | a frame shows a third state between the old and the new (a blank pane, the new header over old rows), or goes back |
