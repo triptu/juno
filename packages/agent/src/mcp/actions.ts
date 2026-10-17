@@ -8,6 +8,7 @@ import { McpError, denied, destructiveArguments, forbidden } from './types'
 import { json, parseObject, validateArguments } from './catalogue'
 import { notionCheck, notionPreconditions, notionReconcile } from './notion'
 import { clickOutput } from './results'
+import { actionName } from './naming'
 
 export const toolKey = (id: string, name: string) => `mcp:${encodeURIComponent(id)}:${encodeURIComponent(name)}`
 const connectHash = (manager: McpManagerApi, id: string) => digestJson(json(manager.stored(id).config))
@@ -98,8 +99,10 @@ export async function changeCard(manager: McpManagerApi, id: string, name: strin
   if (destructiveArguments(parsed, forbidden)) throw new McpError({ reason: 'forbidden', message: 'Juno does not merge, buy or force-push.' })
   await manager.checkSecrets(parsed)
   const preconditions = await notionPreconditions(manager, id, name, parsed)
+  const definition = parseObject(JSON.parse(tool.definition))
+  const named = actionName(manager.stored(id).config.label, name, typeof definition.description === 'string' ? definition.description : undefined)
   return Schema.decodeUnknownSync(CardPayload)({
-    _tag: 'change', server: manager.stored(id).config.label, target: name,
+    _tag: 'change', server: manager.stored(id).config.label, target: name, title: named.title, verb: named.verb,
     action: child(manager, id, toolKey(id, name), tool.hash, parsed, preconditions),
   })
 }

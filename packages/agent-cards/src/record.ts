@@ -90,7 +90,8 @@ export function toCard(record: CardRecord, now: number): P.Card {
         : [{ name: 'Arguments', after: canonicalJson(args) }]
       return { ...base, _tag: p._tag, server: p.server, target: p.target,
         fields: (fields.length ? fields : [{ name: 'Arguments', after: '{}' }]).map((field) => ({ ...field, ...(field.after.length > 280 ? { long: true as const } : {}) })),
-        ...(p.caption === undefined ? {} : { caption: p.caption }), ...(p.review === undefined ? {} : { review: p.review }) }
+        ...(p.caption === undefined ? {} : { caption: p.caption }), ...(p.review === undefined ? {} : { review: p.review }),
+        ...(p.title === undefined ? {} : { title: p.title }), ...(p.verb === undefined ? {} : { verb: p.verb }) }
     }
     case 'remove': return { ...base, _tag: p._tag, messages: p.messages, ...(p.offerReply === undefined ? {} : { offerReply: p.offerReply }) }
     case 'budget': return { ...base, _tag: p._tag, spentTodayUsd: p.spentTodayUsd, capUsd: p.capUsd }
