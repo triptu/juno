@@ -18,7 +18,9 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | First sign-in → first sidebar rows (quick start) | 5 s | Empty cache, large seed, 300 ms per Slack call, production pacing. The rows are the cold boot's quick steps (`userBoot`, `prefs`, `counts`, DM names, the first `getView` page): followed threads titled from their first words, and channels and DMs from `client.counts`. History, replies, search and users fill in after, with no reload. Asserted by `quick start` in `perf.spec.ts` (slowest of three); `quick-start.spec.ts` checks the flow on a fifth of the large seed with a 30 s ceiling and records the time, because a timing budget cannot hold inside a loaded remote plan. `pnpm bench:sync -- --latency 300` prints the engine side. |
 | First sign-in → channel previews | 10 s after the quick start | Same setup. One or two newest-first searches after the quick start (`searchPreviews`, `@juno/sync` discovery) give the busiest channels a preview before their history is read. Asserted by `quick-start.spec.ts` with history held. |
 | First sign-in → every active conversation in the sidebar | 30 s | Every member conversation with activity in the window has its row, from `client.counts` (a provisional Main until its history lands). Live 23 to 25 s on 147 conversations (10-17). Measured by `pnpm sync:timeline`, live; not asserted in CI. |
-| First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, DMs, mentions and unread followed threads first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
+| First sign-in → unread counts exact for unread DMs and mentions | 1.6 s per such conversation after the quick start | The unread DMs and group DMs, then the channels that mention you, are read first (`historyOrder`), and each page makes its count exact, so their dots turn into numbers first. Live 7.8 s for 4 conversations (10-18); the 10-16 order read every DM first and would have taken about 83 s. Measured by `pnpm sync:timeline` (`unreadDmsAndMentionsRight`), live; the order is asserted by `sync.test.ts`. |
+| First sign-in → no unread count left as a dot | 1.6 s per unread conversation after the quick start | The other unread channels come next. Live 35.6 s for 22 unread conversations (10-18), 170.7 s with the 10-16 order. |
+| First sign-in → history for every active conversation | 1.6 s per active conversation | One `conversations.history` page per conversation at 40 a minute, unread DMs, mentions and other unread conversations first, so this is the pacing itself: live 222 s for 146 (1.50 s apart, 10-17). Exact unread counts follow each conversation's page. |
 | Last history page → first sync ended | 30 s | The boot is recorded (Home ready, AI titles and Home's checks may start) and the sync cycle ends (the sidebar is no longer busy). Nothing that has a clock of its own waits for history: thread previews and emoji run beside it, so only the discovery search (three pages at 10 a minute, 13 to 21 s live) and the last users remain. Live 21 s after the 10-17 fixes, 83 s (boot) and 174 s (cycle) before. `first-sync.test.ts` checks the order on the fake with the app's pacing. |
 | Topic open, cached (rows already in `cache.db`) | 50 ms | `pointerdown` on a row → messages painted at the right scroll position. 16 ms when the topic was prefetched (section 4.2). |
 | Topic open, uncached (never synced) | 50 ms to header and empty body; no spinner before 300 ms | Messages arrive whenever Slack answers; the list must not shift when they do. |
@@ -1344,6 +1346,22 @@ After queueing at the 24-vCPU cap, final remote checks used the supported
 The sidebar holds its first list on an empty cache until the cold boot's quick start (membership, DM names, the first page of followed threads) is stored, then shows rows as the sync stores them. Clear bot channels are sorted into Automated as each one's history lands. Cached rows still paint immediately. Topic-row timestamps and status tags reserve their widths; the participant stack, the @ and the unread count keep no slot and take only their own width at the preview line's end, so one arriving cuts the preview shorter and moves nothing else (updated 10-16); New view stays beside Unread only while view pills fill.
 
 All topics holds its first cold rows until the quick start is stored, and reserves the status-count and place-select widths and its scrollbar gutter. Cold-sync checks for Home and All topics hold thread subscriptions while the page paints, then release them under the same zero-shift probe.
+
+### History order for unread counts (2026-10-18)
+
+Until a conversation's history page lands, its unread count is a dot (`client.counts` says only that it is unread). The 10-16 order (owner) read every DM and group DM first, then channels with an unread mention, then channels with unread followed threads, then the user's own channels, then the rest; an unread channel with no mention sat among the channels by recency. The 10-18 order puts the unread ones first: unread DMs and group DMs, then mentions, then the other unread channels, then the 10-16 order for the rest, with the read DMs at its head. Pacing and calls are unchanged.
+
+`JUNO_LIVE=1 pnpm sync:timeline` once on the new order, the same workspace (147 active conversations): history in this order was 3 unread DMs, 1 channel with a mention, 18 other unread channels, 50 read DMs, then 74 others, 1.51 s apart.
+
+| Seconds from start | 10-17 (old order) | 10-18 (new order) |
+| --- | --- | --- |
+| Unread DMs and mentions exact | about 83, estimated: after all 53 DMs and the mention | 7.8 |
+| No unread count left as a dot | 170.7 | 35.6 |
+| Last history page | 221.8 | 222.2 |
+| First sync ended | 242.9 | 235.1 |
+| Calls | 366 | 367 |
+
+The old figure for unread DMs and mentions was not a milestone of the 10-17 runs; it is the place the old order gave the last of them in this run's list (position 53 of 146) times the measured spacing. No 429 again. The tests that check these orders and the paced first sync run at a tenth of the app's spacing (`fakeSlackPaceScale`, `scaledPacing` in `@juno/slack`): every method's spacing, the total ceiling and the interactive refill divided alike, so the ratios hold and the two paced tests take 9 s instead of 174 s.
 
 ### First sync timeline (2026-10-17)
 
