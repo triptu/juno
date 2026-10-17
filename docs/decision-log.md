@@ -6,6 +6,7 @@ Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
 - 10-17 15:30 · bundle-split · Duotone is not an `IconWeight`: a duotone icon is a wrapped icon from `packages/ui/src/duotone.ts`, the desktop build drops the duotone weight from every other icon (36.9 KB of initial JS), and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
 - 10-17 12:45 · bundle-split · A part that shows only after input (peek, suggestion list, sync cards, edit field, link editor) is a chunk preloaded when idle and drawn only once loaded (`usePreloaded`), so it never suspends; initial JS 1,054.6 KB to 1,027.6 KB after the unified Home merge.
+- 10-17 12:20 · ci-fix-22 · The ⌘N typing tests send ⌘N as `tabs.shortcut`: the keydown to the page, then the menu item, as on a Mac. Clicking the item alone let typed keys reach the page before the command; test key presses do not reach Electron's menu accelerators on Linux.
 - 10-17 12:00 · tooling-1017 · `pnpm lint` runs its independent checks at once through `scripts/lint.mjs`, printing each check's output as one group and naming the checks that failed; health, set by knip, is now the floor.
 - 10-17 11:50 · tooling-1017 · The gallery's behaviour project matches every `*.spec.ts` except `shots.spec.ts`, so branches that add a spec no longer conflict on one config line.
 - 10-17 11:40 · tooling-1017 · Health tools get a time limit scaled by load and one retry on timeout, and a timeout is reported as a timeout, not as a finding; lint still fails then, since nothing was checked.

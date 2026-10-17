@@ -1,0 +1,1 @@
+- 10-17 12:20 · ci-fix-22 · The ⌘N typing tests send ⌘N as `tabs.shortcut`: the keydown to the page, then the menu item, as on a Mac. Clicking the item alone let typed keys reach the page before the command; test key presses do not reach Electron's menu accelerators on Linux.
