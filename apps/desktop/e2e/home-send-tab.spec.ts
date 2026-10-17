@@ -4,6 +4,8 @@
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
+// A failing test attaches the send's path through the app and the fake's post calls (README, "Send trace").
+test.use({ sendTrace: true })
 
 /** #eng's Postgres thread, titled by its root's first words with AI off. */
 const POSTGRES = 'Draft plan is in the doc'

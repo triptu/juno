@@ -84,6 +84,8 @@ export interface LaunchOptions {
   readonly updateServer?: string
   /** Record the sidebar's order hold and topic list values in the main window (`sidebarTrace.ts` in `@juno/state`; README, "Sidebar trace"). */
   readonly sidebarTrace?: boolean
+  /** Record a send's path through the main window (`sendTrace.ts` in `@juno/state`; README, "Send trace"). */
+  readonly sendTrace?: boolean
 }
 
 /** Puts an empty sidebar trace on the window, which turns the recording on (`@juno/state`'s `sidebarTrace.ts`). */
@@ -98,6 +100,25 @@ async function attachSidebarTrace(win: Page, testInfo: TestInfo): Promise<void> 
   if (trace === undefined) return
   await testInfo.attach('sidebar-trace', { body: JSON.stringify(trace, null, 1), contentType: 'application/json' })
   console.log(`sidebar trace (${testInfo.titlePath.slice(1).join(' › ')}): ${JSON.stringify(trace)}`)
+}
+
+/** Puts an empty send trace on the window, which turns the recording on (`@juno/state`'s `sendTrace.ts`). */
+const startSendTrace = () => {
+  const g = globalThis as { __junoSendTrace?: unknown }
+  g.__junoSendTrace ??= { events: [] }
+}
+
+/** The fake's calls a send makes, with no text: when each came and how it was answered. */
+const POST_METHODS = new Set(['chat.postMessage', 'conversations.open', 'chat.update', 'chat.delete'])
+
+/** A failing test's send trace and the fake's post calls: attached, and printed on one line so a remote run's log has it. */
+async function attachSendTrace(win: Page, fake: FakeSlack, testInfo: TestInfo): Promise<void> {
+  const trace = await win.evaluate(() => (globalThis as { __junoSendTrace?: unknown }).__junoSendTrace).catch(() => undefined)
+  if (trace === undefined) return
+  const posts = fake.calls.filter((call) => POST_METHODS.has(call.method)).map((call) => ({ at: call.at, method: call.method, channel: call.args.channel, ok: call.ok, ...(call.error === undefined ? {} : { error: call.error }) }))
+  const body = { ...trace, posts }
+  await testInfo.attach('send-trace', { body: JSON.stringify(body, null, 1), contentType: 'application/json' })
+  console.log(`send trace (${testInfo.titlePath.slice(1).join(' › ')}): ${JSON.stringify(body)}`)
 }
 
 let launches = 0
@@ -172,6 +193,10 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     await app.context().addInitScript(startSidebarTrace)
     await win.evaluate(startSidebarTrace)
   }
+  if (options.sendTrace === true) {
+    await app.context().addInitScript(startSendTrace)
+    await win.evaluate(startSendTrace)
+  }
   return {
     app,
     win,
@@ -219,6 +244,8 @@ export interface Fixtures {
   readonly updateServer: string | undefined
   /** Record the `running` app's sidebar trace and attach it to a failing test (`LaunchOptions.sidebarTrace`); `test.use({ sidebarTrace: true })` opts a file in. */
   readonly sidebarTrace: boolean
+  /** Record the `running` app's send trace and attach it, with the fake's post calls, to a failing test (`LaunchOptions.sendTrace`); `test.use({ sendTrace: true })` opts a file in. */
+  readonly sendTrace: boolean
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -293,14 +320,16 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace }, use, testInfo) => {
+  sendTrace: [false, { option: true }],
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace }, use, testInfo) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-      aiJobs, screenShared, sidebarTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+      aiJobs, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })
     await use(running)
     if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(running.win, testInfo)
+    if (sendTrace && testInfo.status !== testInfo.expectedStatus) await attachSendTrace(running.win, fake, testInfo)
     await running.close()
   },
   app: async ({ running }, use) => {

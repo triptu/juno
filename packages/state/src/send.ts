@@ -31,6 +31,7 @@ import {
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
+import { traceSend } from './sendTrace'
 import { offerSentSuggestion } from './sentSuggestions'
 import { releaseSidebarTopic } from './sidebar'
 
@@ -41,11 +42,13 @@ import { releaseSidebarTopic } from './sidebar'
 export const sendMessage = async (registry: Registry, to: SendTarget, text: string, draftOf?: string, files?: ReadonlyArray<string>, startThread = false) => {
   const clientMsgId = crypto.randomUUID()
   const sentAt = performance.now()
+  traceSend('send asked', () => ({ clientMsgId: clientMsgId.slice(0, 8), to }))
   const exit = await runCommand(registry, messagesSend, {
     to, text, startThread, clientMsgId,
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })
+  traceSend('send answered', () => ({ clientMsgId: clientMsgId.slice(0, 8), ok: exit._tag === 'Success', ...(exit._tag === 'Success' ? { topicId: exit.value.topicId } : {}) }))
   // Your own send moves its row at once, even while the sidebar holds its order.
   if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
   // The line belongs to the text as the field showed it, which is what the message's edit text is.

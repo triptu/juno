@@ -40,6 +40,7 @@ import { liveQuery, prefetch, refreshLive, runCommand } from './atoms'
 import type { Registry } from './client'
 import { emptyWindow, sameOrder, type ListWindow } from './list'
 import { mark } from './perf'
+import { traceWindow } from './sendTrace'
 
 /** Which messages a tab wants. See `messages.list` in the contract. */
 export interface MessageWindowSpec {
@@ -124,6 +125,7 @@ export const messageListAtom = Atom.family((view: string) =>
     const shown = Option.getOrUndefined(get.self<MessageWindow>())
     if (AsyncResult.isFailure(result)) return shown ?? { ...emptyWindow<MessageView>(), spec, ready: false, failed: true }
     if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<MessageView>(), spec, ready: false, failed: false }
+    traceWindow(view, result.value, spec)
     return carryOver(shown, result.value, spec)
   }),
 )

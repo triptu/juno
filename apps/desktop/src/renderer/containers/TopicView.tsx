@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, type MessageWindow } from '@juno/state'
+import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
 import { closeTabById, openTopic, warmTopic } from './navigation'
@@ -81,6 +81,11 @@ export const TopicTab = memo(function TopicTab({ tabId, id }: TopicTabProps) {
       if (registry.get(selectedTopicAtom) === id) registry.set(selectedTopicAtom, acknowledgedId)
     }
   }, [id, acknowledgedId])
+  // Tests only: when the tab's topic view mounts and unmounts (`sendTrace.ts`).
+  useEffect(() => {
+    traceSend('tab mounted', () => ({ tab: tabId, topic: id }))
+    return () => traceSend('tab unmounted', () => ({ tab: tabId, topic: id }))
+  }, [tabId, id])
   // A topic the store does not know (a saved tab whose topic is gone) closes its tab.
   useEffect(() => {
     if (detail === null) closeTabById(tabId)

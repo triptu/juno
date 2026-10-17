@@ -83,6 +83,7 @@ import {
   topicOfView,
   topicPlace,
   topicView,
+  traceSend,
   untouched,
   updateTabs,
   type MessageWindowSpec,
@@ -152,6 +153,7 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
   if (before !== undefined) leaving.get(before)?.()
   const next = updateTabs(registry, change)
   registry.set(selectedTopicAtom, activeTopic(next))
+  traceSend('tabs applied', () => ({ active: next.active, topic: activeTopic(next) }))
   return next
 }
 
@@ -267,9 +269,11 @@ interface Arriving {
 function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replaceable = true, ready?: Promise<void>): void {
   const at = performance.now()
   const ticket = replaceable ? ++currentTicket : currentTicket
+  traceSend('tabs asked', () => ({ ticket, replaceable, ...(topic === undefined ? {} : { view: (topic.view ?? topic.id).replace('\u0000', '@'), fresh: topic.fresh }) }))
   if (topic === undefined) {
     queue = queue.then(() => ready).then(() => {
       if (ticket === currentTicket) apply(change)
+      else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
     })
     return
   }
@@ -287,6 +291,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
     .then(() => topicReady)
     .then(() => {
       if (!replaceable || ticket === currentTicket) apply(landing)
+      else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
     })
 }
 
@@ -315,12 +320,18 @@ export function openTopicFromList(id: string, options: OpenOptions = {}): void {
  */
 export function openTopicInBackground(id: string, { after, unlessShown = false }: { readonly after?: string; readonly unlessShown?: boolean } = {}): void {
   queue = queue.then(() => {
-    if (unlessShown && tabShowing(registry.get(tabsAtom), id) !== undefined) return
+    const shownIn = unlessShown ? tabShowing(registry.get(tabsAtom), id) : undefined
+    traceSend('background', () => ({ topic: id, ...(shownIn === undefined ? {} : { reused: shownIn.id }) }))
+    if (shownIn !== undefined) return
     const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
     const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true, ...(after === undefined ? {} : { after }) }))
     const tab = next.tabs.find((each) => !before.has(each.id))
+    traceSend('background opened', () => ({ topic: id, tab: tab?.id }))
     if (tab === undefined) return
-    void whenReady(id, true).then(() => registry.set(messageWindowSpecAtom(topicView(id, tab.id)), registry.get(messageWindowSpecAtom(id))))
+    void whenReady(id, true).then(() => {
+      registry.set(messageWindowSpecAtom(topicView(id, tab.id)), registry.get(messageWindowSpecAtom(id)))
+      traceSend('background window', () => ({ topic: id, tab: tab.id }))
+    })
   })
 }
 
@@ -611,6 +622,7 @@ export function switchToTab(tabId: string): void {
   if (tabs.active === tabId) return
   const tab = tabs.tabs.find((other) => other.id === tabId)
   if (tab === undefined) return
+  traceSend('switch', () => ({ tab: tabId, from: tabs.active }))
   const topic = arriving(tabs, tabId, currentPlace(tab), false)
   if (topic === undefined) {
     ++currentTicket

@@ -40,6 +40,7 @@ export {
   type SidebarWindow,
 } from './sidebar'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
+export { sendTracing, traceSend } from './sendTrace'
 export {
   bottomWindow,
   channelThreadsAtom,

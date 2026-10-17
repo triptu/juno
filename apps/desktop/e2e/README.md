@@ -14,3 +14,19 @@ A sidebar test that fails because a row did not appear, or did not move, needs t
 - **When a test fails:** the `running` fixture attaches the trace as `sidebar-trace` and prints it on one line, `sidebar trace (<test>): {...}`, so a remote run's `run.log` has it.
 
 Reading it: a row that never appeared with the hold still on (`engaged` or `sheets > 0` and not `paused` in the last entry) points at the hold. A `list.last` older than the change the test made, or a rising `errors`, points at the engine's `topics.list`.
+
+## Send trace
+
+A test that sends from Home and then misses the message in a tab needs to say where the message got to. The send trace records the send's path through the renderer.
+
+- **On:** `test.use({ sendTrace: true })` in a spec file, or `launchApp(dir, { sendTrace: true })`. `break-pass-1017` and `home-send-tab` have it on. The fixture puts an empty `globalThis.__junoSendTrace` on the main window, which turns the recording on (`packages/state/src/sendTrace.ts`).
+- **Off:** the app records nothing. Each traced point costs one property read.
+- **What it records**, the last 120 entries, each with `at` (`Date.now()`), ids, states and counts, never message text:
+  - `send asked` and `send answered`: the send command (`sendMessage` in `@juno/state`), its target, the first 8 characters of its `clientMsgId`, and the topic it answered with.
+  - `background`, `background opened` and `background window`: Home's open of the topic behind it (`openTopicInBackground`), with `reused` when a tab already showed it.
+  - `switch`, `tabs asked`, `tabs applied` and `tabs dropped`: a tab change the navigation was asked for, with its ticket, the one it applied (the active tab after it), and one a newer change replaced.
+  - `tab mounted` and `tab unmounted`: a tab's topic view.
+  - `window`: each new message window a topic view got (`view` is `<topic>@<tab>`): its `seq`, row count, newest row, the spec, and in `sent` each of the last rows sent from this app as `<clientMsgId>:<sending|failed|stored>:<ts or pending>`.
+- **When a test fails:** the `running` fixture adds the fake's `chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete` calls (`posts`: time, method, channel, answer) and attaches the whole as `send-trace`, and prints it on one line, `send trace (<test>): {...}`, so a remote run's `run.log` has it.
+
+Reading it: no `posts` entry for the channel means the send never left the engine. A `window` for the tab's view whose `sent` stays at `pending` while `posts` shows an answer points at the engine's reconcile. No `window` for the tab's view after the send means its subscription did not run again. A `tabs dropped` or no `tabs applied` with the tab active after `switch` means the tab never showed.
