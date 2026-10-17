@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { shouldMarkRead, type ReadView } from '../src/reads'
 
-const watching: ReadView = { active: true, focused: true, atBottom: true }
+const watching: ReadView = { active: true, focused: true, atBottom: true, markedUnread: false }
 
 describe('the read rule', () => {
   it('opening a topic marks it read', () => {
@@ -15,4 +15,9 @@ describe('the read rule', () => {
     expect(shouldMarkRead('bottom', { ...watching, active: false })).toBe(false)
   })
 
+  it('a topic marked unread stays unread at the bottom until it is opened again', () => {
+    const held = { ...watching, markedUnread: true }
+    expect(shouldMarkRead('bottom', held)).toBe(false)
+    expect(shouldMarkRead('open', held)).toBe(true)
+  })
 })

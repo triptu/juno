@@ -32,11 +32,13 @@ export function useWindowFocused(): boolean {
 
 /**
  * The "N new" divider. It sits where the read pointer was when the tab first showed the topic, so marking
- * read does not move it. `at` is the first unread row's index; a preview has none.
+ * read does not move it; Mark as unread moves it to the new pointer. `at` is the first unread row's index;
+ * a preview has none.
  */
-export function useDivider(id: string, lastReadTs: string | undefined, list: MessageWindow, readOnly: boolean) {
-  // The read pointer when this tab first showed the topic, for the divider.
-  const [readAtOpen] = useState(() => ({ lastReadTs }))
+export function useDivider(id: string, lastReadTs: string | undefined, markedUnread: boolean, list: MessageWindow, readOnly: boolean) {
+  // The read pointer when this tab first showed the topic, or when the topic was last marked unread, for the divider.
+  const [readAtOpen, setReadAtOpen] = useState(() => ({ lastReadTs }))
+  if (markedUnread && lastReadTs !== readAtOpen.lastReadTs) setReadAtOpen({ lastReadTs })
   const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 
@@ -89,15 +91,15 @@ export function listStatus(showWindow: boolean, list: MessageWindow, { fetchStat
 
 /**
  * The read rule (`shouldMarkRead`). Opening, and showing the tab again, marks the topic read; after
- * that, the bottom of a focused window does. A preview never does.
+ * that, the bottom of a focused window does, unless the topic was marked unread. A preview never does.
  */
-export function useMarkRead(id: string, readOnly: boolean, unread: number, positioned: boolean, focused: boolean, atBottom: boolean): void {
+export function useMarkRead(id: string, readOnly: boolean, unread: number, markedUnread: boolean, positioned: boolean, focused: boolean, atBottom: boolean): void {
   'use no memo'
   useEffect(() => {
-    if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false })) void markRead(id)
+    if (!readOnly && shouldMarkRead('open', { active: true, focused: true, atBottom: false, markedUnread: false })) void markRead(id)
   }, [id, readOnly])
   useEffect(() => {
     if (readOnly || unread === 0 || !positioned) return
-    if (shouldMarkRead('bottom', { active: true, focused, atBottom })) void markRead(id)
-  }, [id, readOnly, unread, positioned, focused, atBottom])
+    if (shouldMarkRead('bottom', { active: true, focused, atBottom, markedUnread })) void markRead(id)
+  }, [id, readOnly, unread, markedUnread, positioned, focused, atBottom])
 }

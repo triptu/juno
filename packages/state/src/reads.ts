@@ -4,7 +4,9 @@
  * `shouldMarkRead` is the read rule. Opening a topic marks it read. After
  * that, messages are marked read only while the tab is active, the window
  * is focused and the list is at the bottom; messages that arrive while the
- * user is scrolled up stay unread until they reach the bottom.
+ * user is scrolled up stay unread until they reach the bottom. A topic
+ * marked unread while it is shown stays unread: the bottom no longer marks
+ * it read until the tab shows it again (SPEC 7, "Mark as unread").
  *
  * The commands are run with `runCommand(registry, readsMarkRead, { id, upTo })`
  * and `readsMarkUnread`; each returns the undo the engine computed.
@@ -28,12 +30,14 @@ export interface ReadView {
   readonly focused: boolean
   /** The message list is scrolled to the bottom. */
   readonly atBottom: boolean
+  /** The topic was marked unread and has not been marked read since. */
+  readonly markedUnread: boolean
 }
 
 /** Whether `trigger` in a tab in state `view` marks the topic read. */
 export function shouldMarkRead(trigger: ReadTrigger, view: ReadView): boolean {
   if (trigger === 'open') return true
-  return view.active && view.focused && view.atBottom
+  return view.active && view.focused && view.atBottom && !view.markedUnread
 }
 
 /** The mirror setting of the open workspace: `{ on, explicit }`. */
