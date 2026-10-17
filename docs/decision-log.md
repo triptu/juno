@@ -5,6 +5,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
 - 10-17 15:30 · bundle-split · Duotone is not an `IconWeight`: a duotone icon is a wrapped icon from `packages/ui/src/duotone.ts`, the desktop build drops the duotone weight from every other icon (36.9 KB of initial JS), and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
+- 10-17 14:42 · topic-sidebar-review · A sidebar row's place line is as tall as Resolve on every row, so rows without Resolve (resolved, renaming) keep one rhythm; my reaction chip keeps its ring on hover and its fill steps up to `--hl-bubble`; the audience line starts its icon and text on the check bar's edge.
 - 10-17 14:30 · status-page · The status page puts decisions at full width, grouped by day with search and area filters; areas come from one keyword table in `scripts/status-areas.mjs`, and `needsYou` in now.json holds real blockers only, with optional checks in `later`.
 - 10-17 12:53 · home-review-2 · Home's destination list (and All topics' place filter) draws Recent's marks, a face, group initials or the channel's tile, so a conversation looks the same in Recent, the chip's list and the Send to list.
 - 10-17 12:53 · home-review-2 · Home's Recent stays empty in its room until the first sync ends and its ranking has arrived, as Home's rows keep their slots, so its rows never re-rank under the pointer; the destination list has every conversation meanwhile.
