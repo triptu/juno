@@ -22,15 +22,16 @@ function replace(hash: string) {
 
 export function App() {
   const location = useLocation()
-  useLayoutEffect(() => applyTheme(location.theme, location.accent, location.density), [location.theme, location.accent, location.density])
+  const entry = location.component ? findComponent(location.component) : undefined
+  const state = entry ? findState(entry, location.state) : undefined
+  // Compact is the app's default density, so the gallery draws it unless the address or the state asks for Comfortable.
+  const density = location.density ?? state?.frame.density ?? 'compact'
+  useLayoutEffect(() => applyTheme(location.theme, location.accent, density), [location.theme, location.accent, density])
 
   useEffect(() => {
     // Exposed for the test runners, so they never have to parse the DOM.
     ;(window as unknown as { __galleryRoutes: typeof allRoutes }).__galleryRoutes = allRoutes
   }, [])
-
-  const entry = location.component ? findComponent(location.component) : undefined
-  const state = entry ? findState(entry, location.state) : undefined
 
   useKeys()
 

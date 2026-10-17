@@ -14,6 +14,8 @@ export default defineFixtures(AppearanceSettings, {
   },
   System: {
     'system-density': fixture({ theme: 'system', accent: 'coral', density: 'compact', onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+    // Comfortable picked, drawn in Comfortable.
+    'comfortable-density': fixture({ theme: 'system', accent: 'coral', density: 'comfortable', onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }, { density: 'comfortable' }),
   },
   Layout: {
     stacked: fixture({ theme: 'light', accent: 'coral', layout: 'stack', onThemeChange: noop, onAccentChange: noop }, { width: 300 }),

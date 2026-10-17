@@ -122,6 +122,8 @@ export default defineFixtures(
       // The minimum window with the sidebar shown: Settings is 336 wide, so the list is a rail of icons.
       'general-minimum-window': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />, { width: 336, height: 436, padded: false }),
       'appearance-minimum-window': at('appearance', <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />, { width: 336, height: 436, padded: false }),
+      // Comfortable picked: the page and the controls drawn in Comfortable.
+      'appearance-comfortable': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />, { density: 'comfortable' }),
       // Tidy up (SPEC 14): what Resolve does, then when Juno suggests a topic.
       'tidy-up': at('tidy-up', <SettingsTidyUp prefs={TIDY_UP_DEFAULTS} onChange={noop} aiAssist />),
       'tidy-up-ai-off': at('tidy-up', <SettingsTidyUp prefs={{ quiet: '1d', threads: true, dms: false }} onChange={noop} aiAssist={false} />),

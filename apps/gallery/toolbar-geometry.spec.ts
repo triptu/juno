@@ -78,7 +78,8 @@ for (const [id, target, header] of [
     const at = await measure(page, target)
     expect(at.header).toBe(header)
     expect(at.toolbar.top).toBeLessThan(at.row.top)
-    expect(at.toolbar.bottom).toBeGreaterThan(at.row.top)
+    // It comes into the row by the row's top padding less 2px: none in Compact density, so its bottom meets the edge.
+    expect(at.toolbar.bottom).toBeGreaterThanOrEqual(at.row.top)
     expect(at.toolbar.bottom).toBeLessThanOrEqual(at.textTop)
     expect(at.toolbar.top).toBeGreaterThanOrEqual(at.listTop)
   })
@@ -89,7 +90,8 @@ test('a row whose top is under the header band gets the toolbar below it, clear 
   const at = await measure(page, '[data-message-row] [data-msg-text]')
   expect(at.row.top).toBeLessThan(at.listTop)
   expect(at.toolbar.top).toBeGreaterThanOrEqual(at.textBottom)
-  expect(at.toolbar.top).toBeLessThan(at.row.bottom)
+  // Flipped, it straddles the bottom edge the same way: in Compact density its top meets the edge.
+  expect(at.toolbar.top).toBeLessThanOrEqual(at.row.bottom)
   expect(at.toolbar.bottom).toBeGreaterThan(at.row.bottom)
 })
 
@@ -130,6 +132,7 @@ test('a hovered row that scrolls under the header band under a still pointer get
   const at = await read(row)
   expect(at.row.top).toBeLessThan(at.listTop)
   expect(at.toolbar.top).toBeGreaterThanOrEqual(at.textBottom)
-  expect(at.toolbar.top).toBeLessThan(at.row.bottom)
+  // Flipped, it straddles the bottom edge the same way: in Compact density its top meets the edge.
+  expect(at.toolbar.top).toBeLessThanOrEqual(at.row.bottom)
   expect(at.toolbar.bottom).toBeGreaterThan(at.row.bottom)
 })

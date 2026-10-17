@@ -187,6 +187,8 @@ export default defineFixtures(
     Main: {
       // Real-data shapes in Main, where every row could get a thread link: the density check (message-geometry.spec.ts).
       conversation: state({ items: conversation, main: true, onToggleReaction: noop }),
+      // The same rows in Comfortable density: a wider group gap and taller rows.
+      'conversation-comfortable': state({ items: conversation, main: true, onToggleReaction: noop }, { density: 'comfortable' }),
       'thread-links': state({ items: mainStream, main: true }),
       'main-new-divider': state({ items: mainStream.slice(4), main: true, dividerBefore: mainDividerBefore }),
     },

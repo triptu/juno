@@ -10,8 +10,9 @@ import { defaultAccent, isAccentName, isThemeName, type AccentName, type Density
  *
  * `__state` is `<group id>/<state key>`, or just `<state key>` for a state
  * with no group. `theme` and `accent` are left out when they are the defaults.
- * `density=compact` draws the state in Compact density (inventory 3.3); the
- * links the gallery makes leave it out.
+ * `density=comfortable` or `density=compact` draws the state in that density
+ * (inventory 3.3). Without it a state draws in its own `frame.density`, or
+ * Compact, the app's default. The links the gallery makes leave it out.
  */
 export interface GalleryLocation {
   readonly component: string | null
@@ -19,7 +20,8 @@ export interface GalleryLocation {
   readonly state: string | null
   readonly theme: ThemeName
   readonly accent: AccentName
-  readonly density: DensityName
+  /** Null when the address does not name one. */
+  readonly density: DensityName | null
   /** The index filter. */
   readonly query: string
 }
@@ -30,12 +32,13 @@ export function parseHash(hash: string): GalleryLocation {
   const [component = null, legacyState = null] = pathPart.split('/').map((part) => (part ? decodeURIComponent(part) : null))
   const theme = params.get('theme')
   const accent = params.get('accent')
+  const density = params.get('density')
   return {
     component,
     state: params.get('__state') ?? legacyState,
     theme: isThemeName(theme) ? theme : 'light',
     accent: isAccentName(accent) ? accent : defaultAccent,
-    density: params.get('density') === 'compact' ? 'compact' : 'comfortable',
+    density: density === 'compact' || density === 'comfortable' ? density : null,
     query: params.get('q') ?? '',
   }
 }

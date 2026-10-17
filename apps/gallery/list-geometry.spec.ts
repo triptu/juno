@@ -182,7 +182,7 @@ test('every Main row (DM, group DM, channel) is two lines and shorter, with even
   expect(rows.map((row) => row.lines)).toEqual([2, 2, 2, 3, 2, 3, 3])
   for (const row of rows) {
     expect(row.drawn).toBe(row.lines)
-    expect(row.height).toBe(row.lines === 2 ? 64 : 88)
+    expect(row.height).toBe(row.lines === 2 ? 58 : 80)
     expect(row.fill).toBeGreaterThan(row.content - 1)
     expect(row.fill).toBeLessThanOrEqual(row.content)
     expect(row.place).toBe(row.lines === 3)
