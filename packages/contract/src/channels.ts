@@ -198,7 +198,7 @@ export interface ContextMenuAt {
 }
 
 /** The sidebar's width range in CSS pixels, and the width a double-click on its edge resets to (spec section 4). */
-export const SIDEBAR_WIDTH = { min: 280, max: 480, default: 384 } as const
+export const SIDEBAR_WIDTH = { min: 312, max: 480, default: 384 } as const
 
 /** The Juno panel's width in CSS pixels: `--juno-panel-min-width`, `--juno-panel-max-width` and `--juno-panel-width`. */
 export const JUNO_PANEL_WIDTH = { min: 360, max: 640, default: 440 } as const

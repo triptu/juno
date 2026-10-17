@@ -196,7 +196,7 @@ test('row hover to paint', async ({ juno, win }) => {
   within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
 })
 
-/** Records the next pointerdown on Home's nav item to Home painted in `window.__homeSample`. */
+/** Records the next pointerdown on the sidebar's Home button to Home painted in `window.__homeSample`. */
 async function armHomeSample(nav: Locator): Promise<void> {
   await nav.evaluate((node) => {
     const w = window as unknown as { __homeSample?: Promise<number> }
@@ -222,12 +222,12 @@ async function armHomeSample(nav: Locator): Promise<void> {
   })
 }
 
-// Home from the sidebar's Home item, with a topic open in the tab: the
+// Home from the sidebar's Home button, with a topic open in the tab: the
 // pointerdown to the first presented frame that shows Home's greeting and
 // rows, read from the local cache (performance.md section 1, "Home open").
 // Every fourth sample comes back after 31 s idle, past the home.view
 // atom's idle time, when the CPU has slowed down. The pointer entering the
-// Home item warms home.view (performance.md 4.2), and that prefetch is still
+// Home button warms home.view (performance.md 4.2), and that prefetch is still
 // held here, so these opens render cached data on a slow CPU. They have
 // their own budget, 150 ms; the quick opens keep 50 ms (performance.md 1).
 test('home open: from a topic to Home painted', async ({ juno, win }) => {

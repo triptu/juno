@@ -87,7 +87,7 @@ export type ProviderResult = typeof ProviderResult.Type
 export const CodexSetup = Schema.Literals(['missing', 'signedOut', 'signedIn'])
 export type CodexSetup = typeof CodexSetup.Type
 
-/** The sidebar's width in CSS pixels (280 to 480) and whether it is hidden (spec section 4). */
+/** The sidebar's width in CSS pixels (312 to 480) and whether it is hidden (spec section 4). */
 export const SidebarLayout = Schema.Struct({
   width: Schema.Int.check(Schema.isBetween({ minimum: SIDEBAR_WIDTH.min, maximum: SIDEBAR_WIDTH.max })),
   collapsed: Schema.Boolean,

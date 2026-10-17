@@ -9,7 +9,7 @@
  * - `homeGreeting`, `homeScene`, `homeItemLimit`: the copy, the scene and
  *   the cap, from the local clock and the window, chosen when Home appears.
  * - `prefetchHome`: warms `home.view` on pointer enter or focus of the
- *   sidebar's Home item, so an open after the subscription's idle time
+ *   sidebar's Home button, so an open after the subscription's idle time
  *   renders what is cached instead of waiting on the engine.
  * - `startVisitLog`: tells the engine which topic was open for a minute,
  *   for "Pick up where you left off".

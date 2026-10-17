@@ -762,7 +762,7 @@ export const layout = stylex.defineVars({
   '--tooltip-max-width': '280px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
-  '--sidebar-min-width': '280px',
+  '--sidebar-min-width': '312px',
   '--sidebar-max-width': '480px',
   '--sidebar-resize-hit': '6px',
   // The sidebar's inset on both sides: the title bar's end, the nav, the filter row and the rows. The list's

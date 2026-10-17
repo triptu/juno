@@ -191,9 +191,9 @@ test('the sidebar resizes by its edge, resets on double-click, and hides', { tag
   await frame.expectWidth(444)
   await frame.drag(200)
   await frame.expectWidth(480)
-  // Past the narrowest but not below 200: it stops at 280.
+  // Past the narrowest but not below 200: it stops at 312.
   await frame.drag(-250)
-  await frame.expectWidth(280)
+  await frame.expectWidth(312)
   await frame.doubleClickEdge()
   await frame.expectWidth(384)
 

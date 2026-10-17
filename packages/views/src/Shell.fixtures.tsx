@@ -78,7 +78,7 @@ export default defineFixtures(
   {
     Window: {
       'signed-in': scene(() => <SignedIn />),
-      'sidebar-narrowest': scene(() => <SignedIn width={280} />),
+      'sidebar-narrowest': scene(() => <SignedIn width={312} />),
       'sidebar-widest': scene(() => <SignedIn width={480} />),
       'sidebar-hidden': scene(() => <SignedIn hidden />),
       'sidebar-hidden-minimum-window': scene(() => <SignedIn hidden />, { width: 720, height: 480 }),

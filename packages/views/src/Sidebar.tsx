@@ -96,9 +96,9 @@ export interface SidebarProps {
   readonly onSearch: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
-  /** Right-click on a page item: its menu (Open in new tab). */
+  /** Right-click on a page item or button: its menu (Open in new tab). */
   readonly onNavigateMenu?: (target: SidebarNavTarget) => void
-  /** Pointer enter or focus on a page item: warm the page it opens. */
+  /** Pointer enter or focus on a page item or button: warm the page it opens. */
   readonly onNavigatePrefetch?: (target: SidebarNavTarget) => void
   readonly onFilterKind: (kind: KindFilter) => void
   /** The views, in pill order, after DMs. */
@@ -135,7 +135,7 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search, All topics and the account button, the nav items (Home and Juno), a
+ * space, Search, All topics, Home and the account button, the Juno nav item, a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
  * while there is something to say: the sync status card, and, while
@@ -203,6 +203,15 @@ export function Sidebar({
               {...activateHandlers<HTMLButtonElement>((event) => onNavigate('all-topics', event))}
               onContextMenu={navMenu('all-topics')}
             />
+            <IconButton
+              icon={House}
+              label="Home"
+              size={30}
+              current={activeNav === 'home'}
+              {...activateHandlers<HTMLButtonElement>((event) => onNavigate('home', event))}
+              onContextMenu={navMenu('home')}
+              {...(onNavigatePrefetch === undefined ? {} : { onPointerEnter: () => onNavigatePrefetch('home'), onFocus: () => onNavigatePrefetch('home') })}
+            />
             <span {...stylex.props(styles.account)}>
               <Popover
                 open={accountMenuOpen}
@@ -230,9 +239,6 @@ export function Sidebar({
       </header>
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
-        <NavItem icon={House} active={activeNav === 'home'} onSelect={(event) => onNavigate('home', event)} onContextMenu={navMenu('home')} {...(onNavigatePrefetch === undefined ? {} : { onPrefetch: () => onNavigatePrefetch('home') })}>
-          Home
-        </NavItem>
         <NavItem
           icon={junoBusy ? SparkleDuotone : Sparkle}
           active={activeNav === 'juno'}

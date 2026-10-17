@@ -39,7 +39,7 @@ Covers: quick filters, status chips, Resolve (row and header), Not yet, Discard/
 
 ## 2a. NavItem
 
-The sidebar navigation item (Home, All topics, Juno): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). While a job runs the Juno item passes `SparkleDuotone`, which stays duotone whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button; `onPrefetch` on pointer enter and focus, to warm the page it opens (performance.md 4.2). `compact` draws the icon alone in a 32px square, with a string label as its accessible name and tooltip and no `trailing` or `kbd` (Settings' rail). Never animates.
+The sidebar navigation item (Juno; Settings' sections): 32px, full width, radius 12, 16px `icon` then the label, ghost until hovered; when `active` (sets `aria-current="page"`) it takes the accent's nav tint `--hl-nav`, accent text `--hl-text`, weight 600 and a filled icon (the ink accent keeps the plain `--secondary-default`). While a job runs the Juno item passes `SparkleDuotone`, which stays duotone whether or not it is open. `trailing` takes the count Chip, `kbd` the "⌘J" hint. Navigates on mouse down through `onSelect` like rows and tabs; `onContextMenu` for the right button; `onPrefetch` on pointer enter and focus, to warm the page it opens (performance.md 4.2). `compact` draws the icon alone in a 32px square, with a string label as its accessible name and tooltip and no `trailing` or `kbd` (Settings' rail). Never animates.
 
 ## 3. IconButton
 
@@ -55,7 +55,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
 | `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
-| `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics) |
+| `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics and Home) |
 
 ## 4. Avatar and AvatarStack
 
