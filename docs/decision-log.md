@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 18:44 · home-send-bg-tab · A send from Home to a person or channel, or a reply through Home's topic chip, opens the topic it went to in a background tab right after the Home tab it was sent from, as ⌘-click on Start thread does, unless a tab shows that topic already; Home stays active with its toast (owner's call). A channel Main send opens the new thread it started, since that is where the message is. Juno sends are unchanged.
+- 10-17 18:44 · home-send-bg-tab · Home's syncing line shows the first sync's count, as the sidebar's card does: "Syncing 30 of 143 conversations." (owner's call), after "Syncing with Slack." while the conversations are listed. Tabular figures, the count in room for the total's digits and a box as wide as the column keep it still as it updates. A small container reads the progress, so a new count redraws the line and not Home.
 - 10-17 18:44 · owner · Juno stays as the only row in the sidebar's nav list: it is a hero feature and keeps its own space (unread, ⌘J, busy sparkle); revisit the design only if it looks odd.
 - 10-17 18:44 · owner · This Mac is a spare the owner does not use, so agents may run perf, feel, e2e and gallery locally at any time, still through the heavy lock and the load limits.
 - 10-17 18:44 · owner · Auto-update reads a separate private repo (triptu/juno-releases) through a token scoped read-only to that repo; the changelog lives there and is fetched on demand.
