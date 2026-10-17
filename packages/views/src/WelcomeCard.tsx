@@ -21,7 +21,7 @@ export const welcomeCopy = {
       ? `Hold ${peekKey === 'space' ? 'Space' : '⌥'} over a topic to read it without opening it`
       : hint === 'tab'
         ? '⌘-click a topic to open it in a new tab'
-        : 'Ask Juno below. Nothing goes to Slack until you approve it.',
+        : 'Ask Juno below. It sends nothing without your OK.',
   progress: (count: number) => `${count} of 3 done`,
 } as const
 
