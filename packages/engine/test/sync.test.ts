@@ -994,9 +994,11 @@ describe('cold boot details (review M3 finding 10)', () => {
     await sleep(100)
     engine.fake.release()
     await engine.phase('live', 30_000)
-    // The mention follows it, as in Slack (SPEC 5), and brings it in; the replies before the boot count as read.
-    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed), 'the mentioned thread')
-    expect(rows.find((r) => r.id === id)).toMatchObject({ mentionsMe: true, unreadCount: 1, subscribed: true })
+    // The mention follows it, as in Slack (SPEC 5), and brings it in. Followed, it keeps Slack's unread state: every reply after Slack's pointer.
+    const sub = engine.fake.workspace.subscription('C0ENG', tsOf(id))!
+    const unread = engine.fake.workspace.replies('C0ENG', tsOf(id)).filter((reply) => reply.ts > sub.lastRead && reply.user !== SELF_ID).length
+    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed && r.unreadCount === unread), 'the mentioned thread, followed')
+    expect(rows.find((r) => r.id === id)).toMatchObject({ mentionsMe: true, unreadCount: unread, subscribed: true })
   })
 
   it('an interrupted cold boot does not fetch again the history it already has', async () => {
