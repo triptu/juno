@@ -64,17 +64,28 @@ export function PageHeader({ title, size = 'default', subtitle, trailing }: Page
 export interface SectionProps {
   readonly heading: string
   readonly sub?: string
+  /** A quiet control at the end of the heading's line (a ghost `xs` button such as Add). It never makes the line taller. */
+  readonly action?: ReactNode
   readonly children?: ReactNode
 }
 
 /** A settings section: heading, one-line explanation, then a group card. */
-export function Section({ heading, sub, children }: SectionProps) {
+export function Section({ heading, sub, action, children }: SectionProps) {
   return (
     <section {...stylex.props(styles.section)}>
       <div {...stylex.props(styles.sectionHead)}>
-        <Text variant="heading" tone="default">
-          {heading}
-        </Text>
+        {action === undefined ? (
+          <Text variant="heading" tone="default">
+            {heading}
+          </Text>
+        ) : (
+          <div {...stylex.props(styles.headingLine)}>
+            <Text variant="heading" tone="default">
+              {heading}
+            </Text>
+            <div {...stylex.props(styles.action)}>{action}</div>
+          </div>
+        )}
         {sub ? (
           <Text variant="ui" tone="muted" as="p">
             {sub}
@@ -155,6 +166,21 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
     userSelect: 'none',
+  },
+  headingLine: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing['--space-3'],
+    minWidth: 0,
+  },
+  // No height of its own: the control centres on the heading's line and
+  // overhangs it, so a section with an action is as tall as one without.
+  action: {
+    display: 'flex',
+    alignItems: 'center',
+    flexShrink: 0,
+    height: 0,
   },
 })
 
