@@ -11,7 +11,7 @@ SPEC §12 (Home, Tidy up), §14 (Settings › Tidy up) and §15 decide behaviour
 | `card-light.png`, `card-dark.png` | Home's card: the whole row opens the review, the meta line names the places, Resolve all keeps its slot |
 | `a-sheet-light.png`, `a-sheet-dark.png` | Direction A, a sheet over Home |
 | `a-sheet-acted-*.png` | One resolved, one kept open: each row stays in place, says what happened, and has Undo |
-| `a-sheet-about-*.png` | The info button open: What Resolve does, and Tidy up settings |
+| `a-sheet-about-*.png` | The info button open: What Resolve does, and Tidy up settings, over the top of the list so the sheet keeps its size |
 | `a-sheet-minimum-*.png` | The minimum window: the buttons go under each row's text |
 | `b-in-place-*.png`, `b-in-place-many-*.png` | Direction B, the card opening in place on Home |
 | `settings-light.png`, `settings-dark.png` | Settings › Tidy up |
@@ -79,7 +79,7 @@ The preference is one workspace value, `tidyUp` (`TidyUpPrefs` in `@juno/contrac
 
 ## More self-management
 
-Cards in the same spirit, each opening the same review sheet (`ReviewSheet` in `@juno/views`, which Tidy up's review is built on; `useReview` in the desktop containers): every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). Built: 3 (SPEC §12, "Automated's record"), and 4 and 5, each with a switch in Settings › Tidy up; shots in `apps/gallery/shots/ReviewCards/`.
+Cards in the same spirit, each opening the same review sheet (`ReviewSheet` and `ReviewList` in `@juno/views`, which Tidy up's review is built on; `HomeReview` and `useReview`, the one container for every card): every row with its signal in words, one click to act, one to say no, Undo, and a line on what the action does in Slack. Ranked by value, then by trust risk (low risk first at equal value). Built: 3 (SPEC §12, "Automated's record"), and 4 and 5, each with a switch in Settings › Tidy up; shots in `apps/gallery/shots/ReviewCards/`.
 
 | # | Card | Signal | What it does | Staying transparent | Value | Risk |
 | --- | --- | --- | --- | --- | --- | --- |
