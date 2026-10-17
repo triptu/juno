@@ -4,7 +4,7 @@
  */
 import { createModels, createProvider, fauxAssistantMessage, fauxProvider, fauxToolCall, type ClassifierAnswer, type ClassifierContext, type FauxResponseStep } from '@earendil-works/pi-ai'
 import { createFauxCore } from '@earendil-works/pi-ai/providers/faux'
-import { Effect } from 'effect'
+import { Effect, Fiber } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { OPENROUTER, defineStructuredTask, defineTextTask, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
 import { NOW, postgres, stagingBill } from './fixtures'
@@ -152,6 +152,23 @@ describe('PiAiProvider decisions', () => {
     const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
     expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
     // Settled as known, not kept whole: at most the first attempt, under half the reservation.
+    expect(settled).toHaveLength(1)
+    expect(settled[0]).toBeTypeOf('number')
+    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
+  })
+
+  it('settles a call stopped in its first attempt at that attempt\'s bound, not the whole reservation', async () => {
+    const asked: number[] = []
+    const settled: Array<number | undefined> = []
+    const admit = (upper: number) => Effect.sync(() => {
+      asked.push(upper)
+      return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
+    })
+    const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
+    // A job restarted while the request was out: the call is interrupted, not timed out.
+    const fiber = Effect.runFork(provider.decide(tasks.routeCheck, routeInput))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await Effect.runPromise(Fiber.interrupt(fiber))
     expect(settled).toHaveLength(1)
     expect(settled[0]).toBeTypeOf('number')
     expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
