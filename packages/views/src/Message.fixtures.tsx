@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { layout } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
@@ -11,8 +12,10 @@ import { messageTime } from './time'
 const noop = () => {}
 
 // The frame sizes a lone component to its content; the list column sizes a
-// row to its width, so the row fills the frame as it would the column.
-const column = stylex.create({ fill: { width: '100%' } })
+// row to its width, so the row fills the frame as it would the column. The
+// toolbar and the delete confirm straddle the row's top edge, so the frame
+// keeps their height above the row, as the row before does in a list.
+const column = stylex.create({ fill: { width: '100%', paddingTop: layout['--toolbar-height'] } })
 
 const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: FixtureFrame): Fixture<MessageProps> =>
   scene(
