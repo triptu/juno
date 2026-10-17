@@ -3,9 +3,11 @@ import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Button, Icon, Text, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
+import { PlaceTile } from './PlaceTile'
+import { tileOf } from './tileModel'
 
 export interface HomeProps {
   readonly scene: HomeSceneName
@@ -123,7 +125,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
           <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
         </span>
       ) : (
-        <TopicArt topicId={topic.id} recipe={topic.art} size={40} />
+        <PlaceTile tile={tileOf(topic)} />
       )}
       <span {...stylex.props(styles.text)}>
         {/* An assistant title, and a follow-up's promise, can quote the messages; the plain one only says what kind of thing waits. */}
@@ -343,7 +345,8 @@ const styles = stylex.create({
     flexShrink: 0,
     width: sizes['--tile-36'],
     height: sizes['--tile-36'],
-    marginInline: spacing['--space-0-5'],
+    // In the 44px slot a topic's tile takes, so every row's text starts at one line.
+    marginInline: spacing['--space-1'],
     borderRadius: radii['--radius-xl'],
     backgroundColor: colors['--secondary-default'],
     color: colors['--foreground-subtle'],

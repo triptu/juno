@@ -13,7 +13,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
-import { ChannelRef } from '../refs'
+import { ChannelRef, Person } from '../refs'
 import { CommandResult, DraftRestore, FollowUpRestore } from './topics'
 
 /**
@@ -117,6 +117,12 @@ export const HomeTopic = Schema.Struct({
   place: Schema.String,
   /** The topic's art recipe for the tile. Absent shows the placeholder. */
   art: Schema.optionalKey(Schema.String),
+  /** The conversation's Main: its title names the place, so the meta line says it once. */
+  main: Schema.optionalKey(Schema.Boolean),
+  /** A DM's Main: the other person, whose photo is the tile instead of art, as in the sidebar. */
+  person: Schema.optionalKey(Person),
+  /** A group DM's Main: up to three other members, drawn as the sidebar's pair. */
+  members: Schema.optionalKey(Schema.Array(Person)),
   /** Tidy up: the topic's latest activity, epoch milliseconds. */
   at: Schema.optionalKey(Schema.Number),
   /** Tidy up: why it looks settled. */

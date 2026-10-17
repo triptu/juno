@@ -1,5 +1,6 @@
 import type { HomeTopic } from '@juno/contract'
 import type { ReviewAbout } from './ReviewSheet'
+import { tileOf } from './tileModel'
 import type { ReviewEntry, ReviewVerbs, ReviewWords } from './reviewModel'
 import { relativeTime } from './time'
 
@@ -31,9 +32,8 @@ export const movedAbout: ReviewAbout = { label: automatedMovesCopy.about, lines:
 export function movedEntries(topics: ReadonlyArray<HomeTopic>, now: number): ReadonlyArray<ReviewEntry> {
   return topics.map((topic) => ({
     id: topic.id,
-    topicId: topic.id,
     title: topic.title,
-    ...(topic.art === undefined ? {} : { art: topic.art }),
+    ...tileOf(topic),
     ...(topic.moved?.reason === undefined ? {} : { reason: topic.moved.reason }),
     meta: [topic.moved?.detail, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · '),
     words: topic.moved?.change === 'out' ? OUT : IN,

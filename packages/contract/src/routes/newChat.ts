@@ -52,6 +52,8 @@ export const PickConversation = Schema.Struct({
    * group DMs, which draw people.
    */
   art: Schema.optionalKey(Schema.String),
+  /** A group DM's other members, up to three, for the sidebar's pair. */
+  members: Schema.optionalKey(Schema.Array(Person)),
   /** Juno holds no message in it: "No messages yet" for a person. */
   empty: Schema.Boolean,
   /** With text, the parts of `name` the text matched, as [start, end) offsets, for the row to highlight. */

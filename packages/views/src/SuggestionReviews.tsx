@@ -3,6 +3,7 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import type { HomeTopic, UnopenedWhy } from '@juno/contract'
 import type { CardReviewProps } from './ReviewCards'
 import { ReviewSheet, type ReviewAbout } from './ReviewSheet'
+import { tileOf } from './tileModel'
 import type { ReviewEntry, ReviewVerbs } from './reviewModel'
 import { quietSpan } from './settled'
 import { relativeTime } from './time'
@@ -69,7 +70,7 @@ export function unopenedEntries(topics: ReadonlyArray<HomeTopic>, unit: 'reply' 
     const why = topic.unopened
     if (why === undefined) return []
     const meta = [topic.place, topic.at === undefined ? undefined : relativeTime(topic.at, now)].filter((part) => part !== undefined && part !== '').join(' · ')
-    return [{ id: topic.id, topicId: topic.id, title: topic.title, ...(topic.art === undefined ? {} : { art: topic.art }), reason: unopenedReason(why, unit, now), meta }]
+    return [{ id: topic.id, title: topic.title, ...tileOf(topic), reason: unopenedReason(why, unit, now), meta }]
   })
 }
 

@@ -4,7 +4,7 @@ import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
-import type { Person, TopicRow as TopicRowModel } from '@juno/contract'
+import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
@@ -22,7 +22,7 @@ import {
   type ActivateEvent,
   type AvatarStackPerson,
 } from '@juno/ui'
-import { countLabel, groupInitials, hueFor, initials, kindIcon } from './look'
+import { countLabel, groupInitials, hueFor, initials, kindIcon, stackPerson } from './look'
 import { RenameField } from './RenameField'
 
 export interface TopicRowProps {
@@ -317,17 +317,6 @@ function Tile({ row }: { readonly row: TopicRowModel }) {
  */
 function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
   return row.kind === 'main'
-}
-
-/** A person as the stack (18px, the 48px photo) or the group tile (28px, the 72px photo) draws them. */
-function stackPerson(person: Person, large = false): AvatarStackPerson {
-  return {
-    id: person.id,
-    initials: initials(person.name),
-    name: person.name,
-    hue: hueFor(person.color, person.id),
-    ...(person.avatarUrl === undefined ? {} : { src: (large ? undefined : person.avatarSmallUrl) || person.avatarUrl }),
-  }
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */

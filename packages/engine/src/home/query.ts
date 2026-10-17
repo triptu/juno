@@ -54,7 +54,7 @@ import { aiAssistOn } from '../ai'
 import { readMoves, withMove, type MoveRow } from './moves'
 import { parseReason, parseScore, parseTitle } from './answers'
 import { cardTitle, readDelivered, readOldDrafts, withDelivery, withDraft, type Delivered, type OpenPromise } from './reviewCards'
-import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
+import { artRefOf, channelInfoOf, channelRefOf, parseColumns, personFrom, tileMemberIds, topicFrom, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
 import { FOLLOWED, HOME_SELECT, messagesAfter, messageStatements, NO_READ, OPEN, type HomeRow, type MessageRow, type Statement } from './rows'
 import { readIgnore, readMentioned, readUnfollow, withUnopened, type Suggested } from './suggested'
 
@@ -295,11 +295,18 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       const info = channelInfoOf(row, columns, selfId, nameOf)
       const topic = topicFrom(row, columns, info)
       const art = artRefOf(row, aiAssist)
+      // A DM's Main is the person and a group DM's its members, as the sidebar's Main rows draw them.
+      const main = row.kind === 'main'
+      const partnerId = main && row.c_kind === 'im' ? (row.c_user_id ?? undefined) : undefined
+      const memberIds = main && row.c_kind === 'mpim' ? tileMemberIds(columns, selfId) : []
       return {
         id: row.topic_id,
-        title: row.kind === 'main' ? channelLabel(info) : resolveTitle(topic, { user: nameOf }).text,
+        title: main ? channelLabel(info) : resolveTitle(topic, { user: nameOf }).text,
         place: channelLabelBare(info),
         ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
+        ...(main ? { main } : {}),
+        ...(partnerId === undefined ? {} : { person: personFrom(partnerId, users.get(partnerId)) }),
+        ...(memberIds.length === 0 ? {} : { members: memberIds.map((id) => personFrom(id, users.get(id))) }),
       }
     }
 

@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { accent, colors, opacity as opacityTokens, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, Icon, Text, TopicArt, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Button, Icon, Text, type ActivateEvent } from '@juno/ui'
+import { PlaceTile } from './PlaceTile'
 import { reviewCopy, type ReviewEntry, type ReviewStatus, type ReviewVerbs } from './reviewModel'
 
 // A sheet narrower than this (the minimum window, `ReviewSheet.tsx`'s) puts a row's buttons under its text.
@@ -48,7 +49,7 @@ export function ReviewRow({ entry, status, verbs, active, compact = false, onOpe
       >
         {compact ? null : (
           <span {...stylex.props(styles.art, handled && styles.dim)}>
-            <TopicArt topicId={entry.topicId} recipe={entry.art} size={40} />
+            <PlaceTile tile={entry} />
           </span>
         )}
         <span {...stylex.props(styles.lines)}>
