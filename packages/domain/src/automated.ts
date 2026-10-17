@@ -12,8 +12,15 @@ export const AUTOMATED_VIEW_ID = 'automated'
 /** The view as Juno first makes it. */
 export const AUTOMATED_VIEW = { name: 'Automated', icon: 'robot' satisfies ViewIcon, keepOutOfAll: true } as const
 
-/** Who sent a message: an app or bot, the user, or another person. */
+/** Who sent a message: an app or bot, the user, or another person. A person's message that tags or asks a bot is the person's. */
 export type Sender = 'app' | 'you' | 'person'
+
+/** One of a conversation's latest messages, as the rules read it. */
+export interface SampledMessage {
+  readonly sender: Sender
+  /** A reply in a thread. Replies say nothing about who starts conversations, so the rules skip them. */
+  readonly reply?: boolean
+}
 
 /** What the rules read about a conversation. */
 export interface ConversationSample {
@@ -22,8 +29,8 @@ export interface ConversationSample {
   readonly name: string
   /** A DM whose other side is a bot or an app. */
   readonly partnerIsApp?: boolean
-  /** The senders of its latest messages, at most `AUTOMATED_SAMPLE`. */
-  readonly senders: ReadonlyArray<Sender>
+  /** Its latest messages, newest first. Only the first `AUTOMATED_SAMPLE` top-level ones count. */
+  readonly messages: ReadonlyArray<SampledMessage>
 }
 
 /**
@@ -34,26 +41,55 @@ export interface ConversationSample {
  */
 export type AutomatedVerdict = 'automated' | 'ambiguous' | 'people' | 'unknown'
 
-/** Messages the rules read per conversation. */
+/** Top-level messages the rules read per conversation. */
 export const AUTOMATED_SAMPLE = 30
-/** Fewer messages than this say nothing. */
+/** Fewer top-level messages than this say nothing. */
 export const AUTOMATED_MIN_MESSAGES = 4
-/** Share of messages from apps that makes a channel automated on its own. */
-export const APP_SHARE_AUTOMATED = 0.8
 /**
- * With an integration-style name, this share is enough. A move happens without
- * asking, so it needs high confidence; anything less is asked about on Home
- * (owner, 10-17).
+ * People started at most this share of the latest top-level messages: apps
+ * clearly start the conversations, and the channel moves on its own. A move
+ * happens without asking, so it needs high confidence (owner, 10-17).
  */
-export const APP_SHARE_NAMED = 0.7
+export const PEOPLE_SHARE_MOVE = 0.2
+/** With an integration-style name, this share of people is still a move. */
+export const PEOPLE_SHARE_MOVE_NAMED = 0.3
 /**
- * Below this share a channel is people talking, and is not asked about. An
- * app that posts a minority of the messages (meeting notes, a standup bot,
- * links unfurled by an integration) does not make people's channel unclear.
+ * People started at least this share: a people channel, not asked about,
+ * however much apps reply in its threads or post now and then (Cursor,
+ * Devin, CI, a meeting-notes app).
  */
-export const APP_SHARE_AMBIGUOUS = 0.5
-/** With an integration-style name, this share is enough to ask. */
-export const APP_SHARE_NAMED_AMBIGUOUS = 0.3
+export const PEOPLE_SHARE_PEOPLE = 0.5
+/** With an integration-style name, people must start this share to leave it unasked. */
+export const PEOPLE_SHARE_PEOPLE_NAMED = 0.7
+
+/** Who wrote a conversation's latest top-level messages: the numbers the rules decide on and the reasons quote. */
+export interface PostingCounts {
+  /** Top-level messages from apps and bots. */
+  readonly apps: number
+  /** Top-level messages from people, the user included. */
+  readonly people: number
+  /** Of `people`, the user's. */
+  readonly you: number
+  /** Top-level messages read: `apps + people`. */
+  readonly of: number
+}
+
+/** Counts the first `AUTOMATED_SAMPLE` top-level messages by who wrote them. Thread replies are skipped. */
+export function postingCounts(messages: ReadonlyArray<SampledMessage>): PostingCounts {
+  let apps = 0
+  let people = 0
+  let you = 0
+  for (const message of messages) {
+    if (message.reply === true) continue
+    if (apps + people >= AUTOMATED_SAMPLE) break
+    if (message.sender === 'app') apps += 1
+    else {
+      people += 1
+      if (message.sender === 'you') you += 1
+    }
+  }
+  return { apps, people, you, of: apps + people }
+}
 
 /** Words that name an integration channel: alerts-prod, deploy-notifications, ci, github-feed. */
 const INTEGRATION_WORDS = new Set([
@@ -93,23 +129,28 @@ export function integrationName(name: string): boolean {
 
 /**
  * The rules, in code, with no model call. A DM with an app is automated; a
- * group DM is people. A channel the user wrote in is people: they talk
- * there. Otherwise a channel is automated when most of its latest messages
- * come from apps (or half do and its name says so), and ambiguous when
- * apps write at least half (or, with an integration name, a third).
+ * group DM is people. A channel is judged by who starts its conversations:
+ * its latest top-level messages, never the replies in its threads. One
+ * where the user started a conversation is people. Otherwise it is
+ * automated when people started at most a fifth of them (three in ten with
+ * an integration name), people when they started at least half (seven in
+ * ten with an integration name), and ambiguous in between.
  */
 export function classifyConversation(sample: ConversationSample): AutomatedVerdict {
   if (sample.kind === 'im') return sample.partnerIsApp === true ? 'automated' : 'people'
   if (sample.kind === 'mpim') return 'people'
-  const total = sample.senders.length
-  if (total < AUTOMATED_MIN_MESSAGES) return 'unknown'
-  if (sample.senders.includes('you')) return 'people'
-  const apps = sample.senders.filter((sender) => sender === 'app').length
-  const share = apps / total
-  const named = integrationName(sample.name)
-  if (share >= APP_SHARE_AUTOMATED || (named && share >= APP_SHARE_NAMED)) return 'automated'
-  if (share >= APP_SHARE_AMBIGUOUS || (named && share >= APP_SHARE_NAMED_AMBIGUOUS)) return 'ambiguous'
-  return 'people'
+  return classifyCounts(sample.name, postingCounts(sample.messages))
+}
+
+/** The channel rule on counts already taken (`postingCounts`), so a caller can quote the same numbers. */
+export function classifyCounts(name: string, counts: PostingCounts): AutomatedVerdict {
+  if (counts.of < AUTOMATED_MIN_MESSAGES) return 'unknown'
+  if (counts.you > 0) return 'people'
+  const share = counts.people / counts.of
+  const named = integrationName(name)
+  if (share <= PEOPLE_SHARE_MOVE || (named && share <= PEOPLE_SHARE_MOVE_NAMED)) return 'automated'
+  if (share >= (named ? PEOPLE_SHARE_PEOPLE_NAMED : PEOPLE_SHARE_PEOPLE)) return 'people'
+  return 'ambiguous'
 }
 
 /** Juno's answer, the probability that a conversation is automated: at or above, move it. */
@@ -125,12 +166,27 @@ export function junoVerdict(probability: number): 'automated' | 'ambiguous' | 'p
 }
 
 /**
- * Home's one line on why it asks about a channel: Juno's reason when Juno
- * gave one, else the count the rules read. Undefined when neither is known.
+ * Why Juno moved a channel or asks about one, in one line: Juno's reason
+ * when Juno gave one, else the count the rules read ("Apps wrote 24 of the
+ * last 30 top-level messages"). Undefined when neither is known.
  */
 export function automatedReason(why: { readonly apps?: number | null; readonly of?: number | null; readonly juno?: string | null }): string | undefined {
   const juno = why.juno?.trim().replace(/[.\s]+$/, '') ?? ''
   if (juno !== '') return juno.charAt(0).toUpperCase() + juno.slice(1)
   if (why.apps == null || why.of == null || why.of === 0) return undefined
-  return `${why.apps === 1 ? 'An app' : 'Apps'} wrote ${why.apps} of the last ${why.of} messages`
+  return `${why.apps === 1 ? 'An app' : 'Apps'} wrote ${why.apps} of the last ${why.of} top-level messages`
+}
+
+/**
+ * Why Juno took a channel out of Automated, from the counts that decided it:
+ * the line ("Moved back: people start most conversations here") and the
+ * numbers ("People wrote 18 of the last 30 top-level messages").
+ */
+export function movedBackReason(counts: Pick<PostingCounts, 'people' | 'you' | 'of'>): { readonly line: string; readonly detail: string | undefined } {
+  // A channel the user started a conversation in is people, whoever else writes there.
+  const mine = counts.you > 0
+  const line = mine ? 'Moved back: you start conversations here' : 'Moved back: people start most conversations here'
+  if (counts.of === 0) return { line, detail: undefined }
+  const who = mine ? 'You' : counts.people === 1 ? 'A person' : 'People'
+  return { line, detail: `${who} wrote ${mine ? counts.you : counts.people} of the last ${counts.of} top-level messages` }
 }

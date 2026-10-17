@@ -11,15 +11,22 @@
  * already looked at is looked at again only when it has new activity, or
  * when AI assist is turned on or off.
  *
- * For each, the rules (`classifyConversation`) read the senders of its
- * latest messages:
+ * For each, the rules (`classifyConversation`) read who wrote its latest
+ * top-level messages (thread replies say nothing about who starts
+ * conversations):
  * - automated: it goes into the view, which is made the first time.
  * - ambiguous: with AI assist on, Juno judges it once (`automatedChannel`,
  *   a decision over the latest 20 messages, kept in `ai_cache`). Sure it is
  *   automated: it goes in. Sure it is not: it stays. Otherwise, or with AI
  *   off or no provider, Home asks (`ask`), with why: how many of the
- *   latest messages apps wrote, and Juno's reason when it gave one.
+ *   latest top-level messages apps wrote, and Juno's reason when it gave one.
  * - people or too few messages: it stays, and an open question goes.
+ *
+ * The same pass looks again at what the rules and Juno already moved in
+ * (never what the user placed), when it has new activity: one where people
+ * now start most conversations (`people`) goes back out, and the move is
+ * recorded for Home's card. Only `people` moves one out, not `ambiguous`, so
+ * a channel near the line does not go back and forth.
  *
  * Nothing runs once the user deleted the view.
  */
@@ -32,7 +39,7 @@ import { aiAssistOn, aiJobsOn } from '../ai'
 import type { EngineConfig } from '../config'
 import { AiCredentials, aiWakes } from '../aiCredentials'
 import { AiSpend } from '../aiSpend'
-import { automatedViewState, candidates, classify, clearVerdict, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
+import { automatedViewState, candidates, classify, clearVerdict, moveBackOut, movedIn, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
 import { userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, usedToday } from './assist'
@@ -51,6 +58,8 @@ const DEFER_CAP_MILLIS = 60 * 60_000
 interface Memory {
   /** Conversation id to what it was looked at with: its activity and whether AI assist was on. */
   readonly seen: Map<string, string>
+  /** Conversations in Automated by the rules or Juno, to the activity they were last checked at. */
+  readonly checked: Map<string, string>
   readonly deferred: Map<string, { readonly until: number; readonly attempts: number }>
 }
 
@@ -79,18 +88,19 @@ const runPass = (memory: Memory, jobs: boolean): Effect.Effect<void, SqlError, S
     if ((yield* syncState.get(BOOT_KEY)) === undefined) return
     if ((yield* automatedViewState) === 'deleted') return
     const now = yield* Clock.currentTimeMillis
+    const selfId = yield* selfIdOf
+    yield* recheckMoved(memory, selfId, now)
     // With the AI jobs off (tests that do not opt in), ambiguous channels go to Home's question as with AI assist off.
     const ai = jobs && (yield* aiAssistOn)
     const due = (yield* candidates(now)).filter((row) => memory.seen.get(row.id) !== `${row.activity}|${ai}`)
     if (due.length === 0) return
-    const selfId = yield* selfIdOf
     let calls = ai ? Math.min(PASS_CALLS, HOME_DAILY_BUDGET - (yield* usedToday(now))) : 0
 
     for (const row of due) {
-      const { verdict, sample } = yield* classify(row, selfId)
+      const { verdict, sample, counts } = yield* classify(row, selfId)
       const seen = () => memory.seen.set(row.id, `${row.activity}|${ai}`)
       if (verdict === 'automated') {
-        yield* write(moveToAutomated(row.id, 'rules', now))
+        yield* write(moveToAutomated(row.id, 'rules', now, { counts }))
         seen()
         continue
       }
@@ -115,17 +125,32 @@ const runPass = (memory: Memory, jobs: boolean): Effect.Effect<void, SqlError, S
         }
       }
       const judged = answer === undefined ? 'ambiguous' : junoVerdict(answer.probability)
-      if (judged === 'automated') yield* write(moveToAutomated(row.id, 'juno', now))
+      if (judged === 'automated') yield* write(moveToAutomated(row.id, 'juno', now, { counts, ...(answer?.reason === undefined ? {} : { reason: answer.reason }) }))
       else if (judged === 'people') {
         if (row.verdict === 'ask') yield* write(clearVerdict(row.id))
       } else {
         // Written only when something Home says changed, so a pass waiting on Juno does not wake the next.
         const by = answer === undefined ? 'rules' : 'juno'
-        const why = { apps: sample.filter((message) => senderOf(message, selfId) === 'app').length, sampled: sample.length, ...(answer?.reason === undefined ? {} : { reason: answer.reason }) }
+        const why = { apps: counts.apps, sampled: counts.of, ...(answer?.reason === undefined ? {} : { reason: answer.reason }) }
         if (row.verdict !== 'ask' || row.by !== by || row.apps !== why.apps || row.sampled !== why.sampled || row.reason !== (why.reason ?? null)) yield* write(setVerdict(row.id, 'ask', by, now, why))
       }
       // Without Juno's answer yet, Home asks meanwhile and Juno is asked on a later pass.
       if (!ai || answer !== undefined) seen()
+    }
+  })
+
+/**
+ * Looks again at what the rules and Juno moved in, each when it has new
+ * activity: where people now start most conversations, it goes back out.
+ */
+const recheckMoved = (memory: Memory, selfId: string | undefined, now: number) =>
+  Effect.gen(function* () {
+    for (const row of yield* movedIn) {
+      const activity = row.activity ?? ''
+      if (memory.checked.get(row.id) === activity) continue
+      memory.checked.set(row.id, activity)
+      const { verdict, counts } = yield* classify(row, selfId)
+      if (verdict === 'people') yield* write(moveBackOut(row.id, row.by, now, { counts }))
     }
   })
 
@@ -161,10 +186,11 @@ export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | Ai
     const passes = workspace.changes.pipe(
       Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
-        const memory: Memory = { seen: new Map(), deferred: new Map() }
+        const memory: Memory = { seen: new Map(), checked: new Map(), deferred: new Map() }
         // A wake forgets the waits and runs a pass after the one under way, which it does not stop.
         const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => {
           memory.seen.clear()
+          memory.checked.clear()
           memory.deferred.clear()
         })))
         const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK)), woken)

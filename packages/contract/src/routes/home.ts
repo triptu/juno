@@ -16,7 +16,7 @@ import { liveValueRoute } from '../live'
 import { ChannelRef } from '../refs'
 
 /** Ranked in this order: at most one of each, and at most three in all. */
-export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp'])
+export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'automatedMoves'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /**
@@ -39,6 +39,23 @@ export const SettledWhy = Schema.Struct({
 })
 export type SettledWhy = typeof SettledWhy.Type
 
+/**
+ * A move the rules or Juno made to Automated, for the record card ("Juno
+ * moved 2 channels to Automated", SPEC 12). The lines are facts from the
+ * counts that decided the move.
+ */
+export const AutomatedMove = Schema.Struct({
+  /** The conversation moved, for Move back and Keep. */
+  channel: ChannelRef,
+  /** `in`: Juno put it in Automated. `out`: Juno took it back out. */
+  change: Schema.Literals(['in', 'out']),
+  /** "Apps wrote 24 of the last 30 top-level messages", or "Moved back: people start most conversations here". */
+  reason: Schema.String,
+  /** A second line: Juno's own reason when Juno decided ("Juno: release tags from a bot"), or the counts behind a move back. */
+  detail: Schema.optionalKey(Schema.String),
+})
+export type AutomatedMove = typeof AutomatedMove.Type
+
 /** A topic as a Home row names it. */
 export const HomeTopic = Schema.Struct({
   id: Schema.String,
@@ -52,18 +69,20 @@ export const HomeTopic = Schema.Struct({
   at: Schema.optionalKey(Schema.Number),
   /** Tidy up: why it looks settled. */
   settled: Schema.optionalKey(SettledWhy),
+  /** Automated's record: the move, on the conversation's Main. `at` is when it was made. */
+  moved: Schema.optionalKey(AutomatedMove),
 })
 export type HomeTopic = typeof HomeTopic.Type
 
 export const HomeItem = Schema.Struct({
-  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `automated:<channel id>`. */
+  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `automated:<channel id>`, `automatedMoves`. */
   id: Schema.String,
   kind: HomeItemKind,
   /** The title line with AI off: "Elena asked you something", "3 topics look settled", "Move #ci-builds?". */
   title: Schema.String,
   /** A sharper title line from the assistant, only when it was confident. Never changes the meta line. */
   aiTitle: Schema.optionalKey(Schema.String),
-  /** The topic the row opens; for Tidy up, the settled topics it resolves. */
+  /** The topic the row opens; for Tidy up, the settled topics it resolves; for Automated's record, the Mains of the channels moved. */
   topics: Schema.Array(HomeTopic),
   /** Epoch milliseconds for the meta line's time: the question, the last visit, the promise. */
   at: Schema.optionalKey(Schema.Number),
@@ -133,6 +152,12 @@ export const homeView = liveValueRoute('home.view', { value: HomeView })
  */
 export const homeVisit = Rpc.make('home.visit', { payload: { id: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
+/**
+ * Home showed Automated's record card with these conversations' moves: they
+ * are not shown again, and the card waits a day before it shows newer ones.
+ */
+export const homeMovesSeen = Rpc.make('home.movesSeen', { payload: { channels: Schema.Array(Schema.String) }, success: Schema.Void, error: NotSignedIn })
+
 /** Mark done on a Follow-up: that promise does not come back. No undo. */
 export const homeMarkDone = Rpc.make('home.markDone', {
   payload: { topicId: Schema.String, messageTs: Schema.String },
@@ -140,4 +165,4 @@ export const homeMarkDone = Rpc.make('home.markDone', {
   error: NotSignedIn,
 })
 
-export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone)
+export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesSeen)

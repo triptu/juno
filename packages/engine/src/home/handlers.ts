@@ -9,17 +9,18 @@
  * So rewrites are asked for only while Home is on screen, and only after
  * the first sync, when the people they name are known.
  *
- * `home.visit` and `home.markDone` are small local writes.
+ * `home.visit`, `home.markDone` and `home.movesSeen` are small local writes.
  */
 import { AiProvider, tasks } from '@juno/ai'
 import { HomeRoutes, NotSignedIn } from '@juno/contract'
-import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
+import { Invalidation, keys, liveQuery, prefs, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { aiJobsOn } from '../ai'
 import { aiWakes } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
+import { MOVES_SEEN_PREF } from './moves'
 import { readHome, type HomeRun } from './query'
 
 const KEYS: InvalidationKeys = [
@@ -38,6 +39,7 @@ const KEYS: InvalidationKeys = [
   'topic_visits',
   'sync_state',
   'automated_channels',
+  'automated_moves',
   'sidebar_views',
 ]
 
@@ -134,6 +136,16 @@ export const HomeHandlers = HomeRoutes.toLayer(
             const now = String(yield* Clock.currentTimeMillis)
             yield* sql`UPDATE follow_ups SET done_at = ${now} WHERE topic_id = ${topicId} AND message_ts = ${messageTs} AND done_at IS NULL`
             yield* (yield* Invalidation).invalidate(keys.followUps)
+          }),
+        ),
+      'home.movesSeen': ({ channels }) =>
+        write(
+          Effect.gen(function* () {
+            const sql = yield* StoreWriter
+            const now = yield* Clock.currentTimeMillis
+            if (channels.length > 0) yield* sql`UPDATE automated_moves SET seen_at = ${String(now)} WHERE channel IN ${sql.in(channels)} AND seen_at IS NULL`
+            yield* prefs.set(MOVES_SEEN_PREF, now)
+            yield* (yield* Invalidation).invalidate(keys.automatedMoves)
           }),
         ),
     }
