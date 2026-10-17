@@ -26,7 +26,7 @@ const STAGING = 'Unrelated: has anyone looked at the'
 const KEYS = 'The staging deploy keys need rotating'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-test('During the first sync Home greets and says it is syncing, and the sidebar shows how far it got', async ({ juno, slack, win }) => {
+test('During the first sync Home greets and says how far the sync got, as the sidebar does', async ({ juno, slack, win }) => {
   // The first conversation's history waits, as a real workspace's backfill takes minutes.
   slack.fake.holdNext({ method: 'conversations.history' })
   await juno.signIn()
@@ -34,11 +34,14 @@ test('During the first sync Home greets and says it is syncing, and the sidebar 
   await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
-  await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
   await expect(syncing.getByText('All caught up.')).toHaveCount(0)
   const progress = juno.sidebar.syncStatus
   await expect(progress).toHaveText('Syncing with Slack')
   await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^0 of \d+ conversations$/)
+  // Home's line counts the conversations as the sidebar's card does.
+  const line = syncing.locator('h2 + p')
+  await expect(line).toHaveText(/^Syncing 0 of \d+ conversations\.$/)
+  await expect.poll(async () => `Syncing ${await juno.sidebar.syncProgress.getAttribute('aria-valuetext')}.`).toBe(await line.textContent())
 
   // Once the history lands the first sync finishes: Home shows what waits and the line goes.
   slack.fake.release()
@@ -70,7 +73,7 @@ test('Home shows rows before the first sync ends', async ({ juno, slack, win }) 
       { timeout: 30_000 },
     )
     .toBe(true)
-  await expect(syncing.getByText('Syncing with Slack.')).toBeVisible()
+  await expect(syncing.locator('h2 + p')).toHaveText(/^Syncing \d+ of \d+ conversations\.$/)
   await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
   const early = await juno.home.kinds()
 

@@ -12,6 +12,7 @@ import { PrivacyOn } from './fixtures/privacy'
 import { atMa, DRAFT, eng, hashEn, maya, MULTILINE, recentChannels, recentPeople } from './fixtures/recents'
 import { art, NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
+import { HomeSyncLine } from './HomeSyncLine'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { destinationLabel, HomeRecent, SendToList, sendToRowId } from './HomeWrite'
 import { WelcomeCard, type WelcomeHintName } from './WelcomeCard'
@@ -170,16 +171,18 @@ export default defineFixtures(
       // Before the sidebar has rows, and after Hide: the card's room, empty, so the rows never move.
       'room-kept': state({ welcome: card([], true) }),
       // The first sync: reserved rows and the card's room.
-      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3, welcome: card([], true) }),
+      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3, welcome: card([], true) }),
     },
     Empty: {
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }),
       'caught-up-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }, narrow),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
       // Recent keeps its room empty until the sync ends, so its rows never re-rank under the pointer.
-      syncing: state({ line: 'Syncing with Slack.', items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      // Once the conversations are listed, the line counts them as the sidebar's card does, in a fixed width.
+      'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
       // Mid-sync: the rows that landed so far, with room kept for the rest.
-      'syncing-rows': state({ line: 'Syncing with Slack.', items: [homeItems.waiting], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
