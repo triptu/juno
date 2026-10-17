@@ -5,6 +5,9 @@
   "private": true,
   "description": "Juno desktop app (Electron shell).",
   "main": "./out/main/index.js",
+  "files": [
+    "out"
+  ],
   "scripts": {
     "dev": "node ../../scripts/without-run-as-node.mjs electron-vite dev",
     "build": "electron-vite build && node ../../scripts/check-bundle-size.mjs",
