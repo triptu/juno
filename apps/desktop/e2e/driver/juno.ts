@@ -55,6 +55,32 @@ export async function pointAt(win: Page, target: Locator, position?: { readonly 
   throw new Error(`Pointing did not hover the element; hovered: ${deepest}`)
 }
 
+type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+
+/** The element's box once it is the same on two frames in a row (up to two seconds), or null when it is not shown. */
+function settledBox(target: Locator): Promise<Box | null> {
+  return target.evaluate(
+    (node) =>
+      new Promise<Box | null>((resolve) => {
+        const read = () => {
+          const { x, y, width, height } = node.getBoundingClientRect()
+          return node.isConnected && width > 0 ? { x, y, width, height } : null
+        }
+        const until = performance.now() + 2_000
+        let last = read()
+        const frame = () => {
+          const next = read()
+          if (next === null || (last !== null && next.x === last.x && next.y === last.y && next.height === last.height) || performance.now() > until) resolve(next)
+          else {
+            last = next
+            requestAnimationFrame(frame)
+          }
+        }
+        requestAnimationFrame(frame)
+      }),
+  )
+}
+
 export type SidebarSectionName = 'Pinned' | 'Recent'
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
@@ -97,10 +123,16 @@ export class SidebarRow {
     return this.root.focus()
   }
 
-  /** Selects the row with the mouse (it activates on mouse down). */
+  /**
+   * Selects the row with the mouse (it activates on mouse down). Rows move
+   * while the list fills and when a topic gets activity, so the pointer goes
+   * to the row once its box has stayed the same for two frames; from then on
+   * the list holds its order under the pointer (SPEC 5). A test that has just
+   * caused a move waits for it first (`expectTop`).
+   */
   async select(): Promise<void> {
     await this.root.scrollIntoViewIfNeeded()
-    const box = await this.root.boundingBox()
+    const box = await settledBox(this.root)
     if (!box) throw new Error(`Row "${this.title}" is not on screen`)
     await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
     await press(this.win)
@@ -258,6 +290,14 @@ export class Sidebar {
 
   async expectVisible(): Promise<void> {
     await expect(this.root).toBeVisible({ timeout: 15_000 })
+  }
+
+  /**
+   * Waits until Recent starts with these rows, in this order. A message a test injects moves its topic to the top
+   * when the engine stores it, so a test that then clicks a row waits for that move first.
+   */
+  async expectTop(...titles: ReadonlyArray<string>): Promise<void> {
+    await expect.poll(() => this.titles('Recent').then((shown) => shown.slice(0, titles.length))).toEqual(titles)
   }
 
   /** Waits until at least one row has arrived from the engine. */

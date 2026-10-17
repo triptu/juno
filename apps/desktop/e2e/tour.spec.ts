@@ -37,6 +37,11 @@ opensItself('opens once after the first sign-in, when the sidebar has rows, step
   await expect(tour.back).toBeDisabled()
   await expect(tour.dot(1)).toHaveAttribute('aria-current', 'step')
   const tabCount = await tabs.root.getByRole('tab').count()
+  // The tour opens with the first rows, while the first sync still runs: bot channels leave the list as their
+  // history lands and the sync card at the foot goes, which lengthens the list (sidebar.spec.ts checks both).
+  // Let the sync end so the check below sees only what the tour does.
+  await juno.expectEngineLive()
+  await sidebar.expectNoSyncStatus()
   await tour.expectSettled()
   const sheet = await tour.root.boundingBox()
 
