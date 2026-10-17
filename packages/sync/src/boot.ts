@@ -418,6 +418,8 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     yield* transaction(reindexTopics(active.map((conversation) => mainTopicOf(conversation.id)), { ...reindexOptions(ctx), provisionalMain: true }))
     // Names before rows: the people of every DM and group DM, on the interactive lane.
     yield* fillUsers(ctx, 'interactive')
+    // Before any row shows: the engine holds back what Automated's rules cannot place yet.
+    yield* ctx.onListed
     // The quick start ends with the first page of followed threads; the other pages run beside history.
     const quickStarted = yield* Deferred.make<void>()
     const quickStart = Effect.flatMap(Clock.currentTimeMillis, (at) => transaction(setSyncState(QUICK_START_KEY, { at }))).pipe(

@@ -51,6 +51,8 @@ export interface SyncContext {
   readonly usergroupTopics: Set<string>
   /** Called after the cold boot stored a conversation's history page (`RunSyncOptions.onHistory`). */
   readonly onHistory: (channel: string) => Effect.Effect<void>
+  /** Called once the cold boot listed the conversations, before the sidebar shows rows (`RunSyncOptions.onListed`). */
+  readonly onListed: Effect.Effect<void>
   /** Ids the edge did not return (`failed_ids`: bots, Slack Connect users). Not asked for again in this session. */
   readonly unknownUsers: Set<string>
   /** Stored users without a photo already asked for again in this session (`fillUsers`), so each is asked once. */
