@@ -79,7 +79,7 @@ const THANKS = /\b(thanks|thank you|thank u|thx|tysm|ty|cheers|appreciate it|muc
 const DONE = /\b(done|merged|shipped|fixed|deployed|released|landed|closed|resolved|sorted|completed)\b|:white_check_mark:|:heavy_check_mark:|✅/iu
 const AGREED = /^\s*(ok|okay|k|kk|sounds good|sgtm|lgtm|great|perfect|works for me|cool|yep|yes|agreed|got it|:\+1:|:thumbsup:|:ok_hand:|👍|👌)(?![\p{L}\p{N}])/iu
 /** "not done", "isn't merged", "no thanks": a closing word that is denied does not close. */
-const DENIED = /\b(not|isn't|isnt|hasn't|hasnt|haven't|havent|no|never|yet)\b/i
+const DENIED = /\b(not|isn't|isnt|hasn't|hasnt|haven't|havent|never|no thanks)\b/i
 /** An agreement is a short reply; a long message that starts with "ok" goes on to say something else. */
 const AGREED_MAX = 60
 

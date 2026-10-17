@@ -53,6 +53,7 @@ describe('Why a topic looks settled', () => {
     expect(settledEvidence([msg('U0PRIYA', 'sounds good'), msg(me, 'Ship it Friday then')], me, false)).toEqual({ kind: 'agreed', by: 'U0PRIYA' })
     expect(settledEvidence([msg('U0PRIYA', ':+1:')], me, false)).toEqual({ kind: 'agreed', by: 'U0PRIYA' })
     expect(settledEvidence([msg(me, 'thanks all')], me, false)).toEqual({ kind: 'thanks' })
+    expect(settledEvidence([msg(me, 'Thanks both. Postmortem in the usual doc, no rush.'), msg('U0DEV', 'Confirmed, p95 back to 210ms.')], me, false)).toEqual({ kind: 'thanks' })
   })
 
   it('does not count a denied or asked closing word', () => {
