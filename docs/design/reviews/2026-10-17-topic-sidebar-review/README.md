@@ -185,3 +185,25 @@ Not done here: 17 other views still write their focus ring by hand, mostly in Ho
   - Two runs of that one spec were used to find it; it was then diagnosed locally against the built gallery.
 - **`pnpm affected`, third run** (on `08eee002`).
   - Passed: typecheck, lint, gallery (278 passed) and desktop e2e (420 passed).
+
+## Round 3: the 24px top gap, with the toolbar inside the first message
+
+Decided by the orchestrator, on `topic-top-gap` from `4c4ac09b`. `small-ui-1017` added a toolbar placement inside the row's top edge. The first message at scroll top now uses it too, in place of keeping room above it or flipping the toolbar below. That makes the 24px gap possible:
+- **Gap:** at scroll top the first message starts where the header band ends, 24px under the islands. That is the same 24px the last message keeps above the composer.
+- **Loading line:** "Loading older messages" shows in that gap, out of the flow and drawn over the band's fade.
+- **Toolbar placement:** `placeToolbar` puts the toolbar 2px inside the row when there is no room above and the row's top is in view. A row whose top is under the band still flips it below, and a row taller than the list still takes it in the part in view.
+- **Tests:** `toolbar-geometry.spec.ts` now checks that the first row's toolbar sits inside the row, below the band and clear of the name and time. `message-geometry.spec.ts` checks the 24px gaps at the top and bottom.
+
+| | Before | After |
+| --- | --- | --- |
+| Thread at its top, light | ![](shots/r3-top-gap-before-light.jpg) | ![](shots/r3-top-gap-after-light.jpg) |
+| Thread at its top, dark | ![](shots/r3-top-gap-before-dark.jpg) | ![](shots/r3-top-gap-after-dark.jpg) |
+| Minimum window, light | ![](shots/r3-top-gap-minimum-before-light.jpg) | ![](shots/r3-top-gap-minimum-after-light.jpg) |
+| Minimum window, dark | ![](shots/r3-top-gap-minimum-before-dark.jpg) | ![](shots/r3-top-gap-minimum-after-dark.jpg) |
+| First message hovered, light | ![](shots/r3-first-toolbar-before-light.jpg) | ![](shots/r3-first-toolbar-after-light.jpg) |
+| First message hovered, dark | ![](shots/r3-first-toolbar-before-dark.jpg) | ![](shots/r3-first-toolbar-after-dark.jpg) |
+| Loading an older page, light | | ![](shots/r3-loading-older-after-light.jpg) |
+
+**What this costs.** Inside the row, the toolbar (36px) is taller than the name line (about 26px). While the first message is hovered or focused, it covers the right end of the first body line, about 14px of it, when that line runs to the edge (`shots/r3-first-toolbar-closeup-light.jpg`). The name and time stay clear. Flipped below, it would have covered the next message's name instead. SPEC 7 now says "clear of the name and time" for this case, not "never covers the message's own text".
+
+**Verification.** Gallery shots of `TopicView` and `MessageList` before and after; only the topic lists' first rows moved, up 34px. Typecheck and lint ran locally. `pnpm affected`, once, on `c391ce2a`: typecheck, lint, gallery (232 passed) and desktop e2e (316 passed).

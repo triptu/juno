@@ -105,25 +105,26 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   await expect(page.locator('[data-msg-text] img[alt=":makes-sense:"]')).toHaveCount(1)
 })
 
-test('at scroll top the first row sits the toolbar’s room below the header band, and “Loading older messages” takes no space', async ({ page }) => {
-  const firstRow = () =>
-    page.evaluate(() => {
-      const row = document.querySelector('[data-message-row]')!
-      const scroller = row.closest('[data-scroll-area]')!
-      const band = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
-      const toolbar = Number.parseFloat(getComputedStyle(row).getPropertyValue('--toolbar-height'))
-      const padding = Number.parseFloat(getComputedStyle(row).paddingTop)
-      const line = document.querySelector('[data-older-line]')?.getBoundingClientRect()
-      return { below: row.getBoundingClientRect().top - band, room: toolbar - padding + 2, lineBottom: line?.bottom ?? 0, rowTop: row.getBoundingClientRect().top }
+test('at scroll top the first row starts 24px under the islands, as the last ends 24px over the composer, and “Loading older messages” takes no space', async ({ page }) => {
+  const measure = () =>
+    page.evaluate(async () => {
+      const island = document.querySelector('[data-island="left"]')!.getBoundingClientRect()
+      const rows = [...document.querySelectorAll('[data-message-row]')]
+      const first = rows[0]!.getBoundingClientRect().top
+      const scroller = rows[0]!.closest('[data-scroll-area]') as HTMLElement
+      scroller.scrollTop = scroller.scrollHeight
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      const field = document.querySelector('[data-composer-field]')!.getBoundingClientRect()
+      return { top: first - island.bottom, bottom: field.top - rows[rows.length - 1]!.getBoundingClientRect().bottom }
     })
-  await open(page, 'MessageList', 'thread/long')
-  const none = await firstRow()
-  expect(none.below).toBe(none.room)
-  await open(page, 'MessageList', 'thread/more-above')
-  expect((await firstRow()).below).toBe(none.below)
+  await open(page, 'TopicView', 'thread/long-thread')
+  const at = await measure()
+  expect(at.top).toBe(24)
+  expect(at.bottom).toBe(at.top)
   await open(page, 'MessageList', 'thread/loading-older')
   await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')
-  const loading = await firstRow()
-  expect(loading.below).toBe(none.below)
-  expect(loading.lineBottom).toBeLessThanOrEqual(loading.rowTop)
+  await open(page, 'MessageList', 'thread/more-above')
+  const more = await page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)
+  await open(page, 'MessageList', 'thread/long')
+  expect(await page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)).toBe(more)
 })

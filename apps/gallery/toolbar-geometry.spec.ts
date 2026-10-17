@@ -5,11 +5,13 @@ import { openState, type Route } from './support'
  * The message toolbar straddles the row's top edge, mostly above it, so it
  * never covers the row's text (SPEC 7, inventory 6.5): not the name and time
  * of a header row, not the first line of a grouped row. Where there is no
- * room above, under the header band at the list's top, it flips below the
- * row. A row taller than the list, as the last message is when its end sits
- * on the composer, has room for neither, so the toolbar goes inside it, at
- * the top of the part in view. It never goes above the list's visible top or
- * below its bottom, where the list clips it.
+ * room above, under the header band at the list's top, a row whose own top is
+ * in view (the first message at scroll top, right at the band) takes it
+ * inside its top edge, clear of the name and time; a row whose top is under
+ * the band has it flip below. A row taller than the list, as the last message
+ * is when its end sits on the composer, has room for neither, so the toolbar
+ * goes inside it, at the top of the part in view. It never goes above the
+ * list's visible top or below its bottom, where the list clips it.
  */
 
 const open = (page: Page, id: string) =>
@@ -71,7 +73,6 @@ async function read(row: Locator): Promise<Geometry> {
 for (const [id, target, header] of [
   ['interaction/hover-toolbar', '[data-message-row]:nth-of-type(4)', true],
   ['interaction/hover-toolbar-grouped', '[data-message-row]:nth-of-type(6)', false],
-  ['interaction/hover-toolbar-first', '[data-message-row]', true],
 ] as const) {
   test(`${id}: the toolbar straddles the row's top edge, above its text`, async ({ page }) => {
     await open(page, id)
@@ -84,6 +85,29 @@ for (const [id, target, header] of [
     expect(at.toolbar.top).toBeGreaterThanOrEqual(at.listTop)
   })
 }
+
+/** Whether the toolbar runs over the row's name or time: their boxes against the toolbar's left edge. */
+const clearOfHeader = (row: Locator) =>
+  row.evaluate((element) => {
+    const toolbar = element.querySelector('[role="toolbar"]')!.getBoundingClientRect()
+    const header = element.querySelector('[data-message-header]')!
+    const right = Math.max(...[...header.children].map((child) => child.getBoundingClientRect().right))
+    return toolbar.left >= right
+  })
+
+test('the first row at scroll top, with no room above, gets the toolbar inside its top edge, clear of its name and time', async ({ page }) => {
+  await open(page, 'interaction/hover-toolbar-first')
+  const at = await measure(page, '[data-message-row]')
+  expect(at.header).toBe(true)
+  // At scroll top the row starts where the band ends: a toolbar above it would sit under the band.
+  expect(at.row.top).toBeGreaterThanOrEqual(at.listTop)
+  expect(at.row.top - (at.toolbar.bottom - at.toolbar.top)).toBeLessThan(at.listTop)
+  expect(at.toolbar.top).toBeGreaterThan(at.row.top)
+  expect(at.toolbar.top).toBeGreaterThanOrEqual(at.listTop)
+  // Inside the row, not flipped below it over the next row's name.
+  expect(at.toolbar.bottom).toBeLessThan(at.row.bottom)
+  expect(await clearOfHeader(page.locator('[data-fixture-frame] [data-message-row]').first())).toBe(true)
+})
 
 test('a row whose top is under the header band gets the toolbar below it, clear of its text', async ({ page }) => {
   await open(page, 'interaction/hover-toolbar-under-band')
@@ -125,7 +149,9 @@ test('a hovered row that scrolls under the header band under a still pointer get
   // The pointer rests on the name, which is still inside the row once the row has scrolled up.
   const before = await measure(page, '[data-message-row] [data-sender]')
   expect(before.row.top).toBeGreaterThanOrEqual(before.listTop)
-  expect(before.toolbar.top).toBeLessThan(before.row.top)
+  // At scroll top the first row has no room above it: the toolbar is inside its top edge.
+  expect(before.toolbar.top).toBeGreaterThan(before.row.top)
+  expect(before.toolbar.bottom).toBeLessThan(before.row.bottom)
   await scrollList(page, underBand)
   const row = page.locator('[data-fixture-frame] [data-message-row]').first()
   expect(await row.evaluate((element) => element.matches(':hover'))).toBe(true)

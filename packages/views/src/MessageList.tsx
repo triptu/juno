@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
-import { density, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
 import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
@@ -335,9 +335,6 @@ function Empty({ main, status }: { readonly main: boolean; readonly status: Mess
   )
 }
 
-/** The room a first row's toolbar needs above it: its height less the straddle (Message.tsx `placeToolbar`). */
-const TOOLBAR_ROOM = `calc(${layout['--toolbar-height']} - ${density['--density-message-padding-block']} + ${spacing['--space-0-5']})`
-
 const styles = stylex.create({
   scroller: {
     flexGrow: 1,
@@ -350,14 +347,12 @@ const styles = stylex.create({
     maxWidth: layout['--reading-width'],
     minHeight: '100%',
     marginInline: 'auto',
-    // At scroll top the first row starts the toolbar's room below the header
-    // band: its hover toolbar straddles its top edge (Message.tsx), so it
-    // needs the toolbar's height less the row's top padding (less 2) above
-    // the row to show above it, not flipped over the next row. "Loading
-    // older messages" shows in that room too (olderInRoom), so nothing is
-    // ever kept for it.
+    // At scroll top the first row starts where the header band ends, 24px
+    // under the islands; the last row ends 16 + the composer's 8 = 24px
+    // above the field, so the two gaps match. With no room above it, the
+    // first row's hover toolbar sits inside its top edge (placeToolbar).
     position: 'relative',
-    paddingTop: `calc(${layout['--header-band']} - ${layout['--header-inset']} + ${TOOLBAR_ROOM})`,
+    paddingTop: `calc(${layout['--header-band']} - ${layout['--header-inset']})`,
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-4'],
     boxSizing: 'border-box',
@@ -380,13 +375,16 @@ const styles = stylex.create({
     flexShrink: 0,
     userSelect: 'none',
   },
-  // Under the header: in the toolbar's room above the first row, out of the
-  // flow, so the line appearing or going moves nothing and no space is kept for it.
+  // Under the header: in the gap between the islands and the first row, out
+  // of the flow, so the line appearing or going moves nothing and no space is
+  // kept for it. Over the band's fade, which would wash it out (the list
+  // comes after the header, so the same layer paints over it).
   olderInRoom: {
     position: 'absolute',
-    top: `calc(${layout['--header-band']} - ${layout['--header-inset']})`,
+    top: `calc(${layout['--header-island-top']} + ${layout['--header-island-height']} - ${layout['--header-inset']})`,
     insetInline: 0,
-    height: TOOLBAR_ROOM,
+    height: `calc(${layout['--header-band']} - ${layout['--header-island-top']} - ${layout['--header-island-height']})`,
+    zIndex: z['--z-header'],
     pointerEvents: 'none',
   },
   notDrawn: (rows: number) => ({
