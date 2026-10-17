@@ -6,6 +6,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
 - Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
+- A control that opens a menu or popover (`aria-expanded`) draws its hover fill while it is open, and its press draws that fill too, so hover, press and open are one colour and opening changes nothing. `Button` and `IconButton` take `expanded`, `AvatarButton` takes `open`; views that draw their own trigger (the header title, Home's pickers) follow the same rule. A toggle (`pressed`) is a state of its own and keeps its own fill; a trigger is not also a toggle. Each set's `Open` fixture group holds `<name>-hover`, `-press`, `-open` and `-open-hover`, and `apps/gallery/trigger-open.spec.ts` checks the four fills match in light and dark (decided 10-17).
 - Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, duotone only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations), through the icons in `packages/ui/src/duotone.ts`.
 - Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`. It must show whole: a box that clips (overflow other than visible, or paint containment) gives the controls at its edge `ringRoom` (`--focus-ring-room` of padding taken back by a negative margin; a fixed size adds the room), and a scroller passes `revealFocus` as its `onFocus` so a control half under its edge scrolls in whole when it takes keyboard focus (`PillRow`, `TabStrip`, `ScrollArea` and `Page` do). Items that fill a scroller edge to edge take the inset ring instead. A scroller that is not a Tab stop of its own (its rows are driven from a field) sets `tabIndex={-1}`, since Chromium makes a scroller with no focusable children a Tab stop.
 - The ring is one style, `focusRing` from `@juno/ui`: `outside` (2px out, with its scroll margin) for controls, `inset` for rows and controls flush against others. Primitives and views spread it; nothing writes the outline by hand (decided 10-17; Home and the Juno chat views still had their own copies then).
@@ -34,6 +35,7 @@ One component for every clickable control with a label. Radius, text size and ic
 | `iconTint` | an accent name or `neutral` | Draws `iconStart` in that colour from the `iconTints` tokens, on hover and when pressed too (a sidebar view's icon) |
 | `kbd` | string | Trailing mono hint ("↵", "⌘J") |
 | `pressed` | boolean | Toggle state (Pin, filters); sets `aria-pressed` |
+| `expanded` | boolean | Its menu or popover is showing; sets `aria-expanded` and holds the variant's hover fill (Show why) |
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
 | `disabled` | boolean | Same look as dimmed; no press scale |
 
@@ -53,10 +55,11 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `radius` | derived (4 for 20–22, 6 for 26, 12 for 28 (the hover-toolbar button), 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 
 `EmojiButton`: the 28px hover-toolbar button whose icon is an emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), radius 12, the same feedback as `IconButton`. Needs a `label` ("React 👍").
-| `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover `--secondary-default`, pressed `--secondary-hover`) |
+| `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover and open `--secondary-default`, pressed toggle `--secondary-hover`) |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
 | `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
+| `expanded` | Its menu or popover is showing (⋯, the quick reactions +, About): `aria-expanded` and the variant's hover fill held still, ghost `--surface-hover`, island `--secondary-default`, secondary `--secondary-hover` |
 | `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics and Home) |
 
 ## 4. Avatar and AvatarStack

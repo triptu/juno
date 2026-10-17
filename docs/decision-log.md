@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-17 19:00 · owner · A control that opens a menu or popover keeps its hover fill while pressed and while open, so opening changes no colour; Button and IconButton take `expanded`, and a trigger is not also a toggle.
 - 10-17 18:44 · owner · Juno stays as the only row in the sidebar's nav list: it is a hero feature and keeps its own space (unread, ⌘J, busy sparkle); revisit the design only if it looks odd.
 - 10-17 18:44 · owner · This Mac is a spare the owner does not use, so agents may run perf, feel, e2e and gallery locally at any time, still through the heavy lock and the load limits.
 - 10-17 18:44 · owner · Auto-update reads a separate private repo (triptu/juno-releases) through a token scoped read-only to that repo; the changelog lives there and is fetched on demand.
