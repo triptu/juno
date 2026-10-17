@@ -29,6 +29,7 @@ import {
   activateTab,
   activeTab,
   allTopicsLayoutAtom,
+  flushSidebar,
   bottomWindow,
   messagesAtom,
   closeAllTabs,
@@ -289,6 +290,13 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
  * `newTab`, in a new tab even when another tab shows it (SPEC 6).
  */
 export function openTopic(id: string, options: OpenOptions = {}): void {
+  // An open from anywhere but the sidebar list shows the list's held changes (SPEC 5, "Holding the order").
+  flushSidebar(registry)
+  openTopicFresh(id, options, undefined, undefined)
+}
+
+/** A sidebar row's open: the list goes on holding its order under the pointer. */
+export function openTopicFromList(id: string, options: OpenOptions = {}): void {
   openTopicFresh(id, options, undefined, undefined)
 }
 
@@ -433,6 +441,7 @@ const MESSAGE_TOP = 80
  * message once shown (letting go of the bottom) and flashes it.
  */
 export function openTopicAt(id: string, ts: string, options: OpenOptions & { readonly flash?: boolean } = {}): void {
+  flushSidebar(registry)
   if (options.flash === true) flashMessage(registry, id, ts)
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {

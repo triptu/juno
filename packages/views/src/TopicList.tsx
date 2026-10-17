@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { FocusEvent, KeyboardEvent, ReactNode } from 'react'
+import { useRef, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, ScrollArea, Text } from '@juno/ui'
 
@@ -36,6 +36,14 @@ export interface TopicListProps {
   readonly onEditView?: () => void
   /** A row got focus, by keyboard or pointer. The owner moves the roving tabindex to it. */
   readonly onRowFocus?: (id: string) => void
+  /**
+   * The pointer or keyboard focus came into the list (true), or both have
+   * left it (false). Focus from a mouse press does not count: the pointer
+   * already does. The owner holds the list's order while it is engaged.
+   */
+  readonly onEngagedChange?: (engaged: boolean) => void
+  /** The pointer moved, or keyboard focus moved, inside the list. */
+  readonly onTouch?: () => void
 }
 
 const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: 'Recent' }
@@ -47,18 +55,53 @@ const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: '
  * the pointer is over the list. Arrow keys move focus between rows; the
  * rows themselves activate on Enter.
  */
-export function TopicList({ sections, renderRow, empty, quietDays = 7, enterEmpty = true, truncated = false, onClearFilters, onViewAll, onEditView, onRowFocus }: TopicListProps) {
+export function TopicList({
+  sections,
+  renderRow,
+  empty,
+  quietDays = 7,
+  enterEmpty = true,
+  truncated = false,
+  onClearFilters,
+  onViewAll,
+  onEditView,
+  onRowFocus,
+  onEngagedChange,
+  onTouch,
+}: TopicListProps) {
   const shown = sections.filter((section) => section.ids.length > 0)
   const isEmpty = shown.length === 0
-  const onFocus =
-    onRowFocus === undefined
-      ? undefined
-      : (event: FocusEvent<HTMLDivElement>) => {
-          const target = event.target
-          if (target instanceof HTMLElement && target.matches(ROW) && target.dataset['topicId'] !== undefined) onRowFocus(target.dataset['topicId'])
-        }
+  // Where the pointer and keyboard focus are. Not React state: nothing renders from it.
+  const inside = useRef({ pointer: false, keyboard: false })
+  const engage = (part: 'pointer' | 'keyboard', now: boolean) => {
+    const was = inside.current.pointer || inside.current.keyboard
+    inside.current[part] = now
+    const is = inside.current.pointer || inside.current.keyboard
+    if (is !== was) onEngagedChange?.(is)
+  }
+  const onFocus = (event: FocusEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (onRowFocus !== undefined && target instanceof HTMLElement && target.matches(ROW) && target.dataset['topicId'] !== undefined) onRowFocus(target.dataset['topicId'])
+    const keyboard = target instanceof HTMLElement && target.matches(':focus-visible')
+    engage('keyboard', keyboard)
+    if (keyboard) onTouch?.()
+  }
+  const onBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) engage('keyboard', false)
+  }
   return (
-    <ScrollArea role="group" aria-label="Topics" scrollbar="hover" onKeyDown={moveFocus} onFocus={onFocus} sx={styles.scroller}>
+    <ScrollArea
+      role="group"
+      aria-label="Topics"
+      scrollbar="hover"
+      onKeyDown={moveFocus}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onPointerEnter={() => engage('pointer', true)}
+      onPointerLeave={() => engage('pointer', false)}
+      onPointerMove={onTouch}
+      sx={styles.scroller}
+    >
       {isEmpty && empty !== undefined ? (
         <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} onEditView={onEditView} />
       ) : (

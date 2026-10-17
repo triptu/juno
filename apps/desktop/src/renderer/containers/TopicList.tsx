@@ -8,7 +8,9 @@ import {
   focusedTopicAtom,
   nowAtom,
   registry,
+  resumeSidebarHold,
   rowRenamingAtom,
+  setSidebarEngaged,
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
@@ -21,7 +23,7 @@ import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
-import { openAllTopics, openTopic, warmTopic } from './navigation'
+import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
 import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
@@ -37,6 +39,13 @@ const FIRST_ROWS = 32
 const EMPTY_REPLAY_MS = 1_000
 
 const KINDS: ReadonlyArray<KindFilter> = ['all', 'channels', 'dms']
+
+/**
+ * How long the list keeps holding its order after the pointer and keyboard
+ * focus have left, so brushing past it, or crossing it on the way to the
+ * title bar, does not reorder it (SPEC 5, "Holding the order").
+ */
+const HOLD_GRACE_MS = 400
 
 /** Phases before the engine has caught up once: an empty list may only mean nothing has arrived yet. */
 const BEFORE_LIVE = new Set(['first-run', 'booting', 'catching-up'])
@@ -55,7 +64,22 @@ function emptyKind(ready: boolean, filter: TopicListFilter, syncing: boolean, em
 
 /** Mouse down on a row (or Enter): opens the topic in the current tab, or a new one with ⌘. */
 function open(id: string, event: ActivateEvent): void {
-  openTopic(id, { newTab: event.metaKey })
+  openTopicFromList(id, { newTab: event.metaKey })
+}
+
+let releaseHold: ReturnType<typeof setTimeout> | undefined
+
+/** The pointer or keyboard focus came into the list, or both left it: hold the order now, or let go after the grace. */
+function engage(engaged: boolean): void {
+  clearTimeout(releaseHold)
+  releaseHold = undefined
+  if (engaged) setSidebarEngaged(registry, true)
+  else releaseHold = setTimeout(() => setSidebarEngaged(registry, false), HOLD_GRACE_MS)
+}
+
+/** The pointer or keyboard focus moved in the list: a hold paused by an action elsewhere starts again. */
+function touch(): void {
+  resumeSidebarHold(registry)
 }
 
 
@@ -217,6 +241,15 @@ export const TopicList = memo(function TopicList() {
 
   useWarmFilters(ready, filter)
 
+  // An unmounted list holds nothing.
+  useEffect(
+    () => () => {
+      clearTimeout(releaseHold)
+      setSidebarEngaged(registry, false)
+    },
+    [],
+  )
+
   const syncing = useAtomValue(engineStatusAtom, (status) => status._tag === 'Success' && BEFORE_LIVE.has(status.value.phase._tag))
   const emptyView = useAtomValue(viewsAtom, (views) => filter.view !== undefined && views.find((view) => view.id === filter.view)?.channels.length === 0)
   const empty = emptyKind(ready, filter, syncing, emptyView)
@@ -237,6 +270,8 @@ export const TopicList = memo(function TopicList() {
       onViewAll={viewAllTopics}
       onEditView={editSelectedView}
       onRowFocus={focusRow}
+      onEngagedChange={engage}
+      onTouch={touch}
     />
   )
 })

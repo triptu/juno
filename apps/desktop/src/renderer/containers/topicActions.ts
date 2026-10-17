@@ -34,6 +34,7 @@ import {
   copyText,
   currentNotificationSettings,
   editUndo,
+  flushSidebar,
   loadNotificationSettings,
   loadWhy,
   messageLink,
@@ -42,6 +43,7 @@ import {
   canRedraw,
   redrawTopic,
   registry,
+  releaseSidebarTopic,
   renamingAtom,
   runAction,
   showToast,
@@ -55,7 +57,7 @@ import {
   type RenameTarget,
   type ToastContent,
 } from '@juno/state'
-import { openTopic } from './navigation'
+import { openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction, viewChoices } from './viewActions'
 import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
 
@@ -82,10 +84,13 @@ const said = (verb: string, topic: ActionTopic): ToastContent => ({ text: `${ver
 /** Resolve, from a row's check, the header and the menus: hides the row, marks it read, toast with Undo. */
 export function resolveTopic(id: string): void {
   const topic = topicOf(id)
+  // Your own action shows at once, even while the sidebar holds its order (SPEC 5).
+  releaseSidebarTopic(registry, id)
   if (topic !== undefined) void runAction(registry, topicsResolve, { id }, { ...said('Resolved', topic), check: true })
 }
 
 function reopenTopic(topic: ActionTopic): void {
+  releaseSidebarTopic(registry, topic.id)
   void runAction(registry, topicsReopen, { id: topic.id }, said('Reopened', topic))
 }
 
@@ -121,6 +126,7 @@ export function renameTopic(id: string, title: string): void {
   const topic = topicOf(id)
   if (topic === undefined || title.trim() === topic.title) return
   const text = title.trim() === '' ? 'Title cleared' : `Renamed · ${title.trim()}`
+  releaseSidebarTopic(registry, id)
   void runAction(registry, topicsRename, { id, title }, { text })
 }
 
@@ -168,9 +174,11 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
   const { id } = topic
   if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, topic.channel)
   const notify = notifyTarget(topic)
+  // Pin, read state, Notify me and the rest move this row at once, even while the sidebar holds its order (SPEC 5).
+  releaseSidebarTopic(registry, id)
   switch (chosen) {
     case 'open-new-tab':
-      return openTopic(id, { newTab: true })
+      return from === 'row' ? openTopicFromList(id, { newTab: true }) : openTopic(id, { newTab: true })
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
     case 'redraw':
@@ -199,6 +207,7 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
     case 'notify-never':
       return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
     case 'ignore-channel':
+      flushSidebar(registry)
       return void runAction(registry, channelsIgnore, { channel: topic.channel.id }, { text: `Ignoring ${topic.channel.label}` })
   }
 }
@@ -276,10 +285,16 @@ function editingText(): boolean {
 export function runUndoCommand(command: MenuCommand): void {
   if (command !== 'edit.undo') return
   if (editingText()) editUndo()
-  else void undoLast(registry)
+  else undo()
 }
 
 /** The toast's Undo. */
 export function undoFromToast(): void {
+  undo()
+}
+
+/** Undo is your own action: the sidebar shows its result at once, even while it holds its order. */
+function undo(): void {
+  flushSidebar(registry)
   void undoLast(registry)
 }
