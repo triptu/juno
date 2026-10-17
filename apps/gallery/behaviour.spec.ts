@@ -126,6 +126,17 @@ test.describe('truncation tooltip', () => {
     const short = await hoverText(page, 'Staging bill doubled since August')
     await expect(short).not.toHaveAttribute('title')
   })
+
+  test('a cut-off topic header title shows the full title; one that fits does not', async ({ page }) => {
+    const title = page.locator('[data-fixture-frame] h1 button span[dir="auto"]')
+    await page.goto('/#/TopicHeader?__state=content/long-title')
+    await title.hover()
+    await expect(title).toHaveAttribute('title', 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one')
+    await page.goto('/#/TopicHeader?__state=thread/public')
+    await title.hover()
+    await expect(title).toHaveText('Postgres 16 migration plan')
+    await expect(title).not.toHaveAttribute('title')
+  })
 })
 
 /**
