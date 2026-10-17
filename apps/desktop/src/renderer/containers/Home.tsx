@@ -6,6 +6,7 @@ import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views
 import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
 import { AutomatedMovesReview } from './AutomatedMovesReview'
+import { CardReview } from './CardReviews'
 import { TidyUpReview } from './TidyUpReview'
 import { showChannelMenu } from './placeMenus'
 
@@ -113,7 +114,7 @@ function SyncLine({ line }: { readonly line: string }) {
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
-  // Tidy up's review or Automated's record, open over Home, with the item it shows.
+  // A card's review, open over Home (`SettledReview`, `AutomatedReview`, `CardReview`), with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
@@ -130,6 +131,10 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
   const { markDone, resolveAll, review, sort, itemMenu } = itemActions(key, view.items, setReviewing)
+  const closeReview = (item: HomeItem, allDone: boolean) => {
+    if (allDone) markHomeItemUsed(registry, key, item.id)
+    setReviewing(undefined)
+  }
 
   return (
     <>
@@ -153,17 +158,12 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
     />
-    {reviewing?.kind === 'automatedMoves' ? (
+    {reviewing === undefined ? null : reviewing.kind === 'automatedMoves' ? (
       <AutomatedMovesReview item={reviewing} now={shown.now} onClose={() => setReviewing(undefined)} />
-    ) : reviewing === undefined ? null : (
-      <TidyUpReview
-        item={reviewing}
-        now={shown.now}
-        onClose={(allDone) => {
-          if (allDone) markHomeItemUsed(registry, key, reviewing.id)
-          setReviewing(undefined)
-        }}
-      />
+    ) : reviewing.kind === 'tidyUp' ? (
+      <TidyUpReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
+    ) : (
+      <CardReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
     )}
     </>
   )
