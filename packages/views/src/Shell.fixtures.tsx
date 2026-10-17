@@ -91,7 +91,7 @@ export default defineFixtures(
           <SignedIn
             page={
               <SettingsPage section="appearance" onSection={noop}>
-                <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />
+                <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />
               </SettingsPage>
             }
           />

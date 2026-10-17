@@ -51,6 +51,8 @@ export default defineFixtures(
     State: {
       read: state(rows.postgres),
       unread: state(rows.roadmap),
+      // Comfortable density: the 44px tile and more padding.
+      'unread-comfortable': state(rows.roadmap, {}, { density: 'comfortable' }),
       mention: state(rows.hiring),
       selected: state(rows.postgres, { selected: true }),
       'selected-unread': state(rows.roadmap, { selected: true }),
