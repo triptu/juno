@@ -1,172 +1,287 @@
-// Builds a local status page: what needs the owner, what is running, the
-// decision log and recent commits. Output: .juno-status/index.html (gitignored).
+// Builds the owner's local status page. Output: .juno-status/index.html (gitignored).
 //
-//   node scripts/status-page.mjs
+//   node scripts/status-page.mjs [--root <checkout>]
 //
-// Inputs:
-//   .juno-status/now.json   { "updated": "...", "needsYou": [{ "title", "detail" }],
-//                             "running": [{ "name", "model", "detail", "since" }],
-//                             "next": ["..." or { name, detail }],
-//                             "pendingDecisions": ["..."], "ideas": ["..." or { name, detail }] }
-//                           (local, not committed)
-//   docs/decision-log.md    the committed decision log
-//   git log --all           recent commits on every branch, including agent worktrees
+// A git post-commit and post-merge hook runs this, so it must stay fast and must
+// never fail on a missing or broken file. The page reloads itself every 20 s and
+// keeps its search and area filter across reloads.
 //
-// A git post-commit hook runs this, so commits show up on their own. The page
-// reloads itself every 20 seconds.
+// .juno-status/now.json is written by the orchestrator (local, not committed).
+// Keep each list accurate, since the owner reads the page top to bottom:
+//
+//   needsYou   [{ title, detail }]  Real blockers only: work that is stopped until
+//              the owner acts or answers. Remove an item as soon as it is resolved.
+//              Optional checks and questions that can wait go in `later`.
+//   running    [{ name, model?, detail?, since? }]  Agents working right now. Drop
+//              an agent when it finishes.
+//   next       ["..." or { name, detail }]  What starts after the running work, in order.
+//   later      [{ title, detail }]  "When you have time": optional checks, live
+//              tests and questions the owner can take up whenever. Not blockers.
+//   pendingDecisions ["MM-DD HH:MM · who · text"]  Calls made for the owner that
+//              they may want to override.
+//   ideas      ["..." or { name, detail }]  Possible work nobody has picked up.
+//   updated    ISO time of the last write.
+//
+// Also read: docs/decision-log.md, main's git history, .juno-status/ci-keeper.md
+// (last green commit, DMG), .juno-status/health.json and apps/desktop/release.
+// Areas of work are tagged by the keyword table in status-areas.mjs.
 
-import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { areas } from './status-areas.mjs'
+import { clientScript } from './status-client.mjs'
+import { changesSince, readDecisions, readDmg, readJson, readKeeper, readLanded } from './status-data.mjs'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const rootArg = process.argv.indexOf('--root')
+const root = rootArg > 0 ? resolve(process.argv[rootArg + 1]) : join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, '.juno-status')
-mkdirSync(outDir, { recursive: true })
+
+const now = readJson(join(outDir, 'now.json')) ?? {}
+const health = readJson(join(outDir, 'health.json'))
+const decisions = readDecisions(root)
+const landed = readLanded(root)
+const keeper = readKeeper(root)
+const dmg = readDmg(root)
+const list = (value) => (Array.isArray(value) ? value : [])
 
 const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+  String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 const inline = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>')
-
-const nowPath = join(outDir, 'now.json')
-const now = existsSync(nowPath) ? JSON.parse(readFileSync(nowPath, 'utf8')) : { needsYou: [], running: [], next: [] }
-
-const healthPath = join(outDir, 'health.json')
-const health = existsSync(healthPath) ? JSON.parse(readFileSync(healthPath, 'utf8')) : undefined
-
-const logPath = join(root, 'docs/decision-log.md')
-const decisions = existsSync(logPath)
-  ? readFileSync(logPath, 'utf8')
-      .split('\n')
-      .filter((line) => line.startsWith('- '))
-      .map((line) => {
-        const [when, who, ...rest] = line.slice(2).split(' · ')
-        return { when, who, text: rest.join(' · ') }
-      })
-  : []
-
-let commits = []
-try {
-  const raw = execFileSync(
-    'git',
-    ['log', '--all', '-n', '60', '--date=format:%m-%d %H:%M', '--format=%ad%x1f%h%x1f%D%x1f%s'],
-    { cwd: root, encoding: 'utf8' },
-  )
-  commits = raw
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const [when, hash, refs, subject] = line.split('\x1f')
-      const branch = /worktree-agent-/.test(refs) ? 'agent branch' : /\bmain\b/.test(refs) ? 'main' : ''
-      return { when, hash, branch, subject }
-    })
-} catch {
-  commits = []
+const ist = (date, options) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', ...options }).format(date)
+const clock = (date) => ist(date, { hour: '2-digit', minute: '2-digit' })
+const dayLabel = (mmdd) => {
+  const [month, day] = mmdd.split('-').map(Number)
+  const date = new Date(Date.UTC(new Date().getUTCFullYear(), month - 1, day, 12))
+  return Number.isNaN(date.getTime()) ? mmdd : ist(date, { weekday: 'short', day: 'numeric', month: 'short' })
 }
+const tags = (names) => names.map((name) => `<span class="tag">${esc(name)}</span>`).join('')
+const ago = (date) => `<span data-ts="${date.getTime()}"></span>`
 
-const generated = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+const updatedTimes = [now.updated, now.updatedAt].map((t) => new Date(t)).filter((d) => !Number.isNaN(d.getTime()))
+const updated = updatedTimes.toSorted((a, b) => b - a)[0]
 
-const section = (title, body, count) =>
-  `<section><h2>${esc(title)}${count != null ? ` <span class="count">${count}</span>` : ''}</h2>${body}</section>`
+const section = (id, title, body, count) =>
+  `<section id="${id}"><h2>${esc(title)}${count ? ` <span class="count">${count}</span>` : ''}</h2>${body}</section>`
 
-const needs = now.needsYou?.length
-  ? `<ul class="cards">${now.needsYou
-      .map((n) => `<li class="card needs"><strong>${inline(n.title)}</strong>${n.detail ? `<p>${inline(n.detail)}</p>` : ''}</li>`)
-      .join('')}</ul>`
-  : `<p class="empty">Nothing needs you right now.</p>`
+// Needs you, running, next.
+const needs = list(now.needsYou)
+const needsBody = needs.length
+  ? `<ul class="cards">${needs.map((n) => `<li class="card needs"><strong>${inline(n.title)}</strong>${n.detail ? `<p>${inline(n.detail)}</p>` : ''}</li>`).join('')}</ul>`
+  : ''
 
-const running = now.running?.length
-  ? `<ul class="cards">${now.running
+const running = list(now.running)
+const runningBody = running.length
+  ? `<ul class="cards">${running
       .map(
         (r) =>
-          `<li class="card"><div class="row"><strong>${inline(r.name)}</strong><span class="meta">${esc(r.model ?? '')}${r.since ? ` · since ${esc(r.since)}` : ''}</span></div>${r.detail ? `<p>${inline(r.detail)}</p>` : ''}</li>`,
+          `<li class="card"><strong>${inline(r.name)}</strong>${r.model || r.since ? `<span class="meta"> · ${esc(r.model ?? '')}${r.since ? ` since ${esc(r.since)}` : ''}</span>` : ''}${r.detail ? `<p>${inline(r.detail)}</p>` : ''}</li>`,
       )
       .join('')}</ul>`
-  : `<p class="empty">No agents running.</p>`
+  : '<p class="quiet">No agents running.</p>'
 
 // A list item is a plain string or { name, detail }.
-const item = (n) => (typeof n === 'string' ? inline(n) : `<strong>${inline(n.name ?? '')}</strong>${n.detail ? ` · ${inline(n.detail)}` : ''}`)
-const next = now.next?.length ? `<ol class="next">${now.next.map((n) => `<li>${item(n)}</li>`).join('')}</ol>` : ''
-// Calls the orchestrator made that the owner may want to override.
-const pending = now.pendingDecisions?.length ? `<ul class="next">${now.pendingDecisions.map((n) => `<li>${item(n)}</li>`).join('')}</ul>` : ''
-const ideas = now.ideas?.length ? `<ul class="next">${now.ideas.map((n) => `<li>${item(n)}</li>`).join('')}</ul>` : ''
+const item = (n) =>
+  typeof n === 'string' ? inline(n) : `<strong>${inline(n.name ?? n.title ?? '')}</strong>${n.detail ? ` · ${inline(n.detail)}` : ''}`
+const nextItems = list(now.next)
+const nextBody = nextItems.length
+  ? `<ol class="plain">${nextItems.map((n) => `<li>${item(n)}</li>`).join('')}</ol>`
+  : '<p class="quiet">Nothing queued.</p>'
 
-const healthBody = health
-  ? (() => {
-      const c = health.counts ?? {}
-      const items = [
-        ['Unused files', c.unusedFiles],
-        ['Unused exports', c.unusedExports],
-        ['Unused types', c.unusedTypes],
-        ['Unused dependencies', c.unusedDependencies],
-        ['Duplication', `${health.duplication?.percentage ?? '?'}%`],
-        ['Files over 400 lines', c.oversizedFiles],
-        ['Functions over 80 lines', c.oversizedFunctions],
-      ]
-      return `<table>${items.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="time">${esc(v ?? '?')}</td></tr>`).join('')}</table><p class="meta">From \`pnpm health\` (report-only) at ${esc(new Date(health.timestamp).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }))}.</p>`
-    })()
-  : '<p class="empty">Run <code>pnpm health</code> to fill this in.</p>'
-
-const decisionRows = decisions
-  .map(
-    (d) =>
-      `<tr><td class="time">${esc(d.when)}</td><td class="who ${d.who === 'Tushar' ? 'owner' : ''}">${esc(d.who)}</td><td>${inline(d.text)}</td></tr>`,
+// Build: last green commit, DMG, health.
+const greenAt = changesSince(root, keeper.green?.hash)
+const buildParts = [
+  keeper.green
+    ? `<div class="stat"><span class="label">Last green</span><code>${esc(keeper.green.hash.slice(0, 8))}</code> <span class="meta">${esc(keeper.green.date)}${greenAt > 0 ? ` · main has ${greenAt} change${greenAt === 1 ? '' : 's'} since` : greenAt === 0 ? ' · main is at it' : ''}</span></div>`
+    : '<div class="stat"><span class="label">Last green</span><span class="meta">none recorded</span></div>',
+  `<div class="stat"><span class="label">DMG</span>${keeper.dmgHash ? `from <code>${esc(keeper.dmgHash.slice(0, 8))}</code> ` : ''}<span class="meta">${dmg ? `local ${esc(dmg.name)} built ${esc(ist(dmg.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}` : 'no local DMG'}</span></div>`,
+]
+if (health) {
+  const c = health.counts ?? {}
+  buildParts.push(
+    `<div class="stat"><span class="label">Health</span><span class="meta">${esc(c.oversizedFiles ?? '?')} files over 400 lines · ${esc(c.oversizedFunctions ?? '?')} long functions · ${esc(c.clonePairs ?? '?')} clones · ${esc((c.unusedFiles ?? 0) + (c.unusedExports ?? 0) + (c.unusedDependencies ?? 0))} unused</span></div>`,
   )
+}
+const buildBody = `<div class="stats">${buildParts.join('')}</div>`
+
+// Recently landed on main, with the decisions each branch recorded.
+const byWho = Map.groupBy(decisions, (d) => d.who)
+const landedRow = (l) => {
+  const linked = byWho.get(l.branch) ?? []
+  const title = l.branch || l.subject
+  const more = [
+    ...l.merged.map((s) => `<li>${inline(s)}</li>`),
+    ...linked.map((d) => `<li class="linked">Decision: ${inline(d.text)}</li>`),
+  ]
+  const head = `<span class="time">${esc(l.when)}</span><span class="title">${inline(title)}</span><span class="tags">${tags(l.areas)}</span><span class="meta">${l.merged.length ? `${l.merged.length} commit${l.merged.length === 1 ? '' : 's'}` : esc(l.hash)}${linked.length ? ` · ${linked.length} decision${linked.length === 1 ? '' : 's'}` : ''}</span>`
+  return `<li class="filterable landed" data-areas="${esc(l.areas.join('|'))}">${more.length ? `<details><summary>${head}</summary><ul class="sub">${more.join('')}</ul></details>` : `<div class="summary">${head}</div>`}</li>`
+}
+const landedBody = landed.length
+  ? `<ul class="rows">${landed.slice(0, 10).map(landedRow).join('')}</ul>${landed.length > 10 ? `<details class="more"><summary>${landed.length - 10} earlier</summary><ul class="rows">${landed.slice(10).map(landedRow).join('')}</ul></details>` : ''}`
+  : '<p class="quiet">No history found.</p>'
+
+// When you have time: later, decisions made for the owner, ideas.
+const fold = (title, detail) =>
+  `<li><details><summary>${inline(title)}</summary>${detail ? `<p>${inline(detail)}</p>` : ''}</details></li>`
+const later = list(now.later)
+// "MM-DD HH:MM · who · text", or any other string.
+const pendingRow = (p) => {
+  const [when, who, ...rest] = typeof p === 'string' ? p.split(' · ') : []
+  return rest.length
+    ? `<li class="decision"><span class="time">${esc(when)}</span><span class="who">${esc(who)}</span><span class="text">${inline(rest.join(' · '))}</span></li>`
+    : `<li class="decision"><span></span><span></span><span class="text">${item(p)}</span></li>`
+}
+const pending = list(now.pendingDecisions)
+const ideas = list(now.ideas)
+const laterBody = [
+  later.length ? `<ul class="folds">${later.map((l) => fold(l.title ?? l.name ?? l, l.detail)).join('')}</ul>` : '<p class="quiet">Nothing waiting.</p>',
+  pending.length
+    ? `<h3>Decided for you, override if you disagree <span class="count">${pending.length}</span></h3><ul class="rows">${pending.map(pendingRow).join('')}</ul>`
+    : '',
+  ideas.length
+    ? `<h3>Ideas <span class="count">${ideas.length}</span></h3><ul class="folds">${ideas.map((i) => (typeof i === 'string' ? `<li>${inline(i)}</li>` : fold(i.name ?? i.title, i.detail))).join('')}</ul>`
+    : '',
+].join('')
+
+// By area: counts and the latest decisions, newest day first.
+const areaNames = [...areas.map(([name]) => name), 'Other']
+const today = decisions[0]?.day
+const areaCards = areaNames
+  .map((name) => {
+    const own = decisions.filter((d) => d.areas.includes(name))
+    const lands = landed.filter((l) => l.areas.includes(name))
+    if (!own.length && !lands.length) return ''
+    const todayCount = own.filter((d) => d.day === today).length
+    const latest = own
+      .filter((d) => d.areas[0] === name)
+      .slice(0, 2)
+      .map((d) => `<li>${inline(d.text.length > 120 ? `${d.text.slice(0, 118)}…` : d.text)}</li>`)
+      .join('')
+    return `<button class="area" data-area="${esc(name)}"><span class="area-head"><strong>${esc(name)}</strong><span class="meta">${own.length} decisions${todayCount ? ` · ${todayCount} today` : ''}${lands.length ? ` · ${lands.length} landed` : ''}</span></span><ul>${latest}</ul></button>`
+  })
   .join('')
 
-const commitRows = commits
+// Decisions grouped by day, newest first; the latest day starts open.
+const days = Map.groupBy(decisions, (d) => d.day)
+const decisionRow = (d) =>
+  `<li class="filterable decision" data-areas="${esc(d.areas.join('|'))}"><span class="time">${esc(d.time)}</span><span class="who${/^(tushar|owner)$/i.test(d.who) ? ' owner' : ''}">${esc(d.who)}</span><span class="text">${inline(d.text)}<span class="tags">${tags(d.areas)}</span></span></li>`
+const decisionDays = [...days]
   .map(
-    (c) =>
-      `<tr><td class="time">${esc(c.when)}</td><td class="hash">${esc(c.hash)}</td><td>${c.branch === 'agent branch' ? '<span class="tag">agent branch</span> ' : ''}${esc(c.subject)}</td></tr>`,
+    ([day, items], index) =>
+      `<details class="day" data-day="${esc(day)}"${index === 0 ? ' open' : ''}><summary><strong>${esc(dayLabel(day))}</strong> <span class="count n">${items.length}</span></summary><ul class="rows">${items.map(decisionRow).join('')}</ul></details>`,
   )
   .join('')
+const chips = ['All', ...areaNames]
+  .map((name) => {
+    const count = name === 'All' ? decisions.length : decisions.filter((d) => d.areas.includes(name)).length
+    return `<button class="chip" data-area="${name === 'All' ? '' : esc(name)}">${esc(name)}<span class="n">${count}</span></button>`
+  })
+  .join('')
+const filterBar = `<div class="filters"><input id="q" type="search" placeholder="Search decisions and landed work" autocomplete="off"><div class="chips">${chips}</div><p class="meta" id="result"></p></div>`
+
+const header = `<header><h1>Juno status</h1><p class="meta">${updated ? `Updated ${esc(clock(updated))} IST, ${ago(updated)}` : 'No now.json yet'} · page built ${esc(clock(new Date()))} IST</p></header>`
 
 const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="refresh" content="20">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juno status</title>
-<style>
-  :root { color-scheme: light dark; --bg: #fbf9f3; --fg: #1d1c17; --muted: #6f6c63; --line: #ebe6d8; --card: #fff; --accent: #cc4628; --soft: #fbe9e4; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #161513; --fg: #ece8de; --muted: #a29d91; --line: #2a2825; --card: #1e1d1a; --accent: #ff8a73; --soft: #3a231d; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
-  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
-  h1 { font: 600 22px/1.2 -apple-system, system-ui, sans-serif; margin: 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 28px 0 10px; }
-  .count { background: var(--line); color: var(--fg); border-radius: 999px; padding: 1px 8px; font-size: 12px; letter-spacing: 0; }
-  .meta, .time, .hash, .empty { color: var(--muted); }
-  .time, .hash { white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .hash { font-family: ui-monospace, monospace; font-size: 12px; }
-  .cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
-  .card p { margin: 4px 0 0; color: var(--muted); }
-  .card.needs { border-color: var(--accent); background: var(--soft); }
-  .row { display: flex; justify-content: space-between; gap: 12px; }
-  .next { margin: 0; padding-left: 20px; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
-  .who { white-space: nowrap; color: var(--muted); }
-  .who.owner { color: var(--accent); font-weight: 600; }
-  .tag { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; color: var(--muted); }
-  code { font-family: ui-monospace, monospace; font-size: 12px; background: var(--line); border-radius: 4px; padding: 0 4px; }
-</style>
+<style>${readCss()}</style>
 </head>
 <body><main>
-<header><h1>Juno status</h1><span class="meta">updated ${esc(now.updated ?? generated)} · page built ${esc(generated)} · reloads every 20 s</span></header>
-${section('Needs you', needs, now.needsYou?.length ?? 0)}
-${pending ? section('Decided for you, override if you disagree', pending, now.pendingDecisions.length) : ''}
-<div class="grid">
-  <div>${section('Running now', running, now.running?.length ?? 0)}${next ? section('Up next', next) : ''}${ideas ? section('Ideas', ideas, now.ideas.length) : ''}${section('Codebase health', healthBody)}</div>
-  <div>${section('Decisions', `<table>${decisionRows}</table>`, decisions.length)}</div>
-</div>
-${section('Commits', `<table>${commitRows}</table>`, commits.length)}
-</main></body></html>
+${header}
+${needs.length ? section('needs', 'Needs you', needsBody, needs.length) : '<p class="all-clear">Nothing needs you.</p>'}
+${section('running', 'Now running', runningBody, running.length)}
+${section('build', 'Build', buildBody)}
+${section('landed', 'Recently landed on main', landedBody)}
+${section('next', 'Next', nextBody, nextItems.length)}
+${section('later', 'When you have time', laterBody, later.length)}
+${section('areas', 'By area', `<div class="areas">${areaCards}</div>`)}
+${section('decisions', 'Decisions', filterBar + decisionDays, decisions.length)}
+</main>
+<script>${clientScript}</script>
+</body></html>
 `
 
+mkdirSync(outDir, { recursive: true })
 writeFileSync(join(outDir, 'index.html'), html)
+
+function readCss() {
+  return `
+:root { color-scheme: light dark; --bg: #faf9f6; --fg: #1f1e1b; --muted: #6b675f; --line: #e7e3da; --card: #fff; --accent: #b8432a; --soft: #fbebe5; --chip: #f0ede6; --green: #2f7a4a; }
+@media (prefers-color-scheme: dark) { :root { --bg: #171614; --fg: #ebe7de; --muted: #a39e93; --line: #2e2c28; --card: #1f1e1b; --accent: #f08a72; --soft: #3a241e; --chip: #2a2825; --green: #7cc596; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+main { max-width: 980px; margin: 0 auto; padding: 40px 28px 96px; }
+header { margin-bottom: 20px; }
+h1 { font-size: 24px; line-height: 1.2; margin: 0 0 4px; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+h3 { font-size: 14px; margin: 24px 0 8px; }
+section { padding: 28px 0; border-top: 1px solid var(--line); }
+p { margin: 0; }
+.count { display: inline-block; background: var(--chip); color: var(--fg); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 500; letter-spacing: 0; }
+.meta, .time, .quiet { color: var(--muted); }
+.meta { font-size: 13px; }
+.time { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
+.all-clear { padding: 14px 0; border-top: 1px solid var(--line); color: var(--green); font-weight: 500; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
+ul, ol { margin: 0; padding: 0; }
+.cards { list-style: none; display: grid; gap: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.card strong { font-weight: 550; }
+.card p { margin-top: 4px; color: var(--muted); max-width: 80ch; }
+.card.needs { border-color: var(--accent); background: var(--soft); }
+.plain { padding-left: 20px; max-width: 80ch; }
+.plain li { margin: 6px 0; }
+.stats { display: grid; gap: 8px; }
+.stat { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.label { width: 88px; flex: none; font-weight: 600; font-size: 13px; }
+.rows { list-style: none; }
+.rows > li { border-top: 1px solid var(--line); }
+.rows > li:first-child { border-top: 0; }
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: '›'; display: inline-block; width: 14px; color: var(--muted); transition: transform .15s; }
+details[open] > summary::before { transform: rotate(90deg); }
+.landed summary, .landed .summary { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; flex-wrap: wrap; }
+.landed .summary { padding-left: 14px; }
+.landed .title { font-weight: 600; }
+.sub { list-style: disc; padding: 0 0 10px 44px; color: var(--muted); font-size: 14px; max-width: 86ch; }
+.sub .linked { color: var(--fg); }
+.more > summary { padding: 8px 0; color: var(--muted); }
+.folds { list-style: none; max-width: 86ch; }
+.folds li { border-top: 1px solid var(--line); }
+.folds li:first-child { border-top: 0; }
+.folds summary { padding: 8px 0; }
+.folds p { padding: 0 0 12px 14px; color: var(--muted); }
+.areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.area { font: inherit; color: inherit; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.area:hover { border-color: var(--muted); }
+.area.on { border-color: var(--accent); }
+.area-head { display: grid; margin-bottom: 8px; }
+.area ul { list-style: none; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.area li + li { margin-top: 6px; }
+.filters { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 10px 0 12px; display: grid; gap: 10px; }
+#q { font: inherit; width: 100%; max-width: 480px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); }
+#q:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 13px; color: var(--fg); background: var(--chip); border: 1px solid transparent; border-radius: 999px; padding: 2px 11px; }
+.chip:hover { border-color: var(--line); }
+.chip.on { background: var(--fg); color: var(--bg); }
+.chip .n { color: var(--muted); margin-left: 4px; font-size: 12px; }
+.chip.on .n { color: inherit; opacity: .7; }
+.day { border-top: 1px solid var(--line); }
+.day > summary { padding: 12px 0; font-size: 15px; }
+.day .rows { padding-bottom: 12px; }
+.decision { display: grid; grid-template-columns: 48px 140px minmax(0, 1fr); gap: 12px; padding: 9px 0; }
+.who { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: 1px; }
+.who.owner { color: var(--accent); font-weight: 600; }
+.text { max-width: 78ch; }
+.tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; vertical-align: 1px; }
+.tag { font-size: 11px; line-height: 1.6; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
+[hidden] { display: none !important; }
+.stale { color: var(--accent); }
+@media (max-width: 640px) { .decision { grid-template-columns: 44px minmax(0, 1fr); } .who { grid-column: 2; } .text { grid-column: 1 / -1; } }
+`
+}
