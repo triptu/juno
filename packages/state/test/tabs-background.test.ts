@@ -20,4 +20,11 @@ describe('a background tab', () => {
     expect(shown(opened)).toEqual(['a', 'b', 'c', 'c'])
     expect(opened.active).toBe(three.active)
   })
+
+  it('goes right after the tab it is opened from, when that is not the active one', () => {
+    const first = three.tabs[0]!.id
+    const opened = open(three, 'd', { newTab: true, background: true, after: first })
+    expect(shown(opened)).toEqual(['a', 'd', 'b', 'c'])
+    expect(opened.active).toBe(three.active)
+  })
 })
