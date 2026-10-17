@@ -206,4 +206,4 @@ Decided by the orchestrator, on `topic-top-gap` from `4c4ac09b`. `small-ui-1017`
 
 **What this costs.** Inside the row, the toolbar (36px) is taller than the name line (about 26px). While the first message is hovered or focused, it covers the right end of the first body line, about 14px of it, when that line runs to the edge (`shots/r3-first-toolbar-closeup-light.jpg`). The name and time stay clear. Flipped below, it would have covered the next message's name instead. SPEC 7 now says "clear of the name and time" for this case, not "never covers the message's own text".
 
-**Verification.** Gallery shots of `TopicView` and `MessageList` before and after; only the topic lists' first rows moved, up 34px. Typecheck and lint ran locally. `pnpm affected`, once: see the report.
+**Verification.** Gallery shots of `TopicView` and `MessageList` before and after; only the topic lists' first rows moved, up 34px. Typecheck and lint ran locally. `pnpm affected`, once, on `c391ce2a`: typecheck, lint, gallery (232 passed) and desktop e2e (316 passed).
