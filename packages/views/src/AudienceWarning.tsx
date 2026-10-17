@@ -17,7 +17,7 @@ export function AudienceWarning({ message }: AudienceWarningProps) {
   return (
     <div data-audience-warning="" role="status" {...stylex.props(styles.line)}>
       <span aria-hidden {...stylex.props(styles.icon)}>
-        <Icon icon={Sparkle} size={13} />
+        <Icon icon={Sparkle} size={14} />
       </span>
       <Text variant="meta" tone="inherit">
         {message}
@@ -30,11 +30,14 @@ const styles = stylex.create({
   line: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing['--space-1-5'],
+    // The icon and the text start where the check bar's do (SendCheckBar),
+    // so the two lines stacked in the composer share one edge.
+    gap: spacing['--space-2-5'],
     marginTop: spacing['--space-1-5'],
     marginInline: spacing['--space-1-5'],
     paddingBlock: spacing['--space-1-5'],
-    paddingInline: spacing['--space-2-5'],
+    paddingInlineStart: spacing['--space-3'],
+    paddingInlineEnd: spacing['--space-2-5'],
     // The composer's one inset (6px, as the chips and the attach and send
     // buttons), and concentric with its 20px corners.
     borderRadius: radii['--radius-2xl'],

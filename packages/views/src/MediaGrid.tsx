@@ -164,7 +164,6 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, 
   )
 }
 
-/** The icon for each kind of file, on cards and composer chips. */
 const styles = stylex.create({
   // The box is sized here, with the aspect ratio as a second guard, so a
   // late image never moves what the user is reading (performance 3.3).

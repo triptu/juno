@@ -236,7 +236,7 @@ export function Sidebar({
         <NavItem
           icon={junoBusy ? SparkleDuotone : Sparkle}
           active={activeNav === 'juno'}
-          kbd="⌘J"
+          kbd={menuKeys('juno.toggle')}
           onSelect={(event) => onNavigate('juno', event)}
           onContextMenu={navMenu('juno')}
           trailing={

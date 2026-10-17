@@ -79,7 +79,8 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
-  const pillName = `${channel.name}, ${kind.toLowerCase()}`
+  // "eng, public channel", "Maya and Leo, group DM": only the first letter steps down, so DM stays DM.
+  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}`
 
   // Follow can turn into Resolve or Reopen, and back on ⌘Z or Never, so each reserves the other's label.
   const canFollow = !main && onFollow !== undefined

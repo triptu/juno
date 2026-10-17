@@ -10,8 +10,9 @@ export interface ComposerSlotProps {
 
 /**
  * Where the composer goes (inventory 7), at the composer's single-line
- * height, so M6 swaps the real one in with no shift. Inert: it draws the
- * frame, the placeholder and the send mark, and takes no input.
+ * height, until the draft has loaded and the real one takes its place with
+ * no shift. Inert: it draws the frame, the placeholder and the send mark,
+ * and takes no input.
  */
 export function ComposerSlot({ placeholder }: ComposerSlotProps) {
   return (
