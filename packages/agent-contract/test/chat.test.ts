@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { Emoji, OpenTarget, sendMessageStatus, type ProposedMessage } from '../src/index'
+import { Emoji, endGroupsAtDividers, OpenTarget, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type ProposedMessage, type RunId } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -53,5 +53,23 @@ describe('sendMessageStatus', () => {
 
   it('says Failed, with nothing to click, when no row was sent', () => {
     expect(sendMessageStatus([row('a', { _tag: 'failed' }), row('b', { _tag: 'failed' })])).toEqual({ _tag: 'failed', line: 'Failed' })
+  })
+})
+
+describe('endGroupsAtDividers', () => {
+  const bubble = (n: number, group: GroupPosition): ChatItem => ({ _tag: 'juno', id: `run-1:${n}` as BubbleId, runId: 'run-1' as RunId, body: [], at: 0, origin: { _tag: 'owner' }, reactions: [], group, unread: false })
+  const divider: ChatItem = { _tag: 'newDivider', count: 2 }
+  const groups = (items: ReadonlyArray<ChatItem>) => items.map((item) => ('group' in item ? item.group : item._tag))
+
+  it('ends a group at a divider in its middle', () => {
+    expect(groups(endGroupsAtDividers([bubble(0, 'first'), bubble(1, 'middle'), divider, bubble(2, 'middle'), bubble(3, 'last')]))).toEqual(['first', 'last', 'newDivider', 'first', 'last'])
+    expect(groups(endGroupsAtDividers([bubble(0, 'first'), divider, bubble(1, 'last')]))).toEqual(['single', 'newDivider', 'single'])
+  })
+
+  it('leaves groups that already end at the divider, and a list with no divider, as they are', () => {
+    const items = [bubble(0, 'single'), divider, bubble(1, 'first'), bubble(2, 'last')]
+    expect(groups(endGroupsAtDividers(items))).toEqual(['single', 'newDivider', 'first', 'last'])
+    const plain = [bubble(0, 'first'), bubble(1, 'last')]
+    expect(endGroupsAtDividers(plain)).toBe(plain)
   })
 })
