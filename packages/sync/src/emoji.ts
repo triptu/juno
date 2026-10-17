@@ -3,7 +3,7 @@ import { EdgeEmojisListOk, customEmojiRow, type CustomEmoji } from '@juno/slack-
 import { Invalidation, StoreWriter, transaction } from '@juno/store'
 import { Effect } from 'effect'
 
-/** Refresh after boot's message work. Keep the old table until every edge page has arrived. */
+/** Refresh beside the boot (`run/boot.ts`). Keep the old table until every edge page has arrived. */
 export const syncEmoji = Effect.fn('sync.emoji')(function* () {
   const edge = yield* SlackEdge
   const sql = yield* StoreWriter
