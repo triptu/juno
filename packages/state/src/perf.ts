@@ -40,6 +40,8 @@ export type PerfName =
   | 'juno.chat-bubble'
   /** ⌘J or the header's Juno button to the panel painted with its composer (one frame). */
   | 'juno.panel-open'
+  /** A pick in the Juno header's switcher to the Juno page painted with its rows, in the tab or the panel. */
+  | 'juno.page-switch'
 
 const TRACK = 'Juno'
 

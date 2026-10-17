@@ -1,5 +1,5 @@
 import { SlackAuthRequired } from '@juno/slack'
-import { Clock, Deferred, Effect, Scope } from 'effect'
+import { Clock, Deferred, Effect, Fiber, Scope } from 'effect'
 import { backfillWindow } from '../window'
 import { bootState, coldBoot, warmBoot } from '../boot'
 
@@ -36,6 +36,9 @@ export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void
   ))
 
   const initialize = cycle(Effect.gen(function* () {
+    // User groups and emoji are methods of their own, so they are read beside the boot rather than after it: a cold boot
+    // reads 30 or more emoji pages, which would keep the first sync running for another minute and a half (live, 10-17).
+    const refreshes = yield* Effect.forkChild(Effect.all([refreshUsergroups, refreshEmoji], { concurrency: 2 }))
     while (true) {
       const result = yield* Effect.result(attempt)
       if (result._tag === 'Success') break
@@ -51,8 +54,10 @@ export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void
     }
     state.booted = true
     yield* settle()
-    yield* refreshUsergroups
-    yield* refreshEmoji
+    // One that failed beside a boot that had to retry is read again now.
+    const [usergroups, emoji] = yield* Fiber.join(refreshes)
+    if (!usergroups) yield* refreshUsergroups
+    if (!emoji) yield* refreshEmoji
     yield* followPassIfDue(runtime)
   }))
 

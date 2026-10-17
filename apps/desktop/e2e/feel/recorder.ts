@@ -40,6 +40,12 @@ export type Probe =
    * the user was looking at moved in that frame.
    */
   | { readonly kind: 'edge'; readonly name: string; readonly scroller: string; readonly rowKey: string; readonly side: 'top' | 'bottom' }
+  /**
+   * The rows (`row`) in view inside a scroller, each as the box of its `part`
+   * keyed by the part's `key` attribute, in list order. Only rows in view are
+   * read inside, so rows the browser skips off screen stay skipped.
+   */
+  | { readonly kind: 'rows'; readonly name: string; readonly scroller: string; readonly row: string; readonly part: string; readonly key: string }
 
 export interface Rect {
   readonly x: number
@@ -342,6 +348,21 @@ async function installProbes(page: Page, probes: ReadonlyArray<Probe>): Promise<
           }
           case 'edge':
             return edge(probe)
+          case 'rows': {
+            const scroller = visible(probe.scroller)
+            if (scroller === null) return null
+            const box = scroller.getBoundingClientRect()
+            const found: Array<{ key: string; x: number; y: number; width: number; height: number }> = []
+            for (const row of scroller.querySelectorAll<HTMLElement>(probe.row)) {
+              const r = row.getBoundingClientRect()
+              if (r.height === 0 || r.bottom <= box.top || r.top >= box.bottom) continue
+              const part = row.querySelector<HTMLElement>(probe.part)
+              if (part === null) continue
+              const { x, y, width, height } = part.getBoundingClientRect()
+              found.push({ key: part.getAttribute(probe.key) ?? '', x, y, width, height })
+            }
+            return found
+          }
         }
       }
 

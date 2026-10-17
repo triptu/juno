@@ -1,6 +1,6 @@
 import { useEmojiSuggestions } from '../emojiSuggestions'
 import { useRef, useState, type ReactNode } from 'react'
-import { chatCopy, type ChatPage, type Quote, type SendContext } from '@juno/agent-contract'
+import { chatCopy, type ChatPage, type JunoPage, type Quote, type SendContext } from '@juno/agent-contract'
 import { junoDraftAtom, nowAtom, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
@@ -26,6 +26,8 @@ export interface JunoChatProps {
   readonly onSent?: (context: SendContext | undefined) => void
   /** Esc in the empty composer. */
   readonly onEscape?: () => void
+  /** A link to a Juno page in the chat: the tab or the panel shows it in place (SPEC 13.10). */
+  readonly onOpenPage: (page: JunoPage) => void
 }
 
 /**
@@ -51,7 +53,7 @@ export interface JunoChatProps {
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
  */
-export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape }: JunoChatProps) {
+export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, onOpenPage }: JunoChatProps) {
   const agent = useAgentState()
   const { page, pageRef, current, loaded, setWindow } = useChatWindow(column, agent)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -78,7 +80,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const files = useChatFiles(draftKey, draft, setDraft, send)
   const { setRemoval, sheet } = useRemoval(now)
   const { setPicker, pickerAt } = useReactionPicker(items)
-  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval })
+  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setPicker, setRemoval, openPage: onOpenPage })
 
   return (
     <>

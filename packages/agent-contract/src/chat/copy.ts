@@ -49,6 +49,8 @@ export const chatCopy = {
     settings: 'Settings',
     review: 'Review',
   },
+  /** The Juno header's switcher (SPEC 13.10): the chat's row, and the menu's name. */
+  switcher: { chat: 'Chat', label: 'Juno pages' },
   /** The Juno panel (SPEC 7, inventory 12.1). */
   panel: {
     openInTab: 'Open in a tab',
@@ -208,14 +210,17 @@ export const chatCopy = {
     change: {
       apply: 'Apply',
       applied: 'Applied',
+      /** A connection call that only looks something up, once it ran. */
+      done: 'Done',
       showAll: 'Show all',
       /** The auto-review's one line on a connection call (SPEC 13.9): why Juno asked, or why it ran without asking. */
       review: {
         always: 'Asked because your rule for this tool is Always ask.', failed: "Asked because Juno couldn't review this call.",
         notAsked: "Asked because you didn't ask for this.", untrusted: 'Asked because only something Juno read asked for this.',
-        implied: "Asked because you didn't ask for exactly this.", delete: "Asked because deleting can't be undone.",
+        implied: "Asked because your message didn't ask for this exact change.", delete: "Asked because deleting can't be undone.",
         send: "Asked because sending can't be undone.", write: "Asked because this change can't be undone.",
         ranExplicit: 'Ran without asking because you asked for it and it can be undone.',
+        ranRead: 'Ran without asking because it only looks something up.',
         ranNever: 'Ran without asking because your rule for this tool is Never ask.',
         ruleChanged: 'Asked because your rule for this tool changed.',
       },
@@ -377,8 +382,17 @@ export const chatCopy = {
   pages: {
     activity: {
       outcome: { replied: 'Replied', interrupted: 'Interrupted', blocked: 'Blocked', failed: 'Failed', stayedQuiet: 'Stayed quiet' },
-      /** Who asked, for a run without a named job. */
-      who: { owner: 'You', click: 'You', wake: 'A schedule', report: 'A job' },
+      subtitle: 'Every run Juno made: what started it, what it read, what it did, and what you decided.',
+      empty: { title: 'No runs yet', body: 'Runs show up here as Juno answers you or wakes on a schedule.' },
+      /** What started a run that was not a message of yours, before its name. */
+      trigger: { schedule: 'Schedule', job: 'Job', answer: 'You answered', reaction: 'You reacted', removed: 'A removed message' },
+      /** The run read outside content, so it asked before acting (SPEC 13.9). */
+      read: 'Read',
+      readOutside: 'Read outside content',
+      askedFirst: 'Content Juno read in this run could hold instructions, so it asked before acting.',
+      steps: 'Steps',
+      moreSteps: (n: number) => `${n} more ${n === 1 ? 'step' : 'steps'}`,
+      older: 'Show older runs',
       copyDetails: 'Copy details',
     },
     memory: { beingUpdated: 'being updated' },

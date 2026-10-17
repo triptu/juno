@@ -54,8 +54,15 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
       Effect.ensuring(options.onCycle?.('finished') ?? Effect.void),
     )
   const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
-  const refreshEmoji = syncEmoji().pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: emoji refresh failed', { tag: error._tag })))
-  const refreshUsergroups = syncUsergroups(ctx).pipe(Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: user groups refresh failed', { tag: error._tag })))
+  // Each says whether it finished; a failure other than an expired session is logged.
+  const refreshEmoji = syncEmoji().pipe(
+    Effect.as(true),
+    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: emoji refresh failed', { tag: error._tag }), false)),
+  )
+  const refreshUsergroups = syncUsergroups(ctx).pipe(
+    Effect.as(true),
+    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: user groups refresh failed', { tag: error._tag }), false)),
+  )
   const reportBoot: Phase = phase
   // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
   const background = yield* FiberSet.make<void, SlackAuthRequired>()

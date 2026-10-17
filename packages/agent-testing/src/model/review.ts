@@ -10,17 +10,21 @@
  *   ("update" for `notion-update-page`), `implied` when the owner wrote
  *   something else, `notAsked` when there are no owner words;
  * - risk: `delete` for a tool named like a delete, `send` for one named like
- *   a send, otherwise `reversible`.
+ *   a send, `read` for one named like a lookup, otherwise `reversible`.
+ *
+ * A tool that takes one `command` string is judged by its command, as the
+ * real one is told to: `help`, `info x`, `search x` and the like are lookups,
+ * and `call <tool> …` is judged by that tool's name.
  */
 export interface FakeReviewRequest {
   readonly state: {
     readonly owner: ReadonlyArray<string>
-    readonly call: { readonly server: string; readonly tool: string; readonly args: string }
+    readonly call: { readonly server: string; readonly tool: string; readonly args: string; readonly about?: string; readonly readOnly?: true }
   }
 }
 
 export type FakeIntent = 'explicit' | 'implied' | 'notAsked'
-export type FakeRisk = 'reversible' | 'write' | 'delete' | 'send'
+export type FakeRisk = 'read' | 'reversible' | 'write' | 'delete' | 'send'
 export interface FakeReviewAnswers {
   readonly intent: FakeIntent
   readonly risk: FakeRisk
@@ -28,13 +32,30 @@ export interface FakeReviewAnswers {
 
 const ACTIONS = ['create', 'update', 'append', 'add', 'edit', 'rename', 'move', 'delete', 'remove', 'archive', 'trash', 'send', 'post', 'publish']
 
+/** Tool names that look like a lookup, and the commands of a command-string tool that are one. */
+const READS = ['get', 'list', 'search', 'find', 'fetch', 'read']
+const LOOKUPS = [...READS, 'help', 'tools', 'info', 'schema', 'show', 'describe']
+
+/** What the call does, in words: its tool's name, and its command's when it takes one. */
+function callWords(call: FakeReviewRequest['state']['call']): { readonly words: ReadonlyArray<string>; readonly lookup: boolean } {
+  let command: unknown
+  try { command = (JSON.parse(call.args) as { command?: unknown }).command } catch { command = undefined }
+  const split = (text: string) => text.toLowerCase().split(/[^a-z]+/).filter(Boolean)
+  const tool = split(call.tool)
+  if (typeof command !== 'string') return { words: tool, lookup: call.readOnly === true || tool.some((w) => READS.includes(w)) }
+  const [verb = '', target = ''] = command.trim().toLowerCase().split(/\s+/)
+  // `call <tool> …` does what that tool does; any other command is its verb.
+  const words = verb === 'call' ? split(target) : split(verb)
+  return { words: [...tool, ...words], lookup: verb === 'call' ? words.some((w) => READS.includes(w)) : LOOKUPS.includes(verb) }
+}
+
 export function fakeReview(request: FakeReviewRequest): FakeReviewAnswers {
-  const words = request.state.call.tool.toLowerCase().split(/[^a-z]+/)
+  const { words, lookup } = callWords(request.state.call)
   const owner = request.state.owner.join('\n').toLowerCase()
   const action = words.find((word) => ACTIONS.includes(word))
   const intent: FakeIntent = owner.trim() === '' ? 'notAsked' : action !== undefined && owner.match(/[a-z0-9_-]+/g)?.includes(action) === true ? 'explicit' : 'implied'
   const risk: FakeRisk = words.some((w) => ['delete', 'remove', 'archive', 'trash'].includes(w)) ? 'delete'
-    : words.some((w) => ['send', 'post', 'publish'].includes(w)) ? 'send' : 'reversible'
+    : words.some((w) => ['send', 'post', 'publish'].includes(w)) ? 'send' : lookup ? 'read' : 'reversible'
   return { intent, risk }
 }
 
@@ -48,7 +69,7 @@ export function choice(value: string, choices: ReadonlyArray<string>, confidence
 }
 
 const INTENTS = ['explicit', 'implied', 'notAsked']
-const RISKS = ['reversible', 'write', 'delete', 'send']
+const RISKS = ['read', 'reversible', 'write', 'delete', 'send']
 
 export interface FakeReviewer {
   /** The agent's `ReviewModel`. */

@@ -71,7 +71,16 @@ export default defineFixtures(
       'paused-minimum-window': header({ _tag: 'paused' }, {}, { ...frame, width: 336 }),
     },
     Menu: {
-      open: header({ _tag: 'none' }, { menuOpen: true }, { ...frame, height: 320 }),
+      open: header({ _tag: 'none' }, { menuOpen: true }, { ...frame, height: 380 }),
+      // Over a page: the title names it, and the menu checks it.
+      'open-on-activity': header({ _tag: 'none' }, { menuOpen: true, current: 'activity' }, { ...frame, height: 380 }),
+    },
+    Title: {
+      activity: header({ _tag: 'none' }, { current: 'activity' }),
+      remembers: header({ _tag: 'none' }, { current: 'remembers' }),
+      // The longest name at the minimum window, with a chip: the chip's line shortens first.
+      'memory-minimum-window': header({ _tag: 'paused' }, { current: 'memory' }, { ...frame, width: 336 }),
+      'panel-remembers': header({ _tag: 'none' }, { current: 'remembers', column: 'panel', actions: panelActions }, { ...frame, width: 360 }),
     },
     'Over the chat': {
       'at-top': scene(() => <OverChat />, chatFrame),

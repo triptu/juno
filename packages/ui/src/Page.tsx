@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { revealFocus } from './internal/revealFocus'
 import { Text } from './Text'
@@ -17,12 +17,21 @@ export interface PageProps {
  * focus inside it scrolls into view whole, ring included.
  */
 export function Page({ width = 'default', children }: PageProps) {
+  const underHeader = useContext(PageUnderHeader)
   return (
-    <div onFocus={revealFocus} {...stylex.props(styles.scroll)}>
-      <div {...stylex.props(styles.column, widths[width], styles.page)}>{children}</div>
+    <div onFocus={revealFocus} data-under-header={underHeader ? '' : undefined} {...stylex.props(styles.scroll, underHeader && styles.scrollUnderHeader)}>
+      <div {...stylex.props(styles.column, widths[width], styles.page, underHeader && styles.pageUnderHeader)}>{children}</div>
     </div>
   )
 }
+
+/**
+ * Set by a frame that lays a header's islands over its page (the Juno
+ * pages, under the Juno header): the page scrolls under the band, starts
+ * below the islands, and its scrollbar track starts below the band, as a
+ * list does with `ScrollArea underHeader`.
+ */
+export const PageUnderHeader = createContext(false)
 
 export interface PageHeaderProps {
   readonly title: string
@@ -106,6 +115,14 @@ const styles = stylex.create({
   page: {
     paddingBlock: `${spacing['--space-10']} ${spacing['--space-18']}`,
     paddingInline: { default: spacing['--space-8'], [NARROW]: spacing['--space-4'] },
+  },
+  scrollUnderHeader: {
+    paddingTop: layout['--header-inset'],
+    scrollPaddingTop: layout['--header-band'],
+  },
+  // The islands already sit above it: a smaller gap than the page's own top.
+  pageUnderHeader: {
+    paddingBlockStart: spacing['--space-4'],
   },
   header: {
     display: 'flex',

@@ -3,6 +3,7 @@
  * the sidebar and the topic view load apart), fetched on idle once the window
  * is up, so the Juno tab and the panel are ready before they are asked for.
  */
-export { JunoBackup, JunoConnections, JunoPageTab, JunoSettings } from './JunoPages'
+export { JunoBackup, JunoConnections, JunoSettings } from './JunoPages'
+export { JunoPageTab } from './JunoPageView'
 export { JunoPanel } from './JunoPanel'
 export { JunoTab } from './JunoTab'

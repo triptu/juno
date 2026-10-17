@@ -39,6 +39,7 @@
     "presence:live": "node scripts/presence-live.ts",
     "probe:live": "node scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
+    "sync:timeline": "node --import ./scripts/ts-resolve-hooks.mjs scripts/first-sync-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
     "ai:eval": "pnpm --filter @juno/ai eval",
     "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",

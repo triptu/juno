@@ -43,7 +43,7 @@ import { deliver } from '../inbox/bridge'
 import { accept, find, nextAccepted, settle, unsettled, type Accept, type InboxKind, type InboxOp } from '../inbox/inbox'
 import { providerFailure, type StreamProgress } from '../providers'
 import type { ChatModel, RequestBuilder, WireMessage } from '../request/builder'
-import type { JunoTool, ToolRun } from '../request/tool'
+import { takeSummary, type JunoTool, type ToolRun } from '../request/tool'
 import type { Journal, Settled } from '../runtime/journal'
 import { transaction } from '../store/database'
 import { mode, setMode, type Mode } from '../store/ledger'
@@ -54,6 +54,7 @@ import { admittedFiles, clearBodies, copyFiles, storeFiles, withImages } from '.
 import { archivedBubble, carriesFiles, modelText, ownerOpOf, readsTopic, runText, type CardText } from './input'
 import { parseOutput } from './output'
 import { resolveSpans, sourceTable } from './sources'
+import { stepLog, type StepLog } from './steps'
 
 export interface Session {
   readonly journal: () => Journal
@@ -113,6 +114,20 @@ interface Live {
   flushing: Promise<void>
 }
 
+/** A tool call as pi's tool hooks give it. `parent` is set for a call a running script made. */
+interface ToolHookCall {
+  readonly name: string
+  readonly id?: string
+  readonly arguments?: unknown
+  readonly parent?: unknown
+}
+
+/** A tool's result as pi's `afterTool` gives it. */
+interface ToolResult {
+  readonly output?: ReadonlyArray<{ readonly type: string; readonly text?: unknown }>
+  readonly isError?: boolean
+}
+
 const originOf = (kind: InboxKind): Origin => (kind === 'send' || kind === 'steer' || kind === 'retry' || kind === 'react' ? 'owner' : kind)
 const isMessage = (kind: InboxKind | undefined) => kind === 'send' || kind === 'steer' || kind === 'retry'
 const join = (...parts: ReadonlyArray<string>) => parts.filter((part) => part !== '').join('\n\n')
@@ -168,6 +183,7 @@ class Router {
 
   constructor(options: RouterOptions) {
     this.options = options
+    this.steps = stepLog(options.store)
   }
 
   private get store() { return this.options.store }
@@ -187,6 +203,11 @@ class Router {
   }
 
   private current: Live | undefined
+
+  /** The run begun last, live or ended: a chat request the guard reports late still belongs to it. */
+  private latest: string | undefined
+
+  private readonly steps: StepLog
 
   private closing = false
 
@@ -317,6 +338,7 @@ class Router {
     const run = live(row, isMessage(op.kind))
     run.inputs.set(op.opId, undefined)
     this.current = run
+    this.latest = run.runId
     this.emit({ _tag: 'started', runId: run.runId, opId: run.opId, origin })
     return run
   }
@@ -325,12 +347,12 @@ class Router {
     const journal = this.session.journal()
     const input = find(this.store, run.opId)
     if (input === undefined) throw new Error(`run ${run.runId} has no input`)
-    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(this.store, journal, input, { steer: false, text: () => this.inputText(input) }))
+    if (input.state === 'accepted') run.inputs.set(input.opId, await deliver(this.store, journal, input, { steer: false, text: () => this.inputText(input, run) }))
     // A crash can leave a steered input recorded in run_inputs but not yet in pi.
     for (const opId of run.inputs.keys()) {
       if (opId === run.opId) continue
       const queued = find(this.store, opId)
-      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(this.store, journal, queued, { steer: true, text: () => this.inputText(queued) }))
+      if (queued?.state === 'accepted') run.inputs.set(opId, await deliver(this.store, journal, queued, { steer: true, text: () => this.inputText(queued, run) }))
     }
     const results = new Map<string, Settled | InboxOp['state']>()
     for (;;) {
@@ -353,7 +375,12 @@ class Router {
   /** A bubble's text: from the live run, or from the archive. */
   private bubbleText = (id: string) => this.current?.bubbles.find((bubble) => bubble.id === id)?.text ?? archivedBubble(this.store, id)
 
-  private inputText = (op: InboxOp) => withImages(this.store, op.opId, modelText(this.store, op, this.bubbleText, this.options.cards))
+  private inputText = (op: InboxOp, run: Live) => {
+    const text = withImages(this.store, op.opId, modelText(this.store, op, this.bubbleText, this.options.cards))
+    // A connection call's result carried with the input is something Juno read (§6.4).
+    if (this.options.cards?.carriesData?.(op.opId)) this.taint(run)
+    return text
+  }
 
   private recordReaction = (input: { opId: string; kind: 'bubble' | 'card' | 'owner'; id: string; by: 'owner' | 'juno'; emoji: string | null }) => {
     const added = transaction(this.store.db, () =>
@@ -404,14 +431,25 @@ class Router {
     })
   }
 
-  private toolStarted = (name: string) => {
+  private toolStarted = (call: ToolHookCall) => {
     const run = this.current
     if (run === undefined) return
-    const tool = this.options.tools().find((t) => t.name === name)
-    const count = (run.calls.get(name) ?? 0) + 1
-    run.calls.set(name, count)
+    const tool = this.options.tools().find((t) => t.name === call.name)
+    const count = (run.calls.get(call.name) ?? 0) + 1
+    run.calls.set(call.name, count)
     if (tool?.taints) this.taint(run)
+    // A script's own calls are in `script_calls`; the run log keeps the model's.
+    if (call.parent === undefined && call.id !== undefined) this.steps.started({ runId: run.runId, callId: call.id, tool: call.name, args: call.arguments })
     this.showStatus(run, tool?.status(count) ?? 'Working')
+  }
+
+  private toolEnded = (call: ToolHookCall, result: ToolResult) => {
+    const run = this.current
+    if (run === undefined || call.parent !== undefined || call.id === undefined) return
+    const text = (result.output ?? []).flatMap((part) => (part.type === 'text' && typeof part.text === 'string' ? [part.text] : [])).join('\n')
+    const reads = this.options.tools().find((t) => t.name === call.name)?.taints === true
+    const summary = takeSummary(call.id)
+    this.steps.ended({ runId: run.runId, callId: call.id, text, isError: result.isError === true, reads, ...(summary === undefined ? {} : { summary }) })
   }
 
   /** Delivers held input into the live run at a boundary, oldest first. */
@@ -429,7 +467,7 @@ class Router {
         })) continue
         // §6.4: a steered report or wake is untrusted content, and so is a message sent beside a topic or with files.
         if (untrusted) run.clean = false
-        run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op) }))
+        run.inputs.set(op.opId, await deliver(this.store, this.session.journal(), op, { steer: true, text: () => this.inputText(op, run) }))
         this.emit({ _tag: 'steered', runId: run.runId, opId: op.opId })
       }
     })()
@@ -483,8 +521,13 @@ class Router {
       },
     },
     tool: {
-      beforeTool: (call: { readonly name: string }) => {
-        this.toolStarted(call.name)
+      beforeTool: (call: ToolHookCall) => {
+        this.toolStarted(call)
+        return undefined
+      },
+      // Only records the result for Activity; returning nothing keeps it as it is.
+      afterTool: (call: ToolHookCall, result: ToolResult) => {
+        this.toolEnded(call, result)
         return undefined
       },
     },
@@ -594,6 +637,9 @@ class Router {
 
   /** The live run's cutoff, for the compactor's ceiling (G2). */
   cutoff = (): number | undefined => this.current?.h
+
+  /** The run begun last, if any since this process started. */
+  latestRun = (): string | undefined => this.current?.runId ?? this.latest
 
   /** The live run as a tool sees it. Call it inside the tool's `execute()`. */
   toolRun = async (): Promise<ToolRun | undefined> => {

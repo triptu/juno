@@ -170,12 +170,12 @@ const styles = stylex.create({
   // islands, so the page's header variables are set for the panel's own
   // top here: the row at 0, the band and list inset 8px shorter.
   side: {
-    // Not drawn until its chat has mounted (the Juno chunk loads lazily),
-    // so the topic reflows and the panel appears in the same frame, never
-    // as an empty floating box.
+    // Not drawn until its chat or Juno page has mounted (the Juno chunk
+    // loads lazily), so the topic reflows and the panel appears in the same
+    // frame, never as an empty floating box.
     display: {
       default: 'flex',
-      ':not(:has([data-juno-chat]))': 'none',
+      ':not(:has([data-juno-chat], [data-juno-page]))': 'none',
     },
     position: {
       default: 'relative',

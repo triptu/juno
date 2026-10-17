@@ -12,7 +12,7 @@
  *   m3 #eng (C0ENG) ts 1760500000.000004 in thread 1760500000.000001, Maya Chen: It times out…
  */
 import type { AgentHostError, HostMessagePage, HostChannel, TopicLink } from '@juno/agent-contract'
-import { abortable, Cancelled, defineTool, type JunoTool } from '../request/tool'
+import { abortable, Cancelled, defineTool, type JunoTool, type ToolOutput } from '../request/tool'
 import type { SourceRef } from './sources'
 
 type Page = typeof HostMessagePage.Type
@@ -35,11 +35,12 @@ const line = (m: Page['messages'][number], handle: string | undefined) => {
   return `${handle === undefined ? '' : `${handle} `}${place} ts ${m.ts}${thread}, ${m.senderName ?? (m.senderId || 'unknown sender')}: ${m.text}`
 }
 
-const lines = async (page: Page, handles: Handles) => {
-  if (page.messages.length === 0) return 'No messages.'
+const lines = async (page: Page, handles: Handles): Promise<ToolOutput> => {
+  const summary = plural(page.messages.length, 'message', 'messages')
+  if (page.messages.length === 0) return { text: 'No messages.', summary }
   const refs = page.messages.map((m) => ({ channelId: m.channelId, ts: m.ts, ...(m.channelName === undefined ? {} : { place: m.channelName }) }))
   const assigned = await handles(refs)
-  return page.messages.map((m, i) => line(m, assigned[i])).join('\n')
+  return { text: page.messages.map((m, i) => line(m, assigned[i])).join('\n'), summary }
 }
 
 const reasons: Record<string, string> = {
@@ -50,9 +51,10 @@ const reasons: Record<string, string> = {
 }
 
 /** A failed read is told to the model in fixed words, never with the host's error body. */
-async function read(f: () => Promise<string>, signal?: AbortSignal): Promise<{ readonly text: string; readonly isError?: boolean }> {
+async function read(f: () => Promise<string | ToolOutput>, signal?: AbortSignal): Promise<ToolOutput> {
   try {
-    return { text: await abortable(f(), signal) }
+    const output = await abortable(f(), signal)
+    return typeof output === 'string' ? { text: output } : output
   } catch (error) {
     if (error instanceof Cancelled) return { text: 'The read was cancelled.', isError: true }
     const reason = (error as Partial<typeof AgentHostError.Type>)?.reason
@@ -106,7 +108,8 @@ export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<Host
       run: (_, call) =>
         read(async () => {
           const { topics } = await host.topics()
-          return topics.length === 0 ? 'No topics.' : topics.map((t) => `${t.topicId} ${t.title} (${t.where})`).join('\n')
+          const summary = plural(topics.length, 'topic', 'topics')
+          return { text: topics.length === 0 ? 'No topics.' : topics.map((t) => `${t.topicId} ${t.title} (${t.where})`).join('\n'), summary }
         }, call.signal),
     }),
     defineTool<{ readonly user: string }>({

@@ -7,7 +7,8 @@
  * that the key set in Settings reached the provider, that the picked model is
  * used, and what the agent sent. Compaction models are answered by the
  * deterministic compactor, as in the in-process fake. An answer can be one
- * tool call; the request after it carries the tool's result.
+ * tool call; the request after it carries the tool's result, or text sent
+ * in pieces some time apart, as a model streams.
  *
  * The catalogue is `fakeCatalogue` in OpenRouter's shape, so the picker
  * resolves the same slugs as the in-process fake provider.
@@ -39,11 +40,19 @@ export interface ToolCallAnswer {
   readonly toolCall: { readonly name: string; readonly arguments: Record<string, unknown> }
 }
 
+/** Text sent in pieces `gapMs` apart, as a model streams: a piece that ends a `<say>` shows its bubble then. */
+export interface StreamedAnswer {
+  readonly chunks: ReadonlyArray<string>
+  readonly gapMs: number
+}
+
+type Answer = string | ToolCallAnswer | StreamedAnswer
+
 export interface FakeOpenRouterOptions {
   /** When set, a request with any other key is refused with 401, as OpenRouter does. */
   readonly key?: string
   /** What a chat request answers: fixed text, or text from the request, now or later. Default: one bubble. */
-  readonly answer?: string | ((request: OpenRouterRequest) => string | ToolCallAnswer | Promise<string | ToolCallAnswer>)
+  readonly answer?: string | ((request: OpenRouterRequest) => Answer | Promise<Answer>)
   /** How the decision model (System One, `/api/v1/systemone`) answers an auto-review. Default: `fakeReview`. */
   readonly review?: (request: FakeReviewRequest) => FakeReviewAnswers
 }
@@ -129,39 +138,54 @@ function toolResultOf(messages: ReadonlyArray<WireMessage>): string | undefined 
   return results.length === 0 ? undefined : results.join('\n')
 }
 
-function anthropic(res: ServerResponse, model: string, answer: string | ToolCallAnswer) {
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** The answer's text pieces, or null for a tool call. */
+const piecesOf = (answer: Answer): ReadonlyArray<string> | null => (typeof answer === 'string' ? [answer] : 'chunks' in answer ? answer.chunks : null)
+
+/** Writes each piece, `gapMs` apart for a streamed answer. */
+async function stream(answer: Answer, pieces: ReadonlyArray<string>, write: (text: string) => void) {
+  for (const [index, piece] of pieces.entries()) {
+    if (index > 0 && typeof answer !== 'string' && 'gapMs' in answer) await pause(answer.gapMs)
+    write(piece)
+  }
+}
+
+async function anthropic(res: ServerResponse, model: string, answer: Answer) {
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   event(res, 'message_start', {
     type: 'message_start',
     message: { id: 'msg_fake', type: 'message', role: 'assistant', model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 100, output_tokens: 1 } },
   })
-  if (typeof answer === 'string') {
+  const pieces = piecesOf(answer)
+  if (pieces !== null) {
     event(res, 'content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
-    event(res, 'content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: answer } })
-  } else {
+    await stream(answer, pieces, (text) => event(res, 'content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } }))
+  } else if (typeof answer !== 'string' && 'toolCall' in answer) {
     const { name, arguments: input } = answer.toolCall
     event(res, 'content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: `toolu_fake_${++toolCalls}`, name, input: {} } })
     event(res, 'content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) } })
   }
   event(res, 'content_block_stop', { type: 'content_block_stop', index: 0 })
-  event(res, 'message_delta', { type: 'message_delta', delta: { stop_reason: typeof answer === 'string' ? 'end_turn' : 'tool_use', stop_sequence: null }, usage: { output_tokens: 20 } })
+  event(res, 'message_delta', { type: 'message_delta', delta: { stop_reason: pieces !== null ? 'end_turn' : 'tool_use', stop_sequence: null }, usage: { output_tokens: 20 } })
   event(res, 'message_stop', { type: 'message_stop' })
   res.end()
 }
 
-function completions(res: ServerResponse, model: string, answer: string | ToolCallAnswer) {
+async function completions(res: ServerResponse, model: string, answer: Answer) {
   res.writeHead(200, { 'content-type': 'text/event-stream' })
   const chunk = (delta: unknown, finish: string | null, usage?: unknown) => ({
     id: 'gen-fake', object: 'chat.completion.chunk', created: 0, model,
     choices: [{ index: 0, delta, finish_reason: finish }], ...(usage === undefined ? {} : { usage }),
   })
-  if (typeof answer === 'string') {
-    event(res, undefined, chunk({ role: 'assistant', content: answer }, null))
-  } else {
+  const pieces = piecesOf(answer)
+  if (pieces !== null) {
+    await stream(answer, pieces, (content) => event(res, undefined, chunk({ role: 'assistant', content }, null)))
+  } else if (typeof answer !== 'string' && 'toolCall' in answer) {
     const call = { index: 0, id: `call_fake_${++toolCalls}`, type: 'function', function: { name: answer.toolCall.name, arguments: JSON.stringify(answer.toolCall.arguments) } }
     event(res, undefined, chunk({ role: 'assistant', tool_calls: [call] }, null))
   }
-  event(res, undefined, chunk({}, typeof answer === 'string' ? 'stop' : 'tool_calls', { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }))
+  event(res, undefined, chunk({}, pieces !== null ? 'stop' : 'tool_calls', { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 }))
   event(res, undefined, '[DONE]')
   res.end()
 }
@@ -186,7 +210,7 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         const answers = (options.review ?? fakeReview)(review)
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answers: {
           intent: { type: 'choice', ...choice(answers.intent, ['explicit', 'implied', 'notAsked']) },
-          risk: { type: 'choice', ...choice(answers.risk, ['reversible', 'write', 'delete', 'send']) },
+          risk: { type: 'choice', ...choice(answers.risk, ['read', 'reversible', 'write', 'delete', 'send']) },
         } }))
         return
       }
@@ -208,8 +232,8 @@ export async function startFakeOpenRouter(options: FakeOpenRouterOptions = {}): 
         return
       }
       const text = request.compaction ? compactorText(users, compactions++) : typeof answer === 'string' ? answer : await answer(request)
-      if (path === '/api/v1/messages') anthropic(res, model, text)
-      else completions(res, model, text)
+      if (path === '/api/v1/messages') await anthropic(res, model, text)
+      else await completions(res, model, text)
     })().catch(() => {
       if (!res.headersSent) res.writeHead(500).end()
     })

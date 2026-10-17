@@ -332,8 +332,9 @@ function layout(entries: ReadonlyArray<Entry>, source: ChatSource): ReadonlyArra
         items.push({ _tag: 'day', at: start })
       }
     }
+    // The divider does not end a group: the renderer shows only the one there when the chat opened, and ends the
+    // group at it then (`endGroupsAtDividers`). A group ended at every read mark opens a gap in the middle of an answer.
     if (!divided && entry.by === 'juno' && entry.item.unread) {
-      close()
       divided = true
       items.push({ _tag: 'newDivider', count: unread })
     }

@@ -1,4 +1,5 @@
-import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
+import * as stylex from '@stylexjs/stylex'
+import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { engTopics } from './fixtures/messages'
 import { art, NOW } from './fixtures/topics'
 import { TopicSwitcher, type TopicSwitcherProps } from './TopicSwitcher'
@@ -20,8 +21,30 @@ const base: TopicSwitcherProps = {
   onOpen: noop,
 }
 
+// A thread whose title is too long for the row, first after Main, so the ellipsis shows.
+const long = {
+  ...engTopics[0]!,
+  id: 'C0ENG:1760000000.000900',
+  title: 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one',
+}
+
 // The popover's width (`--menu-width-browse` 300), on the popover's surface.
 const frame: FixtureFrame = { width: 300, surface: 'surface', padded: false }
+
+// As wide as the frame, as the popover's panel makes it; the frame alone sizes it to its longest row.
+const fixture = (props: TopicSwitcherProps, at: FixtureFrame) =>
+  scene<TopicSwitcherProps>(
+    () => (
+      <div {...stylex.props(styles.panel)}>
+        <TopicSwitcher {...props} />
+      </div>
+    ),
+    at,
+  )
+
+const styles = stylex.create({
+  panel: { alignSelf: 'stretch' },
+})
 
 export default defineFixtures(
   TopicSwitcher,
@@ -30,6 +53,7 @@ export default defineFixtures(
       thread: fixture(base, frame),
       main: fixture({ ...base, currentId: 'C0ENG:main' }, frame),
       loading: fixture({ ...base, threads: undefined }, frame),
+      'long-title': fixture({ ...base, threads: [long, ...base.threads!] }, frame),
       'nothing-else': fixture({ ...base, threads: [], mainUnread: 0, currentId: 'C0ENG:main' }, frame),
     },
     Search: {

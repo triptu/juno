@@ -85,7 +85,7 @@ test('Activity lists the run a message started, and the other pages open', async
   await chat.send('what is on today?')
   await chat.expectJuno('You said: what is on today?')
   await openPage(juno, 'Activity')
-  await expect(juno.win.locator('main').getByText('You', { exact: true }).first()).toBeVisible()
+  await expect(juno.win.locator('main [data-activity-trigger="message"]').first()).toHaveText('what is on today?')
   for (const label of ['What Juno remembers', 'Memory of this chat', 'Scheduled', 'Connections']) {
     await openChat(juno)
     await openPage(juno, label)

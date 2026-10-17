@@ -14,11 +14,13 @@
  * live, back to the quiet window) then run beside one history page per
  * active conversation (`historyOrder`: DMs, mentions, unread followed
  * threads and the user's own channels first, then newest first; background lane, skipping
- * conversations an interrupted boot already covered). After history:
- * unknown users from the edge, and beside each other a latest-reply fetch
- * for the unfollowed threads with the most recent activity, so their rows
- * have a preview, and the discovery sweep over the window, so Main knows
- * about replies to roots older than the window.
+ * conversations an interrupted boot already covered), and beside history,
+ * once the `getView` pages are stored, a latest-reply fetch for the
+ * unfollowed threads it finds with the most recent activity, so their rows
+ * have a preview. After history, beside the
+ * previews still running: unknown users from the edge, then the discovery
+ * sweep over the window, so Main knows about replies to roots older than
+ * the window.
  *
  * Warm boot: `client.userBoot`, a full `client.counts` (membership is
  * derived from it), history since the synced range for conversations whose
@@ -355,18 +357,44 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
     }
   })
 
-/** Rows for unfollowed threads discovered through history have only the root; fetch the latest reply for a preview. */
-const loadThreadPreviews = (ctx: SyncContext, seedReadBefore: string): Effect.Effect<void, BootError, BootServices> =>
+/**
+ * Rows for unfollowed threads discovered through history have only the root;
+ * fetch the latest reply for a preview, for at most `previewThreads` of them,
+ * the most recently active first. Runs beside history: `replies` has its own
+ * clock on the background lane, so the previews cost the boot no time. It
+ * starts once the `getView` pass is stored (`threads`), so a followed thread
+ * is never taken for an unfollowed one. Each history page offers to
+ * `landed`; with no root waiting, it waits for the next page, and ends once
+ * `historyDone` is set and none is left.
+ */
+const loadThreadPreviews = (
+  ctx: SyncContext,
+  seedReadBefore: string,
+  threads: Deferred.Deferred<void>,
+  landed: Queue.Queue<void>,
+  historyDone: Deferred.Deferred<void>,
+): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
+    yield* Deferred.await(threads)
     const sql = yield* StoreWriter
     const api = yield* SlackApi
-    const roots = yield* sql<{ channel: string; root_ts: string; latest_reply: string | null }>`
-      SELECT i.channel, i.root_ts, m.latest_reply FROM topic_index i
-        JOIN messages m ON m.channel = i.channel AND m.ts = i.root_ts
-        WHERE i.kind = 'thread' AND m.reply_count > 0
-          AND NOT EXISTS (SELECT 1 FROM messages r WHERE r.channel = i.channel AND r.thread_ts = i.root_ts AND r.ts <> i.root_ts)
-        ORDER BY i.last_activity_ts DESC LIMIT ${ctx.config.previewThreads}`
-    for (const root of roots) {
+    const tried = new Set<string>()
+    while (tried.size < ctx.config.previewThreads) {
+      // Read before the query: a page that lands after it offers again, so no root is missed.
+      const finished = yield* Deferred.isDone(historyDone)
+      const roots = yield* sql<{ channel: string; root_ts: string; latest_reply: string | null }>`
+        SELECT i.channel, i.root_ts, m.latest_reply FROM topic_index i
+          JOIN messages m ON m.channel = i.channel AND m.ts = i.root_ts
+          WHERE i.kind = 'thread' AND m.reply_count > 0
+            AND NOT EXISTS (SELECT 1 FROM messages r WHERE r.channel = i.channel AND r.thread_ts = i.root_ts AND r.ts <> i.root_ts)
+          ORDER BY i.last_activity_ts DESC LIMIT ${ctx.config.previewThreads}`
+      const root = roots.find((row) => !tried.has(`${row.channel}:${row.root_ts}`))
+      if (root === undefined) {
+        if (finished) return
+        yield* Effect.raceFirst(Queue.take(landed), Deferred.await(historyDone))
+        continue
+      }
+      tried.add(`${root.channel}:${root.root_ts}`)
       if (root.latest_reply === null) continue
       const requestedAt = yield* nowTs
       const page = yield* api
@@ -431,6 +459,9 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
     const previews = Deferred.await(quickStarted).pipe(
       Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: bootTs })) : Effect.void),
     )
+    // Each history page wakes the thread previews beside it.
+    const landed = yield* Queue.sliding<void>(1)
+    const historyDone = yield* Deferred.make<void>()
     const history = Effect.gen(function* () {
       yield* phase({ _tag: 'catching-up', done: 0, total: active.length, first: true })
       let done = 0
@@ -439,23 +470,22 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
         // A boot that failed half way left ranges behind; what they cover is not fetched again.
         if (!(yield* covered(conversation.id, start, conversation.latest))) {
           yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
+          yield* Queue.offer(landed, undefined)
           yield* ctx.onHistory(conversation.id)
         }
         yield* phase({ _tag: 'catching-up', done: ++done, total: active.length, first: true })
         yield* Effect.yieldNow
       }
-    })
-    const rest = Effect.gen(function* () {
-      yield* Effect.all([threads, history], { concurrency: 2, discard: true })
+    }).pipe(Effect.ensuring(Deferred.succeed(historyDone, undefined)))
+    const threadsDone = yield* Deferred.make<void>()
+    const pages = Effect.gen(function* () {
+      yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2, discard: true })
       yield* fillUsers(ctx)
-      // Independent methods, so they run side by side: previews read replies, discovery searches.
       // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-      const [, found] = yield* Effect.all([
-        loadThreadPreviews(ctx, bootTs),
-        discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })),
-      ], { concurrency: 2 })
-      return found
+      return yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
     })
+    // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
+    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
     const [discovered] = yield* Effect.all([rest, previews], { concurrency: 2 })
     yield* fillUsers(ctx)
