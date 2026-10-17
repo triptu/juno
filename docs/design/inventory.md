@@ -188,7 +188,7 @@ Centered, padding `48 16`, gap 8: title 14/500, body 13 muted lh 1.5, button 30p
 
 **Shows:** S01 (unread, mention, selected; its Main tag is gone, decided 10-16), S02 (context menu), S14 (selected + mention), shot 02-row-hover-resolve, shot 20-rename-row, shots 52–53 (densities).
 
-### 3.1 Anatomy (comfortable density, the default)
+### 3.1 Anatomy (comfortable density)
 
 ```
 [tile 44]  [line 1: title ........................ time | Resolve]  height 22
@@ -240,8 +240,8 @@ Every Main (a channel's, a DM's or a group DM's) has two lines and no line 3:
 
 | Density | Vertical padding | Line gap | Title | Tile | Row height |
 | --- | --- | --- | --- | --- | --- |
-| Comfortable (default; the prototype's "balanced") | 11 | 2 | 14.5 | 44 | 88 |
-| Compact | 8 | 0 | 14.5 | 36 | 80 |
+| Comfortable (the prototype's "balanced") | 11 | 2 | 14.5 | 44 | 88 |
+| Compact (default) | 8 | 0 | 14.5 | 36 | 80 |
 
 The preview is one line in both, so the row height is fixed (measured 10-15: 87.56 and 79.56px, rounded up to whole pixels; before, 107px with a two-line preview).
 
@@ -658,7 +658,7 @@ One page for everything the owner sets (SPEC 14), in one tab: title "Settings", 
 - **Appearance** — subtitle "System follows macOS. Density changes the sidebar and the messages." One group card, padding 12 14 (so labels start 15px from the card's edge, as the Juno rows do), three rows of min-height 32, 14 apart: the label 14/500 at the start and the control at the trailing edge, as System Settings lays out its rows (decided 10-17). Every Settings row with a label and a control does the same; a checkbox keeps its label after the box, as macOS draws one:
   - **Theme**: segmented control (padding 2, bg `--surface-hover`, radius 7; segments 26px, padding 0 10, 12.5/500, selected bg `--surface-raised` with `--shadow-sm`): System · Light · Dark. Default System. Changes apply in one frame (§18).
   - **Accent**: a row of 20px round swatches, gap 8, one per accent in tokens §1.3, each with a 2px ring in `--focus-ring` when selected and the accent's name as its accessible name and tooltip. Default Coral.
-  - **Density**: segmented control: Comfortable · Compact. Default Comfortable (§3.3).
+  - **Density**: segmented control: Comfortable · Compact. Default Compact (§3.3): main's `launch.json` keeps a density only once it is chosen, so someone who never chose one gets Compact and a chosen one stays.
   Theme, accent and density are saved in main's `launch.json`, so the first frame of the next launch has them; System follows macOS and the window paints in the matching background.
   - **Quick reactions** (section under the card, sub "One click each in the toolbar over a message. Up to 7."; `QuickReactionsSetting`, container `QuickReactions`): a group card with the reactions as 28px pills in toolbar order (the removable chip's size and `--secondary-default` fill, emoji 16, a 20px remove `x` that the keyboard skips), gap 6, then a 28px **Add reaction** (`plus`, `aria-haspopup="dialog"`). At seven Add is dimmed but focusable (`aria-disabled`, as Send is) and named "Up to 7", which its tooltip shows; pressing it does nothing. Add opens `EmojiPicker`, the one More reactions opens, as a popover: fixed in a portal on `body` (`--z-picker`), under Add at its start edge, over Add when there is no room below, moved in to stay inside the window. So the card never clips it and never grows for it. It has search, Frequently used, the workspace's custom emoji and every category; the chosen ones get `EmojiPicker`'s `selected` look (`--hl-soft` fill and a 1px `--hl-ring` inset ring, "added", `aria-disabled`) and are not picked, by click or by Enter in the search. A pick joins the end and closes the picker; Esc closes it and focus goes back to Add; a press, focus or scroll outside closes it. A pill drags to a new place (the row shows the drop order while dragging; the dragged pill dims to `--opacity-dim`). The pills are one tab stop: ← → Home End move focus, ⌥← ⌥→ move the pill and keep focus on it, Delete or Backspace removes it and focuses its neighbour. The last pill has no remove. Under the pills, 12 muted "5 of 7. Drag to reorder, or use ⌥← and ⌥→." and right after it (gap 8, wrapping under it when narrow) **Reset to default** (ghost, disabled at 👍 ✅ 👀), so it never sits out at the card's far edge. The card holds only the pills and this line; nothing reserves room for the picker. Saved as the workspace preference `quickReactions` in user.db (`{ name, unicode, url? }` per reaction; the default is saved as no value). [built quick-reactions]
 - **Notifications** — the Notifications page (§13) as it was, title and all.
@@ -810,7 +810,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | --- | --- | --- | --- |
 | theme | system, light, dark | system | §18 |
 | accent | the accents in tokens §1.3 | coral | `--hl` and its group |
-| density | comfortable, compact | comfortable | §3.3, §6.1 |
+| density | comfortable, compact | compact | §3.3, §6.1 |
 | aiAssist (avatar menu) | on, off | on | Hides: settled hint, send checks, audience warning, Home's follow-up and tidy-up items and AI title lines, the Juno panel and its button, topic art; ⌘K still searches. [spec] also turns off notification gating and Juno |
 | sidebarWidth, sidebarCollapsed | 312–480px; on, off | 384, off | §1; kept in main's `launch.json` with the theme, so the first frame has them |
 | junoPanelOpen | on, off | off | §12.1 |

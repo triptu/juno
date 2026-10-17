@@ -19,10 +19,10 @@ export const DEFAULT_THEME: Theme = 'system'
 export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'tidy-up', 'juno', 'ai-activity', 'connections', 'backup', 'about'])
 export type SettingsSection = typeof SettingsSectionSchema.Type
 
-/** Settings › Appearance › Density (inventory 3.3). */
+/** Settings › Appearance › Density (inventory 3.3). Compact unless the user chose one: `launch.json` keeps only a chosen density. */
 export const DensitySchema = Schema.Literals(['comfortable', 'compact'])
 export type Density = typeof DensitySchema.Type
-export const DEFAULT_DENSITY: Density = 'comfortable'
+export const DEFAULT_DENSITY: Density = 'compact'
 
 /**
  * The accent names, in the order the picker shows them. Coral is the

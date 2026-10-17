@@ -515,8 +515,8 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 
 | Density | Row | Vertical padding | Line gap | Title size |
 | --- | --- | --- | --- | --- |
-| Comfortable (default) | 90 / 109 | 11px | 3px | 14.5px |
-| Compact | 80 / 99 | 8px | 1px | 13.5px |
+| Comfortable | 90 / 109 | 11px | 3px | 14.5px |
+| Compact (default) | 80 / 99 | 8px | 1px | 13.5px |
 
 [built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
