@@ -1,0 +1,1 @@
+- 10-17 15:24 · home-icon · Home moves from the sidebar nav into the title bar as an icon button left of the avatar, with no count or dot; the sidebar's minimum width rises from 280 to 312 so the four title bar icons and the avatar fit (`docs/design/home-icon/`).
