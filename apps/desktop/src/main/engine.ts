@@ -13,6 +13,7 @@ import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type Uti
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { Events, EngineToMain, type EngineConfig, type MainToEngine, type PortRequestResult } from '@juno/contract'
+import { startupMark } from './startupMarks'
 
 const BACKOFF_BASE_MS = 1_000
 const BACKOFF_CAP_MS = 30_000
@@ -57,6 +58,7 @@ export class EngineSupervisor {
   start(): void {
     if (this.child) return
     this.state = 'starting'
+    startupMark('engine-fork')
     const child = utilityProcess.fork(join(__dirname, 'engine.js'), [], {
       serviceName: 'juno-engine',
       partition: 'persist:slack',
@@ -73,6 +75,7 @@ export class EngineSupervisor {
         return
       }
       if (message._tag === 'ready') {
+        startupMark('engine-ready')
         this.state = 'ready'
         this.send({ _tag: 'aiKey', key: this.aiKey })
         this.attempt = 0

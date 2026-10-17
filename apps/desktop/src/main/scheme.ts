@@ -12,6 +12,7 @@ import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { serveThumbnail, serveUpload } from './files'
 import { serveImage } from './images'
+import { startupMark } from './startupMarks'
 
 export const APP_SCHEME = 'juno'
 export const APP_ORIGIN = `${APP_SCHEME}://app`
@@ -44,4 +45,5 @@ export function serveAppScheme(rendererDir: string, fakeSlackOrigin?: string): v
     if (file !== root && !file.startsWith(root + sep)) return new Response('Forbidden', { status: 403 })
     return net.fetch(pathToFileURL(file).toString()).catch(() => new Response('Not found', { status: 404 }))
   })
+  startupMark('scheme')
 }

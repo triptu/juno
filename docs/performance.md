@@ -326,7 +326,7 @@ The `mention typing` scenario types "@ma " ten times in a reply, so every "@" op
 
 ### 7.3 The perf harness
 
-Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `apps/desktop/perf/`, and run with `pnpm perf` (all) or `pnpm perf -g "topic view"` (some), queued behind the machine-wide heavy-job lock. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported. `pnpm verify:main --with-mac` runs the suite and the feel suite on the Mac. Each prints its samples with the load average and fails when its p95 (p50 where section 1 says so) is over budget; the one-frame budgets use the rule proposed in section 8 on a display slower than 120 Hz. Both scroll scenarios trace the renderer over CDP and check the main thread's work per frame, the long animation frames and the dropped frames. Baselines and the 15 % median check below do not exist yet. To explain a number, `JUNO_PERF_TRACE=<dir>` writes a trace and a CPU profile per traced scenario, `JUNO_UNMINIFIED=1` builds with function names (the bundle check is skipped), and `node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]` sums the main thread's time by trace event and by function inside each `juno.*` measure. Add `JUNO_TRACE_SKIA=1` to record the GPU process's raster passes too (blurs, image filters, pipeline compiles); a keystroke that is slow after its frame callback is usually raster, and shows there.
+Status, M4: the scenarios live in `apps/desktop/e2e/perf.spec.ts` rather than `apps/desktop/perf/`, and run with `pnpm perf` (all) or `pnpm perf -g "topic view"` (some), queued behind the machine-wide heavy-job lock. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported. `pnpm verify:main --with-mac` runs the suite and the feel suite on the Mac. Each prints its samples with the load average and fails when its p95 (p50 where section 1 says so) is over budget; the one-frame budgets use the rule proposed in section 8 on a display slower than 120 Hz. Both scroll scenarios trace the renderer over CDP and check the main thread's work per frame, the long animation frames and the dropped frames. Baselines and the 15 % median check below do not exist yet. To explain a number, `JUNO_PERF_TRACE=<dir>` writes a trace and a CPU profile per traced scenario, `JUNO_UNMINIFIED=1` builds with function names (the bundle check is skipped), and `node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]` sums the main thread's time by trace event and by function inside each `juno.*` measure. For the warm start, `JUNO_E2E_STARTUP_TRACE=<file>` traces the start itself (8.8). Add `JUNO_TRACE_SKIA=1` to record the GPU process's raster passes too (blurs, image filters, pipeline compiles); a keystroke that is slow after its frame callback is usually raster, and shows there.
 
 Each scroll scenario runs three kinds of sweep, twice each, over the same distance down and back, and pools the two of a kind before taking the p95. The **continuous** sweep is one scroll gesture with a delta every frame (CDP `Input.synthesizeScrollGesture`, mouse source, 2,000 px/s), as a trackpad sends; it carries the 8.3 ms gate (owner's decision, 10-17, section 8.5). The **stepped** sweep is 200 px wheel steps 100 ms apart, each its own gesture; its p95 is reported, not gated. The **held-clock** sweep repeats the stepped one with two background worker threads busy and has its own 7 ms gate. Both gates must pass; neither substitutes for the other. The workers end in a `finally` block. `holdClock()` lives in `e2e/perfStats.ts`. A three-second idle gap separates pairs. The trace marks the measured region, excluding trace startup, its settling interval and collection. The continuous and stepped sweeps both fail on a visible placeholder, a long animation frame or 1 % dropped frames, and both count toward the dirty-layout ceiling.
 
@@ -1165,6 +1165,7 @@ to 17 of 18.
   renderer added 83 to 160 ms to the shell and 182 to 299 ms to the rows.
   On 10-16 navigation took 308 to 335 ms. Whether today's merges added the
   rest, or the load did, needs an A/B of the two builds on an idle Mac.
+  The A/B is in 8.8: main did not regress, and the 570 ms was load.
 - **All topics did not measure (test fixed).** Since `6f971705` All
   topics is an icon button in the sidebar title bar, and the scenario
   pressed 40 px from its left edge, outside it. It now presses the
@@ -1185,6 +1186,74 @@ to 17 of 18.
 
 The feel findings and frames are in
 `docs/reviews/mac-perf-feel-1017/feel-review.md`.
+
+### 8.8 Warm start A/B and where the start goes (10-17)
+
+The two builds of 8.7 side by side: `8c501ca8` (that morning's green) and
+main at `89111e14`, each built in its own detached worktree and launched by
+the `launch warm start` scenario, alternated over four rounds in one
+exclusive run (20 measured launches each, load 2.3 to 9.7). ms.
+
+| Metric | `8c501ca8` | main `89111e14` | Budget |
+| --- | --- | --- | --- |
+| Warm start to shell, median / p95 | 414.3 / 636.1 | **384.2 / 430.2** | 400 median |
+| Warm start to rows, median / p95 | 505.4 / 760.8 | **473.2 / 516.1** | 500 median |
+| Launch to focused composer, median / p95 | 528.3 / 761.4 | 494.3 / 531.4 | |
+| Main to renderer process / navigation, median | 233 / 314.5 | 211.5 / 284 | |
+| From navigation: bundle run, shell, snapshot, rows, median | +71, +98, +141, +179.5 | +68.5, +96, +143.5, +186.5 | |
+
+Main did not regress, though its initial JS grew from 996.7 to 1,077.7 KB.
+Both builds pass on a quiet Mac; the 8.7 reading was load.
+
+A bare Electron app with the same binary and the same window settings
+(sandbox, a preload, hidden until `ready-to-show`), 15 launches: main's
+script runs at 110 ms, `ready` at 153, the `BrowserWindow` constructor takes
+82, the renderer process starts at 224, navigation at 238 and the first
+paint at 297 (medians; p95 of the paint 319 to 351). Juno's main reaches
+the same steps at about 140 (its bundle loaded), 185 (`ready`), 192 (the
+window asked for) and 285 (navigation); its window constructor also takes
+82 to 100 ms. So Juno adds about 45 ms before navigation: main's bundle
+has loaded about 30 ms after the bare app's script starts (10-15 measured 9
+ms of that as main's own module load; the rest was not split), and
+`serveAppScheme` takes 7 to 9 ms, which is Electron's `protocol.handle`
+(6.6 to 7.8 ms in the bare app too). After navigation, a
+startup trace and the engine's messages showed:
+
+- The bundle comes from the V8 code cache (1.1 MB consumed, 2.3 ms) and
+  its top level runs in about 20 ms; `juno.start` is at +63 to +72.
+- The shell has painted by +88 to +96.
+- The page sends `topics.list` at +67. The engine answers
+  `session.status` at +76, and `topics.list` at +100: about 30 ms of SQL,
+  shaping 300 rows and encoding a 220 KB snapshot. It is not waiting on
+  other work. The snapshot lands at +111 to +124.
+- The rows paint 42 to 46 ms after the snapshot.
+
+Tried, measured and not kept:
+
+- Node's compile cache for the engine (`NODE_COMPILE_CACHE` on the fork):
+  engine ready at 316 against 323 ms, rows 472.5 against 473.6 ms median,
+  20 launches each. No change.
+- Registering IPC after the window: the time before the window is
+  `protocol.handle`, not IPC, so nothing moved.
+- Waiting without polling in the scenario: after a 2 s idle gap the CPU
+  clocks down (7.3) and every step, Electron's included, took about twice
+  as long. The scenario keeps polling.
+
+Not done yet, each about 10 ms and below what this Mac resolves while
+other agents run: a smaller first sidebar window (40 rows instead of 300;
+10 ms on 10-15), which would cut the engine's first answer, the transfer
+and the decode; and serving the first `juno://` request without loading
+Node's `Response` on the critical path (about 8 ms in the bare app).
+
+The budgets stay. Electron alone paints its first frame at about 300 ms,
+which leaves 100 ms for the shell and 200 ms for the rows, and main uses
+about 85 to 100 and 175 to 190.
+
+The scenario now logs main's own steps (`src/main/startupMarks.ts`, read
+from `globalThis.junoStartupMarks` under `JUNO_E2E`). `JUNO_E2E_STARTUP_TRACE=<file>` writes a
+Chromium trace of the start, renderer and engine included, with JS samples
+and the Juno marks. Tracing starts a few tens of ms after `ready` and slows
+the start, so it shows where the time goes, not how long the start takes.
 
 ### Engine speed measurements (2026-10-15)
 

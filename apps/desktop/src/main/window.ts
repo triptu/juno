@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
+import { startupMark } from './startupMarks'
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
 const TITLEBAR_HEIGHT = 44
@@ -82,6 +83,7 @@ const launchOf = new WeakMap<BaseWindow, () => PageLaunch>()
  * rather than loading the one the window opened with.
  */
 export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow {
+  startupMark('window')
   const launch = currentLaunch()
   const window = createWindow({
     title: 'Juno',
@@ -111,6 +113,8 @@ export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow
   window.on('leave-full-screen', () => window.webContents.send(Events.windowFullScreen, false))
 
   void window.loadURL(appPageUrl(launch))
+  startupMark('window-made')
+  window.once('ready-to-show', () => startupMark('shown'))
 
   return window
 }

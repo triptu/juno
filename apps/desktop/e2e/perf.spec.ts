@@ -603,15 +603,19 @@ test.describe('large workspace', () => {
         if (i > 0) runs.push(times)
         // Where the start goes: main to the renderer's navigation, the bundle loaded and run (`juno.start` is
         // marked after every import), then the shell and the rows. Times after `+` are from the navigation.
-        const [created, renderer] = await running.app.evaluate(({ app }) => {
+        const [created, renderer, marks] = await running.app.evaluate(({ app }) => {
           const metrics = app.getAppMetrics()
-          return [metrics.find((metric) => metric.type === 'Browser')?.creationTime ?? 0, metrics.find((metric) => metric.type === 'Tab')?.creationTime ?? Number.NaN] as const
+          const startup = { ...(globalThis as unknown as { junoStartupMarks: Record<string, number> }).junoStartupMarks }
+          return [metrics.find((metric) => metric.type === 'Browser')?.creationTime ?? 0, metrics.find((metric) => metric.type === 'Tab')?.creationTime ?? Number.NaN, startup] as const
         })
         const page = await running.win.evaluate(() => {
           const first = (name: string) => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? Number.NaN
           return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot'), composer: first('juno.composer-ready') }
         })
         if (i > 0) composers.push(page.origin + page.composer - created)
+        // Main's own steps from the process's creation (src/main/startupMarks.ts): its bundle has loaded, ready, the scheme served,
+        // the window asked for and made, the engine forked and ready, ready-to-show.
+        if (i > 0) console.log(`warm start ${i}: main ${['loaded', 'ready', 'scheme', 'window', 'window-made', 'engine-fork', 'engine-ready', 'shown'].map((name) => `${name} ${((marks[name] ?? Number.NaN) - created).toFixed(0)}`).join(', ')}`)
         if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
