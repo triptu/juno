@@ -382,7 +382,7 @@ export const chatCopy = {
       stopped: { owner: 'Stopped', paused: 'Stopped when Juno paused', interrupted: 'Stopped when Juno closed' },
       /** After a line for a pass that ended early: " · Kept 4 notes". */
       kept: (written: number) => (written === 0 ? '' : ` · Kept ${written === 1 ? '1 note' : `${written} notes`}`),
-      dismissed: 'Not now',
+      dismissed: 'Dismissed',
       started: 'Juno is learning how you work',
     },
   },
