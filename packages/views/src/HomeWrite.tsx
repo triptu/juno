@@ -3,8 +3,8 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import type { PickConversation } from '@juno/contract'
 import { accent, colors, layout, radii, sizes, spacing, text, tints, weights, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, ChannelIcon, Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
-import { channelIconFor, hueFor, initials } from './look'
+import { Icon, Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
+import { DestinationMark } from './DestinationMark'
 
 /**
  * Home's writing block (SPEC section 12, "Writing"): Recent, then the
@@ -16,15 +16,6 @@ import { channelIconFor, hueFor, initials } from './look'
 const isChannel = (conversation: PickConversation) => conversation.kind === 'public' || conversation.kind === 'private'
 /** "#eng" or "Maya Chen": as the chip and the list's footer name it. */
 export const destinationLabel = (conversation: PickConversation): string => (isChannel(conversation) ? `#${conversation.name}` : conversation.name)
-
-/** A face, a group's initials or a channel's art, at 20px. */
-function DestinationMark({ conversation }: { readonly conversation: PickConversation }) {
-  const person = conversation.person
-  if (person !== undefined) return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
-  if (conversation.kind === 'mpim') return <Avatar kind="group" size={20} label={initials(conversation.name)} hue={hueFor('', conversation.key)} />
-  const icon = conversation.icon === undefined ? undefined : channelIconFor(conversation.icon)
-  return <ChannelIcon name={conversation.name} id={conversation.channelId ?? conversation.key} size={20} {...(icon === undefined ? {} : { icon })} {...(conversation.color === undefined ? {} : { color: hueFor(conversation.color, conversation.key) })} />
-}
 
 export interface HomeRecentProps {
   /** DMs and group DMs, at most five. */
