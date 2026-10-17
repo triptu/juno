@@ -6,7 +6,7 @@ const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: str
   fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => String(call.args['text']))
 
 // Which emoji match and in what order, and that a colon inside a word starts no list, are domain rules
-// (packages/domain/test/composer-emoji.test.ts). New chat's Tab pick is in mentions.spec.ts.
+// (packages/domain/test/composer-emoji.test.ts). Home's Tab pick is in mentions.spec.ts.
 test('colon suggestions insert Unicode in a reply and send it to Slack; in Main, Esc keeps the colon text and a closing colon converts it', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()

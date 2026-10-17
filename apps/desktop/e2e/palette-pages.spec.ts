@@ -13,7 +13,7 @@ test('">" lists the pages; "Juno" opens the Juno tab, and then Memory of this ch
 
   await palette.open()
   await palette.type('>')
-  for (const name of ['Home', 'All topics', 'Juno', 'New chat', 'Scheduled', 'What Juno remembers', 'Activity', 'Settings']) {
+  for (const name of ['Home', 'All topics', 'Juno', 'Scheduled', 'What Juno remembers', 'Activity', 'Settings']) {
     await expect(pages.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible()
   }
   await expect(pages.getByRole('option', { name: /Memory of this chat/ })).toHaveCount(0)

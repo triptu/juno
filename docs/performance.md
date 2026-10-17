@@ -531,7 +531,7 @@ marked; ordinary / held-clock for scrolls.
 | Live update, sidebar / open thread | 18.5 / 30.5 | 20.1 / 27.9 | 50 |
 | Juno panel open | 18.8 (max 320.3) | 19.0 (max 323.7) | 24.7 |
 | Chat send to your bubble | 23.4 | 23.6 | 24.7 |
-| New chat open | 17.6 | 17.7 | 24.7 |
+| New tab with Home (New chat open until 10-17; not measured since) | 17.6 | 17.7 | 24.7 |
 | All topics open | 27.1 | 25.8 | 50 |
 | Warm start to shell / rows, median | 394.0 / 457.6 | 370.1 / 454.5 | 400 / 500 |
 | Sidebar drag, work per frame | 10.2 | 6.7 | 8.3 |

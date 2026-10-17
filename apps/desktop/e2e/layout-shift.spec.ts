@@ -184,7 +184,7 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
   await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
-  // A launch opens a New chat tab; Home, which this waits on, is one click away.
+  // A launch opens Home; its sidebar item opens it afresh, which this waits on.
   await juno.home.navItem.click()
   await expect(win.locator('[data-topic-row]')).toHaveCount(0)
   await expectStableAnchor(win, '[data-topic-row]', async () => {
@@ -200,7 +200,7 @@ for (const destination of ['Home', 'All topics'] as const) {
     fake.holdNext({ method: 'subscriptions.thread.getView' })
     await juno.signIn()
     await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
-    // A launch opens a New chat tab: open the page under test from the sidebar.
+    // Open the page under test from the sidebar, so it reads its rows afresh.
     if (destination === 'All topics') await juno.allTopics.open()
     else await juno.home.navItem.click()
     const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
@@ -218,7 +218,7 @@ test('Home rows painted during the first sync stay fixed as later history pages 
   const method = 'conversations.history'
   fake.holdNext({ method })
   await juno.signIn()
-  // A launch opens a New chat tab; open Home from the sidebar while the sync runs.
+  // Open Home from the sidebar while the sync runs.
   await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   // Let pages land one at a time until Home paints a row while the sync still runs.

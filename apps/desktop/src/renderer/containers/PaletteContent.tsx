@@ -48,7 +48,7 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
 import { junoCommands, openJunoTab } from './juno/actions'
-import { openNewChatTo, openTopic, openTopicAt, warmTopic } from './navigation'
+import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette } from './paletteActions'
 import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
@@ -74,7 +74,7 @@ async function openMessage(message: SearchMessage, options: OpenOptions): Promis
 /** A person's result: your Main with them, or a New chat addressed to them when you have never messaged (spec section 10). */
 function openPerson(person: Pick<SearchPerson, 'person' | 'mainId'>, options: OpenOptions): void {
   if (person.mainId !== undefined) return openTopic(person.mainId, options)
-  openNewChatTo({ key: `u:${person.person.id}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
+  newMessage({ key: `u:${person.person.id}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
 }
 
 /**
@@ -180,7 +180,7 @@ const conversationRow = (pick: PickConversation): Row => {
     compact: true,
     ...(pick.person === undefined ? {} : { person: pick.person }),
     ...(mainId === undefined ? { sub: 'Starts a conversation' } : { opensTab: true, topicId: mainId }),
-    run: (options) => (mainId === undefined ? openNewChatTo(pick) : openTopic(mainId, options)),
+    run: (options) => (mainId === undefined ? newMessage(pick) : openTopic(mainId, options)),
   }
 }
 

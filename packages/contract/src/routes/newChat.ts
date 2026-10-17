@@ -1,14 +1,17 @@
 /**
- * New chat (spec section 9, inventory 8): destinations and the two pickers.
+ * Destinations for Home's composer (spec section 12, "Writing"): the
+ * conversation list, Recent and ⌘K's Conversations tab. The route names
+ * keep the New chat prefix they were built with.
  *
  * Live queries, which never call Slack:
- * - `newChat.conversations`: the conversation picker's sections. With an
+ * - `newChat.conversations`: the destination list's sections. With an
  *   empty query, the recent conversations; with a query, the matching
  *   people (everyone in the workspace, including people never messaged)
  *   and the matching channels and group DMs you are in. Ignored channels
  *   are left out.
- * - `newChat.frequent`: up to six local destinations by decayed own sends,
- *   with member activity as the fallback, DMs first; no archived channels.
+ * - `newChat.frequent`: Home's Recent, up to five people then five
+ *   channels by decayed own sends, with member activity as the fallback; no
+ *   archived channels.
  * - `newChat.ranked`: the ⌘K Conversations tab (spec section 10). DMs,
  *   group DMs and channels by own sends and topic visits, decayed like
  *   `newChat.frequent`, then activity; with text, the conversations the
@@ -18,15 +21,12 @@
  * `@juno/domain`): each typed word matches the start of a word of the
  * name, a person's names or a channel's words, in any order, then inside
  * a word, then with one typo.
- * - `newChat.threads`: the thread picker's rows. With a channel, its
- *   threads by latest activity, followed or not; without one, recent
- *   threads from everywhere. Main is not a row: the renderer puts it first.
  *
  * Sending is `messages.send` in `send.ts`.
  */
 import { Schema } from 'effect'
 import { RpcGroup } from 'effect/rpc'
-import { ContextTint, ConversationKind } from '@juno/domain'
+import { ChannelColor, ChannelIcon, ContextTint, ConversationKind } from '@juno/domain'
 import { liveValueRoute } from '../live'
 import { Person } from '../refs'
 
@@ -45,6 +45,9 @@ export const PickConversation = Schema.Struct({
   mainId: Schema.optionalKey(Schema.String),
   /** The other person, for a DM or a person with no DM yet. */
   person: Schema.optionalKey(Person),
+  /** A channel's tile, as its topic rows draw it (`defaultChannelStyle`). Absent for DMs and group DMs, which draw people. */
+  icon: Schema.optionalKey(ChannelIcon),
+  color: Schema.optionalKey(ChannelColor),
   /** Juno holds no message in it: "No messages yet" for a person. */
   empty: Schema.Boolean,
   /** With text, the parts of `name` the text matched, as [start, end) offsets, for the row to highlight. */
@@ -62,7 +65,7 @@ export type PickConversations = typeof PickConversations.Type
 
 /** Rows in the conversation picker's Recent section. */
 export const RECENT_CONVERSATIONS = 8
-/** Rows in each of the conversation picker's People and Channels sections, and in the thread picker. */
+/** Rows in each of the destination list's People and Channels sections. */
 export const PICK_LIMIT = 20
 
 export const newChatConversations = liveValueRoute('newChat.conversations', {
@@ -70,23 +73,6 @@ export const newChatConversations = liveValueRoute('newChat.conversations', {
   value: PickConversations,
 })
 
-/** A thread the picker offers, with the conversation it lives in. */
-export const PickThread = Schema.Struct({
-  /** The thread's topic id. */
-  id: Schema.String,
-  rootTs: Schema.String,
-  title: Schema.String,
-  replyCount: Schema.Int,
-  /** Epoch milliseconds of the latest activity. */
-  lastActivityAt: Schema.Number,
-  conversation: PickConversation,
-})
-export type PickThread = typeof PickThread.Type
-
-export const newChatThreads = liveValueRoute('newChat.threads', {
-  payload: { channel: Schema.optionalKey(Schema.String), query: Schema.String },
-  value: Schema.Array(PickThread),
-})
 
 
 /** Up to six local destinations ranked by own recent sends, then activity. */
@@ -101,4 +87,4 @@ export const newChatRanked = liveValueRoute('newChat.ranked', {
   value: Schema.Array(PickConversation),
 })
 
-export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatThreads, newChatFrequent, newChatRanked)
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatFrequent, newChatRanked)

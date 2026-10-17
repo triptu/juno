@@ -1,5 +1,7 @@
 # New chat, and the window controls
 
+**Superseded on 10-17:** there is no New chat page. New messages are written from Home (SPEC §12, "Writing"; `docs/design/home-merged/`). The window controls part still holds.
+
 Two designs from the 10-14 simplification pass. SPEC §9 (New chat), §4 to §6 and §18 (window and tabs) decide behaviour; inventory §8, §1 and §4 have the sizes. `mock.html` holds both; `node ../../../scripts/heavy.mjs node render.mjs` writes the PNGs.
 
 | File | What |

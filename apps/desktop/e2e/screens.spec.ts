@@ -79,29 +79,26 @@ test('peek, light and dark', async ({ juno, win }) => {
   }
 })
 
-test('New chat with a destination and the thread list open, light and dark', async ({ juno, win }) => {
+test('Home writing to a destination, with the destination list open, light and dark', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
-  const { sidebar, tabs, newChat } = juno
-  await sidebar.row('Draft plan is in the doc').open()
-  await tabs.newTabButton.click()
-  await newChat.write('Can we move the cutover to Thursday night? Dev needs one more day on the replica check.')
-  await newChat.pickConversation('eng', 'eng')
-  await newChat.expectPreview('Draft plan is in the doc')
-  await newChat.threadButton.click()
-  await expect(newChat.list).toBeVisible()
+  const { write } = juno
+  await write.pickConversation('eng', 'eng')
+  await write.write('Can we move the cutover to Thursday night? Dev needs one more day on the replica check.')
+  await write.chip.click()
+  await expect(write.list).toBeVisible()
   await win.evaluate(() => document.fonts.ready)
   await win.waitForTimeout(300)
-  await win.screenshot({ path: resolve(screens, 'new-chat-light.png') })
+  await win.screenshot({ path: resolve(screens, 'home-write-light.png') })
 
   await win.keyboard.press('Escape')
   await juno.setTheme('Dark')
   await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
-  await newChat.threadButton.click()
-  await expect(newChat.list).toBeVisible()
+  await write.chip.click()
+  await expect(write.list).toBeVisible()
   await win.waitForTimeout(300)
-  await win.screenshot({ path: resolve(screens, 'new-chat-dark.png') })
+  await win.screenshot({ path: resolve(screens, 'home-write-dark.png') })
 })
 
 test('the topic header over a thread and a Main, light and dark', async ({ juno, win }) => {

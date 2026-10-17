@@ -1,0 +1,1 @@
+- 10-17 01:23 · home-newchat · Merged Home round 2: one bottom composer with Juno by default; a first @ or # suggests a destination without taking over (Tab or Enter picks, Space or Esc keeps the text); five layouts explored, Address book recommended over Shelf (docs/design/home-merged/round-2).

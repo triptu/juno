@@ -31,7 +31,6 @@ const surfaces = [
   'CommandPalette',
   'AllTopics',
   'Home',
-  'NewChat',
   'Composer',
   'HoverToolbar',
   'Message',

@@ -89,7 +89,7 @@ test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text
   await juno.signIn()
   await juno.waitForSync()
   await juno.setPeekKey('space')
-  // Closing Preferences left a New chat, whose composer has focus; Space peeks only outside a text field.
+  // Closing Preferences left Home, whose composer has focus; Space peeks only outside a text field.
   await juno.win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   const rina = juno.sidebar.row(RINA)
   slack.resetCalls()

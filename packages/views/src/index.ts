@@ -10,7 +10,8 @@ export { Composer, type ComposerMention, type ComposerPopover } from './Composer
 export { LinkEditor } from './LinkEditor'
 export { MentionSuggestions, mentionRowId, type EmojiSuggestion } from './MentionSuggestions'
 export { ComposerSlot } from './ComposerSlot'
-export { DestinationPickers, PlacePicker, type PickerName, type PlacePick } from './DestinationPickers'
+export { DestinationChip, PlacePicker, type PlacePick } from './DestinationPickers'
+export { destinationLabel, HomeRecent, HomeWriteTop, SendToList, sendToRowId } from './HomeWrite'
 export { EmojiPicker } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaViewer'
@@ -20,7 +21,6 @@ export { InlineEdit, type InlineEditProps } from './InlineEdit'
 export { Floating, SelectionQuote } from './Floating'
 
 export { MessageList, type MessageListItem, type MessageListStatus, type OlderStatus } from './MessageList'
-export { NewChat, startOfConversation } from './NewChat'
 
 export { NewMessagesPill } from './NewMessagesPill'
 export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'

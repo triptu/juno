@@ -1,116 +1,107 @@
 import * as stylex from '@stylexjs/stylex'
-import { At } from '@phosphor-icons/react/dist/icons/At'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
-import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
-import { ChatText } from '@phosphor-icons/react/dist/icons/ChatText'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { At } from '@phosphor-icons/react/dist/icons/At'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
-import type { ConversationKind, PickConversation, PickConversations, PickThread } from '@juno/contract'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
-import { chunk, Icon, Popover, type PhosphorIcon } from '@juno/ui'
+import { Avatar, chunk, Icon, Popover, type PhosphorIcon } from '@juno/ui'
+import { hueFor, initials } from './look'
 
 const lists = chunk(() => import('./DestinationLists'))
 const loadLists = lists.load
 const ConversationList = lists.component((module) => module.ConversationList)
-const ThreadList = lists.component((module) => module.ThreadList)
-
-export type PickerName = 'conversation' | 'thread'
-
-export interface DestinationPickersProps {
-  readonly conversation: PickConversation | undefined
-  /** A thread in the conversation; none is Main. */
-  readonly thread: PickThread | undefined
-  /** The picker whose list is open. */
-  readonly open: PickerName | undefined
-  readonly onOpen: (picker: PickerName | undefined) => void
-  /** The open list's search text. */
-  readonly query: string
-  readonly onQuery: (query: string) => void
-  /** The conversation list's sections; undefined while they load. */
-  readonly conversations: PickConversations | undefined
-  /** The thread list's rows (Main is added here); undefined while they load. */
-  readonly threads: ReadonlyArray<PickThread> | undefined
-  /** The open list shows an earlier query's rows while the typed one's load. Enter waits for them. */
-  readonly loading?: boolean
-  readonly now: number
-  readonly onPickConversation: (conversation: PickConversation) => void
-  /** A thread, or Main with `undefined`. */
-  readonly onPickThread: (thread: PickThread | undefined) => void
-}
 
 const kindIcons: Record<ConversationKind, PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
 
+export interface DestinationChipProps {
+  /** Where Enter sends; none is Juno. */
+  readonly destination: PickConversation | undefined
+  /** Juno is a destination (AI assist on). Without it, nothing chosen reads "Pick a conversation". Default true. */
+  readonly juno?: boolean
+  readonly open: boolean
+  readonly onOpen: (open: boolean) => void
+  /** The list's search text. */
+  readonly query: string
+  readonly onQuery: (query: string) => void
+  /** The list's sections; undefined while they load. */
+  readonly conversations: PickConversations | undefined
+  readonly loading?: boolean
+  /** A conversation, or Juno with `undefined`. */
+  readonly onPick: (conversation: PickConversation | undefined) => void
+  readonly buttonRef?: Ref<HTMLButtonElement>
+}
+
 /**
- * New chat's two pickers (spec section 9, inventory 8), on one row above
- * the composer. The conversation button takes the context pill's tint and
- * icon once a conversation is picked; the thread button says Main, the
- * thread's title, or "Any thread" before a conversation is picked. Each
- * opens a searchable list above itself: typing filters, ↑ ↓ move, Enter
- * picks, Esc closes and puts focus back on the button.
+ * Home's destination (SPEC section 12, "Writing"): one chip just above the
+ * composer, on its left edge, so the field's text has its full width. It
+ * says Juno until a person or channel is chosen, then takes the context
+ * pill's tint (neutral, amber for private, blue for DMs) and the face or
+ * the channel's mark. The chip's slot is always there, so a change moves
+ * nothing; the new name rises into it once, briefly. It opens the
+ * destination list above itself, Juno first.
  */
-export function DestinationPickers(props: DestinationPickersProps) {
+export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef }: DestinationChipProps) {
   useEffect(() => {
     const idle = requestIdleCallback(() => void loadLists(), { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
   }, [])
-  const { conversation, thread, open, onOpen } = props
-  const conversationLabel = conversation?.name ?? 'Pick a conversation'
-  const threadLabel = thread?.title ?? (conversation === undefined ? 'Any thread' : 'Main')
+  const none = juno ? 'Juno' : 'Pick a conversation'
+  const label = destination === undefined ? none : destination.kind === 'public' || destination.kind === 'private' ? `#${destination.name}` : destination.name
   return (
-    <div role="group" aria-label="Destination" {...stylex.props(styles.row)}>
-      <Popover
-        open={open === 'conversation'}
-        onClose={() => onOpen(undefined)}
-        placement="top-start"
-        width="picker"
-        maxHeight="none"
-        layer="picker"
-        padding="none"
-        label="Pick a conversation"
-        anchor={
-          <PickerButton
-            label={`Conversation: ${conversationLabel}`}
-            icon={conversation === undefined ? At : kindIcons[conversation.kind]}
-            tint={conversation?.tint}
-            expanded={open === 'conversation'}
-            onOpen={() => onOpen(open === 'conversation' ? undefined : 'conversation')}
-          >
-            {conversationLabel}
-          </PickerButton>
-        }
-      >
-        {open === 'conversation' ? <ConversationList {...props} onClose={() => onOpen(undefined)} /> : null}
-      </Popover>
-      <Popover
-        open={open === 'thread'}
-        onClose={() => onOpen(undefined)}
-        placement="top-start"
-        width="picker"
-        maxHeight="none"
-        layer="picker"
-        padding="none"
-        label="Pick a thread"
-        anchor={
-          <PickerButton
-            label={`Thread: ${threadLabel}`}
-            icon={thread === undefined && conversation !== undefined ? ChatText : ChatsCircle}
-            muted={conversation === undefined}
-            wide
-            expanded={open === 'thread'}
-            onOpen={() => onOpen(open === 'thread' ? undefined : 'thread')}
-          >
-            {threadLabel}
-          </PickerButton>
-        }
-      >
-        {open === 'thread' ? <ThreadList {...props} /> : null}
-      </Popover>
-    </div>
+    <Popover
+      open={open}
+      onClose={() => onOpen(false)}
+      placement="top-start"
+      width="picker"
+      maxHeight="none"
+      layer="picker"
+      padding="none"
+      label="Send to"
+      anchor={
+        <PickerButton
+          ref={buttonRef}
+          label={`Send to: ${label}`}
+          icon={destination === undefined ? (juno ? Sparkle : At) : kindIcons[destination.kind]}
+          iconWeight={destination === undefined && juno ? 'duotone' : undefined}
+          {...(destination?.person === undefined ? {} : { leading: <PersonMark person={destination.person} /> })}
+          tint={destination?.tint}
+          muted={destination === undefined && !juno}
+          wide
+          expanded={open}
+          onOpen={() => onOpen(!open)}
+          change={destination?.key ?? 'juno'}
+        >
+          {destination?.name ?? none}
+        </PickerButton>
+      }
+    >
+      {open ? (
+        <ConversationList
+          query={query}
+          onQuery={onQuery}
+          conversations={conversations}
+          loading={loading}
+          onPickConversation={(conversation) => onPick(conversation)}
+          onClose={() => onOpen(false)}
+          {...(juno ? { onJuno: () => onPick(undefined) } : {})}
+          selected={destination?.key ?? JUNO_KEY}
+        />
+      ) : null}
+    </Popover>
   )
+}
+
+/** The key the list's Juno row is selected by. */
+const JUNO_KEY = 'juno'
+
+function PersonMark({ person }: { readonly person: NonNullable<PickConversation['person']> }) {
+  return <Avatar size={18} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
 }
 
 /** The place a list is narrowed to, as its button shows it. */
@@ -136,7 +127,7 @@ export interface PlacePickerProps {
 }
 
 /**
- * A place filter (All topics, spec section 11): New chat's conversation
+ * A place filter (All topics, spec section 11): Home's destination
  * button and searchable list, opening below the button, with Anywhere as
  * the list's first row. The button takes the place's tint once one is
  * picked.
@@ -186,9 +177,14 @@ export function PlacePicker({ place, open, onOpen, query, onQuery, conversations
 }
 
 interface PickerButtonProps {
-  readonly ref?: Ref<HTMLButtonElement>
+  readonly ref?: Ref<HTMLButtonElement> | undefined
   readonly label: string
   readonly icon: PhosphorIcon
+  readonly iconWeight?: 'duotone' | undefined
+  /** In place of the icon: a person's face. */
+  readonly leading?: ReactNode
+  /** A key that changes with what the button names: the name rises in once when it changes (not on first paint). */
+  readonly change?: string
   /** A picked conversation's context tint. */
   readonly tint?: PickConversation['tint'] | undefined
   /** Nothing picked: subtle text. Default: no tint. */
@@ -200,8 +196,11 @@ interface PickerButtonProps {
   readonly children: ReactNode
 }
 
-function PickerButton({ ref, label, icon, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, iconWeight, leading, change, tint, muted, wide = false, expanded, onOpen, children }: PickerButtonProps) {
   const subtle = muted ?? tint === undefined
+  // The name shown first never rises; any later one does.
+  const [first] = useState(change)
+  const rises = change !== undefined && change !== first
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'ArrowDown' || expanded) return
     event.preventDefault()
@@ -220,8 +219,10 @@ function PickerButton({ ref, label, icon, tint, muted, wide = false, expanded, o
       onKeyDown={onKeyDown}
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint])}
     >
-      <Icon icon={icon} size={13} />
-      <span {...stylex.props(styles.buttonLabel, wide && styles.buttonLabelWide)}>{children}</span>
+      <span key={change} {...stylex.props(styles.face, rises && styles.rise)}>
+        {leading ?? (iconWeight === undefined ? <Icon icon={icon} size={13} /> : <Icon icon={icon} size={13} weight={iconWeight} />)}
+        <span {...stylex.props(styles.buttonLabel, wide && styles.buttonLabelWide)}>{children}</span>
+      </span>
       <span {...stylex.props(styles.caret)}>
         <Icon icon={CaretDown} size={12} />
       </span>
@@ -229,16 +230,29 @@ function PickerButton({ ref, label, icon, tint, muted, wide = false, expanded, o
   )
 }
 
-/** The longest a thread title runs in its button before the ellipsis. */
+/** The longest a place's name runs in its button before the ellipsis. */
 const THREAD_LABEL_MAX = '260px'
+
+// The new destination rises 4px into the chip with the fade; with reduced motion it only fades.
+const rise = stylex.keyframes({
+  from: { opacity: 0, transform: 'var(--picker-rise-from)' },
+  to: { opacity: 1, transform: 'none' },
+})
 
 
 const styles = stylex.create({
-  row: {
-    display: 'flex',
+  face: {
+    display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
     minWidth: 0,
+  },
+  rise: {
+    '--picker-rise-from': { default: 'none', '@media (prefers-reduced-motion: no-preference)': `translateY(${spacing['--space-1']})` },
+    animationName: rise,
+    animationDuration: motion['--duration-fast'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
   },
   button: {
     display: 'inline-flex',
@@ -293,4 +307,5 @@ const tintStyles = stylex.create({
   private: { color: tints['--tint-private-fg'], backgroundColor: tints['--tint-private-bg'] },
   dm: { color: tints['--tint-dm-fg'], backgroundColor: tints['--tint-dm-bg'] },
 })
+
 

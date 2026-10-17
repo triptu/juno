@@ -29,7 +29,7 @@ test('During the first sync Home greets and says it is syncing, and the sidebar 
   // The first conversation's history waits, as a real workspace's backfill takes minutes.
   slack.fake.holdNext({ method: 'conversations.history' })
   await juno.signIn()
-  // A launch opens a New chat tab; Home is one click away.
+  // A launch opens Home.
   await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
@@ -51,7 +51,7 @@ test('Home shows rows before the first sync ends', async ({ juno, slack, win }) 
   const method = 'conversations.history'
   slack.fake.holdNext({ method })
   await juno.signIn()
-  // A launch opens a New chat tab; Home is one click away.
+  // A launch opens Home.
   await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   const rows = win.locator('[data-home] [data-home-item]')
@@ -73,11 +73,10 @@ test('Home shows rows before the first sync ends', async ({ juno, slack, win }) 
   await expect(juno.sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
   const early = await juno.home.kinds()
 
-  // The sync ends: the rows shown stay first, in their order, and the count line replaces the syncing one.
+  // The sync ends: the rows shown stay first, in their order, and the syncing line goes.
   slack.fake.release({ method })
   await expect(syncing).toHaveCount(0, { timeout: 30_000 })
   expect((await juno.home.kinds()).slice(0, early.length)).toEqual(early)
-  await expect(win.locator('[data-home]').getByText(/wants? you\.$/)).toBeVisible()
   await expect(rows.first().getByRole('link')).toBeVisible()
 })
 
@@ -157,7 +156,7 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
 })
 
-test('with AI assist off, Home shows the rules alone, with their plain titles and no Ask Juno, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await running.close()
@@ -167,7 +166,7 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
   try {
-    const { home } = new Juno(again.app, again.win)
+    const { home, write } = new Juno(again.app, again.win)
     // The relaunch restores the session first.
     await expect(home.navItem).toBeVisible({ timeout: 30_000 })
     await home.open()
@@ -176,8 +175,8 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
     // Nothing arrives later either.
     await again.win.waitForTimeout(3_000)
     await expect(home.title('waiting')).toHaveText('Elena asked you something')
-    // Ask Juno is an AI surface: it is left out, and the Juno tab says Juno is off rather than asking for a model.
-    await expect(home.ask).toHaveCount(0)
+    // Juno is an AI surface: Home's composer has no Juno to send to, and the Juno tab says Juno is off rather than asking for a model.
+    await expect(write.chip).toHaveAccessibleName('Send to: Pick a conversation')
     await again.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
     await expect(again.win.locator('main').getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
     await expect(again.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
@@ -214,7 +213,6 @@ quiet('caught up, Home says so and leaves All topics to the sidebar', async ({ j
   const { home } = juno
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
-  await expect(home.root.getByText('Nothing is waiting on you.')).toBeVisible()
   expect(await home.kinds()).toEqual([])
   await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
 })

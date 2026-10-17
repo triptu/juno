@@ -1,20 +1,16 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { viewsSortChannel } from '@juno/contract'
-import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, junoAvailableAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
-import { junoNavAtom } from '@juno/state/agent'
+import { fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, registry, resolveAllTopics, runAction, showHome } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Home, type ActivateEvent } from '@juno/views'
-import { openJunoTab } from './juno/actions'
+import { HomeComposer } from './HomeComposer'
 import { openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
 
+const noop = () => {}
+
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
-}
-
-/** Ask Juno opens the Juno chat with its composer focused (SPEC section 12), as ⌘J does outside a topic. */
-function askJuno(): void {
-  openJunoTab()
 }
 
 /** Takes Home at each stage (`showHome`), and while the first sync runs adds the items each new value brings (`fillHome`). */
@@ -31,30 +27,26 @@ function useShowHome(key: string, stage: 0 | 1 | 2, value: unknown): void {
 }
 
 /**
- * Home (SPEC section 12): the Home tab, and what the workspace shows with
- * no tab open. It shows the items `home.view` had when Home appeared
+ * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
+ * at the bottom. It shows the items `home.view` had when Home appeared
  * (`showHome`, before the first paint, again each time Home comes back
  * from a hidden tab, and once more when the first value arrives); later
  * values change only a row's title line (`freezeHome`). Until the first
  * sync is done it shows the scene and the greeting with "Syncing with
- * Slack.", and rows fill reserved slots as they land (`fillHome`). Until there is any value (a few milliseconds) the
- * page is blank, never a spinner, so it paints whole.
+ * Slack.", and rows fill reserved slots as they land (`fillHome`).
  */
-export function HomePage() {
+export function HomePage({ tabId }: { readonly tabId: string }) {
   const key = useId()
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
   const latest = value?.ready === true ? value : undefined
   const shown = useAtomValue(homeShownAtom(key))
-  // The newest running job's state line replaces the field's placeholder (SPEC 13.4).
-  const jobLine = useAtomValue(junoNavAtom, (nav) => nav.jobLine)
-  // With AI assist off Home has no Ask Juno field (inventory 11).
-  const junoOn = useAtomValue(junoAvailableAtom)
 
   // Nothing yet, the first sync running, or ready: Home is taken again at each step.
   useShowHome(key, latest !== undefined ? 2 : value !== undefined ? 1 : 0, value)
 
-  if (shown === undefined) return <div data-home="" data-home-waiting="" />
+  // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
+  if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
   const view = value === undefined ? shown.view : freezeHome(shown.view, value)
 
   const itemOf = (itemId: string) => view.items.find((candidate) => candidate.id === itemId)
@@ -94,7 +86,7 @@ export function HomePage() {
       reservedItems={shown.reservedItems}
       scene={shown.scene}
       // While syncing there are no rows to hold still, so the greeting takes the name once the boot has stored it.
-      title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, items: 0, caughtUp: false }).title : shown.title}
+      title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, caughtUp: false }).title : shown.title}
       line={shown.line}
       items={view.items}
       done={shown.used}
@@ -105,8 +97,7 @@ export function HomePage() {
       onResolveAll={resolveAll}
       onSort={sort}
       onItemMenu={itemMenu}
-      {...(junoOn ? { onAsk: askJuno } : {})}
-      {...(jobLine === undefined ? {} : { askLine: jobLine })}
+      composer={<HomeComposer tabId={tabId} />}
     />
   )
 }

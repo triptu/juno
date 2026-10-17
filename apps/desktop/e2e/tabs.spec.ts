@@ -1,7 +1,7 @@
 // Tabs: opening uses the current tab, ⌘-click opens a new one, a plain open
 // of an open topic focuses its tab, one topic in two tabs scrolls apart,
-// closing focuses the neighbour and never leaves no tab, what a new tab
-// opens, where "+" sits, the app menu's tab items, the row menu's Open in
+// closing focuses the neighbour and never leaves no tab, a new tab opens
+// Home, where "+" sits, the app menu's tab items, the row menu's Open in
 // new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
 // each tab shows its topic's art or the DM person's photo, and a tab not
 // viewed for a day closes by itself.
@@ -50,7 +50,7 @@ test('opening, ⌘-click, focusing an open topic and closing to the neighbour', 
   await tabs.expectActive(ROADMAP)
   await tabs.close(ROADMAP)
   await tabs.expectActive(RINA)
-  // Closing the last tab leaves a New chat, never no tab.
+  // Closing the last tab leaves Home, never no tab.
   await tabs.close(RINA)
   await juno.expectNothingOpen()
 })
@@ -74,10 +74,10 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await tabs.expectFocused(ROADMAP)
   await tabs.closeWithKeyboard(ROADMAP)
   await tabs.expectFocused(POSTGRES)
-  // The last one gives way to a New chat, whose composer takes focus.
+  // The last one gives way to Home, whose composer takes focus.
   await tabs.closeWithKeyboard(POSTGRES)
   await juno.expectNothingOpen()
-  await expect(juno.newChat.composer).toBeFocused()
+  await expect(juno.write.composer).toBeFocused()
 })
 
 test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
@@ -299,7 +299,7 @@ test.describe('one topic in two tabs', () => {
   })
 })
 
-test('closing the last tab opens a new tab: a New chat, or Home once Settings says so; ⌘T and "+" follow it, ⌘N stays a New chat', async ({ juno }) => {
+test('closing the last tab leaves Home; ⌘T and "+" open Home in a new tab, ready to write', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -312,32 +312,20 @@ test('closing the last tab opens a new tab: a New chat, or Home once Settings sa
   await sidebar.row(POSTGRES).open()
   await tabs.menu('new-tab')
   await tabs.expectCount(2)
-  await tabs.expectActive('New chat')
-  await expect(juno.newChat.composer).toBeFocused()
-
-  // Settings › General: a new tab opens Home.
-  await juno.openSettings('General')
-  const home = juno.settings.root.getByRole('radiogroup', { name: 'New tabs open' }).getByRole('radio', { name: 'Home' })
-  await home.click()
-  await expect(home).toHaveAttribute('aria-checked', 'true')
-  await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')
-
-  await tabs.menu('new-tab')
   await tabs.expectActive('Home')
   await juno.home.expectShown()
+  await expect(juno.write.composer).toBeFocused()
+  await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')
+
   const homes = await tabs.tab('Home').count()
   await tabs.newTabButton.click()
   await expect(tabs.tab('Home')).toHaveCount(homes + 1)
   await juno.home.expectShown()
-
-  // ⌘N is always a New chat, in a new tab.
-  const chats = await tabs.tab('New chat').count()
-  await tabs.menu('new-chat')
-  await tabs.expectActiveAt('New chat', chats)
+  await expect(juno.write.composer).toBeFocused()
 
   // Closing every tab leaves one Home.
   await tabs.contextMenu(POSTGRES, 'close-all')
-  await juno.expectNothingOpen('Home')
+  await juno.expectNothingOpen()
 })
 
 test('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {

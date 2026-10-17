@@ -186,26 +186,26 @@ test('a failed upload keeps the text and the file for Retry, and is sent once', 
   expect(fake.messages('C0ENG').filter((m) => m.client_msg_id === shares[0]!.args['client_msg_id'])).toHaveLength(1)
 })
 
-test('a New chat keeps its files through a change of destination and sends them to the last one', async ({ juno, fake }) => {
+test('Home keeps its files through a change of destination and sends them to the last one', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { tabs, newChat, topic } = juno
+  const { tabs, write } = juno
   await tabs.newTabButton.click()
-  await newChat.write('Brief for the launch')
-  await paste(newChat.composer, [brief()])
-  const briefChip = newChat.root.locator('[data-composer]').getByRole('button', { name: 'Remove launch-brief.pdf' })
+  await write.write('Brief for the launch')
+  await paste(write.composer, [brief()])
+  const briefChip = write.root.locator('[data-composer]').getByRole('button', { name: 'Remove launch-brief.pdf' })
   await expect(briefChip).toBeVisible()
-  await newChat.pickConversation('eng', 'eng')
+  await write.pickConversation('eng', 'eng')
   await expect(briefChip).toBeVisible()
-  await newChat.pickConversation('product', 'product')
+  await write.pickConversation('product', 'product')
   await expect(briefChip).toBeVisible()
-  await expect(newChat.composer).toHaveValue('Brief for the launch')
-  await staged(newChat, 1)
+  await expect(write.composer).toHaveValue('Brief for the launch')
+  await staged(write, 1)
 
-  await newChat.send()
-  await topic.expectSent('Brief for the launch')
-  const shares = fake.calls.filter((call) => call.method === 'files.share')
-  expect(shares.map((call) => call.args['channel'])).toEqual(['C0PRODUCT'])
+  await write.send()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').map((call) => call.args['channel'])).toEqual(['C0PRODUCT'])
+  await tabs.expectActiveAt('Home', 1)
+  await expect(briefChip).toHaveCount(0)
 })
 
 test('an image opens in the viewer, and Esc closes it', async ({ juno }) => {

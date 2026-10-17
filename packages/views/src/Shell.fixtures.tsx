@@ -44,7 +44,6 @@ export function SignedIn({ width, hidden = false, fullScreen = false, peek, page
           accountMenuOpen={false}
           onAccountMenu={noop}
           onSearch={noop}
-          onNewChat={noop}
           onNavigate={noop}
           onFilterKind={noop}
           onToggleUnread={noop}

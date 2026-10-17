@@ -16,7 +16,6 @@ export {
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
-export { newTabPageAtom, setNewTabPage } from './newTabPage'
 export { closeTour, showTour, tourOpenAtom, tourStepAtom } from './tour'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
@@ -72,21 +71,20 @@ export {
   junoPagePlace,
   junoPlace,
   openSettingsSection,
-  newChatPlace,
   openPlace,
   reopenClosedTab,
   scrollSnapshotAtom,
   setPinned,
-  settleNewChat,
   acknowledgeTopic,
   tabByNumber,
   tabsAtom,
   tabShowing,
+  tabShowingPlace,
   tabStripAtom,
   tabTopic,
   topicPlace,
   updateTabs,
-  setNewChat,
+  setHomeDraft,
   type OpenOptions,
   type JunoTabPage,
   type Place,
@@ -96,18 +94,17 @@ export {
   type TabSummary,
 } from './tabs'
 export {
-  emptyNewChat,
-  newChatAtom,
+  emptyHomeDraft,
+  homeDraftAtom,
+  homeFocusAtom,
+  requestHomeFocus,
   frequentConversationsAtom,
   pickConversation,
   pickConversationsAtom,
-  pickThread,
-  pickThreadsAtom,
-  previewTopic,
   sendTarget,
   untouched,
-  type NewChat,
-} from './newChat'
+  type HomeDraft,
+} from './homeDraft'
 export { composerEmojiAtom, mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
   checkMessage,

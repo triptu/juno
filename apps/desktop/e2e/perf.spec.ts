@@ -855,13 +855,13 @@ test.describe('topic view', () => {
 
   const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
 
-  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one New chat. */
+  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one Home. */
   async function ready(): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
     const running = await launch()
     const juno = new Juno(running.app, running.win)
     await juno.sidebar.expectRows()
     await juno.expectEngineLive(120_000)
-    for (let i = 0; i < 10 && !((await juno.tabs.root.getByRole('tab').count()) === 1 && (await juno.tabs.tab('New chat').count()) === 1); i++) await juno.tabs.menu('close-tab')
+    for (let i = 0; i < 10 && !((await juno.tabs.root.getByRole('tab').count()) === 1 && (await juno.tabs.tab('Home').count()) === 1); i++) await juno.tabs.menu('close-tab')
     await juno.expectNothingOpen()
     await running.win.mouse.move(900, 400)
     return { running, juno }
@@ -1211,7 +1211,7 @@ async function panelOpens(juno: Juno, win: Page): Promise<number[]> {
   return panels
 }
 
-test('New chat open to first paint', async ({ juno, win }) => {
+test('a new tab with Home open to its composer painted', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   const samples: number[] = []
@@ -1219,25 +1219,25 @@ test('New chat open to first paint', async ({ juno, win }) => {
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.expectTitle(POSTGRES)
     await win.evaluate(() => {
-      const button = document.querySelector('[aria-label="New chat ⌘T"]')
-      if (!button) throw new Error('New chat button missing')
+      const button = document.querySelector('[aria-label="New tab ⌘T"]')
+      if (!button) throw new Error('New tab button missing')
       button.addEventListener('click', () => {
-        performance.mark('new-chat-open-start')
+        performance.mark('home-open-start')
         const observer = new MutationObserver(() => {
-          if (![...document.querySelectorAll('[data-new-chat]')].some(node => node.getClientRects().length > 0)) return
+          if (![...document.querySelectorAll('[data-home] [data-composer-field]')].some(node => node.getClientRects().length > 0)) return
           observer.disconnect()
-          requestAnimationFrame(() => setTimeout(() => performance.measure('new-chat-open', 'new-chat-open-start'), 0))
+          requestAnimationFrame(() => setTimeout(() => performance.measure('home-open', 'home-open-start'), 0))
         })
         observer.observe(document.body, { childList: true, subtree: true, attributes: true })
       }, { once: true })
     })
     await juno.tabs.newTabButton.hover()
     await press(win)
-    await expect(juno.newChat.root).toBeVisible()
-    await expect.poll(() => win.evaluate(() => performance.getEntriesByName('new-chat-open').length)).toBe(i + 1)
-    samples.push(await win.evaluate(() => performance.getEntriesByName('new-chat-open').at(-1)!.duration))
+    await expect(juno.write.field).toBeVisible()
+    await expect.poll(() => win.evaluate(() => performance.getEntriesByName('home-open').length)).toBe(i + 1)
+    samples.push(await win.evaluate(() => performance.getEntriesByName('home-open').at(-1)!.duration))
   }
-  within('New chat open, p95', stats('New chat open to first paint', samples).p95, 50)
+  within('Home open, p95', stats('New tab with Home to its composer', samples).p95, 50)
 })
 
 test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per call, production pacing', async () => {

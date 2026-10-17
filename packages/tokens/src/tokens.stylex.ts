@@ -863,7 +863,9 @@ export const layout = stylex.defineVars({
   '--menu-width-account': '248px',
   '--menu-width-browse': '300px',
   '--menu-width-mention': '280px',
-  // The New chat pickers' lists.
+  // The list a first @ or # opens on Home: wide enough for a name and its kind.
+  '--send-to-width': '320px',
+  // Home's destination list and All topics' place list.
   '--menu-width-picker': '340px',
   '--destination-list-max-height': '360px',
   // A sidebar view's name pill (inventory 2.3): longer names end with an ellipsis.

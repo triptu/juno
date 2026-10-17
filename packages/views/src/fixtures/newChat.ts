@@ -1,10 +1,6 @@
-/** Destinations for the New chat fixtures: the conversations and threads the pickers offer. */
-import type { Person, PickConversation, PickConversations, PickThread } from '@juno/contract'
+/** Destinations for the fixtures: the conversations Home's destination list and ⌘K offer. */
+import type { Person, PickConversation, PickConversations } from '@juno/contract'
 import { people } from './topics'
-
-const MINUTE = 60_000
-const HOUR = 60 * MINUTE
-const DAY = 24 * HOUR
 
 const channel = (key: string, name: string, kind: 'public' | 'private' = 'public', empty = false): PickConversation => ({
   key,
@@ -45,32 +41,3 @@ export const recentConversations: PickConversations = {
   people: [],
   channels: [],
 }
-
-export const jonQuery: PickConversations = {
-  recent: [],
-  people: [conversations.jonas, dm('D0JO', { id: 'U0JO', name: 'Jo Okafor', color: 'emerald' })],
-  channels: [conversations.onboarding],
-}
-
-export const noConversations: PickConversations = { recent: [], people: [], channels: [] }
-
-const thread = (id: string, title: string, conversation: PickConversation, replyCount: number, ago: number, now: number): PickThread => ({
-  id: `t:${conversation.channelId ?? conversation.key}:${id}`,
-  rootTs: id,
-  title,
-  replyCount,
-  lastActivityAt: now - ago,
-  conversation,
-})
-
-export const cutoverThreads = (now: number): ReadonlyArray<PickThread> => [
-  thread('1760000000.000100', 'Postgres 16 cutover window', conversations.eng, 14, 2 * HOUR, now),
-  thread('1760000000.000200', 'Cutover checklist for billing', conversations.billing, 6, DAY + HOUR, now),
-  thread('1760000000.000300', 'Who owns the cutover comms?', conversations.maya, 3, 3 * DAY, now),
-]
-
-export const engThreads = (now: number): ReadonlyArray<PickThread> => [
-  thread('1760000000.000100', 'Postgres 16 cutover window', conversations.eng, 14, 4 * MINUTE, now),
-  thread('1760000000.000400', 'Flaky integration tests on main', conversations.eng, 1, 3 * HOUR, now),
-  thread('1760000000.000500', 'A very long thread title about the replica lag dashboards and who should own the alert thresholds', conversations.eng, 22, 2 * DAY, now),
-]

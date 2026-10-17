@@ -1,0 +1,1 @@
+- 10-17 04:17 · home-newchat · Merged Home round 4: the greeting and scene stay in every state with no count line; one "Recent" label over the two columns, placed just above the composer (layout B, recommended); the destination chip stays on the composer's first line; All topics moves to the sidebar title bar in the New chat button's place.

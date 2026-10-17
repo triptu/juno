@@ -26,7 +26,6 @@ const chrome: Omit<SidebarProps, 'children'> = {
   accountMenuOpen: false,
   onAccountMenu: noop,
   onSearch: noop,
-  onNewChat: noop,
   onNavigate: noop,
   onFilterKind: noop,
   onToggleUnread: noop,
@@ -240,6 +239,7 @@ export default defineFixtures(
     Nav: {
       // Home tab active, or no tab open.
       'home-active': scene(() => full({ activeNav: 'home' })),
+      // All topics is the title bar's button: it takes the nav's active look.
       'all-topics-active': scene(() => full({ activeNav: 'all-topics' })),
       'juno-active': scene(() => full({ activeNav: 'juno' })),
       'juno-unread': scene(() => full({ junoUnread: 3 })),
@@ -270,6 +270,15 @@ export default defineFixtures(
           </>
         ),
         { tooltip: '[aria-label="Back ⌘["]' },
+      ),
+      'all-topics': scene(
+        () => (
+          <>
+            {full()}
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: '[aria-label="All topics"]' },
       ),
       'view-pill': scene(
         () => (

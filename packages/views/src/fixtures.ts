@@ -21,13 +21,12 @@ import MediaViewer from './MediaViewer.fixtures'
 import Message from './Message.fixtures'
 import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
-import NewChat from './NewChat.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
-import NewTabSetting from './NewTabSetting.fixtures'
+import TabExpirySetting from './TabExpirySetting.fixtures'
 import TopicSwitcher from './TopicSwitcher.fixtures'
 import PeekKeySetting from './PeekKeySetting.fixtures'
 import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
@@ -111,12 +110,11 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MessageList,
   CommandPalette,
   MoveSheet: moveSheet,
-  NewChat,
   NewDivider,
   NewMessagesPill,
   SendCheckBar,
   NotificationsPage,
-  NewTabSetting,
+  TabExpirySetting,
   TopicSwitcher,
   PeekKeySetting,
   QuickReactionsSetting,

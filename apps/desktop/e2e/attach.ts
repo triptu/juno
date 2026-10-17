@@ -40,5 +40,5 @@ export async function drop(target: Locator, files: ReadonlyArray<Upload>): Promi
 
 export const chips = (topic: TopicPane) => topic.root.locator('[data-composer]').getByRole('button', { name: /^Remove / })
 export const chip = (topic: TopicPane, name: string) => topic.root.locator('[data-composer]').getByRole('button', { name: `Remove ${name}` })
-/** Waits until `count` of a pane's chips are staged. New chat's Enter does nothing while a file is still being read, so its sends wait for this. */
+/** Waits until `count` of a pane's chips are staged. Home's Enter does nothing while a file is still being read, so its sends wait for this. */
 export const staged = (pane: { readonly root: Locator }, count: number) => expect(pane.root.locator('[data-composer] [data-attachment="ready"]')).toHaveCount(count)

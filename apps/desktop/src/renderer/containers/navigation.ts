@@ -50,11 +50,10 @@ import {
   messageListAtom,
   messageWindowSpecAtom,
   mountedTabs,
-  newChatAtom,
-  setNewChat,
-  newChatPlace,
-  newTabPageAtom,
-  emptyNewChat,
+  homeDraftAtom,
+  setHomeDraft,
+  emptyHomeDraft,
+  requestHomeFocus,
   openInSlack,
   openPlace,
   openSettingsSection,
@@ -66,13 +65,13 @@ import {
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
-  settleNewChat,
   showTour,
   signedInAtom,
   slackLink,
   tabByNumber,
   tabsAtom,
   tabShowing,
+  tabShowingPlace,
   tabTopic,
   topicAtom,
   topicOfView,
@@ -316,50 +315,50 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
   // A fresh open starts at the divider or the bottom (or `snapshot`), not where it was left: `landFresh`.
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
   show(
-    (tabs) => openHere(tabs, topicPlace(id), options),
+    (tabs) => openPlace(tabs, topicPlace(id), options),
     { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }), ...(snapshot === undefined ? {} : { snapshot }) },
     options.newTab !== true,
   )
 }
 
 /**
- * Opens `place` (`openPlace`). A New chat with a draft or a destination in
- * the current tab stays in its history, so Back returns to what was written.
+ * A new tab with Home, its field focused; with `list`, its destination list
+ * open; with `conversation`, that destination chosen.
  */
-function openHere(tabs: Tabs, place: Place, options: OpenOptions = {}): Tabs {
-  return openPlace(tabs, place, { ...options, keepNewChat: keepsNewChat(tabs) })
+function openHomeTab(list: boolean, conversation?: PickConversation): void {
+  // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘T must not land in
+  // the field the old tab had focused.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  show((tabs) => {
+    const next = openPlace(tabs, homePlace, { newTab: true })
+    if (next.active !== undefined) {
+      if (conversation !== undefined) setHomeDraft(registry, next.active, pickConversation(emptyHomeDraft, conversation))
+      requestHomeFocus(registry, next.active, list)
+    }
+    return next
+  }, undefined)
 }
 
-/** The current tab is a New chat with a draft or a destination, which stays in its history. */
-function keepsNewChat(tabs: Tabs): boolean {
-  const tab = tabs.tabs.find((each) => each.id === tabs.active)
-  return tab !== undefined && currentPlace(tab).kind === 'newChat' && !untouched(registry.get(newChatAtom(tab.id)))
+/** ⌘T and the strip's "+": a new tab with Home, ready to write (SPEC 6). */
+export function openNewTab(): void {
+  openHomeTab(false)
 }
 
 /**
- * ⌘N, "+", ⌘T and the sidebar's New chat button: a New chat in a new tab
- * (spec section 9), every time. Each New chat tab keeps its own draft.
+ * ⌘N (SPEC 12, "Writing"): write a message from Home. It uses this tab if it
+ * is Home, else a tab that shows Home, else a new one, and a new one too
+ * when that Home already has a draft, so nothing written is disturbed. The
+ * destination list opens; with `conversation` (⌘K's result for a person
+ * never messaged) that destination is chosen instead.
  */
-export function openNewChat(): void {
-  // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘N must not land in
-  // the field the old tab had focused.
-  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-  show((tabs) => openHere(tabs, newChatPlace, { newTab: true }), undefined)
-}
-
-/** ⌘T and the strip's "+": a new tab with what Settings › General chooses, a New chat (the default) or Home. */
-export function openNewTab(): void {
-  if (registry.get(newTabPageAtom) === 'home') openHome({ newTab: true })
-  else openNewChat()
-}
-
-/** A New chat addressed to `conversation`, as ⌘K's result for a person never messaged (spec section 10). */
-export function openNewChatTo(conversation: PickConversation): void {
-  show((tabs) => {
-    const next = openHere(tabs, newChatPlace, { newTab: true })
-    if (next.active !== undefined) setNewChat(registry, next.active, pickConversation(emptyNewChat, conversation))
-    return next
-  }, undefined)
+export function newMessage(conversation?: PickConversation): void {
+  const tabs = registry.get(tabsAtom)
+  const current = activeTab(tabs)
+  const home = current !== undefined && currentPlace(current).kind === 'home' ? current : tabShowingPlace(tabs, homePlace)
+  if (home === undefined || !untouched(registry.get(homeDraftAtom(home.id)))) return openHomeTab(conversation === undefined, conversation)
+  if (conversation !== undefined) setHomeDraft(registry, home.id, pickConversation(registry.get(homeDraftAtom(home.id)), conversation))
+  if (home.id !== tabs.active) switchToTab(home.id)
+  requestHomeFocus(registry, home.id, conversation === undefined)
 }
 
 /**
@@ -389,7 +388,7 @@ export function openHome(options: OpenOptions = {}): void {
     check()
   })
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
-  show((tabs) => openHere(tabs, homePlace, options), undefined, options.newTab !== true, ready)
+  show((tabs) => openPlace(tabs, homePlace, options), undefined, options.newTab !== true, ready)
 }
 
 /**
@@ -400,12 +399,12 @@ export function openHome(options: OpenOptions = {}): void {
 export function openJunoPage(page: JunoPage, options: OpenOptions = {}): void {
   if (page === 'settings') return openSettings('juno', options)
   if (page === 'connections') return openSettings('connections', options)
-  show((tabs) => openHere(tabs, junoPagePlace(page), options), undefined)
+  show((tabs) => openPlace(tabs, junoPagePlace(page), options), undefined)
 }
 
 /** The Juno tab (SPEC 13). A plain open focuses a tab that shows it; each Juno tab shows the one chat. */
 export function openJuno(options: OpenOptions = {}): void {
-  show((tabs) => openHere(tabs, junoPlace, options), undefined)
+  show((tabs) => openPlace(tabs, junoPlace, options), undefined)
 }
 
 /**
@@ -414,7 +413,7 @@ export function openJuno(options: OpenOptions = {}): void {
  * puts focus in the key field while no provider is set up).
  */
 export function openSettings(section: SettingsSection = 'general', options: OpenOptions = {}): void {
-  show((tabs) => openSettingsSection(tabs, section, { ...options, keepNewChat: keepsNewChat(tabs) }), undefined)
+  show((tabs) => openSettingsSection(tabs, section, options), undefined)
 }
 
 /** Below the header band, where a message a notification opens lands. */
@@ -493,7 +492,7 @@ function whenAllTopicsReady(): Promise<void> {
 /** The sidebar's All topics item and the "View all topics" empty states. A plain open focuses a tab that shows it, as for Home. */
 export function openAllTopics(options: OpenOptions = {}): void {
   if (options.newTab !== true && allTopicsTab(registry.get(tabsAtom)) !== undefined) {
-    show((tabs) => openHere(tabs, allTopicsPlace, options), undefined)
+    show((tabs) => openPlace(tabs, allTopicsPlace, options), undefined)
     return
   }
   const ticket = ++currentTicket
@@ -502,26 +501,8 @@ export function openAllTopics(options: OpenOptions = {}): void {
   queue = queue
     .then(() => ready)
     .then(() => {
-      if (ticket === currentTicket) apply((tabs) => openHere(tabs, allTopicsPlace, options))
+      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
     })
-}
-
-/**
- * A New chat sent to `topicId`: its tab becomes the topic, in the frame the
- * topic can paint, or closes when another tab shows it (`settleNewChat`).
- * Never replaced by a later open, so the sent message always shows. The
- * draft is cleared even when the tab was closed during the send, so
- * reopening it can never send the message again.
- */
-export function settleSentChat(tabId: string, topicId: string): void {
-  show(
-    (tabs) => {
-      setNewChat(registry, tabId, emptyNewChat)
-      return settleNewChat(tabs, tabId, topicId)
-    },
-    { id: topicId, fresh: true, name: 'juno.topic-open' },
-    false,
-  )
 }
 
 /** The topic a tab change brings on screen, if it has to wait for one. */
@@ -624,7 +605,7 @@ export function runMenuCommand(command: MenuCommand): void {
     case 'tab.new':
       return openNewTab()
     case 'chat.new':
-      return openNewChat()
+      return newMessage()
     case 'tab.close':
       return closeActiveTab()
     case 'tab.reopen':
@@ -716,7 +697,6 @@ export async function showTabMenu(tabId: string): Promise<void> {
 
 /** What the history menu calls a place: the tab's title for it. */
 function placeLabel(place: Place): string {
-  if (place.kind === 'newChat') return 'New chat'
   if (place.kind === 'home') return 'Home'
   if (place.kind === 'juno') return 'Juno'
   if (place.kind === 'junoPage') return chatCopy.pageTitles[place.page]

@@ -66,7 +66,7 @@ export type PaletteIconName =
   | 'theme-dark'
   | 'theme-system'
   | 'new-tab'
-  | 'new-chat'
+  | 'new-message'
   | 'settings'
   | 'hide-text'
   | 'show-text'
@@ -108,7 +108,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'theme-dark': Moon,
   'theme-system': CircleHalf,
   'new-tab': Plus,
-  'new-chat': NotePencil,
+  'new-message': NotePencil,
   settings: Gear,
   'hide-text': EyeSlash,
   'show-text': Eye,

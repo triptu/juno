@@ -20,7 +20,7 @@ function Toolbar() {
         <IconButton icon={CaretLeft} label="Back" shortcut="⌘[" />
         <IconButton icon={CaretRight} label="Forward" shortcut="⌘]" />
         <IconButton icon={MagnifyingGlass} label="Search" shortcut="⌘K" />
-        <IconButton icon={NotePencil} label="New chat" shortcut="⌘N" />
+        <IconButton icon={NotePencil} label="New message" shortcut="⌘N" />
         <IconButton icon={DotsThree} label="More" />
       </Row>
       <TooltipLayer />

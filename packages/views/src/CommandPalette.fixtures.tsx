@@ -53,7 +53,7 @@ const globalCommands: ReadonlyArray<PaletteItem> = [
   { id: 'g4', icon: 'theme-system', accent: 'coral', label: 'Accent: Coral', sub: 'Current', compact: true },
   { id: 'g5', icon: 'theme-system', accent: 'teal', label: 'Accent: Teal', compact: true },
   { id: 'g6', icon: 'new-tab', label: 'New tab', hint: '⌘T', compact: true },
-  { id: 'g7', icon: 'new-chat', label: 'New chat', hint: '⌘N', compact: true },
+  { id: 'g7', icon: 'new-message', label: 'New message', hint: '⌘N', compact: true },
   { id: 'g8', icon: 'settings', label: 'Settings: Appearance', compact: true },
   { id: 'g9', icon: 'hide-text', label: 'Hide message text', hint: '⌃⌘H', compact: true },
   { id: 'g10', icon: 'presence', label: 'Set yourself away', compact: true },

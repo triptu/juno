@@ -25,11 +25,9 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
     const active = tabs.tabs.find((tab) => tab.id === tabs.active)
     return active === undefined ? undefined : currentPlace(active)
   }
-  // New chat becomes its sent topic as soon as the send command returns.
-  const initial = visible()
-  // A finding that beats New chat to its topic waits for the topic to show.
+  // A finding that arrives before its topic shows waits for it.
   let held: ClarityFinding | undefined
-  // A thread New chat starts is renamed from its pending id once Slack has it.
+  // A thread a send starts is renamed from its pending id once Slack has it.
   let topicId = sent.topicId
   const onTopic = (place: ReturnType<typeof visible>) => {
     if (place?.kind !== 'topic' || (place.topicId !== topicId && place.viewId !== topicId)) return false
@@ -51,7 +49,6 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
       if (held !== undefined && current()) show(held)
       return
     }
-    if (initial?.kind === 'newChat' && place?.kind === 'newChat') return
     left = true
     held = undefined
     if (registry.get(sentSuggestionAtom)?.clientMsgId === sent.clientMsgId) dismissSentSuggestion(registry)
@@ -68,7 +65,6 @@ export function watchSentMessage(registry: Registry, sent: SentMessage): (findin
       return
     }
     if (onTopic(place)) show(finding)
-    else if (initial?.kind === 'newChat' && place?.kind === 'newChat') held = finding
     else cleanup()
   }
 }

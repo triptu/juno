@@ -34,6 +34,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   readonly pressed?: boolean
   /** A menu button whose menu is showing: `aria-expanded`, drawn as pressed. */
   readonly expanded?: boolean
+  /** Opens a page and that page is the current tab: `aria-current="page"`, the nav's accent tint and the filled icon, as an active NavItem. */
+  readonly current?: boolean
   readonly dimmed?: boolean
   /** No tooltip, when the label would repeat visible text. */
   readonly noTooltip?: boolean
@@ -87,6 +89,7 @@ export function IconButton({
   tone = 'subtle',
   pressed,
   expanded,
+  current = false,
   dimmed = false,
   noTooltip = false,
   type = 'button',
@@ -102,6 +105,7 @@ export function IconButton({
       {...(noTooltip ? {} : tooltip(label, shortcut))}
       aria-pressed={pressed}
       aria-expanded={expanded}
+      aria-current={current ? 'page' : undefined}
       aria-disabled={dimmed || undefined}
       disabled={disabled}
       {...rest}
@@ -117,6 +121,7 @@ export function IconButton({
         variants[variant],
         variant === 'ghost' && tones[tone],
         (pressed === true || expanded === true) && pressedStyles[variant],
+        current && styles.current,
         (dimmed || disabled) && interactive.dimmed,
       )}
     >
@@ -133,6 +138,8 @@ export function IconButton({
         <span data-icon-tint={iconTint} {...stylex.props(styles.tint, tintColors[iconTint])}>
           {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
         </span>
+      ) : current ? (
+        <Icon icon={icon} size={px} weight="fill" />
       ) : iconWeight === undefined ? (
         <Icon icon={icon} size={px} />
       ) : (
@@ -164,6 +171,14 @@ const styles = stylex.create({
   },
   tint: {
     display: 'inline-flex',
+  },
+  // The page this button opens is showing: the same fill and colour as an active NavItem.
+  current: {
+    color: accent['--hl-text'],
+    backgroundColor: {
+      default: accent['--hl-nav'],
+      ':hover': { default: null, [HOVER]: accent['--hl-nav'] },
+    },
   },
   pair: {
     display: 'grid',

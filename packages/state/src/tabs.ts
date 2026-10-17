@@ -1,7 +1,7 @@
 /**
  * Workspace tabs (spec section 6, inventory 4, performance 4.3 and 4.5).
  *
- * A tab shows one place, a topic, a New chat or a page (Home, All topics, Settings, the Juno chat or a Juno page), and keeps its own
+ * A tab shows one place, a topic or a page (Home, All topics, Settings, the Juno chat or a Juno page), and keeps its own
  * history of the places it showed, like a browser tab. The rules are pure
  * functions over `Tabs`:
  * - `openPlace`: a place opens in the current tab (a new history entry), or
@@ -9,11 +9,9 @@
  *   ⌘T). A plain open of a topic or page that a tab already shows focuses
  *   that tab; a new tab always opens, so one place can show in several tabs.
  * - `ensureTab`: there is never no tab. Closing the last one, or a launch
- *   with none saved, leaves one tab with what a new tab opens (`newTabPage.ts`).
+ *   with none saved, leaves one tab with Home.
  * - `openSettingsSection`: Settings at a section, in the tab that shows
  *   Settings if one does, where the section replaces the one it showed.
- * - `settleNewChat`: a New chat that sent becomes the topic it sent to, in
- *   place of its own entry, or closes when another tab shows that topic.
  * - `stepHistory` (Back and Forward), `goToEntry` (the history menu).
  * - `closeTab`, `closeOtherTabs`, `closeTabsToRight`, `closeAllTabs`: every
  *   closed tab goes onto the reopen stack with its history; `reopenClosedTab`
@@ -37,21 +35,19 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { PickConversation, PickThread, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
+import { PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
-import { newChatAtom, newChatTitle, untouched, type NewChat } from './newChat'
-import { newTabPageAtom, type NewTabPage } from './newTabPage'
+import { homeDraftAtom, untouched, type HomeDraft } from './homeDraft'
 import { signedInAtom } from './session'
 
 /** The Juno menu's pages that have a tab of their own. Its Connections and Settings are sections of Settings. */
 export type JunoTabPage = Exclude<JunoPage, 'settings' | 'connections'>
 
-/** What a tab shows: a topic, a New chat (spec section 9), or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
+/** What a tab shows: a topic, or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
 export type Place =
   | { readonly kind: 'topic'; readonly topicId: string; readonly viewId?: string }
-  | { readonly kind: 'newChat' }
   | { readonly kind: 'home' }
   | { readonly kind: 'allTopics' }
   /** One tab for Settings, whichever section it shows. */
@@ -60,7 +56,6 @@ export type Place =
   /** A page behind the Juno menu (SPEC 13.10). */
   | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
 
-export const newChatPlace: Place = { kind: 'newChat' }
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
 export const settingsPlace = (section: SettingsSection): Place => ({ kind: 'settings', section })
@@ -114,8 +109,6 @@ export interface OpenOptions {
   readonly newTab?: boolean
   /** With `newTab`: the current tab stays active and the new one waits behind it, as ⌘-click on Start thread opens it. */
   readonly background?: boolean
-  /** The current tab's New chat has a draft or a destination, so it stays in the history for Back. */
-  readonly keepNewChat?: boolean
 }
 
 export const currentPlace = (tab: Tab): Place => tab.history.entries[tab.history.index]!
@@ -131,10 +124,9 @@ const samePlace = (a: Place, b: Place) =>
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
 /**
  * The tab a plain open of `place` focuses: of the tabs that show it, the
- * one active most recently. A New chat is never focused this way.
+ * one active most recently.
  */
 export function tabShowingPlace(tabs: Tabs, place: Place): Tab | undefined {
-  if (place.kind === 'newChat') return undefined
   const showing = tabs.tabs.filter((tab) => samePlace(currentPlace(tab), place))
   if (showing.length < 2) return showing[0]
   const rank = (tab: Tab) => {
@@ -170,14 +162,13 @@ export function activateTab(tabs: Tabs, id: string): Tabs {
 
 const freshTab = (id: string, place: Place): Tab => ({ id, pinned: false, history: { entries: [place], index: 0 } })
 
-/** `place` as the tab's next entry. Forward is dropped. An empty New chat is replaced, not kept. */
-function push(history: TabHistory, place: Place, keepNewChat: boolean): TabHistory {
-  const kept = history.entries[history.index]!.kind === 'newChat' && !keepNewChat ? history.index : history.index + 1
-  const entries = [...history.entries.slice(0, kept), place].slice(-HISTORY_LIMIT)
+/** `place` as the tab's next entry. Forward is dropped. */
+function push(history: TabHistory, place: Place): TabHistory {
+  const entries = [...history.entries.slice(0, history.index + 1), place].slice(-HISTORY_LIMIT)
   return { entries, index: entries.length - 1 }
 }
 
-export function openPlace(tabs: Tabs, place: Place, { newTab = false, background = false, keepNewChat = false }: OpenOptions = {}): Tabs {
+export function openPlace(tabs: Tabs, place: Place, { newTab = false, background = false }: OpenOptions = {}): Tabs {
   // A plain open of a place a tab shows focuses that tab. A new tab is always new, so a place can show in several.
   const showing = newTab ? undefined : tabShowingPlace(tabs, place)
   if (showing !== undefined) return activateTab(tabs, showing.id)
@@ -192,7 +183,7 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false, background
   }
   const current = tabs.tabs[at]!
   if (samePlace(currentPlace(current), place)) return tabs
-  const tab: Tab = { ...current, history: push(current.history, place, keepNewChat) }
+  const tab: Tab = { ...current, history: push(current.history, place) }
   return { ...tabs, tabs: tabs.tabs.with(at, tab), recent: touch(tabs.recent, tab.id) }
 }
 
@@ -202,9 +193,6 @@ export function ensureTab(tabs: Tabs, place: Place): Tabs {
   const tab = freshTab(nextTabId(tabs), place)
   return { ...tabs, tabs: [tab], active: tab.id, recent: [tab.id] }
 }
-
-/** What a new tab shows. */
-export const newTabPlace = (page: NewTabPage): Place => (page === 'home' ? homePlace : newChatPlace)
 
 /**
  * Settings at `section`. The tab that shows Settings is focused and shows
@@ -220,27 +208,6 @@ export function openSettingsSection(tabs: Tabs, section: SettingsSection, option
   return activateTab(next === tab ? tabs : { ...tabs, tabs: tabs.tabs.with(at, next) }, tab.id)
 }
 
-/**
- * After a New chat in tab `tabId` sent to `topicId`: the tab shows the topic
- * in place of the New chat's entry, so Back goes to what the tab showed
- * before, also when another tab shows the topic too: the tab you wrote in
- * stays where you are, as any tab can show a topic another shows. A tab
- * closed while the message was sending comes back from the reopen stack
- * showing the topic, not the sent draft.
- */
-export function settleNewChat(tabs: Tabs, tabId: string, topicId: string): Tabs {
-  const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
-  const tab = tabs.tabs[at]
-  if (tab === undefined) {
-    const closedAt = tabs.closed.findIndex((closed) => closed.tab.id === tabId)
-    const closed = tabs.closed[closedAt]
-    if (closed === undefined || currentPlace(closed.tab).kind !== 'newChat') return tabs
-    return { ...tabs, closed: tabs.closed.with(closedAt, { ...closed, tab: { ...closed.tab, history: sentHistory(closed.tab.history, topicId) } }) }
-  }
-  if (currentPlace(tab).kind !== 'newChat') return tabs
-  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: sentHistory(tab.history, topicId) }) }
-}
-
 /** Replace an acknowledged topic throughout history without replacing its mounted view. */
 export function acknowledgeTopic(tabs: Tabs, pendingId: string, topicId: string): Tabs {
   const references = (tab: Tab) => tab.history.entries.some(place => place.kind === 'topic' && place.topicId === pendingId)
@@ -253,12 +220,6 @@ export function acknowledgeTopic(tabs: Tabs, pendingId: string, topicId: string)
   const changed = tabs.tabs.map(change)
   const closed = tabs.closed.map(entry => ({ ...entry, tab: change(entry.tab) }))
   return { ...tabs, tabs: changed, closed }
-}
-
-/** The history with its New chat entry replaced by the topic it sent to. */
-function sentHistory(history: TabHistory, topicId: string): TabHistory {
-  const entries = [...history.entries.slice(0, history.index), topicPlace(topicId)]
-  return { entries, index: entries.length - 1 }
 }
 
 /** The place Back (-1) or Forward (1) would show in the active tab, if there is one. */
@@ -425,7 +386,9 @@ export const TABS_PREF = 'tabs'
 
 const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('topic'), topicId: Schema.String, viewId: Schema.optionalKey(Schema.String) }),
-  Schema.Struct({ kind: Schema.Literals(['newChat', 'home', 'allTopics', 'juno']) }),
+  Schema.Struct({ kind: Schema.Literals(['home', 'allTopics', 'juno']) }),
+  // Saved before New chat became part of Home: a New chat tab reads back as Home, with its draft.
+  Schema.Struct({ kind: Schema.Literal('newChat') }),
   Schema.Struct({ kind: Schema.Literal('settings'), section: SettingsSectionSchema }),
   // Saved before Settings was one page: Notifications, Preferences, and Settings › Juno and Connections as Juno pages.
   Schema.Struct({ kind: Schema.Literals(['notifications', 'preferences']) }),
@@ -435,6 +398,8 @@ const PlaceJson = Schema.Union([
 /** A saved place as it reads today: the pages that became sections of Settings open there. */
 function placeOf(saved: typeof PlaceJson.Type): Place {
   switch (saved.kind) {
+    case 'newChat':
+      return homePlace
     case 'notifications':
       return settingsPlace('notifications')
     case 'preferences':
@@ -451,7 +416,7 @@ function placeOf(saved: typeof PlaceJson.Type): Place {
  * is dropped.
  */
 const TabJson = Schema.Union([
-  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), lastViewedAt: Schema.optionalKey(Schema.Number), newChat: Schema.optionalKey(Schema.Unknown) }),
+  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), lastViewedAt: Schema.optionalKey(Schema.Number), homeDraft: Schema.optionalKey(Schema.Unknown), newChat: Schema.optionalKey(Schema.Unknown) }),
   Schema.Struct({ id: Schema.String }),
 ])
 const TabsJson = Schema.Struct({
@@ -483,40 +448,45 @@ export function parseTabs(value: unknown): Tabs {
   })
 }
 
-/** A New chat's draft and destination as a tab saves them. One that no longer reads is dropped, not the tab. */
-const NewChatJson = Schema.Struct({
+/**
+ * A Home tab's draft and destination as a tab saves them. A New chat saved
+ * before Home took its place reads the same way; its thread is dropped. One
+ * that no longer reads is dropped, not the tab.
+ */
+const HomeDraftJson = Schema.Struct({
   draft: Schema.String,
   mentions: Schema.Array(Schema.Struct({ kind: Schema.Literals(['person', 'channel']), id: Schema.String, name: Schema.String })),
   conversation: Schema.optionalKey(PickConversation),
-  thread: Schema.optionalKey(PickThread),
 })
-const decodeNewChat = Schema.decodeUnknownOption(NewChatJson)
+const decodeHomeDraft = Schema.decodeUnknownOption(HomeDraftJson)
 
-/** The New chats saved with the tabs, by tab id. */
-function parseNewChats(value: unknown): ReadonlyMap<string, NewChat> {
-  const chats = new Map<string, NewChat>()
+/** The Home drafts saved with the tabs, by tab id. */
+function parseHomeDrafts(value: unknown): ReadonlyMap<string, HomeDraft> {
+  const drafts = new Map<string, HomeDraft>()
   Option.map(decodeTabs(value), (saved) => {
     for (const tab of saved.tabs) {
-      if (!('place' in tab) || tab.newChat === undefined) continue
-      Option.map(decodeNewChat(tab.newChat), (chat) => chats.set(tab.id, { draft: chat.draft, mentions: chat.mentions, conversation: chat.conversation, thread: chat.thread }))
+      if (!('place' in tab)) continue
+      const json = tab.homeDraft ?? tab.newChat
+      if (json === undefined) continue
+      Option.map(decodeHomeDraft(json), (draft) => drafts.set(tab.id, { draft: draft.draft, mentions: draft.mentions, conversation: draft.conversation }))
     }
   })
-  return chats
+  return drafts
 }
 
-/** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, and a New chat's draft and destination. */
-export function savedTabs(tabs: Tabs, chatOf: (tabId: string) => NewChat | undefined = () => undefined): unknown {
+/** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, and a Home tab's draft and destination. */
+export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | undefined = () => undefined): unknown {
   return {
     tabs: tabs.tabs.map((tab) => {
       const place = currentPlace(tab)
-      const chat = place.kind === 'newChat' ? chatOf(tab.id) : undefined
+      const chat = place.kind === 'home' ? draftOf(tab.id) : undefined
       return {
         id: tab.id,
         pinned: tab.pinned,
         place,
         ...(tab.lastViewedAt === undefined ? {} : { lastViewedAt: tab.lastViewedAt }),
         ...(tab.junoPanel === true ? { junoPanel: true } : {}),
-        ...(chat === undefined || untouched(chat) ? {} : { newChat: savedNewChat(chat) }),
+        ...(chat === undefined || untouched(chat) ? {} : { homeDraft: savedHomeDraft(chat) }),
       }
     }),
     active: tabs.active ?? null,
@@ -524,33 +494,32 @@ export function savedTabs(tabs: Tabs, chatOf: (tabId: string) => NewChat | undef
   }
 }
 
-const savedNewChat = (chat: NewChat) => ({
-  draft: chat.draft,
-  mentions: chat.mentions,
-  ...(chat.conversation === undefined ? {} : { conversation: chat.conversation }),
-  ...(chat.thread === undefined ? {} : { thread: chat.thread }),
+const savedHomeDraft = (draft: HomeDraft) => ({
+  draft: draft.draft,
+  mentions: draft.mentions,
+  ...(draft.conversation === undefined ? {} : { conversation: draft.conversation }),
 })
 
 const savedTabsAtom = liveQuery(prefsGet)({ key: TABS_PREF })
 
-const savedNewChatsAtom = Atom.make((get): ReadonlyMap<string, NewChat> => {
+const savedHomeDraftsAtom = Atom.make((get): ReadonlyMap<string, HomeDraft> => {
   const saved = get(savedTabsAtom)
-  return AsyncResult.isSuccess(saved) ? parseNewChats(saved.value) : new Map()
+  return AsyncResult.isSuccess(saved) ? parseHomeDrafts(saved.value) : new Map()
 })
 
-/** The draft and destination a New chat tab was saved with, read back after a restart. */
-export const savedNewChatAtom = Atom.family((tabId: string) => Atom.make((get) => get(savedNewChatsAtom).get(tabId)))
+/** The draft and destination a Home tab was saved with, read back after a restart. */
+export const savedHomeDraftAtom = Atom.family((tabId: string) => Atom.make((get) => get(savedHomeDraftsAtom).get(tabId)))
 
-/** The tabs as `TABS_PREF` saves them, with each New chat's draft and destination. */
+/** The tabs as `TABS_PREF` saves them, with each Home tab's draft and destination. */
 function saveTabs(registry: Registry, tabs: Tabs): void {
-  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(tabs, (id) => registry.get(newChatAtom(id))) })
+  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(tabs, (id) => registry.get(homeDraftAtom(id))) })
 }
 
 let chatSave: ReturnType<typeof setTimeout> | undefined
 
-/** Sets a New chat tab's draft and destination, and saves them with the tabs once typing pauses. */
-export function setNewChat(registry: Registry, tabId: string, chat: NewChat): void {
-  registry.set(newChatAtom(tabId), chat)
+/** Sets a Home tab's draft and destination, and saves them with the tabs once typing pauses. */
+export function setHomeDraft(registry: Registry, tabId: string, draft: HomeDraft): void {
+  registry.set(homeDraftAtom(tabId), draft)
   clearTimeout(chatSave)
   chatSave = setTimeout(() => {
     chatSave = undefined
@@ -568,16 +537,16 @@ export const tabsAtom = Atom.make((get): Tabs => {
   const changed = get(changedTabsAtom(teamId))
   if (changed !== undefined) return changed
   const saved = get(savedTabsAtom)
-  return AsyncResult.isSuccess(saved) ? ensureTab(parseTabs(saved.value), newTabPlace(get(newTabPageAtom))) : noTabs
+  return AsyncResult.isSuccess(saved) ? ensureTab(parseTabs(saved.value), homePlace) : noTabs
 }).pipe(Atom.withEquality((a: Tabs, b: Tabs) => a === b))
 
-/** Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with what a new tab opens. */
+/** Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with Home. */
 export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Tabs {
   const teamId = registry.get(signedInAtom)?.teamId
   const current = registry.get(tabsAtom)
   if (teamId === undefined) return current
   const changed = change(current)
-  const ensured = changed === current ? current : ensureTab(changed, newTabPlace(registry.get(newTabPageAtom)))
+  const ensured = changed === current ? current : ensureTab(changed, homePlace)
   // The tab that became active and the one left are both viewed now; expiry counts from there.
   const next = ensured.active === current.active ? ensured : stampViewed(ensured, [ensured.active, current.active], Date.now())
   if (next === current) return current
@@ -608,8 +577,6 @@ export interface TabSummary {
   readonly place: Place
   /** A topic's header: undefined until it arrives (and for a page), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
-  /** A New chat's title: "New chat", then its destination's name. */
-  readonly chatTitle?: string
 }
 
 const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
@@ -625,11 +592,8 @@ export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
     const place = currentPlace(tab)
     const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : undefined
     const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
-    const chatTitle = place.kind === 'newChat' ? newChatTitle(get(newChatAtom(tab.id))) : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail && held.chatTitle === chatTitle
-      ? held
-      : { id: tab.id, pinned: tab.pinned, place, detail, ...(chatTitle === undefined ? {} : { chatTitle }) }
+    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail ? held : { id: tab.id, pinned: tab.pinned, place, detail }
   })
 }).pipe(Atom.withEquality(sameStrip))
 

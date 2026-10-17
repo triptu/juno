@@ -51,7 +51,18 @@ export function rankConversations(
     .map(({ id }) => id)
 }
 
-/** Own sends decay by half each week; unscored DMs fill before channels. At most six. */
+/** How many people and how many channels Home's Recent shows. */
+export const RECENT_PER_KIND = 5
+
+/**
+ * Home's Recent (SPEC section 12): own sends decay by half each week,
+ * unscored conversations fill by activity. At most five people (DMs and
+ * group DMs), then at most five channels, each in rank order.
+ */
 export function frequentDestinations(conversations: ReadonlyArray<Destination>, sends: ReadonlyArray<Use>, now: number): ReadonlyArray<string> {
-  return rankConversations(conversations, sends, now).slice(0, 6)
+  const kinds = new Map(conversations.map((conversation) => [conversation.id, isDm(conversation.kind)]))
+  const ranked = rankConversations(conversations, sends, now)
+  const people = ranked.filter((id) => kinds.get(id) === true).slice(0, RECENT_PER_KIND)
+  const channels = ranked.filter((id) => kinds.get(id) !== true).slice(0, RECENT_PER_KIND)
+  return [...people, ...channels]
 }

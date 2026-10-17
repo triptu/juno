@@ -49,15 +49,15 @@ function timeOfDay(now: Date): TimeOfDay {
 
 const isFriday = (now: Date): boolean => now.getDay() === 5 && timeOfDay(now) !== 'night'
 
-const COUNT_WORDS = ['', 'One thing wants you.', 'Two things want you.', 'Three things want you.']
-
-/** The two greeting lines (the home README, "Copy"). */
-export function homeGreeting(input: { readonly now: Date; readonly firstName?: string | undefined; readonly items: number; readonly caughtUp: boolean }): { readonly title: string; readonly line: string } {
-  const line = COUNT_WORDS[input.items] ?? `${input.items} things want you.`
-  if (input.caughtUp) return { title: 'All caught up.', line: 'Nothing is waiting on you.' }
+/**
+ * The greeting (the home README, "Copy"): one line, by the time of day, or
+ * "All caught up." There is no count under it; the rows are the count.
+ */
+export function homeGreeting(input: { readonly now: Date; readonly firstName?: string | undefined; readonly caughtUp: boolean }): { readonly title: string } {
+  if (input.caughtUp) return { title: 'All caught up.' }
   const name = input.firstName === undefined || input.firstName === '' ? '' : `, ${input.firstName}`
   const opening = isFriday(input.now) ? 'Happy Friday' : { morning: 'Morning', midday: 'Hello', evening: 'Evening', night: 'Still up' }[timeOfDay(input.now)]
-  return { title: `${opening}${name}.`, line: input.items === 0 ? 'Nothing is waiting on you.' : line }
+  return { title: `${opening}${name}.` }
 }
 
 const dayKey = (date: Date): string => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
@@ -139,7 +139,8 @@ export interface HomeShown {
   readonly view: HomeView
   readonly scene: HomeScene
   readonly title: string
-  readonly line: string
+  /** Under the greeting only while the first sync runs (`HOME_SYNCING_LINE`). */
+  readonly line: string | undefined
   readonly now: number
   readonly caughtUp: boolean
   /** Play the entrance: the first appearance, not a return from a hidden tab. */
@@ -184,7 +185,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
   const limit = homeItemLimit(options.windowHeight)
   const syncing = previous?.loading === true
   if (!result.value.ready) {
-    const greeting = homeGreeting({ now, firstName: result.value.firstName, items: 0, caughtUp: false })
+    const greeting = homeGreeting({ now, firstName: result.value.firstName, caughtUp: false })
     return registry.set(homeShownAtom(key), {
       view: { ...result.value, items: addHomeItems(syncing ? previous.view.items : [], result.value.items, limit) },
       scene: previous?.loading === true ? previous.scene : homeScene({ now, caughtUp: false, firstVisitToday: homeAppeared(registry, now) }),
@@ -203,12 +204,13 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
   const items = syncing ? addHomeItems(previous.view.items, view.items, previous.reservedItems) : view.items.slice(0, limit)
   const shown = { ...view, items }
   const done = caughtUp(shown)
-  const greeting = homeGreeting({ now, firstName: view.firstName, items: items.length, caughtUp: done })
+  const greeting = homeGreeting({ now, firstName: view.firstName, caughtUp: done })
   registry.set(homeShownAtom(key), {
     view: shown,
     // Coming out of the syncing state the scene stays, unless there is nothing to do.
     scene: syncing && !done ? previous.scene : homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
     ...greeting,
+    line: undefined,
     now: now.getTime(),
     caughtUp: done,
     enter: options.enter,
