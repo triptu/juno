@@ -2,6 +2,7 @@
  * One ⌘K row (inventory 9): its glyph (an icon, a DM's avatar or an
  * accent's dot), label, sub line, badge and key hint.
  */
+import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
@@ -84,6 +85,7 @@ export type PaletteIconName =
   | 'appearance'
   | 'notifications'
   | 'ignored'
+  | 'tidy-up'
   | 'connections'
   | 'backup'
   | 'about'
@@ -126,6 +128,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   appearance: Palette,
   notifications: Bell,
   ignored: EyeSlash,
+  'tidy-up': Broom,
   connections: Plugs,
   backup: HardDrives,
   about: Info,

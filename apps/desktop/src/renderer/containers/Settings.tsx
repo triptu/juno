@@ -1,8 +1,8 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, showTour, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, showTour, tabExpiryAtom, themeAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage } from '@juno/views'
+import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { EngineStatus } from './EngineStatus'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
@@ -42,6 +42,8 @@ function Section({ section }: { readonly section: SettingsSection }) {
       return <NotificationsPage />
     case 'ignored':
       return <Ignored />
+    case 'tidy-up':
+      return <TidyUp />
     case 'juno':
       return <JunoSettings />
     case 'ai-activity':
@@ -143,6 +145,13 @@ function Appearance() {
 function Ignored() {
   const ignored = useAtomValue(ignoredChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
   return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
+}
+
+/** Tidy up: what Resolve does, and when Juno suggests a topic. */
+function TidyUp() {
+  const prefs = useAtomValue(tidyUpPrefsAtom)
+  const aiAssist = useAtomValue(aiAssistOnAtom)
+  return <SettingsTidyUp prefs={prefs} aiAssist={aiAssist} onChange={(next) => setTidyUpPrefs(registry, next)} />
 }
 
 /** AI activity: the engine's log of model calls, from the engine and the agent. */

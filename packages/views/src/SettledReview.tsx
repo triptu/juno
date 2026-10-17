@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
-import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import type { HomeTopic, SettledWhy } from '@juno/contract'
 import { accent, colors, layout, opacity as opacityTokens, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, IconButton, Kbd, ringRoom, Surface, Text, TopicArt, type ActivateEvent } from '@juno/ui'
@@ -164,6 +164,8 @@ export interface SettledListProps {
   readonly compact?: boolean
   /** The row whose link takes focus first. The gallery passes one to show a focused row. */
   readonly initialActive?: string
+  /** Focus the first row when the list appears, as a sheet does with its first control. */
+  readonly autoFocus?: boolean
   readonly onOpen: SettledRowProps['onOpen']
   readonly onResolve: SettledRowProps['onResolve']
   readonly onKeep: SettledRowProps['onKeep']
@@ -172,13 +174,17 @@ export interface SettledListProps {
 
 /**
  * The proposals, one Tab stop: ↑ ↓ (and Home, End) move between rows,
- * Enter opens (⌘Enter in a new tab), R resolves, K keeps open, and ⌘Z
- * undoes the current row.
+ * Enter opens (⌘Enter in a new tab), R resolves and K keeps open. ⌘Z is
+ * Edit › Undo, which undoes the last action; the container follows it.
  */
-export function SettledList({ topics, statuses, now, label, compact = false, initialActive, onOpen, onResolve, onKeep, onUndo }: SettledListProps) {
+export function SettledList({ topics, statuses, now, label, compact = false, initialActive, autoFocus = false, onOpen, onResolve, onKeep, onUndo }: SettledListProps) {
   const [active, setActive] = useState(initialActive ?? topics[0]?.id)
   const list = useRef<HTMLUListElement>(null)
   const focusRow = (id: string) => list.current?.querySelector<HTMLElement>(`[data-settled-row="${CSS.escape(id)}"] a`)?.focus()
+  const first = useRef(autoFocus ? active : undefined)
+  useEffect(() => {
+    if (first.current !== undefined) focusRow(first.current)
+  }, [])
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const index = topics.findIndex((topic) => topic.id === active)
     const current = topics[index]
@@ -195,10 +201,6 @@ export function SettledList({ topics, statuses, now, label, compact = false, ini
     if (event.key === 'ArrowUp') return move(index - 1)
     if (event.key === 'Home') return move(0)
     if (event.key === 'End') return move(topics.length - 1)
-    if (event.metaKey && event.key.toLowerCase() === 'z' && status !== 'open') {
-      event.preventDefault()
-      return onUndo(current.id)
-    }
     if (event.metaKey || event.shiftKey) return
     const key = event.key.toLowerCase()
     if ((key === 'r' || key === 'k') && status === 'open') {
@@ -267,6 +269,7 @@ export interface SettledReviewProps {
   /** Start with What Resolve does open; the gallery shows it. */
   readonly initialAbout?: boolean
   readonly initialActive?: string
+  readonly autoFocus?: boolean
   readonly onOpen: SettledRowProps['onOpen']
   readonly onResolve: SettledRowProps['onResolve']
   readonly onKeep: SettledRowProps['onKeep']
@@ -284,7 +287,7 @@ export interface SettledReviewProps {
  * Resolve does and leads to Settings › Tidy up. A panel for `SheetLayer`,
  * which closes it on Esc and keeps Tab inside.
  */
-export function SettledReview({ topics, statuses, now, initialAbout = false, initialActive, onOpen, onResolve, onKeep, onUndo, onResolveAll, onSettings, onClose }: SettledReviewProps) {
+export function SettledReview({ topics, statuses, now, initialAbout = false, initialActive, autoFocus = false, onOpen, onResolve, onKeep, onUndo, onResolveAll, onSettings, onClose }: SettledReviewProps) {
   const titleId = useId()
   const aboutId = useId()
   const [about, setAbout] = useState(initialAbout)
@@ -304,7 +307,7 @@ export function SettledReview({ topics, statuses, now, initialAbout = false, ini
         <div id={aboutId}>{about ? <ResolveExplainer onSettings={onSettings} /> : null}</div>
       </div>
       <div {...stylex.props(styles.scroll, ringRoom.inline)}>
-        <SettledList topics={topics} statuses={statuses} now={now} label={settledCopy.title(topics.length)} initialActive={initialActive} onOpen={onOpen} onResolve={onResolve} onKeep={onKeep} onUndo={onUndo} />
+        <SettledList topics={topics} statuses={statuses} now={now} label={settledCopy.title(topics.length)} initialActive={initialActive} autoFocus={autoFocus} onOpen={onOpen} onResolve={onResolve} onKeep={onKeep} onUndo={onUndo} />
       </div>
       <div {...stylex.props(styles.foot)}>
         <span {...stylex.props(styles.keys)} aria-hidden>

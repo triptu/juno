@@ -114,6 +114,17 @@ export async function undoLast(registry: Registry): Promise<boolean> {
   return true
 }
 
+/**
+ * Replays one undo a caller kept, wherever it is in the stack (a row's own
+ * Undo, as on Tidy up's review), takes it off the stack, and hides the
+ * toast that offered it.
+ */
+export async function undoOne(registry: Registry, undo: UndoCommand): Promise<void> {
+  registry.set(undoStackAtom, registry.get(undoStackAtom).filter((entry) => entry !== undo))
+  if (registry.get(toastAtom)?.undoable === true) registry.set(toastAtom, undefined)
+  await replay(registry, undo)
+}
+
 /** A command's payload: the command without its tag. */
 function payloadOf<T extends { readonly _tag: string }>(command: T): Omit<T, '_tag'> {
   const { _tag: _, ...payload } = command
