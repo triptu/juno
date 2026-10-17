@@ -113,9 +113,15 @@ A milestone review of the sidebar (title bar with All topics, nav, quick filters
 
 Decided by the orchestrator for the owner, on `topic-sidebar-review-2` from `41ad6fe9`.
 
-**1. No slot for older messages that cannot come.** The "Loading older messages" slot is kept only while older messages can still load. Once the topic's start is known (a thread's root is shown, or a page said so) there is none. The fact is kept per topic for the run (`topicStartKnownAtom`), so a topic opened again has no slot from its first frame. If the start becomes known while the slot is on screen, as in a short conversation, the slot stays empty until the topic opens again (`OlderStatus` `ended`), so the messages never move under the reader. `layout-shift.spec.ts` covers this: the three-message DM with Maya holds still while its start arrives, and has no slot when opened again.
+**1. No space kept for older messages.** The "Loading older messages" slot is gone. The line now shows only while an older page loads, out of the flow, in the room above the first message, so it never moves anything (`olderInRoom`). A topic whose start a page reached this run asks for no older page when it opens again (`topicStartKnownAtom`). Peek keeps its small in-flow slot, as before.
 
-The remaining gap is now measured and symmetric. At scroll top the first message starts where the header band ends, 24px under the islands. That is the same 24px the last message keeps above the composer's field (the list's 16 plus the composer's 8). The column's top padding is `--header-band` − `--header-inset`, and `message-geometry.spec.ts` checks both gaps.
+**The gap that remains is the hover toolbar's room, so it barely changed (60px → 58px).** A first version made the gap 24px, matching the gap above the composer. `pnpm affected` then showed what the 28px slot had been doing: it was also the room the first message's hover toolbar needs to show above it at scroll top. With 24px, that toolbar flips below the first message and covers the next message's name. `toolbar-geometry.spec.ts` treats that as a failure, and the decision behind it (5629badc) is that the toolbar always straddles its own row's top edge.
+
+So the gap is now measured from that need: the toolbar's height less the row's top padding, plus 2, which is 34px under the header band (36px in Compact). The first message sits 58px under the islands, not 24px, and top and bottom are not symmetric. `message-geometry.spec.ts` checks the room and that the loading line takes none of it.
+
+The 24px gap is a choice for the owner. It costs the first message's toolbar flipping below at scroll top, as it already does for a message under the header band. Shots of that option: `shots/r2-top-gap-24px-option-light.jpg`, `shots/r2-top-gap-minimum-24px-option-dark.jpg`.
+
+That first version also showed a real shift. In a short Main, the start became known while the slot was on screen. Committing the "keep the slot" state and the store's change in two renders let one frame drop the slot, and the messages moved up 28px (`peek.spec.ts:120`). The shipped version keeps no slot, so this cannot happen.
 
 | | Before | After |
 | --- | --- | --- |
@@ -123,8 +129,7 @@ The remaining gap is now measured and symmetric. At scroll top the first message
 | Thread at its top, dark | ![](shots/r2-top-gap-before-dark.jpg) | ![](shots/r2-top-gap-after-dark.jpg) |
 | Minimum window, light | ![](shots/r2-top-gap-minimum-before-light.jpg) | ![](shots/r2-top-gap-minimum-after-light.jpg) |
 | Minimum window, dark | ![](shots/r2-top-gap-minimum-before-dark.jpg) | ![](shots/r2-top-gap-minimum-after-dark.jpg) |
-
-While older messages may come, the slot is still there: `shots/r2-more-above-after-light.jpg`.
+| Loading an older page, dark | | ![](shots/r2-loading-older-after-dark.jpg) |
 
 **2. The place pill gives way first in a narrow header.** Under the header's 480px width, a thread's place pill is its icon alone: a 24px circle in its tint (`ContextPill iconWhenNarrow`). It keeps the same accessible name, and its tooltip names the place and its kind ("hiring · Private channel"). The title takes the room. One refinement: a Main keeps its channel's name, because its title is the one word "Main" and needs no more room (`shots/r2-narrow-main-after-light.jpg`). `narrow-geometry.spec.ts` checks all three forms.
 
@@ -163,9 +168,14 @@ Not done here: 17 other views still write their focus ring by hand, mostly in Ho
 **Verification, round 2.**
 
 - **Gallery shots.** Regenerated for `TopicView`, `TopicHeader`, `MessageList`, `HoverToolbar`, `Sidebar`, `ChannelIconPicker` and `PeekView`. They changed only as intended:
-  - the topic and peek lists lost the slot and moved up;
+  - the topic lists moved up 2px, to the toolbar's room;
   - the 336px headers show the icon pill;
   - the channel picker's focus shot moved to the chosen icon.
   - The few other differences are one-pixel anti-aliasing and the random topic art.
 - **Typecheck and lint.** Local typecheck of `ui`, `views`, `state`, `gallery` and `desktop`; `pnpm lint` passed (10 of 10). `node --test scripts/check-tokens.test.mjs`: 7 of 7.
-- **`pnpm affected`:** see the next note.
+- **`pnpm affected`, first run** (on `6e8bb88e`).
+  - Typecheck, lint, unit tests and spec conformance passed.
+  - Gallery failed on the top-gap version described above: `toolbar-geometry.spec.ts` three times, and `roving.spec.ts`'s Esc test, which looked for the hidden toolbar by role.
+  - Desktop failed on `peek.spec.ts:120`, the 28px shift above. 420 passed.
+  - All four failures were fixed in `cadcd590`.
+- **`pnpm affected`, second run:** run once to check those fixes; its result is in the report.
