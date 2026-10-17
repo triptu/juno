@@ -215,9 +215,9 @@ const styles = stylex.create({
     flexGrow: 1,
     minHeight: 0,
     userSelect: 'none',
-    // A size container has no width of its own: it takes the page's.
+    // A size container has no size of its own: it takes the page's width and, as a flex item, its height.
     width: '100%',
-    containerType: 'inline-size',
+    containerType: 'size',
     containerName: 'home',
   },
   // The greeting and the rows scroll on their own, so the composer under them never moves.
@@ -227,6 +227,8 @@ const styles = stylex.create({
     flexGrow: 1,
     minHeight: 0,
     overflowY: 'auto',
+    // Room for a scrollbar on both sides, so the centred column stays put when one comes or goes.
+    scrollbarGutter: 'stable both-edges',
   },
   // Centred in the page, and scrolls from the top when the window is shorter than it.
   column: {
@@ -245,6 +247,7 @@ const styles = stylex.create({
     minWidth: 0,
     marginTop: spacing['--space-3-5'],
     textAlign: 'center',
+    position: 'relative',
   },
   title: {
     margin: 0,
@@ -260,8 +263,14 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
+  // The syncing line sits in the gap above the rows, so the rows stay where they are when it goes.
   line: {
-    marginTop: spacing['--space-1-5'],
+    position: 'absolute',
+    top: `calc(100% + ${spacing['--space-1-5']})`,
+    insetInlineStart: '50%',
+    transform: 'translateX(-50%)',
+    whiteSpace: 'nowrap',
+    margin: 0,
   },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {
@@ -270,7 +279,7 @@ const styles = stylex.create({
     gap: spacing['--space-0-5'],
     width: '100%',
     maxWidth: layout['--home-width'],
-    marginTop: spacing['--space-6'],
+    marginTop: spacing['--space-8'],
     marginBottom: 0,
     padding: 0,
     listStyle: 'none',

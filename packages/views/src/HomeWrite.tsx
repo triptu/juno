@@ -55,22 +55,7 @@ export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve =
   const filled = lists.flatMap((list, index) => (list.length > 0 ? [index] : []))
   const [at, setAt] = useState<readonly [number, number]>([0, 0])
   if (filled.length === 0 && !reserve) return null
-  // Waiting for its rows: the same box, empty and hidden, so it takes exactly Recent's room.
-  if (filled.length === 0) {
-    return (
-      <div aria-hidden="true" data-home-recent-reserved="" {...stylex.props(styles.recent, styles.hidden)}>
-        <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>
-          Recent
-        </Text>
-        <div {...stylex.props(styles.scope)}>
-          <div {...stylex.props(styles.columns)}>
-            <div {...stylex.props(styles.list)} />
-            <div {...stylex.props(styles.list)} />
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (filled.length === 0) return <RecentReserved />
   const column = filled.includes(at[0]) ? at[0] : filled[0]!
   const row = Math.min(at[1], lists[column]!.length - 1)
   const move = (event: KeyboardEvent<HTMLElement>) => {
@@ -96,36 +81,7 @@ export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve =
             <ul key={c === 0 ? 'people' : 'channels'} aria-label={c === 0 ? 'People' : 'Channels'} {...stylex.props(styles.list)}>
               {list.map((conversation, r) => (
                 <li key={conversation.key}>
-                  <button
-                    type="button"
-                    data-recent={`${c}-${r}`}
-                    aria-pressed={conversation.key === chosen}
-                    tabIndex={c === column && r === row ? 0 : -1}
-                    onMouseDown={(event: MouseEvent) => {
-                      if (event.button === 0) event.preventDefault()
-                    }}
-                    onClick={(event) => (event.metaKey ? onOpen(conversation) : onPick(conversation))}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && event.metaKey) {
-                        event.preventDefault()
-                        onOpen(conversation)
-                        return
-                      }
-                      move(event)
-                    }}
-                    onFocus={() => setAt([c, r])}
-                    {...stylex.props(styles.row, conversation.key === chosen && tintRows[conversation.tint])}
-                  >
-                    <span {...stylex.props(styles.markSlot)}>
-                      <DestinationMark conversation={conversation} />
-                    </span>
-                    <span {...stylex.props(styles.name)}>{conversation.name}</span>
-                    {conversation.kind === 'private' ? (
-                      <span {...stylex.props(styles.lock)}>
-                        <Icon icon={Lock} size={12} label="Private" />
-                      </span>
-                    ) : null}
-                  </button>
+                  <RecentRow conversation={conversation} place={`${c}-${r}`} chosen={conversation.key === chosen} tabbable={c === column && r === row} onPick={onPick} onOpen={onOpen} onMove={move} onFocus={() => setAt([c, r])} />
                 </li>
               ))}
             </ul>
@@ -133,6 +89,71 @@ export function HomeRecent({ people, channels, chosen, onPick, onOpen, reserve =
         </div>
       </div>
     </section>
+  )
+}
+
+/** Recent's box while its rows are on their way: the same structure, empty and hidden, so it takes exactly Recent's room. */
+function RecentReserved() {
+  return (
+    <div aria-hidden="true" data-home-recent-reserved="" {...stylex.props(styles.recent, styles.hidden)}>
+      <Text variant="sectionLabel" tone="muted" as="div" sx={styles.label}>
+        Recent
+      </Text>
+      <div {...stylex.props(styles.scope)}>
+        <div {...stylex.props(styles.columns)}>
+          <div {...stylex.props(styles.list)} />
+          <div {...stylex.props(styles.list)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface RecentRowProps {
+  readonly conversation: PickConversation
+  /** "column-row", for the arrow keys. */
+  readonly place: string
+  readonly chosen: boolean
+  /** Recent's one Tab stop. */
+  readonly tabbable: boolean
+  readonly onPick: (conversation: PickConversation) => void
+  readonly onOpen: (conversation: PickConversation) => void
+  readonly onMove: (event: KeyboardEvent<HTMLElement>) => void
+  readonly onFocus: () => void
+}
+
+function RecentRow({ conversation, place, chosen, tabbable, onPick, onOpen, onMove, onFocus }: RecentRowProps) {
+  return (
+    <button
+      type="button"
+      data-recent={place}
+      aria-pressed={chosen}
+      tabIndex={tabbable ? 0 : -1}
+      onMouseDown={(event: MouseEvent) => {
+        if (event.button === 0) event.preventDefault()
+      }}
+      onClick={(event) => (event.metaKey ? onOpen(conversation) : onPick(conversation))}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' && event.metaKey) {
+          event.preventDefault()
+          onOpen(conversation)
+          return
+        }
+        onMove(event)
+      }}
+      onFocus={onFocus}
+      {...stylex.props(styles.row, chosen && tintRows[conversation.tint])}
+    >
+      <span {...stylex.props(styles.markSlot)}>
+        <DestinationMark conversation={conversation} />
+      </span>
+      <span {...stylex.props(styles.name)}>{conversation.name}</span>
+      {conversation.kind === 'private' ? (
+        <span {...stylex.props(styles.lock)}>
+          <Icon icon={Lock} size={12} label="Private" />
+        </span>
+      ) : null}
+    </button>
   )
 }
 
@@ -210,6 +231,8 @@ const HOVER = '@media (hover: hover)'
 /** Rows per Recent column (`frequentDestinations`). */
 const RECENT_ROWS = 5
 const FOLD = '@container (max-width: 400px)'
+// Home's page on a window shorter than about 600px, where Home shows two rows (Home's root is the container).
+const SHORT = '@container home (height < 560px)'
 
 const tintRows = stylex.create({
   public: { backgroundColor: tints['--tint-public-bg'], color: tints['--tint-public-fg'] },
@@ -231,7 +254,9 @@ const styles = stylex.create({
     minWidth: 0,
   },
   // As wide as Home's column; it starts on the field's edge.
+  // A window too short for Recent and Home's rows keeps the rows; the chip's list still has every conversation.
   recent: {
+    display: { default: 'block', [SHORT]: 'none' },
     width: '100%',
     maxWidth: layout['--home-width'],
   },
