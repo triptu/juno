@@ -59,7 +59,7 @@ const rows = (page: Page) =>
     })
   })
 
-for (const id of ['main/conversation', 'thread/long', 'main/thread-links']) {
+for (const id of ['main/conversation', 'main/conversation-comfortable', 'thread/long', 'main/thread-links']) {
   test(`${id}: rows hold no empty space, senders sit the group gap apart, runs touch`, async ({ page }) => {
     await open(page, 'MessageList', id)
     const measured = await rows(page)
