@@ -34,6 +34,7 @@
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
+    "presence:live": "node scripts/presence-live.ts",
     "probe:live": "node scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
