@@ -20,7 +20,9 @@ const viewChange = { id: 'view', undo }
 const cases: Record<string, readonly [unknown, unknown]> = {
   'agent.chat.page': [{ window: { _tag: 'around', anchor: '1', before: 5, limit: 20 } }, { page: { items: [], banner: { _tag: 'none' }, moreAbove: true, moreBelow: true, composerEnabled: true }, cards: [], messages: [] }],
   'agent.chat.summary': [null, { unread: 1, busy: false }],
-  'agent.chat.send': [{ ...op, text: 'Example' }, accepted],
+  'agent.chat.send': [{ ...op, text: 'Example', files: [{ _tag: 'image', name: 'chart.png', mimeType: 'image/png', data: 'AAAA', width: 640, height: 400, thumb: 'data:image/webp;base64,AAAA' }, { _tag: 'text', name: 'notes.md', text: 'Example', cut: false }] }, accepted],
+  'agent.chat.image': [{ opId: 'previous', n: 0 }, 'data:image/webp;base64,AAAA'],
+  'agent.chat.reads': [null, { images: true }],
   'agent.chat.react': [{ ...op, target: { _tag: 'bubble', id: 'run:0' }, emoji: '🎉' }, accepted],
   'agent.chat.retry': [{ ...op, interruptedOpId: 'previous' }, accepted],
   'agent.chat.read': [{ through: '1' }, undefined],

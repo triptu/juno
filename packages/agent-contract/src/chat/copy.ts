@@ -9,6 +9,7 @@
  *
  * SPEC §17 applies: sentence case, verb-first buttons, no emoji.
  */
+import { filesLeftCopy } from './files'
 
 /** "$2.00", "$0.35". Two decimals, always. */
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
@@ -27,6 +28,8 @@ export const chatCopy = {
     /** In the Juno panel beside a topic. */
     panelPlaceholder: 'Ask about this topic',
     send: 'Send',
+    /** Under files a send to Juno leaves in the composer, one line for each reason (`JunoLeft`). */
+    filesLeft: filesLeftCopy,
   },
   /** The About line over an owner bubble and the About chip above the panel's composer (SPEC 7). */
   about: {

@@ -23,6 +23,7 @@ View-shaped types for the Juno chat (SPEC "Juno Agent", plan v3 §12 and §13). 
 | `page.ts` | `ChatPage` (items, `moreAbove` and `moreBelow`, the `Banner` picked by precedence: otherDevice, updateNeeded, recovery, aiOff, paused, offline) and `ChatSummary` (unread count, busy while a job runs, the job line the sidebar and home show) |
 | `pages.ts` | The header-menu pages: `ScheduledPage`, `RemembersPage`, `MemoryPage`, `ActivityPage`, `ConnectionsPage` (with the T3 address settings), `ReviewPage` (recovery), `JunoSettingsPage` (with `Ownership`) |
 | `commands.ts` | `CardCommand`: what a card button asks for, one union for every card. The views call back with it; `@juno/state/agent` maps it to the card RPCs |
+| `files.ts` | Files the owner gives Juno: which types it reads (`junoFileKind`), the limits, `fitImage` (the size an image is scaled to), `imageTokenBound`, `imageSize`, `cutText`, `junoTakes` (what a send takes and why the rest stays), and the wire shapes (`JunoFileInput` on a send, `OwnerFile` on the bubble) |
 | `copy.ts` | `chatCopy`: every fixed string the chat prints: plan v3 §13.2 states, ending and failure lines, banner chips and lines, card buttons and after-lines, the Remove sheet, the pages. The model never writes any of them |
 
 Rules of the shape:

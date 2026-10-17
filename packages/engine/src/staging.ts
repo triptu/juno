@@ -22,7 +22,7 @@ import { Clock, Context, Effect, Layer, PubSub, Stream } from 'effect'
 import { MAX_FILE_BYTES, NotSignedIn, Rejected, type StagedFile, type StageError } from '@juno/contract'
 import { pendingPosts, uploadedNames, type PendingFile } from '@juno/sync'
 import { Workspace, type OpenWorkspace } from './workspace'
-import { imageSize } from './imageSize'
+import { imageSize } from '@juno/agent-contract'
 
 /** Staged bytes no post names are deleted after this long. */
 const SWEEP_AFTER_MILLIS = 24 * 60 * 60_000
