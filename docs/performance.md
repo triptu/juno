@@ -25,7 +25,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Sidebar resize drag | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames | Only the sidebar box's inline `width` changes, at most once per frame; nothing re-renders until the drag ends. A custom property on the shell cost 4.7 ms of style recalculation per frame, because every element under it inherits it. Asserted by `sidebar drag` in `perf.spec.ts` on the large workspace with a topic open. |
 | Sidebar filter or scope change | 50 ms | Query, delta, render. The old list stays on screen until the new one is ready. |
 | ⌘K open | 50 ms | Input focused and recent rows painted. |
-| Media viewer open | 50 ms | `pointerdown` on a picture in a message → the viewer painted with the item's thumbnail in its final box and the filmstrip. The budget of the other overlays (⌘K). The chunk is preloaded once a topic has painted; strip images load lazily and the full image fades in later. Measured by `media viewer open` in `perf.spec.ts`. |
+| Media viewer open | 50 ms | `click` on a picture in a message (its activating event; a press is held about 60 ms before it) → the viewer painted with the item's thumbnail in its final box and the filmstrip. The budget of the other overlays (⌘K). The chunk is preloaded once a topic has painted; strip images load lazily and the full image fades in later. Measured by `media viewer open` in `perf.spec.ts`. |
 | ⌘K keystroke → results painted | 100 ms, typing never blocked | Local FTS only. The AI command parse arrives later and never delays results. |
 | Keystroke → character painted (composer, ⌘K, any text field) | Within one refresh interval of a bare `<input>` measured in the same run (8.3 ms at 120 Hz, 16.7 ms at 60 Hz), p95; zero long animation frames while typing | Input event timestamp to its frame's presentation feedback; see 7.1. Until 10-15 this was an absolute 16 ms, which the bare input misses too. Event Timing is diagnostic only. The @ and # suggestions keep to it: each keystroke narrows the last answer in the renderer and the engine's answer follows (`mentions.people`, `mentions.channels`, local only). Measured by `mention typing` in `perf.spec.ts` (each keystroke of "@ma ", against the bare input as the keystroke controls are) and checked by the `mention-typing` feel scenario. |
 | Send (Enter) → pending message painted | 50 ms | Only ready wrong-place routing may stop a send; Enter never waits for a model. Text fixes show after sending; the grammar request starts on the typing pause, so its answer is usually ready by send. Results paint within one second on the same topic or are dropped. The suggestion is an overlay with no reserved space. |
@@ -919,6 +919,100 @@ last row of a 30-row sidebar its art while the row is skipped, waits past
 the fade, scrolls it into view and reads the placeholder in the first
 frame drawn: opacity 0 and no running animation, with and without reduced
 motion. On the old code it read opacity 0.94 with a running transition.
+
+### 8.6 A quiet-Mac pass after the 10-17 merges (10-17)
+
+Full `pnpm perf` and `pnpm test:feel` runs on the shared M2 (60 Hz, so a
+one-frame budget is 24.7 ms), at night with no other agent's job holding
+the lock. "Before" is main at `10317936`; "after" is this pass's branch on
+main at `4574f250`, which also keeps the engine's background AI jobs off in
+tests (`49a76117`). Load was 2 to 5.5, except warm start in the first run
+(7.7). ms, p95 unless marked.
+
+| Metric | Before | After | Budget |
+| --- | --- | --- | --- |
+| Topic open, uncached | 38.3 | 36.0 | 50 |
+| Topic open, cached / prefetched | 18.0 / 20.2 | 18.1 / 19.5 | 50 / 24.7 |
+| Tab switch, mounted / unmounted | 18.4 / 19.2 | 19.0 / 18.0 | 24.7 / 50 |
+| Peek open | 12.1 | 15.5 | 24.7 |
+| Home open, including after idle | **116.5** | **65.1** | 50 |
+| Media viewer open | did not run | 11.0, from the click | 50 |
+| Filter change | 21.8 | 21.8 | 50 |
+| ⌘K open / keystroke to rows | 12.7 / 30.8 | 18.2 / 29.4 | 50 / 100 |
+| Send / send in Main | 35.1 / 41.7 | 35.7 / 39.0 | 50 |
+| Live update, sidebar / open thread | 15.8 / 26.3 | 19.4 / 28.1 | 50 |
+| Row hover | 13.1 | 7.5 | 24.7 |
+| Juno panel open / chat send to bubble | 18.7 / 21.2 | 17.8 / 22.3 | 24.7 |
+| New chat open | 18.1 | 18.0 | 24.7 |
+| All topics open | 23.6 | 19.5 | 50 |
+| First opens in a second app (account, switcher, emoji, Settings) | 16.3, 15.5, 34.0, 20.6 | 16.8, 16.2, 33.1, 18.1 | 50 |
+| Warm start to shell / rows, median | 375.6 / 490.6 | 385.7 / 438.8 | 400 / 500 |
+| Sidebar drag, work per frame | 6.7 | 6.4 | 8.3 |
+| Sidebar scroll, continuous / held-clock | 5.0 / 4.2, **2 long frames** | 5.7 / 4.0 | 8.3 / 7 |
+| All topics scroll | 6.6 / 5.2 | 5.7 / 4.7 | 8.3 / 7 |
+| Message scroll and prepend | **stopped at 250 rows** | 6.4 / 3.5, 0 px shift | 8.3 / 7 |
+| Chat scroll | 5.2 / 3.6 | 4.8 / 3.6 | 8.3 / 7 |
+
+Keystrokes stayed within one refresh interval of the same run's bare
+input in every surface (after: composer 51.8 against a 56.1 budget, emoji
+58.4 against 71.2). The initial JS is 1,047.0 KB of 1,100 KB.
+
+The first run passed 21 of 25 scenarios, the after run 24 of 25. The feel
+suite went from 14 of 18 to 18 of 18.
+
+- **Uncached topic open was load.** The 195 ms reading on 10-16 was taken
+  with about 14 agents on the Mac. Quiet, it measured 38.3 and 36.0 ms,
+  within 50.
+- **Media viewer (test fixed).** The scenario timed out: `#eng` opens at
+  its divider, so the injected message sat under the composer and the
+  press missed the picture. Once it was in view, the open measured
+  84.6 ms, because a tile opens the viewer on `click` and the measure
+  started at `pointerdown`, holding the driver's 60 ms press. It is now
+  timed from the click, as the first-open popovers are (decision log,
+  10-17 05:17); the budget is unchanged.
+- **Open at the bottom jumped 31 px (fixed).** A bisect over the merges
+  found `5820838d` (engine-small-1017). Since `893855e8`, a reply that a
+  search match stored is `partial` and the open fetches the thread's
+  replies again, which is how its reaction is first stored. But the
+  message query still counted partial replies as covering the window, so
+  the topic painted the search matches and the reaction grew the message
+  a frame later. The coverage check now counts only full replies, as the
+  open's own check does, so the body waits for the replies page like any
+  partial cache (3.3). A thread known only from search now shows its header and an
+  empty body until Slack answers, where before it showed incomplete rows.
+  The feel scenario opens the thread once first, so its recorded open
+  reads a full cache.
+- **Palette feel scenario (test fixed).** Since ⌘K opened on Conversations
+  (`36fc9db2`), its six recent topics are on the Messages tab; the
+  scenario now waits for the Frequent rows.
+- **Not reproduced.** The first run's prepend that stopped at 250 rows
+  and the sidebar's two long frames (234 and 361 ms, no scripts and no
+  blocking time, the shape of the first wheel step after idle in 8.5)
+  passed on two reruns each, on both the old build and the new main. So
+  did the feel failures of the long thread with late images (an icon in
+  the header moved 40 px in frame 126) and of the tab restore (its row was
+  not found within 30 s at load 8.8).
+- **Open miss: Home open after idle.** Six runs of the same code read
+  116.5, 38.9, 43.0, 31.9, 65.1 and 72.2 ms; every miss is in the five
+  opens that follow a 31 s idle gap, when Home's subscription has expired.
+  Traced, the slow ones keep the main thread busy for the whole measure
+  (94.2 of 94.9 ms, 71.9 of 72.2 ms): taking down the topic (16 ms of
+  `removeChild`), mounting Home (layout 16 ms, paint 11 ms, text shaping
+  4 ms) and script. A quick open does the same work in about 10 ms. It
+  never waits on the engine, so warming `home.view` on hover would not
+  help; this is the low clock after an idle gap (8.5), which this
+  scenario meets on purpose. It was red on 10-16 too (79.8 ms). Next: a
+  held-clock reading of the same opens, as the scroll gates have, to
+  separate the clock from the work.
+- **Initial JS grew.** From 997.1 KB at `90928615` to 1,047.0 KB. Before
+  minification the entry gained about 99 KB, spread over the day's
+  features: the topic container's hooks (41 KB), the media grid (11 KB),
+  the workspace strip (9 KB), tooltips (8 KB), the reactors popover
+  (8 KB) and composer links (16 KB with their editor and rules), while
+  the topic view and the pickers shrank. No single dependency stands out.
+  Warm start passed; the 53 KB left is the room for the next features.
+
+Logs are under `.juno-status/perf-pass-1017/`.
 
 ### Engine speed measurements (2026-10-15)
 
