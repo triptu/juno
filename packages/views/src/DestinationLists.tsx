@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionGroupLabel, OptionList, OptionRow, SparkleDuotone, useOptionListKeys } from '@juno/ui'
 import { Highlighted } from './Highlighted'
 import { hueFor, initials, kindIcon } from './look'
@@ -145,7 +145,7 @@ function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly i
       size={36}
       active={activeId === id}
       selected={selected}
-      leading={juno ? <Icon icon={SparkleDuotone} size={15} /> : <Icon icon={Globe} size={15} />}
+      leading={<span {...stylex.props(styles.mark)}>{juno ? <Icon icon={SparkleDuotone} size={15} /> : <Icon icon={Globe} size={15} />}</span>}
       label={juno ? 'Juno' : 'Anywhere'}
       {...(juno ? { sub: 'Ask Juno' } : {})}
       onSelect={onSelect}
@@ -154,13 +154,24 @@ function FirstRow({ id, activeId, selected, onSelect, onActivate }: { readonly i
   )
 }
 
+/** A face or the kind's icon, in a slot as wide as the face, so every name starts on one edge. */
 function ConversationMark({ conversation }: { readonly conversation: PickConversation }) {
   const person = conversation.person
-  if (person === undefined) return <Icon icon={kindIcon(conversation.kind)} size={15} />
+  if (person === undefined)
+    return (
+      <span {...stylex.props(styles.mark)}>
+        <Icon icon={kindIcon(conversation.kind)} size={15} />
+      </span>
+    )
   return <Avatar size={20} label={initials(person.name)} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarSmallUrl || person.avatarUrl })} />
 }
 
 const styles = stylex.create({
+  mark: {
+    display: 'inline-flex',
+    justifyContent: 'center',
+    width: sizes['--avatar-20'],
+  },
   scroll: {
     maxHeight: layout['--destination-list-max-height'],
     overflowY: 'auto',
