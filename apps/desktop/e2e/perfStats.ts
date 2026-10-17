@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { loadavg } from 'node:os'
 import { resolve } from 'node:path'
+import { Worker } from 'node:worker_threads'
 
 const ROOT = resolve(__dirname, '../../..')
 
@@ -40,3 +41,24 @@ export function stats(name: string, samples: ReadonlyArray<number>): { readonly 
   return { median, p95 }
 }
 
+/**
+ * Keep two cores busy without changing the renderer's workload, so the CPU
+ * clock stays up (performance.md 7.3). Returns the function that stops them.
+ */
+export async function holdClock(): Promise<() => Promise<void>> {
+  const workers = Array.from({ length: 2 }, () => new Worker(`
+    const { parentPort } = require('node:worker_threads')
+    parentPort.postMessage('ready')
+    for (;;) Math.sqrt(Math.random())
+  `, { eval: true }))
+  try {
+    await Promise.all(workers.map((worker) => new Promise<void>((resolve, reject) => {
+      worker.once('message', () => resolve())
+      worker.once('error', reject)
+    })))
+  } catch (error) {
+    await Promise.all(workers.map((worker) => worker.terminate()))
+    throw error
+  }
+  return async () => { await Promise.all(workers.map((worker) => worker.terminate())) }
+}
