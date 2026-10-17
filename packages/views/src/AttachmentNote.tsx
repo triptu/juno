@@ -6,15 +6,15 @@ import { Text } from '@juno/ui'
 export interface AttachmentNoteProps {
   /** The composer's file chips. */
   readonly chips: ReactNode
-  /** One short line about them: "Juno reads text only. Pick a person or channel to send files." */
+  /** One short line about the files a send to Juno leaves: "This model can't read images. Choose another in Settings › Juno." */
   readonly note: string
 }
 
 /**
  * The file chips with a quiet line under them, in the composer's
- * attachments slot. Home uses it while Juno is chosen and files are
- * attached (SPEC 12, "Writing"): a send to Juno takes the text, and the
- * files stay for a person or channel.
+ * attachments slot. Home, the Juno tab and the panel use it while Juno is
+ * where the draft goes and some files are ones Juno cannot take (SPEC 12,
+ * "Writing"): a send to Juno takes the rest, and these stay.
  */
 export function AttachmentNote({ chips, note }: AttachmentNoteProps) {
   return (

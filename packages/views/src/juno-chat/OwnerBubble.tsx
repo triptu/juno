@@ -4,6 +4,7 @@ import { aboutLabel, chatCopy, type About, type Delivery, type OwnerMessageItem 
 import { accent, chat, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Text } from '@juno/ui'
 import type { ChatActions } from './commands'
+import { OwnerFiles } from './OwnerFiles'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
@@ -25,7 +26,8 @@ export interface OwnerBubbleProps {
  * sent from the Juno panel or with an About chip has the "About …" line
  * over its group's first bubble; a topic's opens the topic. A reply
  * shows its quote above; Juno's reaction sits on the top corner, out of
- * flow. A message sent while Juno works looks like any other. The fill
+ * flow. Images and text files the message gave Juno sit over the bubble;
+ * a message of files alone has no bubble. A message sent while Juno works looks like any other. The fill
  * and text come from the `chat` token group, so the owner's colour choice
  * is a token change.
  */
@@ -34,6 +36,10 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
   const menu = actions.onContextMenu
   const replyTo = item.replyTo
   const about = item.about !== undefined && (item.group === 'first' || item.group === 'single') ? item.about : undefined
+  const files = item.files !== undefined && item.files.length > 0 ? item.files : undefined
+  // A message of files alone has no bubble.
+  const wordless = files !== undefined && item.text.trim() === ''
+  const onMenu = menu === undefined ? undefined : (event: MouseEvent<HTMLElement>) => menu({ kind: 'owner', opId: item.opId, ...(item.id === undefined ? {} : { id: item.id }) }, event)
   return (
     <div data-chat-owner={item.opId} {...stylex.props(groupGap[item.group], styles.root)}>
       {about !== undefined ? <AboutLine about={about} actions={actions} /> : null}
@@ -46,14 +52,21 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
         <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
           {messageTime(item.at, now)}
         </Text>
-        <div
-          onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'owner', opId: item.opId, ...(item.id === undefined ? {} : { id: item.id }) }, event)}
-          {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailEnd)}
-        >
-          <Text variant="bodySmall" tone="inherit" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
-            {item.text}
-          </Text>
-          <ReactionBadge reactions={item.reactions} corner="start" />
+        <div {...stylex.props(styles.content)}>
+          {files !== undefined ? (
+            <div onContextMenu={wordless ? onMenu : undefined} {...stylex.props(wordless && rowStyles.anchor)}>
+              <OwnerFiles opId={item.opId} files={files} renderImage={actions.renderOwnerImage} />
+              {wordless ? <ReactionBadge reactions={item.reactions} corner="start" /> : null}
+            </div>
+          ) : null}
+          {wordless ? null : (
+            <div onContextMenu={onMenu} {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, styles.fill, end && rowStyles.tailEnd)}>
+              <Text variant="bodySmall" tone="inherit" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
+                {item.text}
+              </Text>
+              <ReactionBadge reactions={item.reactions} corner="start" />
+            </div>
+          )}
         </div>
       </div>
       {end ? (
@@ -151,6 +164,18 @@ const styles = stylex.create({
     outlineOffset: sizes['--focus-ring-offset'],
     scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
+  },
+  // Inside `content`, which already has the bubble's width.
+  fill: {
+    maxWidth: '100%',
+  },
+  // Files over the bubble, both on the row's end edge, no wider than a bubble.
+  content: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    minWidth: 0,
+    maxWidth: chat['--bubble-max-width'],
   },
   quote: {
     display: 'flex',

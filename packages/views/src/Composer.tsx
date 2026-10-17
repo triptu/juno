@@ -87,9 +87,10 @@ const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types
 
 /**
  * A paste or a drop with files is taken, and a text paste the owner takes;
- * other text pastes and text drags stay the browser's.
+ * other text pastes and text drags stay the browser's. The Juno composer
+ * takes files the same way.
  */
-function transfers(onFiles: ComposerProps['onFiles'], onPasteText: ComposerProps['onPasteText']) {
+export function transfers(onFiles: ComposerProps['onFiles'], onPasteText: ComposerProps['onPasteText']) {
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(event.clipboardData.files)
     if (files.length === 0 || onFiles === undefined) {

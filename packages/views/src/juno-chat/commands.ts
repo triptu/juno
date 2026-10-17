@@ -3,8 +3,8 @@
  * `CardCommand` (in `@juno/agent-contract`, so the state layer can map it to
  * the card RPCs without importing views).
  */
-import type { MouseEvent } from 'react'
-import type { BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, ReplyTarget } from '@juno/agent-contract'
+import type { MouseEvent, ReactNode } from 'react'
+import type { BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, OwnerFile, ReplyTarget } from '@juno/agent-contract'
 import type { ActivateEvent } from '@juno/ui'
 
 export type { CardCommand } from '@juno/agent-contract'
@@ -38,6 +38,8 @@ export interface ChatActions {
   readonly onGroupLabel: (id: string, action: GroupLabelAction) => void
   /** Right-click on a bubble: the container shows the native menu. */
   readonly onContextMenu?: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => void
+  /** An image the owner sent, with its thumbnail (`OwnerImage`): the container reads it from the agent. */
+  readonly renderOwnerImage?: (opId: OpId, file: Extract<OwnerFile, { _tag: 'image' }>) => ReactNode
 }
 
 export const noopActions: ChatActions = {

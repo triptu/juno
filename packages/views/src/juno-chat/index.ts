@@ -9,5 +9,6 @@ export { JunoHeader, JunoPanelActions } from './JunoHeader'
 
 export { JunoPanelContext, type PanelPlace } from './JunoPanelContext'
 export { NoProvider } from './NoProvider'
+export { OwnerImage, type OwnerImageFile } from './OwnerFiles'
 
 export { RemoveSheet } from './RemoveSheet'

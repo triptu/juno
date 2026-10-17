@@ -71,7 +71,7 @@ export const owner = (
   group: GroupPosition = 'single',
   delivery: Delivery = { _tag: 'sent' },
   at = NOW - 4 * MINUTE,
-  extra: { readonly replyTo?: Quote; readonly reactions?: ReadonlyArray<Reaction>; readonly about?: About } = {},
+  extra: { readonly replyTo?: Quote; readonly reactions?: ReadonlyArray<Reaction>; readonly about?: About; readonly files?: OwnerMessageItem['files'] } = {},
 ): OwnerMessageItem => ({
   _tag: 'owner',
   opId: opId(`op-${id}`),
@@ -81,6 +81,7 @@ export const owner = (
   delivery,
   ...(extra.replyTo === undefined ? {} : { replyTo: extra.replyTo }),
   ...(extra.about === undefined ? {} : { about: extra.about }),
+  ...(extra.files === undefined ? {} : { files: extra.files }),
   reactions: extra.reactions ?? [],
   group,
 })
