@@ -20,7 +20,7 @@ import {
 import { junoNavAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { Composer, DestinationChip, destinationLabel, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { Composer, DestinationChip, destinationLabel, holdKeys, HomeRecent, HomeWriteTop, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { junoCommands } from './juno/actions'
@@ -52,7 +52,10 @@ function placeholderOf(draft: HomeDraft, junoOn: boolean, jobLine: string | unde
 /**
  * A first @ or # while Juno is chosen: the "Send to" rows, the highlighted
  * one, and the keys that drive them. Esc closes them until the text stops
- * starting that way.
+ * starting that way. Tab or Enter while the rows for the typed text are
+ * still on their way (an earlier query's still shown, or none) picks the
+ * first of them once they land, and keys typed after it wait for the pick
+ * (`holdKeys`), as the destination list's search does.
  */
 function useSendTo(draft: HomeDraft, onPick: (conversation: PickConversation | undefined) => void) {
   const [dismissed, setDismissed] = useState(false)
@@ -64,8 +67,29 @@ function useSendTo(draft: HomeDraft, onPick: (conversation: PickConversation | u
   const [chosenKey, setChosenKey] = useState<string | undefined>(undefined)
   const activeKey = rows.some((row) => row.key === chosenKey) ? chosenKey : rows[0]?.key
   const open = trigger !== undefined && rows.length > 0 && activeKey !== undefined
+  const loading = trigger !== undefined && held.loading
+  const pending = useRef(false)
+  // The waiting pick, once the rows are in. Held keys go in after the field shows the pick, below.
+  const [picked, setPicked] = useState(0)
+  useEffect(() => {
+    if (!pending.current || loading || trigger === undefined) return
+    pending.current = false
+    const first = sendToRows(held.value, trigger)[0]
+    if (first !== undefined) onPick(first)
+    setPicked((n) => n + 1)
+  }, [loading, held.value, trigger, onPick])
+  useLayoutEffect(() => {
+    if (picked > 0) releaseKeys()
+  }, [picked])
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (!open || event.metaKey || event.altKey || event.ctrlKey) return false
+    if (event.metaKey || event.altKey || event.ctrlKey) return false
+    if (loading && (event.key === 'Tab' || event.key === 'Enter') && !event.shiftKey) {
+      event.preventDefault()
+      pending.current = true
+      holdKeys()
+      return true
+    }
+    if (!open) return false
     const at = rows.findIndex((row) => row.key === activeKey)
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
@@ -93,6 +117,7 @@ function useSendTo(draft: HomeDraft, onPick: (conversation: PickConversation | u
     dismiss: () => setDismissed(true),
     /** A change that no longer starts with @ or # lets the next one open the list again. */
     typed: (value: string) => {
+      pending.current = false
       if (dismissed && !FIRST.test(value)) setDismissed(false)
     },
   }
