@@ -322,7 +322,7 @@ function Empty({ main, status }: { readonly main: boolean; readonly status: Mess
     return <EmptyState illustration="nothing-here" title="Nothing here yet" body="Slack couldn't be reached. Juno fetches this topic when you're back online." enter={false} />
   }
   return main ? (
-    <EmptyState illustration="nothing-here" title="Quiet in here" body="New messages in this channel show up here. Threads live behind the Threads button." enter={false} />
+    <EmptyState illustration="nothing-here" title="Quiet in here" body="New messages in this channel show up here. Click Main above for its threads." enter={false} />
   ) : (
     <EmptyState illustration="nothing-here" title="No messages yet" body="Replies show up here as they arrive." enter={false} />
   )
