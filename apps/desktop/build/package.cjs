@@ -1,6 +1,8 @@
 const { build } = require('electron-builder')
-const { rmSync } = require('node:fs')
-const { resolve } = require('node:path')
+const { execFileSync } = require('node:child_process')
+const { mkdtempSync, rmSync } = require('node:fs')
+const { tmpdir } = require('node:os')
+const { join, resolve } = require('node:path')
 
 const feed = process.env.JUNO_UPDATE_FEED_URL
 if (feed) {
@@ -30,9 +32,18 @@ if (!release) process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 // A previous build may have enabled updates; never leave its checksums behind.
 rmSync(resolve(__dirname, '../release/latest-mac.yml'), { force: true })
 
+// The workspace links dependencies from pnpm's global virtual store, where
+// electron-builder cannot find the dependencies of a dependency. Package from
+// `pnpm deploy` instead: the built app and its production dependencies as
+// real files in a temporary folder. Native rebuilds then touch only this copy.
+const staging = mkdtempSync(join(tmpdir(), 'juno-deploy-'))
+const app = join(staging, 'app')
+execFileSync('pnpm', ['--filter', '@juno/desktop', 'deploy', '--prod', app], { cwd: resolve(__dirname, '..'), stdio: 'inherit' })
+
 build({
   config: {
     extends: './electron-builder.yml',
+    directories: { app, output: 'release', buildResources: 'build' },
     forceCodeSigning: release,
     publish: feed ? { provider: 'generic', url: feed } : null,
     mac: { notarize: release, ...(!release ? { identity: null } : {}) },
@@ -40,7 +51,9 @@ build({
     electronFuses: { resetAdHocDarwinSignature: !release },
   },
   publish: 'never',
-}).catch(() => {
-  console.error('Packaging failed; see electron-builder output above.')
-  process.exitCode = 1
 })
+  .catch(() => {
+    console.error('Packaging failed; see electron-builder output above.')
+    process.exitCode = 1
+  })
+  .finally(() => rmSync(staging, { recursive: true, force: true }))

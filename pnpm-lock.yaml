@@ -162,6 +162,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-iEJCIJ4Xe2oV5TJZF7bCK6K2JWpGMUU0BfjC9RYo3gw=
+
 importers:
 
   .:
@@ -262,7 +264,7 @@ importers:
         version: link:../../packages/views
       '@playwright/test':
         specifier: 1.64.0
-        version: 1.64.0
+        version: 1.64.0(electron@44.7.0(supports-color@7.2.0))
       '@stylexjs/unplugin':
         specifier: 0.19.1
         version: 0.19.1(supports-color@7.2.0)(unplugin@2.3.11)
@@ -338,7 +340,7 @@ importers:
         version: link:../../packages/testing
       '@playwright/test':
         specifier: 1.64.0
-        version: 1.64.0
+        version: 1.64.0(electron@44.7.0(supports-color@7.2.0))
       '@stylexjs/unplugin':
         specifier: 0.19.1
         version: 0.19.1(supports-color@7.2.0)(unplugin@2.3.11)
@@ -896,7 +898,7 @@ importers:
     devDependencies:
       '@playwright/test':
         specifier: 1.64.0
-        version: 1.64.0
+        version: 1.64.0(electron@44.7.0(supports-color@7.2.0))
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -939,7 +941,7 @@ importers:
         version: link:../topic-art
       '@phosphor-icons/react':
         specifier: 2.1.10
-        version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 2.1.10(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@stylexjs/stylex':
         specifier: 0.19.1
         version: 0.19.1
@@ -976,7 +978,7 @@ importers:
         version: link:../ui
       '@phosphor-icons/react':
         specifier: 2.1.10
-        version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 2.1.10(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@stylexjs/stylex':
         specifier: 0.19.1
         version: 0.19.1
@@ -2299,8 +2301,12 @@ packages:
     resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
     engines: {node: '>=10'}
     peerDependencies:
+      '@types/react': '*'
       react: '>= 16.8'
       react-dom: '>= 16.8'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@playwright/test@1.64.0':
     resolution: {integrity: sha512-oTN9FNYuN6bqQMwiho6jJKLCG2/QOYCixGXuCjRmzOq23eODeukuY2XiAVoVpAECbuezMt1MHQjAiQxK8F+Y+g==}
@@ -3863,6 +3869,11 @@ packages:
     resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
     engines: {node: '>=20'}
     hasBin: true
+    peerDependencies:
+      electron: '*'
+    peerDependenciesMeta:
+      electron:
+        optional: true
 
   playwright@1.64.0:
     resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
@@ -5113,7 +5124,9 @@ snapshots:
       line-column: 1.0.2
       lodash: 4.18.1
       lodash.clonedeep: 4.5.0
+      protobufjs: 7.6.6
       seedrandom: 3.0.5
+      semver: 7.7.4
       tar: 7.5.22
       yargs: 17.7.3
 
@@ -5519,14 +5532,18 @@ snapshots:
       tslib: 2.8.1
       webcrypto-core: 1.9.2
 
-  '@phosphor-icons/react@2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@phosphor-icons/react@2.1.10(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
+    optionalDependencies:
+      '@types/react': 19.3.0
 
-  '@playwright/test@1.64.0':
+  '@playwright/test@1.64.0(electron@44.7.0(supports-color@7.2.0))':
     dependencies:
-      playwright: 1.64.0
+      playwright: 1.64.0(electron@44.7.0(supports-color@7.2.0))
+    transitivePeerDependencies:
+      - electron
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -7155,11 +7172,15 @@ snapshots:
       pvutils: 1.2.0
       tslib: 2.8.1
 
-  playwright-core@1.64.0: {}
+  playwright-core@1.64.0(electron@44.7.0(supports-color@7.2.0)):
+    optionalDependencies:
+      electron: 44.7.0(supports-color@7.2.0)
 
-  playwright@1.64.0:
+  playwright@1.64.0(electron@44.7.0(supports-color@7.2.0)):
     dependencies:
-      playwright-core: 1.64.0
+      playwright-core: 1.64.0(electron@44.7.0(supports-color@7.2.0))
+    transitivePeerDependencies:
+      - electron
 
   plist@3.1.0:
     dependencies:
