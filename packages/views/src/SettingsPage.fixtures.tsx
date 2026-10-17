@@ -1,4 +1,4 @@
-import { DEFAULT_QUICK_REACTIONS, sendCheckDefaults, sendCheckPrefKeys, type AiActivity, type AiCallRow, type ProviderState } from '@juno/contract'
+import { DEFAULT_QUICK_REACTIONS, emojiCatalog, sendCheckDefaults, sendCheckPrefKeys, type AiActivity, type AiCallRow, type ProviderState } from '@juno/contract'
 import { useLayoutEffect, type ReactNode } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
@@ -13,6 +13,7 @@ import { notificationsBase } from './NotificationsPage.fixtures'
 import { SettingsPage, type SettingsPageProps } from './SettingsPage'
 import { AiActivityPage } from './AiActivityPage'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
+import { EmojiPicker } from './EmojiPicker'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
 import { sevenQuickReactions } from './fixtures/quickReactions'
 import { UpdateSettings } from './UpdateSettings'
@@ -98,6 +99,8 @@ export default defineFixtures(
       'sharing-always-on': at('general', <SettingsGeneral hideWhileSharing sharingDetection="alwaysOn" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'read-mirroring-off': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} quietDays={7} onQuietDaysChange={noop} checks={checks} onCheckChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} tabExpiry="1d" onTabExpiryChange={noop} peekKey="option" onPeekKeyChange={noop} classifier onClassifierChange={noop} />),
       'appearance-quick-reactions': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={sevenQuickReactions} onChange={noop} onAdd={noop} />} />),
+      // Add's picker over the page, not clipped by the card.
+      'appearance-quick-reactions-picker': at('appearance', <SettingsAppearance theme="system" accent="coral" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} picker={<EmojiPicker catalog={emojiCatalog} recent={DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name)} selected={new Set(DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name))} onPick={noop} onClose={noop} />} />} />),
       // The minimum window with the sidebar hidden: the hours rows put their days and times under the label.
       'notifications-minimum-window': at('notifications', <NotificationsPage {...notificationsBase} />, { width: 720, height: 436, padded: false }),
       // The minimum window with the sidebar shown: Settings is 336 wide, so the list is a rail of icons.
