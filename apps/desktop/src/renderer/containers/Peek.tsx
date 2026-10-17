@@ -1,5 +1,5 @@
 import { memo, Suspense, useEffect, useRef, useState } from 'react'
-import { isPeekKey, messageListAtom, openTopic, peekKeyAtom, refreshMessages, registry, topicAtom } from '@juno/state'
+import { isPeekKey, messageListAtom, openTopic, peekKeyAtom, refreshMessages, registry, tickWelcome, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { PeekPlacement } from '@juno/views'
 import { chunk } from './chunks'
@@ -186,6 +186,11 @@ export const Peek = memo(function Peek() {
   }, [open])
 
   const shown = useWhenReady(peeking)
+  // A peek on screen: the welcome card's first hint (SPEC 4).
+  const peeked = shown !== undefined
+  useEffect(() => {
+    if (peeked) tickWelcome(registry, 'peek')
+  }, [peeked])
   if (peeking === undefined || shown === undefined) return null
   // Shown only once the chunk has loaded, so this never suspends; the boundary keeps it that way.
   return (

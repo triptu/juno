@@ -102,7 +102,7 @@ export const Events = {
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
  * Juno's last action, Settings (⌘,), which opens Settings, and Help › Show
- * the Tour, which opens the tour (SPEC 4).
+ * the Tour, which brings the welcome card back on Home (SPEC 4).
  */
 export type MenuCommand =
   /** ⌘T: a new tab with Home. */

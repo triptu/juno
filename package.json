@@ -33,7 +33,6 @@
     "package": "pnpm --filter @juno/desktop package",
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",
-    "tour:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery tour-shots",
     "smoke:live": "node scripts/smoke-live.ts",
     "probe:live": "node scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",

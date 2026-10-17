@@ -25,14 +25,23 @@ import {
   registry,
   setJunoPanelOpen,
   tabsAtom,
+  tickWelcome,
 } from '@juno/state'
 import { chatActions, junoPageActions } from '@juno/state/agent'
 import { afterNavigation, openJuno } from '../navigation'
 
 export { openJunoPage } from '../navigation'
 
-/** The chat's RPC-backed commands, one set for the app. */
-export const junoCommands = chatActions(registry)
+const chat = chatActions(registry)
+
+/** The chat's RPC-backed commands, one set for the app. A sent question is the welcome card's third hint (SPEC 4). */
+export const junoCommands: typeof chat = {
+  ...chat,
+  send: (...args) => {
+    tickWelcome(registry, 'juno')
+    return chat.send(...args)
+  },
+}
 
 const topicTabActive = (): boolean => {
   const tab = activeTab(registry.get(tabsAtom))
