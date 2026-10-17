@@ -17,7 +17,7 @@ import { ChannelRef } from '../refs'
 import { CommandResult, DraftRestore, FollowUpRestore } from './topics'
 
 /** Ranked in this order: at most one of each, and at most three in all. */
-export const HomeItemKind = Schema.Literals(['waiting', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'automatedMoves'])
+export const HomeItemKind = Schema.Literals(['waiting', 'mentioned', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /**
@@ -89,6 +89,21 @@ export const OldDraft = Schema.Struct({
 })
 export type OldDraft = typeof OldDraft.Type
 
+/**
+ * Why Home suggests unfollowing a thread or ignoring a channel: the unread
+ * stretch the cache knows (`unfollowEvidence`, `ignoreEvidence` in
+ * `@juno/domain`). "14 replies, never opened", "312 messages since the last
+ * one you read, 5 weeks ago".
+ */
+export const UnopenedWhy = Schema.Struct({
+  count: Schema.Int,
+  /** The cache holds only part of the stretch, so there may be more: "At least 120 messages". */
+  atLeast: Schema.Boolean,
+  /** The last message read, epoch milliseconds. Absent: no reply in the thread was ever read. */
+  lastRead: Schema.optionalKey(Schema.Number),
+})
+export type UnopenedWhy = typeof UnopenedWhy.Type
+
 /** A topic as a Home row names it. */
 export const HomeTopic = Schema.Struct({
   id: Schema.String,
@@ -108,14 +123,16 @@ export const HomeTopic = Schema.Struct({
   followUp: Schema.optionalKey(FollowUpMatch),
   /** Old drafts: the draft. */
   draft: Schema.optionalKey(OldDraft),
+  /** Unfollow and Ignore: the unread stretch behind the suggestion. */
+  unopened: Schema.optionalKey(UnopenedWhy),
 })
 export type HomeTopic = typeof HomeTopic.Type
 
 export const HomeItem = Schema.Struct({
-  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `automated:<channel id>`, `automatedMoves`. */
+  /** Stable for the same thing: `<kind>:<topic id>`, `followUp:<topic id>:<ts>`, `tidyUp`, `unfollow`, `ignore`, `automated:<channel id>`, `automatedMoves`. */
   id: Schema.String,
   kind: HomeItemKind,
-  /** The title line with AI off: "Elena asked you something", "3 topics look settled", "Move #ci-builds?". */
+  /** The title line with AI off: "Elena asked you something", "Maya mentioned you in #deploys", "3 topics look settled", "2 threads you never open", "Move #ci-builds?". */
   title: Schema.String,
   /** A sharper title line from the assistant, only when it was confident. Never changes the meta line. */
   aiTitle: Schema.optionalKey(Schema.String),
@@ -127,7 +144,7 @@ export const HomeItem = Schema.Struct({
   newCount: Schema.optionalKey(Schema.Int),
   /** Follow-up: the user's message the promise was found in, for Mark done. */
   messageTs: Schema.optionalKey(Schema.String),
-  /** Automated: the conversation asked about, for Move, Keep in All and its menu. Its Main is `topics[0]`. */
+  /** Automated: the conversation asked about, for Move, Keep in All and its menu. Its Main is `topics[0]`. Mentioned: the ignored channel, for its menu. */
   channel: Schema.optionalKey(ChannelRef),
   /** Automated: why it is asked, one plain line for the meta line: "Apps wrote 18 of the last 30 messages", or Juno's reason. */
   reason: Schema.optionalKey(Schema.String),
@@ -164,10 +181,14 @@ export const TidyUpPrefs = Schema.Struct({
   followUps: Schema.Boolean,
   /** Suggest deleting drafts untouched for two weeks in topics that moved on. */
   drafts: Schema.Boolean,
+  /** Suggest unfollowing threads you never open (Home's Unfollow card). */
+  unfollow: Schema.Boolean,
+  /** Suggest ignoring channels you never read (Home's Ignore card). */
+  ignore: Schema.Boolean,
 })
 export type TidyUpPrefs = typeof TidyUpPrefs.Type
 export const TIDY_UP_PREF = 'tidyUp'
-export const TIDY_UP_DEFAULTS: TidyUpPrefs = { quiet: '4h', threads: true, dms: true, followUps: true, drafts: true }
+export const TIDY_UP_DEFAULTS: TidyUpPrefs = { quiet: '4h', threads: true, dms: true, followUps: true, drafts: true, unfollow: true, ignore: true }
 export const TIDY_UP_QUIET_MILLIS: Record<TidyUpQuiet, number> = { '1h': 3_600_000, '4h': 4 * 3_600_000, '1d': 86_400_000, '3d': 3 * 86_400_000 }
 
 /** Reads the saved preference, filling what is missing or wrong from the defaults. */
@@ -180,6 +201,8 @@ export function tidyUpPrefsOf(value: unknown): TidyUpPrefs {
     dms: typeof saved.dms === 'boolean' ? saved.dms : TIDY_UP_DEFAULTS.dms,
     followUps: typeof saved.followUps === 'boolean' ? saved.followUps : TIDY_UP_DEFAULTS.followUps,
     drafts: typeof saved.drafts === 'boolean' ? saved.drafts : TIDY_UP_DEFAULTS.drafts,
+    unfollow: typeof saved.unfollow === 'boolean' ? saved.unfollow : TIDY_UP_DEFAULTS.unfollow,
+    ignore: typeof saved.ignore === 'boolean' ? saved.ignore : TIDY_UP_DEFAULTS.ignore,
   }
 }
 

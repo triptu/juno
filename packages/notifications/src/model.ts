@@ -6,6 +6,8 @@ export const Candidate = Schema.Struct({
   senderId: UserId,
   senderName: Schema.optionalKey(Schema.String),
   mentionsMe: Schema.Boolean,
+  /** By name or a group the owner is in, not @here: breaks through an ignored channel. Absent in rows logged before it existed. */
+  mentionsMeDirectly: Schema.optionalKey(Schema.Boolean),
   ts: Schema.String,
   topicId: Schema.String,
   text: Schema.String,

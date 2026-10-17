@@ -11,6 +11,7 @@ import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { homeStatements } from '../src/home/query'
+import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
 import { automatedStatements } from '../src/automatedView'
 import { movesStatements } from '../src/home/moves'
@@ -184,6 +185,10 @@ describe('query plans', () => {
         staleStatement('settledScore', '1700000000.000000', '1800000000.000000', 12),
         homeStatements.automated(),
         homeStatements.askedWhy('C0ALERTS'),
+        suggestedStatements.ignoredMentions('1700000000.000000'),
+        suggestedStatements.unreadChannels('1700000000.000000'),
+        suggestedStatements.mentionChannels('1700000000.000000'),
+        suggestedStatements.firstThreadUnread('C0ENG', '1700000000.000100', '1700000000.000100', 'U0ME'),
         homeStatements.kept(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
         automatedStatements.candidates(),
         automatedStatements.sample('C0ALERTS'),

@@ -30,7 +30,7 @@ import { AiSpend } from '../aiSpend'
 import { channelInfoOf, parseColumns, topicFrom, userIdsOf, userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
-import { FOLLOWED, HOME_SELECT, OPEN, type HomeRow } from './query'
+import { FOLLOWED, HOME_SELECT, OPEN, type HomeRow } from './rows'
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'prefs', 'sync_state']
 /** Changes in this window are one pass; a steady stream of changes still gets a pass per window. */
