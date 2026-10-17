@@ -307,6 +307,12 @@ export function carryOutcomes(store: Store, opId: string): string {
   })
 }
 
+/** Whether the outcomes input `opId` carried include a connection call's result. */
+export function carriesData(store: Store, opId: string): boolean {
+  const rows = store.db.prepare("SELECT card_id AS id FROM card_outcomes JOIN cards ON cards.id = card_outcomes.card_id WHERE carried_by = ? AND cards.kind = 'change'").all(opId) as Array<{ id: string }>
+  return rows.some((row) => clickOutputOf(store, row.id) !== undefined)
+}
+
 /** The model text of the last attempt any child of a card made, if its executor gave one. */
 function clickOutputOf(store: Store, cardId: string): string | undefined {
   const row = store.db

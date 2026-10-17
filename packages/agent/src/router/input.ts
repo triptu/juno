@@ -74,6 +74,8 @@ export function archivedBubble(store: Store, id: string): string | undefined {
 export interface CardText {
   /** The outcomes of settled cards the model has not read, for input `opId`; the same op gets the same text. */
   readonly carry: (opId: string) => string
+  /** Whether what `carry` gave input `opId` includes a connection call's result: untrusted data. */
+  readonly carriesData?: (opId: string) => boolean
   readonly quote: (cardId: string) => string | undefined
 }
 

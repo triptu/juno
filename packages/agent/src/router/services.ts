@@ -61,7 +61,7 @@ export function createTurnServices(setup: Setup) {
     startWake: (opId, persist) => scheduler.start(opId, persist),
     rotationDue: session.rotationDue,
     onRunEnded: poke,
-    cards: { carry: (opId) => actions.carry(opId), quote: (cardId) => actions.quote(cardId) },
+    cards: { carry: (opId) => actions.carry(opId), carriesData: (opId) => actions.carriesData(opId), quote: (cardId) => actions.quote(cardId) },
     admits: () => ownership.admits() && (options.online?.() ?? true),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })

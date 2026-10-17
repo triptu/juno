@@ -12,7 +12,7 @@ import type { JournalPosition, Mode } from '../store/ledger'
 import type { Store } from '../store/store'
 import type { ChildBinding } from '../policy/policy'
 import {
-  cardRow, cardViews, carryOutcomes, dismiss, editMessage, prepareChoice, proposeCard, quoteOf, recordClick,
+  cardRow, cardViews, carriesData, carryOutcomes, dismiss, editMessage, prepareChoice, proposeCard, quoteOf, recordClick,
   type CardView, type Choice, type Proposal,
 } from './cards'
 import { createDispatcher } from './dispatcher'
@@ -117,6 +117,8 @@ export function createActions(options: ActionsOptions & {
     undo: async (identity: Identity) => await resolved?.undo(identity) || await options.undoCard?.(identity) || false,
     /** Outcomes the model has not read, as text for input `opId` (§19.5). */
     carry: (opId: string) => carryOutcomes(store, opId),
+    /** Whether input `opId` carried a connection call's result. */
+    carriesData: (opId: string) => carriesData(store, opId),
     /** A reply's quote of a card. */
     quote: (cardId: string) => quoteOf(store, cardId),
     /**
