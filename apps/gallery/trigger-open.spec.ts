@@ -43,7 +43,7 @@ test('a trigger draws the same fill on hover, press and open', async ({ page }) 
     set.set(kind, route)
     triggers.set(key, set)
   }
-  expect([...triggers.keys()]).toEqual(expect.arrayContaining(['IconButton/more', 'IconButton/island', 'Button/ghost', 'AvatarButton/avatar', 'TopicHeader/title', 'TopicHeader/more', 'Home/chip']))
+  expect([...triggers.keys()]).toEqual(expect.arrayContaining(['IconButton/more', 'IconButton/island', 'Button/ghost', 'Button/filter', 'AvatarButton/avatar', 'TopicHeader/title', 'TopicHeader/more', 'Home/chip']))
   for (const [key, set] of triggers) {
     expect([...set.keys()].toSorted(), key).toEqual([...kinds].toSorted())
     const selector = set.get('hover')!.frame.hover!
