@@ -20,10 +20,12 @@ export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } fro
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
+  closeSidebarSheet,
   currentRowAtom,
   flushSidebar,
   focusedTopicAtom,
   nowAtom,
+  openSidebarSheet,
   releaseSidebarTopic,
   resumeSidebarHold,
   selectedTopicAtom,

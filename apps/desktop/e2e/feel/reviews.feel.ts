@@ -106,7 +106,7 @@ async function actOnRow(feel: Feel, juno: Juno, card: Card): Promise<void> {
         { kind: 'count', name: 'handled', within: 'body', selector: `${SHEET} li[data-review-row]:not([data-review-status="open"])` },
         { kind: 'rect', name: 'outcome', selector: `${SHEET} li[data-review-row]:not([data-review-status="open"]) [data-review-outcome]` },
       ],
-      regions: { sheet: SHEET, list: `${SHEET} ul[data-review-list]` },
+      regions: { sheet: SHEET, list: `${SHEET} ul[data-review-list]`, sidebar: 'aside[aria-label="Sidebar"]' },
       checks: [
         feedbackInOneFrame('look', 'pointerdown', 'the button press', { from: 'press' }),
         // The row is the user's own action: it says so at once, before the engine answers.
@@ -114,8 +114,9 @@ async function actOnRow(feel: Feel, juno: Juno, card: Card): Promise<void> {
         landsAndStays('outcome', 'the outcome'),
         landsAndStays('rowBoxes', 'the rows'),
         landsAndStays('list', 'the list'),
-        // The list, not the whole sheet: the sheet's layer spans the window, and Move back puts a row in the sidebar under it.
         noLayoutShift({ region: 'list', includeInput: true }),
+        // The sidebar holds its order while the sheet is open (SPEC 5): Move back's row waits for Done.
+        noLayoutShift({ region: 'sidebar', includeInput: true, label: 'the sidebar holds behind the sheet' }),
         noFlicker('sheet', 'the sheet'),
       ],
     },

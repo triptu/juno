@@ -61,7 +61,8 @@ test('a bot channel joined later moves by itself, the card says why, and Move ba
   await sheet.act(CI_BUILDS).click()
   await juno.expectToast('Moved #ci-builds back to All')
   await expect(sheet.outcome(CI_BUILDS)).toHaveText('Moved back to All')
-  await sidebar.row(CI_BUILDS).expectVisible()
+  // The sidebar holds behind the sheet (SPEC 5): the channel comes to All when the sheet closes.
+  await sidebar.row(CI_BUILDS).expectAbsent()
 
   // Undo on the row gives the channel back to Automated, where Juno had put it.
   await sheet.undo(CI_BUILDS).click()

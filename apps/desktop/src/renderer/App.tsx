@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, densityAtom, junoSetupPendingAtom, persistAccent, persistTheme, privacyAtom, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyPrivacy, applyTheme, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { followFullScreen } from './containers/fullScreen'
@@ -14,6 +14,9 @@ import { Workspace } from './containers/Workspace'
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
 const SetUpJuno = setup.component((module) => module.SetUpJuno)
+
+/** A sheet over the window holds the sidebar's order until it closes (SPEC 5, "Holding the order"). */
+const sheetOpen = { opened: () => openSidebarSheet(registry), closed: () => closeSidebarSheet(registry) }
 
 // The contract's names and the tokens' names must be the same set. These
 // assignments fail to compile if either side drifts.
@@ -81,12 +84,12 @@ export function App() {
   }
   if (signedIn !== undefined) {
     return (
-      <>
+      <SheetOpenContext.Provider value={sheetOpen}>
         <PrivacyRoot />
         <Frame sidebar={<Sidebar />} peek={<Peek />}>
           <Workspace />
         </Frame>
-      </>
+      </SheetOpenContext.Provider>
     )
   }
   return (

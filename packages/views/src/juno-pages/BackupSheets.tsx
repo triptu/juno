@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import { colors, fonts, layout, radii, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Surface, Text, TextField } from '@juno/ui'
@@ -11,6 +11,13 @@ import { cell } from './cell'
  * word that the old Mac is off, and Move to another Mac. Each is a panel in
  * `SheetLayer`, which dims the page and closes on Escape.
  */
+
+/**
+ * Told when a sheet opens and closes, so the app can hold what is behind it
+ * (the sidebar's order, SPEC 5). The app provides it once; without it,
+ * nothing is told.
+ */
+export const SheetOpenContext = createContext<{ readonly opened: () => void; readonly closed: () => void } | undefined>(undefined)
 
 const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
@@ -26,6 +33,13 @@ export function SheetLayer({ onClose, children }: { readonly onClose: () => void
   const layer = useRef<HTMLDivElement>(null)
   // Read on the first render, before the sheet's own autofocused button takes focus.
   const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null))
+  const told = useContext(SheetOpenContext)
+  // Before the first paint, so nothing behind the sheet moves in the frame it opens.
+  useLayoutEffect(() => {
+    if (told === undefined) return
+    told.opened()
+    return told.closed
+  }, [told])
   useEffect(() => {
     close.current = onClose
   })
