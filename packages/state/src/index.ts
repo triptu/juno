@@ -29,7 +29,6 @@ export {
   selectedTopicAtom,
   sidebarDotAtom,
   sidebarFilterAtom,
-  sidebarHoldAtom,
   sidebarListAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,

@@ -3,11 +3,11 @@ import type { TopicRow } from '@juno/contract'
 import { emptyWindow, type ListWindow } from '../src/list'
 import { holdOrder } from '../src/holdOrder'
 
-const topicRow = (id: string, rev = 1, section: TopicRow['section'] = 'recent'): TopicRow => ({
+const topicRow = (id: string, rev = 1, section: TopicRow['section'] = 'recent', at = 1000): TopicRow => ({
   id, rev, kind: 'thread', section, status: 'open', title: id, titleSource: 'fallback',
   preview: { sender: 'Dev', text: `Hello ${rev}` }, messageCount: 2, unreadCount: rev - 1, unreadExact: true,
   mentionsMe: false, tags: [], pinned: section === 'pinned', resolved: false, canResolveOnHover: true,
-  subscribed: true, newThreads: 0, lastActivityTs: '1.000000', lastActivityAt: 1000,
+  subscribed: true, newThreads: 0, lastActivityTs: '1.000000', lastActivityAt: at,
   channel: { id: 'C1', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'hash', color: 'cyan' },
   participants: [],
 })
@@ -15,10 +15,10 @@ const window = (...rows: TopicRow[]): ListWindow<TopicRow> => ({
   ...emptyWindow<TopicRow>(), order: rows.map((row) => row.id), rows: new Map(rows.map((row) => [row.id, row])),
 })
 const none = new Set<string>()
-const a = topicRow('a')
-const b = topicRow('b')
-const c = topicRow('c')
-const d = topicRow('d')
+const a = topicRow('a', 1, 'recent', 4000)
+const b = topicRow('b', 1, 'recent', 3000)
+const c = topicRow('c', 1, 'recent', 2000)
+const d = topicRow('d', 1, 'recent', 1000)
 
 describe('the held sidebar order', () => {
   it('keeps the order shown while new activity would move a row to the top', () => {
@@ -50,15 +50,17 @@ describe('the held sidebar order', () => {
     expect(holdOrder(held, window(pinned, a), none).rows.get('b')).toBe(held.rows.get('b'))
   })
 
-  it('moves a released row to its live place at once', () => {
-    const c2 = topicRow('c', 2)
+  it('moves a released row to its place by recency at once', () => {
+    const c2 = topicRow('c', 2, 'recent', 5000)
     expect(holdOrder(window(a, b, c), window(c2, a, b), new Set(['c'])).order).toEqual(['c', 'a', 'b'])
-    // Placed after the nearest row above it in the live order that is shown.
-    expect(holdOrder(window(a, b, c), window(d, a, c, b), new Set(['c'])).order).toEqual(['a', 'c', 'b'])
+    // A held row with newer activity, still low in the list, does not pull it down.
+    const b2 = topicRow('b', 2, 'recent', 6000)
+    expect(holdOrder(window(a, b, c), window(b2, c2, a), new Set(['c'])).order).toEqual(['c', 'a', 'b'])
   })
 
   it('adds a released new row and removes a released row that left', () => {
-    expect(holdOrder(window(a, b, c), window(d, a, b, c), new Set(['d'])).order).toEqual(['d', 'a', 'b', 'c'])
+    const d2 = topicRow('d', 2, 'recent', 3500)
+    expect(holdOrder(window(a, b, c), window(a, d2, b, c), new Set(['d'])).order).toEqual(['a', 'd', 'b', 'c'])
     const held = holdOrder(window(a, b, c), window(a, c), new Set(['b']))
     expect(held.order).toEqual(['a', 'c'])
     expect(held.rows.has('b')).toBe(false)

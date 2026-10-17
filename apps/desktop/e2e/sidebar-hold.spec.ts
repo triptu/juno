@@ -63,7 +63,7 @@ test('under the pointer, new activity does not move rows, and a press opens the 
   await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
 
   // Leaving the list applies the new order in one step, and the selection stays.
-  await win.mouse.move(900, 400, { steps: 4 })
+  await juno.sidebar.leave()
   await expectMovedAbove(juno, movers, target)
   const after = await recentIds(juno)
   expect(after.indexOf(movers[1])).toBeLessThan(after.indexOf(movers[0]))
@@ -82,7 +82,7 @@ test('with keyboard focus in the list, the arrows walk the held order', async ({
   await pointAt(win, rowOf(juno, before[0]!), { x: 40, y: 20 })
   await press(win)
   await juno.topic.expectTitle(await titleOf(juno, before[0]!))
-  await win.mouse.move(900, 400, { steps: 4 })
+  await juno.sidebar.leave()
   await rowOf(juno, before[0]!).focus()
   await win.keyboard.press('ArrowDown')
   await expect(rowOf(juno, before[1]!)).toBeFocused()

@@ -24,8 +24,10 @@ function inSection(row: TopicRow, section: TopicRow['section']): TopicRow {
  * The window to show while the list holds: `shown`'s order and sections,
  * with each row's contents from `live`. A row that left `live` stays with
  * its last contents, so nothing leaves a gap; a row new in `live` waits.
- * A released row takes its live place: after the nearest row above it in
- * `live` that is shown, or first; it goes when `live` no longer has it.
+ * A released row takes its place by recency among the rows shown: before
+ * the first one with older activity, else last. (Its neighbours in `live`
+ * may be held elsewhere, so the live order cannot place it.) It goes when
+ * `live` no longer has it.
  * Everything but the order and rows (refs, meta, retained) is `live`'s.
  */
 export function holdOrder<W extends ListWindow<TopicRow>>(shown: ListWindow<TopicRow>, live: W, released: ReadonlySet<string>): W {
@@ -39,23 +41,12 @@ export function holdOrder<W extends ListWindow<TopicRow>>(shown: ListWindow<Topi
     rows.set(id, now === undefined ? old : inSection(now, old.section))
     order.push(id)
   }
-  if (released.size > 0) {
-    for (let i = 0; i < live.order.length; i++) {
-      const id = live.order[i]!
-      if (!released.has(id)) continue
-      const row = live.rows.get(id)
-      if (row === undefined) continue
-      let at = 0
-      for (let j = i - 1; j >= 0; j--) {
-        const above = order.indexOf(live.order[j]!)
-        if (above >= 0) {
-          at = above + 1
-          break
-        }
-      }
-      order.splice(at, 0, id)
-      rows.set(id, row)
-    }
+  for (const id of released) {
+    const row = live.rows.get(id)
+    if (row === undefined) continue
+    const at = order.findIndex((other) => rows.get(other)!.lastActivityAt < row.lastActivityAt)
+    order.splice(at < 0 ? order.length : at, 0, id)
+    rows.set(id, row)
   }
   const same = order.length === shown.order.length && order.every((id, i) => id === shown.order[i])
   return { ...live, order: same ? shown.order : order, rows }

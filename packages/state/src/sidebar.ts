@@ -229,7 +229,7 @@ const sidebarPausedAtom = Atom.make(false).pipe(Atom.keepAlive)
 const sidebarReleasedAtom = Atom.make<ReadonlyArray<string>>([]).pipe(Atom.keepAlive)
 
 /** Whether the list holds its order now (SPEC 5, "Holding the order"). */
-export const sidebarHoldAtom = Atom.make((get) => get(sidebarEngagedAtom) && !get(sidebarPausedAtom))
+const sidebarHoldAtom = Atom.make((get) => get(sidebarEngagedAtom) && !get(sidebarPausedAtom))
 
 /** The pointer or keyboard focus came into the list, or both have left it. Leaving shows the held changes in one step. */
 export function setSidebarEngaged(registry: Registry, engaged: boolean): void {

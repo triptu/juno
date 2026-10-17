@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { useRef, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useRef, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, EmptyState, ScrollArea, Text } from '@juno/ui'
+import { Button, EmptyState, pointerMoved, ScrollArea, Text } from '@juno/ui'
 
 export type TopicListSectionId = 'pinned' | 'recent'
 
@@ -38,8 +38,10 @@ export interface TopicListProps {
   readonly onRowFocus?: (id: string) => void
   /**
    * The pointer or keyboard focus came into the list (true), or both have
-   * left it (false). Focus from a mouse press does not count: the pointer
-   * already does. The owner holds the list's order while it is engaged.
+   * left it (false). The pointer counts once it moves over the list, not
+   * when the list comes under a still pointer (a toast over it closing).
+   * Focus from a mouse press does not count: the pointer already does. The
+   * owner holds the list's order while it is engaged.
    */
   readonly onEngagedChange?: (engaged: boolean) => void
   /** The pointer moved, or keyboard focus moved, inside the list. */
@@ -97,9 +99,12 @@ export function TopicList({
       onKeyDown={moveFocus}
       onFocus={onFocus}
       onBlur={onBlur}
-      onPointerEnter={() => engage('pointer', true)}
+      onPointerEnter={(event: PointerEvent<HTMLElement>) => pointerMoved(event) && engage('pointer', true)}
       onPointerLeave={() => engage('pointer', false)}
-      onPointerMove={onTouch}
+      onPointerMove={() => {
+        engage('pointer', true)
+        onTouch?.()
+      }}
       sx={styles.scroller}
     >
       {isEmpty && empty !== undefined ? (

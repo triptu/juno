@@ -82,6 +82,17 @@ function touch(): void {
   resumeSidebarHold(registry)
 }
 
+/** An unmounted list holds nothing. */
+function useReleaseOnUnmount(): void {
+  useEffect(
+    () => () => {
+      clearTimeout(releaseHold)
+      setSidebarEngaged(registry, false)
+    },
+    [],
+  )
+}
+
 
 /** A row got focus: Tab comes back to it, and reaches its Resolve button next. */
 function focusRow(id: string): void {
@@ -241,14 +252,7 @@ export const TopicList = memo(function TopicList() {
 
   useWarmFilters(ready, filter)
 
-  // An unmounted list holds nothing.
-  useEffect(
-    () => () => {
-      clearTimeout(releaseHold)
-      setSidebarEngaged(registry, false)
-    },
-    [],
-  )
+  useReleaseOnUnmount()
 
   const syncing = useAtomValue(engineStatusAtom, (status) => status._tag === 'Success' && BEFORE_LIVE.has(status.value.phase._tag))
   const emptyView = useAtomValue(viewsAtom, (views) => filter.view !== undefined && views.find((view) => view.id === filter.view)?.channels.length === 0)

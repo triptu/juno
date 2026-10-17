@@ -222,6 +222,11 @@ export class Sidebar {
     return this.root.getByRole('group', { name: 'Topics' })
   }
 
+  /** Moves the pointer off the list, onto the workspace, so the list stops holding its order (SPEC 5). */
+  leave(): Promise<void> {
+    return this.win.mouse.move(900, 400, { steps: 4 })
+  }
+
   /** Points at the list near its top-left corner, away from any row's controls. */
   hoverList(): Promise<void> {
     return pointAt(this.win, this.list, { x: 10, y: 10 })

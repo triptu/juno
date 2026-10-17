@@ -172,10 +172,10 @@ export const isLinkable = (topic: ActionTopic): boolean => topic.kind === 'main'
 /** One topic action, from the topic menu or the ⌘K palette. `from` says which title Rename edits. */
 export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from: RenameTarget['where']): void {
   const { id } = topic
+  // Pin, read state, Notify me, views and the rest move this row at once, even while the sidebar holds its order (SPEC 5).
+  releaseSidebarTopic(registry, id)
   if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, topic.channel)
   const notify = notifyTarget(topic)
-  // Pin, read state, Notify me and the rest move this row at once, even while the sidebar holds its order (SPEC 5).
-  releaseSidebarTopic(registry, id)
   switch (chosen) {
     case 'open-new-tab':
       return from === 'row' ? openTopicFromList(id, { newTab: true }) : openTopic(id, { newTab: true })
