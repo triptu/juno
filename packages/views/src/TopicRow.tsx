@@ -50,11 +50,7 @@ export interface TopicRowProps {
   readonly onRename?: (id: string, title: string) => void
   /** Rename cancelled (Esc). */
   readonly onRenameCancel?: (id: string) => void
-  /**
-   * Main rows only: threads started in the channel since its Main was last
-   * read. Hidden at 0. The engine does not supply it yet; only the gallery
-   * passes it.
-   */
+  /** Main rows only: threads started in the channel since its Main was last read. Hidden at 0. */
   readonly newThreads?: number
 }
 
