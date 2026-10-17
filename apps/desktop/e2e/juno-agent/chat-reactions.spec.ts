@@ -49,19 +49,27 @@ async function cutsOf(badge: Locator): Promise<ReadonlyArray<string>> {
   })
 }
 
-/** Every badge on screen shows whole. */
-async function expectBadgesWhole(chat: JunoChatPane, count: number): Promise<void> {
+/** Every badge in the list's visible area shows whole where it sits; returns which were on screen. */
+async function expectBadgesWhole(chat: JunoChatPane, count: number): Promise<ReadonlyArray<string>> {
   const badges = chat.root.locator('[data-reactions]')
   await expect(badges).toHaveCount(count)
+  const scroller = (await chat.root.locator('[data-scroll]').boundingBox())!
+  const seen: string[] = []
   for (const badge of await badges.all()) {
-    if (!(await badge.isVisible())) continue
-    await badge.scrollIntoViewIfNeeded()
-    expect(await cutsOf(badge), await badge.getAttribute('data-reactions') ?? '').toEqual([])
+    const box = await badge.boundingBox()
+    if (box === null || box.y + box.height <= scroller.y || box.y >= scroller.y + scroller.height) continue
+    const name = (await badge.getAttribute('data-reactions')) ?? ''
+    seen.push(name)
+    expect(await cutsOf(badge), name).toEqual([])
   }
+  expect(seen.length).toBeGreaterThan(0)
+  return seen
 }
 
 async function scrollTo(chat: JunoChatPane, where: 'top' | 'bottom'): Promise<void> {
-  await chat.root.locator('[data-scroll]').evaluate((el, at) => el.scrollTo({ top: at === 'top' ? 0 : el.scrollHeight }), where)
+  const scroller = chat.root.locator('[data-scroll]')
+  await scroller.evaluate((el, at) => el.scrollTo({ top: at === 'top' ? 0 : el.scrollHeight, behavior: 'instant' }), where)
+  await expect.poll(() => scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)).toBe(true)
 }
 
 async function shoot(chat: JunoChatPane, name: string): Promise<void> {
@@ -115,7 +123,7 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await panel.reactWithPicker('Answering quote me first', 'tada', 'tada')
   await expect(panel.junoBubble('Answering quote me first').getByLabel('Reacted 🎉')).toBeVisible()
   await scrollTo(panel, 'top')
-  await expectBadgesWhole(panel, 3)
+  expect(await expectBadgesWhole(panel, 3)).toContain('owner:🎉')
   await shoot(panel, 'panel-360-light-top')
   await scrollTo(panel, 'bottom')
   await expectBadgesWhole(panel, 3)
@@ -136,7 +144,7 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await expect(panel.composer).toBeFocused()
   await expect.poll(() => juno.win.locator('aside[data-juno-panel]').evaluate((el) => el.getBoundingClientRect().width)).toBe(360)
   await scrollTo(panel, 'top')
-  await expectBadgesWhole(panel, 3)
+  expect(await expectBadgesWhole(panel, 3)).toContain('owner:🎉')
   await shoot(panel, 'panel-360-dark-top')
   await scrollTo(panel, 'bottom')
   await expectBadgesWhole(panel, 3)
