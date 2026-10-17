@@ -12,7 +12,8 @@
  * 3. The wire context is pi's own messages for this run (they keep tool
  *    call ids and provider metadata), after one memory message with the
  *    pins, the view and the tail. A tool result the builder paged is sent
- *    paged.
+ *    paged. A connection tool's schema is marked `whole`, so it is paged
+ *    only past 48 KB (`limits.wholeResult`).
  * 4. `guard.stamp` revalidates `gen` and `pin_rev` and admits the window;
  *    the guard checks both again at dispatch.
  *
@@ -21,7 +22,7 @@
  * the other results as notes, because the memory rules pair one call id
  * with one entry; the guard still counts every byte sent.
  */
-import { pageMcpResult } from '../mcp/results'
+import { isSchemaResult, pageMcpResult } from '../mcp/results'
 import { buildRequest, type ActiveEntry, type Line, type Pins, type Source } from '@juno/agent-memory'
 import type { Ending } from '@juno/agent-contract'
 import { AdmissionError, providerFailure, type ProviderGuardApi, type StreamProgress } from '../providers'
@@ -192,7 +193,9 @@ function activeEntries(store: Store, rows: ReadonlyArray<Row>): ReadonlyArray<Ac
       const callId = message?.toolCallId
       if (callId === undefined || !calls.has(callId)) return { ...span, kind: 'note' }
       calls.delete(callId)
-      return { ...span, text: pageMcpResult(message?.toolName, span.text, first.id), kind: 'tool-result', callId }
+      // A tool's schema is sent whole: the model can't call the tool from part of it.
+      const whole = isSchemaResult(message?.toolName, span.text)
+      return { ...span, text: pageMcpResult(message?.toolName, span.text, first.id), kind: 'tool-result', callId, ...(whole ? { whole } : {}) }
     }
     return { ...span, kind: first.kind === 'echo' ? 'note' : first.kind }
   })
