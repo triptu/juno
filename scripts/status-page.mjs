@@ -20,10 +20,11 @@
 //   pendingDecisions ["MM-DD HH:MM · who · text"]  Calls made for the owner that
 //              they may want to override.
 //   ideas      ["..." or { name, detail }]  Possible work nobody has picked up.
+//   dmg        { commit, builtAt }  The commit the owner's DMG on ~/Desktop came from.
 //   updated    ISO time of the last write.
 //
 // Also read: docs/decision-log.md, main's git history, .juno-status/ci-keeper.md
-// (last green commit, DMG), .juno-status/health.json and apps/desktop/release.
+// (last green commit, DMG), .juno-status/health.json and the DMG on ~/Desktop.
 // Areas of work are tagged by the keyword table in status-areas.mjs.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -42,7 +43,7 @@ const health = readJson(join(outDir, 'health.json'))
 const decisions = readDecisions(root)
 const landed = readLanded(root)
 const keeper = readKeeper(root)
-const dmg = readDmg(root)
+const dmg = readDmg()
 const list = (value) => (Array.isArray(value) ? value : [])
 
 const esc = (s) =>
@@ -89,12 +90,19 @@ const nextBody = nextItems.length
   : '<p class="quiet">Nothing queued.</p>'
 
 // Build: last green commit, DMG, health.
+function dmgLine() {
+  const commit = now.dmg?.commit ?? keeper.dmgHash
+  const builtAt = new Date(now.dmg?.builtAt ?? dmg?.at ?? Number.NaN)
+  const when = Number.isNaN(builtAt.getTime()) ? '' : ist(builtAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const file = dmg ? `~/Desktop/${esc(dmg.name)}` : 'not on the Desktop'
+  return `<div class="stat"><span class="label">DMG</span>${commit ? `from <code>${esc(String(commit).slice(0, 8))}</code> ` : ''}<span class="meta">${file}${when ? ` · built ${esc(when)}` : ''}</span></div>`
+}
 const greenAt = changesSince(root, keeper.green?.hash)
 const buildParts = [
   keeper.green
     ? `<div class="stat"><span class="label">Last green</span><code>${esc(keeper.green.hash.slice(0, 8))}</code> <span class="meta">${esc(keeper.green.date)}${greenAt > 0 ? ` · main has ${greenAt} change${greenAt === 1 ? '' : 's'} since` : greenAt === 0 ? ' · main is at it' : ''}</span></div>`
     : '<div class="stat"><span class="label">Last green</span><span class="meta">none recorded</span></div>',
-  `<div class="stat"><span class="label">DMG</span>${keeper.dmgHash ? `from <code>${esc(keeper.dmgHash.slice(0, 8))}</code> ` : ''}<span class="meta">${dmg ? `local ${esc(dmg.name)} built ${esc(ist(dmg.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}` : 'no local DMG'}</span></div>`,
+  dmgLine(),
 ]
 if (health) {
   const c = health.counts ?? {}
