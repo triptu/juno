@@ -224,9 +224,12 @@ export const kindClause = (kind: ListFilter['kind']): string =>
 /**
  * The topic's conversation is in a view that keeps it out of All (spec
  * section 5, "Views"): a probe on the views' channel index, then the view by
- * key. Correlated, so it never changes how SQLite walks `topic_index`.
+ * key. Or the first sync holds it until Automated's rules have read it
+ * (`automated_holds`, a probe by key). Correlated, so it never changes how
+ * SQLite walks `topic_index`.
  */
-const KEPT_OUT = ` AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc JOIN sidebar_views v ON v.id = vc.view_id WHERE vc.channel = i.channel AND v.keep_out_of_all = 1)`
+const KEPT_OUT = ` AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc JOIN sidebar_views v ON v.id = vc.view_id WHERE vc.channel = i.channel AND v.keep_out_of_all = 1)
+  AND NOT EXISTS (SELECT 1 FROM automated_holds h WHERE h.channel = i.channel)`
 
 /**
  * Which conversations the filter shows, after membership and the ignored
@@ -631,7 +634,8 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
 
 /**
  * Unread topics per group for the Channels and DMs dots, without the
- * conversations a view keeps out of All (unless scoped to one), and the
+ * conversations a view keeps out of All or the first sync holds (unless
+ * scoped to one), and the
  * views with an unread mention, in pill order.
  */
 export const countTopics = (scope: string | undefined): Effect.Effect<TopicCounts, SqlError, StoreReader> =>
@@ -641,6 +645,8 @@ export const countTopics = (scope: string | undefined): Effect.Effect<TopicCount
     const rows = yield* sql.unsafe<{ channel: string; kind: 'public' | 'private' | 'im' | 'mpim'; n: number; mentions: number }>(statement.sql, statement.params)
     const members = yield* sql.unsafe<{ view_id: string; keep_out: number; channel: string }>(VIEW_MEMBERS)
     const keptOut = new Set<string>()
+    // A channel the first sync holds out of All is not counted in its dots either.
+    if (scope === undefined) for (const held of yield* sql<{ channel: string }>`SELECT channel FROM automated_holds`) keptOut.add(held.channel)
     const viewsOf = new Map<string, Array<string>>()
     for (const member of members) {
       if (member.keep_out === 1 && scope === undefined) keptOut.add(member.channel)

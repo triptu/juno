@@ -24,7 +24,7 @@
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { RequestQueue } from '@juno/slack'
 import { AiProvider } from '@juno/ai'
-import { sortClearCases } from '../automatedView'
+import { HOLD_MILLIS, holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
 import { OwnerActivity, startActivity } from '../activity'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import type { SlackAuthRequired } from '@juno/slack'
@@ -100,10 +100,16 @@ export class SyncRunner extends Context.Service<
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
               openTopics: link.shown,
-              // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated").
-              onBooted: sortClearCases().pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
-              // The sidebar shows rows during the first sync; a clear bot channel leaves All once its history is here.
-              onHistory: (channel) => sortClearCases(channel).pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
+              // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated"); nothing stays held after.
+              onBooted: sortClearCases().pipe(Effect.andThen(releaseHolds), Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
+              // The first sync's All waits for the rules: undecided channels are held until their history is sorted, for HOLD_MILLIS at most.
+              onListed: holdUndecided.pipe(
+                Effect.andThen(Effect.forkIn(Effect.sleep(HOLD_MILLIS).pipe(Effect.andThen(releaseHolds)), active.scope)),
+                Effect.provide(open.context),
+                Effect.asVoid,
+                Effect.catch((error) => Effect.logWarning('sync: Automated holds not set', error)),
+              ),
+              onHistory: (channel) => sortAndRelease(channel).pipe(Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
             })
           }).pipe(
             Effect.provide(active.context),

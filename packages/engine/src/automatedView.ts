@@ -5,9 +5,16 @@
  *
  * `sortClearCases` is the rules' pass the sync runs at the end of each boot
  * (`onBooted`), before it reports live, and for each conversation as the
- * first sync stores its history (`onHistory`), so a clear bot channel
- * leaves All soon after its first messages show. The job then asks Juno and the
- * user about the ambiguous ones.
+ * first sync stores its history (`onHistory`). The job then asks Juno and
+ * the user about the ambiguous ones.
+ *
+ * The first sync never shows a channel in All that the rules then move
+ * out: once the conversations are listed and before any row shows
+ * (`onListed`), `holdUndecided` sorts what the rules can already place and
+ * holds the channels they cannot read yet (`automated_holds`, which the
+ * sidebar's All leaves out). Each is let go once its history is sorted
+ * (`sortAndRelease`), and the rest after `HOLD_MILLIS` or when the boot
+ * ends, so a slow history never keeps a channel out of All for long.
  *
  * `automated_channels` holds one row per conversation whose place is
  * settled. The rules and Juno only ever write a conversation that has no
@@ -290,9 +297,9 @@ export const write = <A>(effect: Effect.Effect<A, SqlError, StoreWriter | Invali
 /**
  * The rules alone: clear cases go into the view. Ambiguous ones wait for the
  * job. With `channel`, only that conversation: the first sync sorts each one
- * as its history lands, while the sidebar already shows rows. Rules only
- * ever move a conversation in, and a later look with more names known can
- * only see more apps, so an early look never keeps one out wrongly.
+ * as its history lands. Rules only ever move a conversation in, and a later
+ * look with more names known can only see more apps, so an early look never
+ * keeps one out wrongly.
  */
 export const sortClearCases = (channel?: string): Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> => Effect.gen(function* () {
   if ((yield* automatedViewState) === 'deleted') return
@@ -305,3 +312,51 @@ export const sortClearCases = (channel?: string): Effect.Effect<void, SqlError, 
   }
   if (channel === undefined) yield* startRecording(now)
 })
+
+/** How long the first sync holds an undecided channel out of All at most, from just before rows first show. */
+export const HOLD_MILLIS = 5_000
+
+/**
+ * The first sync's look before any row shows, from what is stored by then:
+ * conversation metadata, provisional Main rows and the people of the DMs.
+ * A DM with an app moves now. A channel with too few top-level messages to
+ * read (on an empty cache, every one) is held out of All until its history
+ * is sorted; one an interrupted boot already stored is sorted now. Nothing
+ * is held once the user deleted the view, since nothing moves then.
+ */
+export const holdUndecided: Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> = Effect.gen(function* () {
+  yield* releaseHolds
+  if ((yield* automatedViewState) === 'deleted') return
+  const now = yield* Clock.currentTimeMillis
+  const selfId = yield* selfIdOf
+  const held: Array<string> = []
+  for (const row of yield* candidates(now)) {
+    const { verdict, counts } = yield* classify(row, selfId)
+    if (verdict === 'automated') yield* write(moveToAutomated(row.id, 'rules', now, { counts }))
+    else if (verdict === 'unknown' && (row.kind === 'public' || row.kind === 'private')) held.push(row.id)
+  }
+  if (held.length === 0) return
+  yield* transaction(Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    for (const channel of held) yield* sql`INSERT OR IGNORE INTO automated_holds (channel) VALUES (${channel})`
+    yield* invalidate(keys.automatedHolds)
+  }))
+})
+
+/** Sorts one conversation whose history the first sync stored, then lets it into All if it is still held. */
+export const sortAndRelease = (channel: string): Effect.Effect<void, SqlError, StoreReader | StoreWriter | Invalidation> =>
+  sortClearCases(channel).pipe(Effect.andThen(release(channel)))
+
+const release = (channel: string) =>
+  transaction(Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const gone = yield* sql<{ channel: string }>`DELETE FROM automated_holds WHERE channel = ${channel} RETURNING channel`
+    if (gone.length > 0) yield* invalidate(keys.automatedHolds)
+  }))
+
+/** Lets every held channel into All: the cap, the end of the boot, or the start of a new first sync. */
+export const releaseHolds: Effect.Effect<void, SqlError, StoreWriter | Invalidation> = transaction(Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  const gone = yield* sql<{ channel: string }>`DELETE FROM automated_holds RETURNING channel`
+  if (gone.length > 0) yield* invalidate(keys.automatedHolds)
+}))
