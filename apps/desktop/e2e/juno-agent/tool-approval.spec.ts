@@ -30,6 +30,9 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   return echo(request)
 }
 
+/** While set, the search waits for it, so a test can read the status bubble during the call. */
+let held: Promise<void> | undefined
+
 const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpenRouter }>({
   // oxlint-disable-next-line no-empty-pattern
   model: async ({}, use) => {
@@ -45,7 +48,10 @@ const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpen
     let notes = 0
     const server = await startFakeMcpServer({ name: 'context', tools: [
       // No read-only mark, as Littlebird's own search has none.
-      { name: 'search_user_context', description: 'Search what is known about the user.', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, call: () => json({ results: ['Prefers short messages.'] }) },
+      { name: 'search_user_context', description: 'Search what is known about the user.', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, call: async () => {
+        await held
+        return json({ results: ['Prefers short messages.'] })
+      } },
       { name: 'create_note', description: 'Create a note.', inputSchema: note, call: () => json({ id: `note-${++notes}`, saved: true }) },
       { name: 'create_note_failing', description: 'Create a note.', inputSchema: note, call: () => { throw new Error('Notes are full for this workspace.') } },
     ] })
@@ -60,7 +66,13 @@ test('a search with no read-only mark runs under Auto with no card', async ({ ju
   await ready(juno)
   const { id } = await addServer(juno, 'Context', mcp.url)
   const pane = await openChat(juno)
+  let release = () => {}
+  held = new Promise((resolve) => { release = resolve })
   await pane.send(`learn about me on ${id}`)
+  // While the call runs, the status bubble names the connection and what the tool does.
+  await expect(pane.root.locator('[data-chat-status]')).toHaveText('Searching Context')
+  release()
+  held = undefined
   await pane.expectJuno('You prefer short messages.')
   await expect(card(pane, 'change')).toHaveCount(0)
   expect(mcp.calls.map((call) => call.name)).toEqual(['search_user_context'])
