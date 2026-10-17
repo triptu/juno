@@ -46,3 +46,25 @@ A milestone review of Home after New chat was folded into it (layout B, the dest
 - `pnpm perf -g "home open: from a topic|a new tab with Home open"`, once: a new Home tab to its focused composer took 16.5 ms median and 18.5 ms p95. Home open from a topic took 131.8 ms p95 against the single 50 ms gate on this branch's base. This is the known miss: the p95s documented on main are 106 to 215 ms, and main has since split the gate into 150 ms after idle and 50 ms for quick opens. This branch adds one hidden 8-node box to Recent on that path.
 - `pnpm affected`, once: typecheck, lint, unit tests, spec conformance and the desktop e2e specs passed. The gallery had 241 passed and 1 failed: `toolbar-geometry.spec.ts:77`, the message hover toolbar under the header band (toolbar top 42, expected at least 143). This branch does not touch message rows or the toolbar, so it goes to the CI keeper. The new `few-recent` geometry case measured the last row 12 above the chip, light and dark.
 - Gallery shots for `Home` and `Sidebar` regenerated. Only `Home/write/destination-list-*` changed, and `Home/write/few-recent-*` is new.
+
+## Round 2: the decisions on the owner's items
+
+Decided by the orchestrator for the owner. Item 3, the inner left edges, stays as it is.
+
+**1. Recent stays empty until the first sync ends.** Recent keeps its room, with nothing in it, until the first sync is done and the ranking has arrived, as Home's rows keep their slots. No rows re-rank or leave under the pointer, and nothing moves when they come. The gallery's syncing states now show this.
+
+| | Before | After |
+| --- | --- | --- |
+| Light | ![](shots/round-2-syncing-rows-before-light.jpg) | ![](shots/round-2-syncing-rows-after-light.jpg) |
+| Dark | ![](shots/round-2-syncing-rows-before-dark.jpg) | ![](shots/round-2-syncing-rows-after-dark.jpg) |
+
+**2. One mark per conversation.** The chip's destination list draws Recent's mark (`DestinationMark`): a face, a group's initials or the channel's tile. The "Send to" list already did. All topics' place filter uses the same list, so it changes too. The Juno row's icon keeps its 20px slot, so every name still starts on one edge.
+
+| | Before | After |
+| --- | --- | --- |
+| Destination list, light | ![](shots/round-2-destination-list-before-light.jpg) | ![](shots/round-2-destination-list-after-light.jpg) |
+| Destination list, dark | ![](shots/round-2-destination-list-before-dark.jpg) | ![](shots/round-2-destination-list-after-dark.jpg) |
+| Place filter, light | ![](shots/round-2-place-filter-before-light.jpg) | ![](shots/round-2-place-filter-after-light.jpg) |
+| Place filter, dark | ![](shots/round-2-place-filter-before-dark.jpg) | ![](shots/round-2-place-filter-after-dark.jpg) |
+
+**4. A budget for a new Home tab.** `docs/performance.md` now budgets a new Home tab (⌘T, "+") to its focused composer at one frame, the budget New chat open had. `a new tab with Home open to its composer painted` gates on it with the one-frame rule, where it gated at 50 ms before. The last run measured 18.5 ms p95, under 24.7 ms at 60 Hz.
