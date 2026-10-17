@@ -78,7 +78,7 @@ const replay = (engine: RunningEngine, undo: UndoCommand) => {
 describe('cold boot', () => {
   it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
     const engine = await bootedWithAll()
-    const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== ''), 'all rows named')
+    const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== '' || r.channel.kind === 'im'), 'all rows named')
 
     // Newest activity first; every row is from a conversation the user is in.
     const order = rows.map((r) => r.lastActivityTs)
@@ -464,7 +464,8 @@ describe('realtime', () => {
     await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo here', 'the edit')
     engine.fake.deleteMessage({ channel: 'D0SAM', ts: posted.ts })
     const rows = await engine.rowsUntil((list) => list.find((r) => r.title === 'Sam')?.preview.text !== 'typo here', 'the delete')
-    expect(rows.find((r) => r.title === 'Sam')?.preview).toEqual({ sender: 'Sam', text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.' })
+    // The other side of a one-to-one DM is not named in its preview.
+    expect(rows.find((r) => r.title === 'Sam')?.preview).toEqual({ sender: '', text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.' })
   })
 
   it('goes offline while the socket is down and comes back live after a reconnect', async () => {

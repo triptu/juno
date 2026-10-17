@@ -28,6 +28,7 @@ import {
   compareTs,
   indexTopic,
   maxTs,
+  namesakes,
   parseTopicId,
   UNKNOWN_PERSON,
   type IndexInput,
@@ -37,7 +38,7 @@ import {
   type Ts,
   type UserId,
 } from '@juno/domain'
-import type { Attachment, Block } from '@juno/slack-schema'
+import type { Attachment, Block, File } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIndexRow } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
@@ -63,7 +64,12 @@ export interface StoredPreview {
   readonly text: string
   readonly senderId?: string
   readonly rootText?: string
+  /** Other people who wrote in the topic with the sender's first name, so the row can add a last initial ("Alex K"). */
+  readonly namesakes?: ReadonlyArray<string>
 }
+
+/** How many of the topic's latest distinct senders are checked for a sender's namesakes. */
+const NAMESAKE_WINDOW = 50
 
 /** Enough of a root for `firstWords`, never a whole message. */
 export const ROOT_TEXT_CHARS = 240
@@ -208,12 +214,16 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const messages: Array<IndexMessage> = live.map((row) => ({
       ts: row.ts as Ts,
       ...(row.user_id === null ? {} : { userId: row.user_id as UserId }),
+      ...(row.subtype === null ? {} : { subtype: row.subtype }),
       text: row.text,
       get attachments(): ReadonlyArray<Attachment> | undefined {
         return row.attachments_json === null ? undefined : (JSON.parse(row.attachments_json) as ReadonlyArray<Attachment>)
       },
       get blocks(): ReadonlyArray<Block> | undefined {
         return row.blocks_json === null ? undefined : (JSON.parse(row.blocks_json) as ReadonlyArray<Block>)
+      },
+      get files(): ReadonlyArray<File> | undefined {
+        return row.files_json === null ? undefined : (JSON.parse(row.files_json) as ReadonlyArray<File>)
       },
     }))
     let indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
@@ -239,12 +249,14 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     }
 
     const activity = indexed.activity
+    const sakes = latest?.bot_name == null && latest?.user_id != null ? yield* senderNamesakes(latest.user_id, live, options.me.userId) : []
     const rootText = root !== undefined && root.deleted === 0 ? indexed.rootText?.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
       sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
       text: indexed.preview?.text ?? '',
       ...(latest?.bot_name != null || latest?.user_id === null || latest?.user_id === undefined ? {} : { senderId: latest.user_id }),
       ...(rootText === undefined ? {} : { rootText }),
+      ...(sakes.length === 0 ? {} : { namesakes: sakes }),
     }
     const next: TopicIndexRow = {
       topic_id: id,
@@ -261,6 +273,23 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       rev: existing === undefined ? 1 : existing.rev + 1,
     }
     return yield* writeRow(id, next, existing)
+  })
+
+/** The people among the topic's latest senders who share the sender's first name. Usually none. */
+const senderNamesakes = (senderId: string, live: ReadonlyArray<MessageRow>, me: string): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const ids = new Set<string>([senderId])
+    for (const row of live.toSorted((a, b) => compareTs(b.ts, a.ts))) {
+      if (ids.size > NAMESAKE_WINDOW) break
+      if (row.user_id !== null && row.user_id !== me) ids.add(row.user_id)
+    }
+    if (ids.size < 2) return []
+    const sql = yield* StoreWriter
+    const found = yield* sql<{ id: string; display_name: string | null; real_name: string | null; name: string | null }>`
+      SELECT id, display_name, real_name, name FROM users WHERE id IN ${sql.in([...ids])}`
+    const people = found.map((user) => ({ id: user.id, name: user.display_name ?? user.real_name ?? user.name ?? '' }))
+    const sender = people.find((person) => person.id === senderId)
+    return sender === undefined ? [] : namesakes(sender, people)
   })
 
 /** Writes `next` unless it equals `existing`, bumping `rev`, and fires the topic's key. */

@@ -67,6 +67,8 @@ export interface UserRow {
   readonly avatar_small_url?: string | null
   readonly avatar_large_url?: string | null
   readonly avatar_url: string | null
+  /** Read by the topic list, for the preview's name; other readers may leave it out. */
+  readonly is_bot?: 0 | 1
 }
 
 /** The name a row shows for a user: the display name, the real name, the handle, or "Someone" until the user is stored. Never the raw id. */
@@ -118,12 +120,13 @@ function parsePreview(json: string | null): StoredPreview {
   }
 }
 
-/** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and the people the root mentions (for the title). */
+/** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and its namesakes, the people the root mentions (for the title). */
 export function userIdsOf(row: JoinedRow, columns: ParsedColumns, into: Set<string>): void {
   for (const id of columns.participants.slice(0, SHOWN_PARTICIPANTS)) into.add(id)
   for (const id of columns.members) into.add(id)
   if (row.c_user_id !== null) into.add(row.c_user_id)
   if (columns.preview.senderId !== undefined) into.add(columns.preview.senderId)
+  for (const id of columns.preview.namesakes ?? []) into.add(id)
   for (const id of mentionedUserIds(columns.preview.rootText)) into.add(id)
 }
 
