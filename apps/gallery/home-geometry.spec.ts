@@ -35,3 +35,28 @@ for (const [state, title, meta] of [
     expect(at.gap).toBeGreaterThan(0)
   })
 }
+
+/**
+ * Home's syncing line (SPEC 12) starts under the greeting's first letter, so
+ * "Syncing with Slack." becoming the count moves no word: the first word is
+ * at the same place in both states.
+ */
+test('Home keeps the syncing line under the greeting as its copy changes', async ({ page }) => {
+  const starts: Array<{ readonly greeting: number; readonly line: number; readonly first: number }> = []
+  for (const [state, copy] of [
+    ['Empty/syncing', 'Syncing with Slack.'],
+    ['Empty/syncing-count', /^Syncing\s*7\s*of 143 conversations\.$/],
+  ] as const) {
+    await open(page, 'Home', state)
+    const line = page.locator('[data-home] h2 + p')
+    await expect(line).toHaveText(copy)
+    starts.push(await line.evaluate((node) => {
+      const range = document.createRange()
+      range.setStart(node.firstChild!, 0)
+      range.setEnd(node.firstChild!, 1)
+      return { greeting: node.previousElementSibling!.getBoundingClientRect().left, line: node.getBoundingClientRect().left, first: range.getBoundingClientRect().left }
+    }))
+  }
+  for (const start of starts) expect(start.line).toBe(start.greeting)
+  expect(starts[1]!.first).toBe(starts[0]!.first)
+})
