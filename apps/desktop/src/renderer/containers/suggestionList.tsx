@@ -1,5 +1,5 @@
-import { Suspense, useEffect, type ComponentProps } from 'react'
-import { chunk } from './chunks'
+import { Suspense, type ComponentProps } from 'react'
+import { chunk, usePreloaded } from './chunks'
 
 /**
  * The @, # and : suggestion list (`MentionSuggestions`), loaded on its own:
@@ -9,24 +9,9 @@ import { chunk } from './chunks'
 const suggestions = chunk(() => import('./SuggestionListPanel'))
 const Panel = suggestions.component((module) => module.MentionSuggestions)
 
-let preloaded = false
-
-/**
- * Preloads the list once a composer has mounted, and loads it at once when
- * `wanted` (a trigger typed before the idle preload). True once it has
- * loaded, so the list never suspends: until then the composer shows none.
- */
+/** True once the list has loaded; until then the composer shows none. `wanted`: a trigger typed before the idle preload. */
 export function useSuggestionList(wanted: boolean): boolean {
-  const ready = suggestions.useReady()
-  useEffect(() => {
-    if (preloaded) return
-    preloaded = true
-    requestIdleCallback(() => void suggestions.load(), { timeout: 5_000 })
-  }, [])
-  useEffect(() => {
-    if (wanted && !ready) void suggestions.load()
-  }, [wanted, ready])
-  return ready
+  return usePreloaded(suggestions, wanted)
 }
 
 export function SuggestionList(props: ComponentProps<typeof Panel>) {

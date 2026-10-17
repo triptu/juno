@@ -1,7 +1,7 @@
-import { Suspense, useEffect } from 'react'
+import { Suspense } from 'react'
 import { restartEngine, registry, syncNoticeAtom, syncProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { chunk } from './chunks'
+import { chunk, usePreloaded } from './chunks'
 
 // The cards show only while the engine is behind Slack, so they load when idle, after the first paint.
 const cards = chunk(() => import('./SyncNoticeCards'))
@@ -9,21 +9,12 @@ const EngineNotice = cards.component((module) => module.EngineNotice)
 const SyncProgress = cards.component((module) => module.SyncProgress)
 
 /**
- * Preloads the status cards when the sidebar mounts, and loads them at once
- * when `wanted` (a notice before the idle preload). True once they have
- * loaded: until then the sidebar shows no footer, so the card never
- * suspends and its footer never shows empty.
+ * True once the cards have loaded: until then the sidebar shows no footer,
+ * so the card never suspends and its footer never shows empty. `wanted`: a
+ * notice before the idle preload.
  */
 export function useSyncNoticeReady(wanted: boolean): boolean {
-  const ready = cards.useReady()
-  useEffect(() => {
-    const idle = requestIdleCallback(() => void cards.load(), { timeout: 5_000 })
-    return () => cancelIdleCallback(idle)
-  }, [])
-  useEffect(() => {
-    if (wanted && !ready) void cards.load()
-  }, [wanted, ready])
-  return ready
+  return usePreloaded(cards, wanted)
 }
 
 function restart(): void {
