@@ -20,8 +20,7 @@
  */
 import { AiProvider, tasks } from '@juno/ai'
 import { channelLabel, resolveTitle, type TopicId } from '@juno/domain'
-import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, syncState, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
-import { BOOT_KEY } from '@juno/sync'
+import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn, aiJobsOn } from '../ai'
 import type { EngineConfig } from '../config'
@@ -30,6 +29,7 @@ import { AiSpend } from '../aiSpend'
 import { channelInfoOf, parseColumns, topicFrom, userIdsOf, userName, type UserRow } from '../topicRows'
 import { Workspace, type StoreServices } from '../workspace'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
+import { homeStage } from './ready'
 import { FOLLOWED, HOME_SELECT, OPEN, type HomeRow } from './rows'
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'prefs', 'sync_state']
@@ -83,8 +83,9 @@ const describe = (row: HomeRow, selfId: string | undefined, users: ReadonlyMap<s
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>
   Effect.gen(function* () {
     if (!(yield* aiAssistOn)) return
-    // Before the first sync finishes, a topic's messages are not all here yet.
-    if ((yield* syncState.get(BOOT_KEY)) === undefined) return
+    // Before Home is ready a topic's messages are not all here yet. Then they are: the followed topics are DMs, which
+    // the first sync reads first, and threads, which come with the `getView` pages.
+    if (!(yield* homeStage).ready) return
     const sql = yield* StoreReader
     const now = yield* Clock.currentTimeMillis
     let budget = HOME_DAILY_BUDGET - (yield* usedToday(now))

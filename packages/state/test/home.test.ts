@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { HomeItem, HomeView } from '@juno/contract'
-import { freezeHome, homeGreeting, homeItemLimit, homeScene } from '../src/home'
+import { freezeHome, homeItemLimit } from '../src/home'
+import { homeGreeting, homeScene } from '../src/homeScene'
 
 // 2026-10-14 is a Wednesday, 2026-10-16 a Friday; local time.
 const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 30)
 const greet = (now: Date) => homeGreeting({ now, firstName: 'Tushar', caughtUp: false })
 const item = (id: string, aiTitle?: string): HomeItem => ({ id, kind: 'waiting', title: 'Elena asked you something', topics: [], ...(aiTitle === undefined ? {} : { aiTitle }) })
-const view = (...items: HomeItem[]): HomeView => ({ items, unread: true, ready: true })
+const view = (...items: HomeItem[]): HomeView => ({ items, unread: true, ready: true, firstSync: false })
 
 describe('Home copy and scene', () => {
   it('greets by the time of day, and with Happy Friday on Friday until late', () => {

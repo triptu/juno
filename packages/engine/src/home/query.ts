@@ -52,6 +52,7 @@ import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
 import { readMoves, withMove, type MoveRow } from './moves'
+import { homeStage } from './ready'
 import { parseReason, parseScore, parseTitle } from './answers'
 import { cardTitle, readDelivered, readOldDrafts, withDelivery, withDraft, type Delivered, type OpenPromise } from './reviewCards'
 import { artRefOf, channelInfoOf, channelRefOf, parseColumns, topicFrom, userIdsOf, userName, type JoinedRow, type UserRow } from '../topicRows'
@@ -354,7 +355,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const self = selfId === undefined ? undefined : users.get(selfId)
     const name = self === undefined ? '' : firstName(self.real_name ?? self.display_name ?? self.name ?? '')
     return {
-      view: { ...(name === '' ? {} : { firstName: name }), items, unread: unread.length > 0, ready: booted !== undefined },
+      view: { ...(name === '' ? {} : { firstName: name }), items, unread: unread.length > 0, ...(yield* homeStage) },
       aiAssist,
       rewritable,
     }
