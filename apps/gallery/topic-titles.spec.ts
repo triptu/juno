@@ -22,6 +22,8 @@ for (const theme of ['light', 'dark'] as const) {
         const lineCount = await long.evaluate((node) => node.clientHeight / parseFloat(getComputedStyle(node).lineHeight))
         expect(lineCount).toBe(lines === 'one-line' ? 1 : 2)
       }
+      expect(heights[0]![0]).toBe(density === 'compact' ? 80 : 88)
+      expect(heights[0]![3]).toBe(density === 'compact' ? 58 : 64)
       expect(heights[1]![0]).toBe(heights[0]![0])
       expect(heights[1]![2]).toBeGreaterThan(heights[0]![2]!)
       expect(heights[1]![3]).toBe(heights[0]![3])

@@ -140,8 +140,9 @@ const styles = stylex.create({
     WebkitBoxOrient: 'vertical',
     WebkitLineClamp: text['--topic-title-lines'],
     overflow: 'hidden',
+    textOverflow: 'ellipsis',
     overflowWrap: 'anywhere',
-    whiteSpace: 'normal',
+    whiteSpace: text['--topic-title-white-space'],
   },
   prose: {
     overflowWrap: 'anywhere',

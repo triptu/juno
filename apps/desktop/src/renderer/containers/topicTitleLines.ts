@@ -19,6 +19,7 @@ export function applyTopicTitleLines(lines: TopicTitleLines): void {
     }
   }
   root.style.setProperty('--topic-title-lines', lines === 'two' ? '2' : '1')
+  root.style.setProperty('--topic-title-white-space', lines === 'two' ? 'normal' : 'nowrap')
   root.dataset['topicTitleLines'] = lines
   // One synchronous layout for a preference change, before paint. Native anchoring
   // can choose the preview inside a partially visible row and move its top instead.

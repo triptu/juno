@@ -648,4 +648,4 @@ Other literal lengths and colours require tokens, or a trailing
 
 ### Topic title line limit
 
-`--topic-title-lines` in the `text` group is 1 by default and 2 when Appearance › Topic titles is Two lines. List titles use it for line clamping; the topic header does not. It reserves no height.
+`--topic-title-lines` in the `text` group is 1 by default and 2 when Appearance › Topic titles is Two lines. List titles use it for line clamping; the topic header does not. It reserves no height. `--topic-title-white-space` is `nowrap` for one line and `normal` for two, preserving the existing one-line truncation.

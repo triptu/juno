@@ -524,6 +524,7 @@ export const tracking = stylex.defineVars({
  */
 export const text = stylex.defineVars({
   '--topic-title-lines': '1',
+  '--topic-title-white-space': 'nowrap',
   // Pinned / Recent / People / Channels headings, in sentence case (SPEC 17).
   '--text-section-label-family': fonts['--font-sans'],
   '--text-section-label-size': '11px',

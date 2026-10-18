@@ -28,7 +28,7 @@ const state = (row: TopicRowProps['row'], extra: Partial<TopicRowProps> = {}, fr
     frame,
   )
 
-const titleColumn = (lines: '1' | '2') => ({ ...column, '--topic-title-lines': lines })
+const titleColumn = (lines: '1' | '2') => ({ ...column, '--topic-title-lines': lines, '--topic-title-white-space': lines === '2' ? 'normal' : 'nowrap' })
 
 const titleScene = (lines: '1' | '2', density: 'compact' | 'comfortable') => scene<TopicRowProps>(() => (
   <div style={titleColumn(lines)}>

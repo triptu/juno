@@ -217,7 +217,7 @@ export const TopicRow = memo(function TopicRow({
       data-row-lines={twoLine ? 2 : 3}
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
-      <span {...stylex.props(styles.tile, quiet && styles.quietTile)}>
+      <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
         <Tile row={row} />
       </span>
       <span {...stylex.props(styles.body)}>
@@ -404,6 +404,8 @@ const styles = stylex.create({
     flexShrink: 0,
     zoom: density['--density-row-tile-zoom'],
   },
+  // The 44px artwork may extend beyond Main’s 42px content box, as before.
+  mainTile: { maxHeight: density['--density-row-two-line-estimate'] },
   artSlot: {
     display: 'inline-flex',
     alignItems: 'center',

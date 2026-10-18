@@ -29,6 +29,7 @@ export function App() {
   const titleLines = state?.frame.topicTitleLines ?? 'one'
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--topic-title-lines', titleLines === 'two' ? '2' : '1')
+    document.documentElement.style.setProperty('--topic-title-white-space', titleLines === 'two' ? 'normal' : 'nowrap')
   }, [titleLines])
   useLayoutEffect(() => applyTheme(location.theme, location.accent, density), [location.theme, location.accent, density])
 
