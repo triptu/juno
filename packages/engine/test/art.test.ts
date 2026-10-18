@@ -54,38 +54,40 @@ function liveThread(engine: RunningEngine, text: string): { readonly id: string 
   return { id: `t:C0ENG:${root.ts}` }
 }
 
+async function checkInitialArt(engine: RunningEngine): Promise<void> {
+  const rows = await drawnRows(engine)
+  const drawn = rows.filter((row) => !isDmMain(row) && hasArt(row))
+  expect(drawn.length).toBeGreaterThan(3)
+  expect(drawn.some(isMain)).toBe(true)
+  expect(drawn.some((row) => row.kind === 'thread' && row.channel.kind === 'im')).toBe(true)
+  for (const row of drawn) {
+    const parsed = parseRecipe(row.art!)
+    expect(parsed.ok, `${row.title}: ${row.art}`).toBe(true)
+    if (parsed.ok) expect(parsed.recipe.confident).toBe(true)
+  }
+  // A DM's Main is the person: no drawing, and none asked for.
+  const dmMains = rows.filter(isDmMain)
+  expect(dmMains.length).toBeGreaterThan(0)
+  expect(dmMains.every((row) => row.art === undefined)).toBe(true)
+  const stored = storedArt(engine)
+  expect(stored.filter((row) => row.topic_id.startsWith('m:D0'))).toEqual([])
+  for (const row of drawn) expect(stored.find((entry) => entry.topic_id === row.id)).toMatchObject({ status: 'ok', source: 'ai', recipe: row.art })
+
+  // The header carries the same recipe as the row.
+  const [first] = drawn
+  unmounts.push(engine.registry.mount(topicAtom(first!.id)))
+  const detail = await waitFor(() => {
+    const result = engine.registry.get(topicAtom(first!.id))
+    return result._tag === 'Success' && result.value?.art !== undefined ? result.value : undefined
+  }, WAIT_MS, 'the header with art')
+  expect(detail.art).toBe(first!.art)
+}
+
 describe('topic art', () => {
   it('draws sidebar and header art, redraws and undoes it, then hides and restores it with AI assist', async () => {
     const engine = await bootedEngine()
 
-    await step('draws every thread and channel Main in the sidebar, keeps the photo on a DM Main, and stores each drawing once', async () => {
-      const rows = await drawnRows(engine)
-      const drawn = rows.filter((row) => !isDmMain(row) && hasArt(row))
-      expect(drawn.length).toBeGreaterThan(3)
-      expect(drawn.some(isMain)).toBe(true)
-      expect(drawn.some((row) => row.kind === 'thread' && row.channel.kind === 'im')).toBe(true)
-      for (const row of drawn) {
-        const parsed = parseRecipe(row.art!)
-        expect(parsed.ok, `${row.title}: ${row.art}`).toBe(true)
-        if (parsed.ok) expect(parsed.recipe.confident).toBe(true)
-      }
-      // A DM's Main is the person: no drawing, and none asked for.
-      const dmMains = rows.filter(isDmMain)
-      expect(dmMains.length).toBeGreaterThan(0)
-      expect(dmMains.every((row) => row.art === undefined)).toBe(true)
-      const stored = storedArt(engine)
-      expect(stored.filter((row) => row.topic_id.startsWith('m:D0'))).toEqual([])
-      for (const row of drawn) expect(stored.find((entry) => entry.topic_id === row.id)).toMatchObject({ status: 'ok', source: 'ai', recipe: row.art })
-
-      // The header carries the same recipe as the row.
-      const [first] = drawn
-      unmounts.push(engine.registry.mount(topicAtom(first!.id)))
-      const detail = await waitFor(() => {
-        const result = engine.registry.get(topicAtom(first!.id))
-        return result._tag === 'Success' && result.value?.art !== undefined ? result.value : undefined
-      }, WAIT_MS, 'the header with art')
-      expect(detail.art).toBe(first!.art)
-    })
+    await step('draws every thread and channel Main in the sidebar, keeps the photo on a DM Main, and stores each drawing once', () => checkInitialArt(engine))
 
     await step('Redraw replaces a drawing with a different one, and Undo after a Redraw puts the previous one back', async () => {
       const rows = await drawnRows(engine)

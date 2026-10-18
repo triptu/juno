@@ -76,75 +76,77 @@ const replay = (engine: RunningEngine, undo: UndoCommand) => {
   throw new Error(`not a follow undo: ${undo._tag}`)
 }
 
+async function checkFixtureDetails(engine: RunningEngine): Promise<void> {
+  const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== '' || r.channel.kind === 'im'), 'all rows named')
+
+  // Newest activity first; every row is from a conversation the user is in.
+  const order = rows.map((r) => r.lastActivityTs)
+  expect(order.toSorted().toReversed()).toEqual(order)
+  expect(rows.every((r) => r.section === 'recent')).toBe(true)
+
+  const byTitle = (title: string) => rows.find((r) => r.title === title)
+  const postgres = byTitle('Draft plan is in the doc')
+  expect(postgres).toMatchObject({
+    kind: 'thread',
+    preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
+    channel: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public' },
+    messageCount: 7,
+    unreadCount: 0,
+    unreadExact: true,
+    mentionsMe: false,
+    tags: [],
+    subscribed: true,
+    titleSource: 'fallback',
+  })
+  // The thread is read, so the stack is empty: it names only the people talking in unread messages.
+  expect(postgres?.participants).toEqual([])
+
+  // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
+  // Main has no follow.
+  const eng = byTitle('#eng')
+  expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: false })
+  expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
+  expect(eng?.channel.icon).toBeTruthy()
+  expect(eng?.channel.color).toBeTruthy()
+
+  // A mention of me in an unread reply.
+  const rina = byTitle('Rina finished the onsite. Panel notes…')
+  expect(rina).toMatchObject({ channel: { kind: 'private', tint: 'private', label: '#hiring' }, unreadCount: 2, mentionsMe: true })
+
+  // DMs: the partner's name is the label and the tile.
+  const maya = byTitle('Maya')
+  expect(maya).toMatchObject({ kind: 'main', channel: { kind: 'im', tint: 'dm', label: 'Maya' } })
+  expect(maya?.channel.partner?.name).toBe('Maya')
+  expect(byTitle('Maya, Leo')).toMatchObject({ channel: { kind: 'mpim', tint: 'dm' } })
+
+  // Threads the user does not follow are not rows, even when active; the mention in the flaky thread
+  // was there before the first sign-in, so the thread started read and stays out too.
+  expect(byTitle('checkout.spec failed again on main. Third…')).toBeUndefined()
+  expect(byTitle("We have 142 flags. 61 haven't…")).toBeUndefined()
+  expect(rows.filter((r) => r.kind === 'thread').every((r) => r.subscribed)).toBe(true)
+
+  // A followed thread in a channel whose Main went quiet: both the thread and the Main show.
+  const finance = byTitle('Finance wants the 2027 plan by…')
+  expect(finance).toMatchObject({ kind: 'thread', subscribed: true, unreadCount: 1, mentionsMe: true, channel: { label: '#leadership' } })
+  const leadership = byTitle('#leadership')
+  expect(leadership).toMatchObject({ kind: 'main', unreadCount: 0 })
+  expect(leadership!.lastActivityAt).toBeLessThan(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  // Quiet topics stay out: nothing older than 7 days, except a Main kept alive by its threads.
+  expect(byTitle('Lag alerts are firing on the…')).toBeUndefined()
+  expect(byTitle('Icon refresh is merged.')).toBeUndefined()
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  expect(rows.filter((r) => r.id !== leadership!.id).every((r) => r.lastActivityAt > weekAgo)).toBe(true)
+
+  // A never-read channel: the history page reached back to its read pointer, so the count is exact.
+  expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: true })
+}
+
 describe('cold boot', () => {
   it('discovers the fixture workspace with exact rows, membership, titles, previews, counts, tags and order', async () => {
     const engine = await bootedWithAll()
 
-    await step('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
-      const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== '' || r.channel.kind === 'im'), 'all rows named')
-
-      // Newest activity first; every row is from a conversation the user is in.
-      const order = rows.map((r) => r.lastActivityTs)
-      expect(order.toSorted().toReversed()).toEqual(order)
-      expect(rows.every((r) => r.section === 'recent')).toBe(true)
-
-      const byTitle = (title: string) => rows.find((r) => r.title === title)
-      const postgres = byTitle('Draft plan is in the doc')
-      expect(postgres).toMatchObject({
-        kind: 'thread',
-        preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
-        channel: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public' },
-        messageCount: 7,
-        unreadCount: 0,
-        unreadExact: true,
-        mentionsMe: false,
-        tags: [],
-        subscribed: true,
-        titleSource: 'fallback',
-      })
-      // The thread is read, so the stack is empty: it names only the people talking in unread messages.
-      expect(postgres?.participants).toEqual([])
-
-      // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
-      // Main has no follow.
-      const eng = byTitle('#eng')
-      expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: false })
-      expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
-      expect(eng?.channel.icon).toBeTruthy()
-      expect(eng?.channel.color).toBeTruthy()
-
-      // A mention of me in an unread reply.
-      const rina = byTitle('Rina finished the onsite. Panel notes…')
-      expect(rina).toMatchObject({ channel: { kind: 'private', tint: 'private', label: '#hiring' }, unreadCount: 2, mentionsMe: true })
-
-      // DMs: the partner's name is the label and the tile.
-      const maya = byTitle('Maya')
-      expect(maya).toMatchObject({ kind: 'main', channel: { kind: 'im', tint: 'dm', label: 'Maya' } })
-      expect(maya?.channel.partner?.name).toBe('Maya')
-      expect(byTitle('Maya, Leo')).toMatchObject({ channel: { kind: 'mpim', tint: 'dm' } })
-
-      // Threads the user does not follow are not rows, even when active; the mention in the flaky thread
-      // was there before the first sign-in, so the thread started read and stays out too.
-      expect(byTitle('checkout.spec failed again on main. Third…')).toBeUndefined()
-      expect(byTitle("We have 142 flags. 61 haven't…")).toBeUndefined()
-      expect(rows.filter((r) => r.kind === 'thread').every((r) => r.subscribed)).toBe(true)
-
-      // A followed thread in a channel whose Main went quiet: both the thread and the Main show.
-      const finance = byTitle('Finance wants the 2027 plan by…')
-      expect(finance).toMatchObject({ kind: 'thread', subscribed: true, unreadCount: 1, mentionsMe: true, channel: { label: '#leadership' } })
-      const leadership = byTitle('#leadership')
-      expect(leadership).toMatchObject({ kind: 'main', unreadCount: 0 })
-      expect(leadership!.lastActivityAt).toBeLessThan(Date.now() - 7 * 24 * 60 * 60 * 1000)
-
-      // Quiet topics stay out: nothing older than 7 days, except a Main kept alive by its threads.
-      expect(byTitle('Lag alerts are firing on the…')).toBeUndefined()
-      expect(byTitle('Icon refresh is merged.')).toBeUndefined()
-      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-      expect(rows.filter((r) => r.id !== leadership!.id).every((r) => r.lastActivityAt > weekAgo)).toBe(true)
-
-      // A never-read channel: the history page reached back to its read pointer, so the count is exact.
-      expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: true })
-    })
+    await step('discovers the fixture workspace: titles, previews, counts, tags and order', () => checkFixtureDetails(engine))
 
     await step('shows exactly the rows of spec section 5: active Main rows and followed threads, no unfollowed thread at first sign-in', async () => {
       const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')

@@ -43,6 +43,29 @@ const storedPointer = (engine: RunningEngine, id: string) =>
 /** Main's latest message in the fake. */
 const latestMain = (engine: RunningEngine, channel: string) => engine.fake.messages(channel).filter((m) => m.thread_ts === undefined || m.thread_ts === m.ts).at(-1)!.ts
 
+async function checkFollowedAndLocalReads(engine: RunningEngine): Promise<void> {
+  const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
+  await rowWhen(engine, roadmap, (r) => r.unreadCount === 3, 'three unread')
+  engine.fake.resetCalls()
+  valueOf(await markRead(engine, roadmap))
+  await rowWhen(engine, roadmap, (r) => r.unreadCount === 0, 'read')
+  await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
+  const latestReply = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap)).at(-1)!.ts
+  expect(marks(engine).map((c) => [c.method, c.args['thread_ts'], c.args['ts'], c.args['read']])).toEqual([
+    ['subscriptions.thread.mark', tsOf(roadmap), latestReply, '1'],
+  ])
+  expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(latestReply)
+
+  // Not followed in Slack: Juno's own pointer moves, nothing is sent.
+  const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
+  valueOf(await markUnread(engine, checkout))
+  valueOf(await markRead(engine, checkout))
+  await sleep(800)
+  await quiet(engine)
+  expect(marks(engine)).toHaveLength(1)
+  expect(storedPointer(engine, checkout)).toBe(engine.fake.workspace.replies('C0ENG', tsOf(checkout)).at(-1)!.ts)
+}
+
 describe('marking read', () => {
   it('marks Main and threads read and unread, and clears new-thread counts', async () => {
     const engine = await bootedEngine()
@@ -68,28 +91,7 @@ describe('marking read', () => {
       await waitFor(() => (engine.fake.workspace.reads.get(ALERTS) === pointer ? true : undefined), 10_000, 'the unread mark in Slack')
     })
 
-    await step('a followed thread gets subscriptions.thread.mark read=1; an unfollowed one stays local', async () => {
-      const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
-      await rowWhen(engine, roadmap, (r) => r.unreadCount === 3, 'three unread')
-      engine.fake.resetCalls()
-      valueOf(await markRead(engine, roadmap))
-      await rowWhen(engine, roadmap, (r) => r.unreadCount === 0, 'read')
-      await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
-      const latestReply = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap)).at(-1)!.ts
-      expect(marks(engine).map((c) => [c.method, c.args['thread_ts'], c.args['ts'], c.args['read']])).toEqual([
-        ['subscriptions.thread.mark', tsOf(roadmap), latestReply, '1'],
-      ])
-      expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(latestReply)
-
-      // Not followed in Slack: Juno's own pointer moves, nothing is sent.
-      const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
-      valueOf(await markUnread(engine, checkout))
-      valueOf(await markRead(engine, checkout))
-      await sleep(800)
-      await quiet(engine)
-      expect(marks(engine)).toHaveLength(1)
-      expect(storedPointer(engine, checkout)).toBe(engine.fake.workspace.replies('C0ENG', tsOf(checkout)).at(-1)!.ts)
-    })
+    await step('a followed thread gets subscriptions.thread.mark read=1; an unfollowed one stays local', () => checkFollowedAndLocalReads(engine))
 
     await step('a thread marked unread from a reply sends read=0 from that reply', async () => {
       const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
