@@ -258,6 +258,7 @@ export const removeCard = defineFixtures(
       working: card(remove('v3', working)),
       'click-then-working': scene(() => <ClickThenWorking make={(status) => remove('v4', status)} />),
       removed: card(remove('v2', done('Removed 2 messages'))),
+      interrupted: card(remove('v5', failed('Interrupted · Nothing was removed'))),
     },
   },
   frame,

@@ -240,6 +240,8 @@ export const chatCopy = {
       cannotRecall: 'Copies already sent to the model provider cannot be recalled.',
       /** "Removed 2 messages". */
       removed: (count: number) => (count === 1 ? 'Removed 1 message' : `Removed ${count} messages`),
+      /** A click cut off before the removal committed (Juno quit or crashed): nothing was removed, and Juno can propose it again. */
+      interrupted: 'Interrupted · Nothing was removed',
     },
     budget: {
       title: "Juno has used today's budget.",

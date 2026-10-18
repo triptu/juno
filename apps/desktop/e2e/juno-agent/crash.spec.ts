@@ -189,6 +189,12 @@ test('a removal cut off after its deletion record leaves the message, and removi
   await using(launchArmed(userData, options, 'redaction.deletionRaised'), async (juno, { app }) => {
     const { pid } = await removeFirst(juno, app)
     await expectKilled(app, pid)
+    // The restarted agent says plainly that the click was cut off and nothing was removed (SPEC 13.3).
+    await agentReady(app)
+    const first = card(await openChat(juno), 'remove')
+    await expect(first).toHaveAttribute('data-card-status', 'failed', { timeout: 20_000 })
+    await expect(first.getByText('Interrupted · Nothing was removed', { exact: true })).toBeVisible()
+    await expect(first.getByRole('button')).toHaveCount(0)
   })
   await using(launchApp(userData, options), async (juno) => {
     await juno.waitForSync()
