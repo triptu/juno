@@ -7,7 +7,9 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
+import { recordReleaseTiming } from './release-timings.mjs'
 
+const started = Date.now()
 const file = join(resolve(import.meta.dirname, '..'), 'apps/desktop/package.json')
 const text = readFileSync(file, 'utf8')
 const current = String(JSON.parse(text).version)
@@ -28,3 +30,4 @@ if (compareVersions(next, current) <= 0) {
 }
 writeFileSync(file, text.replace(`"version": "${current}"`, `"version": "${next}"`))
 console.log(`release:version: ${current} -> ${next}`)
+recordReleaseTiming('version bump', started, { version: next })

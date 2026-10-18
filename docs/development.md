@@ -43,7 +43,7 @@ Run these from the repo root.
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
-| `pnpm package` | Builds a DMG and zip with electron-builder into `apps/desktop/release/`. The tag workflow also builds these; see "Releasing". |
+| `pnpm package` | Builds an unsigned DMG with electron-builder into `apps/desktop/release/`; signed builds also make a ZIP for in-place updates. The tag workflow builds these too; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 pnpm presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
 | `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
@@ -717,7 +717,7 @@ Since 10-16, Juno merges first and tests in full afterwards. Many agents work at
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green. After each run it commits `apps/desktop/e2e/coverage-map.json`, which `pnpm verify:main` refreshed ("Desktop specs by coverage").
+**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. An urgent release request in `.juno-status/ci-keeper-request.json` overrides that interval: run its `command` immediately, record the result, then clear the request. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green. After each run it commits `apps/desktop/e2e/coverage-map.json`, which `pnpm verify:main` refreshed ("Desktop specs by coverage").
 
 **One machine per run** (landed 10-16): `pnpm affected` and `pnpm verify:main` run their remote suites as one plan on one 8x16 machine, build the desktop app once, and do not shard the desktop e2e. See "Remote runs" and "Machine shapes".
 
@@ -1069,10 +1069,16 @@ Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes.
 ## Releasing
 
 The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
-native dependencies for Electron, and writes the DMG, ZIP, block maps and
+native dependencies for Electron, and writes the DMG, its block map and
 update metadata (`latest-mac.yml`) to `apps/desktop/release/`. It never
 publishes; `pnpm release:publish` does (below). Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
 the build prints one unsigned-build line and disables identity discovery.
+The package runs through the machine-wide heavy lock. A signed build also makes
+a ZIP and its block map: electron-updater's Mac installer requires the ZIP.
+Unsigned installs from 0.1.1 onward read the release's asset list themselves
+and download the DMG, so they need neither a ZIP nor a ZIP entry in
+`latest-mac.yml`. The metadata still names the DMG for signed builds and for
+release validation.
 On Apple Silicon, electron-builder repairs the local **ad-hoc** signature after
 flipping fuses. This uses no certificate or credentials and does not grant
 Gatekeeper trust. A literally unsigned ARM64 executable is killed by macOS;
@@ -1091,7 +1097,7 @@ binary comes from `@koromix/koffi-darwin-arm64`, its install script is denied in
 `pnpm-workspace.yaml`, and its C++ sources and docs are left out of the app.
 Only `electron-updater`, koffi and their runtime dependencies ship as node_modules; application dependencies are bundled by Vite.
 Source maps are excluded. Codex uses the separately installed `codex` executable;
-its unused vendor binaries do not ship. Keep the ZIP: macOS auto-update needs it.
+its unused vendor binaries do not ship.
 
 Only English Chromium locale packs ship (`electronLanguages: [en, en_GB]` in
 `electron-builder.yml`). Electron 44 has 220 `*.lproj` folders in its framework
@@ -1207,10 +1213,11 @@ lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
 ### The releases repository
 
 `triptu/juno-releases` is private and holds only what the app may read: one
-GitHub Release `v<version>` per version with the DMG, ZIP, block maps and
+GitHub Release `v<version>` per version with the DMG, its block map and
 `latest-mac.yml`, and `CHANGELOG.md`. The app reads it with the shipped
 read-only token, so anyone with the app can read this repository; put nothing
 else in it (ADR 0016).
+Signed releases also carry the ZIP and its block map for in-place updates.
 
 `CHANGELOG.md` has one section per version, newest first:
 
@@ -1250,8 +1257,8 @@ line. The script:
    (a build without `JUNO_UPDATE_TOKEN` would never update again);
 2. checks the version is newer than every published release and not already
    tagged;
-3. creates a draft release `v<version>` with the DMG, ZIP, block maps and
-   `latest-mac.yml`;
+3. creates a draft release `v<version>` with the DMG, its block map and
+   `latest-mac.yml` (plus the ZIP and its block map if signed);
 4. adds the section to `CHANGELOG.md` with today's date;
 5. publishes the draft and marks it latest. Installs see it from now on.
 
@@ -1259,6 +1266,22 @@ line. The script:
 `--prerelease` publishes a pre-release, which the updater never offers, and
 leaves `CHANGELOG.md` alone; use it to test the upload, then delete it with
 `gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
+
+A normal publish requires the latest `.juno-status/verify-main.json` from the
+CI keeper to be green. Its tested commit must match the build's code; only the
+app version may differ. Use `--urgent` only for a fix to a problem hurting the
+owner now, such as a CPU spin, data loss or a crash on launch. It runs local
+typecheck and lint, remote unit tests, and `pnpm test:package` against the
+packaged app before publishing. It adds an `urgent` marker to the GitHub release
+notes metadata and writes `.juno-status/ci-keeper-request.json`. The CI keeper
+must run the requested full `pnpm verify:main --ref <commit>` immediately,
+record the result, and clear the request; do not wait for the usual batch or
+90-minute interval. An urgent publish is still a normal visible release.
+
+`pnpm release:version`, `pnpm package` and `pnpm release:publish` print their
+step durations and append them to `.juno-status/release-timings.json` (local,
+gitignored): version bump, JS build, deploy, electron-builder, DMG, notarize
+or skip, and upload. The electron-builder total includes the DMG phase.
 
 ### The release keeper's releases
 

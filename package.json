@@ -30,7 +30,7 @@
     "test:feel": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:feel",
     "test:gallery": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery test:e2e",
     "test:plan": "node scripts/plan.mjs",
-    "package": "pnpm --filter @juno/desktop package",
+    "package": "node scripts/heavy.mjs --exclusive node scripts/package.mjs",
     "release:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-version.ts",
     "release:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-publish.ts",
     "gallery": "pnpm --filter @juno/gallery dev",

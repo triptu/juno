@@ -1,6 +1,6 @@
 const { build } = require('electron-builder')
 const { execFileSync } = require('node:child_process')
-const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = require('node:fs')
+const { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
 const { join, resolve } = require('node:path')
 
 // Updates come from GitHub Releases of a private repository, read with a
@@ -34,8 +34,12 @@ if (!release) console.log('Packaging unsigned; Developer ID signing and notariza
 if (!release) process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 if (!updateToken) console.log('Packaging without updates; JUNO_UPDATE_TOKEN is unset.')
 
-// Never leave a previous build's checksums behind.
-rmSync(resolve(__dirname, '../release/latest-mac.yml'), { force: true })
+// Never let a previous package's assets enter the next release.
+const output = resolve(__dirname, '../release')
+const version = require('../package.json').version
+for (const name of (existsSync(output) ? readdirSync(output, { withFileTypes: true }) : []).filter((entry) => entry.isFile()).map((entry) => entry.name)) {
+  if (name === 'latest-mac.yml' || name.includes(`-${version}-`) || name.includes(`-${version}.`)) rmSync(join(output, name), { force: true })
+}
 
 // The workspace links dependencies from pnpm's global virtual store, where
 // electron-builder cannot find the dependencies of a dependency. Package from
@@ -45,13 +49,18 @@ rmSync(resolve(__dirname, '../release/latest-mac.yml'), { force: true })
 // deleting the copy does not load fseventsd (scripts/worktree-folder.mjs).
 async function main() {
   const { scratchFolder } = await import('../../../scripts/worktree-folder.mjs')
+  const { recordReleaseTiming } = await import('../../../scripts/release-timings.mjs')
   mkdirSync(scratchFolder(), { recursive: true })
   const staging = mkdtempSync(join(scratchFolder(), 'juno-deploy-'))
   const app = join(staging, 'app')
   try {
+    const deployStarted = Date.now()
     execFileSync('pnpm', ['--filter', '@juno/desktop', 'deploy', '--prod', app], { cwd: resolve(__dirname, '..'), stdio: 'inherit' })
+    recordReleaseTiming('deploy', deployStarted)
     // Read by main (src/main/releaseFeed.ts). `signed` says whether Squirrel.Mac can install in place.
     if (updateToken) writeFileSync(join(app, 'update.json'), JSON.stringify({ repository, token: updateToken, signed: release }), { mode: 0o600 })
+    const builderStarted = Date.now()
+    let artifactStarted = builderStarted
     await build({
       config: {
         extends: './electron-builder.yml',
@@ -59,12 +68,20 @@ async function main() {
         forceCodeSigning: release,
         // Writes latest-mac.yml for `pnpm release:publish`. Nothing is uploaded here.
         publish: { provider: 'github', owner, repo, private: true },
-        mac: { notarize: release, ...(!release ? { identity: null } : {}) },
+        mac: { notarize: release, target: release ? ['dmg', 'zip'] : ['dmg'], ...(!release ? { identity: null } : {}) },
+        afterPack: async () => { artifactStarted = Date.now() },
+        afterSign: async () => {
+          if (release) recordReleaseTiming('notarize', artifactStarted, { status: 'completed with signing' })
+          artifactStarted = Date.now()
+        },
+        afterAllArtifactBuild: async () => { recordReleaseTiming('DMG', artifactStarted) },
         // ARM64 macOS requires a valid local signature after the fuse bytes change.
         electronFuses: { resetAdHocDarwinSignature: !release },
       },
       publish: 'never',
     })
+    if (!release) recordReleaseTiming('notarize', Date.now(), { status: 'skipped' })
+    recordReleaseTiming('electron-builder', builderStarted)
   } catch {
     console.error('Packaging failed; see electron-builder output above.')
     process.exitCode = 1
