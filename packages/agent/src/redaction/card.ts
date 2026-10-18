@@ -15,7 +15,7 @@ import {
   AccountId, ActionId, CardPayload, ConnectionId, Revision, SourceGeneration, digestJson,
   type ChildAction, type ExecutableIdentity,
 } from '@juno/agent-cards'
-import { memoryGen, type Proposal } from '../actions/cards'
+import { cardRemovalOp, memoryGen, type Proposal } from '../actions/cards'
 import type { Executor } from '../actions/executor'
 import { defineTool, type JunoTool, type ToolRun } from '../request/tool'
 import { ownerOpOf } from '../router/input'
@@ -32,8 +32,7 @@ const firstLine = (text: string) => {
   return line.length > PREVIEW_CHARS ? `${line.slice(0, PREVIEW_CHARS - 1)}…` : line
 }
 
-/** The op a removal by a remove card runs under. */
-export const cardRemovalOp = (actionId: string) => `card:${actionId}`
+export { cardRemovalOp }
 
 /** An owner message the model can name: its archive id, words and time. */
 function ownerMessage(store: Store, handle: string): { readonly id: number; readonly text: string; readonly at: number } | undefined {

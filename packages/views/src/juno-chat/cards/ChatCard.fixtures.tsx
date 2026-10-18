@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { Card } from '@juno/agent-contract'
+import type { Card, CardStatus } from '@juno/agent-contract'
 import { Button, defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
-import { noopActions } from '../commands'
+import { noopActions, type ChatActions } from '../commands'
 import {
   budget,
   change,
@@ -58,6 +58,28 @@ function Settles({ make }: { readonly make: (step: 0 | 1 | 2) => Card }) {
   )
 }
 
+/**
+ * A card that goes working on its first click, as in the app, and logs every
+ * action it is sent. The log shows that a working card's buttons send nothing.
+ */
+function ClickThenWorking({ make }: { readonly make: (status: CardStatus) => Card }) {
+  const [status, setStatus] = useState<CardStatus>(open)
+  const [log, setLog] = useState<ReadonlyArray<string>>([])
+  const actions: ChatActions = {
+    ...noopActions,
+    onCard: (_id, action) => {
+      setLog((entries) => [...entries, action._tag])
+      setStatus(working)
+    },
+  }
+  return (
+    <>
+      {renderCard(make(status), actions, NOW, false)}
+      <output hidden data-activation-log="">{log.join(' ')}</output>
+    </>
+  )
+}
+
 const frame = { width: 600, padded: true } as const
 
 const IMPLIED = { rule: 'auto', intent: 'implied', risk: 'reversible', line: "Asked because your message didn't ask for this exact change." } as const
@@ -96,6 +118,7 @@ export const resolveCard = defineFixtures(
       open: card(resolve('r1')),
       one: card(resolve('r2', open, 1)),
       working: card(resolve('r3', working)),
+      'click-then-working': scene(() => <ClickThenWorking make={(status) => resolve('r7', status)} />),
       resolved: card(resolve('r4', done('Resolved 2', { undo: true }))),
       expired: card(resolve('r5', expired)),
       'may-have-happened': card(resolve('r6', mayHaveHappened)),
@@ -232,7 +255,10 @@ export const removeCard = defineFixtures(
   {
     'Remove': {
       open: card(remove('v1')),
+      working: card(remove('v3', working)),
+      'click-then-working': scene(() => <ClickThenWorking make={(status) => remove('v4', status)} />),
       removed: card(remove('v2', done('Removed 2 messages'))),
+      interrupted: card(remove('v5', failed('Interrupted · Nothing was removed'))),
     },
   },
   frame,

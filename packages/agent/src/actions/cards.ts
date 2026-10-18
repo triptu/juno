@@ -491,7 +491,29 @@ function statusOf(store: Store, card: CardRow, payload: CardPayload, evidences: 
   if (outcomes.includes('working')) return { _tag: 'working' }
   // A connection call says what went wrong: the server's error, else what Juno recorded.
   const output = payload._tag === 'change' ? failureOf(store, evidences.flatMap((e) => e.attempts).at(-1)?.id) : {}
+  if (payload._tag === 'remove' && removalInterrupted(store, payload.action.id)) return { _tag: 'failed', line: chatCopy.card.remove.interrupted }
   return { _tag: 'failed', line: chatCopy.card.failed, ...output }
+}
+
+/** The op a removal by a remove card runs under. */
+export const cardRemovalOp = (actionId: string) => `card:${actionId}`
+
+/**
+ * A Remove click cut off before its removal committed: startup marked the
+ * authorization unknown with no result recorded (`classifyAtStartup`), and no
+ * removal holds the click's op. The removal commits in one local transaction,
+ * so without that row nothing was removed. With it, reconcile turns the card
+ * done.
+ */
+function removalInterrupted(store: Store, actionId: string): boolean {
+  const cutOff = store.db
+    .prepare(
+      `SELECT 1 FROM intents JOIN authorizations ON authorizations.intent_id = intents.id
+       WHERE intents.action_id = ? AND authorizations.outcome = 'unknown'
+         AND NOT EXISTS (SELECT 1 FROM action_results WHERE action_results.authorization_id = authorizations.id)`,
+    )
+    .get(actionId)
+  return cutOff !== undefined && store.db.prepare('SELECT 1 FROM removals WHERE op_id = ?').get(cardRemovalOp(actionId)) === undefined
 }
 
 /** What a connection call a click ran gave back (`action_outputs`), by its attempt. */

@@ -189,6 +189,12 @@ test('a removal cut off after its deletion record leaves the message, and removi
   await using(launchArmed(userData, options, 'redaction.deletionRaised'), async (juno, { app }) => {
     const { pid } = await removeFirst(juno, app)
     await expectKilled(app, pid)
+    // The restarted agent says plainly that the click was cut off and nothing was removed (SPEC 13.3).
+    await agentReady(app)
+    const first = card(await openChat(juno), 'remove')
+    await expect(first).toHaveAttribute('data-card-status', 'failed', { timeout: 20_000 })
+    await expect(first.getByText('Interrupted · Nothing was removed', { exact: true })).toBeVisible()
+    await expect(first.getByRole('button')).toHaveCount(0)
   })
   await using(launchApp(userData, options), async (juno) => {
     await juno.waitForSync()
@@ -198,8 +204,7 @@ test('a removal cut off after its deletion record leaves the message, and removi
     await expect(chat.ownerBubble('the offsite is on Friday')).toHaveCount(1)
     await expect(chat.root.getByText('Removed', { exact: true })).toHaveCount(0)
     await chat.send('forget my first message again')
-    // The first run's reply and card are still in the chat, and that card may still show its
-    // buttons while its cut-off click settles, so wait for the second card itself.
+    // The first run's reply and card are still in the chat, so wait for the second card itself.
     await expect(chat.junoBubble('Ready to remove it.')).toHaveCount(2, { timeout: 15_000 })
     await expect(card(chat, 'remove')).toHaveCount(2)
     const again = card(chat, 'remove').nth(1)
