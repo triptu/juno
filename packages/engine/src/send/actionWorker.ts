@@ -280,8 +280,12 @@ export class ActionWorker extends Context.Service<
             if (checkedAt - action.createdAt >= stallMillis) yield* local(transaction(markStalled(action)))
             else stalls.push(action.createdAt + stallMillis)
           }
+          // Only a channel's first row can go. The rows behind it wait for it to end, which wakes the worker,
+          // so their own past `nextAt` must not make the next pass due at once.
+          const heads = new Map<string, PendingAction>()
+          for (const action of yield* local(pendingActions)) if (!heads.has(action.channel)) heads.set(action.channel, action)
           // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
-          const rest = (yield* local(pendingActions)).filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && isCopyDelete(action)))
+          const rest = [...heads.values()].filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && isCopyDelete(action)))
           const after = yield* Clock.currentTimeMillis
           const due = [...rest.map((action) => action.nextAt), ...stalls, ...(copyWait === undefined ? [] : [copyWait])]
           const next = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - after)
