@@ -1,0 +1,1 @@
+- 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.

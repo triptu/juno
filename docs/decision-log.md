@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.
 - 10-18 22:01 · Tushar · The restart recheck stays at 10 topics over 24 hours; other topics refresh when opened.
 - 10-18 22:00 · Tushar · Juno agent's Slack writes are on, but only from the owner's approval click on the exact card; Juno can never write to Slack on its own. Why: an approved Send showed Failed.
 - 10-18 21:50 · main-new-threads · A Main row's new-threads count leaves out threads you started, from Juno or another client (the root's sender), since they are not new to you. SPEC already gave the form (thread icon and number after the title, hidden at 0); reading Main clears it.
