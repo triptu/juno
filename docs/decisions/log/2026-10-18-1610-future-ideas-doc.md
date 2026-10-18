@@ -1,0 +1,1 @@
+- 10-18 16:10 · docs · Product ideas not yet planned live in `docs/future-ideas.md`, apart from the backlog (small known items) and the spec (decided behaviour). A briefed idea moves to a plan; a declined one moves to the doc's last section with the reason.
