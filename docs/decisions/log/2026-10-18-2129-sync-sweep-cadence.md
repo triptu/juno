@@ -1,0 +1,1 @@
+- 10-18 21:29 · sync-sweep-cadence · Keep the fake server on the production hourly follow-pass cadence; ten-minute sweeps repair moved messages from counts and discovery, while focused tests may force a follow pass on every cycle.

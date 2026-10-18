@@ -1,0 +1,1 @@
+- 10-18 22:53 · incremental-thread-refresh · Keep incremental `getView` in every ten-minute sweep for missed follow and read changes; reserve the full quiet-window pass for the hourly repair cadence.

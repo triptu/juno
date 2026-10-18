@@ -1,4 +1,5 @@
 import {
+  compareTs,
   threadTopicId,
   type ChannelId,
   type Ts,
@@ -12,6 +13,14 @@ import { invalidate, type Writer } from './shared'
 export const markRepliesComplete = (channel: string, threadTs: string, complete: boolean, syncedAt: number, completeFrom?: string): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    const current = (yield* sql<{ replies_complete: 0 | 1; complete_from: string | null }>`
+      SELECT replies_complete, complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${threadTs}`)[0]
+    const nextFrom = completeFrom === undefined
+      ? (current?.complete_from ?? null)
+      : current?.complete_from === undefined || current.complete_from === null || compareTs(completeFrom, current.complete_from) < 0
+        ? completeFrom
+        : current.complete_from
+    if (current !== undefined && current.replies_complete === (complete ? 1 : 0) && current.complete_from === nextFrom) return
     yield* sql`INSERT INTO thread_cursors (channel, thread_ts, replies_complete, synced_at, complete_from)
       VALUES (${channel}, ${threadTs}, ${complete ? 1 : 0}, ${String(syncedAt)}, ${completeFrom ?? null})
       ON CONFLICT (channel, thread_ts) DO UPDATE SET replies_complete = excluded.replies_complete, synced_at = excluded.synced_at,
@@ -49,4 +58,18 @@ export const latestSyncedRange = (channel: string): Effect.Effect<{ from_ts: str
     const rows = yield* sql<{ from_ts: string; to_ts: string }>`
       SELECT from_ts, to_ts FROM synced_ranges WHERE channel = ${channel} ORDER BY to_ts DESC LIMIT 1`
     return rows[0]
+  })
+
+/** The newest stored range for each requested conversation, in one read. */
+export const latestSyncedRanges = (channels: ReadonlyArray<string>): Effect.Effect<ReadonlyMap<string, { from_ts: string; to_ts: string }>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    if (channels.length === 0) return new Map()
+    const sql = yield* StoreWriter
+    const rows = yield* sql<{ channel: string; from_ts: string; to_ts: string }>`
+      SELECT channel, from_ts, to_ts FROM (
+        SELECT channel, from_ts, to_ts,
+          row_number() OVER (PARTITION BY channel ORDER BY to_ts DESC) AS position
+        FROM synced_ranges WHERE channel IN ${sql.in(channels)}
+      ) WHERE position = 1`
+    return new Map(rows.map((row) => [row.channel, { from_ts: row.from_ts, to_ts: row.to_ts }]))
   })

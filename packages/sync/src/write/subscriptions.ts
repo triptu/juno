@@ -7,6 +7,7 @@ import {
 } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
+import { FollowFence } from '../followFence'
 import { syncKeys } from '../keys'
 
 import { invalidate, type Writer } from './shared'
@@ -26,16 +27,18 @@ export interface ThreadSubRow {
 export const threadSub = (channel: string, threadTs: string): Effect.Effect<ThreadSubRow | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    const fence = yield* FollowFence
     const rows = yield* sql<{ subscribed: 0 | 1; slack_last_read: string | null; updated_event_ts: string | null; observed_at: string | null; commanded: 0 | 1 }>`
       SELECT subscribed, slack_last_read, updated_event_ts, observed_at, commanded FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
     const row = rows[0]
     if (row === undefined) return undefined
+    const observedAt = fence.effective(channel, threadTs, row.observed_at ?? undefined)
     return {
       subscribed: row.subscribed === 1,
       commanded: row.commanded === 1,
       ...(row.slack_last_read === null ? {} : { slackLastRead: row.slack_last_read }),
       ...(row.updated_event_ts === null ? {} : { updatedEventTs: row.updated_event_ts }),
-      ...(row.observed_at === null ? {} : { observedAt: row.observed_at }),
+      ...(observedAt === undefined ? {} : { observedAt }),
     }
   })
 
@@ -86,12 +89,12 @@ export const setThreadSub = (
     const observedAt = existing?.observedAt === undefined ? at : maxTs(existing.observedAt, at)
     const eventTs = source.kind === 'event' ? source.eventTs : (existing?.updatedEventTs ?? null)
     const commanded = source.kind === 'command' || existing?.commanded === true ? 1 : 0
+    const changed = existing?.subscribed !== subscribed || (slackLastRead !== undefined && existing.slackLastRead !== slackLastRead)
     yield* sql`INSERT INTO thread_subs (channel, thread_ts, subscribed, slack_last_read, updated_event_ts, observed_at, commanded)
       VALUES (${channel}, ${threadTs}, ${subscribed ? 1 : 0}, ${slackLastRead ?? null}, ${eventTs}, ${observedAt}, ${commanded})
       ON CONFLICT (channel, thread_ts) DO UPDATE SET subscribed = excluded.subscribed,
         slack_last_read = COALESCE(excluded.slack_last_read, thread_subs.slack_last_read),
         updated_event_ts = excluded.updated_event_ts, observed_at = excluded.observed_at, commanded = excluded.commanded`
-    const changed = existing?.subscribed !== subscribed || (slackLastRead !== undefined && existing.slackLastRead !== slackLastRead)
     if (changed) yield* invalidate(syncKeys.threadSubs)
     return 'applied'
   })
@@ -183,6 +186,8 @@ export const clearPendingFollows: Effect.Effect<void, SqlError, StoreWriter> = E
 export const clearThreadSub = (channel: string, threadTs: string): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    const fence = yield* FollowFence
     yield* sql`DELETE FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${threadTs}`
+    fence.forget(channel, threadTs)
     yield* invalidate(syncKeys.threadSubs)
   })

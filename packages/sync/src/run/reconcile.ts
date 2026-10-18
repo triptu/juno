@@ -74,14 +74,20 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
   const droppedAt = state.droppedAt
   state.droppedAt = undefined
   const recheck = droppedAt === undefined ? undefined : { since: droppedAt, first: yield* openNow }
-  yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshMetadata: droppedAt !== undefined, refreshThreads: true, ...(recheck === undefined ? {} : { recheck }) }).pipe(
+  const next = yield* catchUp(ctx, previous, reportBoot, {
+    refreshWorkspace: false,
+    refreshMetadata: droppedAt !== undefined,
+    refreshThreads: true,
+    persistState: droppedAt !== undefined,
+    ...(recheck === undefined ? {} : { recheck }),
+  }).pipe(
     Effect.tapError(() =>
       Effect.sync(() => {
         if (droppedAt !== undefined) state.droppedAt = Math.min(droppedAt, state.droppedAt ?? droppedAt)
       }),
     ),
   )
-  state.lastBoot = yield* bootState()
+  state.lastBoot = next
   yield* refreshOpenTopics(runtime)
 })
 
@@ -89,8 +95,10 @@ export const makeReconcile = (runtime: SyncRuntime) => {
   const { cycle, work, settle } = runtime
   /**
    * The catch-up after a reconnect or a sweep, under the work permit, then
-   * the follow pass if it is due. After a drop it rechecks the gap; a drop
-   * during it is rechecked by the next one, and a failure keeps the gap.
+   * the follow pass if it is due. Reconnects refresh the incremental thread
+   * last sync; the hourly full pass covers the whole quiet window. After
+   * a drop it rechecks the gap; a drop during it is rechecked by the next
+   * one, and a failure keeps the gap.
    */
   const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(catchUpAfterGap(runtime).pipe(
     work.withPermit,
