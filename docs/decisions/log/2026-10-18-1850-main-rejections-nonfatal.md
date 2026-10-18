@@ -1,0 +1,1 @@
+- 10-18 18:50 · orchestrator · The main process logs unhandled promise rejections and keeps running; engine and agent still exit and are restarted by main; the process log is installed once per process. Why: one stray rejection in main quit the whole app (found via the coverage hook in session.spec:158).

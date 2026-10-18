@@ -394,6 +394,7 @@ if (e2e) {
         screenClockForTests += ms
       },
       flushCoverage: () => flushAllCoverage(),
+      rejectInMain: () => void Promise.reject(new Error('rejected for a test')),
     },
   })
 }

@@ -64,3 +64,22 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     }
   } finally { await running.close() }
 })
+
+test('an unhandled rejection in main is logged with its stack and the app keeps running', async ({ fake, slackApp, userData }) => {
+  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const { app, win } = running
+    const juno = new Juno(app, win)
+    await juno.signIn()
+    await juno.waitForSync()
+    await app.evaluate(() => (globalThis as unknown as { junoTest: { rejectInMain: () => void } }).junoTest.rejectInMain())
+    const line = /ERROR main unhandled rejection cause=Error stack=\d+:\d+/
+    await expect.poll(() => readFile(join(userData, 'logs', 'main.log'), 'utf8').catch(() => '')).toMatch(line)
+    // Still running: the window answers and About copies the line.
+    await juno.openSettings('About')
+    await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
+    await expect(win.getByText('Copied', { exact: true })).toBeVisible()
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(line)
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBeGreaterThan(0)
+  } finally { await running.close() }
+})
