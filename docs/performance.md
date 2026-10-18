@@ -48,7 +48,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: one socket event transaction, including `reindexTopics` | 5 ms | Backfill transactions ≤ 200 rows and ≤ 20 ms. |
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
 | Idle CPU after sync: the engine, nothing happening | under 3 % of one core, averaged over 20 s | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time. Asserted by `idle-cpu.spec.ts` (the built app, engine) and `idle.test.ts` (the engine on a 3 000-message channel, where that spin costs about 7 %). On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. |
-| Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`, which on macOS is the physical footprint; the scroll and memory scenario of `perf.spec.ts` reads it with `footprint` for main, the renderer and the engine and holds each to these budgets. After that lighter scenario on 10-18: main 51 to 53 MB, renderer 167 to 227 MB, engine 76 to 94 MB (8.10). The scenario this row describes is `memory after heavy use` (`e2e/perfMemory.ts`), read after 30 s idle: main 51 to 63 MB, renderer 265 to 270 MB, over budget, engine 113 to 116 MB (8.11). Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
+| Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`, which on macOS is the physical footprint; the scroll and memory scenario of `perf.spec.ts` reads it with `footprint` for main, the renderer and the engine and holds each to these budgets. After that lighter scenario on 10-18: main 51 to 53 MB, renderer 167 to 227 MB, engine 76 to 94 MB (8.10). The scenario this row describes is `memory after heavy use` (`e2e/perfMemory.ts`), read after 30 s idle: main 51 to 63 MB, renderer 265 to 294 MB, over budget, engine 113 to 125 MB (8.11). Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
 | Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
 
@@ -1377,11 +1377,11 @@ What `placeToolbar` has left runs before the press, as the pointer moves to wher
 
 | Process | After launch | Right after heavy use | After 30 s idle | Budget |
 | --- | --- | --- | --- | --- |
-| Main | 52 to 53 MB | 51 to 52 MB | 51 to 63 MB | 80 MB |
-| Renderer | 149 to 177 MB | 437 to 524 MB | **265 to 270 MB** | 250 MB |
-| Engine | 117 to 133 MB | 115 to 116 MB | 113 to 116 MB | 300 MB |
+| Main | 52 to 54 MB | 51 to 52 MB | 51 to 63 MB | 80 MB |
+| Renderer | 149 to 177 MB | 437 to 524 MB | **265 to 294 MB** | 250 MB |
+| Engine | 117 to 133 MB | 115 to 125 MB | 113 to 125 MB | 300 MB |
 
-The renderer misses its budget by 6 to 8 %. A Chromium memory-infra dump of the renderer at launch and after the idle, without a forced collection (`JUNO_MEMORY_DUMP=<prefix>`; `JUNO_MEMORY_PHASES=1` dumps after each part too, before and after a collection):
+The renderer misses its budget by 6 to 18 % (four runs: 265, 268, 270, 294 MB). A Chromium memory-infra dump of the renderer at launch and after the idle, without a forced collection (`JUNO_MEMORY_DUMP=<prefix>`; `JUNO_MEMORY_PHASES=1` dumps after each part too, before and after a collection):
 
 | Allocator | Launch | After 30 s idle |
 | --- | --- | --- |
@@ -1399,10 +1399,10 @@ Tried, measured and not kept:
 | No hover toolbar elements in message rows | Oilpan after scrolling 108 against 110 MB; nothing |
 | Row hover by ancestor selectors (`stylex.when.ancestor`) instead of inherited custom properties, sidebar | Oilpan before a collection 361 and 384 MB against 325 to 381; nothing |
 | Rows hoverable, their contents not, sidebar | 321 and 357 MB; nothing |
-| No row hover in any list while scrolling (`pointer-events: none` on rows) | sidebar alone 191 and 242 MB against 325 to 381; whole scenario after idle 255 and 261 MB against 265 to 270 |
+| No row hover in any list while scrolling (`pointer-events: none` on rows) | sidebar alone 191 and 242 MB against 325 to 381; whole scenario after idle 255 and 261 MB against 265 to 294 |
 | Three mounted tabs instead of five | 271 and 276 MB after idle; nothing |
 
-So Chromium's hover update as the wheel slides rows under a still pointer is about a third of the scrolling garbage, but taking it away saves only about 10 MB once the page is idle, and the rows would not highlight while the wheel turns. No app-level holder of the 15 to 20 MB over budget was found, and no fix is in this change; the gate stays and fails until the owner decides (proposals in the review report). When the first `stylex.when` keys were tried, they were written as constants outside `stylex.create`; the compiler replaces them only inside it, and elsewhere they run in the bundle and throw at load, which left the app on a blank window (stylex skill).
+So Chromium's hover update as the wheel slides rows under a still pointer is about a third of the scrolling garbage, but taking it away saves only about 10 MB once the page is idle, and the rows would not highlight while the wheel turns. No app-level holder of the 15 to 44 MB over budget was found, and no fix is in this change; the gate stays and fails until the owner decides (proposals in the review report). When the first `stylex.when` keys were tried, they were written as constants outside `stylex.create`; the compiler replaces them only inside it, and elsewhere they run in the bundle and throw at load, which left the app on a blank window (stylex skill).
 
 Logs and dumps are under `.juno-status/perf-memory-1018/`.
 
