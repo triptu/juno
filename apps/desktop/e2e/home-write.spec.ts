@@ -48,39 +48,37 @@ test('a first @ suggests a person, Tab makes them the destination, and the send 
   expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
 })
 
-test('Space keeps a first # as text for Juno', async ({ juno }) => {
+test('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a person', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { write } = juno
-
-  await write.composer.pressSequentially('#eng')
-  await expect(write.sendToOption('eng')).toBeVisible()
-  await write.composer.pressSequentially(' what happened today?')
-  await expect(write.sendTo).toHaveCount(0)
-  await write.expectDestination('Juno')
-  await expect(write.composer).toHaveValue('#eng what happened today?')
-})
-
-test('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an empty field goes back to Juno', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { write } = juno
-
-  await write.composer.pressSequentially('@ma')
-  await expect(write.sendTo).toBeVisible()
-  await write.composer.press('Escape')
-  await expect(write.sendTo).toHaveCount(0)
-  await write.expectDestination('Juno')
-  await expect(write.composer).toHaveValue('@ma')
-
+  await test.step('Space keeps a first # as text for Juno', async () => {
+    await write.composer.pressSequentially('#eng')
+    await expect(write.sendToOption('eng')).toBeVisible()
+    await write.composer.pressSequentially(' what happened today?')
+    await expect(write.sendTo).toHaveCount(0)
+    await write.expectDestination('Juno')
+    await expect(write.composer).toHaveValue('#eng what happened today?')
+  })
+  // An empty field again, so the next @ is a first @.
   await write.composer.fill('')
-  await write.recentRow('Maya').click()
-  await write.expectDestination('Maya')
-  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
-  await expect(write.composer).toBeFocused()
-  await write.composer.press('Backspace')
-  await write.expectDestination('Juno')
-  await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
+  await test.step('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an empty field goes back to Juno', async () => {
+    await write.composer.pressSequentially('@ma')
+    await expect(write.sendTo).toBeVisible()
+    await write.composer.press('Escape')
+    await expect(write.sendTo).toHaveCount(0)
+    await write.expectDestination('Juno')
+    await expect(write.composer).toHaveValue('@ma')
+
+    await write.composer.fill('')
+    await write.recentRow('Maya').click()
+    await write.expectDestination('Maya')
+    await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
+    await expect(write.composer).toBeFocused()
+    await write.composer.press('Backspace')
+    await write.expectDestination('Juno')
+    await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
+  })
 })
 
 test('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', async ({ juno, fake }) => {
