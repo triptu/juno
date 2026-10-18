@@ -139,7 +139,7 @@ interface CountEntry {
 Observed live (`client.userBoot` with `version_all_channels=true`, `return_all_relevant_mpdms=true`; `client.counts` with `thread_counts_by_channel=true`)
 
 - `client.userBoot.channels` lists every channel of the workspace, not only the user's (418 channels against 218 in `client.counts`). The channel objects carry no `is_member`, `last_read`, `latest`, `unread_count` or `is_open`; the keys present on all of them are `id, name, name_normalized, is_channel, is_group, is_im, is_mpim, is_private, is_archived, is_general, is_shared, is_ext_shared, is_org_shared, is_pending_ext_shared, is_frozen, is_slackbot_channel_enabled, created, creator, updated, unlinked, context_team_id, shared_team_ids, pending_shared, pending_connected_team_ids, parent_conversation (null), topic, purpose, properties`; `members` is present on about half, `previous_names` on half, `connected_team_ids`/`conversation_host_id`/`internal_team_ids` on shared channels only, `use_case` rarely. So membership and read state must come from `client.counts`, whose entries are the user's own conversations.
-- **Membership, as Juno derives it.** `userBoot` is channel metadata only. A conversation is the user's own when `client.counts` lists it (`channels`, `mpims`, `ims`); a full counts answer (no `counts_last_fetched`) replaces the membership set, an incremental one only adds. Between counts calls the membership events keep it current: `channel_joined`/`group_joined`, `member_joined_channel` (self), `im_open`, `im_created`, `mpim_open`, `mpim_joined` add; `channel_left`/`group_left`, `member_left_channel` (self), `channel_deleted`/`group_deleted` remove. `im_close`/`mpim_close` do not remove: they hide the DM in Slack's sidebar but it stays the user's. The sync (`packages/sync/src/boot.ts`, `events.ts`) and the fake (`packages/fake-slack`) follow this; the sidebar query filters on it. Unknown: whether an incremental `client.counts` (with `counts_last_fetched`) lists only changed entries or everything; Juno assumes the former and takes a full list at every warm boot, so a channel left while the app was closed drops out then.
+- **Membership, as Juno derives it.** `userBoot` is channel metadata only. A conversation is the user's own when `client.counts` lists it (`channels`, `mpims`, `ims`); a full counts answer (no `counts_last_fetched`) replaces the membership set, an incremental one only adds. Between counts calls the membership events keep it current: `channel_joined`/`group_joined`, `member_joined_channel` (self), `im_open`, `im_created`, `mpim_open`, `mpim_joined` add; `channel_left`/`group_left`, `member_left_channel` (self), `channel_deleted`/`group_deleted` remove. `im_close`/`mpim_close` do not remove: they hide the DM in Slack's sidebar but it stays the user's. The sync (`packages/sync/src/boot.ts`, `events.ts`) and the fake (`packages/fake-slack`) follow this; the sidebar query filters on it. A 10-18 incremental probe returned every ID from the preceding full counts, but most rows contained only `id,last_read`. This replaces the earlier unknown about omission in that sample; behavior across memberships and longer gaps remains unknown. Juno takes a full list at every warm boot, so a channel left while the app was closed drops out then. See [catch-up research](slack-catchup.md) for the partial-row schema mismatch.
 - `client.userBoot.ims` entries always have `id, user, is_im, is_open, is_archived, is_frozen, is_org_shared, is_slackbot_channel_enabled, created, updated, context_team_id`; `is_shared`/`is_ext_shared`/`shared_team_ids`/`connected_team_ids` only on shared DMs.
 - `emoji_cache_ts`, `app_commands_cache_ts` and `translations_cache_ts` are ts-formatted strings, not numbers. `subteams` had only `self` (no `all`). `self.profile` includes `email`, `status_*`, `huddle_state*`, `start_date`. Extra top-level keys not in the bundle reading: `cache_ts_version, cache_version, prefs_version, slack_route, dnd, non_threadable_channels, accept_tos_url (null), is_europe, mobile_app_requires_upgrade` and several `is_*_eligible` flags.
 - `client.counts` entries (channels, mpims, ims) all carry `id, last_read, latest, updated, history_invalid` (all ts strings), `mention_count` and `has_unreads`; `mention_count_display` and `vip_count` were absent on entries, while `threads` has `has_unreads, mention_count, vip_count, unread_count_by_channel, mention_count_by_channel` (no `timestamp`). `channel_badges` is `{ channels, dms, app_dms, thread_mentions, thread_unreads }` (numbers). `alerts`, `saved` and `activity_v2` are flat objects of numeric counters.
@@ -147,7 +147,7 @@ Observed live (`client.userBoot` with `version_all_channels=true`, `return_all_r
 Inferred
 
 - `conversations.view` returns `{ messages, channel, pins?, … }` like `conversations.history` plus channel metadata; it is the client's "open this channel" call.
-- Channels are kept in sync afterwards by RTM events plus periodic `client.counts` (the client passes `counts_last_fetched` to get only changed entries).
+- Channels are kept in sync afterwards by RTM events plus periodic `client.counts`. The client passes `counts_last_fetched`; the 10-18 live probe returned partial rows for many unchanged IDs, rather than omitting those IDs. See [catch-up research](slack-catchup.md).
 
 Unknown
 
@@ -166,7 +166,7 @@ History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineD
 - `conversations.replies` args: `{ channel, ts: thread_ts, inclusive: true, limit, oldest?, latest?, cursor?, include_tombstones?, cached_latest_updates }`. Response: `{ messages, has_more, response_metadata, deleted, latest_updates, unchanged_messages }`. First message is the root, also when `oldest` is after it (observed live 2026-10-15, section 10, "Live probe"). Error `thread_not_found` is handled.
 - `conversations.view` (section 2).
 - Observed live (`conversations.history` with `limit`, `ignore_replies=true`): `{ ok, messages, has_more, pin_count, channel_actions_count, channel_actions_ts (null), response_metadata: { next_cursor } }`. Every message had `type, ts, text, client_msg_id, user`; `blocks` on nearly all, `attachments` on about two thirds, `reactions` on half; roots carry `thread_ts, reply_count, reply_users, reply_users_count, latest_reply, subscribed, is_locked` and sometimes `last_read`; `thread_broadcast` messages carry `root`.
-- `conversations.historyChanges` returns `{ ekm_change_ts }` (enterprise key management only).
+- The cached `conversations.historyChanges` call site consumes `{ ekm_change_ts }` for enterprise key management. **10-18 correction:** live calls returned `channel_timestamps`, `invalid_channel_ids` and `last_checked_ts`, with empty maps. Its broader contract remains unknown; see [catch-up research](slack-catchup.md).
 
 Thread subscriptions and unreads (`shared`, module `ZUxn`; `boot-async` `WhFy` `refreshThreads`, `zvzS` `processThreads`)
 - `subscriptions.thread.add` `{ channel, thread_ts, last_read }` and `subscriptions.thread.remove` `{ channel, thread_ts, last_read }` (sent through the persisted/offline queue `d.I`).
@@ -267,7 +267,7 @@ Inferred
 
 Unknown
 
-- Full response schema of `conversations.view`, `client.dms`, the edge `results` object fields for emoji (`name`, `url`, `alias_for` are referenced elsewhere), and `activity.feed` item shapes.
+- Full response schema of `conversations.view`, `client.dms`, and the edge `results` object fields for emoji (`name`, `url`, `alias_for` are referenced elsewhere). Selected `activity.feed` item shapes were observed on 10-18 in [catch-up research](slack-catchup.md); other entry types remain unknown.
 
 ## 4. Real-time (websocket)
 
@@ -321,7 +321,7 @@ Unknown
 
 - The full `hello.start` payload and `flannel=3` semantics (the `flannel` socket subtype lets the client run edge queries without HTTP; Juno can use HTTP edge calls instead). Live, `hello.start` was the boolean `true`.
 - Why `start_args` silences the socket from Node. The official client sends it and gets `hello`, so the server must be waiting for something only the official client supplies (a first frame, a cookie the browser attaches, or a parameter tied to its build). Not needed: Juno works without it.
-- Whether `reconnect_url` frames keep arriving every 30 to 60 s for the life of the connection (seen twice in 90 s) and whether an unused one expires server-side before the client's 285 s window.
+- Whether `reconnect_url` frames keep arriving every 30 to 60 s for the life of the connection (seen twice in 90 s) and whether an unused one expires server-side before the client's 285 s window. A 10-18 probe confirmed `hello.fast_reconnect=true` when reusing a fresh URL, but did not establish gap-event replay coverage. See [catch-up research](slack-catchup.md) for counts mutation markers, partial incremental rows, Activity and the restricted HTTP event log.
 
 ## 5. Message format
 
