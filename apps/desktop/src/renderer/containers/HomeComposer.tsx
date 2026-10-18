@@ -25,6 +25,7 @@ import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
+import { chatMentions } from './juno/chatMentions'
 import { leaveComposer, takeForJuno, useJunoFiles } from './juno/junoFiles'
 import { useMentions } from './mentions'
 import { openJuno, openTopicInBackground } from './navigation'
@@ -185,6 +186,12 @@ function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefi
   }, [taken, field, search])
 }
 
+/** The people and channels picked with @ and # in a question for Juno, so Juno reads their ids. */
+function withMentions(body: string, draft: HomeDraft) {
+  const mentions = chatMentions(body, draft.mentions)
+  return mentions.length === 0 ? {} : { mentions }
+}
+
 /**
  * Sends the draft where it goes: Juno opens its chat with the question and
  * the files it reads (the rest stay, SPEC 12); a person or channel gets it
@@ -201,7 +208,7 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
     }
     if (registry.get(attachmentsAtom(tabId)).length === 0) {
       if (body.trim() === '') return false
-      junoCommands.send(body)
+      junoCommands.send(body, withMentions(body, current))
       setHomeDraft(registry, tabId, emptyHomeDraft)
       openJuno()
       return true
@@ -213,7 +220,7 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
       if (untouched(registry.get(homeDraftAtom(tabId)))) setHomeDraft(registry, tabId, current)
       return false
     }
-    junoCommands.send(body, files.length === 0 ? {} : { files })
+    junoCommands.send(body, { ...withMentions(body, current), ...(files.length === 0 ? {} : { files }) })
     leaveComposer(tabId, ids)
     openJuno()
     return true
@@ -335,8 +342,9 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     onChange: (text) => set({ ...latest(), draft: text }),
     field: inputRef,
     place: { channel: draft.conversation?.channelId, threadTs: draft.thread?.rootTs },
+    // A first @ or # with Juno chosen is the "Send to" list's (SPEC 12).
+    skipLeading: draft.conversation === undefined,
   })
-  // Juno takes plain text: the @ and # suggestions are for people and channels in Slack.
   const toSlack = draft.conversation !== undefined
 
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
@@ -348,20 +356,19 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       destination.choose(undefined)
       return true
     }
-    return toSlack ? mentions.onFieldKey(event) : false
+    return mentions.onFieldKey(event)
   }
 
   return (
     <Composer
       value={draft.draft}
-      // Marks always, empty for Juno: the field keeps one structure, so a change of destination never remounts it and loses focus.
-      marks={toSlack ? mentions.marks : []}
-      {...(toSlack ? { onCaret: mentions.onCaret, ...(mentions.mention === undefined ? {} : { mention: mentions.mention }) } : {})}
+      marks={mentions.marks}
+      onCaret={mentions.onCaret}
+      {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
       {...(sendToList === undefined ? {} : { mention: sendToList })}
       onChange={(value, caret) => {
         sendTo.typed(value)
-        if (toSlack) mentions.onChange(value, caret)
-        else set({ ...latest(), draft: value })
+        mentions.onChange(value, caret)
       }}
       onFieldKey={onFieldKey}
       onSend={() => {

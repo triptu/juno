@@ -1,7 +1,7 @@
 // @ and # in the composer (spec section 8, inventory 7.1): people, user
 // groups and channels suggested as you type, picked with the keyboard, sent
 // as real Slack mentions and channel links, Esc and Backspace, and Home's
-// composer once a person or channel is chosen.
+// composer, in a question for Juno and once a person or channel is chosen.
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -161,15 +161,21 @@ test('a draft keeps its mentions across tab switches', async ({ juno, fake }) =>
   expect(postedText(fake).at(-1)).toBe('Ask <@U0PRIYA> about the copy.')
 })
 
-test('Home suggests people and channels once a person or channel is chosen, and none while Juno is', async ({ juno, fake }) => {
+test('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { write } = juno
 
-  // Juno takes plain text: an @ inside a question suggests nothing.
-  await write.composer.pressSequentially('Ask about @le')
-  await juno.win.waitForTimeout(300)
+  // Before a destination, a first @ is the "Send to" list's, and an @ inside the question suggests people.
+  await write.composer.pressSequentially('@le')
+  await expect(write.sendTo).toBeVisible()
   await expect(write.suggestions).toHaveCount(0)
+  await write.composer.fill('')
+  await write.composer.pressSequentially('Ask about @le')
+  await expect(write.suggestion('Leo')).toBeVisible()
+  await write.composer.press('Enter')
+  await expect(write.composer).toHaveValue('Ask about @Leo ')
+  await expect(write.composerChips).toHaveText(['@Leo'])
   await write.composer.fill('')
 
   await write.pickConversation('eng', 'eng')
