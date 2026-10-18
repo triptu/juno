@@ -34,6 +34,7 @@ import { UploadProgress } from './uploadProgress'
 import { Staging } from './staging'
 import { ActionWorker } from './send/actionWorker'
 import { PostWorker } from './send/worker'
+import { PostQueue } from './postQueue'
 import { ReadsHandlers } from './reads/handlers'
 import { MarkWorker } from './markWorker'
 import { Outbox } from './outbox'
@@ -93,7 +94,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(SlackSchedule.layer),
   Layer.provideMerge(PostWorker.layer),
-  Layer.provideMerge(Staging.layer),
+  Layer.provideMerge(Layer.merge(Staging.layer, PostQueue.layer)),
   Layer.provideMerge(UploadProgress.layer),
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),

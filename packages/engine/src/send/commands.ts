@@ -18,11 +18,11 @@
 import { Clock, Effect } from 'effect'
 import { MAX_FILES_PER_MESSAGE, NotFound, NotSignedIn, Rejected, type SendError, type SendResult, type SendTarget } from '@juno/contract'
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
-import { composeOutgoing } from '@juno/richtext'
 import { StoreWriter, transaction } from '@juno/store'
-import { discardPost, queuePost, readPost, retryPost, startThread } from '@juno/sync'
+import { discardPost, readPost, retryPost, startThread } from '@juno/sync'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
+import { queueText } from '../postQueue'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
 import { clearDraft } from './drafts'
@@ -61,20 +61,18 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
       channel = to.channelId
     }
     const threadTs = to.kind === 'channel' ? to.threadTs : undefined
-    const outgoing = composeOutgoing(input.text)
     // Taken last, after the DM is open: a failed send leaves the chips as they were.
     const files = fileIds.length === 0 ? [] : yield* staging.take(fileIds)
-    const blocksJson = input.text.trim() === '' ? null : JSON.stringify(outgoing.blocks)
     const now = yield* Clock.currentTimeMillis
     const topicId = yield* transaction(
       Effect.gen(function* () {
-        yield* queuePost({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text.trim() === '' ? '' : outgoing.text, blocksJson, files, createdAt: now })
+        const text = yield* queueText({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text, files, createdAt: now })
         if (input.draftOf !== undefined) yield* clearDraft(input.draftOf)
         if (input.startThread === true && threadTs === undefined) {
           const sql = yield* StoreWriter
           const conversation = (yield* sql<{ kind: string }>`SELECT kind FROM conversations WHERE id = ${channel}`)[0]
           if (conversation !== undefined && conversation.kind !== 'im') {
-            return yield* startThread({ channel, clientMsgId: input.clientMsgId, text: outgoing.text, createdAt: now })
+            return yield* startThread({ channel, clientMsgId: input.clientMsgId, text, createdAt: now })
           }
         }
         return threadTs === undefined ? mainTopicId(channel as ChannelId) : threadTs.startsWith('pending:') ? `p:${channel}:${threadTs.slice(8)}` : threadTopicId(channel as ChannelId, threadTs as Ts)
