@@ -946,6 +946,11 @@ one package, then was removed. No image build occurred for that change.
 Two concurrent SSH containers installed against the same pnpm store and runtime
 lock directory. Both checked that their uid matched the store owner. The image
 contained no workspace manifest or node_modules.
+The same uid check initially exposed Quint's warmed downloads behind the base
+image's private `/home/pwuser` directory. The toolchain makes that directory
+readable and searchable by other job uids. Timings above precede this permission
+fix. After rebuilding, the Rust evaluator and Apalache both passed a one-step
+model check as the laptop's uid 1000, using the warmed downloads.
 
 Namespace saved a 1,666 MB cache generation. Its first follow-up fresh machine
 missed the cache and installed in 15 seconds; a later fresh machine restored

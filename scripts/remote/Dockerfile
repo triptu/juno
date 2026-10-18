@@ -12,7 +12,7 @@ RUN apt-get update \
   && npm install -g --silent "pnpm@${PNPM_VERSION}"
 
 # SSH runs as its host uid; Namespace uses pwuser. Both can unpack into /work.
-RUN mkdir -p /work && chmod 1777 /work
+RUN mkdir -p /work && chmod 1777 /work && chmod 755 /home/pwuser
 USER pwuser
 WORKDIR /work
 ENV QUINT_HOME=/home/pwuser/.quint
