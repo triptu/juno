@@ -149,6 +149,8 @@ export interface RunningEngine {
   readonly workPass: (name: WorkName) => Promise<void>
   /** Number of actions that passed preflight and requested the send lane. */
   readonly actionsReady: () => number
+  /** Commands holding or waiting for the same target lock. */
+  readonly pendingCommands: (key: string) => number
   /** Waits for boot or reconnect and its follow pass to finish. Does not drain socket events or command retries. */
   readonly syncIdle: () => Promise<void>
   /** Waits for a sync cycle that starts after this call to finish. */
@@ -219,6 +221,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   let online = false
+  const commands = new Map<string, number>()
   let actionsReady = 0
   let barrierSent = 0
   let barrierSeen = 0
@@ -232,6 +235,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     timing: { ...fastTiming, ...options.timing },
     ...(options.clock === undefined ? {} : { clock: options.clock }),
     work: {
+      onCommands: (key, count) => { if (count === 0) commands.delete(key); else commands.set(key, count) },
       onActionReady: () => { actionsReady++ },
       onPass: (name, event) => {
         const state = stateOf(name)
@@ -317,6 +321,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       await waitFor(() => barrierSeen >= id || !online ? true : undefined, WAIT_MS, 'socket frames consumed')
     },
     actionsReady: () => actionsReady,
+    pendingCommands: (key) => commands.get(key) ?? 0,
     workPass: async (name) => {
       const state = stateOf(name)
       const wake = await waitFor(() => state.wake, WAIT_MS, `${name} worker ready`)

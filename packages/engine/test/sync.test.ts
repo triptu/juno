@@ -996,7 +996,7 @@ describe('subscriptions after a failure (review M3 finding 10)', () => {
     const first = subscribe(engine, id)
     await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.add' }) === 1 ? true : undefined), 10_000, 'the held add')
     const second = unsubscribe(engine, id)
-    await sleep(200)
+    await waitFor(() => engine.pendingCommands(id) === 2 ? true : undefined, 10_000, 'both commands admitted on the thread')
     expect(apiCalls(engine, 'subscriptions.thread.remove')).toHaveLength(0)
     engine.fake.release()
     expect(errorOf(await first)).toMatchObject({ _tag: 'Rejected' })

@@ -5,6 +5,8 @@ export type WorkName = 'post' | 'action' | 'mark' | 'title' | 'art' | 'home' | '
 
 /** Optional harness observation; no queues or extra passes in the app. */
 export interface WorkControlOptions {
+  /** Commands holding or waiting for the same target lock. */
+  readonly onCommands?: (key: string, count: number) => void
   /** An action passed its initial checks and is about to request the send lane. */
   readonly onActionReady?: () => void
   readonly onPass?: (name: WorkName, event: 'started' | 'finished') => void

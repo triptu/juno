@@ -13,11 +13,9 @@
  * at request time, and its answer waits (`finishFetch`). Echoes of Juno's
  * posts wait in the fake until the trace delivers or drops them.
  *
- * A copy's delete is the one call Juno repeats without the trace asking:
- * it is held when it arrives, and refused (`request_timeout`, Slack's
- * trouble) before any other step, so the check before the next attempt
- * sees that step. `deleteCopy` lets the next attempt through. The model
- * counts only the successful delete; the refusals are stutters.
+ * Copy deletes are refused until deleteCopy permits an attempt; refusals
+ * are stutters. That step first awaits a worker pass so a request checked
+ * before the preceding world step cannot use its permission.
  */
 import { rm } from 'node:fs/promises'
 import { messagesSend } from '@juno/contract'
@@ -270,7 +268,11 @@ const drive: Readonly<Record<string, Drive>> = {
     world.copyFrames.delete(k)
     release(world, world.copy.get(k), `the copy of draft ${k}`)
   },
-  deleteCopy: (world, { k }) => void world.allowDelete.add(k),
+  deleteCopy: async (world, { k }) => {
+    // Finish any refused request whose preflight predates the preceding world step.
+    await world.engine.workPass('action')
+    world.allowDelete.add(k)
+  },
   remoteChange,
   finishFetch: async (world, { k }) =>
     world.engine.fake.decide((await gatedCall(world, `the lookup of draft ${k}`, (c) => isLookup(c.method, c.args) && draftOfChannel(c.args['channel']) === k && c.stage === 'answer')).id, 'answer'),
@@ -377,7 +379,6 @@ export const outboxSpec: Spec<World, View> = {
   },
   own,
   perform,
-
   expected: (states, index) => ({
     d1: expectedDraft(states, index, 1),
     d2: expectedDraft(states, index, 2),
