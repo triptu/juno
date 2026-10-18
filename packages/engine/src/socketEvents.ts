@@ -69,6 +69,47 @@ interface Attached {
   readonly deliveries: Map<object, Delivery>
 }
 
+// Quick, under the lock: the queue takes events from here on, so none is lost while `start` runs in the delivery's fiber.
+const register = (attached: Attached, key: object, { name, start }: Subscriber) =>
+  Effect.gen(function* () {
+    const scope = yield* Scope.fork(attached.scope, 'sequential')
+    const queue = yield* Queue.bounded<readonly [SocketInput, Me]>(CAPACITY)
+    const delivery: Delivery = { name, queue, scope }
+    attached.deliveries.set(key, delivery)
+    // Nothing reaches the subscriber once its delivery closes, at the sync's end or its own.
+    yield* Scope.addFinalizer(scope, Effect.suspend(() => {
+      if (attached.deliveries.get(key) === delivery) attached.deliveries.delete(key)
+      return Queue.shutdown(queue)
+    }))
+    yield* Effect.forkIn(run(attached, delivery, start), scope)
+  })
+
+// Interruptible and outside the lock: a stuck start ends with the sync or the subscriber and holds up nothing else.
+const run = (attached: Attached, { name, queue, scope }: Delivery, start: SessionStart) =>
+  Effect.gen(function* () {
+    const listener = yield* start.pipe(
+      Effect.provideService(Scope.Scope, scope),
+      Effect.provideContext(attached.context),
+      Effect.catchDefect((defect) => Effect.logError('socket events: a subscriber did not start', { subscriber: name, defect }).pipe(Effect.as(undefined))),
+    )
+    // Closing the scope interrupts this fiber, so it runs on its own.
+    if (listener === undefined) return yield* Effect.asVoid(Effect.forkDetach(Scope.close(scope, Exit.void)))
+    // A throw or a defect is logged and the next input follows; an interruption ends the fiber.
+    return yield* Effect.forever(Effect.flatMap(Queue.take(queue), ([input, me]) =>
+      Effect.suspend(() => listener(input, me)).pipe(Effect.catchDefect((defect) => Effect.logWarning('socket events: a subscriber failed on an event', { subscriber: name, defect })))))
+  })
+
+// Never waits: a full queue is emptied, and the subscriber gets `Overflowed` before the new event.
+const offer = ({ name, queue }: Delivery, item: readonly [SocketEvent, Me]) =>
+  Effect.suspend(() => {
+    if (Queue.offerUnsafe(queue, item)) return Effect.void
+    return Queue.clear(queue).pipe(Effect.flatMap((dropped) => {
+      // A queue that closed meanwhile takes neither and was cleared to nothing.
+      if (!Queue.offerUnsafe(queue, [overflowed, item[1]]) || !Queue.offerUnsafe(queue, item)) return Effect.void
+      return Effect.logWarning('socket events: a subscriber fell behind; its queued events were dropped', { subscriber: name, dropped: dropped.length })
+    }))
+  })
+
 export class SocketEvents extends Context.Service<SocketEvents, {
   /** Starts `start` for the running sync, if any, and for every later one, until the calling scope closes. `name` is for the logs. */
   readonly subscribe: (name: string, start: SessionStart) => Effect.Effect<void, never, Scope.Scope>
@@ -80,47 +121,6 @@ export class SocketEvents extends Context.Service<SocketEvents, {
     const lock = yield* Semaphore.make(1)
     const subscribers = new Map<object, Subscriber>()
     let current: Attached | undefined
-
-    // Quick, under the lock: the queue takes events from here on, so none is lost while `start` runs in the delivery's fiber.
-    const register = (attached: Attached, key: object, { name, start }: Subscriber) =>
-      Effect.gen(function* () {
-        const scope = yield* Scope.fork(attached.scope, 'sequential')
-        const queue = yield* Queue.bounded<readonly [SocketInput, Me]>(CAPACITY)
-        const delivery: Delivery = { name, queue, scope }
-        attached.deliveries.set(key, delivery)
-        // Nothing reaches the subscriber once its delivery closes, at the sync's end or its own.
-        yield* Scope.addFinalizer(scope, Effect.suspend(() => {
-          if (attached.deliveries.get(key) === delivery) attached.deliveries.delete(key)
-          return Queue.shutdown(queue)
-        }))
-        yield* Effect.forkIn(run(attached, delivery, start), scope)
-      })
-
-    // Interruptible and outside the lock: a stuck start ends with the sync or the subscriber and holds up nothing else.
-    const run = (attached: Attached, { name, queue, scope }: Delivery, start: SessionStart) =>
-      Effect.gen(function* () {
-        const listener = yield* start.pipe(
-          Effect.provideService(Scope.Scope, scope),
-          Effect.provideContext(attached.context),
-          Effect.catchDefect((defect) => Effect.logError('socket events: a subscriber did not start', { subscriber: name, defect }).pipe(Effect.as(undefined))),
-        )
-        // Closing the scope interrupts this fiber, so it runs on its own.
-        if (listener === undefined) return yield* Effect.asVoid(Effect.forkDetach(Scope.close(scope, Exit.void)))
-        // A throw or a defect is logged and the next input follows; an interruption ends the fiber.
-        return yield* Effect.forever(Effect.flatMap(Queue.take(queue), ([input, me]) =>
-          Effect.suspend(() => listener(input, me)).pipe(Effect.catchDefect((defect) => Effect.logWarning('socket events: a subscriber failed on an event', { subscriber: name, defect })))))
-      })
-
-    // Never waits: a full queue is emptied, and the subscriber gets `Overflowed` before the new event.
-    const offer = ({ name, queue }: Delivery, item: readonly [SocketEvent, Me]) =>
-      Effect.suspend(() => {
-        if (Queue.offerUnsafe(queue, item)) return Effect.void
-        return Queue.clear(queue).pipe(Effect.flatMap((dropped) => {
-          // A queue that closed meanwhile takes neither and was cleared to nothing.
-          if (!Queue.offerUnsafe(queue, [overflowed, item[1]]) || !Queue.offerUnsafe(queue, item)) return Effect.void
-          return Effect.logWarning('socket events: a subscriber fell behind; its queued events were dropped', { subscriber: name, dropped: dropped.length })
-        }))
-      })
 
     const subscribe = (name: string, sessionStart: SessionStart) =>
       Effect.gen(function* () {
