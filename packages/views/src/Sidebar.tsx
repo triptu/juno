@@ -42,6 +42,8 @@ export interface SidebarAccount {
   readonly initials: string
   readonly hue: HueName
   readonly avatarUrl?: string
+  /** Whether Slack shows you as active, drawn as a dot on the avatar. Omitted while unknown. */
+  readonly presence?: 'active' | 'away'
 }
 
 export interface SidebarFilter {
@@ -231,6 +233,7 @@ export function Sidebar({
                     open={accountMenuOpen}
                     onClick={() => onAccountMenu(!accountMenuOpen)}
                     {...(account.avatarUrl === undefined ? {} : { src: account.avatarUrl })}
+                    {...(account.presence === undefined ? {} : { presence: account.presence })}
                   />
                 }
               >

@@ -65,7 +65,14 @@ textarea {
 
 /* Scrollbars: 10px, transparent track, a soft thumb inset by 3px. A scroll
    area that shows its thumb only on hover sets --scrollbar-thumb on itself
-   (ScrollArea in @juno/ui); the gutter never changes. */
+   (ScrollArea in @juno/ui); the gutter never changes. The variable does not
+   inherit, so changing it on hover restyles only the area, not every row in
+   it; the area's own thumb takes it explicitly. */
+@property --scrollbar-thumb {
+  syntax: '*';
+  inherits: false;
+}
+
 ::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
@@ -82,10 +89,25 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
+  --scrollbar-thumb: inherit;
   background-color: var(--scrollbar-thumb, var(--border-strong));
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-xl);
+}
+
+/* A scroller nested in a hover area (a code block in the message list)
+   hides its thumb too until the pointer is over the area, as macOS does.
+   Chromium restyles only the elements with a scrollbar for this rule, not
+   every row. :where() keeps the thumb's own hover below winning. */
+:where([data-scroll-area='hover']) ::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+@media (hover: hover) {
+  :where([data-scroll-area='hover']:hover) ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb, var(--border-strong));
+  }
 }
 
 ::-webkit-scrollbar-thumb:hover {

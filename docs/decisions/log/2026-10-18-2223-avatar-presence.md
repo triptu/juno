@@ -1,0 +1,1 @@
+- 10-18 22:23 · avatar-presence · The title bar's avatar button shows the presence dot (the menu's PresenceDot, ringed in the sidebar colour), so you see whether Slack shows you active without opening the menu. The button's name stays "Account and settings"; the state is its description.

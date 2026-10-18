@@ -198,6 +198,7 @@ const result = {
   sending: { _tag: 'sending' } satisfies SendResult,
   sent: { _tag: 'sent', open: { _tag: 'topic', topicId: topics.postgres.topicId } } satisfies SendResult,
   failed: { _tag: 'failed' } satisfies SendResult,
+  failedNotInChannel: { _tag: 'failed', reason: "You're not in this channel" } satisfies SendResult,
 } as const
 
 const proposed = (id: string, target: Place, textValue: string, r: SendResult = result.pending, inTopic?: TopicLink) => ({

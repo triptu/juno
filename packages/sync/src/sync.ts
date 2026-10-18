@@ -110,7 +110,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
     const reconcile = makeReconcile(runtime)
-    const { reboot, bootLoop } = makeBootLoop(runtime, reconcile)
+    const sweep = makeReconcile(runtime)
+    const { reboot, bootLoop } = makeBootLoop(runtime, sweep)
     const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))
 

@@ -305,6 +305,7 @@ const regressions = [
   ['requestqueue', 'methodSpacing', 'methodSpaced', 'requestqueue-method-spacing'],
   ['discovery', 'rootsFirst', 'noRedundantLookup', 'discovery-roots-first'],
   ['discovery', 'partialOpen', 'openedHasFull', 'discovery-partial-open'],
+  ['discovery', 'lateIndexed', 'lateIndexedKept', 'discovery-late-indexed'],
   ['follow', 'stalePage', 'acceptedUnfollow', 'stale-follow-page'],
   ['follow', 'lateEvent', 'acceptedUnfollow', 'accepted-unsubscribe-late-event'],
   ['follow', 'pendingPage', 'acceptedUnfollow', 'accepted-unsubscribe-pending-page'],
@@ -416,6 +417,10 @@ if (!outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
 if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
   simulate('agent-actions', 'step', 'undoSurvivesRedelivery', 'resolve-corrected.itf.json', false, false, { main: 'agent_resolve', samples: 1, steps: 4 })
   simulate('agent-actions', 'bugStep', 'undoSurvivesRedelivery', 'resolve-bug.itf.json', true, false, { main: 'agent_resolve', samples: 1, steps: 4 })
+  const gate = { main: 'agent_host_gate', samples: 200, steps: 12 }
+  simulate('agent-actions', 'step', 'hostGateSafety', 'host-gate.itf.json', false, true, { ...gate, witnesses: ['reachedAgreement'] })
+  simulate('agent-actions', 'payloadBugStep', 'writesClicked', 'host-gate-payload-bug.itf.json', true, false, gate)
+  simulate('agent-actions', 'reuseBugStep', 'oneWritePerAction', 'host-gate-reuse-bug.itf.json', true, false, gate)
   const options = { main: 'agent_actions' }
   simulate('agent-actions', 'simulationStep', 'invariants', 'agent-actions.itf.json', false, true,
     { ...options, samples: tracesOnly ? 100 : 1000, steps: 100 })

@@ -13,6 +13,7 @@
  */
 import { Context, Effect, Exit, Layer, Scope, Stream, SubscriptionRef } from 'effect'
 import { cacheMigrationsWithProbe, Invalidation, Store, StorePaths, StoreReader, StoreWriter, workspacePaths, type StoreError, type WorkspacePaths } from '@juno/store'
+import { followFenceLayer } from '@juno/sync'
 import { EngineConfig } from './config'
 
 export type StoreServices = Store | StoreWriter | StoreReader | Invalidation | StorePaths
@@ -57,7 +58,10 @@ export class Workspace extends Context.Service<
           const paths = workspacePaths(config.userData, id)
           const next = yield* Scope.make()
           const options = config.e2e && config.cacheMigrationProbe === true ? { cacheMigrations: cacheMigrationsWithProbe } : {}
-          const context = yield* Layer.buildWithScope(Store.layer(paths, options), next).pipe(Effect.onError(() => Scope.close(next, Exit.void)))
+          const context = yield* Layer.buildWithScope(
+            Layer.merge(Store.layer(paths, options), followFenceLayer),
+            next,
+          ).pipe(Effect.onError(() => Scope.close(next, Exit.void)))
           scope = next
           const opened: OpenWorkspace = { id, paths, context }
           yield* SubscriptionRef.set(state, opened)

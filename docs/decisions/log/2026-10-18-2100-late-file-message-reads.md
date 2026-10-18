@@ -1,0 +1,1 @@
+- 10-18 21:00 · late-files · Recover late file thumbnails by re-reading the exact message with history or replies after bounded delays; file events wake recovery, and downloads keep using the Slack session cookie. The fake rejects files.info, while today's cached live check accepted it, so the owner's live cause remains unproven.

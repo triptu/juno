@@ -40,7 +40,7 @@
  * the socket is back.
  */
 import { wakeSchedule } from './nextWake'
-import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
+import { Clock, Context, Effect, Layer, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
 import { SlackRejected } from '@juno/slack'
@@ -64,6 +64,7 @@ import {
 import { UploadProgress } from '../uploadProgress'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
+import { PostQueue } from '../postQueue'
 import { SyncLink } from '../syncLink'
 import { watchWorkerPasses } from '../workerPasses'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
@@ -95,11 +96,11 @@ const NOT_STAGED = 'file_not_staged'
 export class PostWorker extends Context.Service<
   PostWorker,
   {
-    /** Look at the pending posts now: a command queued one, or a row changed. */
+    /** Look at the pending posts now: a command queued one, or a row changed. The same as `PostQueue.wake`. */
     readonly wake: Effect.Effect<void>
   }
 >()('juno/engine/send/PostWorker') {
-  static readonly layer: Layer.Layer<PostWorker, never, Workspace | Outbox | SyncLink | Staging | UploadProgress> = Layer.effect(
+  static readonly layer: Layer.Layer<PostWorker, never, Workspace | Outbox | SyncLink | Staging | UploadProgress | PostQueue> = Layer.effect(
     PostWorker,
     Effect.gen(function* () {
       const workspace = yield* Workspace
@@ -107,8 +108,8 @@ export class PostWorker extends Context.Service<
       const link = yield* SyncLink
       const staging = yield* Staging
       const progress = yield* UploadProgress
-      const signal = yield* Queue.sliding<void>(1)
-      const wake = Effect.asVoid(Queue.offer(signal, undefined))
+      const queue = yield* PostQueue
+      const wake = queue.wake
 
       /**
        * Uploads the files of a queued post that Slack does not have yet, one
@@ -339,7 +340,7 @@ export class PostWorker extends Context.Service<
         while (true) {
           const open = yield* workspace.current
           const wait = open === undefined ? undefined : yield* pass(open)
-          yield* Effect.raceFirst(Queue.take(signal), wait === undefined ? Effect.never : Effect.sleep(wait))
+          yield* Effect.raceFirst(queue.woken, wait === undefined ? Effect.never : Effect.sleep(wait))
         }
       })
 

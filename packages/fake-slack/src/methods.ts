@@ -543,10 +543,12 @@ export const handlers: Handlers = {
   },
 
   'files.info': (ctx, args) => {
+    if (!ctx.workspace.filesInfoSupported) return new ApiError('unknown_method')
     const file = ctx.workspace.files.get(args.file)
     if (file?.bytes === undefined) return new ApiError('file_not_found')
     return { file: fileObject(ctx.baseUrl, file) }
   },
+
 }
 
 function reaction(ctx: MethodContext, args: MethodArgs<'reactions.add'>, add: boolean): MethodResult<'reactions.add'> {

@@ -1,7 +1,7 @@
 // Images and videos other people post (SPEC 8, "Images and the media viewer"; architecture 9, "Late
 // thumbnails"). Live, a fresh image reaches the socket before Slack has made its thumbnails, and a socket
 // message can carry a partial file (`file_access: "check_file_info"`); nothing in the message changes
-// later, so Juno asks `files.info` and the card becomes the picture in place.
+// later, so Juno re-reads the message and the card becomes the picture in place.
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 
@@ -25,7 +25,7 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
   )
 }
 
-test('an old card stored before Slack made the thumbnail becomes the picture when its topic opens', async ({ juno, win, fake }) => {
+test('an old card stored before Slack made the thumbnail becomes the picture through file info when its topic opens', async ({ juno, win, fake }) => {
   fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: 3 * DAY_MINUTES }] })
   await juno.signIn()
   await juno.waitForSync()
@@ -47,6 +47,8 @@ test('an old card stored before Slack made the thumbnail becomes the picture whe
   const image = row.getByRole('button', { name: 'Open floor-plan.png' })
   await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
   expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file')).toHaveLength(0)
+  expect(fake.calls.filter((call) => call.method === 'files.info').every((call) => call.ok)).toBe(true)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
@@ -61,7 +63,7 @@ test('reopening a topic retries an image after its background lookups ran out', 
   fake.resetCalls()
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Slow image processing', media: [{ name: 'late.png', width: 800, height: 600 }] })
   await expect(topic.message('Slow image processing').locator('[data-file-card]')).toHaveCount(1)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 60_000 }).toBe(4)
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
   await win.waitForTimeout(1_000)
   // No message update or file event arrives, and the next history page is newer than this message.
   fake.releaseThumbnails({ event: 'none' })

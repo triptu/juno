@@ -1,5 +1,6 @@
 export { Avatar, hueForId, hueNames, type HueName } from './Avatar'
 export { AvatarButton } from './AvatarButton'
+export { PresenceDot } from './PresenceDot'
 export { AvatarStack, type AvatarStackPerson } from './AvatarStack'
 export { GroupAvatar } from './GroupAvatar'
 export { Button } from './Button'

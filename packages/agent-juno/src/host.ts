@@ -1,12 +1,12 @@
 /**
  * What the engine gives the AgentHost handlers: Juno's data and one Slack
  * write, without the protocol rules. The handlers (`handlers.ts`) add the
- * account check, the single-attempt ledger rules and the evidence rule; the
+ * account check, the digest check, the ledger rules and the evidence rule; the
  * engine (`packages/engine/src/agent-host/`) implements this service over
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostSendState, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -51,7 +51,7 @@ export interface AttemptRecord extends Attempt {
   readonly state: AttemptState
 }
 
-/** What one `chat.postMessage` did. `lost`: no answer, so Slack may have posted it. */
+/** What became of a queued post. `refused`: Slack's code, or `discarded`. `lost`: Juno cannot tell. */
 export type PostOutcome =
   | { readonly _tag: 'posted'; readonly ts: string }
   | { readonly _tag: 'refused'; readonly reason: string }
@@ -108,15 +108,23 @@ export class JunoHost extends Context.Service<
     }
 
     readonly attempts: {
-      /** Records `attempt` as `submitted` unless its authorization is recorded already; then returns that record and writes nothing. */
-      readonly claim: (attempt: Attempt) => Effect.Effect<AttemptRecord | undefined, AgentHostError>
+      /**
+       * Returns the record of the attempt's authorization if there is one, and
+       * writes nothing. Otherwise, in one transaction: takes the owner's click
+       * on the action with `digest`, records `attempt` as `submitted` and
+       * queues its post as the composer does. Fails with `rejected` when no
+       * unused click matches the action and digest.
+       */
+      readonly claim: (attempt: Attempt, digest: string) => Effect.Effect<AttemptRecord | undefined, AgentHostError>
       /** Records the authorization as `cancelled`, the same way: a send that comes later is refused. */
       readonly cancel: (authorizationId: AuthorizationId, attemptId: AttemptId) => Effect.Effect<AttemptRecord | undefined, AgentHostError>
       readonly settle: (authorizationId: AuthorizationId, state: Exclude<AttemptState, { _tag: 'submitted' | 'cancelled' }>) => Effect.Effect<void, AgentHostError>
       readonly byAttempt: (attemptId: AttemptId) => Effect.Effect<AttemptRecord | undefined, AgentHostError>
     }
-    /** One `chat.postMessage` with `client_msg_id = actionId`. Never retried. */
-    readonly post: (attempt: Attempt) => Effect.Effect<PostOutcome>
+    /** Waits for the attempt's queued post to settle: Slack has it, refused it, or the owner deleted the draft. */
+    readonly posted: (attempt: Attempt) => Effect.Effect<PostOutcome>
+    /** Each recent send as its outbox row has it now, then on every change (`host.outbox.states`). */
+    readonly sendStates?: Stream.Stream<ReadonlyArray<typeof HostSendState.Type>>
     /** Messages Slack holds in the channel (or the thread) carrying `clientMsgId`, asked of Slack, not the cache. */
     readonly sent: (channelId: string, threadTs: string | undefined, clientMsgId: string) => Effect.Effect<ReadonlyArray<Message>, AgentHostError>
   }

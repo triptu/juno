@@ -4,7 +4,7 @@ import { asMessageFile, hasThumbs, isReady, parseFiles, type FileJson } from '..
 import { readMessage, writeMessage } from './messages'
 
 /**
- * Writes the file `files.info` answered for `fileId` into the stored
+ * Writes the processed file a message re-read answered for `fileId` into the stored
  * messages `targets` name, over the copy each holds, so its thumbnails,
  * poster and size come with it. A message that no longer carries the file,
  * or already shows it, is left alone. An answer that is not ready either

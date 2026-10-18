@@ -23,7 +23,10 @@ const bootOnce = (runtime: SyncRuntime) => {
   }).pipe(work.withPermit)
 }
 
-export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope>) => {
+export const makeBootLoop = (
+  runtime: SyncRuntime,
+  sweep: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope>,
+) => {
   const { state, config, cycle, phase, settle, refreshEmoji, refreshUsergroups } = runtime
   const attempt = bootOnce(runtime)
   /** A `force_reload`: boot again from the current store. */
@@ -68,7 +71,7 @@ export const makeBootLoop = (runtime: SyncRuntime, reconcile: Effect.Effect<void
     while (true) {
       yield* Effect.sleep(config.sweepIntervalMillis)
       if (!state.connected) continue
-      yield* reconcile
+      yield* sweep
     }
   })
   return { reboot, bootLoop }

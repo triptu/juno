@@ -1,0 +1,1 @@
+- 10-18 20:01 · sync-sweep-noop · Certify unchanged `getView` rows from batched store reads, keep their follow observation clock in the workspace session, and use the existing merge path for changed or uncertain rows.

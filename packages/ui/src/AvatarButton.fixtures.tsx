@@ -14,6 +14,12 @@ export default defineFixtures(
       initials: fixture(base),
       photo: fixture({ ...base, src: photo }),
     },
+    Presence: {
+      active: fixture({ ...base, src: photo, presence: 'active' }),
+      away: fixture({ ...base, src: photo, presence: 'away' }),
+      'active-hover': fixture({ ...base, presence: 'active' }, { hover: 'button' }),
+      'away-open': fixture({ ...base, presence: 'away', open: true }),
+    },
     // The menu's open fill is the hover fill, through the press too, so opening changes no colour (gallery trigger-open spec).
     Open: {
       'avatar-hover': fixture(base, { hover: 'button' }),

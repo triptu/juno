@@ -118,8 +118,8 @@ function Tool({ tool, t3, options, onTool }: {
   readonly onTool: ConnectionToolsSheetProps['onTool'] extends (tool: string, change: infer C) => void ? (change: C) => void : never
 }) {
   const copy = chatCopy.pages.connections
-  // A read runs with no review; a delete and T3 Code's other tools always ask; a forbidden tool is never offered.
-  const fixed = tool.read ? 'read' : tool.locked === 'forbidden' ? 'forbidden' : tool.locked === 'delete' || t3 ? 'always' : undefined
+  // A read runs with no review; a delete, a Slack write and T3 Code's other tools always ask; a forbidden tool is never offered.
+  const fixed = tool.read ? 'read' : tool.locked === 'forbidden' ? 'forbidden' : tool.locked === 'delete' || tool.locked === 'slack' || t3 ? 'always' : undefined
   const mark = tool.changed ? 'changed' : tool.added ? 'new' : undefined
   return (
     <div

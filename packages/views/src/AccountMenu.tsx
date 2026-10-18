@@ -6,8 +6,8 @@ import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import type { ReactNode } from 'react'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
+import { spacing } from '@juno/tokens/tokens.stylex'
+import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
 
 export interface AccountMenuSection {
   readonly title: string
@@ -72,7 +72,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
           ) : (
             <span {...stylex.props(styles.avatar)}>
               {avatar}
-              <span aria-hidden {...stylex.props(styles.dot, presence.active ? styles.dotActive : styles.dotAway)} />
+              <PresenceDot active={presence.active} surface="raised" />
             </span>
           )
         }
@@ -111,9 +111,6 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
   )
 }
 
-/** The presence dot: 10px with a 2px ring in the menu surface (inventory 2.1). */
-const DOT = '10px' // tokens-allow: the presence dot
-
 const styles = stylex.create({
   root: {
     display: 'flex',
@@ -123,26 +120,6 @@ const styles = stylex.create({
   avatar: {
     position: 'relative',
     display: 'inline-flex',
-  },
-  dot: {
-    position: 'absolute',
-    right: `calc(-1 * ${spacing['--space-0-5']})`,
-    bottom: `calc(-1 * ${spacing['--space-0-5']})`,
-    width: DOT,
-    height: DOT,
-    boxSizing: 'border-box',
-    borderRadius: radii['--radius-full'],
-    borderWidth: sizes['--focus-ring-width'],
-    borderStyle: 'solid',
-    // The menu is a popover, on the raised surface.
-    borderColor: colors['--surface-raised'],
-  },
-  dotActive: {
-    backgroundColor: colors['--presence-active'],
-  },
-  dotAway: {
-    backgroundColor: colors['--surface-raised'],
-    boxShadow: `inset 0 0 0 1px ${colors['--foreground-muted']}`, // tokens-allow: The inset ring is a 1px hairline.
   },
   section: {
     display: 'flex',

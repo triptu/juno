@@ -102,6 +102,8 @@ export class Workspace {
   readonly files = new Map<string, StoredFile>()
   /** Files uploaded while this is set start without thumbnails (`holdThumbnails`). */
   holdThumbnails = false
+  /** Some live sessions reject files.info; default to the observed successful response. */
+  filesInfoSupported = true
   prefs: UserPrefs = {}
   /** The user groups self belongs to, as `client.userBoot.subteams.self` lists them. */
   selfUsergroups: Array<string> = []

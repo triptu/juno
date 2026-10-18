@@ -346,6 +346,11 @@ export class FakeSlack {
     this.server.failUploads(input.times ?? 1, input.after ?? 0)
   }
 
+  /** Choose whether files.info is available on this session. Defaults to supported. */
+  setFilesInfoSupported(input: { supported: boolean }): void {
+    this.workspace.filesInfoSupported = input.supported
+  }
+
   /**
    * Files uploaded from now on, and media from `injectMedia`, come without
    * thumbnails and without a size, on the message and from `files.info`, as
@@ -521,6 +526,7 @@ export class FakeSlack {
       delayFiles: (i) => this.delayFiles(i),
       setLatency: (i) => this.setLatency(i),
       failUploads: (i) => this.failUploads(i),
+      setFilesInfoSupported: (i) => this.setFilesInfoSupported(i),
       holdThumbnails: () => this.holdThumbnails(),
       releaseThumbnails: (i) => this.releaseThumbnails(i),
       injectMedia: (i) => this.injectMedia(i),

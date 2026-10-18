@@ -1,0 +1,1 @@
+- 10-18 22:00 · Tushar · Juno agent's Slack writes are on, but only from the owner's approval click on the exact card; Juno can never write to Slack on its own. Why: an approved Send showed Failed.

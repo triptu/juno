@@ -39,9 +39,12 @@ import {
   type CardStatus,
   type ChildAction,
 } from '@juno/agent-cards'
+import { sendMessageStatus, type ProposedMessage, type SendResult } from '@juno/agent-cards/presentation'
 import { OpenTarget, chatCopy, type Card, type CardBinding, type CardId } from '@juno/agent-contract'
 import { bindingMatches, type CardOutcome, type ChildBinding } from '../policy/policy'
 import { crashPoint } from '../runtime/crash'
+import { failureReason, sendFailure } from './failure'
+import { sendRowState } from './outbox'
 import { transaction } from '../store/database'
 import type { Outcome } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
@@ -473,9 +476,34 @@ export function viewOf(store: Store, card: CardRow, now: number): CardView {
   } else {
     record = { ...base, payload, status: statusOf(store, card, payload, evidences, approved || ran) } as CardRecord
   }
-  const view = toCard(record, now)
+  const shown = toCard(record, now)
+  const view: Card = shown._tag === 'sendMessage' && payload._tag === 'sendMessage' ? followRows(store, card.id, shown, payload) : shown
   const binding = view._tag !== 'unknown' && 'status' in view && view.status._tag === 'open' && children.length > 0 ? bindingOf(card, payload) : undefined
   return { runId: card.run_id, at: card.created_at, card: view, ...(binding ? { binding } : {}) }
+}
+
+/**
+ * A Send card's rows follow the outbox (`outbox.ts`): what the host says of
+ * a row's send now wins over the outcome its dispatch first got, so a send
+ * the owner retried from the topic reads "Sending", then "Sent". A failed
+ * row says why. The card's line follows the rows once it was clicked.
+ */
+function followRows(store: Store, cardId: string, shown: Extract<Card, { _tag: 'sendMessage' }>, payload: Extract<CardPayload, { _tag: 'sendMessage' }>): Card {
+  const messages = shown.messages.map((m, i): ProposedMessage => {
+    const proposed = payload.messages[i]!
+    const outbox = m.result._tag === 'pending' ? undefined : sendRowState(store, cardId, proposed.actionId)
+    const open: OpenTarget = { _tag: 'topic', topicId: proposed.inTopic?.topicId ?? `m:${proposed.target.channelId}` }
+    const result: SendResult =
+      outbox === undefined ? m.result
+      : outbox.state === 'sending' ? { _tag: 'sending' }
+      : outbox.state === 'done' ? { _tag: 'sent', open }
+      : { _tag: 'failed' }
+    if (result._tag !== 'failed') return { ...m, result }
+    const reason = outbox === undefined ? sendFailure(store, cardId, proposed.actionId) : failureReason(outbox.state === 'unknown' ? 'unknown' : 'failed', outbox.reason, null)
+    return { ...m, result: reason === undefined ? { _tag: 'failed' } : { _tag: 'failed', reason } }
+  })
+  const clicked = shown.status._tag === 'working' || shown.status._tag === 'done' || shown.status._tag === 'failed'
+  return { ...shown, messages, ...(clicked && messages.some((m) => m.result._tag !== 'pending') ? { status: sendMessageStatus(messages) } : {}) }
 }
 
 function statusOf(store: Store, card: CardRow, payload: CardPayload, evidences: ReadonlyArray<ChildEvidence>, approved: boolean): CardStatus {

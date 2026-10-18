@@ -2,6 +2,9 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { AccountId, ActionId, AuthorizationId, AttemptId, Digest, ExecutableIdentity } from '@juno/agent-cards'
 import { OpenTarget, Place, TopicLink } from '../chat/place'
+
+/** The digest a click binds and a dispatch carries: the host checks one against the other. */
+export { actionDigest } from '@juno/agent-cards'
 import { HostHelloRpcs } from './port'
 
 export const HostChannelId = Schema.String.pipe(Schema.brand('HostChannelId'))
@@ -86,7 +89,21 @@ export const hostReconcileSend = Rpc.make('host.outbox.reconcileSend', { payload
     Schema.TaggedStruct('found', { message: HostMessage }), Schema.TaggedStruct('unknown', {}),
   ]), error: AgentHostError })
 export const hostUndoResolve = Rpc.make('host.topics.undoResolve', { payload: { accountId: AccountId, actionId: ActionId }, success: Schema.Void, error: AgentHostError })
-export const HostActionRpcs = RpcGroup.make(hostSend, hostResolve, hostUndoResolve, hostCancel, hostReconcileSend)
+/**
+ * Each recent send as its outbox row has it now, so a card follows the row:
+ * `sending` while the row waits or goes (also after the owner's Retry in the
+ * topic), `done` once Slack has it from the owner, `failed` with Slack's code
+ * or `discarded`, `unknown` when Juno cannot tell. The current list, then the
+ * list again on every change.
+ */
+export const HostSendState = Schema.Struct({
+  attemptId: AttemptId, actionId: ActionId,
+  state: Schema.Literals(['sending', 'done', 'failed', 'unknown']),
+  reason: Schema.optionalKey(Schema.String),
+  receipt: Schema.optionalKey(Schema.Struct({ channelId: Schema.String, ts: Schema.String })),
+})
+export const hostSendStates = Rpc.make('host.outbox.states', { success: Schema.Array(HostSendState), stream: true })
+export const HostActionRpcs = RpcGroup.make(hostSend, hostResolve, hostUndoResolve, hostCancel, hostReconcileSend, hostSendStates)
 
 export const HostPresence = Schema.Struct({
   online: Schema.Boolean, aiEnabled: Schema.Boolean, quietHours: Schema.Boolean,

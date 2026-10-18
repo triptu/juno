@@ -3,54 +3,12 @@ import { openState, readRoutes } from './support'
 
 /**
  * Behaviour that a screenshot cannot show, checked against the built gallery
- * in a real browser: mouse-down activation, the cursor rule and the state
- * switcher. Layout shift, and the cursor rule on every state, are in shift.spec.ts.
+ * in a real browser: the cursor rule and the state switcher. Mouse-down
+ * activation is in activation.spec.ts. Layout shift, and the cursor rule on
+ * every state, are in shift.spec.ts.
  */
+
 const log = (page: Page) => page.locator('[data-activation-log]')
-
-test.describe('mouse-down activation', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/#/ListRow?__state=activation/activation')
-    await expect(page.getByRole('button', { name: /Postgres 16 migration plan/ })).toBeVisible()
-  })
-
-  test('activates on the primary button going down, before the click', async ({ page }) => {
-    const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
-    const box = (await row.boundingBox())!
-    await page.mouse.move(box.x + 40, box.y + box.height / 2)
-    await page.mouse.down()
-    await expect(log(page)).toHaveText('row:pointer')
-    await page.mouse.up()
-    // The click that follows the release does not activate again.
-    await expect(log(page)).toHaveText('row:pointer')
-  })
-
-  test('passes the command key through for open in new tab', async ({ page }) => {
-    const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
-    await row.click({ modifiers: ['Meta'] })
-    await expect(log(page)).toHaveText('row:pointer:meta')
-  })
-
-  test('ignores ctrl-click and the secondary button', async ({ page }) => {
-    const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
-    // On macOS Chromium turns ctrl-click into a context menu, like the OS.
-    await row.click({ modifiers: ['Control'] })
-    await row.click({ button: 'right' })
-    await expect(log(page)).toContainText('row:contextmenu')
-    await expect(log(page)).not.toContainText('row:pointer')
-  })
-
-  test('leaves a press on a nested control to that control', async ({ page }) => {
-    await page.getByRole('button', { name: 'Resolve', exact: true }).click()
-    await expect(log(page)).toHaveText('resolve:click')
-  })
-
-  test('activates from the keyboard with Enter', async ({ page }) => {
-    await page.getByRole('button', { name: /Postgres 16 migration plan/ }).focus()
-    await page.keyboard.press('Enter')
-    await expect(log(page)).toHaveText('row:keyboard')
-  })
-})
 
 test('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
   await page.goto('/#/MessageList?__state=thread/long')
@@ -172,6 +130,32 @@ test('the wheel over a long code block reaches the end of the block, then scroll
   await page.waitForTimeout(500)
   await page.mouse.wheel(0, 300)
   await expect.poll(() => scroller.evaluate((node) => node.scrollTop)).toBeGreaterThan(listBefore)
+})
+
+/**
+ * A scroller inside a hover-only list hides its thumb like the list does: a
+ * long code block's thumb shows only while the pointer is over the list. The
+ * list's hover variable is not inherited, so its rows are not restyled.
+ */
+test('a code block in the message list shows its thumb only while the pointer is over the list', async ({ page }) => {
+  await page.goto('/#/MessageList?__state=content/long-code')
+  const block = page.locator('[data-fixture-frame] pre').first()
+  await expect(block).toBeVisible()
+  expect(await block.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
+  const list = page.locator('[data-fixture-frame] [data-scroll-area="hover"]')
+  const thumb = () => block.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar-thumb').backgroundColor)
+  const transparent = 'rgba(0, 0, 0, 0)'
+
+  const listBox = (await list.boundingBox())!
+  await page.mouse.move(0, 0)
+  await expect.poll(thumb).toBe(transparent)
+  await page.mouse.move(listBox.x + 4, listBox.y + 4)
+  await expect.poll(thumb).not.toBe(transparent)
+  await block.hover()
+  await expect.poll(thumb).not.toBe(transparent)
+  expect(await block.evaluate((node) => getComputedStyle(node).getPropertyValue('--scrollbar-thumb'))).toBe('')
+  await page.mouse.move(0, 0)
+  await expect.poll(thumb).toBe(transparent)
 })
 
 /**
@@ -357,7 +341,6 @@ test('every font family comes from the bundle', async ({ page }) => {
   })
   expect(Object.entries(families).filter(([, faces]) => faces === 0)).toEqual([])
 })
-
 
 test('palette keeps the highlighted item through late commands and reordered results', async ({ page }) => {
   await page.goto('/#/CommandPalette?__state=interaction/updates')

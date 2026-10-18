@@ -63,6 +63,32 @@ module discovery {
   val noRedundantLookup = not(pageHadRoot) or calls == 0
   // An opened thread shows its replies in full, reactions included.
   val openedHasFull = not(opened) or replyFull
+  // Juno advances this local cursor when a sweep starts. Slack may index a
+  // reply afterwards whose server timestamp is a little older. The five-unit
+  // overlap represents the five-minute production margin; this reply is
+  // three units behind the cursor and must still be applied.
+  val cursor = 10
+  val margin = 5
+  val lateReplyTs = 7
+  action lateIndexedSearch(useMargin: bool): bool = {
+    val accepted = lateReplyTs >= cursor - (if (useMargin) margin else 0)
+    all {
+      not(finished),
+      rootKnown' = accepted,
+      counters' = if (accepted) 2 else 0,
+      reactions' = reactions,
+      followed' = followed,
+      calls' = calls,
+      finished' = true,
+      pageHadRoot' = accepted,
+      replyStored' = accepted,
+      replyFull' = replyFull,
+      opened' = opened,
+    }
+  }
+  action lateIndexedStep = if (finished) idle else lateIndexedSearch(true)
+  action lateIndexedBugStep = if (finished) idle else lateIndexedSearch(false)
+  val lateIndexedKept = not(finished) or replyStored
   val invariants = reactions and followed and noRedundantLookup and openedHasFull and (finished implies rootKnown and counters == 2)
   val reachedAgreement = finished
 }

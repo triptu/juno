@@ -109,15 +109,16 @@ const base = {
 }
 
 /**
- * One row's outcome on a Send message card. Every row starts `pending`;
- * Send moves them all to `sending`, and each settles on its own.
+ * One row's outcome on a Send message card. Every row starts `pending`
+ * (after the click it reads "Approved"); each moves to `sending` when Juno
+ * hands it to the outbox, and settles on its own.
  */
 export const SendResult = Schema.Union([
   Schema.TaggedStruct('pending', {}),
   Schema.TaggedStruct('sending', {}),
   Schema.TaggedStruct('sent', { open: OpenTarget }),
-  /** Rejected, or Juno could not confirm it. The row says "Failed" and offers nothing. */
-  Schema.TaggedStruct('failed', {}),
+  /** Rejected, or Juno could not confirm it. The row says "Failed", and why when Juno knows, and offers nothing. */
+  Schema.TaggedStruct('failed', { reason: Schema.optionalKey(Schema.String) }),
 ])
 export type SendResult = typeof SendResult.Type
 

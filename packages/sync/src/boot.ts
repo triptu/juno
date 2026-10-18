@@ -29,10 +29,10 @@
  * derived from it), history since the synced range for conversations whose
  * `latest` moved, `getView` back to the window, the discovery sweep for
  * the gap, users. Reconnect refreshes workspace and full membership on the
- * background lane; a periodic sweep uses incremental counts. Both read
- * `getView` back to the last moment the store was in step. `followPass` reads the followed
- * threads over the window and checks the follows it left out; `runSync`
- * schedules it.
+ * background lane, and reads `getView` back to the last moment the store
+ * was in step. A periodic sweep uses incremental counts. `followPass` reads
+ * the followed threads over the window and checks the follows it left out;
+ * `runSync` schedules it at most hourly.
  */
 import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
@@ -42,16 +42,19 @@ import { Clock, Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { activeConversations, historyOrder, loadCounts } from './counts'
 import { discoverSince, searchPreviews } from './discovery'
+import { FollowFence } from './followFence'
 import { readMetadata, storeMetadata } from './metadata'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
 import { reindexTopics } from './reindex'
+import { threadViewPageUnchanged } from './threadViews'
 import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
   AVATAR_BASE_KEY,
   getSyncState,
   latestSyncedRange,
+  latestSyncedRanges,
   markRepliesComplete,
   observeRead,
   readState,
@@ -178,6 +181,18 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, la
     yield* transaction(Effect.andThen(markRepliesComplete(channel, root.ts, replies >= root.reply_count, syncedAt, completeFrom), reindexTopics([topic], reindexOptions(ctx))))
   })
 
+const applyThreadViewObservations = (
+  ctx: SyncContext,
+  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
+  lane: 'interactive' | 'background',
+): Effect.Effect<void, BootError, BootServices> =>
+  Effect.gen(function* () {
+    const unchanged = yield* transaction(threadViewPageUnchanged(ctx, observations))
+    const changed = observations.filter((_, index) => unchanged[index] !== true)
+    yield* nameFirst(ctx, changed.flatMap(({ view }) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), lane)
+    for (const { view, requestedAt } of changed) yield* applyThreadView(ctx, view, requestedAt, lane)
+  })
+
 /**
  * Followed threads from `subscriptions.thread.getView`, newest activity
  * first, 10 per page live whatever `limit` says (research section 10),
@@ -198,6 +213,8 @@ const loadThreadViews = (
     readonly until: Ts
     readonly probe: boolean
     readonly lane: 'interactive' | 'background'
+    /** A background follow pass can certify all fetched pages with one store snapshot. */
+    readonly batchPages?: boolean
     /** Runs once, after the first page is stored: the cold boot's quick start ends here. */
     readonly afterFirstPage?: Effect.Effect<void, BootError, BootServices>
   },
@@ -207,22 +224,28 @@ const loadThreadViews = (
     const listed = new Set<string>()
     let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
+    const batched: Array<{ readonly view: ThreadView; readonly requestedAt: Ts }> = []
     // `until` when the pages stopped there; undefined when they reached the end of the list.
     let coveredFrom: Ts | undefined = options.until
     while (true) {
       const requestedAt = yield* nowTs
       firstRequestedAt ??= requestedAt
-      const page = yield* api.call(
+      const pageResult = yield* Effect.result(api.call(
         'subscriptions.thread.getView',
         { limit: ctx.config.getViewPageLimit, ...(current === undefined ? {} : { current_ts: current }) },
         { lane: options.lane, reason: 'threads' },
-      )
-      // Everyone on the page in one lookup, not one per thread, so the rows land named without a call each.
-      yield* nameFirst(ctx, page.threads.flatMap((view) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), options.lane)
-      for (const view of page.threads) {
-        listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
-        yield* applyThreadView(ctx, view, requestedAt, options.lane)
+      ))
+      if (pageResult._tag === 'Failure') {
+        // Keep repairs from every page Slack already returned. A later-page
+        // failure must not discard them; the next pass can retry the gap.
+        if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
+        return yield* pageResult.failure
       }
+      const page = pageResult.success
+      for (const view of page.threads) listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
+      const observations = page.threads.map((view) => ({ view, requestedAt }))
+      if (options.batchPages === true) batched.push(...observations)
+      else yield* applyThreadViewObservations(ctx, observations, options.lane)
       if (current === undefined && options.afterFirstPage !== undefined) yield* options.afterFirstPage
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
@@ -240,6 +263,7 @@ const loadThreadViews = (
       current = lastActivity
       yield* Effect.yieldNow
     }
+    if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
     if (options.probe) yield* probeUnlisted(ctx, listed, coveredFrom, firstRequestedAt)
   })
 
@@ -252,7 +276,7 @@ const loadThreadViews = (
 export const followPass = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const windowStart = millisToTs(yield* windowStartMillis(ctx))
-    yield* loadThreadViews(ctx, { until: windowStart, probe: true, lane: 'background' })
+    yield* loadThreadViews(ctx, { until: windowStart, probe: true, lane: 'background', batchPages: true })
   })
 
 /**
@@ -273,6 +297,7 @@ const probeUnlisted = (
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const api = yield* SlackApi
+    const fence = yield* FollowFence
     const followed = yield* sql<{ channel: string; thread_ts: string; observed_at: string | null; activity: string }>`
       SELECT s.channel, s.thread_ts, s.observed_at, COALESCE(m.latest_reply, m.ts, s.thread_ts) AS activity
       FROM thread_subs s JOIN conversations c ON c.id = s.channel
@@ -282,7 +307,8 @@ const probeUnlisted = (
       if (listed.has(`${row.channel}:${row.thread_ts}`)) continue
       if (coveredFrom !== undefined && compareTs(row.activity, coveredFrom) < 0) continue
       if (compareTs(row.activity, listRequestedAt) >= 0) continue
-      if (row.observed_at !== null && compareTs(row.observed_at, listRequestedAt) >= 0) continue
+      const observedAt = fence.effective(row.channel, row.thread_ts, row.observed_at ?? undefined)
+      if (observedAt !== undefined && compareTs(observedAt, listRequestedAt) >= 0) continue
       const requestedAt = yield* nowTs
       const page = yield* api
         .call(
@@ -530,6 +556,8 @@ export interface CatchUpOptions {
   readonly refreshMetadata?: boolean
   /** Read the likely topics again for changes made during a gap (`recheck.ts`): after a drop or a restart, not on a sweep. */
   readonly recheck?: RecheckOptions
+  /** Persist the new cursor. Periodic sweeps keep it in memory; a restart can safely replay from the last durable boot or reconnect. */
+  readonly persistState?: boolean
 }
 
 /**
@@ -539,7 +567,7 @@ export interface CatchUpOptions {
  * after a gap the recheck of the likely topics, and unknown users. Used by
  * the warm boot and after every reconnect.
  */
-export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, options: CatchUpOptions): Effect.Effect<void, BootError, BootServices> =>
+export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, options: CatchUpOptions): Effect.Effect<BootState, BootError, BootServices> =>
   Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
     const start = millisToTs(yield* windowStartMillis(ctx))
@@ -551,9 +579,10 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     // Names first: a DM joined meanwhile, and anyone an earlier run left without one.
     yield* fillUsers(ctx, 'interactive')
     const active = yield* activeConversations(counts.entries, start)
+    const ranges = yield* latestSyncedRanges(active.map((conversation) => conversation.id))
     const moved: Array<{ id: string; since: string | undefined }> = []
     for (const conversation of active) {
-      const range = yield* latestSyncedRange(conversation.id)
+      const range = ranges.get(conversation.id)
       if (range === undefined || conversation.latest > range.to_ts) moved.push({ id: conversation.id, since: range?.to_ts })
     }
     if (moved.length > 0) yield* phase({ _tag: 'catching-up', done: 0, total: moved.length })
@@ -578,7 +607,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
       lastSyncAt: discovered ? startedAt : previous.lastSyncAt,
     }
-    yield* transaction(setSyncState(BOOT_KEY, state))
+    if (options.persistState !== false) yield* transaction(setSyncState(BOOT_KEY, state))
+    return state
   })
 
 /** The warm boot: `catchUp` with a workspace refresh, and the recheck for the time the app was closed. */

@@ -109,7 +109,7 @@ export function MemoryDocs() {
         setChosen((current) => ({ ...current, [id]: { relationship, revision } }))
         void actions.relationship(id, revision, relationship).then((answer) => {
           // A refusal puts back what the agent has.
-          if (answer.outcome !== 'ok') setChosen(({ [id]: _refused, ...rest }) => rest)
+          if (answer.outcome !== 'ok') setChosen((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)))
         })
       }}
       confirmingDelete={confirmingDelete}

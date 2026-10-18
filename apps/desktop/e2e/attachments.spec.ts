@@ -73,7 +73,7 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
     await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
     // Processing can outlast all four background tries. Only file_created follows.
-    await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 60_000 }).toBe(4)
+    await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
     // Let the final empty response reach the sync before delivering the completion event.
     await win.waitForTimeout(1_000)
     fake.releaseThumbnails({ event: 'file_created' })
@@ -81,7 +81,7 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     await expect.poll(() => image.locator('img[src^="juno://files/"]').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
   })
   expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
-  expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
 })
 
 test('another person\'s image that arrives without thumbnails fills in after the refetch', async ({ juno, fake }) => {
@@ -96,11 +96,38 @@ test('another person\'s image that arrives without thumbnails fills in after the
   const row = topic.message('Whiteboard from today')
   await expect(row.getByRole('button', { name: 'Download whiteboard.png' })).toBeVisible()
   // The first try finds no thumbnails yet; Slack makes them without an event, and a later try brings them.
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
   fake.releaseThumbnails({ event: 'none' })
   const image = row.getByRole('button', { name: 'Open whiteboard.png' })
   await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
+})
+
+test('a reply image takes Slack thumbnails after processing without a message update or file event', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  fake.setFilesInfoSupported({ supported: false })
+  fake.holdThumbnails()
+  fake.resetCalls()
+  await paste(topic.composer, [chart()])
+  await staged(topic, 1)
+  await topic.send('The processed reply image')
+  await topic.expectSent('The processed reply image')
+  const image = topic.message('The processed reply image').getByRole('button', { name: 'Open chart.png' })
+  await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  fake.releaseThumbnails({ event: 'none' })
+  const remote = image.locator('img[src^="juno://files/"]')
+  await expect(remote).toHaveCount(1, { timeout: 20_000 })
+  await expect.poll(() => remote.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
+  const reads = fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file')
+  expect(reads.every((call) => call.args['ts'] === root.ts && call.args['oldest'] === call.args['latest'])).toBe(true)
+  const info = fake.calls.filter((call) => call.method === 'files.info')
+  expect(info.length).toBeGreaterThan(0)
+  expect(info.every((call) => call.error === 'unknown_method')).toBe(true)
 })
 
 test('a file dropped on the topic is sent on its own as a file row with Download', async ({ juno, fake }) => {

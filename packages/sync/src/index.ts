@@ -7,6 +7,7 @@
 export { runSync, type SyncPhase, type TopicFetcher } from './sync'
 export { type FetchReport } from './open'
 export { syncConfigLayer, type SyncConfigShape } from './config'
+export { followFenceLayer } from './followFence'
 
 export { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow } from './merge'
 export { imagesWithoutThumbs } from './files'
@@ -49,7 +50,6 @@ export {
   postUnknown,
   queuePost,
   readPost,
-  recordSend,
   recoverPosts,
   requeuePost,
   retryPost,

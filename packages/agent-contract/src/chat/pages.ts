@@ -190,10 +190,11 @@ export const DiscoveredTool = Schema.Struct({
    */
   added: Schema.optionalKey(Schema.Literal(true)),
   /**
-   * A rule the owner cannot change: `delete` always asks; `forbidden` (merge,
-   * buy, force-push) is never offered to Juno.
+   * A rule the owner cannot change: `delete` and `slack` (a Slack server's
+   * tool that is not a read) always ask; `forbidden` (merge, buy,
+   * force-push) is never offered to Juno.
    */
-  locked: Schema.optionalKey(Schema.Literals(['delete', 'forbidden'])),
+  locked: Schema.optionalKey(Schema.Literals(['delete', 'forbidden', 'slack'])),
 })
 export type DiscoveredTool = typeof DiscoveredTool.Type
 
