@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import type { MemoryDocsPage as MemoryDocsPageModel } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, Text, TooltipLayer } from '@juno/ui'
@@ -22,26 +23,26 @@ const editingLong: DocEditing = { _tag: 'edit', id: long.docs[1]!.entries[0]!.id
  * for the gallery's behaviour spec. Editing grows the row in place.
  */
 function EditKeys() {
-  const [page, setPage] = useState(long)
+  const [model, setModel] = useState(long)
   const [editing, setEditing] = useState<DocEditing | undefined>(undefined)
   const [log, setLog] = useState<ReadonlyArray<string>>([])
-  const textOf = (id: string) => page.docs.flatMap((section) => section.entries).find((entry) => entry.id === id)?.text ?? ''
+  const textOf = (id: string) => model.docs.flatMap((section) => section.entries).find((entry) => entry.id === id)?.text ?? ''
   const save = () => {
     if (editing?._tag !== 'edit') return
     const { id, draft } = editing
-    setPage((current) => ({ ...current, docs: current.docs.map((section) => ({ ...section, entries: section.entries.map((entry) => (entry.id === id ? { ...entry, text: draft.trim() } : entry)) })) }))
+    setModel((current) => ({ ...current, docs: current.docs.map((section) => ({ ...section, entries: section.entries.map((entry) => (entry.id === id ? { ...entry, text: draft.trim() } : entry)) })) }))
     setEditing(undefined)
     setLog((prev) => [...prev, 'save'])
   }
   return (
-    <div data-expands-in-place="">
+    <div data-expands-in-place="" {...stylex.props(styles.harness)}>
       <Text variant="meta" tone="muted" numeric as="p" data-activation-log>
         {/* A non-breaking space keeps the line, so the first log entry moves nothing. */}
         {log.length > 0 ? log.join(' ') : '\u00a0'}
       </Text>
       <MemoryDocsPage
         {...base}
-        page={page}
+        page={model}
         {...(editing === undefined ? {} : { editing })}
         onEditStart={(id) => setEditing({ _tag: 'edit', id, draft: textOf(id) })}
         onDraftChange={(draft) => setEditing((current) => (current === undefined ? current : { ...current, draft }))}
@@ -88,3 +89,8 @@ export default defineFixtures(
   },
   frame,
 )
+
+const styles = stylex.create({
+  // The frame lays its content out at the start; the page takes the frame's width.
+  harness: { width: '100%' },
+})
