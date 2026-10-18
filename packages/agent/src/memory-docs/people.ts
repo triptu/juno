@@ -13,7 +13,7 @@ import {
   peopleContext, peopleIn, peopleLine, docLimits, splitPeopleNotes,
   type Interaction, type PersonFile, type PersonSummary, type Relationship,
 } from '@juno/agent-memory'
-import type { SendContext } from '@juno/agent-contract'
+import type { ChatMention, SendContext } from '@juno/agent-contract'
 import { transaction } from '../store/database'
 import type { Store } from '../store/store'
 import { bump, docEntries, entries, forget, outlineNow, type Entry } from './store'
@@ -152,13 +152,14 @@ export const outlineWithPeople = (store: Store): string => outlineNow(store, fil
 
 /* The people a run involves -------------------------------------------------- */
 
-/** What a run's first input says about who it involves: the person it is about, the DM's other person, and the owner's words. */
-export function involved(store: Store, input: { readonly text: string; readonly context?: SendContext }): ReadonlyArray<string> {
+/** What a run's first input says about who it involves: the person it is about, the DM's other person, tagged people, and the owner's words. */
+export function involved(store: Store, input: { readonly text: string; readonly context?: SendContext; readonly mentions?: ReadonlyArray<ChatMention> }): ReadonlyArray<string> {
   const files = people(store)
   const ids: Array<string> = []
   const context = input.context
   if (context?._tag === 'person') ids.push(context.userId)
   if ((context?._tag === 'topic' || context?._tag === 'channel') && context.person !== undefined) ids.push(context.person)
+  for (const mention of input.mentions ?? []) if (mention.kind === 'person') ids.push(mention.id)
   for (const id of peopleIn(input.text, files)) ids.push(id)
   const known = new Set(files.map((file) => file.id))
   return [...new Set(ids)].filter((id) => known.has(id))
@@ -175,8 +176,8 @@ export function peopleNow(store: Store, h: number): string {
   if (run === undefined) return ''
   const op = store.db.prepare('SELECT text, data FROM inbox WHERE op_id = ?').get(run.opId) as { text: string; data: string | null } | undefined
   if (op === undefined) return ''
-  const data = (op.data === null ? {} : JSON.parse(op.data)) as { readonly context?: SendContext }
-  const ids = involved(store, { text: op.text, ...(data.context === undefined ? {} : { context: data.context }) })
+  const data = (op.data === null ? {} : JSON.parse(op.data)) as { readonly context?: SendContext; readonly mentions?: ReadonlyArray<ChatMention> }
+  const ids = involved(store, { text: op.text, ...(data.context === undefined ? {} : { context: data.context }), ...(data.mentions === undefined ? {} : { mentions: data.mentions }) })
   if (ids.length === 0) return ''
   const all = entries(store)
   return peopleContext(ids.flatMap((id) => {
