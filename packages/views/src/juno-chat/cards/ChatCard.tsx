@@ -4,7 +4,7 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useState, type ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import { chatCopy, type CardId, type CardKind, type CardStatus, type OpenTarget, type Place, type PlaceTint } from '@juno/agent-contract'
 import { chat, colors, motion, opacity, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, IconButton, Surface, Text, type PhosphorIcon } from '@juno/ui'
@@ -25,7 +25,7 @@ export interface ChatCardProps {
   readonly because?: string
   /** The card offers Dismiss: the header X while `open`, and the ghost button in the footer. */
   readonly dismiss?: boolean
-  /** The footer's buttons while the card is `open` or `working`. */
+  /** The footer's buttons while the card is `open` or `working`. While `working` they are disabled here, so a card's own buttons need no check. */
   readonly buttons?: ReactNode
   /** Leave out the footer slot altogether: a card with no buttons and no outcome (topics, unknown). */
   readonly footer?: boolean
@@ -45,8 +45,11 @@ export interface ChatCardProps {
  * it has settled. The footer keeps its height through that change, so a
  * click never moves what is under the card. A `working` card dims its
  * buttons and keeps every control in place (dimmed, not removed) until the
- * outcome arrives; the view never composes an after-line, it prints
- * `status.line`.
+ * outcome arrives. Those buttons are disabled, not only dimmed: the group
+ * around them is `aria-disabled`, so each reads as disabled, and a click or
+ * Enter or Space on one does nothing, since the agent takes a click only on
+ * an open card. Focus stays where it was. The view never composes an
+ * after-line, it prints `status.line`.
  */
 export function ChatCard({ id, kind, actions, label, source, status, because, dismiss = false, buttons, footer = true, padding = 'normal', enter = true, resultShown = false, children }: ChatCardProps) {
   const open = status === undefined || status._tag === 'open'
@@ -74,7 +77,7 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
           ) : null}
         </span>
         {dismiss && (open || working) ? (
-          <span {...stylex.props(styles.dismiss, working && styles.working)}>
+          <span role="group" aria-disabled={working || undefined} onClickCapture={working ? ignore : undefined} {...stylex.props(styles.dismiss, working && styles.working)}>
             <IconButton icon={X} label={chatCopy.card.dismiss} size={22} radius="sm" iconSize={12} tone="muted" onClick={() => actions.onCard(id, { _tag: 'dismiss' })} />
           </span>
         ) : null}
@@ -94,7 +97,7 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
       {footer ? (
         <div {...stylex.props(styles.footer)}>
           {status === undefined || open || working ? (
-            <div aria-disabled={working || undefined} {...stylex.props(styles.buttons, working && styles.working)}>
+            <div role="group" aria-disabled={working || undefined} onClickCapture={working ? ignore : undefined} {...stylex.props(styles.buttons, working && styles.working)}>
               {/* The default button last, at the trailing edge, as on the Mac: Dismiss before the card's own buttons. */}
               {dismiss ? (
                 <Button variant="ghost" size="md" tone="subtle" onClick={() => actions.onCard(id, { _tag: 'dismiss' })}>
@@ -118,6 +121,16 @@ export function ChatCard({ id, kind, actions, label, source, status, because, di
       </div>
     </Surface>
   )
+}
+
+/**
+ * A working card's buttons ignore activation. A button's Enter and Space
+ * arrive as a click, so stopping the click on its way down covers the
+ * mouse and the keyboard, before the button's own handler runs.
+ */
+function ignore(event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
 }
 
 /** What a settled card prints where its buttons were. */
@@ -237,7 +250,7 @@ export const placeIconFor = (place: Place): PhosphorIcon => placeIcon(place.tint
 export function DangerGhost({ children, onClick, disabled }: { readonly children: ReactNode; readonly onClick: () => void; readonly disabled?: boolean }) {
   return (
     <span {...stylex.props(styles.danger)}>
-      <Button variant="ghost" size="md" onClick={onClick} dimmed={disabled} aria-disabled={disabled}>
+      <Button variant="ghost" size="md" onClick={disabled ? undefined : onClick} dimmed={disabled}>
         {children}
       </Button>
     </span>

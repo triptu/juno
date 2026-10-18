@@ -26,6 +26,8 @@ export function QuestionCard({ card, actions, enter }: QuestionCardProps) {
   const open = card.status._tag === 'open'
   const first = card.options[0]
   const submit = () => {
+    // Enter in the reply field is not a click: a card that is not open takes neither.
+    if (!open) return
     const trimmed = reply.trim()
     if (trimmed.length > 0) actions.onCard(card.id, { _tag: 'reply', text: trimmed })
     else if (first !== undefined) actions.onCard(card.id, { _tag: 'choose', optionId: first.id })
