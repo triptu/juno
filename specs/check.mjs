@@ -322,6 +322,8 @@ const regressions = [
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
+  ['mutation-repair', 'halfOpen', 'quietAgreement', 'mutation-half-open'],
+  ['mutation-repair', 'failedFrame', 'quietAgreement', 'mutation-failed-frame'],
   ['mutation-repair', 'longGap', 'quietAgreement', 'mutation-long-gap'],
   ['mutation-repair', 'missingThread', 'drainBound', 'mutation-missing-thread'],
   ['mutation-repair', 'backwardsMarker', 'quietAgreement', 'mutation-backwards-marker'],

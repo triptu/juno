@@ -62,3 +62,8 @@ omit both markers. The uncovered outbox conformance schedule uses this alongside
 zero fallback topics to model no observation of a deleted original. The separate
 send-copy test keeps markers enabled: repair can observe deletion and keep the
 surviving copy, but only the fallback certifies coverage for deleting a duplicate.
+
+`holdFrames` can hold `pong` as well as message frames. Holding both models a
+half-open socket while HTTP counts still succeeds; the real client timeout detects
+it. The hidden-old-root `thread_not_found` scenario is injected as a refusal in a
+test, not asserted as measured Slack behavior.

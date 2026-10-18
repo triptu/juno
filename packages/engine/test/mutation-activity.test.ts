@@ -19,6 +19,11 @@ it('measures six live ten-minute intervals before a real offline edit on the lar
     await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM messages WHERE text = ?').get(`Live interval ${interval}`))?.n === 150 ? true : undefined, 120_000, 'all live edits stored')
     await engine.nextSync(120_000)
   }
+  // Candidate markers need a later real pong and sweep before they become the baseline.
+  await waitFor(() => readDb(engine, 'cache.db', (db) => targets.every((target) => {
+    const row = db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get(String(target.channel))
+    return row?.updated === engine.fake.workspace.mutationUpdated.get(String(target.channel))
+  })) ? true : undefined, 30_000, 'live markers confirmed by a pong')
   engine.fake.goOffline()
   await engine.phase('offline')
   const target = targets.at(-1)!

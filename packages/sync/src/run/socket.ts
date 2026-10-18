@@ -18,6 +18,7 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
         )
       case 'Disconnected':
         state.connected = false
+        state.markerCandidates.drop()
         if (!state.booted) return options.onConnection?.(false) ?? Effect.void
         return Clock.currentTimeMillis.pipe(
           Effect.tap((now) => Effect.sync(() => { state.droppedAt ??= now })),
@@ -27,12 +28,16 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
           Effect.andThen(phase({ _tag: 'offline' })),
         )
       case 'Frame':
+        if (event.frame.type === 'pong') state.markerCandidates.pong(event.receivedAt)
         if (event.frame.type === 'force_reload') {
           if (state.bootRetry !== undefined) return Deferred.succeed(state.bootRetry, undefined).pipe(Effect.asVoid)
           return FiberSet.run(background, reboot).pipe(Effect.asVoid)
         }
         return applyFrame(ctx, event.frame).pipe(
-          Effect.catchCause((cause) => Effect.logError('sync: event not applied', { type: event.frame.type, cause })),
+          Effect.catchCause((cause) => {
+            state.markerCandidates.failed(event.frame)
+            return Effect.logError('sync: event not applied', { type: event.frame.type, cause })
+          }),
         )
     }
   }

@@ -136,9 +136,12 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 Full counts on reconnect and warm boot compare supplied `updated` and
 `history_invalid` with observed markers using inequality, including backwards
 moves. Missing baselines seed without a repair storm. Changed conversations
-atomically enqueue cached ranges with the new observed markers. Uninterrupted
-ten-minute sweeps refresh supplied baseline markers after merging live activity;
-a socket drop during a sweep prevents that baseline refresh.
+atomically enqueue cached ranges with the new observed markers. Ten-minute sweeps stage supplied markers as in-memory candidates. A later sweep
+can promote a candidate only after a pong received after its counts response.
+A disconnect discards candidates. A failed frame blocks its conversation for the
+rest of the session (all conversations if the frame has no conversation id).
+The socket stamps frames before forwarding them to sync, so a queued older pong
+cannot confirm a newer candidate. Partial rows preserve absent marker fields.
 
 After `live`, at most ten background pages run, one per queued range. Main and
 cached replies start 24 hours before the gap began; old roots do not extend Main
@@ -149,8 +152,9 @@ failures persist and rotate behind unattempted ranges for the next catch-up or
 sweep. `SlackRateLimited` leaves the job queued. Conditional versions come only
 from `latest_updates`, separately from Message decoding. Unchanged ids count as
 present. Absence is inferred only inside proven recent page bounds, excluding
-thread roots and any `is_limited` response. `thread_not_found` tombstones cached
-replies within the job bounds and drops the job. Repair does not certify outbox coverage.
+thread roots and any `is_limited` response. `thread_not_found` drops the job. It tombstones cached replies within the job
+bounds only if the root is already deleted in cache, including deletion proved
+by the Main page. Hidden old history is not evidence of deletion. Repair does not certify outbox coverage.
 
 All ten ordinary fallback pages still run before `live`, including topics queued
 for repair. Missing markers or versions that fail to advance cannot suppress the

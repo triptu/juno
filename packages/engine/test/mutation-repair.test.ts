@@ -283,3 +283,79 @@ it('does not refresh a sweep baseline across a socket gap while counts is in fli
   await waitFor(() => message(engine, 'C0ENG', target.ts)?.text === 'Edited during held counts' ? true : undefined, 30_000, 'gap edit repaired')
   expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
 })
+
+
+it('repairs an edit lost on a half-open socket despite sweeps before timeout detection', async () => {
+  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
+  const target = engine.fake.workspace.main('C0ENG').at(-1)!
+  const baseline = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get('C0ENG'))?.updated
+  const before = baseline()
+  engine.fake.holdFrames({ types: ['message', 'pong'] })
+  engine.fake.editMessage({ channel: 'C0ENG', ts: target.ts, text: 'Lost before timeout' })
+  await engine.nextSync()
+  await engine.nextSync()
+  expect(engine.online()).toBe(true)
+  expect(baseline()).toBe(before)
+  expect(message(engine, 'C0ENG', target.ts)?.text).not.toBe('Lost before timeout')
+  await engine.phase('offline', 45_000)
+  engine.fake.releaseFrames({ drop: true })
+  await engine.phase('live', 30_000)
+  await engine.syncIdle()
+  await waitFor(() => message(engine, 'C0ENG', target.ts)?.text === 'Lost before timeout' ? true : undefined, 30_000, 'half-open edit repaired')
+  expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
+}, 90_000)
+
+it('drops an inaccessible old thread without tombstoning its cached recent replies', async () => {
+  let root = ''
+  let reply = ''
+  const engine = await bootedEngine(engines, { recheckTopics: 0, followPassMillis: DAY, initial: (fake) => {
+    root = seedThread(fake, { channel: 'C0ENG', text: 'Old root', ago: 40 * DAY, replies: [60_000], follow: true }).ts
+    reply = fake.workspace.replies('C0ENG', Ts.make(root))[0]!.ts
+    return fake.signIn()
+  } })
+  expect(message(engine, 'C0ENG', reply)?.deleted).toBe(0)
+  engine.fake.goOffline()
+  await engine.phase('offline')
+  engine.fake.editMessage({ channel: 'C0ENG', ts: reply, text: 'Hidden by plan' })
+  engine.fake.gate((method, args) => method === 'conversations.replies' && args.ts === root && args['_x_reason'] === 'mutation-repair')
+  engine.fake.goOnline()
+  await waitFor(() => engine.fake.gated().length > 0 ? true : undefined, 30_000, 'thread repair gated')
+  for (const call of engine.fake.gated()) engine.fake.decide(call.id, { error: 'thread_not_found' })
+  await waitFor(() => engine.fake.gated().some((c) => c.stage === 'answer') ? true : undefined, 30_000, 'missing-thread answer')
+  engine.fake.gate()
+  await engine.syncIdle()
+  expect(message(engine, 'C0ENG', reply)?.deleted).toBe(0)
+  expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending WHERE thread = ?').get(root))?.n).toBe(0)
+})
+
+it('does not promote a conversation baseline after applying its frame fails', async () => {
+  let ts = ''
+  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY, initial: (fake) => {
+    ts = fake.injectMessage({ channel: 'C0ENG', text: 'Before failed frame' }).ts
+    return fake.signIn()
+  } })
+  const baseline = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get('C0ENG'))?.updated
+  const before = baseline()
+  const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'))
+  try {
+    db.exec("CREATE TRIGGER refuse_frame BEFORE UPDATE ON messages WHEN NEW.text = 'Failed frame edit' BEGIN SELECT RAISE(FAIL, 'test frame failure'); END")
+    let pongs = 0
+    engine.fake.holdFramesWhere((frame) => { if (frame.type === 'pong') pongs++; return false })
+    engine.fake.editMessage({ channel: 'C0ENG', ts, text: 'Failed frame edit' })
+    await engine.nextSync()
+    await waitFor(() => pongs > 0 ? true : undefined, 20_000, 'pong after failed frame')
+    await engine.nextSync()
+    expect(baseline()).toBe(before)
+    expect(message(engine, 'C0ENG', ts)?.text).toBe('Before failed frame')
+    db.exec('DROP TRIGGER refuse_frame')
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.goOnline()
+    await engine.phase('live', 30_000)
+    await engine.syncIdle()
+    expect(message(engine, 'C0ENG', ts)?.text).toBe('Failed frame edit')
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS refuse_frame')
+    db.close()
+  }
+}, 60_000)

@@ -13,7 +13,7 @@ interface Job { readonly id: number; readonly channel: string; readonly thread: 
 export const REPAIR_CALL_LIMIT = 10
 
 /** These are observed markers; unfinished work lives durably in repair_pending. */
-export const saveRepairMarkers = (entries: ReadonlyArray<CountEntry>) => Effect.gen(function* () {
+export const saveRepairMarkers = (entries: ReadonlyArray<Pick<CountEntry, 'id' | 'updated' | 'history_invalid'>>) => Effect.gen(function* () {
   const sql = yield* StoreWriter
   for (const entry of entries) {
     if (entry.updated === undefined && entry.history_invalid === undefined) continue
@@ -54,11 +54,12 @@ export const queueRepairs = (ctx: SyncContext, entries: ReadonlyArray<CountEntry
   }
 }))
 
-/** An authoritative missing thread ends the job and deletes only its bounded cached replies. */
+/** Hidden history may also report a missing thread. Only a deleted root proves its replies gone. */
 const missingThread = (ctx: SyncContext, job: Job, requestedAt: Ts) => transaction(Effect.gen(function* () {
   const sql = yield* StoreWriter
   const replies = yield* sql<{ ts: string }>`SELECT ts FROM messages WHERE channel = ${job.channel}
-    AND thread_ts = ${job.thread} AND ts <> ${job.thread} AND deleted = 0 AND ts >= ${job.oldest} AND ts <= ${job.latest}`
+    AND thread_ts = ${job.thread} AND ts <> ${job.thread} AND deleted = 0 AND ts >= ${job.oldest} AND ts <= ${job.latest}
+    AND EXISTS (SELECT 1 FROM messages root WHERE root.channel = ${job.channel} AND root.ts = ${job.thread} AND root.deleted = 1)`
   for (const reply of replies) yield* writeDeleted(ctx, job.channel, reply.ts, { kind: 'page', requestedAt })
   yield* sql`DELETE FROM repair_pending WHERE id = ${job.id}`
 }))

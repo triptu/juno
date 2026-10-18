@@ -522,3 +522,32 @@ the stored baseline. A `thread_not_found` response drops the job and tombstones
 cached replies within its fixed bounds. Tests cover a Friday 18:00 close, a
 Saturday edit of a Friday 17:00 message, and a Monday reopen, as well as deleting
 a reply followed by its root while offline.
+
+
+### Round 3: proving delivery before refreshing baselines
+
+A connected socket alone does not prove event delivery: it can remain half-open
+until its pong timeout. Incremental counts markers now become in-memory
+candidates. Only a later sweep, after a pong received after that counts response,
+can promote them. The pong carries the socket receive timestamp, so time spent in
+sync's event queue cannot turn an old pong into new evidence. Disconnect discards
+candidates. Any failed frame blocks promotion for its conversation for the rest
+of the session; an unidentified conversation blocks all promotions. This can
+increase repair work after an error, but preserves the dirty signal.
+
+The fake can hold both message frames and pongs while HTTP keeps working. A
+regression test changes a message, loses its event, lets sweeps run before timeout
+detection, then verifies reconnect repair without fallback pages. A separate test
+forces a frame's database write to fail and verifies its marker stays dirty even
+after a pong and later sweep.
+
+**Unknown:** free-plan hidden history may return `thread_not_found` for an old
+root with recent replies. The self-DM deletion probe does not distinguish that
+case. The response alone therefore drops the job without tombstoning replies.
+Bounded cached replies are tombstoned only if the root is already deleted in
+cache, including when the Main page has proved it absent. No additional live
+Slack writes were needed for this revision.
+
+The send-copy test now explicitly covers markers enabled, an original deleted
+while offline, and zero fallback rechecks. Repair observes the deletion and the
+surviving copy remains visible; this still does not certify outbox recheck coverage.

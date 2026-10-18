@@ -75,7 +75,7 @@ export class SocketHandshake extends Context.Service<SocketHandshake, SocketHand
 }
 
 export type SocketEvent =
-  | { readonly _tag: 'Frame'; readonly frame: RtmFrame }
+  | { readonly _tag: 'Frame'; readonly frame: RtmFrame; readonly receivedAt: number }
   /** `hello` arrived. `fast` when a `reconnect_url` was used. */
   | { readonly _tag: 'Connected'; readonly fast: boolean }
   /** The connection ended; the next attempt starts in `retryInMillis`. */
@@ -190,7 +190,9 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
           let id = FIRST_FRAME_ID
           const nextId = () => id++
           let lastPong = yield* Clock.currentTimeMillis
-          const forward = (frame: RtmFrame) => Queue.offer(out, { _tag: 'Frame', frame })
+          const forward = (frame: RtmFrame) => Clock.currentTimeMillis.pipe(
+            Effect.flatMap((receivedAt) => Queue.offer(out, { _tag: 'Frame', frame, receivedAt })),
+          )
 
           /** Reads frames until one ends the connection. `untilHello` stops at `hello`. */
           const pump = (untilHello: boolean): Effect.Effect<Outcome | undefined, SlackAuthRequired> =>

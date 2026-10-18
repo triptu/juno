@@ -271,8 +271,15 @@ retention, upgrade seeding and call costs have fake integration tests.
 The mutation-repair model also tracks gap time, message time and job enqueue time.
 Ranges start 24 hours before the gap; expiry uses 24 hours since enqueueing.
 `longGap` contrasts that rule with a window anchored at reopen time.
-`missingThread` contrasts dropping and tombstoning a missing thread with retrying
-it forever. Random simulation includes time advances and missing thread responses.
+`missingThread` contrasts dropping a missing-thread job with retrying it forever.
+Tombstones additionally require a known deleted root. Random simulation includes time advances and missing thread responses.
+`sweepRefresh` stages a candidate and promotes it only after a later pong, with
+no failed frame. The `halfOpen` schedule loses a mutation event while HTTP counts
+still succeeds; its unsafe variant advances the baseline and violates
+`quietAgreement`. `failedFrame` checks the same exclusion after a frame fails.
+These schedules exercise sweep promotion separately from the random mutation
+simulation. Socket receive timestamps and the real timeout are checked by engine
+tests against the fake.
 
 ## Conversation metadata
 

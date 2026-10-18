@@ -9,6 +9,7 @@ module mutationRepair {
     pending: Set[int], fallback: bool, fresh: bool, running: bool, requested: bool,
     target: int, present: bool, unchanged: bool, answer: int, answerVersion: int,
     now: int, gap: int, messageAt: int -> int, queuedAt: int -> int, threadMissing: bool, notFound: bool,
+    socketAlive: bool, candidate: int, candidateValid: bool, confirmed: bool, frameFailed: bool, rootDeleted: bool,
     sealed: bool, label: str
   }
   var s: State
@@ -17,7 +18,7 @@ module mutationRepair {
   action init = all {
     s' = { content: topics.mapBy(_ => 0), version: topics.mapBy(_ => 0), cached: topics.mapBy(_ => 0), cachedVersion: topics.mapBy(_ => 0),
       deleted: Set(), gone: Set(), required: Set(1), marker: 0, observed: 0, pending: Set(), fallback: false, fresh: false,
-      running: false, requested: false, target: 1, present: true, unchanged: false, answer: 0, answerVersion: 0, now: 24, gap: 24, messageAt: topics.mapBy(_ => 23), queuedAt: topics.mapBy(_ => 24), threadMissing: false, notFound: false, sealed: false, label: "init" },
+      running: false, requested: false, target: 1, present: true, unchanged: false, answer: 0, answerVersion: 0, now: 24, gap: 24, messageAt: topics.mapBy(_ => 23), queuedAt: topics.mapBy(_ => 24), threadMissing: false, notFound: false, socketAlive: true, candidate: 0, candidateValid: false, confirmed: false, frameFailed: false, rootDeleted: false, sealed: false, label: "init" },
     turn' = 0, remaining' = 48
   }
   action change(k: int, markers: bool, versions: bool): bool = all {
@@ -77,11 +78,12 @@ module mutationRepair {
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = noFalseDelete and quietAgreement and drainBound
   action rootGone = all { not(s.sealed), s.deleted.contains(2),
-    s' = { ...s, threadMissing: true, marker: s.marker + 1, label: "rootGone" } }
+    s' = { ...s, threadMissing: true, rootDeleted: true, marker: s.marker + 1, label: "rootGone" } }
   action missingWith(drop: bool): bool = all { s.requested, s.notFound,
     s' = { ...s, requested: false, running: false, notFound: false,
       pending: if (drop) s.pending.exclude(Set(2)) else s.pending,
-      gone: if (drop) s.gone.union(Set(2)) else s.gone, label: "thread_not_found" } }
+      gone: if (drop and s.rootDeleted) s.gone.union(Set(2)) else s.gone,
+      required: if (drop and not(s.rootDeleted)) s.required.exclude(Set(2)) else s.required, label: "thread_not_found" } }
   action advance(hours: int): bool = all { not(s.sealed), not(s.running),
     s' = { ...s, now: s.now + hours, label: "time" } }
   // Expiry is queue age, never the age of the cached message. Expired work is outside the liveness promise.
@@ -140,5 +142,27 @@ module mutationRepair {
   ) }
   action missingThreadStep = missingThreadWith(true)
   action missingThreadBugStep = missingThreadWith(false)
+
+  // A half-open connection still looks connected to sync. A snapshot needs a later pong.
+  action loseSocket = all { not(s.sealed), s' = { ...s, socketAlive: false, label: "halfOpen" } }
+  action failedFrame = all { not(s.sealed), s' = { ...s, frameFailed: true, candidateValid: false, label: "failedFrame" } }
+  action pong = all { s.socketAlive, s.candidateValid, s' = { ...s, confirmed: true, label: "pong" } }
+  action sweepRefreshWith(unsafe: bool): bool = all { not(s.sealed), not(s.running),
+    s' = { ...s,
+      observed: if (unsafe) s.marker else if (s.candidateValid and s.confirmed and not(s.frameFailed)) s.candidate else s.observed,
+      candidate: s.marker, candidateValid: not(s.frameFailed), confirmed: false, label: "sweepRefresh" } }
+  action sweepRefresh = sweepRefreshWith(false)
+  action halfOpenWith(unsafe: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) loseSocket else if (turn == 1) fridayEdit else
+    if (turn == 2 or turn == 3) sweepRefreshWith(unsafe) else if (turn == 4) seal else progress
+  ) }
+  action halfOpenStep = halfOpenWith(false)
+  action halfOpenBugStep = halfOpenWith(true)
+  action failedFrameWith(unsafe: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) fridayEdit else if (turn == 1) sweepRefresh else if (turn == 2) failedFrame else
+    if (turn == 3) sweepRefreshWith(unsafe) else if (turn == 4) seal else progress
+  ) }
+  action failedFrameStep = failedFrameWith(false)
+  action failedFrameBugStep = failedFrameWith(true)
 
 }
