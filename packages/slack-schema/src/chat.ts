@@ -48,7 +48,9 @@ export const ChatUpdateArgs = S.Struct({
 })
 export type ChatUpdateArgs = typeof ChatUpdateArgs.Type
 
-export const ChatUpdateFields = { channel: S.String, ts: Ts, text: opt(S.String), message: opt(Message) } as const
+// The nested message may contain only text and user; ts belongs to the response envelope.
+// https://docs.slack.dev/reference/methods/chat.update/#response
+export const ChatUpdateFields = { channel: S.String, ts: Ts, text: opt(S.String), message: opt(S.Struct({ ...Message.fields, ts: opt(Ts) })) } as const
 
 // chat.delete
 

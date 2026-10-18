@@ -8,9 +8,9 @@
  */
 import { StoreWriter, type Invalidation, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
-import { actionsOn, deleteActions, insertAction, readAction, resolveTarget, targetFields, touch, writePayload, type ActionRefusal, type MessageRef, type PendingAction } from './actions'
+import { actionsOn, deleteActions, insertAction, resolveTarget, targetFields, touch, writePayload, type ActionRefusal, type MessageRef, type PendingAction } from './actions'
 
-/** Whether the row waits for the user: a reaction Slack refused. */
+/** Whether the action waits for the user instead of the worker. */
 export const isFailed = (action: PendingAction): boolean => action.payload.failed !== undefined
 
 export interface ReactInput {
@@ -60,21 +60,6 @@ export const queueReaction = (input: ReactInput): Effect.Effect<ActionRefusal | 
     const { channel, dependsOn, ...fields } = targetFields(target)
     yield* insertAction('react', channel, dependsOn, { ...fields, name: input.name, want: input.on, base }, input.now)
     return undefined
-  })
-
-/**
- * Slack refused a reaction (`invalid_name`, `message_not_found`, ...). The
- * row stays, marked with the code, so the view shows what Slack has with
- * Retry and Dismiss (`queueReaction`); the worker leaves it alone.
- */
-export const failReaction = (action: PendingAction, code: string): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
-  Effect.gen(function* () {
-    const current = yield* readAction(action.id)
-    if (current === undefined) return
-    const { stalled: _stalled, ...rest } = current.payload
-    const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify({ ...rest, failed: code })}, last_error = ${code} WHERE id = ${action.id}`
-    yield* touch(current.payload.topics)
   })
 
 /** A reaction that has waited too long without going out: the view says it is not sent yet. Leaves its timing alone. */

@@ -385,7 +385,8 @@ export const handlers: Handlers = {
     const text = args.text ?? args.markdown_text
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
     const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined)
-    return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: withChannel(ws, args.channel, message) }
+    // chat.update returns a partial message; its timestamp is on the envelope.
+    return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: { text: message.text ?? '', user: ws.selfId } }
   },
 
   'chat.delete': (ctx, args) => {

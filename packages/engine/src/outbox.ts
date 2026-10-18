@@ -73,7 +73,7 @@ export class Outbox extends Context.Service<
         <A>(call: (api: SlackApiShape) => Effect.Effect<A, SlackApiError | NotSent>): Effect.Effect<A, MirrorError | NotSent> =>
           Effect.gen(function* () {
             const api = yield* client.api
-            const laned: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane, singleAttempt }), upload: api.upload }
+            const laned: SlackApiShape = { call: (method, args, options) => api.call(method, args, { ...options, lane, singleAttempt: singleAttempt || options?.singleAttempt === true }), upload: api.upload }
             return yield* call(laned).pipe(
               Effect.catch((error): Effect.Effect<never, MirrorError | NotSent> =>
                 error._tag === 'NotSent' ? Effect.fail(error) : singleAttempt && error._tag === 'SlackDecodeError' ? Effect.fail(new Offline()) : mapSlackError(error),

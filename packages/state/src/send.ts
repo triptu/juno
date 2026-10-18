@@ -22,6 +22,7 @@ import {
   messagesDiscard,
   messagesEdit,
   messagesReact,
+  messagesResolveAction,
   messagesRetry,
   messagesSend,
   sendChecksApply,
@@ -114,3 +115,5 @@ export const draftAtom = (topicId: string) => draftFamily({ topicId })
 
 /** Replaces a topic's draft; an empty text deletes it. */
 export const saveDraft = (registry: Registry, topicId: string, text: string) => runCommand(registry, draftsSet, { topicId, text })
+
+export const resolveMessageAction = (registry: Registry, id: number, retry: boolean) => runCommand(registry, messagesResolveAction, { id, retry })

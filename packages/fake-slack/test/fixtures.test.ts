@@ -152,7 +152,8 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(Schema.is(Message)(posted.message)).toBe(true)
 
     const updated = await client.ok('chat.update', { channel: opened.channel.id, ts: posted.ts, text: 'hello again' })
-    expect(updated.message?.edited?.user).toBe(fake.selfId)
+    expect(updated.message).toEqual({ text: 'hello again', user: fake.selfId })
+    expect(updated.ts).toBe(posted.ts)
     expect(updated.text).toBe('hello again')
 
     expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })).toEqual({ ok: true })

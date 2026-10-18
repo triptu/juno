@@ -18,12 +18,13 @@ module outboxProtocol {
     claimedOffline: bool,
     label: str, target: int,
     // One action row per message (edit, delete or reaction toggle): none,
-    // waiting, transit, accepted, done, dropped, or failed (a reaction Slack
-    // refused, shown with Retry and Dismiss until the user picks one). Kind
+    // waiting, transit, accepted, done, dropped, or failed (a defect, exhausted
+    // retries, or a refused reaction, with Retry and Dismiss). Kind
     // `change` is an edit, `react` a reaction toggle; `delete` replaces them.
     // `stale` holds rows whose intent changed while a call was out.
     // `actSent` records every action call that left Juno; `acted` every
     // message Slack applied one to.
+    actAttempts: int -> int, actChannel: int -> int,
     act: int -> str, actKind: int -> str, stale: Set[int],
     actSent: Set[int], acted: Set[int],
     // Messages another client deleted, as far as Slack's answers to action
@@ -56,6 +57,7 @@ module outboxProtocol {
       server: drafts.mapBy(_ => 0), request: drafts.mapBy(_ => "idle"), due: Set(),
       events: Set(), fetches: Set(), scan: Set(),
       online: true, connected: true, catchup: false, sealed: false, claimedOffline: false, label: "init", target: 0,
+      actAttempts: drafts.mapBy(_ => 0), actChannel: drafts.mapBy(k => k),
       act: drafts.mapBy(_ => "none"), actKind: drafts.mapBy(_ => "change"), stale: Set(),
       actSent: Set(), acted: Set(), missing: Set(), phantom: Set(),
       dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none"),
@@ -342,7 +344,7 @@ module outboxProtocol {
   // row; a row with a call out sends again after its answer.
   action queueAction(k: int, kind: str): bool = {
     val local = Set("queued", "failed").contains(s.row.get(k))
-    val queued = { ...s, actKind: s.actKind.set(k, kind),
+    val queued = { ...s, actAttempts: s.actAttempts.set(k, 0), actKind: s.actKind.set(k, kind),
       act: s.act.set(k, if (actInFlight(k)) s.act.get(k) else "waiting"),
       stale: if (actInFlight(k)) s.stale.union(Set(k)) else s.stale }
     val after = if (local) localAction(k, kind) else queued
@@ -354,7 +356,11 @@ module outboxProtocol {
   }
   // The worker resolves the ts from the stored message when it runs. With
   // the guard off it calls with a guessed ts before the post is stored.
+  // IDs order action rows within a channel. Failed rows are settled and do not hold it.
+  def actionHead(k: int): bool = drafts.forall(j =>
+    (j < k and s.actChannel.get(j) == s.actChannel.get(k)) implies not(actPending(j)))
   action runActionWith(k: int, guard: bool): bool = all {
+    actionHead(k),
     s.online, s.connected, s.act.get(k) == "waiting", not(guard) or s.stored.contains(k),
     s' = { ...s, act: s.act.set(k, "transit"), stale: s.stale.exclude(Set(k)),
       actSent: s.actSent.union(Set(k)), label: "runAction", target: k }
@@ -380,10 +386,16 @@ module outboxProtocol {
     s' = { ...s, act: s.act.set(k, if (s.stale.contains(k)) "waiting" else "done"),
       label: "actAnswer", target: k }
   }
-  // A lost answer, timeout or rate limit: the row waits and goes out again.
+  // Five failed exchanges end an intent. A newer intent has its own budget.
   action actFail(k: int): bool = all {
     not(s.sealed), actInFlight(k),
-    s' = { ...s, act: s.act.set(k, "waiting"), label: "actFail", target: k }
+    s' = { ...s, actAttempts: s.actAttempts.set(k, if (s.stale.contains(k)) 0 else s.actAttempts.get(k) + 1),
+      act: s.act.set(k, if (not(s.stale.contains(k)) and s.actAttempts.get(k) >= 4) "failed" else "waiting"),
+      label: "actFail", target: k }
+  }
+  // A defect, or a legacy row already beyond its budget, stops before another call.
+  action actDefect(k: int): bool = all {
+    actPending(k), s' = { ...s, act: s.act.set(k, if (s.stale.contains(k)) "waiting" else "failed"), label: "actDefect", target: k }
   }
   // A refusal ends an edit or delete row; the view shows the stored message
   // again. A refused reaction stays as `failed`: the chip shows what Slack
@@ -482,13 +494,14 @@ module outboxProtocol {
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   // Juno never shows a reaction as made that Slack refused.
   val reactionsLand = s.phantom == Set()
-  // Only a reaction waits for the user after a refusal.
-  val failedOnlyReactions = drafts.forall(k => s.act.get(k) == "failed" implies s.actKind.get(k) == "react")
+  // Defects and exhausted retries can fail every action kind.
+  val actionRetryBound = drafts.forall(k => s.actAttempts.get(k) <= 5 and
+    (s.actAttempts.get(k) == 5 implies s.act.get(k) == "failed" or s.act.get(k) == "dropped"))
   val repliesWaitForRoot = drafts.forall(k =>
     s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
   val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
-    ownDeleteHolds and reactionsLand and failedOnlyReactions
+    ownDeleteHolds and reactionsLand and actionRetryBound
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
@@ -832,6 +845,38 @@ module outboxProtocol {
   ) }
   action ownDeleteStep = ownDeleteWith(true)
   action ownDeleteBugStep = ownDeleteWith(false)
+
+  // Two rows in one channel: the failed head releases the later action.
+  // The engine tests also seed legacy attempts of 3816 before a restart.
+  action boundedActionStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, false) else
+    if (turn == 3) answer(1) else
+    if (turn == 4) send(2) else
+    if (turn == 5) claim(2) else
+    if (turn == 6) accept(2, false) else
+    if (turn == 7) answer(2) else
+    if (turn == 8) all { s' = { ...s, actChannel: s.actChannel.set(2, 1) } } else
+    if (turn == 9) queueAction(1, "change") else
+    if (turn == 10) queueAction(2, "react") else
+    if (turn >= 11 and turn <= 20) (if (turn % 2 == 1) runAction(1) else actFail(1)) else
+    if (turn == 21) all { s.act.get(1) == "failed", runAction(2) } else
+    if (turn == 22) actAccept(2) else
+    if (turn == 23) actAnswer(2) else seal
+  ) }
+  action defectActionStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, false) else
+    if (turn == 3) answer(1) else
+    if (turn == 4) queueAction(1, "change") else
+    if (turn == 5) runAction(1) else
+    if (turn == 6) actDefect(1) else
+    if (turn == 7) all { s.act.get(1) == "failed", seal } else progress
+  ) }
 
   // The socket drops while the copy's delete waits, and the user deletes
   // the kept message meanwhile. The store learns it only from the

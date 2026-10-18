@@ -127,6 +127,7 @@ export {
   discardMessage,
   draftAtom,
   editMessage,
+  resolveMessageAction,
   precheckMessage,
   reactToMessage,
   retryMessage,

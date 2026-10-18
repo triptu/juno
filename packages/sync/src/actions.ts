@@ -47,7 +47,7 @@ export interface ActionPayload {
   readonly name?: string
   readonly want?: boolean
   readonly base?: boolean
-  /** `react`: Slack refused it with this code. The row is not sent again until the user retries; the view shows what Slack has. */
+  /** The action failed with this code. The row is not sent again until the user retries; the view shows what Slack has. */
   readonly failed?: string
   /** `react`: it has waited past `STALL_MILLIS` without going out, and the view says so. */
   readonly stalled?: boolean
@@ -61,6 +61,7 @@ export interface PendingAction {
   readonly dependsOn: string | null
   readonly payload: ActionPayload
   readonly attempts: number
+  readonly lastError: string | null
   /** Epoch millis. */
   readonly nextAt: number
   /** Epoch millis. */
@@ -74,6 +75,7 @@ interface ActionRow {
   readonly depends_on: string | null
   readonly payload_json: string
   readonly attempts: number
+  readonly last_error: string | null
   readonly next_at: string | null
   readonly created_at: string
 }
@@ -85,15 +87,16 @@ const toAction = (row: ActionRow): PendingAction => ({
   dependsOn: row.depends_on,
   payload: JSON.parse(row.payload_json) as ActionPayload,
   attempts: row.attempts,
+  lastError: row.last_error,
   nextAt: row.next_at === null ? 0 : Number(row.next_at),
   createdAt: Number(row.created_at),
 })
 
-const COLUMNS = 'id, kind, target_key, depends_on, payload_json, attempts, next_at, created_at'
+const COLUMNS = 'id, kind, target_key, depends_on, payload_json, attempts, last_error, next_at, created_at'
 
 export const touch = (topics: ReadonlyArray<string>) => Invalidation.use((i) => i.invalidate({ messages: [...topics] }))
 
-/** Every pending action, oldest first. A refused reaction waits for the user, not the worker, and is left out. */
+/** Every pending action, oldest first. A failed action waits for the user, not the worker, and is left out. */
 export const pendingActions: Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> = Effect.gen(function* () {
   const sql = yield* StoreWriter
   const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE kind IN ('edit', 'delete', 'react') AND json_extract(payload_json, '$.failed') IS NULL ORDER BY id`)
@@ -227,8 +230,9 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     }
     const pending = actions.find((action) => action.kind === 'edit')
     if (pending !== undefined) {
-      if (pending.payload.text === input.text) return undefined
-      yield* writePayload(pending, { ...pending.payload, text: input.text, blocksJson: input.blocksJson, rev: (pending.payload.rev ?? 0) + 1 }, input.now)
+      if (pending.payload.text === input.text && pending.payload.failed === undefined) return undefined
+      const { failed: _failed, ...payload } = pending.payload
+      yield* writePayload(pending, { ...payload, text: input.text, blocksJson: input.blocksJson, rev: (pending.payload.rev ?? 0) + 1 }, input.now)
       return undefined
     }
     if (target.kind === 'stored' && target.row.text === input.text) return undefined
@@ -351,7 +355,7 @@ export const dropAction = (action: PendingAction): Effect.Effect<void, SqlError,
 export const deferAction = (action: PendingAction, nextAt: number, error: string): Effect.Effect<void, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET attempts = attempts + 1, next_at = ${String(nextAt)}, last_error = ${error} WHERE id = ${action.id}`
+    yield* sql`UPDATE outbox SET attempts = attempts + 1, next_at = ${String(nextAt)}, last_error = ${error} WHERE id = ${action.id} AND payload_json = ${JSON.stringify(action.payload)}`
   })
 
 /** The catch-up's flush: every action row is due at `now`. */
