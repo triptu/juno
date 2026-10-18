@@ -8,10 +8,19 @@ How to build and run Juno, and how the repo is put together.
 - pnpm 12. Node 25+ has no Corepack, so install it directly: `npm i -g pnpm@12`.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
 - Google Chrome, for the gallery tests and screenshots.
+- Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
 
 No Playwright browser download is needed for the desktop e2e tests. Electron is the browser. The
 gallery projects use the installed Google Chrome (`channel: 'chrome'`); set
 `GALLERY_BROWSER=chromium` after `npx playwright install chromium` to use Playwright's own build.
+
+### Git LFS
+
+Images and videos under `docs/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.mp4`, `.webm`, `.mov`) are stored in Git LFS, as `.gitattributes` lists. They were about 240 MB of the 265 MB checkout on 10-18, and they made most of the repo's growth. Nothing the app, the tests or CI reads is under `docs/`, so a checkout without LFS gets pointer files there and still builds and tests. The app icon in `apps/desktop/build` stays a normal file.
+
+- `git lfs install` adds the `pre-push` hook that uploads new images. Without it, a push leaves pointers on GitHub with nothing behind them.
+- To clone without the images: `GIT_LFS_SKIP_SMUDGE=1 git clone ...`, then `git lfs pull --include="docs/design/home/**"` for the ones you need.
+- History from before 10-18 still holds the images as normal files, so a full clone still downloads them once (about 220 MB). We chose not to rewrite history, because every clone, worktree and open branch would have had to move to the new commits.
 
 ## Commands
 
