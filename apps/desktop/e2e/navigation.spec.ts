@@ -3,9 +3,9 @@
 // the unread dot, and the sidebar's resize and hide.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
+import { savedTabs, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -13,19 +13,6 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
-
-/** The tabs saved in user.db (`TABS_PREF`): each tab's topic, or its page, and whether it is pinned. */
-function savedTabs(userData: string, teamId: string): Array<{ readonly place: string; readonly pinned: boolean }> | undefined {
-  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
-  try {
-    const row = db.prepare(`SELECT value_json FROM prefs WHERE key = 'tabs'`).get() as { value_json: string } | undefined
-    if (row === undefined) return undefined
-    const saved = JSON.parse(row.value_json) as { tabs: Array<{ pinned: boolean; place: { kind: string; topicId?: string } }> }
-    return saved.tabs.map((tab) => ({ place: tab.place.topicId ?? tab.place.kind, pinned: tab.pinned }))
-  } finally {
-    db.close()
-  }
-}
 
 test('Back and Forward move through the topics one tab showed', async ({ juno }) => {
   await juno.signIn()
@@ -156,8 +143,7 @@ test('the tab menu pins, unpins and closes, and pins survive a restart', async (
   expect(opened).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C[A-Z0-9]+$/)])
 
   // The pin and the closes have reached the engine.
-  const threadId = (text: string) => `t:${slack.root(text).channel}:${slack.root(text).ts}`
-  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual([{ place: threadId(ROADMAP), pinned: true }, { place: threadId(POSTGRES), pinned: false }])
+  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs).toEqual([{ place: threadId(slack, ROADMAP), pinned: true }, { place: threadId(slack, POSTGRES), pinned: false }])
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
