@@ -30,11 +30,10 @@ const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 60_000)
  */
 type Gate = 'portable' | 'mac'
 
-// The native Window and Graphics budgets were measured on the Mac. The Linux
-// runner renders in software, so it uses a 15% spin ceiling for these two
-// processes. The @mac scenarios keep the native budgets; backend budgets
-// stay the same on every platform and in both gates.
-const SOFTWARE_RENDERING_CEILING = 15
+// Remote runs only look for runaway work. The 25% threshold is far above the
+// 2.45–3.4% readings from three noisy remote failures, and below a sustained
+// spin such as the 100% helper seen earlier this week.
+const RUNAWAY_CEILING = 25
 // A focused text field's native caret blinks at rest. Give only its Window
 // 3%, rather than treating normal Mac text editing as an idle spin.
 const FOCUSED_WINDOW_BUDGET = 3
@@ -60,7 +59,7 @@ async function idleCpu(running: RunningApp, ms: number): Promise<ReadonlyArray<R
   return since(before)
 }
 
-/** Measures `state`, prints one line for it, and holds each process to its budget. */
+/** Measures `state`, printing readings and applying the platform gate. */
 async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?: FakeSlack): Promise<void> {
   // Navigation leaves load cleanup, including deferred V8 collections. Let
   // it settle, then average a full minute as the original measurements did.
@@ -92,11 +91,8 @@ async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?:
   console.log(`idle cpu, ${state} (${IDLE_WINDOW_MS / 1000} s, ${focusedTextField ? 'focused text field' : 'no focused text field'}): ${line}`)
   test.info().annotations.push({ type: 'idle cpu', description: `${state}: ${line}` })
   for (const reading of readings) {
-    const rendering = reading.kind === 'window' || reading.kind === 'graphics'
-    // Native rendering is checked by the separate @mac gate below.
-    if (rendering && gate === 'portable' && process.platform === 'darwin') continue
     const nativeBudget = reading.kind === 'window' && focusedTextField ? FOCUSED_WINDOW_BUDGET : BUDGETS[reading.kind] ?? BUDGETS.other!
-    const budget = rendering && gate === 'portable' ? SOFTWARE_RENDERING_CEILING : nativeBudget
+    const budget = gate === 'portable' ? RUNAWAY_CEILING : nativeBudget
     expect.soft(reading.cpu, `${state}: ${reading.name} (${reading.type}, pid ${reading.pid}) at ${reading.cpu.toFixed(1)} % of a core, budget ${budget} %`).toBeLessThan(budget)
   }
 }

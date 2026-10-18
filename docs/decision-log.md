@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 23:55 · orchestrator · Fine idle-CPU budgets run on the Mac only (nightly and on demand); remote runs keep a coarse runaway check. Why: shared remote machines gave three false failures in a day.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.
 - 10-18 22:46 · docs-media-lfs · Images and videos under docs/ move to Git LFS, so new screenshots no longer grow the repo (they were about 240 MB of a 265 MB checkout and nearly all of its growth). History is not rewritten yet, so a full clone still downloads the old images once. Rewriting forces every clone, worktree and open branch onto new commits, so it is planned for a time when no other work is happening. `check-lfs` in lint catches images that land as normal files.
 - 10-18 22:23 · avatar-presence · The title bar's avatar button shows the presence dot (the menu's PresenceDot, ringed in the sidebar colour), so you see whether Slack shows you active without opening the menu. The button's name stays "Account and settings"; the state is its description.
