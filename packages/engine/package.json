@@ -18,6 +18,7 @@
     "@juno/ai": "workspace:*",
     "@juno/contract": "workspace:*",
     "@juno/domain": "workspace:*",
+    "@juno/huddle": "workspace:*",
     "@juno/notifications": "workspace:*",
     "@juno/richtext": "workspace:*",
     "@juno/slack": "workspace:*",
@@ -49,7 +50,8 @@
       "@juno/store",
       "@juno/sync",
       "@juno/topic-art",
-      "@juno/notifications"
+      "@juno/notifications",
+      "@juno/huddle"
     ],
     "testDeps": [
       "@juno/agent",

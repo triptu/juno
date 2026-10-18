@@ -11,6 +11,7 @@ import { PrefsRoutes } from './prefs'
 import { EngineRoutes } from './engine'
 import { FilesRoutes } from './files'
 import { HomeRoutes } from './home'
+import { HuddleRoutes } from './huddle'
 import { MentionsRoutes } from './mentions'
 import { MessagesRoutes } from './messages'
 import { NewChatRoutes } from './newChat'
@@ -21,6 +22,6 @@ import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 import { ViewsRoutes } from './views'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes)
 
 export type AllRoutes = typeof AllRoutes
