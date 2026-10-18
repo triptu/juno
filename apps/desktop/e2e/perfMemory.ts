@@ -48,29 +48,37 @@ async function wheel(win: Page, target: Locator, steps: number, delta: number): 
   }
 }
 
-/**
- * The large-workspace use the memory budgets assume (performance.md 1): 20
- * topics opened, each in a tab of its own, 50 tab switches, the Juno chat
- * given history, then about two minutes of scrolling that moves between the
- * sidebar, a topic's messages and the Juno chat, and the Juno panel opened
- * and closed beside a topic. Answers with the memory read after it.
- */
-export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_000): Promise<MemoryReading> {
+/** What the heavy use works with: the app, and the lists and tabs it moves between. */
+function heavyContext(juno: Juno, running: RunningApp) {
   const { win } = running
   // A topic's message list, not the Juno chat's, in the tab on screen.
   const scrollTopic = win.getByRole('main').locator('[data-topic-view] [data-scroll]:visible')
-  const start = await juno.tabs.root.getByRole('tab').count()
-  const dump = process.env['JUNO_MEMORY_DUMP']
-  // After each part: private memory as it stands, and with JUNO_MEMORY_DUMP=<prefix> and JUNO_MEMORY_PHASES=1 a dump
-  // as it stands and one after a collection, which changes what follows; without the second only the end is dumped.
-  const phase = async (name: string) => {
-    await readMemory(running, `memory after ${name}`)
-    if (dump === undefined || process.env['JUNO_MEMORY_PHASES'] !== '1') return
-    // As it stands, then after a collection.
-    await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}-live.json`, false)
-    await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}.json`, true)
+  const panel = win.locator('aside[data-juno-panel]')
+  return {
+    juno, running, win, scrollTopic, panel,
+    chat: win.locator('main [data-juno-chat] [data-scroll]:visible'),
+    // New tabs open beside the current one, so tabs are found by what they show, not by place.
+    junoTab: juno.tabs.tab('Juno').first(),
+    nextTopic: async () => {
+      for (let tries = 0; tries < 3; tries++) {
+        await juno.tabs.menu('next-tab')
+        if (await scrollTopic.isVisible()) return
+      }
+      await expect(scrollTopic).toBeVisible({ timeout: 15_000 })
+    },
+    togglePanel: async () => {
+      await juno.tabs.menu('juno')
+      await expect(panel).toBeVisible()
+      await juno.tabs.menu('juno')
+      await expect(panel).toHaveCount(0)
+    },
   }
-  // Twenty topics, each in a new tab, as the owner opens them through a day.
+}
+type HeavyContext = ReturnType<typeof heavyContext>
+
+/** Twenty topics, each in a new tab, as the owner opens them through a day; then fifty switches back and forth, so tabs leave the mounted set and come back. */
+async function openAndSwitch(at: HeavyContext, start: number, phase: (name: string) => Promise<void>): Promise<void> {
+  const { juno, win, scrollTopic } = at
   for (let i = 0; i < 20; i++) {
     await juno.tabs.menu('new-tab')
     await juno.tabs.expectCount(start + i + 1)
@@ -80,13 +88,16 @@ export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_
     await expect(scrollTopic).toBeVisible({ timeout: 15_000 })
   }
   await phase('20 topics')
-  // Fifty switches, back and forth over the tabs, so tabs leave the mounted set and come back.
   for (let i = 0; i < 50; i++) {
     await juno.tabs.menu(i % 10 < 7 ? 'next-tab' : 'previous-tab')
     await win.waitForTimeout(60)
   }
   await phase('50 tab switches')
-  // The Juno chat in a tab of its own, with enough history to scroll.
+}
+
+/** The Juno chat in a tab of its own, given forty messages so it has history to scroll. */
+async function fillChat(at: HeavyContext, start: number): Promise<void> {
+  const { juno, win } = at
   await juno.tabs.menu('new-tab')
   await juno.tabs.expectCount(start + 21)
   await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
@@ -99,52 +110,66 @@ export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_
     await composer.press('Enter')
     await expect.poll(() => answers.count(), { timeout: 15_000 }).toBeGreaterThan(before)
   }
-  await phase('the Juno chat')
-  const chat = win.locator('main [data-juno-chat] [data-scroll]:visible')
-  // New tabs open beside the current one, so tabs are found by what they show, not by place.
-  const junoTab = juno.tabs.tab('Juno').first()
-  const nextTopic = async () => {
-    for (let tries = 0; tries < 3; tries++) {
-      await juno.tabs.menu('next-tab')
-      if (await scrollTopic.isVisible()) return
-    }
-    await expect(scrollTopic).toBeVisible({ timeout: 15_000 })
-  }
-  const panel = win.locator('aside[data-juno-panel]')
-  // Two minutes of scrolling, moving between the three lists: the sidebar, a topic's messages (the next topic
-  // tab each round, mounted or not) and the Juno chat, with the panel opened and closed beside the topic.
-  const until = Date.now() + scrollFor
+}
+
+/**
+ * Scrolling for `scrollFor` ms, moving between the three lists: the sidebar, a topic's messages (the next
+ * topic tab each round, mounted or not) and the Juno chat, with the panel opened and closed beside the topic.
+ * Answers with how many times the panel opened.
+ */
+async function scrollRounds(at: HeavyContext, scrollFor: number): Promise<number> {
+  const { juno, win, scrollTopic, chat, junoTab } = at
   // JUNO_MEMORY_PARTS=sidebar,topic,chat,switch keeps only those parts of each round, to find what a part costs. Diagnostic only.
   const parts = new Set((process.env['JUNO_MEMORY_PARTS'] ?? 'sidebar,topic,chat,switch').split(','))
+  const until = Date.now() + scrollFor
   let panelOpens = 0
   for (let round = 0; Date.now() < until; round++) {
     const down = round % 2 === 0 ? 1 : -1
     if (parts.has('sidebar')) await wheel(win, juno.sidebar.list, 30, 300 * down)
-    if (parts.has('switch') || round === 0) await nextTopic()
+    if (parts.has('switch') || round === 0) await at.nextTopic()
     if (parts.has('topic')) await wheel(win, scrollTopic, 30, -300 * down)
     if (parts.has('switch') && round % 2 === 0) {
-      await juno.tabs.menu('juno')
-      await expect(panel).toBeVisible()
-      await juno.tabs.menu('juno')
-      await expect(panel).toHaveCount(0)
+      await at.togglePanel()
       panelOpens++
     }
     if (parts.has('chat')) {
       await junoTab.click()
       await chat.waitFor()
       await wheel(win, chat, 30, -300 * down)
-      if (parts.has('topic') && !parts.has('switch')) await nextTopic()
+      if (parts.has('topic') && !parts.has('switch')) await at.nextTopic()
     }
   }
+  return panelOpens
+}
+
+/**
+ * The large-workspace use the memory budgets assume (performance.md 1): 20
+ * topics opened, each in a tab of its own, 50 tab switches, the Juno chat
+ * given history, then about two minutes of scrolling that moves between the
+ * sidebar, a topic's messages and the Juno chat, and the Juno panel opened
+ * and closed beside a topic. Answers with the memory read after 30 s idle.
+ */
+export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_000): Promise<MemoryReading> {
+  const at = heavyContext(juno, running)
+  const { win } = running
+  const start = await juno.tabs.root.getByRole('tab').count()
+  const dump = process.env['JUNO_MEMORY_DUMP']
+  // After each part: private memory as it stands, and with JUNO_MEMORY_DUMP=<prefix> and JUNO_MEMORY_PHASES=1 a dump
+  // as it stands and one after a collection, which changes what follows; without them only the end is dumped.
+  const phase = async (name: string) => {
+    await readMemory(running, `memory after ${name}`)
+    if (dump === undefined || process.env['JUNO_MEMORY_PHASES'] !== '1') return
+    await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}-live.json`, false)
+    await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}.json`, true)
+  }
+  await openAndSwitch(at, start, phase)
+  await fillChat(at, start)
+  await phase('the Juno chat')
+  let panelOpens = await scrollRounds(at, scrollFor)
   await phase('scrolling')
   // The panel beside a topic, opened and closed at least ten times in all.
-  await nextTopic()
-  for (; panelOpens < 10; panelOpens++) {
-    await juno.tabs.menu('juno')
-    await expect(panel).toBeVisible()
-    await juno.tabs.menu('juno')
-    await expect(panel).toHaveCount(0)
-  }
+  await at.nextTopic()
+  for (; panelOpens < 10; panelOpens++) await at.togglePanel()
   await readMemory(running, 'memory right after heavy use')
   // Then idle, as the owner stops to read: Chromium collects what rendering left behind once the page is quiet.
   await win.mouse.move(0, 0)
