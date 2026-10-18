@@ -6,7 +6,11 @@ The tests run the real engine and state client over a MessageChannel against the
 node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test.ts
 ```
 
-`startTestEngine()` disables periodic sweeps (`sweepIntervalMillis: 0`). Boot, reconnect and `force_reload` still run normally. The fake configuration makes the follow pass due with every catch-up.
+`startTestEngine()` disables periodic sweeps (`sweepIntervalMillis: 0`). Boot, reconnect and `force_reload` still run normally. The harness also sets `followPassMillis: 0`, so each catch-up checks follows; the app keeps its production cadence against both real and fake Slack.
+
+A fresh test engine copies an empty migrated store from a template built once per file's isolated module context (`migratedWorkspace.ts`). The template is closed before copying and removed after the file. Each engine has its own database files, fake Slack server on an allocated port, scope and atom registry. It still performs a cold sign-in and sync. Warm restarts reuse their existing files without copying; store migration and recovery tests continue to start from scratch.
+
+Related assertions can share one engine inside a named `step` flow. Separate tests never share a mutable engine. Cold-boot scenarios, different seeds and independent failure cases stay separate. The large-workspace and socket-liveness repair tests live in separate files so remote workers can overlap them without shortening their waits.
 
 The engine runs the fake AI, but its background AI jobs (titles, topic art, Home's AI items and title rewrites, Juno's Automated check) are off unless a test passes `aiJobs: true` to `startTestEngine()` or `bootedEngine()`. Without them a thread keeps its fallback title, no art is drawn, and the Automated job places only what its rules can, asking on Home about the rest as with AI assist off. A test that waits for a job's output opts in; `restart()` does not carry the option.
 
