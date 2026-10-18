@@ -123,3 +123,23 @@ it('leaves omitted topic and purpose to the snapshot while a partial event chang
     return row.topic === '' && row.purpose === '' ? true : undefined
   })
 })
+
+it('merges a partial incremental counts row without clearing unread state or latest', async () => {
+  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500 })
+  const reads = () => readDb(engine, 'cache.db', (db) => db.prepare(
+    "SELECT slack_last_read, latest, has_unreads, mention_count, counts_updated FROM channel_reads WHERE channel = 'C0ENG'",
+  ).get())
+  const before = reads()
+  // Beyond the last change: the fake now sends { id, last_read } for this channel.
+  engine.fake.advanceClock({ millis: 5_000 })
+  engine.fake.workspace.changedAt.clear()
+  await waitFor(() => {
+    const row = reads()
+    return row?.counts_updated !== before?.counts_updated ? row : undefined
+  }, 20_000, 'partial counts merged')
+  expect(reads()).toMatchObject({
+    slack_last_read: before?.slack_last_read, latest: before?.latest,
+    has_unreads: before?.has_unreads, mention_count: before?.mention_count,
+  })
+  expect(engine.fake.calls.some((call) => call.method === 'client.counts' && call.args['counts_last_fetched'] !== undefined)).toBe(true)
+})

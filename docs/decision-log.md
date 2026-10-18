@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 00:10 · Sync · Accept partial incremental counts rows and preserve omitted unread fields; a two-field live row previously aborted decoding before the cycle could merge any counts.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.
 - 10-18 22:53 · incremental-thread-refresh · Keep incremental `getView` in every ten-minute sweep for missed follow and read changes; reserve the full quiet-window pass for the hourly repair cadence.
 - 10-18 22:52 · discovery-overlap · Search five minutes before the sync cursor so late indexing and clock skew cannot strand an unfollowed reply; unchanged-row checks and the three-page cap bound the replay.

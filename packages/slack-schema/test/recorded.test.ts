@@ -98,3 +98,12 @@ describe('recorded socket frames', () => {
     })
   }
 })
+
+// Invented ids and timestamps; the two-field shape was observed live.
+it('decodes an incremental counts row without manufacturing unread fields', () => {
+  const full = Schema.decodeUnknownSync(Methods['client.counts'].ok)(read(join(dir, 'client.counts.json')))
+  const counts = Schema.decodeUnknownSync(Methods['client.counts'].ok)({
+    ...full, channels: [{ id: 'CINVENTED', last_read: '1700000000.000001' }],
+  })
+  expect(counts.channels).toEqual([{ id: 'CINVENTED', last_read: '1700000000.000001' }])
+})
