@@ -165,6 +165,24 @@ describe('edit', () => {
     await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
     expect(inSlack(engine, message.ts)?.text).toBe('After a restart')
   })
+
+  it('stays idle while the channel’s first edit waits to retry and a second waits behind it', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    const first = await sent(engine, 'First draft', rows)
+    const second = await sent(engine, 'Second draft', rows)
+    engine.fake.forceError({ method: 'chat.update', times: 1000 })
+    valueOf(await editMessage(engine.registry, refOf(first), 'First edit'))
+    valueOf(await editMessage(engine.registry, refOf(second), 'Second edit'))
+    const attempts = () => readDb(engine, 'user.db', (db) => db.prepare(`SELECT max(attempts) AS n FROM outbox WHERE kind = 'edit'`).get() as { n: number })
+    // The second failure puts the first row off for two seconds.
+    await waitFor(() => (attempts().n >= 2 ? true : undefined), 30_000, 'two tries')
+    // The engine shares this thread: a pass that keeps finding the row behind due fills the event loop.
+    const before = performance.eventLoopUtilization()
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    expect(performance.eventLoopUtilization(before).utilization).toBeLessThan(0.5)
+    expect(actionRows(engine)).toHaveLength(2)
+  })
 })
 
 describe('delete', () => {
