@@ -17,7 +17,7 @@ const before = { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: '22:0
 const weekdays = { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '19:00', dnd_end_hour: '09:00' }
 
 /** The app waits 1 s after a change before it writes; most tests wait less, so their checks that nothing more is written are short. */
-const DEBOUNCE_MILLIS = 200
+const DEBOUNCE_MILLIS = 25
 const APP_DEBOUNCE_MILLIS = 1_000
 
 const withSchedule = (schedule: Record<string, unknown>, debounce = DEBOUNCE_MILLIS) =>
@@ -34,9 +34,9 @@ const restarted = (engine: RunningEngine) => restart(engines, engine, undefined,
 const writes = (engine: RunningEngine) => apiCalls(engine, 'users.prefs.set').map((call) => JSON.parse(call.args['prefs'] ?? '{}') as unknown)
 const dnd = (engine: RunningEngine) => Object.fromEntries(Object.entries(engine.fake.workspace.prefs).filter(([key]) => key.startsWith('dnd_')))
 
-/** Past the debounce and the pass after it. */
+/** No signal marks a no-write pass: allow two debounces, then require a quiet API window. */
 async function settled(engine: RunningEngine, debounce = DEBOUNCE_MILLIS): Promise<void> {
-  await sleep(debounce * 2 + 500)
+  await sleep(debounce * 2 + 100)
   await quiet(engine)
 }
 

@@ -1,6 +1,7 @@
 // Read state end to end (architecture 5.6, specs/readstate.qnt): the read
 // commands over the port, the sidebar rows they change, and what reaches
 // the fake Slack.
+import { step } from './step'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -42,89 +43,90 @@ const storedPointer = (engine: RunningEngine, id: string) =>
 /** Main's latest message in the fake. */
 const latestMain = (engine: RunningEngine, channel: string) => engine.fake.messages(channel).filter((m) => m.thread_ts === undefined || m.thread_ts === m.ts).at(-1)!.ts
 
+async function checkFollowedAndLocalReads(engine: RunningEngine): Promise<void> {
+  const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
+  await rowWhen(engine, roadmap, (r) => r.unreadCount === 3, 'three unread')
+  engine.fake.resetCalls()
+  valueOf(await markRead(engine, roadmap))
+  await rowWhen(engine, roadmap, (r) => r.unreadCount === 0, 'read')
+  await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
+  const latestReply = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap)).at(-1)!.ts
+  expect(marks(engine).map((c) => [c.method, c.args['thread_ts'], c.args['ts'], c.args['read']])).toEqual([
+    ['subscriptions.thread.mark', tsOf(roadmap), latestReply, '1'],
+  ])
+  expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(latestReply)
+
+  // Not followed in Slack: Juno's own pointer moves, nothing is sent.
+  const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
+  valueOf(await markUnread(engine, checkout))
+  valueOf(await markRead(engine, checkout))
+  await sleep(800)
+  await quiet(engine)
+  expect(marks(engine)).toHaveLength(1)
+  expect(storedPointer(engine, checkout)).toBe(engine.fake.workspace.replies('C0ENG', tsOf(checkout)).at(-1)!.ts)
+}
+
 describe('marking read', () => {
-  it('Main: the row is read at once and one conversations.mark carries the latest message', async () => {
+  it('marks Main and threads read and unread, and clears new-thread counts', async () => {
     const engine = await bootedEngine()
-    // Exact: the boot's history page reached back to the read pointer.
-    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9 && r.unreadExact, 'nine unread, exactly')
-    engine.fake.resetCalls()
-    const result = valueOf(await markRead(engine, ALERTS_MAIN))
-    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 0, 'read')
-    await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
-    await quiet(engine)
-    expect(marks(engine).map((c) => [c.method, c.args['channel'], c.args['ts']])).toEqual([['conversations.mark', ALERTS, latestMain(engine, ALERTS)]])
-    expect(engine.fake.workspace.reads.get(ALERTS)).toBe(latestMain(engine, ALERTS))
-    // Its own echo changes nothing.
-    expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
 
-    // The undo marks the nine unread again, here and in Slack.
-    expect(result.undo?._tag).toBe('reads.markUnread')
-    valueOf((await replay(engine, result.undo!))!)
-    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread again')
-    const pointer = storedPointer(engine, ALERTS_MAIN)
-    await waitFor(() => (engine.fake.workspace.reads.get(ALERTS) === pointer ? true : undefined), 10_000, 'the unread mark in Slack')
+    await step('Main: the row is read at once and one conversations.mark carries the latest message', async () => {
+      // Exact: the boot's history page reached back to the read pointer.
+      await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9 && r.unreadExact, 'nine unread, exactly')
+      engine.fake.resetCalls()
+      const result = valueOf(await markRead(engine, ALERTS_MAIN))
+      await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 0, 'read')
+      await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
+      await quiet(engine)
+      expect(marks(engine).map((c) => [c.method, c.args['channel'], c.args['ts']])).toEqual([['conversations.mark', ALERTS, latestMain(engine, ALERTS)]])
+      expect(engine.fake.workspace.reads.get(ALERTS)).toBe(latestMain(engine, ALERTS))
+      // Its own echo changes nothing.
+      expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
+
+      // The undo marks the nine unread again, here and in Slack.
+      expect(result.undo?._tag).toBe('reads.markUnread')
+      valueOf((await replay(engine, result.undo!))!)
+      await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread again')
+      const pointer = storedPointer(engine, ALERTS_MAIN)
+      await waitFor(() => (engine.fake.workspace.reads.get(ALERTS) === pointer ? true : undefined), 10_000, 'the unread mark in Slack')
+    })
+
+    await step('a followed thread gets subscriptions.thread.mark read=1; an unfollowed one stays local', () => checkFollowedAndLocalReads(engine))
+
+    await step('a thread marked unread from a reply sends read=0 from that reply', async () => {
+      const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
+      valueOf(await markRead(engine, roadmap))
+      await quiet(engine)
+      engine.fake.resetCalls()
+      const replies = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap))
+      const undo = valueOf(await markUnread(engine, roadmap, replies.at(-2)!.ts)).undo
+      await rowWhen(engine, roadmap, (r) => r.unreadCount === 2, 'two unread')
+      await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
+      expect(marks(engine).map((c) => [c.args['ts'], c.args['read']])).toEqual([[replies.at(-2)!.ts, '0']])
+      expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(replies.at(-3)!.ts)
+      // Undo marks it read again.
+      expect(undo).toEqual({ _tag: 'reads.markRead', id: roadmap, upTo: replies.at(-1)!.ts })
+    })
+
+    await step('counts the threads others started since Main was last read; reading Main clears it', async () => {
+      const engMain = 'm:C0ENG'
+      // #eng was read up to the Postgres plan; the staging bill thread started after it.
+      await rowWhen(engine, engMain, (r) => r.newThreads === 1, 'one new thread')
+      const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Load test results are in.' })
+      engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Looking now.', threadTs: root.ts })
+      await rowWhen(engine, engMain, (r) => r.newThreads === 2, 'two new threads')
+      expect((await engine.rows()).filter((r) => r.kind === 'thread' && r.newThreads !== 0)).toEqual([])
+      // A thread you started from another client is not new to you.
+      const own = engine.fake.injectMessage({ channel: 'C0ENG', user: engine.fake.selfId, text: 'Who owns the deploy step?' })
+      engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'I do.', threadTs: own.ts })
+      await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare('SELECT 1 FROM topic_index WHERE topic_id = ?').get(`t:C0ENG:${own.ts}`)), 10_000, 'own thread indexed')
+      expect((await engine.rows(scoped(engMain))).find((r) => r.id === engMain)?.newThreads).toBe(2)
+
+      valueOf(await markRead(engine, engMain))
+      await rowWhen(engine, engMain, (r) => r.newThreads === 0, 'no new threads once Main is read')
+    })
   })
 
-  it('a followed thread gets subscriptions.thread.mark read=1; an unfollowed one stays local', async () => {
-    const engine = await bootedEngine()
-    const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
-    await rowWhen(engine, roadmap, (r) => r.unreadCount === 3, 'three unread')
-    engine.fake.resetCalls()
-    valueOf(await markRead(engine, roadmap))
-    await rowWhen(engine, roadmap, (r) => r.unreadCount === 0, 'read')
-    await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
-    const latestReply = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap)).at(-1)!.ts
-    expect(marks(engine).map((c) => [c.method, c.args['thread_ts'], c.args['ts'], c.args['read']])).toEqual([
-      ['subscriptions.thread.mark', tsOf(roadmap), latestReply, '1'],
-    ])
-    expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(latestReply)
-
-    // Not followed in Slack: Juno's own pointer moves, nothing is sent.
-    const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
-    valueOf(await markUnread(engine, checkout))
-    valueOf(await markRead(engine, checkout))
-    await sleep(800)
-    await quiet(engine)
-    expect(marks(engine)).toHaveLength(1)
-    expect(storedPointer(engine, checkout)).toBe(engine.fake.workspace.replies('C0ENG', tsOf(checkout)).at(-1)!.ts)
-  })
-
-  it('a thread marked unread from a reply sends read=0 from that reply', async () => {
-    const engine = await bootedEngine()
-    const roadmap = threadId(engine.fake, 'C0PRODUCT', 'Proposal: cut offline mode')
-    valueOf(await markRead(engine, roadmap))
-    await quiet(engine)
-    engine.fake.resetCalls()
-    const replies = engine.fake.workspace.replies('C0PRODUCT', tsOf(roadmap))
-    const undo = valueOf(await markUnread(engine, roadmap, replies.at(-2)!.ts)).undo
-    await rowWhen(engine, roadmap, (r) => r.unreadCount === 2, 'two unread')
-    await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
-    expect(marks(engine).map((c) => [c.args['ts'], c.args['read']])).toEqual([[replies.at(-2)!.ts, '0']])
-    expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(replies.at(-3)!.ts)
-    // Undo marks it read again.
-    expect(undo).toEqual({ _tag: 'reads.markRead', id: roadmap, upTo: replies.at(-1)!.ts })
-  })
-})
-
-describe("Main's new threads", () => {
-  it('counts the threads others started since Main was last read; reading Main clears it', async () => {
-    const engine = await bootedEngine()
-    const engMain = 'm:C0ENG'
-    // #eng was read up to the Postgres plan; the staging bill thread started after it.
-    await rowWhen(engine, engMain, (r) => r.newThreads === 1, 'one new thread')
-    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Load test results are in.' })
-    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Looking now.', threadTs: root.ts })
-    await rowWhen(engine, engMain, (r) => r.newThreads === 2, 'two new threads')
-    expect((await engine.rows()).filter((r) => r.kind === 'thread' && r.newThreads !== 0)).toEqual([])
-    // A thread you started from another client is not new to you.
-    const own = engine.fake.injectMessage({ channel: 'C0ENG', user: engine.fake.selfId, text: 'Who owns the deploy step?' })
-    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'I do.', threadTs: own.ts })
-    await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare('SELECT 1 FROM topic_index WHERE topic_id = ?').get(`t:C0ENG:${own.ts}`)), 10_000, 'own thread indexed')
-    expect((await engine.rows(scoped(engMain))).find((r) => r.id === engMain)?.newThreads).toBe(2)
-
-    valueOf(await markRead(engine, engMain))
-    await rowWhen(engine, engMain, (r) => r.newThreads === 0, 'no new threads once Main is read')
-  })
 })
 
 describe('the outbox', () => {
@@ -268,7 +270,6 @@ describe('nothing marks by itself', () => {
     expect(marks(engine)).toEqual([])
   })
 })
-
 
 describe('read catch-up', () => {
   it('queues only earlier local reads, once, through the mark worker', async () => {

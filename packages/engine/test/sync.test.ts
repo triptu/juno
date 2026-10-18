@@ -1,5 +1,6 @@
 // Sync end to end: the engine boots against the fake, the sidebar rows reach
 // the state atoms over the port, and socket events update them live.
+import { step } from './step'
 import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -75,130 +76,180 @@ const replay = (engine: RunningEngine, undo: UndoCommand) => {
   throw new Error(`not a follow undo: ${undo._tag}`)
 }
 
+async function checkFixtureDetails(engine: RunningEngine): Promise<void> {
+  const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== '' || r.channel.kind === 'im'), 'all rows named')
+
+  // Newest activity first; every row is from a conversation the user is in.
+  const order = rows.map((r) => r.lastActivityTs)
+  expect(order.toSorted().toReversed()).toEqual(order)
+  expect(rows.every((r) => r.section === 'recent')).toBe(true)
+
+  const byTitle = (title: string) => rows.find((r) => r.title === title)
+  const postgres = byTitle('Draft plan is in the doc')
+  expect(postgres).toMatchObject({
+    kind: 'thread',
+    preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
+    channel: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public' },
+    messageCount: 7,
+    unreadCount: 0,
+    unreadExact: true,
+    mentionsMe: false,
+    tags: [],
+    subscribed: true,
+    titleSource: 'fallback',
+  })
+  // The thread is read, so the stack is empty: it names only the people talking in unread messages.
+  expect(postgres?.participants).toEqual([])
+
+  // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
+  // Main has no follow.
+  const eng = byTitle('#eng')
+  expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: false })
+  expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
+  expect(eng?.channel.icon).toBeTruthy()
+  expect(eng?.channel.color).toBeTruthy()
+
+  // A mention of me in an unread reply.
+  const rina = byTitle('Rina finished the onsite. Panel notes…')
+  expect(rina).toMatchObject({ channel: { kind: 'private', tint: 'private', label: '#hiring' }, unreadCount: 2, mentionsMe: true })
+
+  // DMs: the partner's name is the label and the tile.
+  const maya = byTitle('Maya')
+  expect(maya).toMatchObject({ kind: 'main', channel: { kind: 'im', tint: 'dm', label: 'Maya' } })
+  expect(maya?.channel.partner?.name).toBe('Maya')
+  expect(byTitle('Maya, Leo')).toMatchObject({ channel: { kind: 'mpim', tint: 'dm' } })
+
+  // Threads the user does not follow are not rows, even when active; the mention in the flaky thread
+  // was there before the first sign-in, so the thread started read and stays out too.
+  expect(byTitle('checkout.spec failed again on main. Third…')).toBeUndefined()
+  expect(byTitle("We have 142 flags. 61 haven't…")).toBeUndefined()
+  expect(rows.filter((r) => r.kind === 'thread').every((r) => r.subscribed)).toBe(true)
+
+  // A followed thread in a channel whose Main went quiet: both the thread and the Main show.
+  const finance = byTitle('Finance wants the 2027 plan by…')
+  expect(finance).toMatchObject({ kind: 'thread', subscribed: true, unreadCount: 1, mentionsMe: true, channel: { label: '#leadership' } })
+  const leadership = byTitle('#leadership')
+  expect(leadership).toMatchObject({ kind: 'main', unreadCount: 0 })
+  expect(leadership!.lastActivityAt).toBeLessThan(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  // Quiet topics stay out: nothing older than 7 days, except a Main kept alive by its threads.
+  expect(byTitle('Lag alerts are firing on the…')).toBeUndefined()
+  expect(byTitle('Icon refresh is merged.')).toBeUndefined()
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  expect(rows.filter((r) => r.id !== leadership!.id).every((r) => r.lastActivityAt > weekAgo)).toBe(true)
+
+  // A never-read channel: the history page reached back to its read pointer, so the count is exact.
+  expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: true })
+}
+
 describe('cold boot', () => {
-  it('discovers the fixture workspace: titles, previews, counts, tags and order', async () => {
+  it('discovers the fixture workspace with exact rows, membership, titles, previews, counts, tags and order', async () => {
     const engine = await bootedWithAll()
-    const rows = await engine.rowsUntil((list) => list.length >= 20 && list.every((r) => r.preview.sender !== '' || r.channel.kind === 'im'), 'all rows named')
 
-    // Newest activity first; every row is from a conversation the user is in.
-    const order = rows.map((r) => r.lastActivityTs)
-    expect(order.toSorted().toReversed()).toEqual(order)
-    expect(rows.every((r) => r.section === 'recent')).toBe(true)
+    await step('discovers the fixture workspace: titles, previews, counts, tags and order', () => checkFixtureDetails(engine))
 
-    const byTitle = (title: string) => rows.find((r) => r.title === title)
-    const postgres = byTitle('Draft plan is in the doc')
-    expect(postgres).toMatchObject({
-      kind: 'thread',
-      preview: { sender: 'Dev', text: 'Booked 2–4pm. Will post results here.' },
-      channel: { id: 'C0ENG', kind: 'public', name: 'eng', label: '#eng', tint: 'public' },
-      messageCount: 7,
-      unreadCount: 0,
-      unreadExact: true,
-      mentionsMe: false,
-      tags: [],
-      subscribed: true,
-      titleSource: 'fallback',
-    })
-    // The thread is read, so the stack is empty: it names only the people talking in unread messages.
-    expect(postgres?.participants).toEqual([])
-
-    // Main rows carry the channel label as title and the Main tag; counts come from the read pointer.
-    // Main has no follow.
-    const eng = byTitle('#eng')
-    expect(eng).toMatchObject({ kind: 'main', tags: ['main'], unreadCount: 2, unreadExact: true, mentionsMe: false, subscribed: false })
-    expect(eng?.preview).toEqual({ sender: 'Dev', text: '@Leo I think the preview environments never shut down. Will check.' })
-    expect(eng?.channel.icon).toBeTruthy()
-    expect(eng?.channel.color).toBeTruthy()
-
-    // A mention of me in an unread reply.
-    const rina = byTitle('Rina finished the onsite. Panel notes…')
-    expect(rina).toMatchObject({ channel: { kind: 'private', tint: 'private', label: '#hiring' }, unreadCount: 2, mentionsMe: true })
-
-    // DMs: the partner's name is the label and the tile.
-    const maya = byTitle('Maya')
-    expect(maya).toMatchObject({ kind: 'main', channel: { kind: 'im', tint: 'dm', label: 'Maya' } })
-    expect(maya?.channel.partner?.name).toBe('Maya')
-    expect(byTitle('Maya, Leo')).toMatchObject({ channel: { kind: 'mpim', tint: 'dm' } })
-
-    // Threads the user does not follow are not rows, even when active; the mention in the flaky thread
-    // was there before the first sign-in, so the thread started read and stays out too.
-    expect(byTitle('checkout.spec failed again on main. Third…')).toBeUndefined()
-    expect(byTitle("We have 142 flags. 61 haven't…")).toBeUndefined()
-    expect(rows.filter((r) => r.kind === 'thread').every((r) => r.subscribed)).toBe(true)
-
-    // A followed thread in a channel whose Main went quiet: both the thread and the Main show.
-    const finance = byTitle('Finance wants the 2027 plan by…')
-    expect(finance).toMatchObject({ kind: 'thread', subscribed: true, unreadCount: 1, mentionsMe: true, channel: { label: '#leadership' } })
-    const leadership = byTitle('#leadership')
-    expect(leadership).toMatchObject({ kind: 'main', unreadCount: 0 })
-    expect(leadership!.lastActivityAt).toBeLessThan(Date.now() - 7 * 24 * 60 * 60 * 1000)
-
-    // Quiet topics stay out: nothing older than 7 days, except a Main kept alive by its threads.
-    expect(byTitle('Lag alerts are firing on the…')).toBeUndefined()
-    expect(byTitle('Icon refresh is merged.')).toBeUndefined()
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    expect(rows.filter((r) => r.id !== leadership!.id).every((r) => r.lastActivityAt > weekAgo)).toBe(true)
-
-    // A never-read channel: the history page reached back to its read pointer, so the count is exact.
-    expect(byTitle('#alerts-prod')).toMatchObject({ unreadCount: 9, unreadExact: true })
-  })
-
-  it('shows exactly the rows of spec section 5: active Main rows and followed threads, no unfollowed thread at first sign-in', async () => {
-    const engine = await bootedWithAll()
-    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
-    const expected = new Set<string>()
-    for (const c of memberConversations) {
-      const rootTs = (text: string) => engine.fake.messages(c.id).find((m) => m.text === text)!.ts
-      // Main: activity of any kind inside the window, replies in its threads included, or unread.
-      const active = c.messages.some((m) => m.ago < WINDOW || (m.replies ?? []).some((r) => r.ago < WINDOW))
-      if (active || (c.unread ?? 0) > 0) expected.add(`m:${c.id}`)
-      // Threads: only the ones the user follows, inside the window or unread. An unfollowed thread starts read, so a
-      // mention in it before the first sign-in does not bring it in.
-      for (const m of c.messages) {
-        if (m.replies === undefined || m.replies.length === 0 || m.thread?.subscribed === false) continue
-        if (m.replies.some((r) => r.ago < WINDOW) || (m.thread?.unread ?? 0) > 0) expected.add(`t:${c.id}:${rootTs(m.text)}`)
+    await step('shows exactly the rows of spec section 5: active Main rows and followed threads, no unfollowed thread at first sign-in', async () => {
+      const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
+      const expected = new Set<string>()
+      for (const c of memberConversations) {
+        const rootTs = (text: string) => engine.fake.messages(c.id).find((m) => m.text === text)!.ts
+        // Main: activity of any kind inside the window, replies in its threads included, or unread.
+        const active = c.messages.some((m) => m.ago < WINDOW || (m.replies ?? []).some((r) => r.ago < WINDOW))
+        if (active || (c.unread ?? 0) > 0) expected.add(`m:${c.id}`)
+        // Threads: only the ones the user follows, inside the window or unread. An unfollowed thread starts read, so a
+        // mention in it before the first sign-in does not bring it in.
+        for (const m of c.messages) {
+          if (m.replies === undefined || m.replies.length === 0 || m.thread?.subscribed === false) continue
+          if (m.replies.some((r) => r.ago < WINDOW) || (m.thread?.unread ?? 0) > 0) expected.add(`t:${c.id}:${rootTs(m.text)}`)
+        }
       }
-    }
-    expect(new Set(rows.map((r) => r.id))).toEqual(expected)
-    expect(rows.map((r) => r.id)).toHaveLength(expected.size)
+      expect(new Set(rows.map((r) => r.id))).toEqual(expected)
+      expect(rows.map((r) => r.id)).toHaveLength(expected.size)
+    })
+
+    await step('comes from client.counts: channels the user is not in never reach the sidebar and cost no history call', async () => {
+      const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
+      // The fake's userBoot lists every channel, like the real one; the non-member ones have recent threads.
+      expect(nonMemberChannels.length).toBeGreaterThan(0)
+      const memberIds = new Set(memberConversations.map((c) => c.id))
+      expect(rows.every((r) => memberIds.has(r.channel.id))).toBe(true)
+      for (const id of nonMemberChannels) expect(rows.find((r) => r.channel.id === id)).toBeUndefined()
+      expect(rows.find((r) => r.title === '#sales')).toBeUndefined()
+      const history = apiCalls(engine, 'conversations.history').map((c) => c.args['channel'])
+      for (const id of nonMemberChannels) expect(history).not.toContain(id)
+      // Every member conversation with recent activity of any kind (thread replies included) has its Main row.
+      const recent = (c: (typeof memberConversations)[number]) => c.messages.some((msg) => msg.ago < 7 * 24 * 60 || (msg.replies ?? []).some((r) => r.ago < 7 * 24 * 60))
+      for (const c of memberConversations) {
+        expect(rows.some((r) => r.kind === 'main' && r.channel.id === c.id), c.id).toBe(recent(c))
+      }
+    })
   })
 
-  it('spends an exact call budget: one history call per active conversation, every getView page, no call per row', async () => {
+  it('boots within the call budget and filters rows and counts', async () => {
     const engine = await bootedEngine()
-    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    await quiet(engine)
-    const history = apiCalls(engine, 'conversations.history')
-    expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
-    const { 'edge:users/info': namesCalls, ...calls } = callMap(engine)
-    // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
-    // on; a getView page or a preview search page names everyone on it in one call. The preview search runs beside
-    // history, so which of them first names a sender varies; never a call per row.
-    expect(namesCalls).toBeGreaterThanOrEqual(3)
-    expect(namesCalls).toBeLessThanOrEqual(4)
-    expect(calls).toEqual({
-      'api:presence.set': 1,
-      'api:auth.test': 1,
-      'api:client.getWebSocketURL': 1,
-      'api:api.getFlannelHttpUrl': 1,
-      'api:client.userBoot': 1,
-      'api:users.prefs.get': 1,
-      'api:client.counts': 1,
-      // The fixture follows 12 threads; Slack pages them 10 at a time. Two pages back to the window at the
-      // boot, then the complete pass after it (against the fake it runs with every catch-up).
-      'api:subscriptions.thread.getView': 4,
-      // A conversation whose only recent activity is a reply under an older root has nothing for history in the window.
-      'api:conversations.history': activeMains,
-      // The latest reply of the unfollowed threads with recent activity, for their preview.
-      'api:conversations.replies': 2,
-      // The preview search after the quick start, then discovery over the window at the end of the cold boot:
-      // more than 50 messages each, so two pages each.
-      'api:search.modules.messages': 4,
-      'edge:emojis/list': 1,
-      // User group handles, once per boot.
-      'api:usergroups.list': 1,
+
+    await step('spends an exact call budget: one history call per active conversation, every getView page, no call per row', async () => {
+      await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      await quiet(engine)
+      const history = apiCalls(engine, 'conversations.history')
+      expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
+      const { 'edge:users/info': namesCalls, ...calls } = callMap(engine)
+      // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
+      // on; a getView page or a preview search page names everyone on it in one call. The preview search runs beside
+      // history, so which of them first names a sender varies; never a call per row.
+      expect(namesCalls).toBeGreaterThanOrEqual(3)
+      expect(namesCalls).toBeLessThanOrEqual(4)
+      expect(calls).toEqual({
+        'api:presence.set': 1,
+        'api:auth.test': 1,
+        'api:client.getWebSocketURL': 1,
+        'api:api.getFlannelHttpUrl': 1,
+        'api:client.userBoot': 1,
+        'api:users.prefs.get': 1,
+        'api:client.counts': 1,
+        // The fixture follows 12 threads; Slack pages them 10 at a time. Two pages back to the window at the
+        // boot, then the complete pass after it (against the fake it runs with every catch-up).
+        'api:subscriptions.thread.getView': 4,
+        // A conversation whose only recent activity is a reply under an older root has nothing for history in the window.
+        'api:conversations.history': activeMains,
+        // The latest reply of the unfollowed threads with recent activity, for their preview.
+        'api:conversations.replies': 2,
+        // The preview search after the quick start, then discovery over the window at the end of the cold boot:
+        // more than 50 messages each, so two pages each.
+        'api:search.modules.messages': 4,
+        'edge:emojis/list': 1,
+        // User group handles, once per boot.
+        'api:usergroups.list': 1,
+      })
+      const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
+      expect(new Set(asked).size).toBe(asked.length)
     })
-    const asked = engine.fake.calls.filter((c) => c.method === 'users/info').flatMap((c) => JSON.parse(c.args['ids'] ?? '[]') as Array<string>)
-    expect(new Set(asked).size).toBe(asked.length)
+
+    await step('filters by kind, unread and scope, and counts for the dots', async () => {
+      const all = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      const dms = await engine.rows({ kind: 'dms', unreadOnly: false })
+      expect(dms.length).toBeGreaterThan(0)
+      expect(dms.every((r) => r.channel.kind === 'im' || r.channel.kind === 'mpim')).toBe(true)
+      const channels = await engine.rows({ kind: 'channels', unreadOnly: false })
+      expect(channels.length + dms.length).toBe(all.length)
+      const unread = await engine.rows({ kind: 'all', unreadOnly: true })
+      expect(unread.length).toBe(all.filter((r) => r.unreadCount > 0).length)
+      const scoped = await engine.rows({ kind: 'all', unreadOnly: false, scope: 'C0ENG' })
+      expect(scoped.map((r) => r.channel.id)).toEqual(scoped.map(() => 'C0ENG'))
+      expect(scoped.length).toBe(all.filter((r) => r.channel.id === 'C0ENG').length)
+
+      const unmount = engine.registry.mount(topicCountsAtom())
+      try {
+        const counts = await waitFor(() => {
+          const result = engine.registry.get(topicCountsAtom())
+          return result._tag === 'Success' ? result.value : undefined
+        })
+        expect(counts.channelsUnread).toBe(all.filter((r) => r.unreadCount > 0 && r.channel.kind !== 'im' && r.channel.kind !== 'mpim').length)
+        expect(counts.dmsUnread).toBe(all.filter((r) => r.unreadCount > 0 && (r.channel.kind === 'im' || r.channel.kind === 'mpim')).length)
+      } finally {
+        unmount()
+      }
+    })
   })
 
   it('is usable after the quick steps, before any history, and fills in without a reload', async () => {
@@ -273,52 +324,9 @@ describe('cold boot', () => {
     for (let i = 0; i + 1 < groups.length; i++) expect(Math.max(...positions(groups[i]!))).toBeLessThan(Math.min(...positions(groups[i + 1]!)))
   }, 150_000)
 
-  it('filters by kind, unread and scope, and counts for the dots', async () => {
-    const engine = await bootedEngine()
-    const all = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const dms = await engine.rows({ kind: 'dms', unreadOnly: false })
-    expect(dms.length).toBeGreaterThan(0)
-    expect(dms.every((r) => r.channel.kind === 'im' || r.channel.kind === 'mpim')).toBe(true)
-    const channels = await engine.rows({ kind: 'channels', unreadOnly: false })
-    expect(channels.length + dms.length).toBe(all.length)
-    const unread = await engine.rows({ kind: 'all', unreadOnly: true })
-    expect(unread.length).toBe(all.filter((r) => r.unreadCount > 0).length)
-    const scoped = await engine.rows({ kind: 'all', unreadOnly: false, scope: 'C0ENG' })
-    expect(scoped.map((r) => r.channel.id)).toEqual(scoped.map(() => 'C0ENG'))
-    expect(scoped.length).toBe(all.filter((r) => r.channel.id === 'C0ENG').length)
-
-    const unmount = engine.registry.mount(topicCountsAtom())
-    try {
-      const counts = await waitFor(() => {
-        const result = engine.registry.get(topicCountsAtom())
-        return result._tag === 'Success' ? result.value : undefined
-      })
-      expect(counts.channelsUnread).toBe(all.filter((r) => r.unreadCount > 0 && r.channel.kind !== 'im' && r.channel.kind !== 'mpim').length)
-      expect(counts.dmsUnread).toBe(all.filter((r) => r.unreadCount > 0 && (r.channel.kind === 'im' || r.channel.kind === 'mpim')).length)
-    } finally {
-      unmount()
-    }
-  })
 })
 
 describe('membership', () => {
-  it('comes from client.counts: channels the user is not in never reach the sidebar and cost no history call', async () => {
-    const engine = await bootedWithAll()
-    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
-    // The fake's userBoot lists every channel, like the real one; the non-member ones have recent threads.
-    expect(nonMemberChannels.length).toBeGreaterThan(0)
-    const memberIds = new Set(memberConversations.map((c) => c.id))
-    expect(rows.every((r) => memberIds.has(r.channel.id))).toBe(true)
-    for (const id of nonMemberChannels) expect(rows.find((r) => r.channel.id === id)).toBeUndefined()
-    expect(rows.find((r) => r.title === '#sales')).toBeUndefined()
-    const history = apiCalls(engine, 'conversations.history').map((c) => c.args['channel'])
-    for (const id of nonMemberChannels) expect(history).not.toContain(id)
-    // Every member conversation with recent activity of any kind (thread replies included) has its Main row.
-    const recent = (c: (typeof memberConversations)[number]) => c.messages.some((msg) => msg.ago < 7 * 24 * 60 || (msg.replies ?? []).some((r) => r.ago < 7 * 24 * 60))
-    for (const c of memberConversations) {
-      expect(rows.some((r) => r.kind === 'main' && r.channel.id === c.id), c.id).toBe(recent(c))
-    }
-  })
 
   it('follows the membership events: a joined channel shows up, a left one disappears', async () => {
     const engine = await bootedEngine()
@@ -432,55 +440,56 @@ describe('realtime', () => {
     expect(after.find((r) => r.id === other.id)).toBe(other)
   })
 
-  it('a read mark from another client clears the unread count by the conflict rule', async () => {
+  it('applies read, resolve, edit and delete events, then reconnects', async () => {
     const engine = await bootedEngine()
-    const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const eng = before.find((r) => r.title === '#eng')!
-    expect(eng.unreadCount).toBe(2)
-    engine.fake.markRead({ channel: 'C0ENG', ts: eng.lastActivityTs })
-    const after = await engine.rowsUntil((rows) => rows.find((r) => r.id === eng.id)?.unreadCount === 0, 'eng read')
-    expect(after.find((r) => r.id === eng.id)).toMatchObject({ unreadCount: 0, mentionsMe: false })
+
+    await step('a read mark from another client clears the unread count by the conflict rule', async () => {
+      const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      const eng = before.find((r) => r.title === '#eng')!
+      expect(eng.unreadCount).toBe(2)
+      engine.fake.markRead({ channel: 'C0ENG', ts: eng.lastActivityTs })
+      const after = await engine.rowsUntil((rows) => rows.find((r) => r.id === eng.id)?.unreadCount === 0, 'eng read')
+      expect(after.find((r) => r.id === eng.id)).toMatchObject({ unreadCount: 0, mentionsMe: false })
+    })
+
+    await step('a message after a resolve brings the topic back with the Reopened tag', async () => {
+      const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      const pricing = before.find((r) => r.title === 'Final copy for pricing is in')!
+
+      // The overlay exists before the resolve command does: write the resolve the way the command will. The AI title
+      // job may already have made the topic's overlay row, so this updates it if it is there.
+      const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db'))
+      db.prepare(`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts) VALUES (?, ?, ?)
+        ON CONFLICT (topic_id) DO UPDATE SET resolved_at = excluded.resolved_at, resolved_activity_ts = excluded.resolved_activity_ts`).run(pricing.id, String(Date.now()), pricing.lastActivityTs)
+      db.close()
+
+      engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Legal signed off.', threadTs: pricing.id.split(':')[2]! })
+      const after = await engine.rowsUntil((rows) => rows.find((r) => r.id === pricing.id)?.tags.includes('reopened') === true, 'the reopened tag')
+      expect(after.find((r) => r.id === pricing.id)).toMatchObject({ tags: ['reopened'], resolved: false, preview: { sender: 'Maya', text: 'Legal signed off.' } })
+    })
+
+    await step('an edit and a delete reach the row through the merge guards', async () => {
+      await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      const posted = engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'typo hear' })
+      await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo hear', 'the new DM')
+      engine.fake.editMessage({ channel: 'D0SAM', ts: posted.ts, text: 'typo here' })
+      await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo here', 'the edit')
+      engine.fake.deleteMessage({ channel: 'D0SAM', ts: posted.ts })
+      const rows = await engine.rowsUntil((list) => list.find((r) => r.title === 'Sam')?.preview.text !== 'typo here', 'the delete')
+      // The other side of a one-to-one DM is not named in its preview.
+      expect(rows.find((r) => r.title === 'Sam')?.preview).toEqual({ sender: '', text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.' })
+    })
+
+    await step('goes offline while the socket is down and comes back live after a reconnect', async () => {
+      await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      engine.fake.dropSocket()
+      await engine.phase('offline')
+      await engine.phase('live', 20_000)
+      await sleep(50)
+      expect(engine.fake.socketCount()).toBe(1)
+    })
   })
 
-  it('a message after a resolve brings the topic back with the Reopened tag', async () => {
-    const engine = await bootedEngine()
-    const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const pricing = before.find((r) => r.title === 'Final copy for pricing is in')!
-
-    // The overlay exists before the resolve command does: write the resolve the way the command will. The AI title
-    // job may already have made the topic's overlay row, so this updates it if it is there.
-    const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db'))
-    db.prepare(`INSERT INTO topic_overlay (topic_id, resolved_at, resolved_activity_ts) VALUES (?, ?, ?)
-      ON CONFLICT (topic_id) DO UPDATE SET resolved_at = excluded.resolved_at, resolved_activity_ts = excluded.resolved_activity_ts`).run(pricing.id, String(Date.now()), pricing.lastActivityTs)
-    db.close()
-
-    engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Legal signed off.', threadTs: pricing.id.split(':')[2]! })
-    const after = await engine.rowsUntil((rows) => rows.find((r) => r.id === pricing.id)?.tags.includes('reopened') === true, 'the reopened tag')
-    expect(after.find((r) => r.id === pricing.id)).toMatchObject({ tags: ['reopened'], resolved: false, preview: { sender: 'Maya', text: 'Legal signed off.' } })
-  })
-
-  it('an edit and a delete reach the row through the merge guards', async () => {
-    const engine = await bootedEngine()
-    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const posted = engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'typo hear' })
-    await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo hear', 'the new DM')
-    engine.fake.editMessage({ channel: 'D0SAM', ts: posted.ts, text: 'typo here' })
-    await engine.rowsUntil((rows) => rows[0]?.preview.text === 'typo here', 'the edit')
-    engine.fake.deleteMessage({ channel: 'D0SAM', ts: posted.ts })
-    const rows = await engine.rowsUntil((list) => list.find((r) => r.title === 'Sam')?.preview.text !== 'typo here', 'the delete')
-    // The other side of a one-to-one DM is not named in its preview.
-    expect(rows.find((r) => r.title === 'Sam')?.preview).toEqual({ sender: '', text: 'Notes from today: promo packet for Dev, on-call load, Q1 planning.' })
-  })
-
-  it('goes offline while the socket is down and comes back live after a reconnect', async () => {
-    const engine = await bootedEngine()
-    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    engine.fake.dropSocket()
-    await engine.phase('offline')
-    await engine.phase('live', 20_000)
-    await sleep(50)
-    expect(engine.fake.socketCount()).toBe(1)
-  })
 })
 
 describe('subscriptions (spec section 5, "Subscribe works on any thread")', () => {
@@ -558,27 +567,30 @@ describe('subscriptions (spec section 5, "Subscribe works on any thread")', () =
     await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the thread after the retry')
   })
 
-  it('a Main has no follow: subscribing or unsubscribing it is NotFound and keeps its row', async () => {
+  it('rejects follow commands for Main and unknown topics without calling Slack', async () => {
     const engine = await bootedWithAll()
-    const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const id = 'm:C0DEPLOYS'
-    expect(before.find((r) => r.id === id)).toMatchObject({ kind: 'main', subscribed: false })
-    engine.fake.resetCalls()
 
-    expect(errorOf(await unsubscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
-    expect(errorOf(await subscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
-    expect((await engine.rowsUntil((rows) => rows.length >= 20, 'rows')).some((r) => r.id === id)).toBe(true)
-    expect(apiCalls(engine)).toHaveLength(0)
+    await step('a Main has no follow: subscribing or unsubscribing it is NotFound and keeps its row', async () => {
+      const before = await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      const id = 'm:C0DEPLOYS'
+      expect(before.find((r) => r.id === id)).toMatchObject({ kind: 'main', subscribed: false })
+      engine.fake.resetCalls()
+
+      expect(errorOf(await unsubscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
+      expect(errorOf(await subscribe(engine, id))).toMatchObject({ _tag: 'NotFound' })
+      expect((await engine.rowsUntil((rows) => rows.length >= 20, 'rows')).some((r) => r.id === id)).toBe(true)
+      expect(apiCalls(engine)).toHaveLength(0)
+    })
+
+    await step('an unknown topic is NotFound and nothing is called', async () => {
+      await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
+      engine.fake.resetCalls()
+      expect(errorOf(await subscribe(engine, 't:C0ENG:1.000'))).toMatchObject({ _tag: 'NotFound' })
+      expect(errorOf(await unsubscribe(engine, 'm:C0NOPE'))).toMatchObject({ _tag: 'NotFound' })
+      expect(apiCalls(engine)).toHaveLength(0)
+    })
   })
 
-  it('an unknown topic is NotFound and nothing is called', async () => {
-    const engine = await bootedEngine()
-    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    engine.fake.resetCalls()
-    expect(errorOf(await subscribe(engine, 't:C0ENG:1.000'))).toMatchObject({ _tag: 'NotFound' })
-    expect(errorOf(await unsubscribe(engine, 'm:C0NOPE'))).toMatchObject({ _tag: 'NotFound' })
-    expect(apiCalls(engine)).toHaveLength(0)
-  })
 })
 
 describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
