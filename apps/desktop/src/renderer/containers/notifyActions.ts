@@ -21,7 +21,7 @@ import {
   type Why,
 } from '@juno/contract'
 import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction, whyPopoverAtom } from '@juno/state'
-import { askJunoAbout } from './juno/actions'
+import { askJunoAbout, showWhatJunoKnows } from './juno/actions'
 import { openSettings } from './navigation'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
@@ -65,13 +65,14 @@ export function nativeMenu<A extends string>(items: ReadonlyArray<MenuItem<A>>, 
   })
 }
 
-/** The person menu (inventory 15.6), on a sender and an @person chip: Notify me about them, then Ask Juno while the agent runs. */
+/** The person menu (inventory 15.6), on a sender and an @person chip: Notify me about them, then Ask Juno and What Juno knows about them while the agent runs. */
 export async function showPersonMenu(person: { readonly id: string; readonly name: string }, at?: ContextMenuAt): Promise<void> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'person', id: person.id }
   const items = personMenuItems({ name: person.name, notify: choiceFor(settings, target), askJuno: registry.get(junoAvailableAtom) })
-  const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | undefined
+  const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | 'juno-knows' | undefined
   if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
+  else if (chosen === 'juno-knows') void showWhatJunoKnows(person)
   else if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)
 }
 
