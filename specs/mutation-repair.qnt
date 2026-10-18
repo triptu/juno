@@ -1,112 +1,109 @@
-// Counts markers select cached conversations; a repair covers all their
-// cached topics before acknowledging the captured marker. Topics 1 and 2
-// share a conversation; topic 2 is outside the fallback. Each topic holds
-// one cached message. This abstracts paging within a bounded cached range.
+// Two recent cached topics share a conversation. Topic 1 is in the ten-page
+// unconditional fallback, topic 2 is not. One page per background pass models
+// the finite cap; the durable queue survives refusal and the next catch-up.
 module mutationRepair {
   val topics = Set(1, 2)
   type State = {
-    version: int -> int, deleted: Set[int], cached: int -> int, gone: Set[int],
-    updated: int, invalid: int, acknowledged: int, acknowledgedInvalid: int,
-    captured: int, capturedInvalid: int, pending: Set[int], present: Set[int],
-    unchanged: Set[int], answer: int -> int, requested: bool, running: bool,
+    content: int -> int, version: int -> int, cached: int -> int, cachedVersion: int -> int,
+    deleted: Set[int], gone: Set[int], required: Set[int], marker: int, observed: int,
+    pending: Set[int], fallback: bool, fresh: bool, running: bool, requested: bool,
+    target: int, present: bool, unchanged: bool, answer: int, answerVersion: int,
     sealed: bool, label: str
   }
   var s: State
   var turn: int
   var remaining: int
   action init = all {
-    s' = { version: topics.mapBy(_ => 0), deleted: Set(), cached: topics.mapBy(_ => 0), gone: Set(),
-      updated: 0, invalid: 0, acknowledged: 0, acknowledgedInvalid: 0,
-      captured: 0, capturedInvalid: 0, pending: Set(), present: Set(), unchanged: Set(), answer: topics.mapBy(_ => 0),
-      requested: false, running: false, sealed: false, label: "init" },
-    turn' = 0, remaining' = 32
+    s' = { content: topics.mapBy(_ => 0), version: topics.mapBy(_ => 0), cached: topics.mapBy(_ => 0), cachedVersion: topics.mapBy(_ => 0),
+      deleted: Set(), gone: Set(), required: Set(1), marker: 0, observed: 0, pending: Set(), fallback: false, fresh: false,
+      running: false, requested: false, target: 1, present: true, unchanged: false, answer: 0, answerVersion: 0, sealed: false, label: "init" },
+    turn' = 0, remaining' = 48
   }
-  // A version includes reactions: removing a reaction must change it too.
-  action edit(k: int): bool = all {
+  action change(k: int, markers: bool, versions: bool): bool = all {
     not(s.sealed), not(s.deleted.contains(k)),
-    s' = { ...s, version: s.version.set(k, s.version.get(k) + 1), updated: s.updated + 1, label: "editOrReact" }
+    s' = { ...s, content: s.content.set(k, s.content.get(k) + 1),
+      version: if (versions) s.version.set(k, s.version.get(k) + 1) else s.version,
+      marker: if (markers) s.marker + 1 else s.marker,
+      required: s.required.exclude(Set(k)).union(Set(1)),
+      fresh: false, label: "change" }
   }
-  action remove(k: int): bool = all {
-    not(s.sealed), not(s.deleted.contains(k)),
-    s' = { ...s, deleted: s.deleted.union(Set(k)), invalid: s.invalid + 1, label: "delete" }
-  }
-  action countsWith(markers: bool): bool = all {
+  action remove(k: int): bool = all { not(s.sealed), not(s.deleted.contains(k)),
+    s' = { ...s, deleted: s.deleted.union(Set(k)), marker: s.marker + 1, required: s.required.exclude(Set(k)).union(Set(1)), fresh: false, label: "delete" } }
+  action backwards = all { not(s.sealed), s' = { ...s, marker: s.marker - 1, label: "backwards" } }
+  action countsCompared(markers: bool, forwardsOnly: bool): bool = all {
     not(s.running),
-    s' = { ...s, running: true, captured: s.updated, capturedInvalid: s.invalid,
-      pending: if (markers and (s.updated > s.acknowledged or s.invalid > s.acknowledgedInvalid)) topics else Set(1),
-      label: "counts" }
+    s' = { ...s, running: true, fallback: true, fresh: false,
+      pending: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) topics else s.pending,
+      required: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) s.required.union(topics.filter(k => s.deleted.contains(k) or s.version.get(k) != s.cachedVersion.get(k) or s.content.get(k) == s.cached.get(k))) else s.required,
+      observed: if (markers) s.marker else s.observed, label: "counts" }
   }
-  action counts = countsWith(true)
-  // Full snapshot presence is separate from bodies: unchanged messages
-  // occupy page slots and are never inferred deleted.
-  action request = all {
-    s.running, not(s.requested), s.pending.size() > 0,
-    s' = { ...s, requested: true, present: s.pending.exclude(s.deleted), answer: s.version,
-      unchanged: s.pending.exclude(s.deleted).filter(k => s.cached.get(k) == s.version.get(k)), label: "request" }
-  }
-  action finishWith(includeUnchanged: bool): bool = {
-    val bodies = s.present.exclude(s.unchanged)
-    val seen = if (includeUnchanged) s.present else bodies
-    all {
-      s.requested,
-      s' = { ...s, requested: false, pending: Set(),
-        cached: topics.mapBy(k => if (bodies.contains(k)) s.answer.get(k) else s.cached.get(k)),
-        gone: s.gone.union(s.pending.exclude(seen)), label: "finish" }
+  action countsWith(markers: bool): bool = countsCompared(markers, false)
+  action requestWith(skipFallback: bool): bool = {
+    nondet k = (if (s.fallback) Set(1) else s.pending).oneOf()
+    all { s.running, not(s.requested), s.fallback or s.pending.size() > 0,
+      s' = { ...s, requested: true, target: k, present: not(s.deleted.contains(k)),
+        unchanged: (not(s.fallback) or skipFallback) and s.cachedVersion.get(k) == s.version.get(k),
+        answer: s.content.get(k), answerVersion: s.version.get(k), label: "request" }
     }
   }
-  action finish = finishWith(true)
-  action acknowledge = all {
-    s.running, not(s.requested), s.pending.size() == 0,
-    s' = { ...s, running: false, acknowledged: s.captured, acknowledgedInvalid: s.capturedInvalid, label: "acknowledge" }
+  action finishWith(includeUnchanged: bool): bool = all {
+    s.requested,
+    s' = { ...s, requested: false,
+      cached: if (s.present and not(s.unchanged)) s.cached.set(s.target, s.answer) else s.cached,
+      cachedVersion: if (s.present and not(s.unchanged)) s.cachedVersion.set(s.target, s.answerVersion) else s.cachedVersion,
+      gone: if (not(s.present) or (s.unchanged and not(includeUnchanged))) s.gone.union(Set(s.target)) else s.gone,
+      pending: if (s.fallback) s.pending else s.pending.exclude(Set(s.target)),
+      fresh: s.fresh or s.fallback, fallback: false,
+      running: s.fallback, label: "finish" }
   }
-  // A failed range leaves the old durable marker. Retry obtains new counts.
-  action failWith(earlyAck: bool): bool = all {
-    not(s.sealed), s.running,
-    s' = { ...s, running: false, requested: false, pending: Set(),
-      acknowledged: if (earlyAck) s.captured else s.acknowledged,
-      acknowledgedInvalid: if (earlyAck) s.capturedInvalid else s.acknowledgedInvalid, label: "failure" }
-  }
-  action seal = all { not(s.sealed), s' = { ...s, sealed: true, label: "seal" } }
-  val dirty = s.updated > s.acknowledged or s.invalid > s.acknowledgedInvalid
-  val agreed = topics.forall(k => if (s.deleted.contains(k)) s.gone.contains(k) else not(s.gone.contains(k)) and s.cached.get(k) == s.version.get(k))
+  // Failure must not discard queued work, even though markers were observed already.
+  action failWith(dropQueue: bool): bool = all { not(s.sealed), s.running,
+    s' = { ...s, running: false, requested: false, pending: if (dropQueue) Set() else s.pending, label: "failure" } }
+  action finishEmpty = all { s.running, not(s.requested), not(s.fallback), s.pending.size() == 0,
+    s' = { ...s, running: false, label: "empty" } }
+  action seal = all { not(s.sealed), not(s.running), s' = { ...s, sealed: true, fresh: false, label: "seal" } }
+  val dirty = s.marker != s.observed
+  val agreed = s.required.forall(k => if (s.deleted.contains(k)) s.gone.contains(k) else not(s.gone.contains(k)) and s.cached.get(k) == s.content.get(k))
+  val drained = s.sealed and not(s.running) and not(dirty) and s.pending.size() == 0 and s.fresh
   val noFalseDelete = s.gone.subseteq(s.deleted)
-  val quietAgreement = (s.sealed and not(s.running) and not(dirty)) implies agreed
-  val reachedAgreement = s.sealed and not(s.running) and not(dirty) and agreed
+  val quietAgreement = drained implies agreed
+  val reachedAgreement = drained and agreed
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = noFalseDelete and quietAgreement and drainBound
-  action progress = any { all { dirty, counts }, request, finish, acknowledge,
-    all { not(dirty), not(s.running), s' = s } }
+  action progress = any { countsWith(true), requestWith(false), finishWith(true), finishEmpty }
   action tick(a: bool): bool = all { a, turn' = turn + 1, remaining' = if (s.sealed) remaining - 1 else remaining }
   action simulationStep = all { not(reachedAgreement), tick(if (s.sealed) progress else any {
-    progress, edit(1), edit(2), remove(1), remove(2), failWith(false), seal
+    progress, countsWith(false), change(1, false, false), change(2, false, false), change(2, true, false),
+    change(1, true, true), change(2, true, true), backwards, remove(1), remove(2), failWith(false), seal
   }) }
-  action outsideFallbackWith(markers: bool): bool = all { not(reachedAgreement), tick(
-    if (turn == 0) edit(2) else
-    if (turn == 1) countsWith(markers) else
-    if (turn == 2) request else
-    if (turn == 3) finish else
-    if (turn == 4) acknowledge else
-    if (turn == 5) seal else progress
+  action fallbackVersionWith(skip: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) change(1, false, false) else if (turn == 1) seal else
+    if (turn == 2) countsWith(false) else if (turn == 3) requestWith(skip) else
+    if (turn == 4) finishWith(true) else if (turn == 5) finishEmpty else progress
   ) }
-  action outsideFallbackStep = outsideFallbackWith(true)
-  action outsideFallbackBugStep = outsideFallbackWith(false)
+  action fallbackVersionStep = fallbackVersionWith(false)
+  action fallbackVersionBugStep = fallbackVersionWith(true)
   action unchangedWith(guard: bool): bool = all { not(reachedAgreement), tick(
-    if (turn == 0) edit(2) else
-    if (turn == 1) counts else
-    if (turn == 2) request else
-    if (turn == 3) finishWith(guard) else
-    if (turn == 4) acknowledge else
-    if (turn == 5) seal else progress
+    if (turn == 0) backwards else if (turn == 1) countsWith(true) else
+    if (turn == 2) requestWith(false) else if (turn == 3) finishWith(true) else
+    if (turn == 4) requestWith(false) else if (turn == 5) finishWith(guard) else
+    if (turn == 6) seal else progress
   ) }
   action unchangedStep = unchangedWith(true)
   action unchangedBugStep = unchangedWith(false)
-  action failedRepairWith(earlyAck: bool): bool = all { not(reachedAgreement), tick(
-    if (turn == 0) edit(2) else
-    if (turn == 1) counts else
-    if (turn == 2) request else
-    if (turn == 3) failWith(earlyAck) else
-    if (turn == 4) seal else progress
+  action failedRepairWith(drop: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) change(2, true, true) else if (turn == 1) countsWith(true) else
+    if (turn == 2) failWith(drop) else if (turn == 3) seal else progress
   ) }
   action failedRepairStep = failedRepairWith(false)
   action failedRepairBugStep = failedRepairWith(true)
+  action backwardsChange = all { not(s.sealed),
+    s' = { ...s, marker: -1, content: s.content.set(2, 1), version: s.version.set(2, 1), required: topics, label: "backwardsChange" } }
+  action backwardsMarkerWith(forwardsOnly: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) backwardsChange else if (turn == 1) seal else
+    if (turn == 2) countsCompared(true, forwardsOnly) else progress
+  ) }
+  action backwardsMarkerStep = backwardsMarkerWith(false)
+  action backwardsMarkerBugStep = backwardsMarkerWith(true)
+
 }

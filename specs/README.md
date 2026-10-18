@@ -251,24 +251,21 @@ The random simulation (10,000 traces of at most 160 transitions) found two forms
 
 ## Mutation-marker repair
 
-`mutation-repair.qnt` adds counts selection and conditional bodies to the existing
-`catchup.qnt` page/event ordering rules. Its conversation has two cached topics,
-one outside the bounded fallback. An edit or reaction advances `updated`; deletion
-advances `history_invalid`. These are assumptions supported by client source and
-modelled by the fake, not a proof of live Slack completeness. Missing markers
-still rely on the existing bounded fallback.
+`mutation-repair.qnt` separates content from server versions and models a durable
+queue with one background page per pass (the implementation allows ten). Topic 1
+is always read by the unconditional fallback; topic 2 is outside it. Random runs
+include `countsWith(false)`, changes with no marker or version advance, and markers
+moving backwards. Observing a different marker atomically queues ranges; failure
+must retain those ranges even though the marker has already been observed.
 
-The model separates bodies from unchanged ids, captures markers before repair,
-and acknowledges them only after all cached ranges complete. A failure retains
-the durable baseline; mutations after the counts snapshot remain dirty. It checks
-`noFalseDelete`, `quietAgreement`, and a 32-transition quiet drain. Three broken /
-corrected schedules cover a topic outside the fallback, unchanged bodies mistaken
-for deletion, and acknowledging a failed repair. Random simulation runs 10,000
-traces. One response abstracts completion of all selected cached ranges; actual
-cursor paging, partial counts decoding, and the large-seed call budget are covered
-by fake-server and engine tests. The old catch-up model still checks event races
-and waiting for older requests. Neither model claims recovery of uncached history
-or unbounded liveness.
+`noFalseDelete` protects unchanged ids. `quietAgreement` covers the fallback and
+queued changes whose versions can expose them. It does not claim global recovery
+when a marker returns to its prior value or a version hides a change outside the
+fallback. The quiet drain bound is 48 transitions. Broken/corrected schedules
+cover suppressing the fallback on unchanged versions, confusing unchanged ids
+with deletion, dropping queued work after failure, and ignoring backwards markers. Random simulation runs
+10,000 traces. Page/event ordering remains in `catchup.qnt`; bounded paging,
+retention, upgrade seeding and call costs have fake integration tests.
 
 ## Conversation metadata
 
