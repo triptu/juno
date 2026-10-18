@@ -643,6 +643,11 @@ End-to-end and perf tests use a typed user-language driver, so they read as spec
 **Seams.** Some features plug into a closed list that the compiler checks, so each has one place to add to.
 - A kind of tab: a member of the `Place` union in `state/src/tabs.ts` and its `PlaceJson` case (with a `placeOf` case only for an older saved shape, and a `samePlace` case if two places of the kind can differ), then one entry in `tabKinds` in `apps/desktop/src/renderer/containers/tabKinds.tsx`, which gives the tab's look in the strip, its label in the history menu and its page. The table's type lists every kind, so a missing entry does not compile; so does a missing case in `state/src/diagnostics.ts`.
 
+Other features plug into a view's slot, fed from one list in its container. An empty list renders as before, with no element added.
+- A bar at the top of the sidebar: a keyed element in `sidebarTop` (`containers/sidebarTop.tsx`), shown in the Sidebar view's `top` slot under the title bar. The bar brings its own insets and renders nothing while idle.
+- A control in a Main's header: a component in `topicHeaderActions` (`containers/topic/headerActions.tsx`), given the topic's detail and shown first in the right island (TopicHeader `actions`).
+- A mark after a Main row's title: a hook in `rowAccessories` (`containers/rowAccessories.ts`) that returns a node and the words it adds to the row's description (TopicRow `accessory` and `accessoryLabel`). Every row calls it, so it must read one per-channel atom and keep its result's identity while nothing changes.
+
 **Effect 4.0.3 names** (checked in the installed source; v3 habits on the left do not exist):
 
 | Do not write | Write |
