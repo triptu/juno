@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import {
   defaultPersonColor,
   GROUP_SUGGESTION_LIMIT,
@@ -14,7 +14,7 @@ import {
   type MentionQuery,
   type MentionToken,
 } from '@juno/contract'
-import { mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from '@juno/state'
+import { mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, registry, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { hueFor, mentionRowId, type ComposerMention } from '@juno/views'
 
@@ -60,7 +60,9 @@ export interface MentionsOptions {
  * rows already here), and the engine's answer for the new query replaces
  * it when it lands, so the list never empties or waits while typing.
  * Picks and Backspace edit the field through `insertText` and `delete`, so
- * ⌘Z undoes them like typing.
+ * ⌘Z undoes them like typing. The answer for a bare "@" is asked for when
+ * the browser is idle after the composer mounts, so the first "@" opens the
+ * list in the next frame instead of after a round trip to the engine.
  */
 export function useMentions({ text, picks, onPicks, onChange, field, place, groups = false }: MentionsOptions) {
   const emoji = useEmojiSuggestions({ text, onChange, field })
@@ -143,12 +145,25 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
   }
 }
 
+/** Holds the answer for a bare "@" here while the composer is mounted, asked for once the browser is idle, as ⌘K does for its empty query. */
+function useWarmPeople({ channel, threadTs }: MentionPlace) {
+  useEffect(() => {
+    let release: (() => void) | undefined
+    const idle = requestIdleCallback(() => (release = registry.mount(mentionPeopleAtom('', { channel, threadTs }))), { timeout: 5_000 })
+    return () => {
+      cancelIdleCallback(idle)
+      release?.()
+    }
+  }, [channel, threadTs])
+}
+
 /**
  * The rows for `query`: the engine's answer once it is here, and until then
  * the last answer narrowed to the query. `answered` is false while the
  * answer for this query is on its way.
  */
 function useMentionRows(query: MentionQuery | undefined, place: MentionPlace, withGroups: boolean): { readonly rows: Rows | undefined; readonly answered: boolean } {
+  useWarmPeople(place)
   const people = useAtomValue(mentionPeopleAtom(query?.trigger === '@' ? query.text : undefined, place))
   // Groups only once something is typed after the "@"; the people and the groups answer together, so the list grows once.
   const groupQuery = withGroups && query?.trigger === '@' && query.text.trim() !== '' ? query.text : undefined

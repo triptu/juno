@@ -257,16 +257,25 @@ const LONG_ANSWER = [
   '5. Nothing else needs you today.',
 ].map((text) => `<say>${text}</say>`)
 
-/** Lets the last long answer go when the test says, then streams its bubbles 300 ms apart, as a model does. */
+/**
+ * Lets the last long answer go when the test says, then streams its bubbles 300 ms apart, as a model does.
+ * Every request held for it goes at once, and one that comes after the release is not held.
+ */
 let releaseLast: () => void = () => {}
 
 const longTest = test.extend({
   // oxlint-disable-next-line no-empty-pattern
   model: async ({}, use) => {
+    const held: Array<() => void> = []
+    let released = false
+    releaseLast = () => {
+      released = true
+      for (const go of held.splice(0)) go()
+    }
     const model = await startFakeOpenRouter({
       answer: async (request: OpenRouterRequest) => {
         if (/\bonce more\b/.test(request.input)) {
-          await new Promise<void>((resolve) => (releaseLast = resolve))
+          if (!released) await new Promise<void>((resolve) => held.push(resolve))
           return { chunks: LONG_ANSWER, gapMs: 300 }
         }
         return /\blong version\b/.test(request.input) ? LONG_ANSWER.join('') : answer(request)

@@ -1,0 +1,1 @@
+- 10-18 06:25 · warm-bare-mention · A mounted composer asks for the bare "@" answer (`mentions.people` with an empty query) once the browser is idle and holds it while mounted, as ⌘K does for its empty query. The first "@" after a launch opened the list in the third frame in 3 of 6 feel runs (`lazy-suggestions`), waiting on the engine's round trip; the chunk was already loaded.
