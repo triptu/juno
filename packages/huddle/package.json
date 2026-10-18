@@ -1,0 +1,32 @@
+{
+  "name": "@juno/huddle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The engine side of huddles: the Huddle service (one call at a time, rooms.join and rooms.leave, the stored leave that must happen, participants and running huddles from room frames and huddles/info).",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@juno/contract": "workspace:*",
+    "@juno/slack": "workspace:*",
+    "@juno/slack-schema": "workspace:*",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/contract",
+      "@juno/slack",
+      "@juno/slack-schema"
+    ]
+  }
+}
