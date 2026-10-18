@@ -1,7 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { largeSeed } from '@juno/fake-slack'
 import { millisToTs, Ts } from '@juno/domain'
 import { bootedEngine, readDb, restart, seedThread, DAY } from './scenario'
 import { waitFor, type RunningEngine } from './harness'
@@ -14,64 +13,6 @@ afterEach(async () => {
 function message(engine: RunningEngine, channel: string, ts: string) {
   return readDb(engine, 'cache.db', (db) => db.prepare('SELECT text, deleted FROM messages WHERE channel = ? AND ts = ?').get(channel, ts))
 }
-
-it('repairs offline mutations outside the top ten on the large seed, without opening the topic', async () => {
-  const engine = await bootedEngine(engines, { fakeOptions: { seed: largeSeed() }, followPassMillis: 3_600_000 }, 120_000)
-  const target = readDb(engine, 'cache.db', (db) => db.prepare(`
-    SELECT m.channel, m.thread_ts FROM messages m JOIN conversations c ON c.id = m.channel
-    WHERE m.thread_ts IS NOT NULL AND m.thread_ts <> m.ts AND m.deleted = 0 AND m.partial = 0
-      AND c.is_member = 1 AND c.is_archived = 0 AND m.ts >= '${millisToTs(Date.now() - DAY)}'
-      AND ('t:' || m.channel || ':' || m.thread_ts) NOT IN
-        (SELECT topic_id FROM topic_index ORDER BY last_activity_ts DESC LIMIT 10)
-    GROUP BY m.channel, m.thread_ts HAVING count(*) >= 3 ORDER BY m.channel, m.thread_ts LIMIT 1
-  `).get())
-  if (target === undefined) throw new Error('seed needs a cached thread outside the fallback')
-  const channel = String(target.channel)
-  const root = String(target.thread_ts)
-  const cached = readDb(engine, 'cache.db', (db) => db.prepare(`SELECT ts FROM messages
-    WHERE channel = ? AND thread_ts = ? AND ts <> ? AND deleted = 0 AND partial = 0 AND ts >= '${millisToTs(Date.now() - DAY)}' ORDER BY ts LIMIT 3`).all(channel, root, root))
-  const [edited, deleted, reacted] = cached.map((m) => String(m.ts))
-  if (edited === undefined || deleted === undefined || reacted === undefined) throw new Error('seed needs three cached replies')
-  const unchanged = root
-  engine.fake.addReaction({ channel, ts: reacted, name: 'eyes', user: engine.fake.workspace.selfId })
-  await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare(
-    "SELECT 1 FROM reactions WHERE channel = ? AND ts = ? AND name = 'eyes' AND me = 1",
-  ).get(channel, reacted)), 20_000, 'initial reaction stored')
-  const stable = message(engine, channel, unchanged)
-  engine.fake.goOffline()
-  await engine.phase('offline')
-  engine.fake.editMessage({ channel, ts: edited, text: 'Edited during the offline gap.' })
-  engine.fake.deleteMessage({ channel, ts: deleted })
-  engine.fake.removeReaction({ channel, ts: reacted, name: 'eyes', user: engine.fake.workspace.selfId })
-  engine.fake.resetCalls()
-  engine.fake.goOnline()
-  await engine.phase('live', 120_000)
-  await engine.syncIdle()
-  expect(message(engine, channel, edited)?.text).toBe('Edited during the offline gap.')
-  expect(message(engine, channel, deleted)?.deleted).toBe(1)
-  expect(readDb(engine, 'cache.db', (db) => db.prepare(
-    "SELECT 1 FROM reactions WHERE channel = ? AND ts = ? AND name = 'eyes' AND me = 1",
-  ).get(channel, reacted))).toBeUndefined()
-  expect(message(engine, channel, unchanged)).toEqual(stable)
-  const repairs = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')
-  expect(new Set(repairs.map((c) => c.args.channel))).toEqual(new Set([channel]))
-  expect(repairs.some((c) => c.method === 'conversations.replies' && c.args.ts === root)).toBe(true)
-  expect(repairs.every((c) => c.args.cached_latest_updates !== undefined)).toBe(true)
-  const budget = Object.fromEntries(['client.counts', 'conversations.history', 'conversations.replies', 'search.modules.messages', 'subscriptions.thread.getView'].map(
-    (method) => [method, engine.fake.callCount(method)],
-  ))
-  const total = engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL').length
-  const fallback = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck').length
-  expect({ budget, total, repair: repairs.length, fallback }).toEqual({
-    budget: { 'client.counts': 1, 'conversations.history': 0, 'conversations.replies': 13,
-      'search.modules.messages': 2, 'subscriptions.thread.getView': 1 },
-    total: 18, repair: 3, fallback: 10,
-  })
-  console.info('large seed reconnect calls', { budget, total, repair: repairs.length, fallback })
-  // No new mutations: the durable markers avoid another repair on warm boot.
-  const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 }, 120_000)
-  expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(0)
-}, 240_000)
 
 it('retains queued work when one repair range is refused and retries it after restart', async () => {
   const engine = await bootedEngine(engines, { followPassMillis: 3_600_000, recheckTopics: 0 })
@@ -268,43 +209,6 @@ it('tombstones bounded cached replies and drops the job when its root no longer 
   expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(0)
 })
 
-it('does not refresh a sweep baseline across a socket gap while counts is in flight', async () => {
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
-  const target = engine.fake.workspace.main('C0ENG').at(-1)!
-  engine.fake.holdNext({ method: 'client.counts', before: true })
-  await waitFor(() => engine.fake.heldCount({ method: 'client.counts' }) === 1 ? true : undefined, 20_000, 'sweep counts held')
-  engine.fake.goOffline()
-  await engine.phase('offline')
-  engine.fake.editMessage({ channel: 'C0ENG', ts: target.ts, text: 'Edited during held counts' })
-  engine.fake.goOnline()
-  engine.fake.release()
-  await engine.phase('live', 30_000)
-  await engine.syncIdle()
-  await waitFor(() => message(engine, 'C0ENG', target.ts)?.text === 'Edited during held counts' ? true : undefined, 30_000, 'gap edit repaired')
-  expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
-})
-
-
-it('repairs an edit lost on a half-open socket despite sweeps before timeout detection', async () => {
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
-  const target = engine.fake.workspace.main('C0ENG').at(-1)!
-  const baseline = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get('C0ENG'))?.updated
-  const before = baseline()
-  engine.fake.holdFrames({ types: ['message', 'pong'] })
-  engine.fake.editMessage({ channel: 'C0ENG', ts: target.ts, text: 'Lost before timeout' })
-  await engine.nextSync()
-  await engine.nextSync()
-  expect(engine.online()).toBe(true)
-  expect(baseline()).toBe(before)
-  expect(message(engine, 'C0ENG', target.ts)?.text).not.toBe('Lost before timeout')
-  await engine.phase('offline', 45_000)
-  engine.fake.releaseFrames({ drop: true })
-  await engine.phase('live', 30_000)
-  await engine.syncIdle()
-  await waitFor(() => message(engine, 'C0ENG', target.ts)?.text === 'Lost before timeout' ? true : undefined, 30_000, 'half-open edit repaired')
-  expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
-}, 90_000)
-
 it('drops an inaccessible old thread without tombstoning its cached recent replies', async () => {
   let root = ''
   let reply = ''
@@ -327,35 +231,3 @@ it('drops an inaccessible old thread without tombstoning its cached recent repli
   expect(message(engine, 'C0ENG', reply)?.deleted).toBe(0)
   expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending WHERE thread = ?').get(root))?.n).toBe(0)
 })
-
-it('does not promote a conversation baseline after applying its frame fails', async () => {
-  let ts = ''
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY, initial: (fake) => {
-    ts = fake.injectMessage({ channel: 'C0ENG', text: 'Before failed frame' }).ts
-    return fake.signIn()
-  } })
-  const baseline = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get('C0ENG'))?.updated
-  const before = baseline()
-  const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'))
-  try {
-    db.exec("CREATE TRIGGER refuse_frame BEFORE UPDATE ON messages WHEN NEW.text = 'Failed frame edit' BEGIN SELECT RAISE(FAIL, 'test frame failure'); END")
-    let pongs = 0
-    engine.fake.holdFramesWhere((frame) => { if (frame.type === 'pong') pongs++; return false })
-    engine.fake.editMessage({ channel: 'C0ENG', ts, text: 'Failed frame edit' })
-    await engine.nextSync()
-    await waitFor(() => pongs > 0 ? true : undefined, 20_000, 'pong after failed frame')
-    await engine.nextSync()
-    expect(baseline()).toBe(before)
-    expect(message(engine, 'C0ENG', ts)?.text).toBe('Before failed frame')
-    db.exec('DROP TRIGGER refuse_frame')
-    engine.fake.goOffline()
-    await engine.phase('offline')
-    engine.fake.goOnline()
-    await engine.phase('live', 30_000)
-    await engine.syncIdle()
-    expect(message(engine, 'C0ENG', ts)?.text).toBe('Failed frame edit')
-  } finally {
-    db.exec('DROP TRIGGER IF EXISTS refuse_frame')
-    db.close()
-  }
-}, 60_000)

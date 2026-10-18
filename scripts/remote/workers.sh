@@ -1,5 +1,5 @@
 # Sourced by run.sh. Explicit worker settings take precedence.
-# SSH containers use their reservation, since nproc can see the whole host.
+# SSH containers use their CPU limit, since nproc can see the whole host.
 # Namespace containers have a machine to themselves.
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
@@ -14,6 +14,7 @@ if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
   package_jobs=1
   vitest_workers=$cores
   gallery_workers=$(at_least $(( cores * 3 / 4 )) 1)
+  if [ "$cores" -eq 3 ]; then gallery_workers=3; fi
 fi
 export JUNO_TEST_PACKAGE_JOBS=${JUNO_TEST_PACKAGE_JOBS:-$package_jobs}
 if [ "$cores" -eq 2 ]; then export JUNO_TEST_TIMING_SEPARATE=${JUNO_TEST_TIMING_SEPARATE:-1}; fi

@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from 'vitest'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { apiCalls } from './scenario'
+import { topicsPin } from '@juno/contract'
+import { runCommand } from '@juno/state'
+import { apiCalls, valueOf } from './scenario'
 
 let engine: RunningEngine | undefined
 afterEach(async () => {
@@ -37,4 +39,23 @@ it('waits beyond live for the follow pass, and polls async conditions until they
   running.fake.release({ method: 'subscriptions.thread.getView' })
   await completed
   expect(apiCalls(running, 'subscriptions.thread.getView')).toHaveLength(4)
+})
+
+it('starts each engine from an empty schema after the previous engine writes and closes', async () => {
+  engine = await startTestEngine({ initial: (fake) => fake.signIn() })
+  await engine.phase('live')
+  await engine.syncIdle()
+  valueOf(await runCommand(engine.registry, topicsPin, { id: 'm:C0ENG' }))
+  await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:C0ENG' && row.pinned), 'first engine pinned')
+  const first = engine
+  await first.stop()
+  engine = undefined
+
+  engine = await startTestEngine({ initial: (fake) => fake.signIn() })
+  await engine.phase('live')
+  await engine.syncIdle()
+  const rows = await engine.rowsUntil((list) => list.some((row) => row.id === 'm:C0ENG'), 'second engine synced')
+  expect(rows.find((row) => row.id === 'm:C0ENG')?.pinned, 'second engine starts without the first pin').toBe(false)
+  expect(engine.userData).not.toBe(first.userData)
+  expect(apiCalls(engine, 'conversations.history').length, 'second engine still performs a cold sync').toBeGreaterThan(0)
 })

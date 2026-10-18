@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MessageChannel } from 'node:worker_threads'
 import { HttpTransport } from '@juno/slack'
+import { workspacePaths } from '@juno/store'
+import { migratedWorkspace } from './migratedWorkspace'
 import { startFakeSlack, type Credentials, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import type { EngineStatus, SessionSecrets, SessionStatus, TopicRow } from '@juno/contract'
 import {
@@ -205,6 +207,10 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   const main = fakeMain(fake, credentials)
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
+  if (options.reuse === undefined) {
+    const enterprise = fake.workspace.team.enterprise_id
+    await migratedWorkspace(workspacePaths(userData, enterprise === undefined ? fake.teamId : `${enterprise}-${fake.teamId}`))
+  }
   const transport = memoryTransport()
   let cycles = 0
   let pendingCycles = 0

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { runnerConfig, runnerCommand } from './runner.mjs'
 import { imageTag } from './image.mjs'
+import { sideBySide } from '../plan.mjs'
 import { parseRun } from './usage.mjs'
 
 test('runner settings load from the machine file, with environment values taking precedence', () => {
@@ -42,7 +43,7 @@ test('runner reservations wait 60 seconds, or indefinitely when Namespace is dis
   assert.match(runnerCommand(2, 'test', 'cat', { JUNO_REMOTE_MAX_VCPU: '0' }), /'cat' -1$/)
 })
 
-test('container workers use the reservation, preserve overrides and keep Namespace defaults', () => {
+test('container workers use the CPU limit, preserve overrides and keep Namespace defaults', () => {
   const workerKeys = ['JUNO_TEST_PACKAGE_JOBS', 'JUNO_VITEST_WORKERS', 'JUNO_E2E_WORKERS', 'GALLERY_WORKERS', 'GALLERY_SHIFT_PARTS', 'SPECS_JOBS', 'SPECS_APALACHE']
   const workers = (cores, overrides = {}) => {
     const child = spawnSync('bash', ['-uc', 'nproc() { echo 8; }; source "$1" "$2"; env', '_', resolve('scripts/remote/workers.sh'), 'test'], {
@@ -53,6 +54,9 @@ test('container workers use the reservation, preserve overrides and keep Namespa
     return workerKeys.map((key) => Number(env[key]))
   }
   assert.deepEqual(workers('2'), [1, 2, 1, 1, 1, 1, 1])
+  assert.deepEqual(workers('3'), [1, 3, 1, 3, 3, 1, 1])
+  assert.equal(sideBySide(3).app.GALLERY_WORKERS, '3')
+  assert.equal(sideBySide(3).app.GALLERY_SHIFT_PARTS, '3')
   assert.deepEqual(workers('4'), [1, 4, 2, 3, 3, 2, 1])
   assert.deepEqual(workers('8'), [1, 8, 8, 6, 6, 4, 2])
   assert.deepEqual(workers(undefined), [2, 8, 8, 24, 24, 4, 2])
@@ -103,26 +107,32 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
   const { dir, calls, env } = runnerHarness()
   const runs = []
   const cases = [
-    [[], ['test', '--passWithNoTests', 'test/messages.test.ts'], {}, 2],
-    [[], ['test:agent'], {}, 2],
-    [[], ['test:agent-testing'], {}, 2],
-    [[], ['test:agent-contracts'], {}, 2],
-    [[], ['specs:check'], {}, 2],
+    [[], ['test', '--passWithNoTests', 'test/messages.test.ts'], {}, 1, 2],
+    [[], ['test:agent'], {}, 1, 2],
+    [[], ['test:agent-testing'], {}, 1, 2],
+    [[], ['test:agent-contracts'], {}, 1, 2],
+    [[], ['specs:check'], {}, 1, 2],
     [[], ['test:desktop', 'e2e/topic.spec.ts'], {}, 4],
-    [[], ['test:gallery'], {}, 4],
+    [[], ['test:gallery'], {}, 3],
     [[], ['test:e2e'], {}, 4],
-    [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 2],
-    [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 2],
+    [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 1, 2],
+    [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 1, 2],
     [[], ['test:plan', 'test', '+', 'JUNO_E2E_WORKERS=2', 'test:desktop'], {}, 4],
-    [[], ['test:plan', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'test'], {}, 4],
+    [[], ['test:plan', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'test'], {}, 3],
     [[], ['test:plan', 'test:e2e'], {}, 4],
+    [[], ['test:plan', 'test:gallery', '+', 'test:desktop'], {}, 4],
+    [[], ['test:plan', 'test:gallery', '+', 'test:e2e'], {}, 4],
+    [[], ['test:plan', 'lint'], {}, 8],
     [['--machine', 'linux/amd64:8x16'], ['test'], {}, 8],
+    [['--machine', 'linux/amd64:1x2'], ['test'], {}, 1],
+    [['--machine', 'linux/amd64:6x12'], ['test:gallery'], {}, 6],
+    [[], ['test'], { TEST_CAPACITY: '1' }, 1, 2],
     [[], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:6x12' }, 6],
     [['--machine', 'linux/amd64:4x8'], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:8x16' }, 4],
     [[], ['test:desktop'], { TEST_CAPACITY: '2' }, 2],
   ]
   try {
-    for (const [flags, args, overrides, cores] of cases) {
+    for (const [flags, args, overrides, cores, cpus = cores] of cases) {
       writeFileSync(calls, '')
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', ...flags, ...args], {
         env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
@@ -131,8 +141,10 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
       if (path) runs.push(path)
       assert.equal(child.status, 7, child.stderr)
       assert.match(child.stderr, new RegExp(`SSH runner \\(${cores} cores\\)`))
-      assert.match(readFileSync(calls, 'utf8'), new RegExp(`reservation ${cores} cpus ${cores} job-cores ${cores}\\n`))
-      assert.equal(parseRun(readFileSync(join(path, 'run.log'), 'utf8')).cores, cores)
+      assert.match(readFileSync(calls, 'utf8'), new RegExp(`reservation ${cores} cpus ${cpus} job-cores ${cpus}\\n`))
+      const log = readFileSync(join(path, 'run.log'), 'utf8')
+      assert.equal(parseRun(log).cores, cores)
+      assert.equal(JSON.parse(/^remote: summary (.+)$/m.exec(log)[1]).cpuLimit, cpus)
     }
     const dryRun = spawnSync(process.execPath, ['scripts/remote.mjs', '--dry-run', 'test'], {
       env: { ...env, JUNO_RUNNER_HOST: '', JUNO_REMOTE_MACHINE: undefined }, encoding: 'utf8', timeout: 30_000,
