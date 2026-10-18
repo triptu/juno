@@ -100,6 +100,8 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
     '# Changelog', '',
     `## ${nextVersion} - 2026-12-01`, '', '- Faster search.', '',
     `## ${current} - 2026-10-17`, '', '- Updates from the releases repository.', '',
+    '## 0.1.4 - 2026-10-01', '', '- Added topic filters.', '',
+    '## 0.1.3 - 2026-09-25', '', '- Improved startup.', '',
   ].join('\n')
   await juno.signIn()
   await juno.waitForSync()
@@ -109,10 +111,14 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   await expect(updates).toBeEnabled()
   await expect(updates).not.toBeChecked()
 
-  // What's new for the installed version, fetched only when asked.
+  // What's new lists recent versions, fetched only when asked.
   await about.getByRole('button', { name: "What's new" }).click()
   await expect(about.getByText('Updates from the releases repository.')).toBeVisible()
-  await expect(about.getByText('Faster search.')).toHaveCount(0)
+  await expect(about.getByText('Faster search.')).toBeVisible()
+  await expect(about.getByText('Added topic filters.')).toBeVisible()
+  await expect(about.getByText(`Juno ${nextVersion}, 2026-12-01`)).toBeVisible()
+  await expect(about.getByText('Installed', { exact: true })).toBeVisible()
+  await expect(about.getByText('Available', { exact: true })).toBeVisible()
   expect(releases.api.map((request) => request.path)).toEqual([`${REPO}/contents/CHANGELOG.md`])
   await about.getByRole('button', { name: "What's new" }).click()
   await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
@@ -124,7 +130,7 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   await expect(about.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
   await about.getByRole('button', { name: "What's new" }).nth(1).click()
   await expect(about.getByText('Faster search.')).toBeVisible()
-  await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
+  await expect(about.getByText('Updates from the releases repository.')).toBeVisible()
 
   await about.getByRole('button', { name: 'Download the new version' }).click()
   await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { opened: string[] } }).junoTest.opened.slice())).toHaveLength(1)

@@ -5,7 +5,7 @@ import { Events, type ReleaseNotes, type UpdateState } from '@juno/contract'
 import type { AppUpdater } from 'electron-updater'
 import { openedForTests, freePath } from './files'
 import { createReleaseFeed, type LatestRelease, type UpdateConfig } from './releaseFeed'
-import { compareVersions, notesBetween, parseChangelog } from './releaseNotes'
+import { compareVersions, parseChangelog } from './releaseNotes'
 
 const CHECK_EVERY = 6 * 60 * 60 * 1000
 /** How long a fetched changelog is reused before "What's new" asks again. */
@@ -56,12 +56,12 @@ function cachedChangelog(feed: Feed | null) {
   }
 }
 
-/** "What's new" for the installed version, or for every version up to the offered one. */
-function notesFor(text: string, scope: 'installed' | 'update', pending: string | null): ReleaseNotes {
+/** The ten newest changelog sections, with the installed version identified for the view. */
+function notesFor(text: string): ReleaseNotes {
   const entries = parseChangelog(text)
   const current = app.getVersion()
-  if (scope === 'installed') return { kind: 'notes', entries: entries.filter((entry) => compareVersions(entry.version, current) === 0) }
-  return { kind: 'notes', entries: pending === null ? [] : notesBetween(entries, current, pending) }
+  const recent = entries.toSorted((a, b) => compareVersions(b.version, a.version)).slice(0, 10)
+  return { kind: 'notes', installedVersion: current, availableVersions: recent.filter((entry) => compareVersions(entry.version, current) > 0).map((entry) => entry.version), entries: recent }
 }
 
 /**
@@ -146,7 +146,8 @@ export function createUpdates(initial: boolean, save: (enabled: boolean) => void
     },
     notes: async (scope: 'installed' | 'update'): Promise<ReleaseNotes> => {
       try {
-        return notesFor(await changelog(), scope, state.kind === 'ready' || state.kind === 'available' ? state.version : null)
+        void scope
+        return notesFor(await changelog())
       } catch {
         return { kind: 'failed' }
       }
