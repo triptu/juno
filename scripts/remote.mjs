@@ -29,7 +29,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { runnerConfig, checkRunner, runnerCommand, ensureRunnerImage } from './remote/runner.mjs'
+import { runnerConfig, checkRunner, runnerCommand, runnerJobCores, ensureRunnerImage } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
@@ -41,7 +41,7 @@ const started = Date.now()
 
 /** Scripts that give the same result on Linux. feel and perf time the Mac and stay local. */
 const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:plan', 'test:remote-pool']
-// Every script uses one shape, so a free machine fits any waiting run and warm
+// Namespace uses one shape, so a free machine fits any waiting run and warm
 // machines are reused. Measurements: docs/development.md, "Machine shapes".
 const standardShape = '8x16'
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
@@ -261,8 +261,7 @@ try {
     if (health.reachable) {
       backend = 'ssh'
       if (options.keep) throw new Error('--keep is only available for Namespace')
-      // The standard shape is a Namespace size; a smaller runner runs the job on what it has.
-      if (cores > health.cores && !options.explicitMachine) cores = health.cores
+      cores = runnerJobCores(options, health.cores)
       if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
     } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
   }

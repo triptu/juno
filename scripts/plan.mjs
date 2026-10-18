@@ -41,7 +41,7 @@ export function parsePlan(argv) {
   return steps
 }
 
-const appSuites = ['test:desktop', 'test:gallery', 'test:e2e']
+export const appSuites = ['test:desktop', 'test:gallery', 'test:e2e']
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
 export function lanes(steps, serial) {
   if (serial) return [steps]
@@ -52,16 +52,15 @@ export function lanes(steps, serial) {
 }
 
 /**
- * Worker counts for the three lanes on an 8-core machine: four app workers,
- * two unit workers, and two simulations beside one Apalache checker when
- * bounded results are uncached. Gallery
- * has six workers because its checks spend time waiting for the browser.
+ * Split the reservation between app workers (half the cores), unit workers
+ * and simulations (a quarter each), plus one uncached Apalache checker.
+ * Gallery gets three quarters because its checks wait for the browser.
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores) {
-  const galleryWorkers = String(Math.max(2, Math.floor((cores * 3) / 4)))
+  const galleryWorkers = String(Math.max(1, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
+    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
     rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }

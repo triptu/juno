@@ -5,8 +5,18 @@ import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { imageContext, imageTag } from './image.mjs'
+import { appSuites, parsePlan } from '../plan.mjs'
 
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
+
+/** SSH reservations follow the workload; explicit machine sizes still win. */
+export function runnerJobCores({ script, args, machine, explicitMachine }, capacity) {
+  if (explicitMachine) return Number(/:(\d+)x/.exec(machine)?.[1])
+  const scripts = script === 'test:plan' ? parsePlan(args).map((step) => step.script) : [script]
+  const small = script === 'test:plan' || script === 'test' || script.startsWith('test:agent') || script === 'specs:check'
+  const cores = scripts.some((name) => appSuites.includes(name)) ? 4 : small ? 2 : 8
+  return Math.min(cores, capacity)
+}
 
 export function runnerConfig(env = process.env) {
   const home = env.HOME ?? homedir()
