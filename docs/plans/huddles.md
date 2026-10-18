@@ -38,7 +38,7 @@ From the research:
 2. **Join.** The engine calls `rooms.join` with `channel_id`, an optional `thread_ts` and `regions`. The answer holds `call.call_id` and `call.free_willy.{meeting, attendee}`.
 3. **Media.** The engine sends the meeting and attendee to the renderer. The renderer passes them to `new MeetingSessionConfiguration(meeting, attendee)` in the open-source Chime SDK and talks to Chime directly. Slack's session never leaves the engine.
 4. **Live state.** Other people joining, leaving and starting huddles arrive as `sh_room_join`, `sh_room_leave`, `sh_room_update` and `huddle_start` frames. Running huddles per channel come from `huddles/info` and `huddles.activeChannels` after each connect.
-5. **Leave.** The engine calls `rooms.leave` with `channel_id`, `call_id` and `attendee_id`.
+5. **Leave.** The engine sends `rooms.leave` with `channel_id`, `call_id`, `attendee_id` and `reason=user_initiated`, without waiting for the answer, and the renderer stops the Chime session. On a workspace with `huddles_arch_v2` Slack answers `feature_not_enabled` and learns of the leave from Chime, so the Chime stop is the leave that counts there (research section 6).
 
 **Requests look like the official client's.** For the huddle methods Juno sends the same query parameters, form fields and `_x_reason` values as Slack's desktop client (for example `calls-api/joinRoom`). Today `packages/slack/src/client/api.ts` omits some parameters (`_x_desktop_ia`, `_x_gantry`, `_x_frontend_build_type` and others). The spike records a real `rooms.join` from Slack desktop in the test channel and copies its shape. The change goes in `api.ts`, the one place the file says it may go.
 
@@ -145,7 +145,7 @@ The owner then checks with real people in the test channel.
 
 `specs/huddle.qnt` models the call's lifecycle between the user, the engine, Slack and the socket. That means the user's join and leave, the `rooms.join` and `rooms.leave` requests and answers, room frames, socket reconnects, and an app quit or crash. The properties:
 
-- **No ghost.** Every attendee id Juno has received gets a `rooms.leave`, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start.
+- **No ghost.** Every attendee id Juno has received gets a `rooms.leave` and a stopped Chime session, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start. With `huddles_arch_v2` the stored leave does nothing, and after a crash Chime drops the attendee on its own (research section 6).
 - **One call.** At most one call is live at a time. Joining another huddle leaves the current one first.
 - **Leave during join.** A leave asked for while a join is in flight ends with no live call and a leave sent for the attendee the join returns.
 - **No stale leave.** A late `sh_room_leave` for an earlier attendee never ends the current call.
