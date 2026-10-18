@@ -175,7 +175,7 @@ export interface SettingsAboutProps {
   readonly build: ReactNode
   /** The update setting (`UpdateSettings`). */
   readonly updates: ReactNode
-  /** The engine's status line and Ping engine. */
+  /** The engine's status line and Ping engine, then each process's CPU and memory and Copy diagnostics. */
   readonly diagnostics: ReactNode
   /** Brings the welcome card back on Home (SPEC 4, "The welcome"). */
   readonly onShowTour: () => void
@@ -204,8 +204,10 @@ export function SettingsAbout({ build, updates, diagnostics, onShowTour }: Setti
           </div>
         </Surface>
       </Section>
-      <Section heading="Diagnostics" sub="What the sync engine is doing. Useful when something looks wrong.">
-        <Surface kind="group" padding="md" sx={styles.card}>{diagnostics}</Surface>
+      <Section heading="Diagnostics" sub="What Juno's processes are doing. Useful when something looks wrong.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <div {...stylex.props(styles.diagnostics)}>{diagnostics}</div>
+        </Surface>
       </Section>
     </Page>
   )
@@ -235,6 +237,12 @@ const styles = stylex.create({
     flexDirection: 'column',
     alignItems: 'flex-start',
     gap: spacing['--space-3'],
+  },
+  // The engine line over the processes table, which takes the card's width.
+  diagnostics: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-4'],
   },
   tour: {
     display: 'flex',

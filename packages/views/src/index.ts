@@ -17,6 +17,7 @@ export { destinationLabel, HomeRecent, SendToList, sendToRowId } from './HomeWri
 export { HomeWriteTop } from './HomeWriteTop'
 export { EmojiPicker } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
+export { ProcessesView, type ProcessRow } from './ProcessesView'
 export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaViewer'
 
 export { type MessageActions, type MessageProps } from './Message'

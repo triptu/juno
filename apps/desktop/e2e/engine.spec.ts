@@ -52,6 +52,30 @@ test('recovers after the engine process is killed', async ({ juno, app }) => {
   await expect(juno.settings.root.getByText(/Pong \d+/)).toBeVisible()
 })
 
+test('About lists each process and copies a report that names no message, person or topic', async ({ juno, app }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('Draft plan is in the doc').open()
+  await juno.openSettings('About')
+  const processes = juno.settings.root.getByRole('region', { name: 'Processes' })
+  for (const name of ['Main', 'Window', 'Engine', 'Graphics', 'Network']) {
+    await expect(processes.locator(`[data-process="${name}"]`)).toContainText(/\d+(\.\d)? %.*\d+ MB/)
+  }
+  const engine = await hooks(app, 'enginePid')
+  await expect(processes.locator('[data-process="Engine"]')).toContainText(`Utility, pid ${engine}`)
+
+  await juno.settings.root.getByRole('button', { name: 'Copy diagnostics' }).click()
+  await expect(juno.settings.root.getByRole('status').filter({ hasText: 'Copied' })).toBeVisible()
+  const report = await juno.clipboard()
+  expect(report).toMatch(/^Juno diagnostics\nJuno \S+ on \w+, Electron [\d.]+\n/)
+  expect(report).toMatch(/\nView: Settings about, \d tabs?; window [a-z ]+\n/)
+  expect(report).toMatch(/\nTabs: (Home|topic|All topics|Juno tab|Settings [a-z-]+|Juno page [a-z-]+)(, (Home|topic|All topics|Juno tab|Settings [a-z-]+|Juno page [a-z-]+))*\n/)
+  expect(report).toContain('Engine: Engine live (process ready)')
+  expect(report).toMatch(new RegExp(`\n  Engine \\(Utility, pid ${engine}\\): CPU [\\d.]+ %, memory \\d+ MB\n`))
+  // Only kinds and numbers: no topic, channel, person or message text, and no token.
+  for (const word of ['Draft plan', '#eng', 'Maya', 'Tushar', 'xox']) expect(report).not.toContain(word)
+})
+
 test('says so when the supervisor gives up on the engine', async ({ juno, app }) => {
   await juno.signIn()
   await juno.openSettings('About')

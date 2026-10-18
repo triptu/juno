@@ -5,7 +5,7 @@ import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
 import { AppInfo } from './AppInfo'
-import { EngineStatus } from './EngineStatus'
+import { Diagnostics } from './Diagnostics'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
 import { openSettings, showTheTour } from './navigation'
 import { NotificationsPage } from './Notifications'
@@ -54,7 +54,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
     case 'backup':
       return <JunoBackup />
     case 'about':
-      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<EngineStatus />} onShowTour={showTheTour} />
+      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<Diagnostics />} onShowTour={showTheTour} />
   }
 }
 
