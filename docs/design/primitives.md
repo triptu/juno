@@ -66,6 +66,8 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 
 `Avatar` is a person or a group, always round. `kind` `person` (initials) or `group` (two initials). `size` 44, 36, 32, 28, 24, 20, 18 sets the initials size. `hue` picks one of the eight person colours (`hueNames`; `hueForId(slackId)` picks one deterministically); background and foreground are mixed from it. `src` is the Slack profile photo: the box is reserved at `size` before the bytes arrive, the photo fades in over the initials (`--duration-fast`, nothing under reduced motion), and if it fails the initials stay, so nothing ever moves. `name` gives the accessible name; without it the avatar is decorative. `ring` takes the surface the avatar sits on (`background` | `subtle` | `surface`) and adds a 1.5px ring in that colour.
 
+`PresenceDot` marks whether Slack shows you as active, on an avatar's bottom right corner. It is 10px, filled with `--presence-active` when active and hollow inside a `--foreground-muted` hairline when away. Its 2px ring takes the colour of `surface`, `subtle` for the sidebar or `raised` for a popover. It is placed against the nearest positioned ancestor, and screen readers skip it. `AvatarButton` takes `presence` (`active` | `away`) to draw it and to set its `aria-description`; the account menu's header uses it too.
+
 Channels are `ChannelIcon` (section 4a).
 
 `AvatarStack`: `people[]` (`id`, `initials`, `name`, `hue`), `max` (4), `size` (18), overlap −4. Each avatar shows one initial (two would be clipped by the next avatar) and a ring in the colour of `surface` (`subtle` by default, the sidebar; `background` or `surface` elsewhere) so the overlap reads as a cut.
@@ -204,7 +206,7 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 
 ## Count
 
-24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
+24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton, PresenceDot), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.
 
