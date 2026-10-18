@@ -690,7 +690,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 - **Spec cache.** `pnpm specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, and the Quint and Apalache versions. Every worktree shares it. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off pnpm specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many typechecks and simulations run at once (default 3). The Apalache checks run after them, one at a time, on one Apalache server started for the run, so a check no longer pays for starting a JVM. Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
 - **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`, which skips the build when no file git sees in the app or `packages/` changed since the last build and the output is untouched. `JUNO_REBUILD=1` forces a build. `pnpm build` and `pnpm dev` always build.
 - **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, touches once a state that draws the same DOM as one already checked, and its twelve parts take components from one queue in the temp folder, so they finish together. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
-- **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages). Run the full suite once before you report.
+- **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages).
 - **Remote runs.** `pnpm remote <script>` takes no local slot. See "Remote runs" below.
 
 ## Typecheck
@@ -717,11 +717,13 @@ Measured on 10-17 on this Mac, eight alternating runs of each while other agents
 
 Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
 
-**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then every suite its change reaches as one plan on one remote machine, with desktop specs picked by coverage ("Affected tests"). `pnpm affected --plan` first shows what it would run and why. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
+**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then a selective test plan on one remote machine, with desktop specs picked by coverage ("Affected tests"). `pnpm affected --plan` first shows what it would run and why. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**The CI keeper.** One agent owns main's health. It runs the full suites on main (`pnpm verify:main`, every suite on one machine) when about four merges have landed since its last run, or 90 minutes have passed with at least one merge, never more often. Run `pnpm verify:main --no-cache` at least once a day and whenever a spec or its checker changes; other runs reuse passing bounded Apalache results. An urgent release request in `.juno-status/ci-keeper-request.json` overrides that interval: run its `command` immediately, record the result, then clear the request. For each failure it reads `git log` and `git blame` to find the commit and the agent's branch that brought it in, then fixes it or starts a fixer. Flaky tests are fixed or removed, not rerun until they pass. A preview DMG is built only from a commit the keeper has seen green. After each run it commits `apps/desktop/e2e/coverage-map.json`, which `pnpm verify:main` refreshed ("Desktop specs by coverage").
+**The CI keeper.** Run `pnpm verify:main --ref origin/main` every six hours, and replace one run each day with `pnpm verify:main --ref origin/main --nightly`. Full runs include heavy sync tests and quarantined tests. Do not start a full run after a merge count. An urgent request in `.juno-status/ci-keeper-request.json` overrides the interval: run its command, record the result, then clear the request. Fix broken-on-main regressions first. Commit the coverage map after each full run; it must not grow older than three days. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
+
+**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. Tag a confirmed main flake `{ tag: '@flaky' }` the same day and add its exact reporter ID, reason and date to `.juno-status/release-waivers.json`. Triage this list daily. Tagged tests still run in scheduled runs. Release waivers apply only to named test failures in complete reports, never to a crash, timeout, missing report or other infrastructure failure. Remove the tag and waiver when fixed. Do not weaken assertions or run retry loops to obtain green results.
 
 **One machine per run** (landed 10-16): `pnpm affected` and `pnpm verify:main` run their remote suites as one plan on one 8x16 machine, build the desktop app once, and do not shard the desktop e2e. See "Remote runs" and "Machine shapes".
 
@@ -807,7 +809,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 
 **Results cache.** Each unit test file, gallery component, gallery behaviour spec file and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
 
-`perf` and `test:feel` never run here, but `pnpm verify:main --with-mac` runs both on the Mac after the other suites; the plan reminds you to run them on the Mac when the renderer or a view changed. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
+`perf` and `test:feel` never run here, but `pnpm verify:main --with-mac` runs both on the Mac after the other suites; the nightly Mac run covers them. Run a matching perf scenario for new per-row, per-frame or startup work, and a matching feel scenario for a change to that interaction. Use the nightly result as the baseline. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; the scheduled full run on `main` catches that.
 
 ### Desktop specs by coverage
 
@@ -831,13 +833,13 @@ A changed app file that was in no bundle when the map was recorded (types only, 
 
 **Measured** (10-17, map from `d15f27ee`, replaying merges with `pnpm affected --plan --range <merge>^1..<merge>`). Of the 20 merges on main up to `25e9b5f7`, 17 touched the app, and for each the import graph picked every desktop spec. The coverage map picked 6 of 69 for palette-pages, 44 for thread-root and 1 for a batch fix; the other 14 still ran everything, because of the lockfile or root `package.json` (4), the fake Slack, the fake OpenRouter or the fixtures (5), or core files every spec runs (5: navigation, the send worker, sync boot). 123 files are run by every spec and the median file by 40. File by file it is narrower: palette files pick 5 specs, the message window 44. It picked the failing spec for all six real desktop failures of 10-16 (mirror-reads, tabs, both break-pass specs, avatars-unfurls, stick-bottom), whether given the whole merge or only the files that caused the failure. Gallery behaviour specs: 3 of 14 for palette-pages, slack-import-paths and automated-reason, 8 for send-checks-c, 13 for broad UI merges.
 
-**Staleness.** The map lags main by the time since the keeper's last run (about four merges or 90 minutes). The rules above cover the two ways it goes stale: new files, and importers edited since the map. What they miss is a call that became reachable through a file that did not change, which is rare; the keeper's full run on main catches it. A map more than three days old, from a commit this repository does not have, or missing, is not used: every spec runs when the app changed, as before. `pnpm affected --graph` ignores the map.
+**Staleness.** The map lags main by the time since the keeper's last run (at most six hours in normal operation). The rules above cover the two ways it goes stale: new files, and importers edited since the map. What they miss is a call that became reachable through a file that did not change, which is rare; the keeper's full run on main catches it. A map more than three days old, from a commit this repository does not have, or missing, is not used: every spec runs when the app changed, as before. `pnpm affected --graph` ignores the map.
 
 **Limits.** Code that runs only in the test process (the fake Slack, the driver) is not recorded; that is why changes there run every spec. The renderer writes its coverage when the test closes the app, so a renderer that crashed or a window that closed before that is not counted. Tests tagged `@mac` do not run remotely and are not recorded. The gallery is not recorded: its behaviour specs are narrowed by the component names they open (`galleryComponents`), and a spec that reads every route without filtering them runs for any component.
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the standard shape, 8x16 (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the Mac runs them. This includes the sidebar width surviving a relaunch and the native Window and Graphics idle-CPU budgets. Run only the latter through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
+`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the standard shape, 8x16 (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the nightly Mac run includes them. This includes the sidebar width surviving a relaunch and the native Window and Graphics idle-CPU budgets. For a change to idle CPU itself, run the latter through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
 
 - **Plans.** `pnpm remote test:plan <step> + <step> ...` runs several root scripts on one machine (`scripts/plan.mjs`); `KEY=VALUE` words before a step's script set its environment, for example `pnpm remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop`. The app suites (`test:desktop`, `test:gallery`, `test:e2e`) run one after another. Unit tests and spec checks each have their own lane beside them under `nice`; `JUNO_PLAN_SERIAL=1` runs every step in turn. On 8 cores the lanes use four desktop or six gallery workers, two unit workers, and two Quint simulations. An uncached bounded check adds one Apalache checker. The gallery shift sweep uses six parts to match its workers. Inside the container `scripts/build-cached.mjs` reuses a build made earlier in the run, so the desktop app is built once. Each line of output starts with `[<script>]`, and a line `plan: step <i> <script> exited with <code> after <s> s` gives each step's result; `pnpm affected` and `pnpm verify:main` read those lines.
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
@@ -1287,40 +1289,67 @@ line. The script:
 leaves `CHANGELOG.md` alone; use it to test the upload, then delete it with
 `gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
 
-A normal publish requires the latest `.juno-status/verify-main.json` from the
-CI keeper to be green. Its tested commit must match the build's code; only the
-app version may differ. Use `--urgent` only for a fix to a problem hurting the
+A normal publish uses a passing full-run record for the build commit or an
+ancestor. Records live under the shared `.juno-status/verify-main/commits/`;
+`verify-main.json` remains the latest summary for existing readers. A newer red
+run does not erase an older green record. Only docs, tests and the app version
+may change after the verified commit. The publish checkout must be clean.
+`node scripts/release-gate.mjs <commit>` checks this without a build or upload.
+
+The optional shared `.juno-status/release-waivers.json` is a short JSON array:
+
+```json
+[{ "id": "test-id-from-juno-tests", "reason": "Known intermittent focus race", "date": "2026-10-18" }]
+```
+
+Every waived failure is printed during publish. Legacy red records without a
+complete test report cannot use waivers. Never infer a green record from a log.
+
+Use `--urgent` only for a fix to a problem hurting the
 owner now, such as a CPU spin, data loss or a crash on launch. It runs local
 typecheck and lint, remote unit tests, and `pnpm test:package` against the
 packaged app before publishing. It adds an `urgent` marker to the GitHub release
 notes metadata and writes `.juno-status/ci-keeper-request.json`. The CI keeper
 must run the requested full `pnpm verify:main --ref <commit>` immediately,
-record the result, and clear the request; do not wait for the usual batch or
-90-minute interval. An urgent publish is still a normal visible release.
+record the result, and clear the request; do not wait for the usual six-hour interval. An urgent publish is still a normal visible release.
 
 `pnpm release:version`, `pnpm package` and `pnpm release:publish` print their
 step durations and append them to `.juno-status/release-timings.json` (local,
 gitignored): version bump, JS build, deploy, electron-builder, DMG, notarize
 or skip, and upload. The electron-builder total includes the DMG phase.
 
-### The release keeper's releases
+### Scheduled releases
 
-Every DMG the release keeper builds from a commit the CI keeper reported green
-is also a published release, so installs get it as an update:
+Schedule `pnpm release:scheduled` on the release Mac every six hours. Use
+`pnpm release:scheduled --dry-run` to inspect the current refs, records and
+GitHub release without fetching, building, committing or publishing.
 
-1. Run `pnpm release:version patch` on main, commit only
-   `apps/desktop/package.json` as "Release x.y.z", fetch, rebase onto
-   `origin/main` and push. Build from that commit, or from the green commit with
-   only that change applied.
-2. Package in a detached worktree with `JUNO_UPDATE_TOKEN` read from the
-   keychain into the variable (never printed), then verify the DMG, launch it
-   once and quit it by PID. Copy it to the Desktop; the one it replaces becomes
-   `-previous`.
-3. Write 3–8 changelog lines for what changed for the person using Juno since
-   the last release, in the style of SPEC section 17, in a file outside the
-   repository.
-4. Run `pnpm release:publish --notes <file> --dry-run`, then without
-   `--dry-run`, from the worktree that holds the build.
+The command fetches `origin/main` and chooses its newest commit covered by an
+eligible full run. It does nothing if that source is already released, the last
+release is under six hours old, or there are no user-facing changes. It refuses
+to release an ancestor of the last released source. GitHub release metadata
+records both the source and build commits; older releases use their
+`Release x.y.z` commit on main.
+
+A release gets a patch version newer than both the source and published version,
+a worktree on the scratch volume, a version commit, packaging through the heavy
+lock, and the packaged smoke with `JUNO_E2E_AI_JOBS=1`. Packaging uses release
+priority when the installed heavy lock supports it. Notes use commit subjects
+since the last release, omit test and merge maintenance, and group changes by
+area. Keep product commit subjects plain enough to read as release notes.
+
+The command uses the existing `gh` login and requires `JUNO_UPDATE_TOKEN` in its
+environment. Supply it through the existing secure release setup, never in a
+command log. It does not push main. The version commit remains on a local
+`scheduled-release-x.y.z` branch; future versions use GitHub as their source.
+A failed checkout and notes remain for the keeper to inspect. A successful run
+removes its checkout. Only failures need keeper attention. After an interrupted
+run, check the PID in `.juno-status/release-scheduled.lock` and GitHub before
+removing a stale lock or resuming a draft.
+
+Do not build or publish on every green run. Build an extra preview DMG only on
+request. Milestone reviews remain at milestones; a pre-shipping review means a
+minor release or 1.0, not every patch.
 
 ### Updates in the app
 
@@ -1422,6 +1451,24 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 
 ## Scheduled full run
 
-`pnpm verify:main` runs every suite against `main` (`--ref <ref>` for another): it checks the ref out into a temporary detached worktree, so nothing local is sent, and runs `test`, `specs:check`, `test:gallery` and `test:desktop` as one plan on one 8x16 machine (`pnpm remote test:plan`). Gallery then desktop share the app lane; unit tests and specs each run beside them. Every random simulation (`quint run`) executes on each scheduled run. Passing Apalache checks and typechecks reuse the Quint cache keyed by their options, assertions, spec files and imports, and tool versions. These checks are deterministic for the same inputs, and a cached result is checked again before use. `pnpm verify:main --no-cache` reruns every Quint job and does not carry its cache to the runner. The CI keeper uses it daily and on spec or checker changes ("Testing"). The result summary is in `.juno-status/verify-main.md` and `.json`; each suite's log is in `.juno-status/verify-main/<run>/`. The command exits 1 if a suite fails. `--with-mac` also runs the e2e tests tagged `@mac`, `perf` and `test:feel` on this Mac. The first run (2026-10-15, four machines at once) passed in 170 s of wall time: `test` 170 s, `specs:check` 146 s, `test:gallery` 74 s, `test:desktop` 114 s.
+Run `pnpm verify:main --ref origin/main` every six hours after fetching main.
+It checks out that commit in a temporary worktree on the scratch volume and
+runs unit tests, Quint checks, conformance, gallery and desktop tests as
+one plan on one remote 8x16 machine. Heavy sync tests and `@flaky` tests stay in
+this run. Random Quint simulations run each time; deterministic Apalache and
+typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
+
+Once a day, use `pnpm verify:main --ref origin/main --nightly`. This implies
+`--no-cache` for Quint and `--with-mac` for the Mac-only e2e tests, perf and feel.
+Those flags also work separately. Perf and feel run sequentially after the
+other suites and hold the exclusive heavy lock. Ordinary UI changes do not
+require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.
+
+Results live in the main checkout's shared `.juno-status`: the latest
+`verify-main.json` and `.md`, permanent per-commit JSON under
+`verify-main/commits/<commit>/<run>.json`, and logs under `verify-main/<run>/`.
+The summary includes tests that passed on retry. A failed suite still exits 1;
+release waivers do not change CI results. The command refreshes the coverage
+map in the invoking checkout; commit that map after each run.
 
 On 2026-10-18, one full run at `6c15fbb4` before and one at `d0ecf4ab` after this lane/cache change used separate 8x16 machines. Wall time was 1,418 s before and 1,453 s after. The old unit-then-spec lane took 222 + 281 = 503 s; the new parallel unit and spec lanes took 378 and 364 s, so both finished by 378 s. Both full runs failed for the same unrelated reasons: the gallery's `RemoveCard/remove/click-then-working` shift state consumed about 13 minutes and its part timed out at 15 minutes (gallery 938 s before, 950 s after), and `updates.spec.ts` expected version `0.1.1`–`0.1.6` while the app was `0.1.7` (desktop 413 s before, 427 s after). The gallery timeout dominated total time, so the 125 s shorter unit/spec path did not reduce this pair of full runs. The gallery hang was fixed on main after these runs.
