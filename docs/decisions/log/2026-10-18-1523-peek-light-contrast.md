@@ -1,0 +1,1 @@
+- 10-18 15:23 · peek-light-contrast · Give Peek a neutral warm surface and a hairline shadow ring with soft elevation in light, using dedicated tokens so menus stay unchanged; retain the existing dark material and all geometry.

@@ -30,6 +30,7 @@ export const colors = stylex.defineVars({
   '--surface-default': 'hsla(48, 30%, 98%, 1)',
   '--surface-hover': 'hsla(48, 30%, 94%, 1)',
   '--surface-active': 'hsla(48, 30%, 92%, 1)',
+  '--peek-surface': 'hsla(48, 22%, 96%, 1)',
   // A surface that sits on top of --surface-hover and must read as raised in
   // both themes (the selected segment of a segmented control).
   '--surface-raised': 'hsla(48, 30%, 98%, 1)',
@@ -405,6 +406,7 @@ export const shadows = stylex.defineVars({
   '--shadow-card': '0 0 12px 0 rgba(27, 28, 21, 0.12)',
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  '--peek-shadow': '0 0 0 1px oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08), 0 14px 36px -8px oklch(0 0 0 / 0.18)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
   // The Juno panel floating over the page: a hairline ring, a tight contact
   // shadow and two wide soft ones, so it lifts without a border.

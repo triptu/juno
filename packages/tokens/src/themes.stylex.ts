@@ -25,6 +25,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--surface-default': '#252421',
   '--surface-hover': '#2D2B28',
   '--surface-active': '#32302D',
+  '--peek-surface': '#373532',
   '--surface-raised': '#373532',
 
   // A step above the page (L 0.215) and under the field (0.26).
@@ -80,6 +81,7 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--shadow-card': '0 0 12px 0 rgba(0, 0, 0, 0.45)',
   '--shadow-lg': '0 8px 24px 0 rgba(0, 0, 0, 0.50)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
+  '--peek-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   // On ink a dark ring cannot separate; a faint light edge inside does, as on macOS.
   '--panel-shadow': 'inset 0 0 0 1px oklch(1 0 0 / 0.06), 0 0 0 1px oklch(0 0 0 / 0.5), 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 8px 24px -6px oklch(0 0 0 / 0.4), 0 24px 56px -12px oklch(0 0 0 / 0.5)',
