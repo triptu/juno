@@ -78,28 +78,43 @@ async function sessionSaved(userData: string, teamId: string): Promise<void> {
   }).toBe(teamId)
 }
 
+interface SignInFrames {
+  frames: number
+  signIn: number
+  shell: number
+  missing: Array<{ frame: number; at: number; rootChildren: number; hadShell: boolean; bundleStarted: boolean; shellPainted: boolean }>
+}
+
 /**
  * Samples every frame from now on: whether the sign-in page or the sidebar is on screen.
  * Playwright attaches only after the first page has started, so the test also holds
  * Slack's `auth.test` to keep the engine checking the session while it watches.
  */
-async function watchSignInFrames(win: Page): Promise<() => Promise<{ readonly frames: number; readonly signIn: number; readonly shell: number }>> {
+async function watchSignInFrames(win: Page): Promise<() => Promise<SignInFrames>> {
   await win.evaluate(() => {
-    const state = { signIn: 0, shell: 0, frames: 0, on: true }
+    const state: SignInFrames & { on: boolean } = { signIn: 0, shell: 0, frames: 0, missing: [], on: true }
     Object.assign(window, { __signInFrames: state })
     const tick = () => {
       state.frames += 1
       if (document.getElementById('sign-in-title') !== null) state.signIn += 1
       if (document.querySelector('aside[aria-label="Sidebar"]') !== null) state.shell += 1
+      else state.missing.push({
+        frame: state.frames,
+        at: performance.now(),
+        rootChildren: document.getElementById('root')?.childElementCount ?? 0,
+        hadShell: state.shell > 0,
+        bundleStarted: performance.getEntriesByName('juno.start').length > 0,
+        shellPainted: performance.getEntriesByName('juno.shell-paint').length > 0,
+      })
       if (state.on) requestAnimationFrame(tick)
     }
     tick()
   })
   return () =>
     win.evaluate(() => {
-      const state = (window as unknown as { __signInFrames: { signIn: number; shell: number; frames: number; on: boolean } }).__signInFrames
+      const state = (window as unknown as { __signInFrames: SignInFrames & { on: boolean } }).__signInFrames
       state.on = false
-      return { frames: state.frames, signIn: state.signIn, shell: state.shell }
+      return { frames: state.frames, signIn: state.signIn, shell: state.shell, missing: state.missing }
     })
 }
 
@@ -122,6 +137,7 @@ test('a relaunch opens on the shell and never paints the sign-in page while Slac
     fake.release({ method: 'auth.test' })
     await restarted.expectSignedIn('Juno Fake')
     const frames = await stop()
+    await test.info().attach('relaunch-frames', { body: JSON.stringify(frames, null, 2), contentType: 'application/json' })
     expect(frames.frames).toBeGreaterThan(10)
     expect(frames.signIn, 'frames with the sign-in page').toBe(0)
     expect(frames.shell, 'frames with the sidebar').toBe(frames.frames)
