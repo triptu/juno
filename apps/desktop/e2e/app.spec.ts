@@ -199,7 +199,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     process: 'undefined',
     juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
     updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
-    app: ['getInfo'],
+    app: ['getInfo', 'diagnostics', 'reportState'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
     launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],

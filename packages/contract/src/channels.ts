@@ -18,6 +18,10 @@ export const Channels = {
   /** "What's new": changelog entries from the releases repository, fetched when asked. */
   updatesNotes: 'updates.notes',
   appGetInfo: 'app.getInfo',
+  /** Settings › About's diagnostics: each process's CPU and memory, and what the engine and agent supervisors are doing. */
+  appDiagnostics: 'app.diagnostics',
+  /** The renderer tells main its view and whether a sync runs, for main's idle CPU check (no titles, no ids). */
+  appReportState: 'app.reportState',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
   /** Starts the engine again after the supervisor gave up on it. */
@@ -239,6 +243,10 @@ export interface JunoBridge {
   readonly app: {
     /** Name, version and platform of the running app, answered by main. */
     readonly getInfo: () => Promise<unknown>
+    /** A `Diagnostics`, answered by main. */
+    readonly diagnostics: () => Promise<unknown>
+    /** An `AppState`: the view kind and whether a sync runs. */
+    readonly reportState: (state: unknown) => Promise<unknown>
   }
   readonly engine: {
     /**

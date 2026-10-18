@@ -60,6 +60,18 @@ export async function loadScreenProbe(): Promise<LoadedProbe | undefined> {
   return undefined
 }
 
+
+/**
+ * The packaged smoke test (JUNO_E2E_SCREEN_PROBE): the real probe loads once from the asar and
+ * writes which symbol it called into `dir`, since tests otherwise use the seam in index.ts.
+ */
+export async function writeProbeForTests(dir: string): Promise<void> {
+  const { writeFile } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+  const loaded = await loadScreenProbe()
+  const result = loaded === undefined ? { symbol: null } : { symbol: loaded.symbol, value: typeof loaded.probe() }
+  await writeFile(join(dir, 'screen-watch-probe.json'), JSON.stringify(result))
+}
 /** How often the signal is read while the app window is open. */
 export const POLL_MS = 2_000
 

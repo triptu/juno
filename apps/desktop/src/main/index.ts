@@ -2,7 +2,6 @@
 import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
-import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
@@ -21,7 +20,8 @@ import { SessionHost } from './session'
 import { slackKeychainReads } from './slackImport'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
-import { createScreenWatch, loadScreenProbe, type ScreenProbe } from './screenWatch'
+import { createProcessWatch } from './processWatch'
+import { createScreenWatch, loadScreenProbe, writeProbeForTests, type ScreenProbe } from './screenWatch'
 import { loadUpdateConfig } from './releaseFeed'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
@@ -202,6 +202,8 @@ const agent = createAgentSupervisor(
   appMcpCredentials(e2e, (url) => shell.openExternal(url)),
   backupSecrets.answer,
 )
+// Each process's CPU and memory for Settings › About, and the idle CPU self-check (processWatch.ts).
+const processes = createProcessWatch({ supervisor, agent, window: appWindow })
 supervisor.onReady(() => {
   agent.linkHost()
   if (appWindow()?.isVisible()) supervisor.send({ _tag: 'painted' })
@@ -254,6 +256,7 @@ app.whenReady().then(() => {
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
     copyImage: (src) => copyImage(src, fakeSlackOrigin, e2e),
+    processes,
     setViewing: (topicId) => notifier.setViewing(topicId),
     notifications: {
       test: () => notifier.test(),
@@ -310,6 +313,7 @@ function openWindow(): BrowserWindow {
     screenWatch.start()
     notificationPermission.preload()
   })
+  processes.watch(window)
   window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
   window.on('closed', () => screenWatch.stop())
   return window
@@ -342,15 +346,8 @@ app.on('will-quit', (event) => {
   void Promise.all(pending).then(() => app.quit())
 })
 
-// The packaged smoke test (JUNO_E2E_SCREEN_PROBE): the real probe loads once from the asar and
-// writes which symbol it called, since tests otherwise use the seam above.
-if (e2e && process.env.JUNO_E2E_SCREEN_PROBE === '1') {
-  void app.whenReady().then(async () => {
-    const loaded = await loadScreenProbe()
-    const result = loaded === undefined ? { symbol: null } : { symbol: loaded.symbol, value: typeof loaded.probe() }
-    await writeFile(join(app.getPath('userData'), 'screen-watch-probe.json'), JSON.stringify(result))
-  })
-}
+// The packaged smoke test (JUNO_E2E_SCREEN_PROBE, screenWatch.ts).
+if (e2e && process.env.JUNO_E2E_SCREEN_PROBE === '1') void app.whenReady().then(() => writeProbeForTests(app.getPath('userData')))
 
 // Test hooks. Playwright reaches main through app.evaluate; the engine itself
 // is out of reach, so main exposes what tests need to know about it.
@@ -372,6 +369,7 @@ if (e2e) {
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
+      ...processes.testHooks,
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
