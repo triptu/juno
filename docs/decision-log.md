@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 04:51 · huddles · Model durable attendee cleanup before media handoff, serialize call switches through leave and stop, and treat room frames as refetch hints because they do not identify attendees. Reconnect and Overflowed invalidate running-huddle snapshots; eviction by another device requires a new user join. State crash and quiet-delivery assumptions explicitly in the Quint spec.
 - 10-19 02:45 · huddles · Leave as the official client does: send `rooms.leave` with `reason=user_initiated` without waiting, stop the Chime session, and treat `feature_not_enabled` as benign. On a `huddles_arch_v2` workspace Slack learns of the leave from Chime (research section 6).
 - 10-19 02:45 · huddles-other-device · Joining the same huddle on another device moves you there. Chime stops Juno's session with `AudioJoinedFromAnotherDevice`, seen in the spike. Juno treats this as a leave, does not reconnect, and offers Join here.
 - 10-19 01:36 · runner · Prefer the machine-local SSH runner configuration, build missing local image tags under a host lock, and fall back to Namespace after 60 seconds without capacity unless Namespace is disabled. Prune old images explicitly.

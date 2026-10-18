@@ -145,11 +145,14 @@ The owner then checks with real people in the test channel.
 
 `specs/huddle.qnt` models the call's lifecycle between the user, the engine, Slack and the socket. That means the user's join and leave, the `rooms.join` and `rooms.leave` requests and answers, room frames, socket reconnects, and an app quit or crash. The properties:
 
-- **No ghost.** Every attendee id Juno has received gets a `rooms.leave` and a stopped Chime session, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start. With `huddles_arch_v2` the stored leave does nothing, and after a crash Chime drops the attendee on its own (research section 6).
+- **No ghost.** Every attendee id Juno has durably received gets a `rooms.leave` and a stopped Chime session, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start. With `huddles_arch_v2` the stored leave does nothing, and after a crash Chime drops the attendee on its own (research section 6).
 - **One call.** At most one call is live at a time. Joining another huddle leaves the current one first.
 - **Leave during join.** A leave asked for while a join is in flight ends with no live call and a leave sent for the attendee the join returns.
-- **No stale leave.** A late `sh_room_leave` for an earlier attendee never ends the current call.
-- **Matching state.** After a reconnect, the running huddles shown match Slack's, once `huddles/info` has answered.
+- **No stale leave.** A late room frame for an earlier attendee or room never ends the current call. Live frames identify a user, not an attendee, so they trigger a refetch rather than ending local media.
+- **Matching state.** After a reconnect or `Overflowed`, the running huddles shown match Slack's once a fresh `huddles/info` answers and Slack stays quiet. Discard responses invalidated by a later gap or frame.
+- **Other device.** After the renderer reports `AudioJoinedFromAnotherDevice`, clear the current call and queued join intent. Do not reconnect media without a new user command.
+
+Cleanup assumes an eventual leave/quit/crash, restart and successful delivery. Receipt and the durable pending-leave write are one model step: a crash between HTTP receipt and persistence cannot preserve an unknown attendee id. The implementation must keep credentials private until that write commits. See `specs/README.md`, “Huddle lifecycle”, for the checked bounds and remaining assumptions.
 
 The checker runs in `pnpm specs:check` like the other specs.
 
