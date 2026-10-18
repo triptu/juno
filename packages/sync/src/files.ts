@@ -6,8 +6,8 @@
  * the file's id alone, and nothing changes the message itself. A video's
  * poster (`thumb_video` and its size) can come late the same way. A socket
  * message can also carry a partial file, `file_access: "check_file_info"`
- * with little more than its id. So the sync re-reads the message for such a
- * file and writes the processed copy into every stored message that carries it
+ * with little more than its id. So the sync tries `files.info`, then re-reads the message if it fails or
+ * is not ready, and writes the processed copy into every stored message that carries it
  * (`run/files.ts`, `write/files.ts`).
  *
  * What a message shows only ever gets fuller: a later copy without a file's

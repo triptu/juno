@@ -186,6 +186,15 @@ describe('seeded files', () => {
 })
 
 describe('late and partial files', () => {
+  it('can reject files.info for sessions where the method is unavailable', async () => {
+    const message = fake.injectMedia({ channel: 'C0ENG', media: [{ name: 'fallback.png', width: 640, height: 400 }] })
+    const file = message.files![0]!.id!
+    fake.setFilesInfoSupported({ supported: false })
+    expect((await client.call('files.info', { file })).body).toMatchObject({ ok: false, error: 'unknown_method' })
+    fake.setFilesInfoSupported({ supported: true })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ id: file, thumb_360: expect.any(String) })
+  })
+
   it('holdThumbnails sends an image without thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))
@@ -197,7 +206,7 @@ describe('late and partial files', () => {
     expect(echo.files?.[0]).toMatchObject({ id: file, mimetype: 'image/png' })
     expect(echo.files?.[0]?.thumb_360).toBeUndefined()
     expect(echo.files?.[0]?.original_w).toBeUndefined()
-    expect((await client.call('files.info', { file })).body).toMatchObject({ ok: false, error: 'unknown_method' })
+    expect((await client.ok('files.info', { file })).file.thumb_360).toBeUndefined()
 
     const other = fake.injectMedia({ channel: 'C0ENG', media: [{ name: 'board.png', width: 400, height: 300 }] })
     expect(other.files?.[0]?.thumb_360).toBeUndefined()
@@ -205,7 +214,7 @@ describe('late and partial files', () => {
     fake.releaseThumbnails()
     const generated = await socket.next(isType('file_thumbnail_generated'))
     expect(generated).toMatchObject({ file_id: file })
-    expect((await client.call('files.info', { file })).body).toMatchObject({ ok: false, error: 'unknown_method' })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360: expect.any(String) })
     const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 2 })
     expect(history.messages.map((m) => m.files?.[0]?.original_w)).toEqual([400, 640])
   })
@@ -228,7 +237,7 @@ describe('late and partial files', () => {
     const [image, video] = posted.files!
     expect(image).toMatchObject({ mimetype: 'image/png', original_w: 640, original_h: 400 })
     expect(video).toMatchObject({ mimetype: 'video/mp4', thumb_video_w: 1280, thumb_video_h: 720 })
-    expect((await client.call('files.info', { file: video!.id! })).body).toMatchObject({ ok: false, error: 'unknown_method' })
+    expect((await client.ok('files.info', { file: video!.id! })).file).toMatchObject({ thumb_video: video!.thumb_video, thumb_video_w: 1280, thumb_video_h: 720 })
     const poster = await fetch(video!.thumb_video!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(poster.headers.get('content-type')).toBe('image/png')
   })

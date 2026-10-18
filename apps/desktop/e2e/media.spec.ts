@@ -25,7 +25,7 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
   )
 }
 
-test('an old card stored before Slack made the thumbnail becomes the picture when its topic opens', async ({ juno, win, fake }) => {
+test('an old card stored before Slack made the thumbnail becomes the picture through file info when its topic opens', async ({ juno, win, fake }) => {
   fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: 3 * DAY_MINUTES }] })
   await juno.signIn()
   await juno.waitForSync()
@@ -39,14 +39,16 @@ test('an old card stored before Slack made the thumbnail becomes the picture whe
   fake.injectMedia({ channel: 'C0PHOTOS', user: 'U0LEO', text: 'The venue floor plan', ago: 2 * DAY_MINUTES, media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
   fake.releaseThumbnails({ event: 'none' })
   await win.waitForTimeout(3_000)
-  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file')).toHaveLength(0)
+  expect(fake.calls.filter((call) => call.method === 'files.info')).toHaveLength(0)
 
   await juno.sidebar.row(PHOTOS_MAIN).open()
   const row = topic.message('The venue floor plan')
   await row.scrollIntoViewIfNeeded()
   const image = row.getByRole('button', { name: 'Open floor-plan.png' })
   await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
-  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
+  expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file')).toHaveLength(0)
+  expect(fake.calls.filter((call) => call.method === 'files.info').every((call) => call.ok)).toBe(true)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
@@ -124,14 +126,14 @@ test('images and videos in #eng show inline and open full screen, and a partial 
   })
   await test.step('an image that arrives as a partial file on the socket becomes the picture once Slack fills it in', async () => {
     // The first look at the file waits, so the partial copy is on screen first.
-    fake.holdNext({ method: 'conversations.history', reason: 'file', before: true })
+    fake.holdNext({ method: 'files.info', before: true })
     fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Screenshot of the failing check', partial: true, media: [{ name: 'Screenshot check.png', width: 640, height: 400 }] })
     const row = topic.message('Screenshot of the failing check')
     await expect(row.locator('[data-file-card]')).toHaveCount(1)
     await expect(row.locator('[data-thumbnail]')).toHaveCount(0)
 
-    await expect.poll(() => fake.heldCount({ method: 'conversations.history' }), { timeout: 15_000 }).toBeGreaterThan(0)
-    fake.release({ method: 'conversations.history' })
+    await expect.poll(() => fake.heldCount({ method: 'files.info' }), { timeout: 15_000 }).toBeGreaterThan(0)
+    fake.release({ method: 'files.info' })
     const image = row.getByRole('button', { name: 'Open Screenshot check.png' })
     await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)

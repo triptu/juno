@@ -109,6 +109,7 @@ test('a reply image takes Slack thumbnails after processing without a message up
   const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
   await juno.sidebar.row('Draft plan is in the doc').open()
+  fake.setFilesInfoSupported({ supported: false })
   fake.holdThumbnails()
   fake.resetCalls()
   await paste(topic.composer, [chart()])
@@ -124,7 +125,9 @@ test('a reply image takes Slack thumbnails after processing without a message up
   await expect.poll(() => remote.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
   const reads = fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file')
   expect(reads.every((call) => call.args['ts'] === root.ts && call.args['oldest'] === call.args['latest'])).toBe(true)
-  expect(fake.calls.filter((call) => call.method === 'files.info')).toHaveLength(0)
+  const info = fake.calls.filter((call) => call.method === 'files.info')
+  expect(info.length).toBeGreaterThan(0)
+  expect(info.every((call) => call.error === 'unknown_method')).toBe(true)
 })
 
 test('a file dropped on the topic is sent on its own as a file row with Download', async ({ juno, fake }) => {

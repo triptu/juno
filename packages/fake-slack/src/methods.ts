@@ -542,7 +542,12 @@ export const handlers: Handlers = {
     return { files }
   },
 
-  'files.info': () => new ApiError('unknown_method'),
+  'files.info': (ctx, args) => {
+    if (!ctx.workspace.filesInfoSupported) return new ApiError('unknown_method')
+    const file = ctx.workspace.files.get(args.file)
+    if (file?.bytes === undefined) return new ApiError('file_not_found')
+    return { file: fileObject(ctx.baseUrl, file) }
+  },
 
 }
 

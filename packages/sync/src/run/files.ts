@@ -1,10 +1,11 @@
 /**
  * Files stored before Slack filled them in (`files.ts`): images without
  * thumbnails, videos without a poster, and partial copies. Each file is
- * recovered by re-reading its message on the background lane at most
+ * asked about with `files.info` on the background lane at most
  * `FILE_TRIES.length` times, after the waits listed, and a file event
  * (`file_shared`, `file_change`, `file_created`, `file_thumbnail_generated`) asks at once
- * instead of waiting. The answer goes into every stored message that
+ * instead of waiting. If file info fails or is not ready, re-read the message
+ * in the same attempt. The answer goes into every stored message that
  * carries the file, in one transaction. A file whose tries ran out is not
  * asked about again until an event names it or its topic is opened.
  *
@@ -21,7 +22,7 @@ import type { SyncContext } from '../context'
 import { filesToFetch, isReady } from '../files'
 import { storeFileInfo } from '../write'
 
-/** The wait before each message re-read. Stop after four attempts. */
+/** The wait before each recovery attempt. Stop after four attempts. */
 const FILE_TRIES = [1_000, 3_000, 10_000, 30_000] as const
 /** Files asked about at once; more wait for a later write of their message. */
 const MAX_ACTIVE = 50
@@ -56,6 +57,15 @@ const readFileMessage = (target: Target, fileId: string) =>
     return page.messages.find((message) => message.ts === target.ts)?.files?.find((file) => file.id === fileId)
   })
 
+/** Prefer file info when available, with an exact message read as the fallback. */
+const readReadyFile = (target: Target, fileId: string) =>
+  Effect.gen(function* () {
+    const api = yield* SlackApi
+    const info = yield* Effect.result(api.call('files.info', { file: fileId }, { lane: 'background', reason: 'file' }))
+    if (info._tag === 'Success' && isReady(info.success.file)) return info.success.file
+    return yield* readFileMessage(target, fileId)
+  })
+
 export const refreshFiles = (ctx: SyncContext) =>
   Effect.gen(function* () {
     const tries = yield* FiberSet.make()
@@ -69,7 +79,7 @@ export const refreshFiles = (ctx: SyncContext) =>
           yield* Effect.raceFirst(Effect.sleep(wait), Queue.take(entry.wake))
           const target = entry.targets.values().next().value
           if (target === undefined) return 'gone' as const
-          const result = yield* Effect.result(readFileMessage(target, fileId))
+          const result = yield* Effect.result(readReadyFile(target, fileId))
           if (result._tag === 'Failure') {
             // A refused message read will not change; the session's end is someone else's to report.
             if (result.failure._tag === 'SlackRejected' || result.failure._tag === 'SlackAuthRequired') return 'gone' as const
