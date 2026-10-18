@@ -610,6 +610,8 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 `apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs every interactive element of every state, with motion on, and checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
+The guard and the focus-ring check walk many states on one page, and a state changes only the address's hash, so the document is never reloaded and its renderer keeps the code and styles of every component it drew. Both take their page from `walkPages()` in `apps/gallery/support.ts`, which moves to a fresh browser context every 20 states. Before that (10-18), the 24 parts of a remote run on an 8x16 machine grew their renderers from about 100 MB to 370 MB each, the machine ran out of its 16 GB, and the kernel's OOM killer ended one renderer, which Playwright reports as `Target crashed` or `Page crashed` in whatever state that part had reached. With the fresh contexts the same run peaks at 12.7 GB with 3 GB free (154 s script time). 16 workers peak at 9.5 GB but take 172 s, so the remote runner keeps 24. `/dev/shm` is not the cause: the container has 7.9 GB of it, and Playwright already passes `--disable-dev-shm-usage`.
+
 ## The feel suite
 
 `pnpm test:feel` records scripted interactions in the built app against the fake Slack and checks them frame by frame. It is separate from `test:e2e` (its own config, `apps/desktop/playwright.feel.config.ts`) because it records video and takes a few minutes.

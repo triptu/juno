@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
-import { claimQueue, openState, readRoutes, type Route } from './support'
+import { claimQueue, openState, readRoutes, walkPages, type Route } from './support'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
@@ -158,16 +158,18 @@ const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim(
 for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once
   // a page is open; each state is a step in the report.
-  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, async ({ page }) => {
+  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, async ({ browser }) => {
     // A part walks states until the queue is empty, at up to eight elements and six touches per state.
     test.setTimeout(15 * 60_000)
+    const pages = await walkPages(browser)
     // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
-    const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
+    const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     const queue = claimQueue('shift')
     const failures: string[] = []
     const cursors: string[] = []
     for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
       const started = Date.now()
+      const page = await pages.next()
       await test.step(route.route, async () => {
         await openState(page, route)
         for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
@@ -188,6 +190,7 @@ for (let part = 0; part < shards; part++) {
       // A slow state holds up its part; name it so it can be looked at.
       if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
     }
+    await pages.close()
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')
   })

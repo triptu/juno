@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
 
 /** One state, as the gallery lists it on `window.__galleryRoutes`. */
 export interface Route {
@@ -109,5 +109,42 @@ export function claimQueue(name: string) {
     },
     /** Claims any other key (a DOM signature); false when a part already has it. */
     claim,
+  }
+}
+
+/**
+ * States opened on one page before a walk moves to a fresh context. A state
+ * changes only the address's hash, so one document stays loaded for the whole
+ * walk and its renderer keeps the code and styles of every component it drew.
+ * On a remote 8x16 machine the shift guard's 24 parts grew from about 100 MB
+ * to 370 MB each over 60 states, until the kernel ended a renderer (10-18).
+ */
+const statesPerContext = 20
+
+/**
+ * The page for a walk over many states (the shift guard, the focus ring).
+ * `next()` returns the page to open the next state on: the same one for
+ * `statesPerContext` states, then one in a fresh context. A context made in a
+ * test takes the project's options (viewport, scale, motion, base URL), as
+ * the `page` fixture's does.
+ */
+export async function walkPages(browser: Browser) {
+  let context = await browser.newContext()
+  let page = await context.newPage()
+  let opened = 0
+  return {
+    /** The current page, to read the state list from before the walk. */
+    page: () => page,
+    next: async (): Promise<Page> => {
+      if (opened === statesPerContext) {
+        await context.close()
+        context = await browser.newContext()
+        page = await context.newPage()
+        opened = 0
+      }
+      opened++
+      return page
+    },
+    close: () => context.close(),
   }
 }
