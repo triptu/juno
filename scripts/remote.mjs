@@ -29,7 +29,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { runnerConfig, checkRunner, runnerCommand, runnerJobCores, ensureRunnerImage } from './remote/runner.mjs'
+import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, ensureRunnerImage } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
@@ -155,10 +155,11 @@ const scriptArgs = [options.script, ...options.args].map(quote).join(' ')
 const outputDir = `/tmp/juno-remote-${runId}`
 let backend = 'namespace'
 let runner
+let cpuLimit
 let cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
 const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, command]] : ['nsc', ['ssh', '-T', id, command]]
 const container = (image) =>
-  `echo __juno_remote_started; rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${backend === 'ssh' ? `--cpus ${cores} -e JUNO_RUNNER_JOB_CORES=${cores}` : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
+  `echo __juno_remote_started; rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit}` : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
   `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
 const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote', ...(process.env.JUNO_REMOTE_IMAGE_CACHE === 'on' ? ['--experimental', JSON.stringify({ container_cache: { tag: 'juno-remote-images-v1', size_mb: 8192 } })] : [])]
 
@@ -252,7 +253,7 @@ let finalized = false
 function finishLog(result) {
   if (finalized) return
   finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, cores: backend === 'ssh' ? cores : Number(/:(\d+)x/.exec(options.machine)?.[1]), warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, cpuLimit: backend === 'ssh' ? cpuLimit : undefined, cores: backend === 'ssh' ? cores : Number(/:(\d+)x/.exec(options.machine)?.[1]), warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 }
 try {
   runner = runnerConfig()
@@ -261,7 +262,9 @@ try {
     if (health.reachable) {
       backend = 'ssh'
       if (options.keep) throw new Error('--keep is only available for Namespace')
-      cores = runnerJobCores(options, health.cores)
+      const size = runnerJobSize(options, health.cores)
+      cores = size.reserved
+      cpuLimit = size.cpus
       if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
     } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
   }
@@ -271,7 +274,7 @@ try {
     image = await ensureRunnerImage(runner, (message) => { console.error(message); appendFileSync(runLog, `${message}\n`) })
     id = runner.host
     acquiredAt = Date.now()
-    console.error(`remote: SSH runner (${cores} cores); running pnpm ${options.script}`)
+    console.error(`remote: SSH runner (${cores} cores); CPU limit ${cpuLimit}; running pnpm ${options.script}`)
   } else {
     await prepareNamespace()
   }
