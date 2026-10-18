@@ -5,8 +5,6 @@ import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
-import { QuietWindowSetting } from './QuietWindowSetting'
-import { TabExpirySetting, type TabExpiryName } from './TabExpirySetting'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
@@ -27,16 +25,9 @@ const checkLabels: Record<SendCheckPref, string> = {
 }
 
 export interface SettingsGeneralProps {
-  /** How many days of activity the sidebar shows (1, 3, 7 or 14). */
-  readonly quietDays: number
-  readonly onQuietDaysChange: (days: number) => void
   readonly checks: ReadonlyArray<{ readonly key: SendCheckPref; readonly enabled: boolean }>
   readonly grammarUnavailable?: string | undefined
   readonly onCheckChange: (key: SendCheckPref, enabled: boolean) => void
-  /** What a new tab opens: "+", ⌘T and the tab that replaces the last one closed. */
-  /** How long a tab can go unseen before it closes by itself. */
-  readonly tabExpiry: TabExpiryName
-  readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly peekKey: PeekKeyName
   readonly onPeekKeyChange: (key: PeekKeyName) => void
   /** A plain click on a web link opens it in the web panel (SPEC 7). */
@@ -62,21 +53,11 @@ export interface SettingsGeneralProps {
   readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, Home's thought, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, homeThoughts, onHomeThoughtsChange, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+/** General: peek, Home's thought, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ peekKey, onPeekKeyChange, homeThoughts, onHomeThoughtsChange, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
-      <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show.">
-        <Surface kind="group" padding="md" sx={styles.card}>
-          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
-        </Surface>
-      </Section>
-      <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one.">
-        <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
-          <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
-        </Surface>
-      </Section>
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
@@ -228,12 +209,6 @@ const styles = stylex.create({
   // on the same line as the rows of Notifications, Juno, Connections and Backup.
   card: {
     paddingInline: spacing['--space-3-5'],
-  },
-  // A card with two rows: they sit apart as Appearance's do.
-  rows: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
   },
   // Starts on the switch label's text: past the 15px box and the Checkbox's 10px gap.
   catchUp: {

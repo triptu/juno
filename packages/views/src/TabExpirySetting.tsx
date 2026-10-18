@@ -17,7 +17,7 @@ const expiryOptions: ReadonlyArray<{ readonly value: TabExpiryName; readonly lab
   { value: '7d', label: '7 days' },
 ]
 
-/** "Close tabs not viewed in" (Settings › General, Tabs). */
+/** "Close tabs not viewed in" (Settings › Tidy up, Tabs). */
 export function TabExpirySetting({ value, onChange }: TabExpirySettingProps) {
   return (
     <div {...stylex.props(styles.row)}>

@@ -329,7 +329,7 @@ export function moveTab(tabs: Tabs, id: string, index: number): Tabs {
   return { ...tabs, tabs: tabs.tabs.toSpliced(at, 1).toSpliced(to, 0, tab) }
 }
 
-/** Tabs close after this long unseen (Settings › General, "Close tabs not viewed in"); `never` keeps them. */
+/** Tabs close after this long unseen (Settings › Tidy up, "Close tabs not viewed in"); `never` keeps them. */
 export type TabExpiry = 'never' | '1d' | '3d' | '7d'
 export const TAB_EXPIRY_DEFAULT: TabExpiry = '1d'
 const DAY_MS = 24 * 60 * 60 * 1000

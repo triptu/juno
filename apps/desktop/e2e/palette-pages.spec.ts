@@ -50,6 +50,17 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   })
 
+  await test.step('"topics" and "tabs" find Settings: Tidy up', async () => {
+    for (const term of ['settings topics', 'settings tabs']) {
+      await palette.open()
+      await palette.type(term)
+      await palette.expectActive(/Settings: Tidy up/)
+      await palette.press('Enter')
+      await palette.expectClosed()
+      await expect(settings.section('Tidy up')).toHaveAttribute('aria-current', 'page')
+    }
+  })
+
   await test.step('"scheduled" then Enter opens the Scheduled page', async () => {
     await palette.open()
     await palette.type('scheduled')

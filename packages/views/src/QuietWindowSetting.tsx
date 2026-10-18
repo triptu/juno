@@ -16,6 +16,7 @@ const options: ReadonlyArray<{ readonly value: WindowChoice; readonly label: str
   { value: '14', label: '14 days' },
 ]
 
+/** The topic visibility window (Settings › Tidy up, Topics). */
 export function QuietWindowSetting({ value, onChange }: QuietWindowSettingProps) {
   return (
     <div {...stylex.props(styles.row)}>

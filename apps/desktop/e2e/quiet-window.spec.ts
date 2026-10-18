@@ -3,7 +3,7 @@ import { expect, test } from './fixtures'
 
 const DAY = 86_400_000
 
-test('General changes the window: old topics leave locally and arrive through background backfill', async ({ juno, slack }) => {
+test('Tidy up changes the topic window: old topics leave locally and arrive through background backfill', async ({ juno, slack }) => {
   const fake = slack.fake
   for (const [id, name, days] of [['C0QUIETFIVE', 'quiet-five', 5], ['C0QUIETTEN', 'quiet-ten', 10]] as const) {
     fake.workspace.addConversation({ id, name, kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: fake.now() - 30 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
@@ -16,7 +16,7 @@ test('General changes the window: old topics leave locally and arrive through ba
   const ten = juno.sidebar.row('#quiet-ten').root
   await expect(five).toHaveCount(1)
   await expect(ten).toHaveCount(0)
-  await juno.openSettings('General')
+  await juno.openSettings('Tidy up')
   const control = juno.settings.root.getByRole('radiogroup', { name: 'Show topics active in the last' })
   await expect(control.getByRole('radio', { name: '7 days', exact: true })).toHaveAttribute('aria-checked', 'true')
   await control.getByRole('radio', { name: '3 days', exact: true }).click()
@@ -30,6 +30,6 @@ test('General changes the window: old topics leave locally and arrive through ba
   expect(fake.calls.some((c) => c.method === 'conversations.history' && c.args['channel'] === 'C0QUIETTEN' && c.args['_x_reason'] === 'window-history')).toBe(true)
   expect((await top.boundingBox())?.y).toBe(before?.y)
   await juno.tabs.close('Settings')
-  await juno.openSettings('General')
+  await juno.openSettings('Tidy up')
   await expect(control.getByRole('radio', { name: '14 days', exact: true })).toHaveAttribute('aria-checked', 'true')
 })

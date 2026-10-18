@@ -111,6 +111,17 @@ test('General and Appearance put each control at the trailing edge, 15px from th
   }
 })
 
+test('Topics and Tabs are in Tidy up; General keeps its remaining settings', async ({ page }) => {
+  await open(page, 'SettingsPage', 'sections/general')
+  const general = await page.locator('[data-fixture-frame] section h2').allTextContents()
+  expect(general).toEqual(['Peek', 'Links', 'Read status', 'Screen sharing', 'Message checks', 'AI assist'])
+  await open(page, 'SettingsPage', 'states/tidy-up')
+  const tidyUp = await page.locator('[data-fixture-frame] section h2').allTextContents()
+  expect(tidyUp.slice(0, 4)).toEqual(['Topics', 'Tabs', 'What Resolve does', 'Suggestions'])
+  await expect(page.getByText('Show topics active in the last')).toBeVisible()
+  await expect(page.getByText('Close tabs not viewed in')).toBeVisible()
+})
+
 test('a saved API key looks the same in Set up Juno and Settings › Juno: the Key set chip beside the field, which keeps its placeholder', async ({ page }) => {
   const read = () =>
     page.evaluate(() => {

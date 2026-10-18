@@ -66,7 +66,7 @@ Unchanged on purpose: no labels, no counts, no times, no greeting while items wa
 **Removed:**
 
 - The sidebar title bar's New chat button (`NotePencil` IconButton, `onNewChat` in `Sidebar.tsx` and its container).
-- Settings › General › Tabs "New tabs open": `NewTabSetting`, `state/newTabPage.ts` and the `newTabPage` preference. "Close tabs not viewed in" stays.
+- "Close tabs not viewed in" stays in Settings › Tidy up.
 - New chat as a page and a tab type: the `newChat` place in `state/tabs.ts`, `containers/NewChat.tsx`, `views/NewChat.tsx` and its fixtures, the New chat tab icon and title rule, the preview, `FrequentConversations` and `FrequentRows`, and the thread picker.
 - `DestinationPickers`' conversation list stays as the chip's popover.
 - Home's Ask Juno field.
