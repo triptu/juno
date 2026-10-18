@@ -1,12 +1,15 @@
 /**
  * The `agent_attempts` ledger in `user.db`: one row per authorization the
- * agent dispatched, written before the Slack call. `INSERT ... ON CONFLICT
- * DO NOTHING` decides which request owns an authorization, so two requests
- * for one authorization never both call Slack.
+ * agent dispatched, written with the queued post in one transaction
+ * (`claim`). `INSERT ... ON CONFLICT DO NOTHING` decides which request owns
+ * an authorization, so two requests for one authorization never queue two
+ * posts. The row keeps the text the post carries.
  */
 import { StoreWriter, StoreReader } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { Attempt, AttemptRecord, AttemptState } from '@juno/agent-juno'
+import { queueText } from '../postQueue'
+import * as approvals from './approvals'
 
 interface Row {
   readonly authorization_id: string
@@ -48,6 +51,15 @@ const recordOf = (row: Row): AttemptRecord =>
 
 const now = Effect.map(Clock.currentTimeMillis, (ms) => new Date(ms).toISOString())
 
+/** The row of this authorization, or of this attempt id. */
+const find = (authorizationId: string, attemptId: string) =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const [row] = yield* sql<Row>`SELECT * FROM agent_attempts WHERE authorization_id = ${authorizationId} OR attempt_id = ${attemptId}
+      ORDER BY authorization_id = ${authorizationId} DESC LIMIT 1`
+    return row === undefined ? undefined : recordOf(row)
+  })
+
 /** Inserts the row unless the authorization has one; returns the existing row in that case. */
 const insert = (values: { authorizationId: string; attemptId: string; actionId: string; channelId: string; threadTs: string | null; text: string; state: 'submitted' | 'cancelled' }) =>
   Effect.gen(function* () {
@@ -59,20 +71,31 @@ const insert = (values: { authorizationId: string; attemptId: string; actionId: 
       ON CONFLICT DO NOTHING
       RETURNING authorization_id`
     if (inserted.length > 0) return undefined
-    const [row] = yield* sql<Row>`SELECT * FROM agent_attempts WHERE authorization_id = ${values.authorizationId} OR attempt_id = ${values.attemptId}
-      ORDER BY authorization_id = ${values.authorizationId} DESC LIMIT 1`
-    return row === undefined ? undefined : recordOf(row)
+    return yield* find(values.authorizationId, values.attemptId)
   })
 
-export const claim = (attempt: Attempt) =>
-  insert({
-    authorizationId: attempt.authorizationId,
-    attemptId: attempt.attemptId,
-    actionId: attempt.actionId,
-    channelId: attempt.channelId,
-    threadTs: attempt.threadTs ?? null,
-    text: attempt.text,
-    state: 'submitted',
+/**
+ * The send's record if its authorization has one. Otherwise takes the
+ * owner's click on the action and `digest` (`approvals.take`), records the
+ * attempt as `submitted` and queues the post the composer's way. Run it in
+ * one transaction, so a click is never taken without its post.
+ */
+export const claim = (attempt: Attempt, digest: string) =>
+  Effect.gen(function* () {
+    const prior = yield* find(attempt.authorizationId, attempt.attemptId)
+    if (prior !== undefined) return prior
+    yield* approvals.take(attempt.actionId, digest, attempt.authorizationId)
+    const createdAt = yield* Clock.currentTimeMillis
+    const text = yield* queueText({ clientMsgId: attempt.actionId, channel: attempt.channelId, threadTs: attempt.threadTs, text: attempt.text, createdAt })
+    return yield* insert({
+      authorizationId: attempt.authorizationId,
+      attemptId: attempt.attemptId,
+      actionId: attempt.actionId,
+      channelId: attempt.channelId,
+      threadTs: attempt.threadTs ?? null,
+      text,
+      state: 'submitted',
+    })
   })
 
 export const cancel = (authorizationId: string, attemptId: string) =>

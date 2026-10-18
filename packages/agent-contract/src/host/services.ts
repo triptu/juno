@@ -2,6 +2,9 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { AccountId, ActionId, AuthorizationId, AttemptId, Digest, ExecutableIdentity } from '@juno/agent-cards'
 import { OpenTarget, Place, TopicLink } from '../chat/place'
+
+/** The digest a click binds and a dispatch carries: the host checks one against the other. */
+export { actionDigest } from '@juno/agent-cards'
 import { HostHelloRpcs } from './port'
 
 export const HostChannelId = Schema.String.pipe(Schema.brand('HostChannelId'))

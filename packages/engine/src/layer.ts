@@ -8,6 +8,7 @@ import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
 import { OwnerActivity } from './activity'
+import { AgentWritesHandlers } from './agent-host/handlers'
 import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiFallback } from './aiFallback'
 import { AiWarmup } from './aiWarmup'
@@ -114,7 +115,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers)
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))

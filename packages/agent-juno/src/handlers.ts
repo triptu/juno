@@ -5,10 +5,12 @@
  * - Every request names the account it was made for. A request for another
  *   account than the signed-in one fails with `stale`; none open, `signedOut`.
  * - Slack and topic reads come from Juno's local store.
- * - Sends are single-attempt (`dispatch.ts`). They are off unless the
- *   options turn them on. The desktop enables them for approved cards;
- *   a disabled host refuses before recording an attempt.
- * - Resolve uses the local topic command and retains its Undo.
+ * - Sends go through the composer's outbox (`dispatch.ts`), and only for
+ *   a payload that matches its digest and a click the engine recorded on
+ *   that action and digest. They are off unless the options turn them on:
+ *   the desktop does; a disabled host refuses before recording anything.
+ * - Resolve uses the local topic command and retains its Undo. It takes
+ *   the owner's click the same way.
  * - OS notification delivery remains unsupported.
  * - Spend asks go the other way: the engine's model calls offer
  *   reservations and settlements, and the agent answers from its ledger.
@@ -18,11 +20,11 @@
  */
 import { Effect, Stream } from 'effect'
 import { AGENT_HOST_PROTOCOL, AgentHostError, AgentHostRpcs } from '@juno/agent-contract'
-import { makeDispatcher, parseSend } from './dispatch'
+import { digestMatches, makeDispatcher, parseSend } from './dispatch'
 import { JunoHost, type Account, type AccountId } from './host'
 
 export interface HandlerOptions {
-  /** Whether approved sends reach Slack. */
+  /** Whether approved sends reach Slack. Off for embedders that must not write, such as the live scripts. */
   readonly writes: 'enabled' | 'disabled'
 }
 
@@ -68,16 +70,19 @@ export const agentHostHandlers = (options: HandlerOptions) =>
 
         'host.outbox.send': (dispatch) =>
           Effect.gen(function* () {
-            if (options.writes === 'disabled') return yield* unsupported('Juno does not send to Slack yet.')
+            if (options.writes === 'disabled') return yield* unsupported('Slack writes are off in this host.')
             const attempt = parseSend(dispatch)
             if (attempt instanceof AgentHostError) return yield* attempt
             yield* accountFor(dispatch.payload.account_id)
-            return yield* dispatcher.send(attempt)
+            return yield* dispatcher.send(attempt, dispatch.digest)
           }),
         'host.outbox.cancel': ({ authorizationId, attemptId }) => dispatcher.cancel(authorizationId, attemptId),
         'host.outbox.reconcileSend': ({ accountId, channelId, actionId, attemptId }) =>
           Effect.flatMap(accountFor(accountId), (account) => dispatcher.reconcile(attemptId, channelId, actionId, account.userId)),
-        'host.topics.resolve': (dispatch) => asAccount(dispatch.payload.account_id, host.resolve?.(dispatch) ?? unsupported('Resolve is unavailable.')),
+        'host.topics.resolve': (dispatch) =>
+          digestMatches(dispatch)
+            ? asAccount(dispatch.payload.account_id, host.resolve?.(dispatch) ?? unsupported('Resolve is unavailable.'))
+            : Effect.fail(new AgentHostError({ reason: 'rejected', message: 'The payload differs from its digest.' })),
         'host.topics.undoResolve': ({ accountId, actionId }) => asAccount(accountId, host.undoResolve?.(actionId) ?? unsupported('Resolve Undo is unavailable.')),
 
         'host.schedule.check': ({ accountId, conversation, refresh }) => asAccount(accountId, host.schedule?.check(conversation, refresh) ?? unsupported('Reply watches are unavailable.')).pipe(Effect.tap(() => accountFor(accountId))),

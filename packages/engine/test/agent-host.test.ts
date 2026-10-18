@@ -10,11 +10,11 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { AgentHostRpcs, HostDispatch, HostPresence, HostTopicId } from '@juno/agent-contract'
+import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { SELF_ID } from '@juno/fake-slack'
-import { prefsSet } from '@juno/contract'
+import { agentWritesApprove, prefsSet } from '@juno/contract'
 import { runCommand, topicAtom } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
@@ -102,39 +102,52 @@ async function hostWithAgent(writes: 'enabled' | 'disabled') {
 }
 
 let sequence = 0
-/** A dispatch of one Slack send, as the agent's dispatcher makes it after consuming the authorization. */
-function send(account: string, text: string, ids: { readonly n?: number } = {}) {
-  const n = ids.n ?? ++sequence
+/** A dispatch as the agent's dispatcher makes it after consuming the authorization: the payload and its digest. */
+function dispatchOf(n: number, payload: Record<string, unknown>) {
   const hex = n.toString(16).padStart(12, '0')
-  return Schema.decodeUnknownSync(HostDispatch)({
+  const decoded = Schema.decodeUnknownSync(HostDispatch)({
     actionId: `0190a000-0000-7000-8000-${hex}`,
     authorizationId: `auth-${n}`,
     attemptId: `attempt-${n}`,
     digest: '0'.repeat(64),
     mode: 'single-attempt',
-    payload: {
-      connection_id: 'slack',
-      account_id: account,
-      destination_ids: [CHANNEL],
-      tool: 'slack_send',
-      schema_hash: '1'.repeat(64),
-      args: { channelId: CHANNEL, text },
-      preconditions: {},
-      ops: [],
-    },
+    payload,
   })
+  return { ...decoded, digest: actionDigest(decoded.payload) }
+}
+
+/** A dispatch of one Slack send. */
+function send(account: string, text: string, ids: { readonly n?: number } = {}) {
+  return dispatchOf(ids.n ?? ++sequence, {
+    connection_id: 'slack',
+    account_id: account,
+    destination_ids: [CHANNEL],
+    tool: 'slack_send',
+    schema_hash: '1'.repeat(64),
+    args: { channelId: CHANNEL, text },
+    preconditions: {},
+    ops: [],
+  })
+}
+
+/** The owner's click on these dispatches' actions, as the renderer records it before it tells the agent. */
+async function approve(engine: RunningEngine, ...dispatches: ReadonlyArray<typeof HostDispatch.Type>) {
+  const exit = await runCommand(engine.registry, agentWritesApprove, { children: dispatches.map((d) => ({ actionId: d.actionId, digest: d.digest })) })
+  expect(exit._tag).toBe('Success')
 }
 
 const posted = (engine: RunningEngine, clientMsgId: string) => engine.fake.messages(CHANNEL).filter((m) => m.client_msg_id === clientMsgId)
 
 describe('the AgentHost port', () => {
-  it('resolves locally with writes disabled, restores Undo, and never reapplies a repeated dispatch', async () => {
-    const { agent: { client }, account } = await hostWithAgent('disabled')
+  it('resolves locally with writes disabled, only on a click, restores Undo, and never reapplies a repeated dispatch', async () => {
+    const { engine, agent: { client }, account } = await hostWithAgent('disabled')
     const topics = await ok(client['host.topics.list']({ limit: 20 }))
     const topic = topics.topics[0]!
     const base = send(account, '')
-    const dispatch = Schema.decodeUnknownSync(HostDispatch)({ ...base, payload: { ...base.payload,
-      tool: 'topics_resolve', destination_ids: [topic.topicId], args: { topicIds: [topic.topicId] } } })
+    const dispatch = dispatchOf(++sequence, { ...base.payload, tool: 'topics_resolve', destination_ids: [topic.topicId], args: { topicIds: [topic.topicId] } })
+    expect(await failure(client['host.topics.resolve'](dispatch))).toMatchObject({ reason: 'rejected' })
+    expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
+    await approve(engine, dispatch)
     const result = await ok(client['host.topics.resolve'](dispatch))
     expect(result._tag).toBe('done')
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(true)
@@ -142,7 +155,8 @@ describe('the AgentHost port', () => {
     await ok(client['host.topics.undoResolve']({ accountId: account, actionId: dispatch.actionId }))
     expect(await ok(client['host.topics.resolve'](dispatch))).toEqual(result)
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
-    const bad = Schema.decodeUnknownSync(HostDispatch)({ ...send(account, ''), payload: { ...dispatch.payload, args: { topicIds: [topic.topicId, 'missing'] }, destination_ids: [topic.topicId, 'missing'] } })
+    const bad = dispatchOf(++sequence, { ...dispatch.payload, args: { topicIds: [topic.topicId, 'missing'] }, destination_ids: [topic.topicId, 'missing'] })
+    await approve(engine, bad)
     expect(await failure(client['host.topics.resolve'](bad))).toMatchObject({ reason: 'rejected' })
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
   })
@@ -297,19 +311,45 @@ describe('the AgentHost port', () => {
   it('refuses sends while external writes are off', async () => {
     const { engine, agent, account } = await hostWithAgent('disabled')
     const dispatch = send(account, 'Hello from Juno')
+    await approve(engine, dispatch)
     expect(await failure(agent.client['host.outbox.send'](dispatch))).toMatchObject({ reason: 'unsupported' })
     expect(await failure(agent.client['host.topics.resolve'](dispatch))).toMatchObject({ reason: 'rejected' })
     expect(posted(engine, dispatch.actionId)).toEqual([])
     expect(engine.fake.callCount('chat.postMessage')).toBe(0)
   })
 
-  it('sends once per authorization, and answers a repeat from the record', async () => {
+  it('sends only on the owner click on that exact payload, and only once', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    const unclicked = send(account, 'Juno wrote this on its own')
+    expect(await failure(agent.client['host.outbox.send'](unclicked))).toMatchObject({ reason: 'rejected' })
+
+    // The owner approved one text; the dispatch carries another, with its own digest or with the approved one.
+    const shown = send(account, 'Lunch at noon?')
+    await approve(engine, shown)
+    const swapped = { ...shown, payload: { ...shown.payload, args: { channelId: CHANNEL, text: 'Lunch at noon? Also, the launch is cancelled.' } } } as typeof shown
+    expect(await failure(agent.client['host.outbox.send']({ ...swapped, digest: actionDigest(swapped.payload) }))).toMatchObject({ reason: 'rejected' })
+    expect(await failure(agent.client['host.outbox.send'](swapped))).toMatchObject({ reason: 'rejected' })
+    expect(engine.fake.callCount('chat.postMessage')).toBe(0)
+
+    expect(await ok(agent.client['host.outbox.send'](shown))).toMatchObject({ _tag: 'done', attemptId: shown.attemptId })
+    // A second authorization of the same click, a replay under new ids, is refused.
+    const replay = { ...shown, authorizationId: 'auth-replay', attemptId: 'attempt-replay' } as typeof shown
+    expect(await failure(agent.client['host.outbox.send'](replay))).toMatchObject({ reason: 'rejected' })
+    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
+    expect(posted(engine, shown.actionId)).toHaveLength(1)
+    expect(posted(engine, unclicked.actionId)).toEqual([])
+  })
+
+  it('sends through the outbox once per authorization, and answers a repeat from the record', async () => {
     const { engine, agent, account } = await hostWithAgent('enabled')
     const dispatch = send(account, 'Lunch at noon?')
+    await approve(engine, dispatch)
     const result = await ok(agent.client['host.outbox.send'](dispatch))
     const [message] = posted(engine, dispatch.actionId)
     expect(result).toEqual({ _tag: 'done', attemptId: dispatch.attemptId, receipt: { channelId: CHANNEL, ts: message!.ts } })
     expect(message).toMatchObject({ user: 'U0TUSHAR', text: 'Lunch at noon?' })
+    // It went as the composer sends: one rich_text block with the text.
+    expect(JSON.stringify(message!.blocks)).toContain('rich_text')
 
     expect(await ok(agent.client['host.outbox.send'](dispatch))).toEqual(result)
     expect(await ok(agent.client['host.outbox.cancel']({ authorizationId: dispatch.authorizationId, attemptId: dispatch.attemptId }))).toEqual(result)
@@ -318,16 +358,47 @@ describe('the AgentHost port', () => {
     const reconciled = await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: dispatch.actionId, attemptId: dispatch.attemptId } as never))
     expect(reconciled).toMatchObject({ _tag: 'found', message: { ts: message!.ts, senderId: 'U0TUSHAR', clientMessageId: dispatch.actionId } })
 
-    const other = { ...send(account, 'Wrong account'), payload: { ...dispatch.payload, account_id: 'T0OTHER:U0OTHER' } } as typeof dispatch
-    expect(await failure(agent.client['host.outbox.send'](other))).toMatchObject({ reason: 'stale' })
-    const notSend = { ...send(account, 'x'), payload: { ...dispatch.payload, tool: 'notion-update-page' } } as typeof dispatch
+    const other = send(account, 'Wrong account')
+    const otherAccount = { ...other, payload: { ...other.payload, account_id: 'T0OTHER:U0OTHER' } } as typeof other
+    const wrong = { ...otherAccount, digest: actionDigest(otherAccount.payload) }
+    await approve(engine, wrong)
+    expect(await failure(agent.client['host.outbox.send'](wrong))).toMatchObject({ reason: 'stale' })
+    const notSend = dispatchOf(++sequence, { ...dispatch.payload, tool: 'notion-update-page' })
+    await approve(engine, notSend)
     expect(await failure(agent.client['host.outbox.send'](notSend))).toMatchObject({ reason: 'rejected' })
     expect(engine.fake.callCount('chat.postMessage')).toBe(1)
+  })
+
+  it('a refused post fails with Slack’s reason and stays in the topic as Not sent', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    const dispatch = send(account, 'Into a channel I left')
+    await approve(engine, dispatch)
+    engine.fake.forceError({ method: 'chat.postMessage', error: 'not_in_channel' })
+    expect(await ok(agent.client['host.outbox.send'](dispatch))).toEqual({ _tag: 'failed', attemptId: dispatch.attemptId, reason: 'not_in_channel' })
+    expect(posted(engine, dispatch.actionId)).toEqual([])
+    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
+  })
+
+  it('waits out a lost connection and sends when it is back', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    engine.main.network.offline = true
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    const dispatch = send(account, 'Sent while offline')
+    await approve(engine, dispatch)
+    const pending = run(agent.client['host.outbox.send'](dispatch))
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    expect(engine.fake.callCount('chat.postMessage')).toBe(0)
+    engine.main.network.offline = false
+    engine.fake.goOnline()
+    expect(await pending).toMatchObject({ _tag: 'Success', success: { _tag: 'done', attemptId: dispatch.attemptId } })
+    expect(posted(engine, dispatch.actionId)).toHaveLength(1)
   })
 
   it('keeps the send when the agent dies mid-call, and the restarted agent gets its result', async () => {
     const { engine, transport, agent, account } = await hostWithAgent('enabled')
     const dispatch = send(account, 'Sent while the agent crashed')
+    await approve(engine, dispatch)
     engine.fake.holdNext({ method: 'chat.postMessage' })
     const lost = Effect.runPromiseExit(agent.client['host.outbox.send'](dispatch))
     await waitFor(() => (engine.fake.heldCount({ method: 'chat.postMessage' }) === 1 ? true : undefined), 15_000, 'the send to reach Slack')
@@ -343,28 +414,26 @@ describe('the AgentHost port', () => {
     expect(engine.fake.callCount('chat.postMessage')).toBe(1)
   })
 
-  it('a lost answer is unknown, never repeated, and only positive evidence settles it', async () => {
+  it('a lost answer is settled by the outbox lookup, never posted twice, and only the owner’s message counts', async () => {
     const { engine, agent, account } = await hostWithAgent('enabled')
     const lost = send(account, 'Answer lost on the way back')
+    await approve(engine, lost)
     engine.fake.loseResponse({ method: 'chat.postMessage' })
-    expect(await ok(agent.client['host.outbox.send'](lost))).toEqual({ _tag: 'unknown', attemptId: lost.attemptId })
-    expect(posted(engine, lost.actionId)).toHaveLength(1)
-    expect(await ok(agent.client['host.outbox.send'](lost))).toEqual({ _tag: 'unknown', attemptId: lost.attemptId })
-    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
-
-    const reconcile = (d: typeof lost) =>
-      ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: d.actionId, attemptId: d.attemptId } as never))
-    expect(await reconcile(lost)).toMatchObject({ _tag: 'found', message: { clientMessageId: lost.actionId } })
     expect(await ok(agent.client['host.outbox.send'](lost))).toMatchObject({ _tag: 'done', attemptId: lost.attemptId })
+    expect(posted(engine, lost.actionId)).toHaveLength(1)
+    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
 
     // Slack ran nothing, and someone else posts a message carrying the send's client_msg_id.
     const forged = send(account, 'Never landed')
+    await approve(engine, forged)
     engine.fake.forceError({ method: 'chat.postMessage', error: 'internal_error' })
-    expect(await ok(agent.client['host.outbox.send'](forged))).toEqual({ _tag: 'unknown', attemptId: forged.attemptId })
+    const pending = run(agent.client['host.outbox.send'](forged))
+    await waitFor(() => (engine.fake.callCount('chat.postMessage') === 2 ? true : undefined), 15_000, 'the refused post')
     const receipt = forgedSendReceipt(forged.actionId, CHANNEL)
     engine.fake.injectMessage({ channel: CHANNEL, user: 'U0MAYA', text: receipt.text, clientMsgId: forged.actionId })
     expect(HOSTILE_USER).not.toBe('U0MAYA')
-    expect(await reconcile(forged)).toEqual({ _tag: 'unknown' })
+    expect(await pending).toEqual({ _tag: 'Success', success: { _tag: 'unknown', attemptId: forged.attemptId } })
+    expect(await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: forged.actionId, attemptId: forged.attemptId } as never))).toEqual({ _tag: 'unknown' })
     expect(await ok(agent.client['host.outbox.send'](forged))).toEqual({ _tag: 'unknown', attemptId: forged.attemptId })
     expect(engine.fake.callCount('chat.postMessage')).toBe(2)
   })
@@ -373,6 +442,7 @@ describe('the AgentHost port', () => {
     const { engine, agent, account } = await hostWithAgent('enabled')
     engine.main.network.resend = true
     const dispatch = send(account, 'Sent twice by the network')
+    await approve(engine, dispatch)
     engine.fake.loseResponse({ method: 'chat.postMessage' })
     const result = await ok(agent.client['host.outbox.send'](dispatch))
     expect(result).toMatchObject({ _tag: 'done', attemptId: dispatch.attemptId })
@@ -381,28 +451,29 @@ describe('the AgentHost port', () => {
     expect(engine.fake.callCount('chat.delete')).toBe(1)
   })
 
-  it('settles a lost send whose text Slack stores escaped', async () => {
+  it('reconciles a send whose text Slack stores escaped', async () => {
     const { engine, agent, account } = await hostWithAgent('enabled')
-    const lost = send(account, 'Ship it if p95 < 200ms & errors > 0? <@U0MAYA>')
-    engine.fake.loseResponse({ method: 'chat.postMessage' })
-    expect(await ok(agent.client['host.outbox.send'](lost))).toEqual({ _tag: 'unknown', attemptId: lost.attemptId })
-    const [stored] = posted(engine, lost.actionId)
-    expect(stored!.text).not.toBe('Ship it if p95 < 200ms & errors > 0? <@U0MAYA>')
-    const found = await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: lost.actionId, attemptId: lost.attemptId } as never))
-    expect(found).toMatchObject({ _tag: 'found', message: { clientMessageId: lost.actionId, text: stored!.text } })
-    expect(await ok(agent.client['host.outbox.send'](lost))).toMatchObject({ _tag: 'done', attemptId: lost.attemptId })
+    const sent = send(account, 'Ship it if p95 < 200ms & errors > 0?')
+    await approve(engine, sent)
+    expect(await ok(agent.client['host.outbox.send'](sent))).toMatchObject({ _tag: 'done', attemptId: sent.attemptId })
+    const [stored] = posted(engine, sent.actionId)
+    expect(stored!.text).not.toBe('Ship it if p95 < 200ms & errors > 0?')
+    const found = await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: sent.actionId, attemptId: sent.attemptId } as never))
+    expect(found).toMatchObject({ _tag: 'found', message: { clientMessageId: sent.actionId, text: stored!.text } })
     expect(engine.fake.callCount('chat.postMessage')).toBe(1)
   })
 
-  it('a cancel before the send refuses it; a send cut off by an engine restart is unknown', async () => {
+  it('a cancel before the send refuses it; a send cut off by an engine restart is followed to its end', async () => {
     const { engine, transport, agent, account } = await hostWithAgent('enabled')
     const cancelled = send(account, 'Never sent')
+    await approve(engine, cancelled)
     expect(await ok(agent.client['host.outbox.cancel']({ authorizationId: cancelled.authorizationId, attemptId: cancelled.attemptId }))).toEqual({ _tag: 'cancelled' })
     expect(await ok(agent.client['host.outbox.send'](cancelled))).toEqual({ _tag: 'failed', attemptId: cancelled.attemptId, reason: 'cancelled' })
     expect(engine.fake.callCount('chat.postMessage')).toBe(0)
 
     engine.main.network.resend = true
     const cut = send(account, 'Engine stopped mid-send')
+    await approve(engine, cut)
     engine.fake.holdNext({ method: 'chat.postMessage' })
     const pending = Effect.runPromiseExit(agent.client['host.outbox.send'](cut))
     await waitFor(() => (engine.fake.heldCount({ method: 'chat.postMessage' }) === 1 ? true : undefined), 15_000, 'the send to reach Slack')
@@ -428,8 +499,9 @@ describe('the AgentHost port', () => {
     })
     await next.status('ready')
     const restarted = await connectAgent(transport)
-    expect(await ok(restarted.client['host.outbox.send'](cut))).toEqual({ _tag: 'unknown', attemptId: cut.attemptId })
-    expect(engine.fake.callCount('chat.postMessage')).toBe(1)
+    // The post was cut off mid-call: the outbox's lookup finds it, and the record follows.
+    expect(await ok(restarted.client['host.outbox.send'](cut))).toMatchObject({ _tag: 'done', attemptId: cut.attemptId })
+    expect(posted(engine, cut.actionId)).toHaveLength(1)
     const found = await ok(restarted.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: cut.actionId, attemptId: cut.attemptId } as never))
     expect(found).toMatchObject({ _tag: 'found' })
   })
