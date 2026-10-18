@@ -30,3 +30,9 @@ A test that sends from Home and then misses the message in a tab needs to say wh
 - **When a test fails:** the `running` fixture adds the fake's `chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete` calls (`posts`: time, method, channel, answer) and attaches the whole as `send-trace`, and prints it on one line, `send trace (<test>): {...}`, so a remote run's `run.log` has it.
 
 Reading it: no `posts` entry for the channel means the send never left the engine. A `window` for the tab's view whose `sent` stays at `pending` while `posts` shows an answer points at the engine's reconcile. No `window` for the tab's view after the send means its subscription did not run again. A `tabs dropped` or no `tabs applied` with the tab active after `switch` means the tab never showed.
+
+## Relaunch frames
+
+The relaunch check in `session.spec.ts` attaches `relaunch-frames` JSON before its assertions. It records the total frames, sidebar and sign-in counts, and each frame without a sidebar. Each missing frame includes its index, time since navigation, root child count, whether an earlier sample had the sidebar, and whether the bundle and shell-paint marks exist. `hadShell: false` with an empty root identifies a gap before the first shell. `hadShell: true` identifies a later disappearance. The test still requires the sidebar in every sampled frame and no sign-in frame.
+
+Check the failing run's commit before diagnosing a new startup regression. Worktrees created before `fd8ae4f7` can still run the old delayed initial render after that fix lands on main.
