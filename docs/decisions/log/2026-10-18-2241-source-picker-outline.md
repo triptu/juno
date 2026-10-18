@@ -1,0 +1,1 @@
+- 10-18 22:41 · source-picker-outline · In the screen share sheet only the thumbnail is outlined: the chosen one has an accent edge inside the picture, and keyboard focus is the usual ring a gap outside it. The name is never outlined.

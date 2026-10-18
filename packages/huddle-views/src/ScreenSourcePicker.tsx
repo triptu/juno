@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import type { KeyboardEvent } from 'react'
 import { accent, colors, layout, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, focusRing, Icon, moveFocus, ringRoom, Surface, Text } from '@juno/ui'
+import { Button, Icon, moveFocus, ringRoom, Surface, Text } from '@juno/ui'
 
 export interface ScreenSource {
   readonly id: string
@@ -157,7 +157,11 @@ interface SourceTileProps {
   readonly onShare: () => void
 }
 
-/** A thumbnail and its name. A click chooses it, a double-click shares it. */
+/**
+ * A thumbnail and its name. A click chooses it, a double-click shares it.
+ * Only the picture is outlined: the chosen one has the accent's edge on the
+ * picture, and keyboard focus is the usual ring a gap outside the picture.
+ */
 function SourceTile({ source, checked, onChoose, onShare }: SourceTileProps) {
   return (
     <button
@@ -169,10 +173,11 @@ function SourceTile({ source, checked, onChoose, onShare }: SourceTileProps) {
       onClick={onChoose}
       onDoubleClick={onShare}
       autoFocus={checked}
-      {...stylex.props(stylex.defaultMarker(), styles.tile, focusRing.outside)}
+      {...stylex.props(stylex.defaultMarker(), styles.tile)}
     >
-      <span {...stylex.props(styles.thumb, checked && styles.thumbChecked)}>
+      <span {...stylex.props(styles.thumb)}>
         {source.thumbnailUrl === undefined ? null : <img alt="" src={source.thumbnailUrl} draggable={false} {...stylex.props(styles.image)} />}
+        <span aria-hidden {...stylex.props(styles.edge, checked && styles.edgeChecked)} />
       </span>
       <span {...stylex.props(styles.name)}>
         {source.appIconUrl === undefined ? null : <img alt="" src={source.appIconUrl} draggable={false} {...stylex.props(styles.appIcon)} />}
@@ -236,8 +241,11 @@ const styles = stylex.create({
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: spacing['--space-3'],
   },
+  // Its focus ring is on the picture (thumb), so it scrolls clear of the ring's room.
   tile: {
     appearance: 'none',
+    outlineStyle: 'none',
+    scrollMargin: sizes['--focus-ring-room'],
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-1-5'],
@@ -254,25 +262,34 @@ const styles = stylex.create({
     transitionTimingFunction: motion['--ease-out'],
     scale: { default: '1', ':active': motion['--press-scale'] },
   },
-  // The snapshot fits a 16:10 box on a quiet fill; the chosen one has the accent's ring just outside it.
+  // The snapshot fits a 16:10 box on a quiet fill. Keyboard focus on the tile rings the picture, not its name.
   thumb: {
+    position: 'relative',
     display: 'grid',
     placeItems: 'center',
     aspectRatio: '16 / 10',
     overflow: 'hidden',
     borderRadius: radii['--radius-lg'],
     backgroundColor: colors['--secondary-default'],
-    outlineStyle: 'solid',
+    outlineStyle: { default: 'none', [stylex.when.ancestor(':focus-visible')]: 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],
-    outlineColor: {
-      default: 'transparent',
-      [stylex.when.ancestor(':hover')]: { default: null, '@media (hover: hover)': colors['--border-strongest'] },
+    outlineColor: accent['--focus-ring'],
+  },
+  // An edge inside the picture, over the snapshot: grey under the pointer, the accent on the chosen one.
+  // As wide as the focus ring, which sits a gap outside it, so the two read apart.
+  edge: {
+    position: 'absolute',
+    inset: 0,
+    borderRadius: 'inherit',
+    pointerEvents: 'none',
+    boxShadow: {
+      default: 'none',
+      [stylex.when.ancestor(':hover')]: { default: null, '@media (hover: hover)': `inset 0 0 0 ${sizes['--focus-ring-width']} ${colors['--border-strongest']}` },
     },
   },
-  // The chosen one: the accent ring on its picture. Keyboard focus is the usual ring around the whole tile.
-  thumbChecked: {
-    outlineColor: accent['--hl'],
+  edgeChecked: {
+    boxShadow: `inset 0 0 0 ${sizes['--focus-ring-width']} ${accent['--hl']}`,
   },
   image: {
     width: '100%',
