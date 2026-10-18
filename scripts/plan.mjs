@@ -52,13 +52,13 @@ export function lanes(steps, serial) {
 }
 
 /**
- * Split the reservation between app workers (half the cores), unit workers
+ * Split the CPU limit between app workers (half the cores), unit workers
  * and simulations (a quarter each), plus one uncached Apalache checker.
  * Gallery gets three quarters because its checks wait for the browser.
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores) {
-  const galleryWorkers = String(Math.max(1, Math.floor((cores * 3) / 4)))
+  const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
     app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
     rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },

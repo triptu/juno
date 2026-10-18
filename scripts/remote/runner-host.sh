@@ -2,7 +2,7 @@
 # Executed over SSH; stdin is the compressed workspace. The host owns capacity,
 # so clients on different Macs/worktrees cannot overbook it.
 set -euo pipefail
-cores=$1
+reserved=$1
 run=$2
 command=$3
 wait_seconds=$4
@@ -11,8 +11,8 @@ state="$HOME/.cache/juno-runner"
 mkdir -p "$state/jobs"
 exec 9>"$state/lock"
 capacity=$(cat "$HOME/.config/juno-runner/cores")
-[[ "$capacity" =~ ^[1-9][0-9]*$ && "$cores" =~ ^[1-9][0-9]*$ ]] || exit 70
-(( cores <= capacity )) || { echo "runner: job needs $cores cores, host has $capacity" >&2; exit 70; }
+[[ "$capacity" =~ ^[1-9][0-9]*$ && "$reserved" =~ ^[1-9][0-9]*$ ]] || exit 70
+(( reserved <= capacity )) || { echo "runner: job needs $reserved cores, host has $capacity" >&2; exit 70; }
 container="juno-$run"
 lease="$state/jobs/$run"
 exec 8<&0
@@ -41,8 +41,8 @@ while :; do
       rm -f "$job"
     fi
   done
-  if (( used + cores <= capacity )); then
-    echo "$$ $cores $container" > "$lease"
+  if (( used + reserved <= capacity )); then
+    echo "$$ $reserved $container" > "$lease"
     flock -u 9
     break
   fi
