@@ -1,3 +1,4 @@
+import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import { defineFixtures, fixture, scene, type FixtureFrame, type TextareaMark } from '@juno/ui'
@@ -37,15 +38,17 @@ function MentionsOpen({ value, at, kind, column = 'page' }: { readonly value: st
   const rows = kind === 'person' ? { kind, rows: people } : { kind, rows: channels }
   const activeId = mentionRowId(LIST, rows.rows[0]!.id)
   return (
-    <JunoComposer
-      value={value}
-      onChange={noop}
-      onSend={noop}
-      enabled
-      column={column}
-      marks={[maya]}
-      mention={{ anchorAt: at, listId: LIST, activeId, list: <MentionSuggestions {...rows} id={LIST} activeId={activeId} onActivate={noop} onPick={noop} />, onDismiss: noop }}
-    />
+    <div {...stylex.props(styles.column)}>
+      <JunoComposer
+        value={value}
+        onChange={noop}
+        onSend={noop}
+        enabled
+        column={column}
+        marks={[maya]}
+        mention={{ anchorAt: at, listId: LIST, activeId, list: <MentionSuggestions {...rows} id={LIST} activeId={activeId} onActivate={noop} onPick={noop} />, onDismiss: noop }}
+      />
+    </div>
   )
 }
 
@@ -96,3 +99,14 @@ export default defineFixtures(
   },
   frame,
 )
+
+const styles = stylex.create({
+  // The composer at the foot of the frame, as in the chat, so the list has room above it.
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    width: '100%',
+    height: '100%',
+  },
+})
