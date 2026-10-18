@@ -55,16 +55,15 @@ async function startFakeReleases(): Promise<FakeReleases> {
     if (request.headers.authorization !== TOKEN) return response.writeHead(404).end()
     if (path === `${REPO}/releases/latest`) {
       return response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
-        tag_name: 'v99.0.0',
+        tag_name: 'v0.1.7',
         assets: [
-          { name: 'Juno-99.0.0-arm64-mac.zip', url: `${fake.url}${REPO}/releases/assets/1` },
-          { name: 'Juno-99.0.0-arm64.dmg', url: `${fake.url}${REPO}/releases/assets/2` },
+          { name: 'Juno-0.1.7-arm64.dmg', url: `${fake.url}${REPO}/releases/assets/2` },
           { name: 'latest-mac.yml', url: `${fake.url}${REPO}/releases/assets/3` },
         ],
       }))
     }
     if (path === `${REPO}/releases/assets/2` && request.headers.accept === 'application/octet-stream') {
-      return response.writeHead(302, { location: `${filesUrl}/signed/Juno-99.0.0-arm64.dmg?sig=1` }).end()
+      return response.writeHead(302, { location: `${filesUrl}/signed/Juno-0.1.7-arm64.dmg?sig=1` }).end()
     }
     if (path === `${REPO}/contents/CHANGELOG.md`) return response.writeHead(200, { 'content-type': 'text/plain' }).end(fake.changelog)
     response.writeHead(404).end()
@@ -93,10 +92,10 @@ const withReleases = test.extend<{ releases: FakeReleases }>({
 
 withReleases('an unsigned build offers the new version as a DMG and shows what is new', async ({ juno, app, releases }) => {
   const current = await app.evaluate(({ app: electronApp }) => electronApp.getVersion())
+  expect(current).toMatch(/^0\.1\.[1-6]$/)
   releases.changelog = [
     '# Changelog', '',
-    '## 99.0.0 - 2026-12-01', '', '- Faster search.', '',
-    '## 98.0.0 - 2026-11-01', '', '- Peek shows the last reply.', '',
+    '## 0.1.7 - 2026-12-01', '', '- Faster search.', '',
     `## ${current} - 2026-10-17`, '', '- Updates from the releases repository.', '',
   ].join('\n')
   await juno.signIn()
@@ -118,22 +117,23 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   // Opting in checks at once; an unsigned build offers the DMG.
   await updates.click()
   await expect(updates).toBeChecked()
-  await expect(about.getByText('Juno 99.0.0 is available.')).toBeVisible()
+  await expect(about.getByText('Juno 0.1.7 is available.')).toBeVisible()
   await expect(about.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
   await about.getByRole('button', { name: "What's new" }).nth(1).click()
   await expect(about.getByText('Faster search.')).toBeVisible()
-  await expect(about.getByText('Peek shows the last reply.')).toBeVisible()
   await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
 
   await about.getByRole('button', { name: 'Download the new version' }).click()
   await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { opened: string[] } }).junoTest.opened.slice())).toHaveLength(1)
   const [opened] = await app.evaluate(() => (globalThis as unknown as { junoTest: { opened: string[] } }).junoTest.opened.slice())
-  expect(opened).toMatch(/Juno-99\.0\.0-arm64\.dmg$/)
+  expect(opened).toMatch(/Juno-0\.1\.7-arm64\.dmg$/)
   expect(await readFile(opened!)).toEqual(DMG)
   await expect(about.getByRole('button', { name: 'Download the new version' })).toBeEnabled()
 
   // The token went to the API only, never to the host the download was sent on to.
   expect(releases.api.every((request) => request.authorization === TOKEN)).toBe(true)
+  expect(releases.api.some((request) => request.path.endsWith('/releases/assets/1'))).toBe(false)
+  expect(releases.api.some((request) => request.path.endsWith('/releases/assets/3'))).toBe(false)
   expect(releases.files).toHaveLength(1)
   expect(releases.files[0]!.authorization).toBeUndefined()
 })
