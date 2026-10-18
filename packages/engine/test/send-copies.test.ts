@@ -151,6 +151,27 @@ describe('send: a copy whose delete waits across a reconnect', () => {
     expect(inSlack(engine, id)).toBe(2)
   })
 
+  it('keeps the surviving copy when markers find the original deleted offline without a recheck', async () => {
+    const engine = await bootedEngine(engines, { recheckTopics: 0 })
+    await quiet(engine)
+    const id = await copyAcrossDrop(engine, 'Original deleted offline', 5)
+    const original = readDb(engine, 'user.db', (db) => db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id))?.ts
+    expect(typeof original).toBe('string')
+    for (const unmount of unmounts.splice(0)) unmount()
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.deleteMessage({ channel: 'C0ENG', ts: String(original) })
+    engine.fake.goOnline()
+    await engine.phase('live', WAIT_MS)
+    await engine.syncIdle()
+    await waitFor(() => keptCopy(engine), WAIT_MS, 'surviving copy kept')
+    expect(inSlack(engine, id)).toBe(1)
+    expect(keptCopy(engine)?.hidden).toBe(0)
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT deleted FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', String(original)))?.deleted).toBe(1)
+    expect(apiCalls(engine, 'conversations.history').some((c) => c.args['_x_reason'] === 'mutation-repair')).toBe(true)
+    expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'recheck')).toBe(false)
+  })
+
   it('deletes the copy once the recheck after the reconnect has read its channel', async () => {
     const engine = await booted()
     const id = await copyAcrossDrop(engine, 'Sent before the drop, then rechecked', 2)
