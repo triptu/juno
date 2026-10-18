@@ -8,7 +8,7 @@
  * records its field names.
  */
 import { Schema as S } from 'effect'
-import { FormList, RawObject } from './common.ts'
+import { FormBoolean, FormList, RawObject } from './common.ts'
 
 const opt = S.optionalKey
 
@@ -22,6 +22,8 @@ export const RoomsJoinArgs = S.Struct({
   regions: opt(FormList),
   /** A room id, to join a known room. */
   id: opt(S.String),
+  /** The official client always sends it, `false` unless joining from a second device. */
+  multidevice: opt(FormBoolean),
 })
 export type RoomsJoinArgs = typeof RoomsJoinArgs.Type
 
@@ -51,7 +53,7 @@ export const RoomsLeaveArgs = S.Struct({
   channel_id: S.String,
   call_id: S.String,
   attendee_id: S.String,
-  /** `unload` when sent as the page closes. */
+  /** `user_initiated` for a user's leave, `unload` when sent as the page closes. */
   reason: opt(S.String),
 })
 export type RoomsLeaveArgs = typeof RoomsLeaveArgs.Type
