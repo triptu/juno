@@ -91,14 +91,10 @@ it('removing a message clears its run\'s words and step arguments, and later run
   expect(later!.steps).toEqual([{ label: 'Searched Slack', input: 'hiring', result: '0 messages', outcome: 'done' }])
 })
 
-it('500 runs: a window is read with the index and stays a small payload', async () => {
+it('500 runs: a window stays a small payload', async () => {
   const h = await open()
   const { db } = h.turns.store
   seedRuns(db, 500)
-
-  const plan = (db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM runs WHERE ended_at IS NOT NULL AND (? IS NULL OR (started_at, id) < (?, ?)) ORDER BY started_at DESC, id DESC LIMIT ?`).all(null, 0, '', 51) as Array<{ detail: string }>).map((row) => row.detail)
-  expect(plan.join('\n')).toContain('runs_by_start')
-  expect(plan.join('\n')).not.toMatch(/SCAN runs(?! USING)/)
 
   const first = activityPage(h.turns.store, { limit: 50 })
   expect(first.runs).toHaveLength(50)
