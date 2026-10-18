@@ -458,6 +458,8 @@ Each event is one writer transaction wrapped in `Reactivity.withBatch` so querie
 
 `presence_change` is not stored; `user_typing` is forwarded as an event for the open topic only.
 
+After each event's transaction, the engine's `SocketEvents` hands the event and `me` to every subscriber (notifications, the activity tickle), each through its own queue of 1024 drained by one fiber, so a subscriber sees events in socket order and after they are stored; a subscriber that falls 1024 behind makes the sync wait, with a warning, rather than lose an event. Subscribers start again for each sync, in its scope, so an ended session's events never reach the next one.
+
 ## 7. Renderer state
 
 `@juno/state` creates every atom through two helpers, `liveQuery(route)` and `command(route)` (`packages/state/src/atoms.ts`), so the unstable `effect/reactivity/Atom`, `effect/rpc` and `effect/workers` APIs are referenced only inside that package. Both are memoized per route. `liveQuery(route)` returns `(payload) => atom`, memoized by a stable key of the payload; the atom's value is an `AsyncResult` of the latest value (a `liveValueRoute`) or of a `ListWindow { order, rows: Map, meta }` (a `liveListRoute`), failing only with the route's declared errors (transport loss is retried, never shown). `command(route)` returns a writable result atom: writing the payload runs the command, reading gives its `AsyncResult`; `runCommand(registry, route, payload)` runs one for code with no component to mount an atom in. Containers use `useAtomValue`, `useAtomSet` and `useAtomRefresh` from `@juno/state/react`; the one registry lives in `@juno/state` (`makeRegistry()` gives tests their own) and the renderer root provides it through `RegistryContext`.
@@ -642,6 +644,7 @@ End-to-end and perf tests use a typed user-language driver, so they read as spec
 
 **Seams.** Some features plug into a closed list that the compiler checks, so each has one place to add to.
 Fake Slack features provide typed methods and controls in one module, added to `fake-slack/src/features/index.ts`; startup merges the list and rejects duplicate names.
+An engine service that reacts to socket events subscribes to `SocketEvents` (`engine/src/socketEvents.ts`) in its own layer, with a start that runs in each sync's scope and returns its listener; sync and `SyncRunner` do not change.
 - A kind of tab: a member of the `Place` union in `state/src/tabs.ts` and its `PlaceJson` case (with a `placeOf` case only for an older saved shape, and a `samePlace` case if two places of the kind can differ), then one entry in `tabKinds` in `apps/desktop/src/renderer/containers/tabKinds.tsx`, which gives the tab's look in the strip, its label in the history menu and its page. The table's type lists every kind, so a missing entry does not compile; so does a missing case in `state/src/diagnostics.ts`.
 
 Other features plug into a view's slot, fed from one list in its container. An empty list renders as before, with no element added.
