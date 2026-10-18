@@ -1,0 +1,1 @@
+- 10-19 01:36 · runner · Prefer the machine-local SSH runner configuration, build missing local image tags under a host lock, and fall back to Namespace after 60 seconds without capacity unless Namespace is disabled. Prune old images explicitly.

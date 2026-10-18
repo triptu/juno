@@ -1,15 +1,18 @@
 # Set up an optional SSH runner
 
-Namespace remains the default. Set `JUNO_RUNNER_HOST` on the Mac to try a Linux
-runner first. An unreachable host falls back to Namespace. A reachable host with
-broken Docker, an SSH key error, a missing image, or failing tests returns an error without fallback.
-Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation, including image builds.
+Configure the runner on each Mac in `~/.config/juno/runner.json`. Every agent
+then tries it before Namespace, without setting environment variables.
+An unreachable host falls back to Namespace. A reachable host with broken
+Docker, an SSH key error, an image-build failure, or failing tests returns an
+error without fallback. A job waits up to 60 seconds for free cores before
+falling back. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and
+wait for runner capacity without a deadline.
 
 Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
 16 GB available to Linux is a reasonable starting point. The host's
 `~/.config/juno-runner/cores` file is the total capacity across all clients.
-Use the same Linux account from every client. Jobs reserve the cores in their requested machine shape, wait when full, and
-release their reservation after Docker stops. Each job has its own container
+Use the same Linux account from every client. Jobs reserve the cores in their
+requested machine shape and release their reservation after Docker stops. Each job has its own container
 and output directory. A host lock protects reservations. Jobs stop after 3 hours.
 
 ## Install Ubuntu on Windows
@@ -112,38 +115,69 @@ Complete Tailscale's interactive login. Use ordinary OpenSSH with public keys;
 Tailscale SSH is not required. Allow only the Mac to reach TCP 2222 in your
 tailnet policy. Verify the host key on the laptop before accepting it on the Mac.
 
-## Preload the image
+## Configure the Mac
 
-The runner uses the same `scripts/remote/Dockerfile` image as Namespace, already
-built in the workspace registry. On the Mac, `pnpm remote --dry-run test` prints
-the current image tag. Set `JUNO_RUNNER_IMAGE` to that exact registry image.
-On the laptop, install `nsc`, run `nsc login` and `nsc docker login` interactively,
-then run:
+Create `~/.config/juno/runner.json` outside the repository:
+
+```json
+{
+	"host": "<linux-user>@<host-or-ip>",
+	"port": 2222,
+	"key": "~/.ssh/juno_runner"
+}
+```
+
+`JUNO_RUNNER_HOST`, `JUNO_RUNNER_PORT`, and `JUNO_RUNNER_KEY` override the
+corresponding file values. `~/` in the key path expands to the Mac home folder.
+An empty `JUNO_RUNNER_HOST` disables the runner for one command. Without a
+configured host, runs use Namespace.
+
+```sh
+pnpm runner:check
+pnpm remote test:agent-contracts
+```
+
+`runner:check` verifies Linux amd64, Docker access, and host capacity. It reports
+whether the current image is present. A missing local image is informational,
+because the first run builds it. Logs and reports use `.remote/<run>/` for
+either backend. `pnpm affected` and `pnpm verify:main` use this configuration
+through `pnpm remote test:plan`. A run on the runner does not start the Namespace
+warm pool or its daemon. Namespace fallback still needs `nsc` on the Mac.
+
+## Build and prune images on the runner
+
+The SSH backend uses `juno-remote:<tag>`, with the same Dockerfile, lockfile, and
+workspace hash as Namespace. When the tag is missing, the Mac streams the shared
+build context over SSH to `docker build`. The context contains the Dockerfile,
+lockfile, workspace file, package manifests, and `.npmrc` when present. The
+runner needs network access to the public base image and tool downloads, but
+needs neither `nsc` nor Namespace registry access.
+
+A host lock allows one build at a time. Another client waits, checks for the tag
+again, and reuses the completed image. Build step summaries and elapsed time
+appear in the run log. The 60-second capacity wait starts after the image is
+ready. Builds can take several minutes on first use.
+
+Run `pnpm runner:prune` on the Mac to remove old `juno-remote:*` tags and unused
+Docker build cache from the runner. It keeps the current tag and never forces
+removal of images referenced by containers. Stop old jobs before pruning if
+Docker reports an image is in use. The prune command shares the build lock.
+
+## Use a prebuilt image instead
+
+`JUNO_RUNNER_IMAGE` optionally selects an image already present on the runner.
+It disables automatic building. A missing override image is an error.
+Transfer a `docker save` archive and run `docker load < juno-remote.tar`, or pull
+an image from a registry. For Namespace's private registry, install `nsc` on the
+laptop, run `nsc login` and `nsc docker login` interactively, then run:
 
 ```sh
 docker pull nscr.io/<workspace>/juno-remote:<tag>
 docker run --rm nscr.io/<workspace>/juno-remote:<tag> node --version
 ```
 
-Alternatively, transfer a `docker save` archive of that image and run
-`docker load < juno-remote.tar`. Keep registry credentials out of the repo and
-logs. Preload a new tag whenever the Dockerfile, lockfile or workspace file changes.
-The optional backend does not start a Namespace builder to repair a missing image.
-
-On the Mac, configure:
-
-```sh
-export JUNO_RUNNER_HOST='<linux-user>@<tailscale-host-or-ip>'
-export JUNO_RUNNER_PORT=2222
-export JUNO_RUNNER_KEY="$HOME/.ssh/juno_runner"
-export JUNO_RUNNER_IMAGE='nscr.io/<workspace>/juno-remote:<tag>'
-pnpm runner:check
-pnpm remote test:agent-contracts
-```
-
-`runner:check` verifies Linux amd64, Docker access, the host capacity and the
-preloaded image. Run a small suite before larger runs. Logs and reports use
-`.remote/<run>/` for either backend. Unset `JUNO_RUNNER_HOST` to use Namespace.
+Keep registry credentials out of the repository and logs. On the Mac, select it
+with `JUNO_RUNNER_IMAGE=nscr.io/<workspace>/juno-remote:<tag>`.
 
 ## Setup prompt for the laptop
 
@@ -158,7 +192,7 @@ the Juno repository. Do not clone it or request Slack credentials.
 My Mac public SSH key is:
 <MAC_PUBLIC_KEY>
 
-My prebuilt runner image is:
+My optional prebuilt runner image is:
 <NSCR_IMAGE_REFERENCE_OR_LEAVE_PENDING>
 
 1. Inspect Windows, WSL, existing Docker/Tailscale installations, available RAM
@@ -210,8 +244,8 @@ My prebuilt runner image is:
    private nscr.io registry, install Namespace's nsc CLI and let me log in
    interactively with nsc login and nsc docker login. Never print or request
    tokens. A docker save archive loaded with docker load is also supported.
-   If the image reference is pending, mark image preload pending; finish all
-   host checks and report the exact next command with a placeholder.
+   If no image reference is supplied, skip preload. The Mac streams the build
+   context and Docker builds the image on first use without nsc.
 9. Write ~/juno-runner-check.sh, executable, with this check:
    #!/usr/bin/env bash
    set -eu
@@ -233,9 +267,11 @@ My prebuilt runner image is:
    wsl -d Ubuntu-24.04 -u <linux-user> --exec bash -lc '~/juno-runner-check.sh'
    Also print the Scheduled Task status and powercfg AC settings, without secrets.
 10. End with the Linux username, Tailscale IP/name, SSH port 2222, host-key
-    fingerprint and chosen capacity. Give these Mac environment settings:
-    JUNO_RUNNER_HOST=<user>@<tailscale-ip>, JUNO_RUNNER_PORT=2222,
-    JUNO_RUNNER_KEY=<path-to-Mac-private-key>, JUNO_RUNNER_IMAGE=<image>.
+    fingerprint and chosen capacity. Give these Mac config values for
+    ~/.config/juno/runner.json:
+    { "host": "<user>@<tailscale-ip>", "port": 2222,
+      "key": "~/.ssh/juno_runner" }. Include JUNO_RUNNER_IMAGE only if a
+    prebuilt image was explicitly requested.
     The Mac agent will run pnpm runner:check after I paste your check output.
     Do not claim Mac connectivity or an unperformed reboot test passed.
 ```

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 01:36 · runner · Prefer the machine-local SSH runner configuration, build missing local image tags under a host lock, and fall back to Namespace after 60 seconds without capacity unless Namespace is disabled. Prune old images explicitly.
 - 10-19 00:10 · Sync · Accept partial incremental counts rows and preserve omitted unread fields; a two-field live row previously aborted decoding before the cycle could merge any counts.
 - 10-18 23:55 · orchestrator · Fine idle-CPU budgets run on the Mac only (nightly and on demand); remote runs keep a coarse runaway check. Why: shared remote machines gave three false failures in a day.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.
