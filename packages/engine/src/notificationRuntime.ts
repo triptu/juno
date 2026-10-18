@@ -1,11 +1,13 @@
 /** Shared session composition and host seam for the notifications feature. */
 import { ChannelId, UserId, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
+import { AiProvider } from '@juno/ai'
 import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
-import { Clock, Context, Effect, Layer, Queue, Ref, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Layer, Ref, Stream, SubscriptionRef } from 'effect'
 import { HostLink } from './protocol/host'
+import { SocketEvents, type SessionStart } from './socketEvents'
 
 const safe = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.catch(() => Effect.logWarning('notifications: operation failed')))
 const run = (effect: Effect.Effect<void, unknown> | undefined) => effect === undefined ? Effect.void : safe(effect)
@@ -20,6 +22,8 @@ export class NotificationControl extends Context.Service<NotificationControl, {
   readonly attach: (notifications: Notifications | undefined) => Effect.Effect<void>
   readonly wake: Effect.Effect<void>
   readonly setPresence: (presence: Presence) => Effect.Effect<void>
+  /** Slack's presence for the user as the boot read it (`runSync`'s `onSelfPresence`). */
+  readonly seedPresence: (presence: Presence) => Effect.Effect<void>
   readonly currentPresence: Effect.Effect<Presence | undefined>
   /** What Slack shows for the signed-in session, once known, then every change. */
   readonly presence: Stream.Stream<Presence | undefined>
@@ -32,16 +36,22 @@ export class NotificationControl extends Context.Service<NotificationControl, {
     const link = yield* HostLink
     const fromMain = yield* link.messages
     yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => message._tag === 'wake' ? wake : Effect.void))
-    return NotificationControl.of({
+    const control = NotificationControl.of({
       attach: (next) => SubscriptionRef.set(active, next),
       wake,
       setPresence: (value) => Effect.flatMap(current, (notifications) => run(notifications?.setPresence(value))),
+      seedPresence: (value) => Effect.flatMap(current, (notifications) => run(notifications?.seedPresence(value))),
       currentPresence: Effect.flatMap(current, (notifications) => notifications?.currentPresence ?? Effect.succeed(undefined)),
       presence: SubscriptionRef.changes(active).pipe(
         Stream.switchMap((notifications) => notifications === undefined ? Stream.make(undefined) : notifications.presenceChanges),
         Stream.changes,
       ),
     })
+    const host = yield* NotificationHost
+    const ai = yield* AiProvider
+    const events = yield* SocketEvents
+    yield* events.subscribe(sessionNotifications(control, host, ai))
+    return control
   }))
 }
 
@@ -70,13 +80,11 @@ export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(fu
 
 type Frame = Extract<SocketEvent, { readonly _tag: 'Frame' }>['frame']
 
-/** Runs inside the session scope and shares its store and Slack client. */
-export const startNotifications = Effect.gen(function* () {
+/** Runs for each sync, in its scope, and shares its store and Slack client. */
+const sessionNotifications = (control: NotificationControl['Service'], host: NotificationHost, ai: AiProvider['Service']): SessionStart => Effect.gen(function* () {
   const api = yield* SlackApi
   const session = yield* SlackSession
   const sql = yield* StoreReader
-  const host = yield* NotificationHost
-  const control = yield* NotificationControl
   const notifier: Notifier = {
     viewing: host.notifier.viewing,
     show: (notification) => host.notifier.show({ ...notification, id: `${session.teamId}:${notification.id}` }),
@@ -85,7 +93,6 @@ export const startNotifications = Effect.gen(function* () {
     Effect.as(true), Effect.catch(() => Effect.succeed(false)),
   ))
   yield* Effect.acquireRelease(control.attach(notifications), () => control.attach(undefined))
-  const queue = yield* Queue.unbounded<{ readonly frame: Frame; readonly me: Me }>()
   const handle = Effect.fn('Notifications.frame')(function* ({ frame, me }: { readonly frame: Frame; readonly me: Me }) {
     if (frame.type === 'manual_presence_change') {
       if (frame.user === undefined || frame.user === session.userId) yield* notifications.observePresence(frame.presence)
@@ -133,7 +140,6 @@ export const startNotifications = Effect.gen(function* () {
       senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: plainText(body),
       topicId })
   })
-  yield* Effect.forkScoped(Stream.runForEach(Stream.fromQueue(queue), (event) => safe(handle(event))))
   // Re-read persisted preferences only when they change. The initial pass also catches missed starts.
   let last: string | undefined
   yield* Effect.forkScoped(Stream.runForEach(liveQuery(['prefs'], Effect.gen(function* () {
@@ -168,9 +174,6 @@ export const startNotifications = Effect.gen(function* () {
       yield* safe(notifications.tick)
     }
   }))
-  return {
-    onEvent: (event: SocketEvent, me: Me) => event._tag === 'Frame' ? Queue.offer(queue, { frame: event.frame, me }).pipe(Effect.asVoid) : Effect.void,
-    /** Slack's presence for the user as the boot read it. */
-    onSelfPresence: (presence: Presence) => notifications.seedPresence(presence),
-  }
-})
+  // `SocketEvents` calls this after the sync stored the event, one event at a time, so the message's channel and people are in the store.
+  return (event: SocketEvent, me: Me) => event._tag === 'Frame' ? safe(handle({ frame: event.frame, me })).pipe(Effect.provideService(StoreReader, sql)) : Effect.void
+}).pipe(Effect.provideService(AiProvider, ai))

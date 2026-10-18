@@ -46,6 +46,7 @@ import { Session } from './session/Session'
 import { StatusHandlers } from './status/handlers'
 import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
+import { SocketEvents } from './socketEvents'
 import { SyncLink } from './syncLink'
 import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
 import { ViewsHandlers } from './sidebarViews/handlers'
@@ -99,13 +100,13 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(UploadProgress.layer),
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
+  Layer.provideMerge(OwnerActivity.layer),
+  Layer.provideMerge(NotificationControl.layer.pipe(Layer.provideMerge(SocketEvents.layer))),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
   Layer.provideMerge(AiSpend.layer),
   Layer.provideMerge(AiFallback.layer),
   Layer.provideMerge(AiAudit.layer),
-  Layer.provideMerge(OwnerActivity.layer),
-  Layer.provideMerge(NotificationControl.layer),
   Layer.provideMerge(SyncLink.layer),
   Layer.provideMerge(Outbox.layer),
   Layer.provideMerge(SessionClientLive),
