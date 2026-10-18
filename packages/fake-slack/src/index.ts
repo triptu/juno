@@ -82,7 +82,7 @@ export class FakeSlack {
     const server = new FakeServer(workspace, (name, input) => {
       if (fake === undefined) throw new Error('not started')
       return fake.control(name, input)
-    }, handlers)
+    }, handlers, registry.edge)
     const url = await server.listen(options.port ?? 0, options.host ?? '127.0.0.1')
     ;(options.seed ?? seedWorkspace)(workspace, `${url}/avatars`)
     if (options.latencyMillis !== undefined) server.setLatency(options.latencyMillis)
