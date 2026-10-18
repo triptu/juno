@@ -58,8 +58,9 @@ export function lanes(steps, serial) {
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores) {
+  const galleryWorkers = String(Math.max(2, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor(cores / 2))), GALLERY_WORKERS: String(Math.max(2, Math.floor((cores * 3) / 4))) },
+    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
     rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 8))), SPECS_APALACHE: '1' },
   }

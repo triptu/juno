@@ -22,7 +22,7 @@ test('app, unit, and spec suites run in separate lanes', () => {
 
 test('lanes side by side share an 8-core machine without queueing on it', () => {
   assert.deepEqual(sideBySide(8), {
-    app: { JUNO_E2E_WORKERS: '4', GALLERY_WORKERS: '6' },
+    app: { JUNO_E2E_WORKERS: '4', GALLERY_WORKERS: '6', GALLERY_SHIFT_PARTS: '6' },
     rest: { JUNO_VITEST_WORKERS: '2', JUNO_TEST_PACKAGE_JOBS: '1' },
     specs: { SPECS_JOBS: '1', SPECS_APALACHE: '1' },
   })
