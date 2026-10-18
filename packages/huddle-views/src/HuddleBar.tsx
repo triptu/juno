@@ -58,7 +58,7 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], s
             {status}
           </Text>
           <span {...stylex.props(styles.spacer)} />
-          {people.length > 0 ? <PeopleStack people={people} dim={connection === 'reconnecting'} /> : null}
+          {people.length > 0 ? <PeopleStack people={people} dim={connection === 'reconnecting'} ring="background" /> : null}
           <span {...stylex.props(styles.caret)}>
             <Icon icon={CaretRight} size={12} weight="bold" />
           </span>
@@ -85,8 +85,9 @@ const styles = stylex.create({
     paddingBlock: spacing['--space-1'],
     userSelect: 'none',
   },
-  // A raised card in the huddle's green with a green edge, so it stands apart from the sidebar at a glance
-  // and you can find the call quickly. 4px around two 28px rows, 2px between them, as between the controls.
+  // A frosted card in the accent: a tinted fill with a sheen from the top, a hairline highlight inside the top
+  // edge and an accent edge, so it stands apart from the sidebar and you can find the call quickly. No
+  // backdrop blur: nothing scrolls or moves behind it. 4px around two 28px rows, 2px between them, as between the controls.
   // 12 = the controls' 8 + the 4 around them.
   card: {
     display: 'flex',
@@ -98,12 +99,14 @@ const styles = stylex.create({
     borderColor: colors['--huddle-bar-edge'],
     borderRadius: radii['--radius-xl'],
     backgroundColor: colors['--huddle-bar'],
-    boxShadow: shadows['--card-ring'],
+    backgroundImage: colors['--huddle-bar-sheen'],
+    boxShadow: shadows['--huddle-bar-shadow'],
     WebkitAppRegion: 'no-drag',
   },
   // Its glyph sits 6px in, over the Mute glyph's 6px inside its 28px button.
-  // The faces' ring takes the fill under them, so it cuts their overlap in the bar's green.
-  // Muted is 4.2:1 on the light green, so "+N" and the caret take subtle (5.4:1).
+  // The faces' ring (the `background` one) takes the fill under them, so it cuts their overlap in the bar's
+  // tint. Not --surface-default: the faces' own fills are mixed with it.
+  // Muted falls under 4.5:1 on the light tint, so "+N" and the caret take subtle (4.78:1 or more).
   open: {
     '--foreground-muted': colors['--foreground-subtle'],
     appearance: 'none',
@@ -128,7 +131,7 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
       ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
     },
-    '--surface-default': {
+    '--background': {
       default: colors['--huddle-bar'],
       ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
       ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },

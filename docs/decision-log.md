@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 23:30 · huddle-bar-accent-glass · The huddle bar is a frosted card in the user's accent: the accent's hue at a fixed lightness (so contrast is the same for all eight accents), a sheen from the top, a hairline top highlight and an accent edge. No backdrop blur, since nothing moves behind it and the window has no vibrancy. Green stays only for the speaking ring and the live headphones. Replaces the green bar of 22:40.
 - 10-18 22:42 · huddle-own-window-preview · A window you share now shows in your own huddle tab as "Your window" with Stop sharing, so a wrong window is caught at once; beside someone else's share it takes a third of the room. A whole screen still never shows, and the status line names what you share in the bar and the tab. Replaces "your own share is never drawn" from 21:47.
 - 10-18 22:41 · source-picker-outline · In the screen share sheet only the thumbnail is outlined: the chosen one has an accent edge inside the picture, and keyboard focus is the usual ring a gap outside it. The name is never outlined.
 - 10-18 22:40 · huddle-bar-green · The sidebar's huddle bar is a pale green card with a green edge (deep green in dark), and its controls' fills step down the same green, because the light card merged into the light sidebar and the owner lost track of the call. No motion and no saturated block; text keeps 5.4:1 or more on the fill.

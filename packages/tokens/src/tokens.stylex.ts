@@ -112,14 +112,18 @@ export const colors = stylex.defineVars({
   // Live in a huddle: the speaking ring and the green headphones. A step deeper than the
   // presence dot so it holds 3:1 on the tiles' secondary fill too (3.36:1; 3.76:1 on a card).
   '--huddle-live': '#1C935F',
-  // The sidebar's huddle bar: a pale green card with a green edge, so it stands
-  // apart from the sidebar at a glance. Its controls' hover and pressed fills are
-  // steps of the same green. --foreground-subtle is 5.41:1 on the fill.
-  '--huddle-bar': '#D3F1DE',
-  '--huddle-bar-edge': '#88C09F',
-  '--huddle-bar-hover': '#C9E7D4',
-  '--huddle-bar-pressed': '#BCD9C7',
-  '--huddle-bar-pressed-hover': '#B3D0BE',
+  // The sidebar's huddle bar, a frosted card in the accent. Each step keeps the
+  // accent's hue and part of its chroma at a fixed lightness, so it follows
+  // every accent and the text on it keeps one contrast: --foreground-subtle is
+  // 4.78:1 or more on the fill and on hover for all eight accents. Written
+  // with var() because a group cannot refer to another group defined after it.
+  '--huddle-bar': 'oklch(from var(--hl) 0.93 calc(c * 0.28) h)',
+  '--huddle-bar-edge': 'oklch(from var(--hl) 0.78 calc(c * 0.5) h)',
+  '--huddle-bar-hover': 'oklch(from var(--hl) 0.9 calc(c * 0.28) h)',
+  '--huddle-bar-pressed': 'oklch(from var(--hl) 0.865 calc(c * 0.28) h)',
+  '--huddle-bar-pressed-hover': 'oklch(from var(--hl) 0.835 calc(c * 0.28) h)',
+  // The frost: a sheen of white from the top, as on a macOS material.
+  '--huddle-bar-sheen': 'linear-gradient(oklch(1 0 0 / 0.35), oklch(1 0 0 / 0) 70%)',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 
@@ -417,6 +421,8 @@ export const shadows = stylex.defineVars({
   '--shadow-card': '0 0 12px 0 rgba(27, 28, 21, 0.12)',
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  // The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow.
+  '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.7), 0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
   '--peek-shadow': '0 0 0 1px oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08), 0 14px 36px -8px oklch(0 0 0 / 0.18)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
   // The Juno panel floating over the page: a hairline ring, a tight contact

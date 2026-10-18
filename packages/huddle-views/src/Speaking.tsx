@@ -41,6 +41,8 @@ export interface PeopleStackProps {
   readonly max?: number
   /** The connection is down: the stack dims. */
   readonly dim?: boolean
+  /** The surface under the stack, for the ring that cuts the overlap. */
+  readonly ring?: RingSurface
 }
 
 /**
@@ -48,7 +50,7 @@ export interface PeopleStackProps {
  * draws them, with the speaking ring on whoever talks. Join order;
  * speaking never reorders.
  */
-export function PeopleStack({ people, max = 4, dim = false }: PeopleStackProps) {
+export function PeopleStack({ people, max = 4, dim = false, ring = 'surface' }: PeopleStackProps) {
   const shown = people.slice(0, max)
   const rest = people.length - shown.length
   const names = shown.map((person) => person.name).join(', ')
@@ -56,7 +58,7 @@ export function PeopleStack({ people, max = 4, dim = false }: PeopleStackProps) 
     <span role="img" aria-label={rest > 0 ? `${names} and ${rest} more` : names} {...stylex.props(styles.stack, dim && styles.dim)}>
       {shown.map((person, index) => (
         <span key={person.id} {...stylex.props(styles.item, index > 0 && styles.overlap)}>
-          <PersonAvatar person={person} size={18} ring="surface" />
+          <PersonAvatar person={person} size={18} ring={ring} />
         </span>
       ))}
       {rest > 0 ? (

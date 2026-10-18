@@ -99,7 +99,7 @@ export function HuddleControls({
 
 /**
  * In the bar, the controls' hover and pressed fills are steps of the bar's
- * green. Set around each control, not the row, so the device menu that
+ * accent tint. Set around each control, not the row, so the device menu that
  * opens inside the row keeps its own fills.
  */
 function Fills({ shape, children }: { readonly shape: ControlsShape; readonly children: ReactNode }) {
