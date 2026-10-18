@@ -399,7 +399,7 @@ prefs. It reuses the cached session, refuses methods outside its own read-only a
 calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
 milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
 copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
-`-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
+`-- --only files` checks the newest self-DM image via an exact history re-read, probes `files.info`, and compares thumbnail GETs with and without the cookie. It prints booleans and statuses and writes no shapes. `-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
 `users/info` about every person the newest conversations reference and reads one page of each
 users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). A full run is about 34 calls. The
 results are in research section 10, "Live probe".

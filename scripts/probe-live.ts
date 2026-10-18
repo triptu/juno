@@ -19,6 +19,8 @@
  *    credentials, cookie only, bearer token only).
  * 6. `users.prefs.get` and `dnd.info`.
  *
+ * `--only files` checks the newest self-DM image with an exact history read,
+ * probes files.info, and compares thumbnail auth. Booleans and statuses only; no shapes saved.
  * `--only search` runs step 4 alone, plus one search with the exact
  * arguments the discovery sweep sends.
  *
@@ -182,6 +184,31 @@ async function main(): Promise<number> {
       return json?.['ok'] === true ? json : undefined
     }
     return undefined
+  }
+
+  if (flag('--only') === 'files') {
+    const auth = await call('auth.test', {}, 'files')
+    const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'files')
+    const selfDm = ((boot?.['ims'] as Array<Json> | undefined) ?? []).find((im) => im['user'] === auth?.['user_id'])
+    if (typeof selfDm?.['id'] !== 'string') throw new Error('self-DM not found')
+    const channel = selfDm['id']
+    const history = await call('conversations.history', { channel, limit: 100 }, 'self-dm-files')
+    const message = ((history?.['messages'] as Array<Msg> | undefined) ?? []).find((message) => message.files?.some((file) => String(file['mimetype']).startsWith('image/')))
+    const file = message?.files?.find((file) => String(file['mimetype']).startsWith('image/'))
+    if (message === undefined || file === undefined) throw new Error('self-DM image not found in newest page')
+    const exact = await call('conversations.history', { channel, oldest: message.ts, latest: message.ts, inclusive: true, limit: 2 }, 'exact-file-message')
+    const reread = ((exact?.['messages'] as Array<Msg> | undefined) ?? []).find((each) => each.ts === message.ts)?.files?.find((each) => each['id'] === file['id'])
+    await call('files.info', { file: String(file['id']) }, 'file-info-support')
+    const downloads = []
+    if (typeof reread?.['thumb_360'] === 'string') {
+      for (const authenticated of [false, true]) {
+        const response = await fetch(reread['thumb_360'], { redirect: 'manual', headers: authenticated ? { cookie } : {} })
+        downloads.push({ authenticated, status: response.status, image: (response.headers.get('content-type') ?? '').startsWith('image/') })
+        await response.body?.cancel()
+      }
+    }
+    console.log(JSON.stringify({ exactMessageFound: reread !== undefined, hasThumb: typeof reread?.['thumb_360'] === 'string', hasSize: typeof reread?.['original_w'] === 'number' && typeof reread?.['original_h'] === 'number', downloads, calls }, null, 2))
+    return 0
   }
 
   if (flag('--only') === 'integrations') {

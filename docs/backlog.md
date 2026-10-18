@@ -2,6 +2,7 @@
 
 Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
 
+- Image-row report: late thumbnails now recover through bounded exact-message reads, including when `files.info` is rejected. The 10-18 cached live check found a processed self-DM image and successful cookie-authenticated downloads, but `files.info` also succeeded there. Confirm the owner's reported image in the running app after this fix; the cause on that live session is still unproven.
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
 - After the body-sniff sign-in fallback, `secrets.bin` keeps `userId: ''` until a later sign-in.
