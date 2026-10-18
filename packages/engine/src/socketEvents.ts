@@ -85,8 +85,9 @@ export class SocketEvents extends Context.Service<SocketEvents, {
         yield* Scope.addFinalizer(scope, Queue.shutdown(queue))
         const listener = yield* sessionStart.pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(attached.context))
         yield* Effect.forkIn(
+          // A throw or a defect is logged and the next input follows; an interruption ends the fiber.
           Effect.forever(Effect.flatMap(Queue.take(queue), ([input, me]) =>
-            listener(input, me).pipe(Effect.catchCause((cause) => Effect.logWarning('socket events: a subscriber failed on an event', { cause }))))),
+            Effect.suspend(() => listener(input, me)).pipe(Effect.catchDefect((defect) => Effect.logWarning('socket events: a subscriber failed on an event', { subscriber: name, defect }))))),
           scope,
         )
         attached.deliveries.set(key, { name, queue, scope })

@@ -79,3 +79,17 @@ it.effect('a stuck subscriber never holds up the sync or the others, and hears O
   expect(yield* stuck.next(5)).toEqual(['1:1', '1:Overflowed', `1:${CAPACITY + 2}`, `1:${CAPACITY + 3}`, `1:${CAPACITY + 4}`])
   yield* running.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
+
+it.effect('a listener that throws or dies on one event still hears the later ones', () => Effect.gen(function* () {
+  const events = yield* SocketEvents
+  const heard = yield* Queue.unbounded<string>()
+  yield* events.subscribe('fragile', Effect.succeed((input) => {
+    if (label(input) === '2') throw new Error('thrown')
+    if (label(input) === '3') return Effect.die('died')
+    return Queue.offer(heard, label(input)).pipe(Effect.asVoid)
+  }))
+  const running = yield* sync
+  for (const n of [1, 2, 3, 4]) yield* running.publish(n)
+  expect(yield* Effect.replicateEffect(Queue.take(heard), 2)).toEqual(['1', '4'])
+  yield* running.end
+}).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
