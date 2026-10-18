@@ -235,7 +235,10 @@ try {
     if (health.reachable) {
       backend = 'ssh'
       if (options.keep) throw new Error('--keep is only available for Namespace')
-      const size = runnerJobSize(options, health.cores)
+      const specsCached = carriesCache && process.env.SPECS_RUN_CACHE !== 'off'
+        && !options.env.some((pair) => pair === 'SPECS_CACHE=off' || pair === 'SPECS_RUN_CACHE=off')
+        && existsSync(specCache) && readdirSync(specCache).some((name) => name.endsWith('.json'))
+      const size = runnerJobSize({ ...options, specsCached }, health.cores)
       cores = size.reserved
       cpuLimit = size.cpus
       if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)

@@ -13,6 +13,11 @@ gallery_workers=$(( cores * 3 ))
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
   package_jobs=1
   vitest_workers=$cores
+  # Two packages share wide jobs; their Vitest workers fit the CPU limit.
+  if [ "$cores" -ge 4 ]; then
+    package_jobs=2
+    vitest_workers=$(( cores / package_jobs ))
+  fi
   gallery_workers=$(at_least $(( cores * 3 / 4 )) 1)
   if [ "$cores" -eq 3 ]; then gallery_workers=3; fi
 fi

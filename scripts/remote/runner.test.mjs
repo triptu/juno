@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { runnerConfig, runnerCommand } from './runner.mjs'
+import { runnerConfig, runnerCommand, runnerJobSize } from './runner.mjs'
 import { imageTag } from './image.mjs'
 import { sideBySide } from '../plan.mjs'
 import { parseRun } from './usage.mjs'
@@ -57,10 +57,21 @@ test('container workers use the CPU limit, preserve overrides and keep Namespace
   assert.deepEqual(workers('3'), [1, 3, 1, 3, 3, 1, 1])
   assert.equal(sideBySide(3).app.GALLERY_WORKERS, '3')
   assert.equal(sideBySide(3).app.GALLERY_SHIFT_PARTS, '3')
-  assert.deepEqual(workers('4'), [1, 4, 2, 3, 3, 2, 1])
-  assert.deepEqual(workers('8'), [1, 8, 8, 6, 6, 4, 2])
+  assert.deepEqual(workers('4'), [2, 2, 2, 3, 3, 2, 1])
+  assert.deepEqual(workers('8'), [2, 4, 8, 6, 6, 4, 2])
   assert.deepEqual(workers(undefined), [2, 8, 8, 24, 24, 4, 2])
   assert.deepEqual(workers('4', Object.fromEntries(workerKeys.map((key) => [key, '1']))), [1, 1, 1, 1, 1, 1, 1])
+})
+
+test('spec cache presence and step overrides select narrow or wide jobs', () => {
+  const size = (script, args, specsCached) => runnerJobSize({ script, args, specsCached }, 16)
+  assert.deepEqual(size('specs:check', [], true), { reserved: 1, cpus: 2 })
+  assert.deepEqual(size('specs:check', [], false), { reserved: 4, cpus: 4 })
+  assert.deepEqual(size('specs:check', ['--no-cache'], true), { reserved: 4, cpus: 4 })
+  assert.deepEqual(size('test:plan', ['test', 'test/a.test.ts', '+', 'specs:check'], true), { reserved: 1, cpus: 2 })
+  for (const override of ['SPECS_CACHE=off', 'SPECS_RUN_CACHE=off']) {
+    assert.deepEqual(size('test:plan', [override, 'specs:check'], true), { reserved: 4, cpus: 4 })
+  }
 })
 
 // Exercise the public CLI through fake transports, including workspace streaming.
@@ -107,17 +118,30 @@ if (command.includes('docker build')) {
 test('SSH job sizes follow scripts and plan steps, with explicit sizes taking precedence', () => {
   const { dir, calls, env } = runnerHarness()
   const runs = []
+  const files = Array.from({ length: 21 }, (_, index) => `test/file-${index}.test.ts`)
   const cases = [
+    [[], ['test'], {}, 4],
+    [[], ['test', '--passWithNoTests'], {}, 4],
+    [[], ['test', ...files.slice(0, 20)], {}, 1, 2],
+    [[], ['test', ...files], {}, 4],
+    [[], ['test:plan', 'test', ...files], {}, 4],
+    [[], ['test:plan', 'test', 'test/messages.test.ts'], {}, 1, 2],
     [[], ['test', '--passWithNoTests', 'test/messages.test.ts'], {}, 1, 2],
     [[], ['test:agent'], {}, 1, 2],
     [[], ['test:agent-testing'], {}, 1, 2],
     [[], ['test:agent-contracts'], {}, 1, 2],
-    [[], ['specs:check'], {}, 1, 2],
+    [[], ['specs:check'], {}, 4],
+    [[], ['specs:check'], { TEST_SPEC_CACHE: '1' }, 1, 2],
+    [[], ['specs:check', '--no-cache'], { TEST_SPEC_CACHE: '1' }, 4],
+    [[], ['specs:check'], { TEST_SPEC_CACHE: '1', SPECS_CACHE: 'off' }, 4],
+    [['--env', 'SPECS_CACHE=off'], ['specs:check'], { TEST_SPEC_CACHE: '1' }, 4],
+    [[], ['test:plan', 'test', 'test/a.test.ts', '+', 'specs:check'], { TEST_SPEC_CACHE: '1' }, 1, 2],
+    [[], ['test:plan', 'test', '+', 'specs:check'], { TEST_SPEC_CACHE: '1' }, 4],
     [[], ['test:desktop', 'e2e/topic.spec.ts'], {}, 4],
     [[], ['test:gallery'], {}, 3],
     [[], ['test:e2e'], {}, 4],
-    [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 1, 2],
-    [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 1, 2],
+    [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 4],
+    [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 4],
     [[], ['test:plan', 'test', '+', 'JUNO_E2E_WORKERS=2', 'test:desktop'], {}, 4],
     [[], ['test:plan', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'test'], {}, 3],
     [[], ['test:plan', 'test:e2e'], {}, 4],
@@ -127,13 +151,19 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
     [['--machine', 'linux/amd64:8x16'], ['test'], {}, 8],
     [['--machine', 'linux/amd64:1x2'], ['test'], {}, 1],
     [['--machine', 'linux/amd64:6x12'], ['test:gallery'], {}, 6],
-    [[], ['test'], { TEST_CAPACITY: '1' }, 1, 2],
+    [[], ['test'], { TEST_CAPACITY: '1' }, 1],
     [[], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:6x12' }, 6],
     [['--machine', 'linux/amd64:4x8'], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:8x16' }, 4],
     [[], ['test:desktop'], { TEST_CAPACITY: '2' }, 2],
   ]
   try {
     for (const [flags, args, overrides, cores, cpus = cores] of cases) {
+      const cache = join(dir, 'juno-cache/specs')
+      rmSync(cache, { recursive: true, force: true })
+      if (overrides.TEST_SPEC_CACHE) {
+        mkdirSync(cache, { recursive: true })
+        writeFileSync(join(cache, 'passed.json'), '{}')
+      }
       writeFileSync(calls, '')
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', ...flags, ...args], {
         env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,

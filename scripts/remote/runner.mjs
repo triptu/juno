@@ -10,15 +10,25 @@ import { parsePlan } from '../plan.mjs'
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
 
 /** SSH admission and CPU limits follow the workload; explicit sizes still win. */
-export function runnerJobSize({ script, args, machine, explicitMachine }, capacity) {
+export function runnerJobSize({ script, args, machine, explicitMachine, specsCached = false }, capacity) {
   if (explicitMachine) {
     const cores = Number(/:(\d+)x/.exec(machine)?.[1])
     return { reserved: cores, cpus: cores }
   }
-  const scripts = script === 'test:plan' ? parsePlan(args).map((step) => step.script) : [script]
+  const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args, env: {} }]
+  const scripts = steps.map((step) => step.script)
   const unitOnly = scripts.every((name) => name === 'test' || name.startsWith('test:agent') || name === 'specs:check')
-  const reserved = Math.min(scripts.some((name) => name === 'test:desktop' || name === 'test:e2e') ? 4 : scripts.includes('test:gallery') ? 3 : unitOnly ? 1 : 8, capacity)
-  return { reserved, cpus: unitOnly ? 2 : reserved }
+  // More than 20 named files is a broad affected run, rather than a small slice.
+  const wide = steps.some((step) => {
+    if (step.script === 'specs:check') return !specsCached || step.env.SPECS_CACHE === 'off' || step.env.SPECS_RUN_CACHE === 'off' || step.args.includes('--no-cache')
+    if (step.script !== 'test') return false
+    const files = step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
+    return files.length === 0 || files.length > 20
+  })
+  const requested = scripts.some((name) => name === 'test:desktop' || name === 'test:e2e') ? 4
+    : scripts.includes('test:gallery') ? 3 : unitOnly ? wide ? 4 : 1 : 8
+  const reserved = Math.min(requested, capacity)
+  return { reserved, cpus: unitOnly && !wide ? 2 : reserved }
 }
 
 export function runnerConfig(env = process.env) {
