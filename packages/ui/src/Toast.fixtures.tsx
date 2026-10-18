@@ -7,12 +7,14 @@ export default defineFixtures(Toast, {
     undo: fixture({ text: 'Resolved · Postgres 16 migration plan', icon: CheckCircle, action: { label: 'Undo', kbd: '⌘Z', onAction: () => {} } }),
     'marked-done': fixture({ text: 'Marked as done', action: { label: 'Undo', kbd: '⌘Z', onAction: () => {} } }),
     ignoring: fixture({ text: 'Hiding #deploys from now on', action: { label: 'Undo', kbd: '⌘Z', onAction: () => {} } }),
+    'draft-closed': fixture({ text: 'Draft closed', action: { label: 'Undo', kbd: '⌘Z', onAction: () => {} } }),
   },
   Plain: {
     copied: fixture({ text: 'Copied the prompt' }),
   },
   Failure: {
     'juno-error': fixture({ text: "Juno didn't answer. Give it a moment and try again." }),
+    'not-sent': fixture({ text: 'Not sent · Their account is deactivated' }),
     'send-failed': fixture({ text: "Couldn't send that. Your message is still in the composer.", action: { label: 'Try again', onAction: () => {} } }),
   },
   Layout: {

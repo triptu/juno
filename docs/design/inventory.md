@@ -790,7 +790,8 @@ A password field offers no Look Up or Search. A right-click that opens a Juno me
 | Resolved · {title} / Keeping open · {title} (Tidy up's review) | yes |
 | Unfollowed · {title} / Still following · {title} (Unfollow's review) | yes |
 | Ignoring #deploys / Still showing #deploys (Ignore's review) | yes |
-| Draft closed (a Home closed with a draft) | yes |
+| Draft closed (a Home closed with a draft; Undo reopens that tab) | yes |
+| Not sent · {reason} (a Home send Slack refused before it was queued: "You are offline", "Their account is deactivated", "Slack refused it: {code}"; `notSentText` in `@juno/views`) | no |
 | Follow-up done | no |
 | Deleted view · Bots | yes |
 | Added #alerts-prod to Bots / Removed #alerts-prod from Bots | yes |

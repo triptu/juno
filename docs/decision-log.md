@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 01:45 · Home · A Home send refused before it is queued shows "Not sent · {reason}" (the destination stays in the chip, so the 352px toast keeps its room for the reason) and keeps the draft; closing one Home with a draft shows "Draft closed" with Undo for that tab, and bulk closes show no toast.
 - 10-19 00:10 · Sync · Accept partial incremental counts rows and preserve omitted unread fields; a two-field live row previously aborted decoding before the cycle could merge any counts.
 - 10-18 23:55 · orchestrator · Fine idle-CPU budgets run on the Mac only (nightly and on demand); remote runs keep a coarse runaway check. Why: shared remote machines gave three false failures in a day.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.
