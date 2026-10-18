@@ -139,6 +139,8 @@ export interface RunningEngine {
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
   /** Waits for boot or reconnect and its follow pass to finish. Does not drain socket events or command retries. */
   readonly syncIdle: () => Promise<void>
+  /** Waits for a sync cycle that starts after this call to finish. */
+  readonly nextSync: (timeoutMs?: number) => Promise<void>
   /** Whether a sync cycle (boot, catch-up or sweep, with its follow pass) is running now. */
   readonly syncing: () => boolean
   /** Whether the engine's outbox workers see the socket as up (`SyncLink.online`). */
@@ -166,6 +168,10 @@ export interface EngineOptions {
   readonly agent?: { readonly transport: Transport; readonly writes?: 'enabled' | 'disabled' }
   /** How long a failed boot waits before it tries again (the app waits 30 s). */
   readonly bootRetryMillis?: number
+  /** How often the live engine runs its periodic catch-up. Zero disables it. */
+  readonly sweepIntervalMillis?: number
+  /** How often a periodic catch-up also checks every followed thread in the quiet window. */
+  readonly followPassMillis?: number
   /** How many topics the recheck after a drop reads (the app reads 10). */
   readonly recheckTopics?: number
   /** How long a reaction waits unsent before the message says so (the app waits 30 s). */
@@ -209,7 +215,8 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     ...(options.agent === undefined ? {} : { agentTransport: options.agent.transport, agentWrites: options.agent.writes ?? 'disabled' }),
     sync: {
       config: {
-        sweepIntervalMillis: 0,
+        sweepIntervalMillis: options.sweepIntervalMillis ?? 0,
+        ...(options.followPassMillis === undefined ? {} : { followPassMillis: options.followPassMillis }),
         ...(options.bootRetryMillis === undefined ? {} : { bootRetryMillis: options.bootRetryMillis }),
         ...(options.recheckTopics === undefined ? {} : { recheckTopics: options.recheckTopics }),
       },
@@ -273,6 +280,10 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       ),
     syncIdle: async () => {
       await waitFor(() => (cycles > 0 && pendingCycles === 0 ? true : undefined), WAIT_MS, 'the sync cycle to finish')
+    },
+    nextSync: async (timeoutMs = WAIT_MS) => {
+      const previous = cycles
+      await waitFor(() => (cycles > previous && pendingCycles === 0 ? true : undefined), timeoutMs, 'the next sync cycle to finish')
     },
     syncing: () => pendingCycles > 0,
     online: () => online,

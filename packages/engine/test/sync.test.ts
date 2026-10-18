@@ -840,6 +840,34 @@ describe('search matches (review M3 finding 3)', () => {
   })
 })
 
+describe('periodic sweep', () => {
+  it('leaves an unchanged cache alone and repairs a missed reply', async () => {
+    const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
+    const rootTs = tsOf(threadId(engine, 'C0ENG', 'Draft plan is in the doc.'))
+    const cache = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'), { readOnly: true })
+    try {
+      const dataVersion = () => (cache.prepare('PRAGMA data_version').get() as { data_version: number }).data_version
+      const before = dataVersion()
+      engine.fake.resetCalls()
+      await engine.nextSync()
+      expect(apiCalls(engine, 'subscriptions.thread.getView').length).toBeGreaterThan(0)
+      expect(dataVersion()).toBe(before)
+
+      const missed = engine.fake.workspace.post({
+        channel: 'C0ENG',
+        threadTs: rootTs as never,
+        user: 'U0MAYA',
+        text: 'The silent canary reply',
+        silent: true,
+      })
+      await engine.nextSync()
+      expect(cache.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', missed.ts)).toEqual({ text: 'The silent canary reply' })
+    } finally {
+      cache.close()
+    }
+  })
+})
+
 describe('an expired session (review M3 finding 4)', () => {
   it('found by the catch-up after a reconnect ends the session as session-expired', async () => {
     const engine = await bootedEngine()
