@@ -3,6 +3,7 @@ import { encodeMentions, type PickConversation, type PickConversations } from '@
 import {
   attachmentsAtom,
   emptyHomeDraft,
+  errorOf,
   homeDraftAtom,
   homeFocusAtom,
   junoAvailableAtom,
@@ -20,7 +21,7 @@ import {
 import { junoNavAtom, junoReadsImagesAtom } from '@juno/state/agent'
 import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { AttachmentNote, Composer, destinationLabel, holdKeys, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
@@ -240,9 +241,13 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
     else if (current.conversation !== undefined) showToast(registry, { text: `Sent to ${destinationLabel(current.conversation)}` })
     return true
   }
-  // Nothing was queued: the draft, its destination and its files come back, unless something new was written meanwhile.
+  // Nothing was queued: the draft, its destination and its files come back, unless something new was written meanwhile,
+  // and the toast says why, in the words of a failed row.
   if (untouched(registry.get(homeDraftAtom(tabId)))) setHomeDraft(registry, tabId, current)
   attached.restore()
+  // A lost link to the engine has no reason to give beyond "try again".
+  const error = errorOf(exit)
+  showToast(registry, { text: notSentText(error?._tag === 'RpcClientError' ? undefined : error) })
   console.warn('juno: send failed', exit.cause)
   return false
 }
