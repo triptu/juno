@@ -872,7 +872,9 @@ describe('periodic sweep', () => {
       text: 'Indexed after the cursor moved',
     })
   })
+})
 
+describe('scheduled thread view sweep', () => {
   it('keeps repairs from fetched follow pages when a later page fails', async () => {
     const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
     const target = [...engine.fake.workspace.subscriptions.values()]
