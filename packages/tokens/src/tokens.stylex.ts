@@ -523,6 +523,7 @@ export const tracking = stylex.defineVars({
  * enough that the 0.01em tracking Inter needed is gone.
  */
 export const text = stylex.defineVars({
+  '--topic-title-lines': '1',
   // Pinned / Recent / People / Channels headings, in sentence case (SPEC 17).
   '--text-section-label-family': fonts['--font-sans'],
   '--text-section-label-size': '11px',

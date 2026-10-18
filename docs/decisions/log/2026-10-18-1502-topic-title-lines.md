@@ -1,0 +1,1 @@
+- 10-18 15:02 · Tushar · Add Appearance › Topic titles: One line (default) or Two lines, saved on this Mac and shared by sidebar, All topics, Home and topic switcher rows. Grow only titles that wrap; keep the header unchanged and full-title tooltips only for clipped text. Keep sidebar rows in flow with Chromium sizing and anchoring; measure All topics virtual slots.

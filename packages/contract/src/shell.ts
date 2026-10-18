@@ -19,6 +19,10 @@ export const DEFAULT_THEME: Theme = 'system'
 export const SettingsSectionSchema = Schema.Literals(['general', 'appearance', 'notifications', 'ignored', 'tidy-up', 'juno', 'ai-activity', 'connections', 'backup', 'about'])
 export type SettingsSection = typeof SettingsSectionSchema.Type
 
+/** Maximum title lines in topic lists. One line unless chosen otherwise. */
+export const TopicTitleLinesSchema = Schema.Literals(['one', 'two'])
+export type TopicTitleLines = typeof TopicTitleLinesSchema.Type
+
 /** Settings › Appearance › Density (inventory 3.3). Compact unless the user chose one: `launch.json` keeps only a chosen density. */
 export const DensitySchema = Schema.Literals(['comfortable', 'compact'])
 export type Density = typeof DensitySchema.Type
@@ -280,6 +284,7 @@ export const ShellRoutes = {
   },
   [Channels.launchSetTheme]: { input: Schema.Struct({ theme: ThemeSchema }), output: Schema.Void },
   [Channels.launchSetAccent]: { input: Schema.Struct({ accent: AccentSchema }), output: Schema.Void },
+  [Channels.launchSetTopicTitleLines]: { input: Schema.Struct({ topicTitleLines: TopicTitleLinesSchema }), output: Schema.Void },
   [Channels.launchSetDensity]: { input: Schema.Struct({ density: DensitySchema }), output: Schema.Void },
   [Channels.launchSetPrivacy]: { input: Schema.Struct({ privacy: Schema.Boolean }), output: Schema.Void },
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },

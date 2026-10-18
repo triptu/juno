@@ -5,9 +5,9 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
+import type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
-export type { Accent, Density, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
+export type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
 export const Channels = {
   updatesGet: 'updates.get',
@@ -52,6 +52,7 @@ export const Channels = {
   launchSetAccent: 'launch.setAccent',
   /** Remember the density so the next launch's first render already uses it. */
   launchSetDensity: 'launch.setDensity',
+  launchSetTopicTitleLines: 'launch.setTopicTitleLines',
   /** Remember privacy mode, so the next launch's first render already hides message text. */
   launchSetPrivacy: 'launch.setPrivacy',
   /** Remember the sidebar's width and hidden state so the next launch's first render has them. */
@@ -304,6 +305,7 @@ export interface JunoBridge {
   readonly launch: {
     readonly setTheme: (theme: Theme) => Promise<unknown>
     readonly setAccent: (accent: Accent) => Promise<unknown>
+    readonly setTopicTitleLines: (topicTitleLines: TopicTitleLines) => Promise<unknown>
     readonly setDensity: (density: Density) => Promise<unknown>
     readonly setPrivacy: (privacy: boolean) => Promise<unknown>
     readonly setSidebar: (sidebar: SidebarLayout) => Promise<unknown>

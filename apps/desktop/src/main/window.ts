@@ -348,6 +348,7 @@ function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string 
   url.searchParams.set('theme', launch.theme)
   url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
   url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
+  if (launch.topicTitleLines !== undefined) url.searchParams.set('topicTitleLines', launch.topicTitleLines)
   // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
   if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR

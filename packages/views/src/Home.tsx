@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
-import { accent, colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, type ActivateEvent } from '@juno/ui'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
@@ -51,9 +51,9 @@ export interface HomeProps {
 /**
  * Home (SPEC section 12): the scene over the greeting and up to three rows
  * in a centred column, and the composer at the bottom, where every topic's
- * composer is. Every size is fixed before data arrives, so nothing moves
- * when a title line is rewritten: a title is one ellipsised line in a 52px
- * row. The column scrolls on its own, so the composer never moves.
+ * composer is. A row is at least 52px and grows only when its title wraps
+ * under the chosen line limit. The column scrolls on its own, so the
+ * composer never moves.
  */
 export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
   const headingId = useId()
@@ -129,9 +129,9 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       )}
       <span {...stylex.props(styles.text)}>
         {/* An assistant title, and a follow-up's promise, can quote the messages; the plain one only says what kind of thing waits. */}
-        <span data-home-title="" data-sensitive={item.aiTitle === undefined && item.kind !== 'followUp' ? undefined : ''} {...stylex.props(styles.itemTitle)}>
+        <Text variant="ui" weight="medium" tone="default" topicTitle tooltipWhenTruncated data-home-title="" data-sensitive={item.aiTitle === undefined && item.kind !== 'followUp' ? undefined : ''}>
           {item.aiTitle ?? item.title}
-        </span>
+        </Text>
         <span data-home-meta="" {...stylex.props(styles.itemMeta)}>
           {metaOf(item, now)}
         </span>
@@ -290,7 +290,7 @@ const styles = stylex.create({
   row: {
     display: 'flex',
     alignItems: 'center',
-    height: sizes['--row-52'],
+    minHeight: sizes['--row-52'],
     minWidth: 0,
     paddingInlineEnd: spacing['--space-1-5'],
     borderRadius: radii['--radius-3xl'],
@@ -314,7 +314,8 @@ const styles = stylex.create({
     gap: spacing['--space-3'],
     flexGrow: 1,
     minWidth: 0,
-    height: '100%',
+    minHeight: sizes['--row-52'],
+    paddingBlock: spacing['--space-1'],
     paddingInlineStart: spacing['--space-1-5'],
     paddingInlineEnd: spacing['--space-1-5'],
     borderRadius: radii['--radius-3xl'],
@@ -326,7 +327,6 @@ const styles = stylex.create({
   button: {
     borderWidth: 0,
     backgroundColor: 'transparent',
-    padding: 0,
     paddingInlineStart: spacing['--space-1-5'],
     paddingInlineEnd: spacing['--space-1-5'],
     font: 'inherit',
@@ -356,16 +356,6 @@ const styles = stylex.create({
     flexDirection: 'column',
     flexGrow: 1,
     minWidth: 0,
-  },
-  itemTitle: {
-    fontFamily: text['--text-ui-family'],
-    fontSize: text['--text-ui-size'],
-    fontWeight: weights['--weight-medium'],
-    lineHeight: text['--text-ui-leading'],
-    color: colors['--foreground-default'],
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
   },
   itemMeta: {
     fontFamily: text['--text-meta-family'],

@@ -645,3 +645,7 @@ Other literal lengths and colours require tokens, or a trailing
 | Token | Value | Used for |
 | --- | --- | --- |
 | `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
+
+### Topic title line limit
+
+`--topic-title-lines` in the `text` group is 1 by default and 2 when Appearance › Topic titles is Two lines. List titles use it for line clamping; the topic header does not. It reserves no height.

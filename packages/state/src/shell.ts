@@ -1,10 +1,10 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
-export type { Accent, Density, ResolvedTheme, Theme } from '@juno/contract'
+export type { Accent, Density, TopicTitleLines, ResolvedTheme, Theme } from '@juno/contract'
 
 declare const window: { readonly juno: JunoBridge }
 
@@ -75,6 +75,13 @@ export const resolvedThemeAtom = Atom.make((get): ResolvedTheme => {
   const theme = get(themeAtom)
   return theme === 'system' ? (get(systemDarkAtom) ? 'dark' : 'light') : theme
 })
+
+/** List titles start with the saved line limit on the first frame. */
+export const topicTitleLinesAtom = Atom.make<TopicTitleLines>(launchParam('topicTitleLines') === 'two' ? 'two' : 'one')
+
+export function persistTopicTitleLines(topicTitleLines: TopicTitleLines): void {
+  window.juno.launch.setTopicTitleLines(topicTitleLines).catch(() => {})
+}
 
 /** Comfortable or Compact. Starts as the saved one. */
 export const densityAtom = Atom.make<Density>(savedDensity())

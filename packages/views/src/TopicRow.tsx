@@ -234,7 +234,7 @@ export const TopicRow = memo(function TopicRow({
               variant="rowTitle"
               tone={quiet ? 'subtle' : 'default'}
               weight={unread ? 'semibold' : 'medium'}
-              truncate
+              topicTitle
               dir="auto"
               id={titleId}
               data-row-part="title"
@@ -348,8 +348,9 @@ const styles = stylex.create({
     minWidth: 0,
     paddingBlock: density['--density-row-padding-block'],
     paddingInline: spacing['--space-3'],
-    // One fixed height per density: the preview is one line, so every row is the same whole number of pixels.
-    height: `calc(${density['--density-row-estimate']} + 2 * ${density['--density-row-padding-block']})`,
+    // Short titles keep the density’s height; wrapped titles add only their extra line.
+    minHeight: `calc(${density['--density-row-estimate']} + 2 * ${density['--density-row-padding-block']})`,
+    height: 'calc-size(auto, round(up, size, 1px))', // tokens-allow: whole-pixel rounding keeps scroll anchoring exact
     borderRadius: radii['--radius-3xl'],
     color: colors['--foreground-default'],
     userSelect: 'none',
@@ -383,10 +384,9 @@ const styles = stylex.create({
       ':has(:focus-visible)': PLACE_MASK,
     },
   },
-  // A Main: two lines, so a shorter fixed height and
-  // estimate. Known from the row's kind, never measured.
+  // A Main has no meta line, so its minimum and off-screen estimate are shorter.
   twoLineRow: {
-    height: `calc(${density['--density-row-two-line-estimate']} + 2 * ${density['--density-row-padding-block']})`,
+    minHeight: `calc(${density['--density-row-two-line-estimate']} + 2 * ${density['--density-row-padding-block']})`,
     containIntrinsicSize: `auto ${density['--density-row-two-line-estimate']}`,
   },
   // Light muted text fails contrast on the secondary fill (tokens.md 1.7);
@@ -426,7 +426,7 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
-    height: sizes['--control-22'],
+    minHeight: sizes['--control-22'],
     minWidth: 0,
   },
   resolvedCheck: {

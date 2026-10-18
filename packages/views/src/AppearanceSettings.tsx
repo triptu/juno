@@ -1,3 +1,4 @@
+import type { TopicTitleLines } from '@juno/contract'
 import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
@@ -7,6 +8,9 @@ export interface AppearanceSettingsProps {
   readonly accent: AccentName
   readonly onThemeChange: (theme: ThemePreference) => void
   readonly onAccentChange: (accent: AccentName) => void
+  /** With both, the Topic titles row. */
+  readonly topicTitleLines?: TopicTitleLines
+  readonly onTopicTitleLinesChange?: (lines: TopicTitleLines) => void
   /** With both, a Density row: Comfortable or Compact. */
   readonly density?: DensityName
   readonly onDensityChange?: (density: DensityName) => void
@@ -27,9 +31,9 @@ const densityOptions: ReadonlyArray<{ readonly value: DensityName; readonly labe
 
 /**
  * The Appearance group of Settings (SPEC 14, inventory 14): the theme
- * (System follows macOS), the accent as a row of swatches, and the density.
+ * (System follows macOS), the accent as swatches, density, and the topic title line limit.
  */
-export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, density, onDensityChange, layout = 'row' }: AppearanceSettingsProps) {
+export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, density, onDensityChange, topicTitleLines, onTopicTitleLinesChange, layout = 'row' }: AppearanceSettingsProps) {
   const stacked = layout === 'stack'
   return (
     <section {...stylex.props(styles.section)} aria-label="Appearance">
@@ -64,6 +68,13 @@ export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChang
             </Text>
           </div>
           <Segmented options={densityOptions} value={density} onChange={onDensityChange} label="Density" />
+        </div>
+      )}
+      {topicTitleLines === undefined || onTopicTitleLinesChange === undefined ? null : (
+        <div {...stylex.props(styles.row, stacked && styles.rowStacked)}>
+          <Text variant="ui" tone="default" weight="medium">Topic titles</Text>
+          <Segmented label="Topic titles" value={topicTitleLines} onChange={onTopicTitleLinesChange}
+            options={[{ value: 'one', label: 'One line' }, { value: 'two', label: 'Two lines' }]} />
         </div>
       )}
     </section>

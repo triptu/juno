@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
@@ -10,6 +10,7 @@ import { followSharingPrivacy } from './containers/privacy'
 import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
+import { applyTopicTitleLines } from './containers/topicTitleLines'
 
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
@@ -44,6 +45,7 @@ export function App() {
   const resolved = useAtomValue(resolvedThemeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
   const density = useAtomValue(densityAtom)
+  const topicTitleLines = useAtomValue(topicTitleLinesAtom)
   const signedIn = useAtomValue(signedInAtom)
   const sessionUnknown = useAtomValue(sessionUnknownAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
@@ -59,6 +61,8 @@ export function App() {
     })
     return () => cancelIdleCallback(idle)
   }, [signedIn])
+
+  useLayoutEffect(() => applyTopicTitleLines(topicTitleLines), [topicTitleLines])
 
   useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
 
