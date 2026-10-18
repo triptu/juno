@@ -116,7 +116,7 @@ export const historyOrder = (
       const entry = entries.get(id)
       const unread = entry?.has_unreads === true
       if (kind === 'im' || kind === 'mpim') return unread ? 0 : 1
-      if ((unread && entry.mention_count > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 2
+      if ((unread && (entry.mention_count ?? 0) > 0) || (counts.threads.mention_count_by_channel?.[id] ?? 0) > 0) return 2
       if ((counts.threads.unread_count_by_channel?.[id] ?? 0) > 0) return 3
       if (unread) return 4
       return own.has(id) ? 5 : 6

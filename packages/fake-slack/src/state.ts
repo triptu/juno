@@ -316,7 +316,7 @@ export class Workspace {
     return [...c.members].find((id) => id !== this.selfId) ?? this.selfId
   }
 
-  countEntry(c: ConversationRecord): CountEntry {
+  countEntry(c: ConversationRecord): CountEntry & { readonly has_unreads: boolean; readonly mention_count: number } {
     const lastRead = this.reads.get(c.id) ?? NEVER_READ
     const main = this.main(c.id)
     const unread = main.filter((m) => compareTs(m.ts, lastRead) > 0 && m.user !== this.selfId)

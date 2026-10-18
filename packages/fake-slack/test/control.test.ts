@@ -76,19 +76,21 @@ describe('control API', () => {
     expect((await client.ok('conversations.history', { channel: 'C0ENG', limit: 1 })).messages).toHaveLength(1)
   })
 
-  it('an incremental client.counts lists only the conversations that changed since counts_last_fetched', async () => {
+  it('an incremental client.counts carries partial rows for unchanged conversations', async () => {
     const full = await client.ok('client.counts', { thread_counts_by_channel: true })
     expect(full.channels.length).toBeGreaterThan(3)
     const fetched = full.counts_last_fetched!
     fake.advanceClock({ millis: 5_000 })
     const quiet = await client.ok('client.counts', { thread_counts_by_channel: true, counts_last_fetched: fetched + 1 })
-    expect([...quiet.channels, ...quiet.ims, ...quiet.mpims]).toHaveLength(0)
+    const partial = [...quiet.channels, ...quiet.ims, ...quiet.mpims]
+    expect(partial.length).toBe(full.channels.length + full.ims.length + full.mpims.length)
+    expect(partial.every((entry) => Object.keys(entry).toSorted().join(',') === 'id,last_read')).toBe(true)
     fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'hello' })
     fake.markRead({ channel: 'D0MAYA', ts: fake.messages('D0MAYA').at(-1)!.ts })
     fake.joinChannel({ channel: 'C0SALES' })
     const changed = await client.ok('client.counts', { thread_counts_by_channel: true, counts_last_fetched: fetched + 1 })
-    expect(changed.channels.map((c) => c.id).toSorted()).toEqual(['C0ENG', 'C0SALES'])
-    expect(changed.ims.map((c) => c.id)).toEqual(['D0MAYA'])
+    expect(changed.channels.filter((c) => c.has_unreads !== undefined).map((c) => c.id).toSorted()).toEqual(['C0ENG', 'C0SALES'])
+    expect(changed.ims.filter((c) => c.has_unreads !== undefined).map((c) => c.id)).toEqual(['D0MAYA'])
   })
 
   it('a reply by self follows the thread and Slack says so with thread_subscribed', async () => {

@@ -5,6 +5,8 @@ set -euo pipefail
 cores=$1
 run=$2
 command=$3
+wait_seconds=$4
+deadline=$(( SECONDS + wait_seconds ))
 state="$HOME/.cache/juno-runner"
 mkdir -p "$state/jobs"
 exec 9>"$state/lock"
@@ -45,6 +47,10 @@ while :; do
     break
   fi
   flock -u 9
+  if (( wait_seconds >= 0 && SECONDS >= deadline )); then
+    echo __juno_remote_busy
+    exit 75
+  fi
   sleep 2
 done
 echo __juno_remote_allocated

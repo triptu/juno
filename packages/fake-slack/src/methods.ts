@@ -3,7 +3,7 @@
  * the success fields (without `ok`) or an `ApiError`. The server encodes the
  * result through the method's schema.
  */
-import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
+import type { CountEntry, Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
 import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
@@ -125,21 +125,24 @@ export const coreMethods = {
 
   /**
    * The user's own conversations with their read state, as recorded live. A
-   * channel the user is not in is not listed. With `counts_last_fetched`
-   * only the conversations that changed since then are listed (research
-   * section 2 marks this Unknown; the fake takes the strict reading so the
-   * sync cannot lean on an incremental answer being complete).
+   * channel the user is not in is not listed. An incremental response keeps
+   * unchanged conversations as { id, last_read }, matching the live probe.
+   * The sync must also tolerate omitted conversations as Unknown.
    */
   'client.counts': (ctx, args) => {
     const ws = ctx.workspace
     const wanted = args.channel_ids === undefined ? undefined : new Set(args.channel_ids)
     const since = args.counts_last_fetched
     const records = [...ws.conversations.values()].filter(
-      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)) && (since === undefined || ws.changedSince(c.id, since)),
+      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)),
     )
-    const channels = records.filter((c) => c.kind === 'public' || c.kind === 'private').map((c) => ws.countEntry(c))
-    const ims = records.filter((c) => c.kind === 'im').map((c) => ws.countEntry(c))
-    const mpims = records.filter((c) => c.kind === 'mpim').map((c) => ws.countEntry(c))
+    const entry = (c: (typeof records)[number]): CountEntry => {
+      const full = ws.countEntry(c)
+      return since === undefined || ws.changedSince(c.id, since) ? full : { id: full.id, last_read: full.last_read }
+    }
+    const channels = records.filter((c) => c.kind === 'public' || c.kind === 'private').map(entry)
+    const ims = records.filter((c) => c.kind === 'im').map(entry)
+    const mpims = records.filter((c) => c.kind === 'mpim').map(entry)
     // `threads` carries no `timestamp` in client.counts (it does in getView's threads_state).
     const { timestamp: _timestamp, ...threads } = ws.threadCounts()
     return {

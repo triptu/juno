@@ -831,7 +831,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 
 `--wide` keeps the rules from before 10-18: everything runs for the files in the first two rows, every spec the coverage map picks runs, shared e2e support and style sheets run every desktop spec, `packages/tokens/` runs the whole gallery, conformance runs for any of the 425 files its replay reaches, and heavy tests always run.
 
-**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the large-seed idle test (5 minutes in a full run, 12 alone), the first-sync cases in `layout-shift.spec.ts`, every test in `quick-start.spec.ts`, the 429 storm in `realtime.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and the three specs), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. The scheduled full run sets nothing, so it always runs them, as does a run by hand.
+**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the large-seed idle test (5 minutes in a full run, 12 alone), the first-sync cases in `layout-shift.spec.ts`, every test in `quick-start.spec.ts`, the 429 storm in `realtime.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and the three specs), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. The idle spec's portable gate is a remote runaway check (25% of one core averaged over 60 s); its fine per-process budgets are in `@mac` tests. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. The scheduled remote full run includes the coarse idle check. Fine idle budgets run in the nightly Mac lane and on demand on the Mac; they do not run in remote plans or remote full runs.
 
 **Batch gate.** `pnpm affected --batch --base <ref>` (what `scripts/batch-merge.mjs` runs after its own typecheck and lint) plans only the unit files and script tests the batch reaches, `specs:check` when `specs/` changed, and conformance when the code the specs model changed. It does not run the gallery or desktop e2e.
 
@@ -869,11 +869,11 @@ A changed app file that was in no bundle when the map was recorded (types only, 
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs a root script on a Namespace Linux machine of the standard shape, 8x16 (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides) and streams its output and exit code back. Each run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the nightly Mac run includes them. This includes the sidebar width surviving a relaunch and the native Window and Graphics idle-CPU budgets. For a change to idle CPU itself, run the latter through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
+`pnpm remote <script> [args...]` tries a configured SSH runner first, then runs a root script on Namespace if the runner is unreachable or full for 60 seconds. Both backends stream output and the exit code back. Namespace uses the standard shape, 8x16 (see "Machine shapes"; `--machine` or `JUNO_REMOTE_MACHINE` overrides). Each Namespace run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the nightly Mac run includes them. The native Window and Graphics idle budgets are `@mac` only; the remote `idle-cpu.spec.ts` check uses a 25% runaway ceiling for every Juno process. For idle CPU changes, run the fine budgets through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
 
 - **Plans.** `pnpm remote test:plan <step> + <step> ...` runs several root scripts on one machine (`scripts/plan.mjs`); `KEY=VALUE` words before a step's script set its environment, for example `pnpm remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop`. The app suites (`test:desktop`, `test:gallery`, `test:e2e`) run one after another. Unit tests and spec checks each have their own lane beside them under `nice`; `JUNO_PLAN_SERIAL=1` runs every step in turn. On 8 cores the lanes use four desktop or six gallery workers, two unit workers, and two Quint simulations. An uncached bounded check adds one Apalache checker. The gallery shift sweep uses six parts to match its workers. Inside the container `scripts/build-cached.mjs` reuses a build made earlier in the run, so the desktop app is built once. Each line of output starts with `[<script>]`, and a line `plan: step <i> <script> exited with <code> after <s> s` gives each step's result; `pnpm affected` and `pnpm verify:main` read those lines.
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`. On Namespace, when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
 - **Memory.** The remote runner samples `MemTotal - MemAvailable` every two seconds and prints the peak used and available memory after each script. These are machine-wide values, so compare gallery runs on the same 8x16 shape.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 8) idle minutes (the cost is in "Current cost controls"), every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
@@ -952,9 +952,28 @@ into `.remote/shards-*/html`, and a failed shard or missing report fails the par
 `test:e2e` runs the desktop e2e and then the gallery on one machine.
 `pnpm flake` keeps its repetition semantics instead of splitting its selected tests.
 
-Namespace stays the default. An optional SSH backend is enabled only by
-`JUNO_RUNNER_HOST`. Setup, health checks and a standalone Windows setup prompt are
-in [Set up an optional SSH runner](self-hosted-runner.md).
+Configure `~/.config/juno/runner.json` on the Mac with `host`, `port`, and `key`
+to prefer an SSH runner for every agent, including `pnpm affected` and
+`pnpm verify:main` plans. `JUNO_RUNNER_HOST`, `JUNO_RUNNER_PORT`, and
+`JUNO_RUNNER_KEY` override file values. An empty `JUNO_RUNNER_HOST` selects
+Namespace. The real host and user belong only in the machine-local file.
+
+The runner uses `juno-remote:<imageTag()>`. A missing tag is built on the runner
+from the shared Docker build context streamed over SSH, under a host build lock.
+No `nsc` or Namespace registry access is needed on the runner.
+`JUNO_RUNNER_IMAGE` remains an optional preloaded-image override.
+`pnpm runner:check` reports a missing local tag without failing, and
+`pnpm runner:prune` removes old tags and unused build cache while keeping the
+current image. Docker refuses removal of images referenced by containers.
+
+An unreachable runner falls back to Namespace. After the image is ready, a job
+waits at most 60 seconds for runner cores before falling back. With
+`JUNO_REMOTE_MAX_VCPU=0`, it waits without a deadline and never allocates
+Namespace machines. SSH authentication errors, broken Docker, failed builds,
+and failed tests return an error without fallback. A runner job does not start
+the Namespace warm pool or daemon. Without a configured host, Namespace remains
+the default. Setup and a standalone Windows prompt are in
+[Set up an optional SSH runner](self-hosted-runner.md).
 
 ## Hunting a flaky test
 
@@ -1489,7 +1508,9 @@ this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
 
 Once a day, use `pnpm verify:main --ref origin/main --nightly`. This implies
-`--no-cache` for Quint and `--with-mac` for the Mac-only e2e tests, perf and feel.
+`--no-cache` for Quint and `--with-mac` for the Mac-only e2e tests, perf and feel,
+including the fine idle-CPU budgets. The ordinary six-hourly remote run checks
+only the coarse idle runaway ceiling.
 Those flags also work separately. Perf and feel run sequentially after the
 other suites and hold the exclusive heavy lock. Ordinary UI changes do not
 require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.

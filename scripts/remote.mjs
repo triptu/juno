@@ -1,4 +1,4 @@
-// Runs a root test script on a Namespace Linux machine and streams its output.
+// Runs a root test script on an SSH runner or Namespace and streams its output.
 //
 //   pnpm remote [--dry-run] [--machine linux/amd64:4x8] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
@@ -19,11 +19,8 @@
 // after a failure or Ctrl-C it is destroyed at once. `--status` lists the pool
 // and `--drain` destroys its idle machines.
 //
-// Needs `nsc` logged in (`nsc login`, or NSC_TOKEN_FILE for a token). See ADR 0013.
-//
-// When Namespace stops answering, a waiting run says so and keeps waiting;
-// JUNO_REMOTE_OUTAGE_WAIT=10m makes it give up after that much outage with
-// exit code 75 (docs/development.md, "Remote runs", "Outages").
+// Configure ~/.config/juno/runner.json to prefer SSH. Namespace fallback needs
+// `nsc login`. See docs/self-hosted-runner.md and ADR 0013.
 
 import { randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
@@ -32,7 +29,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { runnerConfig, checkRunner, runnerCommand } from './remote/runner.mjs'
+import { runnerConfig, checkRunner, runnerCommand, ensureRunnerImage } from './remote/runner.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
@@ -168,7 +165,8 @@ const create = (duration) => ['create', '--bare', '--machine_type', options.mach
 console.error(`remote: ${files.length} files (${(bytes / 1024 / 1024).toFixed(1)} MB before compression), no secrets found`)
 if (options.dryRun) {
   console.log('remote: dry run; these steps would run:')
-  if (process.env.JUNO_RUNNER_HOST) console.log('  try the configured SSH runner first; Namespace steps apply only if unreachable')
+  const config = runnerConfig()
+  if (config) console.log(`  try SSH runner image ${config.image}${config.build ? ' (built on the runner if missing)' : ''}; Namespace steps apply if unreachable or full for 60 s`)
   console.log(`  image nscr.io/<workspace>/juno-remote:${imageTag()} (nsc build --push if the registry lacks it)`)
   console.log(`  a warm ${options.machine} machine from the pool, or nsc ${create('3h').map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
@@ -219,35 +217,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   })
 }
 
-let code = 1
-let infraFailure = false
-let outageFailure = false
-let finalized = false
-function finishLog(result) {
-  if (finalized) return
-  finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
-}
-try {
-  runner = runnerConfig()
-  if (runner) {
-    const health = checkRunner(runner)
-    if (health.reachable) {
-      backend = 'ssh'
-      if (options.keep) throw new Error('--keep is only available for Namespace')
-      // The standard shape is a Namespace size; a smaller runner runs the job on what it has.
-      if (cores > health.cores && !options.explicitMachine) cores = health.cores
-      if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
-      if (!runner.image) throw new Error('Set JUNO_RUNNER_IMAGE to the preloaded Juno image; pnpm runner:check verifies it')
-    } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
-  }
-  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
-  appendFileSync(runLog, `remote: backend ${backend}\n`)
-  if (backend === 'ssh') {
-    image = runner.image
-    id = runner.host
-    acquiredAt = Date.now()
-  } else {
+async function prepareNamespace() {
   const registryFile = join(tmpdir(), 'juno-remote-pool', 'registry')
   if (!existsSync(registryFile)) writeFileSync(registryFile, JSON.parse(await retry('reading the workspace', () => nsc(['workspace', 'describe', '-o', 'json']))).registry_url)
   const registry = readFileSync(registryFile, 'utf8')
@@ -273,7 +243,38 @@ try {
   warm = claimed.warm
   appendFileSync(runLog, `remote: machine ${JSON.stringify({ id, warm, acquiredSeconds: (Date.now() - started) / 1000 })}\n`)
   console.error(`remote: ${claimed.warm ? 'warm' : 'new'} machine ${id} (${options.machine}) after ${elapsed()}; running pnpm ${options.script}`)
+}
 
+let code = 1
+let infraFailure = false
+let outageFailure = false
+let finalized = false
+function finishLog(result) {
+  if (finalized) return
+  finalized = true
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+}
+try {
+  runner = runnerConfig()
+  if (runner) {
+    const health = checkRunner(runner)
+    if (health.reachable) {
+      backend = 'ssh'
+      if (options.keep) throw new Error('--keep is only available for Namespace')
+      // The standard shape is a Namespace size; a smaller runner runs the job on what it has.
+      if (cores > health.cores && !options.explicitMachine) cores = health.cores
+      if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
+    } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
+  }
+  if (backend === 'namespace' && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0) throw new Error('Namespace is disabled (JUNO_REMOTE_MAX_VCPU=0) and no runner is reachable')
+  appendFileSync(runLog, `remote: backend ${backend}\n`)
+  if (backend === 'ssh') {
+    image = await ensureRunnerImage(runner, (message) => { console.error(message); appendFileSync(runLog, `${message}\n`) })
+    id = runner.host
+    acquiredAt = Date.now()
+    console.error(`remote: SSH runner (${cores} cores); running pnpm ${options.script}`)
+  } else {
+    await prepareNamespace()
   }
 
   const list = join(work, 'files')
@@ -294,6 +295,7 @@ try {
     ssh.stdin.on('error', () => {})
     tar.stdout.pipe(ssh.stdin)
     let errors = ''
+    let runnerBusy = false
     ssh.stderr.on('data', (chunk) => {
       errors += chunk
       appendFileSync(runLog, chunk)
@@ -311,6 +313,7 @@ try {
     }, 8000)
     let lines = 0
     for await (const line of createInterface({ input: ssh.stdout })) {
+      if (line === '__juno_remote_busy') { runnerBusy = true; continue }
       if (line === '__juno_remote_released') { machineSeconds = (Date.now() - acquiredAt) / 1000; continue }
       if (line === '__juno_remote_allocated') { acquiredAt = Date.now(); continue }
       if (line === '__juno_remote_ready') {
@@ -333,9 +336,19 @@ try {
         console.log(line)
       }
     }
-    await closed
+    const transportCode = await closed
     clearTimeout(dialTimer)
     tar.kill()
+    if (backend === 'ssh' && runnerBusy && transportCode === 75 && reported === undefined && Number(process.env.JUNO_REMOTE_MAX_VCPU ?? 48) !== 0) {
+      console.error('remote: runner full for 60 s, trying Namespace')
+      appendFileSync(runLog, 'remote: runner full for 60 s, trying Namespace\nremote: backend namespace\n')
+      backend = 'namespace'
+      id = undefined
+      acquiredAt = undefined
+      machineSeconds = undefined
+      await prepareNamespace()
+      continue
+    }
     if (reported !== undefined) break
     if (backend === 'ssh' || commandStarted || lines > 0 || !/dial tcp|i\/o timeout|connection refused/.test(errors) || tries === 6) {
       // nsc ssh turns every failure into 1, so the script's own code comes back as a marker line.

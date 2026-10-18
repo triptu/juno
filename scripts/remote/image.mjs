@@ -40,6 +40,20 @@ export async function retry(what, attempt) {
   }
 }
 
+/** The same small build context is used by Docker on either backend. */
+export function imageContext() {
+  const context = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-image-'))
+  const manifests = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'], { cwd: root, encoding: 'utf8' })
+    .stdout.split('\n')
+    .filter(Boolean)
+  for (const file of [...imageInputs.slice(1), ...manifests, '.npmrc'].filter((name) => existsSync(join(root, name)))) {
+    mkdirSync(dirname(join(context, file)), { recursive: true })
+    writeFileSync(join(context, file), readFileSync(join(root, file)))
+  }
+  writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, 'scripts/remote/Dockerfile')))
+  return context
+}
+
 /** Builds and pushes the image unless the registry has it. One build at a time per Mac. */
 export async function ensureImage(registry, tag) {
   const image = `${registry}/juno-remote:${tag}`
@@ -63,15 +77,7 @@ export async function ensureImage(registry, tag) {
     }
   }
   try {
-    const context = mkdtempSync(join(tmpdir(), 'juno-remote-image-'))
-    const manifests = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'], { cwd: root, encoding: 'utf8' })
-      .stdout.split('\n')
-      .filter(Boolean)
-    for (const file of [...imageInputs.slice(1), ...manifests, '.npmrc'].filter((name) => existsSync(join(root, name)))) {
-      mkdirSync(dirname(join(context, file)), { recursive: true })
-      writeFileSync(join(context, file), readFileSync(join(root, file)))
-    }
-    writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, 'scripts/remote/Dockerfile')))
+    const context = imageContext()
     console.error(`remote: building ${image} (the lockfile or Dockerfile changed; a few minutes, once)`)
     const built = spawnSync('nsc', ['build', context, '--name', image, '--push', '--platform', 'linux/amd64'], {
       stdio: ['ignore', 'inherit', 'inherit'],
