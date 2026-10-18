@@ -6,7 +6,7 @@ import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
 import { JUNO_IMAGE_LIMITS, JUNO_TEXT_LIMITS, JunoFileInput } from '../chat/files'
 import { Emoji, ReplyTarget, RemoveSheet } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
-import { SendContext } from '../chat/place'
+import { ChatMention, SendContext } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
 
 /** First subscription opens the newest window or the first unread row. Anchored windows
@@ -28,16 +28,20 @@ export const ChatPageSnapshot = Schema.Struct({
 })
 export const chatPage = Rpc.make('agent.chat.page', { payload: { window: ChatWindow }, success: ChatPageSnapshot, stream: true, error: AgentCommandError })
 export const chatSummary = Rpc.make('agent.chat.summary', { success: ChatSummary, stream: true })
+/** At most this many @ and # picks go with one message. */
+export const MAX_MENTIONS = 50
 /**
  * A message, maybe a reply to a Juno bubble or card. While a run is live it joins the run at its next
  * step; otherwise it starts one. A reply to a card is not a click. `files` are images (scaled, with
  * their thumbnails) and text files (already cut), at most `JUNO_IMAGE_LIMITS.count` and
- * `JUNO_TEXT_LIMITS.count` of each; they go to the chat model only, never to Slack.
+ * `JUNO_TEXT_LIMITS.count` of each; they go to the chat model only, never to Slack. `mentions` are
+ * the people and channels picked with @ and # that still stand in `text`.
  */
 export const chatSend = Rpc.make('agent.chat.send', {
   payload: {
     ...operation, text: Schema.String, context: Schema.optionalKey(SendContext), replyTo: Schema.optionalKey(ReplyTarget),
     files: Schema.optionalKey(Schema.Array(JunoFileInput).check(Schema.isMaxLength(JUNO_IMAGE_LIMITS.count + JUNO_TEXT_LIMITS.count))),
+    mentions: Schema.optionalKey(Schema.Array(ChatMention).check(Schema.isMaxLength(MAX_MENTIONS))),
   },
   success: Accepted, error: AgentCommandError,
 })

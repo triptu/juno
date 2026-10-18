@@ -360,12 +360,14 @@ export function agentHandlers(host: ChatHost) {
             Stream.map(() => ({ ...chatSummary(state.items(), state.turns?.jobs.active() ?? []), mayAuthorize: state.turns !== undefined && host.presence()?.aiEnabled !== false && mayAuthorize(authorityOf(state.turns.store)) })),
             Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
           ),
-        'agent.chat.send': ({ opId, text, context, replyTo, files }) =>
-          Effect.flatMap(engine(state, host), (turns) =>
+        'agent.chat.send': ({ opId, text, context, replyTo, files, mentions }) => {
+          const data = { ...(context ? { context } : {}), ...(mentions !== undefined && mentions.length > 0 ? { mentions } : {}) }
+          return Effect.flatMap(engine(state, host), (turns) =>
             changed(answer(opId, () => turns.accept({
-              opId, kind: 'send', text, ...(replyTo ? { replyTo } : {}), ...(context ? { data: { context } } : {}), ...(files !== undefined && files.length > 0 ? { files } : {}),
+              opId, kind: 'send', text, ...(replyTo ? { replyTo } : {}), ...(Object.keys(data).length > 0 ? { data } : {}), ...(files !== undefined && files.length > 0 ? { files } : {}),
             }))),
-          ),
+          )
+        },
         'agent.chat.image': ({ opId, n }) => Effect.sync(() => (state.turns === undefined ? null : (thumbOf(state.turns.store, opId, n) ?? null))),
         // A model change in Settings is not a chat change: look again every few seconds too.
         'agent.chat.reads': () =>

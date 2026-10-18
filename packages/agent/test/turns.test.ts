@@ -232,6 +232,20 @@ it('a reply to a Juno bubble carries that bubble to the model in full', async ()
   expect(h.turns.pins.pinMessage({ messageId: message.id })).toMatchObject({ _tag: 'changed', pin: { text: 'which deploy?' } })
 })
 
+it('people and channels picked with @ and # reach the model with their ids, and a pin takes only the words', async () => {
+  h = await turnsHarness()
+  h.fake.script([reply(say('Asking her.'))])
+  const op = h.send('ask @Maya Chen in #eng, then @Maya Chen again', {
+    mentions: [{ kind: 'person', id: 'U0MAYA', name: 'Maya Chen' }, { kind: 'channel', id: 'C0ENG', name: 'eng' }, { kind: 'person', id: 'U0MAYA', name: 'Maya Chen' }],
+  })
+  await h.ended(op)
+  expect(h.chatRequests()[0]!.context.messages.map(textOf).at(-1)).toBe(
+    '<message id="n1"><person id="U0MAYA" name="Maya Chen"/><channel id="C0ENG" name="#eng"/>ask @Maya Chen in #eng, then @Maya Chen again</message>',
+  )
+  const message = h.turns.messages().find((m) => m.opId === op && m.kind === 'user')!
+  expect(h.turns.pins.pinMessage({ messageId: message.id, from: 0, to: 14 })).toMatchObject({ _tag: 'changed', pin: { text: 'ask @Maya Chen' } })
+})
+
 it('a message sent beside a topic names the topic and the selection, taints its run, and a pin takes only the words', async () => {
   h = await turnsHarness()
   h.fake.script([reply(say('It is settled.')), reply(say('Maya runs it.'))])
