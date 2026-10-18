@@ -1,0 +1,1 @@
+- 10-18 21:50 · main-new-threads · A Main row's new-threads count leaves out threads you started, from Juno or another client (the root's sender), since they are not new to you. SPEC already gave the form (thread icon and number after the title, hidden at 0); reading Main clears it.

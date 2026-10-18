@@ -171,9 +171,13 @@ export class SidebarRow {
     await expect(this.root.locator('[title="Resolved"]')).toHaveCount(shown ? 1 : 0)
   }
 
-  /** Main rows: "2 new threads" under the title. */
+  /** Main rows: "2 new threads" after the title. */
   async expectNewThreads(count: number): Promise<void> {
     await expect(this.root.getByTitle(count === 1 ? '1 new thread' : `${count} new threads`)).toHaveText(String(count))
+  }
+
+  async expectNoNewThreads(): Promise<void> {
+    await expect(this.root.getByTitle(/^\d+ new threads?$/)).toHaveCount(0)
   }
 
   async expectVisible(): Promise<void> {
