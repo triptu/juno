@@ -47,7 +47,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: one live query run (sidebar window, messages window) | 5 ms; FTS query 20 ms | 5 k topics, 100 k messages. Asserted by the engine benchmark with `EXPLAIN QUERY PLAN`. |
 | Engine: one socket event transaction, including `reindexTopics` | 5 ms | Backfill transactions ≤ 200 rows and ≤ 20 ms. |
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
-| Idle CPU after sync, nothing happening: every process | Main 2 %, window (renderer) 3 % with a focused text field, otherwise 2 %, graphics (GPU) 2 %, engine 3 %, Juno agent 2 %, network 1 %, any other helper 1 %, each of one core averaged over the window; Window and Graphics use these limits only in the `@mac` gate, with a 15% spin ceiling on Linux | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time, with only the native caret blinking in a focused text field. `idle-cpu.spec.ts` reads each process from main's process monitor (`processes.ts`, `app.getAppMetrics()` CPU time) after 10 s settling, over 60 s (`JUNO_IDLE_WINDOW_MS`) in each state: after a mention, the first sync's card, and on the large seed Home, a topic with and without its composer focused, the Juno panel after a reply with 20 turns, Activity in the panel and in a tab, the Juno tab after a reply, five tabs, and the window minimized and hidden. Measured on 10-18 over 60 s on this Mac: no process above 1.5 % in any state (table in 8.12). `idle.test.ts` (the engine on a 3 000-message channel) and `outbox-idle.test.ts` (unsent rows waiting in a channel) gate the engine alone. On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. On 10-18 a "Juno Helper" held a core on the owner's Mac: the engine's send workers woke at once while a channel's first unsent row waited out a backoff (8.12). Main logs a process that stays above 30 % of a core for 2 minutes while the app is idle; Settings › About shows each process. |
+| Idle CPU after sync, nothing happening: every process | Main 2 %, window (renderer) 3 % with a focused text field, otherwise 2 %, graphics (GPU) 2 %, engine 3 %, Juno agent 2 %, network 1 %, any other helper 1 %, each of one core averaged over the window; Window and Graphics use these limits only in the `@mac` gate, with a 15% spin ceiling on Linux | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time, with only the native caret blinking in a focused text field. `idle-cpu.spec.ts` reads each process from main's process monitor (`processes.ts`, `app.getAppMetrics()` CPU time) after 10 s settling, over 60 s (`JUNO_IDLE_WINDOW_MS`) in each state: after a mention, the first sync's card, and on the large seed Home, a topic with and without its composer focused, the Juno panel after a reply with 20 turns, Activity in the panel and in a tab, the Juno tab after a reply, five tabs, and the window minimized and hidden. Measured on 10-18 over 60 s on this Mac: no process above 1.5 % in any quiet state (table in 8.12). `idle.test.ts` (the engine on a 3 000-message channel) and `outbox-idle.test.ts` (unsent rows waiting in a channel) gate the engine alone. On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. On 10-18 a "Juno Helper" held a core on the owner's Mac: the engine's send workers woke at once while a channel's first unsent row waited out a backoff (8.12). Main logs a process that stays above 30 % of a core for 2 minutes while the app is idle; Settings › About shows each process. |
 | Memory after the scroll and memory scenario (large workspace, the sidebar's scroll sweeps) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`, which on macOS is the physical footprint; `perf.spec.ts` reads it with `footprint` for main, the renderer and the engine and holds each to these budgets. On 10-18: main 51 to 53 MB, renderer 167 to 227 MB, engine 76 to 94 MB (8.10). Three repetitions of a scenario must not grow the renderer heap by more than 5 %. |
 | Memory after heavy use (large workspace: 20 topics opened, 50 tab switches, 2 minutes of mixed scrolling, the Juno panel opened and closed), read after 30 s idle | Renderer private 300 MB; engine private 300 MB; main 80 MB | `memory after heavy use` (`e2e/perfMemory.ts`). The renderer has 50 MB more here (owner, 10-18): its overage over 250 MB is Chromium's allocators keeping the pages freed after a scrolling peak, which nothing in the app holds; five fixes were tried and none removed it (8.11). On 10-18: main 51 to 63 MB, renderer 265 to 294 MB, engine 113 to 125 MB. |
 | Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,067.7 KB of JS (361.0 KB gzip) and 145.0 KB of CSS with Home's thought (2026-10-18; 1,063.6 KB and 144.5 KB at `8eeb40f1` before it: the thought's logic and view are 4.1 KB, its list is a lazy chunk); 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
@@ -1488,6 +1488,65 @@ window. Local evidence is in `/Volumes/AgentWork/home-idle-evidence/`:
 `baseline-three.log`, `early.log`, and `early/*-idle-sample.trace.json`.
 The full early traces and temporary probes are there too. The probes were
 removed from the worktree after capture.
+
+**Engine's minimized-window miss, investigated on 10-18.** The unprofiled
+reports were 3.1% on home-idle and 3.4% on mention-person-memory. The gate
+can measure a scheduled sync pass as idle CPU. A diagnostic replay traced
+the minimized spike to this pass, rather than a loop caused by minimizing.
+With 10 seconds settling and 60 seconds per state,
+the large-seed sequence reaches minimized near the discovery sweep, ten
+minutes after the first sync ends. The same interval and scheduling loop
+already exist in `05ea2ef3` (`sync/src/config.ts`, `run/boot.ts`). The sweep
+continues while minimized so Slack state and notifications stay current.
+
+One diagnostic replay of the full sequence at `af1e7b30`, with an unminified
+build, the engine's inspector CPU profiler and temporary timer/SQL counters,
+read 0.2–0.3% engine CPU in the preceding states and 5.9% while minimized.
+That busy minute made 121 successful HTTP reads: one `client.counts`, 114
+`subscriptions.thread.getView`, one search, one history and four replies;
+none failed. It ran 60,388 SQL statements, including the thread merges and
+re-indexing. The timer counters include one 600,000 ms sweep wake and 248
+30 ms invalidation timers. The CPU profile attributes 585 ms of sampled
+self time to SQLite `all`, with only 118 ms in garbage collection. Profiling
+and counter overhead make the 5.9% unsuitable as a comparison with the
+unprofiled failures, but the requests and database work establish that this
+was a busy sync window.
+
+An earlier replay that minimized before ten minutes showed sparse SQL
+work and no worker loop. Its minute held six websocket-ping timers, the normal
+minute timers, and 239 wakes from the process logger's empty-buffer flush.
+Automated's grouping window and the Slack schedule debounce did not keep
+waking without input. As in the existing test, background AI jobs were
+disabled; Automated rules and Slack scheduling remained enabled. The
+logger now arms one 250 ms timeout when a line
+arrives and leaves no timer for an empty buffer. This removes needless
+wakes in main, engine and agent; it does not account for the sweep's CPU.
+A separate probe of the revised logger counted zero empty-buffer timer
+wakes over three seconds, then one timer wake that persisted a new line.
+
+The large-seed idle gate now prints and annotates a sample containing a
+successful discovery sweep, waits for sync to finish and settles again,
+then takes one replacement window. The replacement must contain no Slack
+calls and must meet every existing CPU limit, including the engine's 3%.
+A high reading alone gets no retry, failed Slack calls fail the test, and
+continuing requests fail the replacement. The separate first-sync test
+still measures the syncing card while a history call is held.
+
+Final verification used minified builds without the probes. One full Mac
+large-seed run (`pnpm test:desktop idle-cpu.spec.ts --grep 'mac process budgets.*large seed'`)
+passed, exit 0: engine 3.0% in the sweep window, 0.2% in the quiet minimized
+replacement and 0.2% hidden, each over 60 seconds. `pnpm affected` passed,
+exit 0: local typechecking and lint, then 21 selected desktop tests on
+Linux. Its sweep window read 3.5%, the quiet minimized replacement 0.0%
+rounded, and hidden 0.1%. These are single runs on each platform, not a
+speedup distribution: the change separates due sync work from idle rather
+than making that work faster. The 3% budget is unchanged.
+
+Evidence, profiles and temporary probes are in
+`/Volumes/AgentWork/engine-idle-evidence/`: `full-profile.log`,
+`minimized.cpuprofile`, `activity.json`, the earlier `early-*` captures,
+`mac-final.log`, `affected.log` and `log-timers.log`.
+The probes were removed from the worktree before verification.
 
 **Seeing it next time.** Settings › About › Diagnostics lists each process with Juno's name and Electron's type, its CPU over the last few seconds and its memory, and **Copy diagnostics** puts a plain-text report on the clipboard (SPEC 14). Main samples every 15 s and logs one line when a process stays above 30 % of a core for 2 minutes while the window has no input and no sync runs, with the window's state and the view; the report repeats the last such line.
 

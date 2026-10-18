@@ -1,0 +1,1 @@
+- 10-18 18:23 · idle-sweep-window · Keep the 3% idle engine budget; print a window containing a successful scheduled discovery sweep and replace it once with a settled window containing no Slack calls, so scheduled sync work is not mistaken for an idle loop.
