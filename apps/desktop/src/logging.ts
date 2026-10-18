@@ -72,7 +72,10 @@ export function createLog(processName: LogProcess, folder = logFolder()) {
     size = (await stat(file)).size
   }).catch(() => { failed = true })
   let draining: Promise<void> | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
   const flush = (): Promise<void> => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
     if (draining) return draining.then(() => flush())
     if (queued.length === 0 && dropped === 0) return writing
     const lines = queued
@@ -107,16 +110,19 @@ export function createLog(processName: LogProcess, folder = logFolder()) {
     const line = `${new Date().toISOString()} ${level} ${processName} ${label}${extra ? ` ${extra}` : ''}\n`
     if (bytes + Buffer.byteLength(line) > 256 * 1024) { dropped++; return }
     queued.push(line); bytes += Buffer.byteLength(line)
+    // An empty buffer has no work due and needs no periodic wake.
+    if (timer === undefined) {
+      timer = setTimeout(() => { void flush() }, 250)
+      timer.unref()
+    }
   }
-  const timer = setInterval(() => { if (!draining) void flush() }, 250)
-  timer.unref()
   const effectLogger = Logger.make<unknown, void>((options) => {
     if (options.logLevel !== 'Warn' && options.logLevel !== 'Error' && options.logLevel !== 'Fatal') return
     const messages = Array.isArray(options.message) ? options.message : [options.message]
     log(options.logLevel === 'Warn' ? 'WARN' : 'ERROR', messages[0], { cause: options.cause, error: messages[0], defect: messages[1] })
   })
   log('INFO', 'process started', { pid: process.pid })
-  return { log, effectLogger, flush, close: async () => { clearInterval(timer); await flush() }, healthy: () => !failed }
+  return { log, effectLogger, flush, close: async () => { await flush() }, healthy: () => !failed }
 }
 
 /** Scans backwards in small chunks so Copy does not load whole log files into main. */
