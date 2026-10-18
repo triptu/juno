@@ -27,8 +27,6 @@ async function watchEmpty(win: Page): Promise<() => Promise<string[]>> {
 const top = async (row: Locator) => (await row.boundingBox())?.y
 
 async function startThreadOn(juno: Juno, open: () => Promise<void>, text: string, reply: string): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await open()
   const { topic } = juno
   await topic.expectTitle('Main')
@@ -56,20 +54,26 @@ async function startThreadOn(juno: Juno, open: () => Promise<void>, text: string
   expect(await seen()).toEqual([])
 }
 
-test('Start thread on a channel message with no replies shows it as the root, then the reply under it', async ({ juno, fake }) => {
-  const text = 'Yes, both rotations move together.'
-  await startThreadOn(juno, () => juno.sidebar.row('#eng').open(), text, 'Calendar updated for both.')
-  const root = fake.messages('C0ENG').find((m) => m.text === text)!
-  expect(fake.messages('C0ENG').filter((m) => m.thread_ts === root.ts && m.ts !== root.ts).map((m) => m.text)).toEqual(['Calendar updated for both.'])
-})
+// Signed in once; each step starts its own thread, so the row counts are per topic.
+test('Start thread on a message with no replies, in a channel, a DM and a group DM, shows it as the root', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
 
-test('Start thread on a DM message with no replies shows it as the root, then the reply under it', async ({ juno, fake }) => {
-  const text = 'Running 5 late to the planning sync'
-  await startThreadOn(juno, () => juno.sidebar.row('Maya', { exact: true }).open(), text, 'See you there.')
-  const root = fake.messages('D0MAYA').find((m) => m.text === text)!
-  expect(fake.messages('D0MAYA').filter((m) => m.thread_ts === root.ts && m.ts !== root.ts).map((m) => m.text)).toEqual(['See you there.'])
-})
+  await test.step('Start thread on a channel message with no replies shows it as the root, then the reply under it', async () => {
+    const text = 'Yes, both rotations move together.'
+    await startThreadOn(juno, () => juno.sidebar.row('#eng').open(), text, 'Calendar updated for both.')
+    const root = fake.messages('C0ENG').find((m) => m.text === text)!
+    expect(fake.messages('C0ENG').filter((m) => m.thread_ts === root.ts && m.ts !== root.ts).map((m) => m.text)).toEqual(['Calendar updated for both.'])
+  })
 
-test('Start thread on a group DM message with no replies shows it as the root', async ({ juno }) => {
-  await startThreadOn(juno, () => juno.win.locator('[data-topic-id="m:G0MAYALEO"]').click(), 'lunch friday?', 'Booked for 12:30.')
+  await test.step('Start thread on a DM message with no replies shows it as the root, then the reply under it', async () => {
+    const text = 'Running 5 late to the planning sync'
+    await startThreadOn(juno, () => juno.sidebar.row('Maya', { exact: true }).open(), text, 'See you there.')
+    const root = fake.messages('D0MAYA').find((m) => m.text === text)!
+    expect(fake.messages('D0MAYA').filter((m) => m.thread_ts === root.ts && m.ts !== root.ts).map((m) => m.text)).toEqual(['See you there.'])
+  })
+
+  await test.step('Start thread on a group DM message with no replies shows it as the root', async () => {
+    await startThreadOn(juno, () => juno.win.locator('[data-topic-id="m:G0MAYALEO"]').click(), 'lunch friday?', 'Booked for 12:30.')
+  })
 })
