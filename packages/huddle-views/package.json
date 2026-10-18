@@ -1,0 +1,38 @@
+{
+  "name": "@juno/huddle-views",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Huddle views: the sidebar bar, the huddle tab, the header control, the running-huddle glyph, the device menu and the screen share sheet. Dumb React components built from @juno/ui: props in, callbacks out. Every view ships fixtures for the gallery.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@juno/tokens": "workspace:*",
+    "@juno/ui": "workspace:*",
+    "@phosphor-icons/react": "2.1.10",
+    "@stylexjs/stylex": "0.19.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  },
+  "juno": {
+    "allowedDeps": [
+      "@juno/tokens",
+      "@juno/ui"
+    ]
+  }
+}

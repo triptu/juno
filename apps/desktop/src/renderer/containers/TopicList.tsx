@@ -25,6 +25,7 @@ import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
+import { useRowAccessory } from './rowAccessories'
 import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
@@ -121,6 +122,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   const at = row?.lastActivityAt ?? 0
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
+  const accessory = useRowAccessory(row)
   if (row === undefined) return null
   return (
     <TopicRowView
@@ -129,6 +131,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
       selected={selected}
       tabbable={tabbable}
       newThreads={row.newThreads}
+      {...(accessory === undefined ? {} : { accessory: accessory.node, accessoryLabel: accessory.label })}
       onOpen={open}
       onResolve={resolveTopic}
       onPrefetch={warmTopic}

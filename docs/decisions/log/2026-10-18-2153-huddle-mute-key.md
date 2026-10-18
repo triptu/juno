@@ -1,0 +1,1 @@
+- 10-18 21:53 · huddle-mute-key · ⌘⇧Space mutes and unmutes while Juno is active, as in Slack; a Huddle menu in the menu bar holds Show Huddle, Mute Microphone, Share Screen… and Leave Huddle.

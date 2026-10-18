@@ -23,10 +23,9 @@
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { RequestQueue } from '@juno/slack'
-import { AiProvider } from '@juno/ai'
 import { HOLD_MILLIS, holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
-import { OwnerActivity, startActivity } from '../activity'
-import { NotificationControl, startNotifications } from '../notificationRuntime'
+import { NotificationControl } from '../notificationRuntime'
+import { SocketEvents } from '../socketEvents'
 import type { SlackAuthRequired } from '@juno/slack'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
 import { SyncControl } from '../config'
@@ -45,13 +44,15 @@ export class SyncRunner extends Context.Service<
     readonly slowedUntil: Stream.Stream<number | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | SyncLink | AiProvider | NotificationControl | OwnerActivity> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | SyncLink | NotificationControl | SocketEvents> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
       const workspace = yield* Workspace
       const control = yield* SyncControl
       const link = yield* SyncLink
+      const events = yield* SocketEvents
+      const notifications = yield* NotificationControl
       // The host hears it too: tests compare it with the fake's socket.
       const setOnline = (online: boolean) => link.setOnline(online).pipe(Effect.andThen(Effect.sync(() => control.onConnection?.(online))))
       const scope = yield* Effect.scope
@@ -84,11 +85,10 @@ export class SyncRunner extends Context.Service<
               return SubscriptionRef.set(syncing, cycles > 0)
             })
           const program = Effect.gen(function* () {
-            const { onEvent, onSelfPresence } = yield* startNotifications
-            const activity = yield* startActivity
             return yield* runSync({
-              onEvent: (event, me) => onEvent(event, me).pipe(Effect.andThen(activity.onEvent(event))),
-              onSelfPresence,
+              // Subscribers start in this sync's scope and hear each event after its write attempt.
+              onEvent: yield* events.attach,
+              onSelfPresence: notifications.seedPresence,
               onCycle: (event) =>
                 (event === 'finished' ? link.caughtUp : Effect.void).pipe(
                   Effect.andThen(countCycle(event)),

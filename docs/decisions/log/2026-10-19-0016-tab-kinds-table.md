@@ -1,0 +1,1 @@
+- 10-19 00:16 · tab-kinds-table · Each kind of tab's strip look, history menu label and page come from one table, `tabKinds` in the renderer, typed to list every kind of `Place`. A new kind of tab adds a `Place` member and one table entry instead of editing branches across the renderer.

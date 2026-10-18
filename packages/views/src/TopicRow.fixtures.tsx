@@ -1,4 +1,5 @@
-import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
+import { defineFixtures, Icon, scene, type FixtureFrame } from '@juno/ui'
 import { art, channels, newThreadsById, NOW, people, rows } from './fixtures/topics'
 import { relativeTime } from './time'
 import { TopicRow, type TopicRowProps } from './TopicRow'
@@ -40,6 +41,9 @@ const titleScene = (lines: '1' | '2', density: 'compact' | 'comfortable') => sce
 ), { density })
 
 const ROW = '[data-topic-row]'
+
+/** A stand-in for a feature's mark in a Main row's `accessory` slot (the huddle glyph is drawn in `@juno/huddle-views`). */
+const accessory = { accessory: <Icon icon={Headphones} size={13} />, accessoryLabel: 'huddle with 3 people' } as const
 
 /** A DM's Main whose latest message is yours: the preview keeps "You:". */
 const devMain: TopicRowProps['row'] = { ...rows.mayaMain, id: 'm:D0DEV', title: 'Dev Patel', channel: channels.dev, preview: { sender: 'You', text: 'its good' } }
@@ -118,6 +122,9 @@ export default defineFixtures(
       unsubscribed: state(rows.flags),
       private: state(rows.hiring),
       'group-dm-main': state(rows.lunch),
+      // The `accessory` slot follows the title, before the thread count.
+      'main-accessory': state(rows.mayaMain, accessory),
+      'main-accessory-new-threads': state(rows.alertsMain, { ...accessory, newThreads: newThreadsById.get(rows.alertsMain.id) }),
     },
     Content: {
       'long-title': state(rows.long),

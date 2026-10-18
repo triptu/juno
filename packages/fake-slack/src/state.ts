@@ -619,6 +619,26 @@ export class Workspace {
     return undefined
   }
 
+  /** Creates a channel with self as its only member, as `conversations.create` does. Self gets `channel_joined` (or `group_joined`). */
+  create(name: string, kind: 'public' | 'private'): ConversationRecord | 'name_taken' {
+    if ([...this.conversations.values()].some((c) => c.name === name)) return 'name_taken'
+    const record: ConversationRecord = {
+      id: `${kind === 'private' ? 'G' : 'C'}${String(this.conversations.size + 1).padStart(3, '0')}NEW`,
+      name,
+      kind,
+      members: new Set([this.selfId]),
+      created: this.clock.now(),
+      topic: '',
+      purpose: '',
+      isOpen: true,
+      archived: false,
+    }
+    this.addConversation(record)
+    this.#touchConversation(record.id)
+    this.emit({ type: kind === 'private' ? 'group_joined' : 'channel_joined', channel: this.channelObject(record), event_ts: this.eventTs() })
+    return record
+  }
+
   /** Finds or creates the DM or group DM with `users` (self is implied). */
   open(users: ReadonlyArray<string>): { conversation: ConversationRecord; created: boolean } {
     const members = new Set([this.selfId, ...users])

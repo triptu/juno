@@ -27,8 +27,8 @@ export interface Route {
 export type Theme = 'light' | 'dark'
 
 /** The address of a state, for example `/#/Button?__state=variant/primary&theme=dark`. */
-export function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 'light'): string {
-  return `/#/${encodeURIComponent(route.component)}?__state=${route.id}${theme === 'light' ? '' : `&theme=${theme}`}`
+export function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 'light', accent?: string): string {
+  return `/#/${encodeURIComponent(route.component)}?__state=${route.id}${theme === 'light' ? '' : `&theme=${theme}`}${accent === undefined ? '' : `&accent=${accent}`}`
 }
 
 /** Opens the index once and reads every state from the page. */
@@ -42,8 +42,8 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
 }
 
 /** Opens one state and waits until it is drawn: chunks, fonts and images loaded, theme applied, entrance animations done. */
-export async function openState(page: Page, route: Route, theme: Theme = 'light'): Promise<void> {
-  await page.goto(stateUrl(route, theme))
+export async function openState(page: Page, route: Route, theme: Theme = 'light', accent?: string): Promise<void> {
+  await page.goto(stateUrl(route, theme, accent))
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
   // Wait for code, not data: loading and pending-image fixtures intentionally never settle. Some chunks start in an idle
   // callback with a 5 s deadline (the destination lists), so on a busy machine the load begins only then.

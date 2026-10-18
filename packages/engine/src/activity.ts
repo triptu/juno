@@ -12,9 +12,10 @@
  * owner away; when Juno quits, the socket closes.
  */
 import { Clock, Context, Effect, Layer, Stream, SubscriptionRef } from 'effect'
-import { SlackSocket, type SocketEvent } from '@juno/slack'
+import { SlackSocket } from '@juno/slack'
 import { NotificationControl } from './notificationRuntime'
 import { HostLink } from './protocol/host'
+import { SocketEvents, type SessionStart } from './socketEvents'
 
 /** How long one `active` from main counts: main sends it every 10 s, for use in the last 20 s. */
 export const ACTIVE_WINDOW_MILLIS = 20_000
@@ -29,24 +30,24 @@ export class OwnerActivity extends Context.Service<OwnerActivity, {
     const fromMain = yield* link.messages
     yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) =>
       message._tag === 'active' ? Effect.flatMap(Clock.currentTimeMillis, (now) => SubscriptionRef.set(lastActiveAt, now)) : Effect.void))
+    const control = yield* NotificationControl
+    const events = yield* SocketEvents
+    yield* events.subscribe('activity', sessionActivity(lastActiveAt, control))
     return OwnerActivity.of({ lastActiveAt })
   }))
 }
 
-/** Runs inside the session scope, next to the sync, and shares its socket. */
-export const startActivity = Effect.gen(function* () {
+/** Runs for each sync, in its scope, and shares its socket. */
+const sessionActivity = (lastActiveAt: SubscriptionRef.SubscriptionRef<number | undefined>, control: NotificationControl['Service']): SessionStart => Effect.gen(function* () {
   const socket = yield* SlackSocket
-  const activity = yield* OwnerActivity
-  const control = yield* NotificationControl
   const tickle = Effect.gen(function* () {
-    const at = yield* SubscriptionRef.get(activity.lastActiveAt)
+    const at = yield* SubscriptionRef.get(lastActiveAt)
     if (at === undefined || (yield* Clock.currentTimeMillis) - at > ACTIVE_WINDOW_MILLIS) return
     // Manual away stays away, as in the official client.
     if ((yield* control.currentPresence) === 'away') return
     yield* socket.tickle('polling')
   })
-  yield* Effect.forkScoped(Stream.runForEach(SubscriptionRef.changes(activity.lastActiveAt), () => tickle))
-  return {
-    onEvent: (event: SocketEvent) => event._tag === 'Connected' ? tickle : Effect.void,
-  }
+  yield* Effect.forkScoped(Stream.runForEach(SubscriptionRef.changes(lastActiveAt), () => tickle))
+  // `Overflowed` needs nothing: the next `active` from main tickles anyway.
+  return (input) => input._tag === 'Connected' ? tickle : Effect.void
 })

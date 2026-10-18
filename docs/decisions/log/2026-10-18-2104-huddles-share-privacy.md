@@ -1,0 +1,1 @@
+- 10-18 21:04 · huddles-share-privacy · If Juno's own screen share switches on privacy mode through `screenWatch`, that is accepted. Sharing does not suppress the watch.

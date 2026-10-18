@@ -33,6 +33,8 @@ export interface TopicHeaderProps {
    * it such a thread shows Resolve.
    */
   readonly onFollow?: () => void
+  /** A Main's controls from features, such as the huddle control: first in the right island, before ⋯. Not shown on a thread. */
+  readonly actions?: ReactNode
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
@@ -57,14 +59,14 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * topic, with no bar. Left: the context pill (the channel's name; its kind
  * is the tint, the icon, the tooltip and the accessible name) and the
  * title, which opens the topic switcher, hung under the left island; a
- * right-click on it opens the topic's menu. Right: Resolve or Reopen (not
- * on Main), or Follow on a thread you do not follow, then ⋯ (the topic's
- * menu) and Juno. Follow and Resolve keep the wider of their two widths,
+ * right-click on it opens the topic's menu. Right: a Main's `actions`, or
+ * Resolve or Reopen on a thread, or Follow on a thread you do not follow,
+ * then ⋯ (the topic's menu) and Juno. Follow and Resolve keep the wider of their two widths,
  * so following moves nothing. The islands line up with the reading column,
  * and under 480px Follow and Resolve show as icons. Rename turns the title
  * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
@@ -123,6 +125,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
       }
       right={
         <>
+          {main ? actions : null}
           {resolve}
           <MoreButton expanded={menuOpen} onOpen={onMenu} />
           {junoButton}

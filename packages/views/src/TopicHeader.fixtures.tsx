@@ -1,4 +1,5 @@
-import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
+import { defineFixtures, fixture, IconButton, type FixtureFrame } from '@juno/ui'
 import { details, engTopics } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
@@ -28,6 +29,9 @@ const switcher = (currentId: string, query = '') => ({
 /** The same threads, not followed (Notify me is Never). */
 const unfollowed = <D extends TopicHeaderProps['detail']>(detail: D): D => ({ ...detail, subscribed: false, status: 'unsubscribed' })
 
+/** A stand-in for a feature's control in a Main's `actions` slot (the huddle control is drawn in `@juno/huddle-views`). */
+const action = <IconButton icon={Headphones} label="Start huddle" size={28} iconSize={16} radius="full" variant="island" />
+
 // The header lies over the top of its area; the frame is that area's top, the band's height.
 const narrow: FixtureFrame = { width: 336, height: 68 }
 
@@ -43,6 +47,9 @@ export default defineFixtures(
     Main: {
       'channel-main': state({ detail: details.engMain }),
       'group-dm-main': state({ detail: details.lunch }),
+      // The `actions` slot comes first in the right island.
+      'main-actions': state({ detail: details.engMain, actions: action }),
+      'main-actions-336': state({ detail: details.engMain, actions: action }, narrow),
     },
     // The title opens the switcher under the left island: the channel's Main and threads, the resolved ones last.
     Switcher: {

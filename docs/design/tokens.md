@@ -52,7 +52,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
 | `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
 | `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the media viewer: the page at 94%, so only the picture reads |
-| `--media-scrim` | `rgba(20, 19, 16, 0.5)` | | media viewer 10-16 | Over a picture: the "+N" on the last tile of a message's grid, and a video's play badge. Not themed: it sits on the picture |
+| `--media-scrim` | `rgba(20, 19, 16, 0.65)` | | media viewer 10-16; 0.65 since 10-18 | Over a picture: the "+N" on the last tile of a message's grid, a video's play badge, and a huddle share's "Maya's screen" label. Not themed: it sits on the picture. At 0.5 the 12.5px label was 3.37:1 over a white screen; at 0.65 it is 5.56:1 |
 | `--media-scrim-foreground` | `hsla(48, 20%, 98%, 1)` | | media viewer 10-16 | The "+N" and the play glyph on `--media-scrim` |
 | `--link-underline` | `color-mix(in oklch, currentColor 35%, transparent)` | | review 10-17 | A link's underline in message text and the composer, from the link's own colour. Not themed |
 | `--quote-fill` | `color-mix(in oklch, currentColor 6%, transparent)` | | review 10-17 | A quote's fill in message text, from the text colour. Not themed |
@@ -212,7 +212,10 @@ Used by: page header context pill, Juno send-card pill. Icons: `hash` (public), 
 | --- | --- | --- | --- |
 | `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
-| `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark) |
+| `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark). |
+| `--huddle-live` | #1C935F light, #34C77B dark (the presence green) | huddles 10-18 | Live in a huddle (SPEC 20): the speaking ring, and the headphones on a running huddle's row and on Join. The same green idea as presence, a step deeper in light: `--presence-active` is 2.98:1 on the tiles' `--secondary-default`, this is 3.36:1 there and 3.76:1 on a card (dark: 6.12:1 and 7.1:1). A graphic, never text |
+| `--huddle-bar`, `-edge`, `-hover`, `-pressed`, `-pressed-hover` | `oklch(from var(--hl) L calc(c * k) h)`: the accent's hue and part of its chroma at a fixed lightness. Light: L 0.93, 0.78, 0.90, 0.865, 0.835; k 0.28 (0.5 for the edge). Dark: L 0.31, 0.47, 0.355, 0.405, 0.445; k 0.3 (0.5). Coral light fill #FFDDD3, teal light #D6EEEB, coral dark #442822 | huddles 10-18, accent 10-18 | The sidebar's huddle bar (SPEC 20). A light card merged into the light sidebar, so you could forget you were in a call or not find it. A green tint set it apart, but the owner wanted the accent, so the bar follows the chosen accent. A plain mix such as `--hl-bubble` changes lightness with the accent: Midnight and Ink brought `--foreground-subtle` down to 3.2:1 and 2.9:1. Fixing the lightness keeps one contrast for all eight accents (lowest of the eight, light / dark): `--foreground-default` 9.50:1 / 6.26:1 (including the pressed-and-hovered step), `--foreground-subtle` (the status line, Leave's glyph) 4.78:1 / 6.24:1 on the fill, the sheen and the hover step, `--huddle-live` (the speaking ring) 3.07:1 / 5.92:1. `--foreground-muted` falls under 4.5:1, so the bar's row sets it to subtle for "+N" and the caret. Pressed (muted, sharing) is 1.20:1 / 1.45:1 from the fill, on top of the slashed glyph. Edge vs sidebar 1.86:1 / 2.61:1. Ink, a grey accent, gives a grey bar that the edge and the highlight set apart. |
+| `--huddle-bar-sheen` | `linear-gradient(oklch(1 0 0 / .35), oklch(1 0 0 / 0) 70%)` light, `/ .05` dark | huddles 10-18 | The frost on the bar: white fading from the top, over `--huddle-bar`. There is no backdrop blur: the bar sits in the sidebar's flow, nothing scrolls or moves behind it, and Juno's window has no vibrancy, so a blur would cost a composited layer and change no pixel. For the same reason the fill is opaque: over the flat sidebar a translucent tint gives the same colour, and an opaque one keeps the contrast fixed and lets the faces' ring cut their overlap. |
 | `--warning` | #E0A500 | css | Only ever mixed (private tint, audience guard). As text it is 2.13:1, never use raw |
 | `--info` | #008AB3 | css | Only mixed (DM tint). 3.85:1 as text |
 | Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |
@@ -471,6 +474,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
 | `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
 | `--viewer-bar-width` | 560px. The media viewer's header bar: one width for every item, so moving between items never moves its buttons. |
+| `--huddle-tile-width` | 160px. A huddle tab's participant tile (inventory 22.2): a 44px face and a name of about 18 characters at 13.5px. Fixed, so a row of tiles wraps and centres instead of stretching; the people line's chips stop at the same width. New because no existing width fits a tile |
+| `--source-picker-width` | 600px. The screen share sheet (inventory 22.6): three 16:10 thumbnails a row at about 180px, the size macOS's own picker shows them at. Wider than `--palette-width` (560), which fits two |
+| `--source-picker-list-height` | 420px. The sheet's list area, one height in every state (the permission steps, the wait, the grid), so the sheet never changes size when the thumbnails arrive; the grid scrolls past it. Two rows of tiles and a heading fit |
 
 ### Controls
 
@@ -531,6 +537,10 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 
 Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 
+### Huddles
+
+`--speaking-ring` 2px (`sizes` group): the green ring around a participant who is speaking, an outline 1.5px (`--avatar-ring`) outside a face in the bar, the header control and the people line, and inside the edge of a tab's tile. An outline, so it never changes the layout; its colour fades over `--duration-fast`. 2px, not the 1.5px avatar ring, because it has to read at 18px from across the room. The bar has its own frosted accent material (`--huddle-bar*`, section 1.5; `--huddle-bar-shadow`, section 6) and radius 12 (= 8 + 4). The green stays only where it means live: the speaking ring and the headphones. On the accent's tint it holds 3:1 for every accent, Emerald and Teal included, so it does not clash. Shares, the user's own window included, sit on `--secondary-default` with the media viewer's `--media-scrim` labels and controls. Nothing else is new.
+
 ### Privacy mode
 
 `--privacy-blur` 6px (`sizes` group). With `data-privacy` on `<html>`, every element marked `data-sensitive` gets `filter: blur(var(--privacy-blur))` from `global.css` (SPEC section 5, Privacy mode). At 6px a 13px line reads as a soft grey bar: the shape of a line, no letters. Hover never removes it.
@@ -550,6 +560,7 @@ A field Textarea (a note or pin under edit on What Juno remembers) grows the sam
 | `--shadow-card` | `0 0 12px 0 rgba(27,28,21,.12)` | `0 0 12px 0 rgba(0,0,0,.45)` | css | Unused in prototype; prefer `--card-ring` |
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
+| `--huddle-bar-shadow` | `inset 0 1px 0 0 oklch(1 0 0 / .7)`, then `--card-ring` | `inset 0 1px 0 0 oklch(1 0 0 / .08)`, then `--card-ring` | huddles 10-18 | The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 | `--peek-shadow` | `0 0 0 1px oklch(0 0 0 / .12), 0 2px 6px -1px oklch(0 0 0 / .08), 0 14px 36px -8px oklch(0 0 0 / .18)` | Same as dark `--pop-shadow` | review 10-18 | Peek: a hairline shadow ring and soft elevation; the transparent border and geometry stay unchanged |
 | `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
