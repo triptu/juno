@@ -8,7 +8,7 @@ Slack into the store. Cold and warm boot, thread discovery, the merge rules, soc
 permit; `run/boot.ts`, `run/reconcile.ts` and `run/socket.ts` handle boot, catch-up
 and socket events. `run/fetcher.ts` exposes topic fetches and `run/lookups.ts` runs
 root and read lookups. `counts.ts` reads counts through the metadata fence;
-`recheck.ts` still owns gap-page reconciliation.
+`mutationRepair.ts` repairs dirty cached ranges after a gap; `recheck.ts` retains the bounded fallback.
 
 `write.ts` re-exports the table writers in `write/`: messages, users, conversations,
 team, channel reads, subscriptions, coverage, read state, overlays and sync state.
@@ -108,7 +108,7 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 
 ## Known gaps
 
-- Edits, deletes and reactions made during a disconnect or while the app was closed are recovered by the recheck (below) for the topics on screen and the 10 most recently active ones, back to 24 hours before the gap. Older messages and other topics wait until the topic is opened, and then only for messages newer than the stored ones. ADR 0011's `cached_latest_updates` path waits on the live smoke.
+- Edits, deletes and reactions made during a disconnect or while the app was closed are repaired across cached ranges of conversations selected by counts mutation markers (below). The bounded ten-topic recheck remains a fallback for unavailable marker coverage. Conditional history/replies keep unchanged bodies out of repair responses. Uncached ranges are outside this repair.
 - Search requests extra thread metadata and applies roots before replies within each page, avoiding a lookup when the root counters are present. Missing roots still need a lookup. Search fields remain partial: missing reactions never clear stored ones.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.
@@ -130,3 +130,41 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 ## Quiet-window preference
 
 `quietDays` is read before sync starts and observed by `run/window.ts`. An increase runs `window.ts` under the work permit, paging missing history on the background lane, then refreshing follows and discovery. A decrease cancels that pass and retains stored messages. Each page commits with its coverage; retries and restarts reuse it. `specs/quietwindow.qnt` models the coverage rule.
+
+## Mutation repair after a gap
+
+Full counts on reconnect and warm boot compare supplied `updated` and
+`history_invalid` with observed markers using inequality, including backwards
+moves. Missing baselines seed without a repair storm. Changed conversations
+atomically enqueue cached ranges with the new observed markers. Ten-minute sweeps stage supplied markers as in-memory candidates. A later sweep
+can promote a candidate only after a pong received after its counts response.
+A disconnect discards candidates. A failed frame blocks its conversation for the
+rest of the session (all conversations if the frame has no conversation id).
+The socket stamps frames before forwarding them to sync, so a queued older pong
+cannot confirm a newer candidate. Partial rows preserve absent marker fields.
+
+After `live`, at most ten background pages run, one per queued range. Main and
+cached replies start 24 hours before the gap began; old roots do not extend Main
+and roots without cached replies in range get no thread job. Jobs expire 24 hours
+after enqueueing, not when their messages age. Selection interleaves conversations
+before taking another range from the same conversation. Pending cursors and
+failures persist and rotate behind unattempted ranges for the next catch-up or
+sweep. `SlackRateLimited` leaves the job queued. Conditional versions come only
+from `latest_updates`, separately from Message decoding. Unchanged ids count as
+present. Absence is inferred only inside proven recent page bounds, excluding
+thread roots and any `is_limited` response. `thread_not_found` drops the job. It tombstones cached replies within the job
+bounds only if the root is already deleted in cache, including deletion proved
+by the Main page. Hidden old history is not evidence of deletion. Repair does not certify outbox coverage.
+
+All ten ordinary fallback pages still run before `live`, including topics queued
+for repair. Missing markers or versions that fail to advance cannot suppress the
+fallback. Counts cannot find uncached history. The ten-minute discovery sweep,
+five-minute overlap and hourly follow repair are unchanged.
+
+Incremental counts rows update only supplied fields. `{ id, last_read }` updates
+the read pointer without clearing `latest`, `has_unreads` or `mention_count`.
+Before this fix those rows failed decoding and aborted the sync cycle before
+any counts could be merged; the retry kept using the old cursor.
+
+Unchanged counts fields and server-version certificates do not write to the
+cache. This keeps the existing quiet-sweep no-write guarantee with partial rows.

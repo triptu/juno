@@ -3,6 +3,7 @@ import { prefs } from '@juno/store'
 import { SlackAuthRequired, SlackSession, SlackSocket } from '@juno/slack'
 import { Deferred, Effect, FiberSet, Queue, Semaphore } from 'effect'
 import type { BootState, Phase } from '../boot'
+import { makeMarkerCandidates } from '../markerCandidates'
 import { SyncConfig } from '../config'
 import type { FileFetch, RootFetch, SyncContext } from '../context'
 import { syncEmoji } from '../emoji'
@@ -41,6 +42,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   const state = {
     bootRetry: undefined as Deferred.Deferred<void> | undefined,
     connected: false,
+    markerCandidates: makeMarkerCandidates(),
     booted: false,
     lastBoot: undefined as BootState | undefined,
     lastFollowPass: undefined as number | undefined,

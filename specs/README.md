@@ -125,7 +125,7 @@ Each `<name>Step` checks `invariants` and must finish its drain. Each `<name>Bug
 | `keptDeleted` | Slack holds the post and its copy; the copy's delete waits, and the user deletes the kept message on another device. The check keeps the copy and makes it the message. The bug, deciding only at store time, deletes it too. | `keepsRealSends` |
 | `copyReply` | Someone replies to the copy while its delete waits. The check keeps the copy. The bug deletes it. | `repliesKeepRoot` |
 | `ownDelete` | The user deletes the message in Juno before Juno has stored its copy. When the copy arrives it is hidden and deleted too. The bug takes the user's delete for one made elsewhere and keeps the copy as the message. | `ownDeleteHolds` |
-| `uncoveredRecheck` | As `deletedOffline`, but the recheck does not read the post's topic, so the store never learns the kept message is gone. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
+| `uncoveredRecheck` | As `deletedOffline`, but the fallback does not read the post's topic and the fake omits mutation markers, matching the model's lack of any observation of the deleted original. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
 | `deletedOffline` | The socket drops while the copy's delete waits, and the user deletes the kept message meanwhile. The guarded delete waits for the catch-up, whose recheck stores the deletion, then keeps the copy. The bug checks the store at once on the reconnect and deletes the copy. | `keepsRealSends` |
 
 The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before answer. Corrected `blindRetry` covers a lost answer followed by a found lookup. Six additional corrected schedules cover `answerBeforeEcho`, `lostLookupAbsent`, `reconnectPage`, `dependentDelete`, `actionRetry` and `uploadRetry`. The absent case drops the first call, loses its answer, confirms absence, and posts once. `reconnectPage` accepts, loses the answer, disconnects, then reconnects and holds a lookup answer. A catch-up page reconciles first, the catch-up flushes, and the lookup answer safely writes the message again. The seven post schedules cover all five delivery and recovery orderings. `dependentDelete` queues a delete while the post is sending; the post is refused and the delete discards the failed row. `actionRetry` edits a stored message; Slack applies it, a newer edit arrives while the call is out, and the answer is lost. The worker sends again and the row ends. `uploadRetry` refuses a post's upload, retries it, and shares the post with an answer that has no message, so the lookup stores it.
@@ -248,6 +248,38 @@ The first runs found these. A real bug has a test marked `it.fails` while it is 
 | `olderPage` | An opened topic's page is requested, the socket drops and the message is deleted. The guarded recheck waits for that page, then finds the message gone. The bug asks at once; the older page lands last and brings the deleted message back. | `quietAgreement` |
 
 The random simulation (10,000 traces of at most 160 transitions) found two forms of the `olderPage` race before the wait was added: an opened topic's page, and an earlier recheck's page, landing after a later recheck. Four seeds of 10,000 traces each pass with it. `pnpm specs:check` runs the random traces and the three pairs with the other protocols.
+
+## Mutation-marker repair
+
+`mutation-repair.qnt` separates content from server versions and models a durable
+queue with one background page per pass (the implementation allows ten). Topic 1
+is always read by the unconditional fallback; topic 2 is outside it. Random runs
+include `countsWith(false)`, changes with no marker or version advance, and markers
+moving backwards. Observing a different marker atomically queues ranges; failure
+must retain those ranges even though the marker has already been observed.
+
+`noFalseDelete` protects unchanged ids. `quietAgreement` covers the fallback and
+queued changes whose versions can expose them. It does not claim global recovery
+when a marker returns to its prior value or a version hides a change outside the
+fallback. The quiet drain bound is 48 transitions. Broken/corrected schedules
+cover suppressing the fallback on unchanged versions, confusing unchanged ids
+with deletion, dropping queued work after failure, and ignoring backwards markers. Random simulation runs
+10,000 traces. Page/event ordering remains in `catchup.qnt`; bounded paging,
+retention, upgrade seeding and call costs have fake integration tests.
+
+
+The mutation-repair model also tracks gap time, message time and job enqueue time.
+Ranges start 24 hours before the gap; expiry uses 24 hours since enqueueing.
+`longGap` contrasts that rule with a window anchored at reopen time.
+`missingThread` contrasts dropping a missing-thread job with retrying it forever.
+Tombstones additionally require a known deleted root. Random simulation includes time advances and missing thread responses.
+`sweepRefresh` stages a candidate and promotes it only after a later pong, with
+no failed frame. The `halfOpen` schedule loses a mutation event while HTTP counts
+still succeeds; its unsafe variant advances the baseline and violates
+`quietAgreement`. `failedFrame` checks the same exclusion after a frame fails.
+These schedules exercise sweep promotion separately from the random mutation
+simulation. Socket receive timestamps and the real timeout are checked by engine
+tests against the fake.
 
 ## Conversation metadata
 

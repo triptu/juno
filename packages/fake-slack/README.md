@@ -42,3 +42,28 @@ await fake.close()
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them.
 
 `unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
+
+Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
+`updated` and `history_invalid` markers. The fake advances `updated` for thread replies,
+edits and reactions; a new Main message changes only `latest`.
+Deletion advances `history_invalid`. History and replies
+accept `cached_latest_updates`, return changed bodies with `latest_updates`,
+unchanged ids in `unchanged_messages`, and an empty `deleted` list, as the
+controlled self-DM deletion test returned. Versions live in a separate map, not
+on Message bodies. Deleting a reply also changes its root version; deleting the
+final root advances only `history_invalid`.
+Paging counts unchanged messages too. These rules match the controlled self-DM test,
+not a completeness guarantee for every workspace and event. Tests can override
+marker/version maps to model backwards or unchanged values, and `retainedSince`
+omits older messages while marking history and replies `is_limited`.
+
+In-process tests can set `workspace.mutationMarkers = false` to model counts that
+omit both markers. The uncovered outbox conformance schedule uses this alongside
+zero fallback topics to model no observation of a deleted original. The separate
+send-copy test keeps markers enabled: repair can observe deletion and keep the
+surviving copy, but only the fallback certifies coverage for deleting a duplicate.
+
+`holdFrames` can hold `pong` as well as message frames. Holding both models a
+half-open socket while HTTP counts still succeeds; the real client timeout detects
+it. The hidden-old-root `thread_not_found` scenario is injected as a refusal in a
+test, not asserted as measured Slack behavior.

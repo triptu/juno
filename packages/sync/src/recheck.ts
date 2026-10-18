@@ -1,5 +1,6 @@
 /**
- * The recheck (architecture 5.8, specs/catchup.qnt): edits, deletes and
+ * After mutation-marker repair, the bounded fallback (architecture 5.8,
+ * specs/catchup.qnt): edits, deletes and
  * reaction changes made while the socket was down or the app was closed
  * reach Juno through no event, and they do not move a conversation's
  * `latest`, so history since the synced range never sees them. After a
@@ -107,7 +108,7 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
     const edge = page.messages.at(-1)?.ts
     const inSpan = (ts: string) => !page.has_more || edge === undefined || (target.kind === 'main' ? compareTs(ts, edge) >= 0 : compareTs(ts, edge) <= 0)
     const present = new Set<string>(page.messages.map((message) => message.ts))
-    const gone = known.filter((ts) => inSpan(ts) && !present.has(ts))
+    const gone = known.filter((ts) => !page.is_limited && inSpan(ts) && !present.has(ts))
     const sql = yield* StoreWriter
     const fromTs = target.kind === 'main' && page.has_more && edge !== undefined ? edge : from
     const toTs = target.kind === 'thread' && page.has_more && edge !== undefined ? edge : null

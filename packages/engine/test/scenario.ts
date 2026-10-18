@@ -34,7 +34,7 @@ export async function bootedEngine(track: Array<RunningEngine>, options: EngineO
  * The new engine owns the fake and the directory from then on. `options`
  * start it as `bootedEngine`'s do.
  */
-export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}): Promise<RunningEngine> {
+export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
@@ -56,7 +56,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   }
   track.push(owned)
   await owned.status('ready')
-  await owned.phase('live', 30_000)
+  await owned.phase('live', liveMillis)
   await owned.syncIdle()
   return owned
 }
@@ -65,13 +65,14 @@ export const apiCalls = (engine: RunningEngine, method?: string) =>
   engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
 
 /** A page of the recheck after a drop or a restart (`@juno/sync` `recheck.ts`). */
-export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => call.args['_x_reason'] !== 'recheck'
+export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => !['recheck', 'mutation-repair'].includes(call.args['_x_reason'] ?? '')
 
 /** Calls by `kind:method`, for exact budgets. The recheck's pages count apart, as `recheck:method`. */
 export const callMap = (engine: RunningEngine): Record<string, number> => {
   const map: Record<string, number> = {}
   for (const call of engine.fake.calls) {
-    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `recheck:${call.method}`
+    const reason = call.args['_x_reason']
+    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `${reason}:${call.method}`
     map[key] = (map[key] ?? 0) + 1
   }
   return map

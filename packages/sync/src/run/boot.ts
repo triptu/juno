@@ -4,7 +4,7 @@ import { backfillWindow } from '../window'
 import { bootState, coldBoot, warmBoot } from '../boot'
 
 import type { SyncServices } from '../sync'
-import { followPassIfDue } from './reconcile'
+import { followPassIfDue, repairAfterLive } from './reconcile'
 import { isNotAuth, type SyncRuntime } from './runtime'
 
 const bootOnce = (runtime: SyncRuntime) => {
@@ -32,6 +32,7 @@ export const makeBootLoop = (
   /** A `force_reload`: boot again from the current store. */
   const reboot = cycle(attempt.pipe(
     Effect.andThen(settle),
+    Effect.andThen(repairAfterLive(runtime)),
     Effect.andThen(refreshUsergroups),
     Effect.andThen(refreshEmoji),
     Effect.andThen(followPassIfDue(runtime)),
@@ -57,6 +58,7 @@ export const makeBootLoop = (
     }
     state.booted = true
     yield* settle()
+    yield* repairAfterLive(runtime)
     // One that failed beside a boot that had to retry is read again now.
     const [usergroups, emoji] = yield* Fiber.join(refreshes)
     if (!usergroups) yield* refreshUsergroups

@@ -382,7 +382,8 @@ describe('warm boot', () => {
     expect(apiCalls(second, 'conversations.replies').filter(notRecheck).map((call) => call.args)).toEqual([
       expect.objectContaining({ channel: 'C0ENG', ts: oldRoot.ts, limit: '1', _x_reason: 'root' }),
     ])
-    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = callMap(second)
+    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(second)
+    expect({ repairMain, repairThreads }).toEqual({ repairMain: 1, repairThreads: 4 })
     const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
     expect(budget).toEqual({
       'api:presence.set': 1,
@@ -807,7 +808,7 @@ describe('search matches (review M3 finding 3)', () => {
     await second.phase('live')
     await quiet(second)
     expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['extra_message_data'] === '1')).toBe(true)
-    expect(apiCalls(second, 'conversations.replies').filter((c) => c.args['ts'] === root.ts)).toHaveLength(0)
+    expect(apiCalls(second, 'conversations.replies').filter((c) => c.args['ts'] === root.ts && c.args['_x_reason'] === 'root')).toHaveLength(0)
     const stored = readDb(second, 'cache.db', (db) => db.prepare('SELECT text, reply_count, latest_reply FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', root.ts))
     expect(stored).toMatchObject({ text: 'Search-only root', reply_count: 1, latest_reply: reply.ts })
     expect(readDb(second, 'cache.db', (db) => db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', reply.ts))).toMatchObject({ text: 'Search-only reply' })

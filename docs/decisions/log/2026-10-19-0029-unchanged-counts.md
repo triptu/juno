@@ -1,0 +1,1 @@
+- 10-19 00:29 · Sync · Skip cache writes for unchanged counts fields and server-version certificates so partial incremental rows retain the quiet-sweep no-write guarantee.

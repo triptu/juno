@@ -474,7 +474,9 @@ export class FakeServer {
       }
       if (frame['type'] === 'tickle' && self) this.#lastTickleAt = this.workspace.clock.now()
       if (frame['type'] === 'ping' && typeof frame['id'] === 'number') {
-        ws.send(JSON.stringify(encodeRtmFrame({ type: 'pong', reply_to: frame['id'] })))
+        const pong = { type: 'pong', reply_to: frame['id'] } as const
+        if (this.#frameHold?.has('pong') === true || this.#frameWhere?.(pong) === true) this.#heldFrames.push(pong)
+        else ws.send(JSON.stringify(encodeRtmFrame(pong)))
       } else if (frame['type'] === 'presence_sub' && Array.isArray(frame['ids'])) {
         const users = frame['ids'].filter((id): id is string => typeof id === 'string' && this.workspace.users.has(id))
         const self = users.filter((id) => id === this.workspace.selfId && this.workspace.manualPresence === 'away')

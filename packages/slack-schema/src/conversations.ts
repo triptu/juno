@@ -5,7 +5,7 @@
  * Source: docs/research/slack-data-access.md sections 2, 3 and 6.
  */
 import { Schema as S } from 'effect'
-import { FormBoolean, FormJson, FormNumber, RawObject, ResponseMetadata } from './common.ts'
+import { FormBoolean, FormJson, FormNumber, ResponseMetadata } from './common.ts'
 import { Ts } from './ts.ts'
 import { Message } from './message.ts'
 import { User } from './users.ts'
@@ -94,8 +94,8 @@ export function conversationKind(c: Pick<Channel, 'is_im' | 'is_mpim' | 'is_priv
 
 // conversations.history
 
-/** The official client's `cached_latest_updates`; the value format is Unknown, so it is carried as-is. */
-export const CachedLatestUpdates = FormJson(RawObject)
+/** Message ts to server version, observed live (slack-catchup.md). */
+export const CachedLatestUpdates = FormJson(S.Record(S.String, Ts))
 
 export const ConversationsHistoryArgs = S.Struct({
   channel: S.String,
@@ -105,6 +105,7 @@ export const ConversationsHistoryArgs = S.Struct({
   inclusive: opt(FormBoolean),
   cursor: opt(S.String),
   ignore_replies: opt(FormBoolean),
+  include_mutation_timestamps: opt(FormBoolean),
   include_pin_count: opt(FormBoolean),
   no_user_profile: opt(FormBoolean),
   include_stories: opt(FormBoolean),
@@ -117,19 +118,20 @@ export type ConversationsHistoryArgs = typeof ConversationsHistoryArgs.Type
 
 /** Fields shared by history and replies responses. */
 const PageFields = {
+  is_limited: opt(S.Boolean),
   messages: S.Array(Message),
   has_more: S.Boolean,
   response_metadata: opt(ResponseMetadata),
   /** Ts of messages deleted since `cached_latest_updates`. */
   deleted: opt(S.Array(Ts)),
-  /** Format Unknown (research section 3). Carried through untouched. */
-  latest_updates: opt(S.Unknown),
+  /** Versions of returned message bodies. */
+  latest_updates: opt(S.Record(S.String, Ts)),
   unchanged_messages: opt(S.Array(Ts)),
 } as const
 
 export const ConversationsHistoryFields = {
   ...PageFields,
-  is_limited: opt(S.Boolean),
+  mutation_timestamps: opt(S.Struct({ latest: opt(S.NullOr(Ts)), updated: opt(Ts), history_invalid: opt(Ts) })),
   pin_count: opt(S.Number),
   channel_actions_count: opt(S.Number),
   channel_actions_ts: opt(S.NullOr(Ts)),

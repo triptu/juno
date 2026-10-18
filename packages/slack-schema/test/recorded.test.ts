@@ -107,3 +107,10 @@ it('decodes an incremental counts row without manufacturing unread fields', () =
   })
   expect(counts.channels).toEqual([{ id: 'CINVENTED', last_read: '1700000000.000001' }])
 })
+
+it('ignores an unexpected message version without rejecting its history page', () => {
+  const page = Schema.decodeUnknownSync(Methods['conversations.history'].ok)({
+    ok: true, has_more: false, messages: [{ ts: '1700000000.000001', text: 'Invented message.', version: { unexpected: true } }],
+  })
+  expect(page.messages).toEqual([{ ts: '1700000000.000001', text: 'Invented message.' }])
+})

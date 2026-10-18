@@ -4,11 +4,11 @@
  * result through the method's schema.
  */
 import type { CountEntry, Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
-import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
+import { compareTs, isReply, permalinkPath, Ts } from '@juno/slack-schema'
 import { isKnownReaction } from './emojiNames.ts'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
-import { edgeUserObject, type Workspace } from './state.ts'
+import { edgeUserObject, NEVER_READ, type Workspace } from './state.ts'
 
 export class ApiError {
   readonly error: string
@@ -69,6 +69,19 @@ function requireConversation(ctx: MethodContext, channel: string, needMember = f
 
 function withChannel(ws: Workspace, channel: string, message: Message): Message {
   return ws.withThreadFields({ ...message, channel })
+}
+
+/** Conditional pages keep paging over all messages, even when their bodies are omitted. */
+function conditionalPage(messages: Message[], cached: Readonly<Record<string, Ts>> | undefined, version: (ts: Ts) => Ts) {
+  if (cached === undefined) return { messages }
+  const unchanged = messages.filter((m) => cached[m.ts] === version(m.ts))
+  const bodies = messages.filter((m) => cached[m.ts] !== version(m.ts))
+  return {
+    messages: bodies,
+    unchanged_messages: unchanged.map((m) => m.ts),
+    latest_updates: Object.fromEntries(bodies.map((m) => [m.ts, version(m.ts)])),
+    deleted: [],
+  }
 }
 
 export const handlers: Handlers = {
@@ -205,6 +218,7 @@ export const handlers: Handlers = {
     const window = ws
       .main(args.channel)
       .filter((m) => inWindow(m.ts, args.oldest, args.latest, inclusive))
+      .filter((m) => compareTs(m.ts, ws.retainedSince.get(args.channel) ?? NEVER_READ) >= 0)
       .filter((m) => before === undefined || compareTs(m.ts, before) < 0)
       .toReversed()
     const limit = args.limit ?? DEFAULT_LIMIT
@@ -212,9 +226,10 @@ export const handlers: Handlers = {
     const hasMore = window.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.messageVersions.get(`${args.channel}:${ts}`) ?? ts),
       has_more: hasMore,
-      is_limited: false,
+      ...(args.include_mutation_timestamps === true ? { mutation_timestamps: { updated: ws.countEntry(conversation).updated, history_invalid: ws.countEntry(conversation).history_invalid } } : {}),
+      is_limited: ws.retainedSince.has(args.channel),
       pin_count: 0,
       channel_actions_count: 0,
       channel_actions_ts: null,
@@ -232,14 +247,16 @@ export const handlers: Handlers = {
     const after = tsFromCursor(args.cursor)
     const thread = [root, ...ws.replies(args.channel, args.ts)]
       .filter((m) => m.ts === root.ts || inWindow(m.ts, args.oldest, args.latest, inclusive))
+      .filter((m) => m.ts === root.ts || compareTs(m.ts, ws.retainedSince.get(args.channel) ?? NEVER_READ) >= 0)
       .filter((m) => m.ts === root.ts || after === undefined || compareTs(m.ts, after) > 0)
     const limit = args.limit ?? DEFAULT_LIMIT
     const page = thread.slice(0, limit)
     const hasMore = thread.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.messageVersions.get(`${args.channel}:${ts}`) ?? ts),
       has_more: hasMore,
+      is_limited: ws.retainedSince.has(args.channel),
       response_metadata: hasMore && last !== undefined ? { next_cursor: cursorFor(last.ts) } : { next_cursor: '' },
     }
   },
