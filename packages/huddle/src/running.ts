@@ -96,7 +96,8 @@ export function applyInfo(running: Running, channels: Iterable<string>, huddles:
         participants: huddle.active_members ?? [],
         startedAt: huddle.start_date === undefined ? null : huddle.start_date * 1000,
         threadTs: huddle.thread_root_ts ?? null,
-        eventTs: undefined,
+        // A frame of this huddle older than the last one applied stays stale after a read.
+        eventTs: running.get(channel)?.callId === huddle.call_id ? running.get(channel)?.eventTs : undefined,
       })
   }
   return next

@@ -365,7 +365,7 @@ export class Huddle extends Context.Service<Huddle, {
               yield* putBack
               return yield* Queue.offer(info.wake, undefined)
             }
-            const fresh = [...ids].filter((id) => info.frameGen.get(id) === gens.get(id))
+            const fresh = [...ids].filter((id) => (info.frameGen.get(id) ?? 0) === gens.get(id))
             for (const id of ids) if (!fresh.includes(id)) info.dirty.add(id)
             const huddles: ReadonlyArray<HuddleInfo> = answer.success.flat()
             let next = applyInfo(running, fresh, huddles)
