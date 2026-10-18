@@ -5,7 +5,9 @@
  * runs once for each running sync, in that sync's scope, with its Slack
  * client and the open workspace's store, and returns the listener for that
  * sync's events. `SyncRunner` attaches each sync and passes the publisher to
- * `runSync` as `onEvent`, so it does not know who listens.
+ * `runSync` as `onEvent`, so it does not know who listens. The start runs in
+ * a fiber of its own, outside any lock, and can be interrupted; events
+ * published meanwhile wait in the subscriber's queue.
  *
  * Each subscriber gets the events after the sync's write attempt for each
  * (a write that failed is logged and the event still follows), in socket
@@ -79,25 +81,34 @@ export class SocketEvents extends Context.Service<SocketEvents, {
     const subscribers = new Map<object, Subscriber>()
     let current: Attached | undefined
 
-    const start = (attached: Attached, key: object, { name, start: sessionStart }: Subscriber) =>
-      Effect.flatMap(Scope.fork(attached.scope, 'sequential'), (scope) => Effect.gen(function* () {
+    // Quick, under the lock: the queue takes events from here on, so none is lost while `start` runs in the delivery's fiber.
+    const register = (attached: Attached, key: object, { name, start }: Subscriber) =>
+      Effect.gen(function* () {
+        const scope = yield* Scope.fork(attached.scope, 'sequential')
         const queue = yield* Queue.bounded<readonly [SocketInput, Me]>(CAPACITY)
-        yield* Scope.addFinalizer(scope, Queue.shutdown(queue))
-        const listener = yield* sessionStart.pipe(Effect.provideService(Scope.Scope, scope), Effect.provideContext(attached.context))
-        yield* Effect.forkIn(
-          // A throw or a defect is logged and the next input follows; an interruption ends the fiber.
-          Effect.forever(Effect.flatMap(Queue.take(queue), ([input, me]) =>
-            Effect.suspend(() => listener(input, me)).pipe(Effect.catchDefect((defect) => Effect.logWarning('socket events: a subscriber failed on an event', { subscriber: name, defect }))))),
-          scope,
-        )
-        attached.deliveries.set(key, { name, queue, scope })
-      }).pipe(Effect.catchCause((cause) => Effect.logError('socket events: a subscriber did not start', { cause }).pipe(Effect.andThen(Scope.close(scope, Exit.void))))))
+        const delivery: Delivery = { name, queue, scope }
+        attached.deliveries.set(key, delivery)
+        // Nothing reaches the subscriber once its delivery closes, at the sync's end or its own.
+        yield* Scope.addFinalizer(scope, Effect.suspend(() => {
+          if (attached.deliveries.get(key) === delivery) attached.deliveries.delete(key)
+          return Queue.shutdown(queue)
+        }))
+        yield* Effect.forkIn(run(attached, delivery, start), scope)
+      })
 
-    const stop = (attached: Attached, key: object) =>
-      Effect.suspend(() => {
-        const delivery = attached.deliveries.get(key)
-        attached.deliveries.delete(key)
-        return delivery === undefined ? Effect.void : Scope.close(delivery.scope, Exit.void)
+    // Interruptible and outside the lock: a stuck start ends with the sync or the subscriber and holds up nothing else.
+    const run = (attached: Attached, { name, queue, scope }: Delivery, start: SessionStart) =>
+      Effect.gen(function* () {
+        const listener = yield* start.pipe(
+          Effect.provideService(Scope.Scope, scope),
+          Effect.provideContext(attached.context),
+          Effect.catchDefect((defect) => Effect.logError('socket events: a subscriber did not start', { subscriber: name, defect }).pipe(Effect.as(undefined))),
+        )
+        // Closing the scope interrupts this fiber, so it runs on its own.
+        if (listener === undefined) return yield* Effect.asVoid(Effect.forkDetach(Scope.close(scope, Exit.void)))
+        // A throw or a defect is logged and the next input follows; an interruption ends the fiber.
+        return yield* Effect.forever(Effect.flatMap(Queue.take(queue), ([input, me]) =>
+          Effect.suspend(() => listener(input, me)).pipe(Effect.catchDefect((defect) => Effect.logWarning('socket events: a subscriber failed on an event', { subscriber: name, defect })))))
       })
 
     // Never waits: a full queue is emptied, and the subscriber gets `Overflowed` before the new event.
@@ -118,12 +129,14 @@ export class SocketEvents extends Context.Service<SocketEvents, {
         yield* Effect.acquireRelease(
           lock.withPermits(1)(Effect.suspend(() => {
             subscribers.set(key, subscriber)
-            return current === undefined ? Effect.void : start(current, key, subscriber)
+            return current === undefined ? Effect.void : register(current, key, subscriber)
           })),
-          () => lock.withPermits(1)(Effect.suspend(() => {
+          () => lock.withPermits(1)(Effect.sync(() => {
             subscribers.delete(key)
-            return current === undefined ? Effect.void : stop(current, key)
-          })),
+            const delivery = current?.deliveries.get(key)
+            current?.deliveries.delete(key)
+            return delivery
+          })).pipe(Effect.flatMap((delivery) => delivery === undefined ? Effect.void : Scope.close(delivery.scope, Exit.void))),
         )
       })
 
@@ -132,7 +145,7 @@ export class SocketEvents extends Context.Service<SocketEvents, {
       yield* Effect.acquireRelease(
         lock.withPermits(1)(Effect.gen(function* () {
           current = attached
-          for (const [key, subscriber] of subscribers) yield* start(attached, key, subscriber)
+          for (const [key, subscriber] of subscribers) yield* register(attached, key, subscriber)
         })),
         // The deliveries close with the sync's scope.
         () => lock.withPermits(1)(Effect.sync(() => {

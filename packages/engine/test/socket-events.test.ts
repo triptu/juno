@@ -93,3 +93,38 @@ it.effect('a listener that throws or dies on one event still hears the later one
   expect(yield* Effect.replicateEffect(Queue.take(heard), 2)).toEqual(['1', '4'])
   yield* running.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
+
+it.effect('events published while a subscriber starts reach it once it has started, and a stuck start holds up nothing', () => Effect.gen(function* () {
+  const events = yield* SocketEvents
+  const ready = yield* Deferred.make<void>()
+  const slow = yield* recorder()
+  const late = yield* recorder()
+  yield* events.subscribe('stuck', Effect.never)
+  yield* events.subscribe('slow', Deferred.await(ready).pipe(Effect.andThen(slow.start)))
+  const running = yield* sync
+  yield* running.publish(1)
+  yield* events.subscribe('late', Deferred.await(ready).pipe(Effect.andThen(late.start)))
+  yield* running.publish(2)
+  yield* Deferred.succeed(ready, undefined)
+  yield* running.publish(3)
+  expect(yield* slow.next(3)).toEqual(['1:1', '1:2', '1:3'])
+  expect(yield* late.next(2)).toEqual(['1:2', '1:3'])
+  // The stuck start ends with the sync.
+  yield* running.end
+}).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
+
+it.effect('nothing is delivered once the sync\'s scope closes, queued or in flight', () => Effect.gen(function* () {
+  const events = yield* SocketEvents
+  const busy = yield* Deferred.make<void>()
+  const release = yield* Deferred.make<void>()
+  const blocked = yield* recorder((input) => label(input) === '1' ? Deferred.succeed(busy, undefined).pipe(Effect.andThen(Deferred.await(release))) : Effect.void)
+  yield* events.subscribe('blocked', blocked.start)
+  const running = yield* sync
+  for (const n of [1, 2, 3]) yield* running.publish(n)
+  yield* Deferred.await(busy)
+  yield* running.end
+  yield* Deferred.succeed(release, undefined)
+  yield* running.publish(4)
+  yield* Effect.yieldNow
+  expect(yield* Queue.size(blocked.heard)).toBe(0)
+}).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))

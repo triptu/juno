@@ -86,7 +86,7 @@ export class SyncRunner extends Context.Service<
             })
           const program = Effect.gen(function* () {
             return yield* runSync({
-              // Subscribers start in this sync's scope and hear each event after it is stored.
+              // Subscribers start in this sync's scope and hear each event after its write attempt.
               onEvent: yield* events.attach,
               onSelfPresence: notifications.seedPresence,
               onCycle: (event) =>
