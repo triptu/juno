@@ -1,22 +1,15 @@
 /**
- * The browser side of `huddle-live.ts`: one Chime meeting session, audio
- * only, with Chromium's fake microphone. The script bundles this file with
- * Bun, serves it from localhost and opens it in Playwright's Chromium.
+ * The browser side of `huddle-live.ts`: Juno's own Chime media session
+ * (`@juno/huddle-media/chime`), with Chromium's fake microphone. The script
+ * bundles this file with Bun, serves it from localhost and opens it in
+ * Playwright's Chromium.
  *
  * `junoJoin(meeting, attendee)` starts the session; `junoLeave()` stops it.
- * Events go back to the script through `junoReport`, which the script
- * exposes. The Chime logger is off, since its lines carry urls and tokens.
+ * Snapshot changes go back to the script through `junoReport`, which the
+ * script exposes.
  */
-import {
-  ConsoleLogger,
-  DefaultDeviceController,
-  DefaultMeetingSession,
-  LogLevel,
-  MeetingSessionConfiguration,
-  MeetingSessionStatusCode,
-  type AudioVideoObserver,
-  type MeetingSession,
-} from 'amazon-chime-sdk-js'
+import type { MediaSnapshot } from '@juno/huddle-media'
+import { createChimeMediaSession } from '@juno/huddle-media/chime'
 import type { HuddleEvent } from './huddle-live-report.ts'
 
 declare global {
@@ -30,63 +23,36 @@ declare global {
 const report = (event: HuddleEvent) => window.junoReport(event)
 const errorName = (error: unknown) => (error instanceof Error ? error.name : 'unknown')
 
-let session: MeetingSession | undefined
+const session = createChimeMediaSession()
+let last: MediaSnapshot = session.getSnapshot()
+
+/** Turns one snapshot change into the events the report reads. */
+function changed(next: MediaSnapshot) {
+  const prev = last
+  last = next
+  const c = next.connection
+  if (c.state !== prev.connection.state) {
+    if (c.state === 'connecting') report({ kind: 'lifecycle', name: 'audioVideoDidStartConnecting', detail: 'first' })
+    if (c.state === 'reconnecting') report({ kind: 'lifecycle', name: 'audioVideoDidStartConnecting', detail: 'reconnecting' })
+    if (c.state === 'connected') report({ kind: 'lifecycle', name: 'audioVideoDidStart' })
+    if (c.state === 'ended') report({ kind: 'lifecycle', name: 'audioVideoDidStop', detail: `${c.code} (${c.reason})` })
+  }
+  if (next.microphoneAccess !== prev.microphoneAccess) report({ kind: 'lifecycle', name: 'microphone', detail: next.microphoneAccess })
+  if (next.noiseSuppression !== prev.noiseSuppression) report({ kind: 'lifecycle', name: 'voiceFocus', detail: next.noiseSuppression })
+  const before = new Map(prev.remotes.map((r) => [r.attendeeId, r]))
+  const after = new Map(next.remotes.map((r) => [r.attendeeId, r]))
+  for (const r of next.remotes) if (!before.has(r.attendeeId)) report({ kind: 'presence', attendeeId: r.attendeeId, present: true, externalUserId: r.externalUserId, dropped: false })
+  for (const r of prev.remotes) if (!after.has(r.attendeeId)) report({ kind: 'presence', attendeeId: r.attendeeId, present: false, externalUserId: r.externalUserId, dropped: false })
+  for (const r of next.remotes) if (r.speaking && before.get(r.attendeeId)?.speaking !== true) report({ kind: 'speaking', attendeeId: r.attendeeId })
+  if (next.local.speaking && !prev.local.speaking && next.local.attendeeId !== undefined) report({ kind: 'speaking', attendeeId: next.local.attendeeId })
+}
+session.subscribe(() => changed(session.getSnapshot()))
 
 window.junoJoin = async (meeting, attendee) => {
-  const logger = new ConsoleLogger('huddle', LogLevel.OFF)
-  const devices = new DefaultDeviceController(logger)
-  const configuration = new MeetingSessionConfiguration(meeting, attendee)
-  session = new DefaultMeetingSession(configuration, logger, devices)
-  const av = session.audioVideo
-
-  const observer: AudioVideoObserver = {
-    audioVideoDidStartConnecting: (reconnecting) => report({ kind: 'lifecycle', name: 'audioVideoDidStartConnecting', detail: reconnecting ? 'reconnecting' : 'first' }),
-    audioVideoDidStart: () => report({ kind: 'lifecycle', name: 'audioVideoDidStart' }),
-    audioVideoDidStop: (status) => {
-      const code = status.statusCode()
-      report({ kind: 'lifecycle', name: 'audioVideoDidStop', detail: `${code} ${MeetingSessionStatusCode[code] ?? ''}`.trim() })
-    },
-    connectionDidBecomePoor: () => report({ kind: 'lifecycle', name: 'connectionDidBecomePoor' }),
-    connectionDidBecomeGood: () => report({ kind: 'lifecycle', name: 'connectionDidBecomeGood' }),
-    connectionHealthDidChange: (health) =>
-      report({
-        kind: 'health',
-        missedPongs: health.consecutiveMissedPongs,
-        noPacketsStats: health.consecutiveStatsWithNoPackets,
-        noAudioSentStats: health.consecutiveStatsWithNoAudioPacketsSent,
-      }),
-  }
-  av.addObserver(observer)
-
-  const watched = new Set<string>()
-  av.realtimeSubscribeToAttendeeIdPresence((attendeeId, present, externalUserId, dropped) => {
-    report({ kind: 'presence', attendeeId, present, externalUserId: externalUserId ?? '', dropped: dropped === true })
-    if (present && !watched.has(attendeeId)) {
-      watched.add(attendeeId)
-      av.realtimeSubscribeToVolumeIndicator(attendeeId, (id, volume, muted) => {
-        if (volume !== null || muted !== null) report({ kind: 'volume', attendeeId: id, volume: volume ?? 0, muted: muted === true })
-      })
-    }
-  })
-
-  const inputs = await av.listAudioInputDevices()
-  report({ kind: 'lifecycle', name: 'audioInputs', detail: `${inputs.length} device(s)` })
-  await av.startAudioInput(inputs[0]?.deviceId ?? 'default')
-  const element = document.querySelector('audio')
-  if (element !== null) await av.bindAudioElement(element)
-  av.start()
-  av.realtimeUnmuteLocalAudio()
-  return configuration.credentials?.attendeeId ?? ''
+  await session.join({ meeting, attendee })
+  return session.getSnapshot().local.attendeeId ?? ''
 }
 
-window.junoLeave = async () => {
-  if (session === undefined) return
-  try {
-    await session.audioVideo.stopAudioInput()
-  } catch (error) {
-    report({ kind: 'error', where: 'stopAudioInput', name: errorName(error) })
-  }
-  session.audioVideo.stop()
-}
+window.junoLeave = () => session.leave()
 
 window.addEventListener('unhandledrejection', (event) => report({ kind: 'error', where: 'unhandledrejection', name: errorName(event.reason) }))
