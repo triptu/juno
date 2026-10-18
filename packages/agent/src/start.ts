@@ -145,6 +145,14 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
             Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
             Effect.forkScoped, Scope.provide(scope),
           )
+          // A Send card's rows follow the host's outbox, also after the owner retries a send from the topic.
+          if (actionHost.sendStates !== undefined) {
+            yield* actionHost.sendStates.pipe(
+              Stream.runForEach((states) => Effect.sync(() => engine.actions.outboxStates(states))),
+              Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
+              Effect.forkScoped, Scope.provide(scope),
+            )
+          }
           yield* answerEngineSpend(createSpend(engine.store, () => capOf(engine.store))).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
           yield* forwardAiCalls(engine.guard).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
           // A click waits while no Slack account is known; each presence lets it look again.
