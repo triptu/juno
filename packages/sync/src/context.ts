@@ -13,7 +13,7 @@ export interface RootFetch {
 }
 
 /**
- * An image to ask `files.info` about (`run/files.ts`): one a stored message
+ * An image to recover by re-reading its message (`run/files.ts`): one a stored message
  * carries without thumbnails, with that message; or, from a file event, one
  * to ask about now.
  */
@@ -30,7 +30,7 @@ export interface SyncContext {
   readonly rootFetches: Queue.Queue<RootFetch>
   /** Channels whose Main read pointer Slack must settle (`conversations.info`): an event Juno cannot order, or a page too old to apply. A background fiber asks. */
   readonly readLookups: Queue.Queue<string>
-  /** Images stored without thumbnails, and file events. A background fiber asks `files.info`, a few times at most. */
+  /** Images stored without thumbnails, and file events. A background fiber re-reads the message, a few times at most. */
   readonly fileFetches: Queue.Queue<FileFetch>
   /**
    * Reactions that arrived for a message the store did not have yet, by

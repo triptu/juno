@@ -1,7 +1,7 @@
 /**
  * Files stored before Slack filled them in (`files.ts`): images without
  * thumbnails, videos without a poster, and partial copies. Each file is
- * asked about with `files.info` on the background lane at most
+ * recovered by re-reading its message on the background lane at most
  * `FILE_TRIES.length` times, after the waits listed, and a file event
  * (`file_shared`, `file_change`, `file_created`, `file_thumbnail_generated`) asks at once
  * instead of waiting. The answer goes into every stored message that
@@ -15,13 +15,13 @@
  */
 import { SlackApi } from '@juno/slack'
 import { StoreReader, transaction, type SqlError } from '@juno/store'
-import { parseTopicId } from '@juno/domain'
+import { parseTopicId, type Ts } from '@juno/domain'
 import { Effect, FiberSet, Queue } from 'effect'
 import type { SyncContext } from '../context'
 import { filesToFetch, isReady } from '../files'
 import { storeFileInfo } from '../write'
 
-/** The wait before each try. Live, `files.info` had the thumbnails 0.3 s after the share. */
+/** The wait before each message re-read. Stop after four attempts. */
 const FILE_TRIES = [1_000, 3_000, 10_000, 30_000] as const
 /** Files asked about at once; more wait for a later write of their message. */
 const MAX_ACTIVE = 50
@@ -39,9 +39,25 @@ interface Active {
   readonly wake: Queue.Queue<void>
 }
 
-export const refreshFiles = (ctx: SyncContext) =>
+/** Re-read only this message, leaving history coverage, reactions and read state alone. */
+const readFileMessage = (target: Target, fileId: string) =>
   Effect.gen(function* () {
     const api = yield* SlackApi
+    const sql = yield* StoreReader
+    const rows = yield* sql<{ thread_ts: Ts | null }>`SELECT thread_ts FROM messages
+      WHERE channel = ${target.channel} AND ts = ${target.ts}`
+    const row = rows[0]
+    if (row === undefined) return undefined
+    const args = { channel: target.channel, oldest: target.ts, latest: target.ts, inclusive: true, limit: 2 }
+    // Replies include the root too; select the exact message before taking its file.
+    const page = yield* row.thread_ts !== null && row.thread_ts !== target.ts
+      ? api.call('conversations.replies', { ...args, ts: row.thread_ts }, { lane: 'background', reason: 'file' })
+      : api.call('conversations.history', args, { lane: 'background', reason: 'file' })
+    return page.messages.find((message) => message.ts === target.ts)?.files?.find((file) => file.id === fileId)
+  })
+
+export const refreshFiles = (ctx: SyncContext) =>
+  Effect.gen(function* () {
     const tries = yield* FiberSet.make()
     const active = new Map<string, Active>()
     const spent = new Map<string, Map<string, Target>>()
@@ -51,18 +67,18 @@ export const refreshFiles = (ctx: SyncContext) =>
       Effect.gen(function* () {
         for (const wait of waits) {
           yield* Effect.raceFirst(Effect.sleep(wait), Queue.take(entry.wake))
-          const result = yield* Effect.result(api.call('files.info', { file: fileId }, { lane: 'background', reason: 'file' }))
+          const target = entry.targets.values().next().value
+          if (target === undefined) return 'gone' as const
+          const result = yield* Effect.result(readFileMessage(target, fileId))
           if (result._tag === 'Failure') {
-            // A refusal (`file_not_found`, `file_deleted`) will not change; the session's end is someone else's to report.
+            // A refused message read will not change; the session's end is someone else's to report.
             if (result.failure._tag === 'SlackRejected' || result.failure._tag === 'SlackAuthRequired') return 'gone' as const
-            yield* Effect.logDebug('sync: file info failed', { tag: result.failure._tag })
+            yield* Effect.logDebug('sync: file message read failed', { tag: result.failure._tag })
             continue
           }
-          const file = result.success.file
-          if (!isReady(file)) continue
-          yield* transaction(storeFileInfo(fileId, file, [...entry.targets.values()])).pipe(
-            Effect.catchCause((cause) => Effect.logError('sync: file thumbnails not stored', { cause })),
-          )
+          const file = result.success
+          if (file === undefined || !isReady(file)) continue
+          yield* transaction(storeFileInfo(fileId, file, [...entry.targets.values()]))
           return 'stored' as const
         }
         return 'spent' as const
@@ -75,6 +91,7 @@ export const refreshFiles = (ctx: SyncContext) =>
         yield* FiberSet.run(
           tries,
           ask(fileId, entry, waits).pipe(
+            Effect.catchCause((cause) => Effect.logError('sync: file recovery failed', { cause }).pipe(Effect.as('spent' as const))),
             Effect.flatMap((outcome) =>
               Effect.sync(() => {
                 active.delete(fileId)

@@ -1,7 +1,7 @@
 // Images and videos other people post (SPEC 8, "Images and the media viewer"; architecture 9, "Late
 // thumbnails"). Live, a fresh image reaches the socket before Slack has made its thumbnails, and a socket
 // message can carry a partial file (`file_access: "check_file_info"`); nothing in the message changes
-// later, so Juno asks `files.info` and the card becomes the picture in place.
+// later, so Juno re-reads the message and the card becomes the picture in place.
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 
@@ -39,14 +39,14 @@ test('an old card stored before Slack made the thumbnail becomes the picture whe
   fake.injectMedia({ channel: 'C0PHOTOS', user: 'U0LEO', text: 'The venue floor plan', ago: 2 * DAY_MINUTES, media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
   fake.releaseThumbnails({ event: 'none' })
   await win.waitForTimeout(3_000)
-  expect(fake.calls.filter((call) => call.method === 'files.info')).toHaveLength(0)
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file')).toHaveLength(0)
 
   await juno.sidebar.row(PHOTOS_MAIN).open()
   const row = topic.message('The venue floor plan')
   await row.scrollIntoViewIfNeeded()
   const image = row.getByRole('button', { name: 'Open floor-plan.png' })
   await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
-  expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
+  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
@@ -61,7 +61,7 @@ test('reopening a topic retries an image after its background lookups ran out', 
   fake.resetCalls()
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Slow image processing', media: [{ name: 'late.png', width: 800, height: 600 }] })
   await expect(topic.message('Slow image processing').locator('[data-file-card]')).toHaveCount(1)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 60_000 }).toBe(4)
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
   await win.waitForTimeout(1_000)
   // No message update or file event arrives, and the next history page is newer than this message.
   fake.releaseThumbnails({ event: 'none' })
@@ -124,14 +124,14 @@ test('images and videos in #eng show inline and open full screen, and a partial 
   })
   await test.step('an image that arrives as a partial file on the socket becomes the picture once Slack fills it in', async () => {
     // The first look at the file waits, so the partial copy is on screen first.
-    fake.holdNext({ method: 'files.info', before: true })
+    fake.holdNext({ method: 'conversations.history', reason: 'file', before: true })
     fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Screenshot of the failing check', partial: true, media: [{ name: 'Screenshot check.png', width: 640, height: 400 }] })
     const row = topic.message('Screenshot of the failing check')
     await expect(row.locator('[data-file-card]')).toHaveCount(1)
     await expect(row.locator('[data-thumbnail]')).toHaveCount(0)
 
-    await expect.poll(() => fake.heldCount({ method: 'files.info' }), { timeout: 15_000 }).toBeGreaterThan(0)
-    fake.release({ method: 'files.info' })
+    await expect.poll(() => fake.heldCount({ method: 'conversations.history' }), { timeout: 15_000 }).toBeGreaterThan(0)
+    fake.release({ method: 'conversations.history' })
     const image = row.getByRole('button', { name: 'Open Screenshot check.png' })
     await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
