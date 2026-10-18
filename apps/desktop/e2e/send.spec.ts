@@ -2,6 +2,8 @@
 // at once and settles in place, Main and threads, a refused send with Retry
 // and Delete draft, drafts kept across tabs and a restart, and the composer
 // growing to about eight lines.
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
@@ -11,6 +13,26 @@ test.describe.configure({ timeout: 120_000 })
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ENG_MAIN = '#eng'
+
+interface SavedTab {
+  readonly id: string
+  readonly place?: { readonly kind: string; readonly topicId?: string }
+  readonly homeDraft?: { readonly draft?: string; readonly conversation?: unknown }
+}
+
+/** The tabs and topic drafts user.db holds (drafts by text), read while the app runs: what a relaunch reads back. */
+function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray<SavedTab>; readonly active: SavedTab | undefined; readonly drafts: ReadonlyMap<string, string> } {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
+  try {
+    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined
+    const value = row === undefined ? undefined : (JSON.parse(row.value_json) as { readonly tabs: ReadonlyArray<SavedTab>; readonly active: string | null })
+    const drafts = new Map(db.prepare('SELECT topic_id, text FROM drafts').all().map((draft) => [String(draft['text']), String(draft['topic_id'])]))
+    const tabs = value?.tabs ?? []
+    return { tabs, active: tabs.find((tab) => tab.id === value?.active), drafts }
+  } finally {
+    db.close()
+  }
+}
 
 test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
   await juno.signIn()
@@ -99,8 +121,14 @@ test('a draft is kept per topic across tab switches and a restart', async ({ jun
   await juno.tabs.menu('previous-tab')
   await topic.expectTitle(POSTGRES)
   await expect(topic.composer).toHaveValue('Half a thought about the freeze')
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(800)
+  // The draft and the tabs, with the Postgres tab active, are in user.db before the quit.
+  await expect
+    .poll(() => {
+      const state = saved(userData, fake.teamId)
+      const topic = state.drafts.get('Half a thought about the freeze')
+      return topic !== undefined && state.active?.place?.topicId === topic && state.tabs.length === 2
+    })
+    .toBe(true)
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
