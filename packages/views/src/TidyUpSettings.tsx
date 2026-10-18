@@ -36,16 +36,8 @@ export function SettingsTidyUp({ quietDays, onQuietDaysChange, tabExpiry, onTabE
   return (
     <Page width="settings">
       <PageHeader title="Tidy up" subtitle="Keep topics and tabs under control, and review suggestions for finished topics on Home." />
-      <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show.">
-        <Surface kind="group" padding="md" sx={styles.card}>
-          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
-        </Surface>
-      </Section>
-      <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one.">
-        <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
-          <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
-        </Surface>
-      </Section>
+      <TopicsSetting value={quietDays} onChange={onQuietDaysChange} />
+      <TabsSetting value={tabExpiry} onChange={onTabExpiryChange} />
       <Section heading={settledCopy.about}>
         <Surface kind="group" padding="md" sx={styles.card}>
           <ul {...stylex.props(styles.points)} data-tidy-explain="">
@@ -113,6 +105,14 @@ export function SettingsTidyUp({ quietDays, onQuietDaysChange, tabExpiry, onTabE
       </Section>
     </Page>
   )
+}
+
+function TopicsSetting({ value, onChange }: { readonly value: number; readonly onChange: (days: number) => void }) {
+  return <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show."><Surface kind="group" padding="md" sx={styles.card}><QuietWindowSetting value={value} onChange={onChange} /></Surface></Section>
+}
+
+function TabsSetting({ value, onChange }: { readonly value: TabExpiryName; readonly onChange: (expiry: TabExpiryName) => void }) {
+  return <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one."><Surface kind="group" padding="md" sx={[styles.card, styles.rows]}><TabExpirySetting value={value} onChange={onChange} /></Surface></Section>
 }
 
 const styles = stylex.create({

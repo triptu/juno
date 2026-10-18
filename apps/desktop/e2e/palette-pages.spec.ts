@@ -54,7 +54,7 @@ test('"topics" and "tabs" find Settings: Tidy up', async ({ juno }) => {
   await juno.waitForSync()
   const { palette, settings } = juno
 
-  for (const term of ['topics', 'tabs']) {
+  for (const term of ['settings topics', 'settings tabs']) {
     await palette.open()
     await palette.type(term)
     await palette.expectActive(/Settings: Tidy up/)
