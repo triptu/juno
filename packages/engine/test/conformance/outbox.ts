@@ -335,7 +335,7 @@ function own(world: World, prevState: TraceState, nextState: TraceState): boolea
 
 export const outboxSpec: Spec<World, View> = {
   start: async (trace: Trace) => {
-    // Only the fallback writes outbox coverage; mutation-marker repair cannot certify a gap.
+    // This model schedule has neither a fallback read nor any observation of the deleted original.
     const covers = trace.states.every((state) => sOf(state).label !== 'catchUp' || sOf(state).rechecked.size > 0)
     const options: EngineOptions = covers ? {} : { recheckTopics: 0 }
     const world: World = {
@@ -360,6 +360,7 @@ export const outboxSpec: Spec<World, View> = {
         }
       }, 10),
     }
+    if (!covers) world.engine.fake.workspace.mutationMarkers = false
     await quiet(world.engine)
     gate(world)
     return world

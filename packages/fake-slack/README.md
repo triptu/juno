@@ -58,5 +58,7 @@ marker/version maps to model backwards or unchanged values, and `retainedSince`
 omits older messages while marking history and replies `is_limited`.
 
 In-process tests can set `workspace.mutationMarkers = false` to model counts that
-omit both markers. Outbox conformance keeps markers enabled: only the fallback
-writes the coverage required to delete a duplicate send.
+omit both markers. The uncovered outbox conformance schedule uses this alongside
+zero fallback topics to model no observation of a deleted original. The separate
+send-copy test keeps markers enabled: repair can observe deletion and keep the
+surviving copy, but only the fallback certifies coverage for deleting a duplicate.
