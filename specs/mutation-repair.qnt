@@ -8,6 +8,7 @@ module mutationRepair {
     deleted: Set[int], gone: Set[int], required: Set[int], marker: int, observed: int,
     pending: Set[int], fallback: bool, fresh: bool, running: bool, requested: bool,
     target: int, present: bool, unchanged: bool, answer: int, answerVersion: int,
+    now: int, gap: int, messageAt: int -> int, queuedAt: int -> int, threadMissing: bool, notFound: bool,
     sealed: bool, label: str
   }
   var s: State
@@ -16,7 +17,7 @@ module mutationRepair {
   action init = all {
     s' = { content: topics.mapBy(_ => 0), version: topics.mapBy(_ => 0), cached: topics.mapBy(_ => 0), cachedVersion: topics.mapBy(_ => 0),
       deleted: Set(), gone: Set(), required: Set(1), marker: 0, observed: 0, pending: Set(), fallback: false, fresh: false,
-      running: false, requested: false, target: 1, present: true, unchanged: false, answer: 0, answerVersion: 0, sealed: false, label: "init" },
+      running: false, requested: false, target: 1, present: true, unchanged: false, answer: 0, answerVersion: 0, now: 24, gap: 24, messageAt: topics.mapBy(_ => 23), queuedAt: topics.mapBy(_ => 24), threadMissing: false, notFound: false, sealed: false, label: "init" },
     turn' = 0, remaining' = 48
   }
   action change(k: int, markers: bool, versions: bool): bool = all {
@@ -30,24 +31,29 @@ module mutationRepair {
   action remove(k: int): bool = all { not(s.sealed), not(s.deleted.contains(k)),
     s' = { ...s, deleted: s.deleted.union(Set(k)), marker: s.marker + 1, required: s.required.exclude(Set(k)).union(Set(1)), fresh: false, label: "delete" } }
   action backwards = all { not(s.sealed), s' = { ...s, marker: s.marker - 1, label: "backwards" } }
-  action countsCompared(markers: bool, forwardsOnly: bool): bool = all {
+  action countsWindow(markers: bool, forwardsOnly: bool, fromNow: bool): bool = {
+    val eligible = topics.filter(k => s.messageAt.get(k) >= (if (fromNow) s.now else s.gap) - 24)
+    all {
     not(s.running),
     s' = { ...s, running: true, fallback: true, fresh: false,
-      pending: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) topics else s.pending,
-      required: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) s.required.union(topics.filter(k => s.deleted.contains(k) or s.version.get(k) != s.cachedVersion.get(k) or s.content.get(k) == s.cached.get(k))) else s.required,
+      pending: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) s.pending.union(eligible) else s.pending,
+      queuedAt: if (markers and s.marker != s.observed) topics.mapBy(k => if (eligible.contains(k)) s.now else s.queuedAt.get(k)) else s.queuedAt,
+      required: if (markers and (if (forwardsOnly) s.marker > s.observed else s.marker != s.observed)) s.required.union(eligible.filter(k => s.deleted.contains(k) or s.version.get(k) != s.cachedVersion.get(k) or s.content.get(k) == s.cached.get(k))) else s.required,
       observed: if (markers) s.marker else s.observed, label: "counts" }
+    }
   }
+  action countsCompared(markers: bool, forwardsOnly: bool): bool = countsWindow(markers, forwardsOnly, false)
   action countsWith(markers: bool): bool = countsCompared(markers, false)
   action requestWith(skipFallback: bool): bool = {
     nondet k = (if (s.fallback) Set(1) else s.pending).oneOf()
     all { s.running, not(s.requested), s.fallback or s.pending.size() > 0,
-      s' = { ...s, requested: true, target: k, present: not(s.deleted.contains(k)),
+      s' = { ...s, requested: true, target: k, notFound: not(s.fallback) and k == 2 and s.threadMissing, present: not(s.deleted.contains(k)),
         unchanged: (not(s.fallback) or skipFallback) and s.cachedVersion.get(k) == s.version.get(k),
         answer: s.content.get(k), answerVersion: s.version.get(k), label: "request" }
     }
   }
   action finishWith(includeUnchanged: bool): bool = all {
-    s.requested,
+    s.requested, not(s.notFound),
     s' = { ...s, requested: false,
       cached: if (s.present and not(s.unchanged)) s.cached.set(s.target, s.answer) else s.cached,
       cachedVersion: if (s.present and not(s.unchanged)) s.cachedVersion.set(s.target, s.answerVersion) else s.cachedVersion,
@@ -70,11 +76,26 @@ module mutationRepair {
   val reachedAgreement = drained and agreed
   val drainBound = remaining > 0 or reachedAgreement
   val invariants = noFalseDelete and quietAgreement and drainBound
-  action progress = any { countsWith(true), requestWith(false), finishWith(true), finishEmpty }
+  action rootGone = all { not(s.sealed), s.deleted.contains(2),
+    s' = { ...s, threadMissing: true, marker: s.marker + 1, label: "rootGone" } }
+  action missingWith(drop: bool): bool = all { s.requested, s.notFound,
+    s' = { ...s, requested: false, running: false, notFound: false,
+      pending: if (drop) s.pending.exclude(Set(2)) else s.pending,
+      gone: if (drop) s.gone.union(Set(2)) else s.gone, label: "thread_not_found" } }
+  action advance(hours: int): bool = all { not(s.sealed), not(s.running),
+    s' = { ...s, now: s.now + hours, label: "time" } }
+  // Expiry is queue age, never the age of the cached message. Expired work is outside the liveness promise.
+  action expire = {
+    val expired = s.pending.filter(k => s.now - s.queuedAt.get(k) >= 24)
+    all { not(s.sealed), not(s.running), expired.size() > 0,
+      s' = { ...s, pending: s.pending.exclude(expired), required: s.required.exclude(expired).union(Set(1)), label: "expire" } }
+  }
+  action progressWith(drop: bool): bool = any { countsWith(true), requestWith(false), finishWith(true), missingWith(drop), finishEmpty }
+  action progress = progressWith(true)
   action tick(a: bool): bool = all { a, turn' = turn + 1, remaining' = if (s.sealed) remaining - 1 else remaining }
   action simulationStep = all { not(reachedAgreement), tick(if (s.sealed) progress else any {
     progress, countsWith(false), change(1, false, false), change(2, false, false), change(2, true, false),
-    change(1, true, true), change(2, true, true), backwards, remove(1), remove(2), failWith(false), seal
+    change(1, true, true), change(2, true, true), backwards, remove(1), remove(2), rootGone, advance(24), expire, failWith(false), seal
   }) }
   action fallbackVersionWith(skip: bool): bool = all { not(reachedAgreement), tick(
     if (turn == 0) change(1, false, false) else if (turn == 1) seal else
@@ -105,5 +126,19 @@ module mutationRepair {
   ) }
   action backwardsMarkerStep = backwardsMarkerWith(false)
   action backwardsMarkerBugStep = backwardsMarkerWith(true)
+
+  action fridayEdit = all { not(s.sealed),
+    s' = { ...s, content: s.content.set(2, 1), version: s.version.set(2, 1), marker: 1, required: topics, label: "SaturdayEdit" } }
+  action longGapWith(fromNow: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) fridayEdit else if (turn == 1) advance(72) else if (turn == 2) seal else
+    if (turn == 3) countsWindow(true, false, fromNow) else progress
+  ) }
+  action longGapStep = longGapWith(false)
+  action longGapBugStep = longGapWith(true)
+  action missingThreadWith(drop: bool): bool = all { not(reachedAgreement), tick(
+    if (turn == 0) remove(2) else if (turn == 1) rootGone else if (turn == 2) seal else progressWith(drop)
+  ) }
+  action missingThreadStep = missingThreadWith(true)
+  action missingThreadBugStep = missingThreadWith(false)
 
 }

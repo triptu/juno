@@ -80,6 +80,7 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
     refreshMetadata: droppedAt !== undefined,
     refreshThreads: true,
     persistState: droppedAt !== undefined,
+    canRefreshMarkers: () => state.connected && state.droppedAt === undefined,
     ...(recheck === undefined ? {} : { recheck }),
   }).pipe(
     Effect.tapError(() =>

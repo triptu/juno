@@ -461,8 +461,8 @@ advance. Such changes outside the fallback can still wait for an open-topic read
 The foreground boot/reconnect keeps its original ten-page fallback budget.
 Additional mutation repair starts only after phase `live`, on the background
 lane, under the sync work permit. It attempts at most ten pages per catch-up,
-one page per queued range. Main and cached replies are bounded to the most recent
-24 hours (the recheck lookback setting) at enqueue time. Old roots fetched for
+one page per queued range. Main and cached replies are bounded from
+24 hours before the gap began (the recheck lookback setting). Old roots fetched for
 thread metadata do not extend Main; a root without cached recent replies does
 not get a reply job. Unfinished cursors and refused/rate-limited jobs persist in
 `repair_pending` and rotate behind unattempted work on the next catch-up or sweep.
@@ -483,5 +483,42 @@ roots were outside the recent window. All three offline changes were recovered
 without opening the topic. This is a request count with fake pacing disabled,
 not a latency or byte benchmark. The earlier 21-call result above describes the
 unbounded implementation. Failed repair calls are single-attempt, so transport
-retries cannot exceed the ten-request cap. Queued ranges whose latest message
-has aged out are discarded; absence checks always enforce the current lookback.
+retries cannot exceed the ten-request cap. Queued ranges expire 24 hours after enqueueing. Their message bounds stay fixed,
+so a multi-day gap still repairs messages from the day the app closed.
+
+
+### Round 2: incremental markers and live activity
+
+A further controlled self-DM probe created a root and reply, edited the reply,
+and deleted both test messages afterwards. It compared incremental counts using
+the preceding counts stamp with full counts after each operation. Calls were
+spaced at least 1.5 seconds apart, with at least two seconds before each mutation.
+Only field names and equality results were recorded.
+
+| Operation | `latest` changed | `updated` changed | `history_invalid` changed |
+| --- | --- | --- | --- |
+| New Main message | Yes | No | No |
+| New thread reply | No | Yes | No |
+| Edit reply | No | Yes | No |
+
+All three incremental rows supplied `id`, `last_read`, `latest`, `has_unreads`,
+`mention_count`, `updated`, and `history_invalid`. Their markers matched full
+counts. Partial read-only rows can still omit these fields. The fake now leaves
+`updated` unchanged for a new Main message instead of assuming it advances.
+
+The large-seed activity test edits cached messages in 150 conversations six times,
+advancing server time ten minutes each round and waiting for live delivery and a
+sweep. Wall-clock sweeps are accelerated; this is a queue/call measurement, not a
+latency benchmark. After that synthetic live hour, it disconnects and edits one
+message offline. At `c6e3739a`, reconnect queued 396 jobs across 150 conversations;
+the offline edit remained stale after two ten-call repair passes. With baseline
+refresh during uninterrupted sweeps, it queues exactly two jobs in one
+conversation and repairs the edit in two calls on the first pass.
+
+Repair selection also interleaves conversations so one conversation's threads do
+not consume the whole pass. The cap remains ten calls. A drop while an incremental
+counts request is in flight prevents baseline refresh. Missing markers preserve
+the stored baseline. A `thread_not_found` response drops the job and tombstones
+cached replies within its fixed bounds. Tests cover a Friday 18:00 close, a
+Saturday edit of a Friday 17:00 message, and a Monday reopen, as well as deleting
+a reply followed by its root while offline.

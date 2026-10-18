@@ -136,16 +136,21 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 Full counts on reconnect and warm boot compare supplied `updated` and
 `history_invalid` with observed markers using inequality, including backwards
 moves. Missing baselines seed without a repair storm. Changed conversations
-atomically enqueue recent cached ranges with the new observed markers.
+atomically enqueue cached ranges with the new observed markers. Uninterrupted
+ten-minute sweeps refresh supplied baseline markers after merging live activity;
+a socket drop during a sweep prevents that baseline refresh.
 
 After `live`, at most ten background pages run, one per queued range. Main and
-cached replies are limited to the latest 24 hours; old roots do not extend Main
-and roots without cached recent replies get no thread job. Pending cursors and
+cached replies start 24 hours before the gap began; old roots do not extend Main
+and roots without cached replies in range get no thread job. Jobs expire 24 hours
+after enqueueing, not when their messages age. Selection interleaves conversations
+before taking another range from the same conversation. Pending cursors and
 failures persist and rotate behind unattempted ranges for the next catch-up or
 sweep. `SlackRateLimited` leaves the job queued. Conditional versions come only
 from `latest_updates`, separately from Message decoding. Unchanged ids count as
 present. Absence is inferred only inside proven recent page bounds, excluding
-thread roots and any `is_limited` response. Repair does not certify outbox coverage.
+thread roots and any `is_limited` response. `thread_not_found` tombstones cached
+replies within the job bounds and drops the job. Repair does not certify outbox coverage.
 
 All ten ordinary fallback pages still run before `live`, including topics queued
 for repair. Missing markers or versions that fail to advance cannot suppress the

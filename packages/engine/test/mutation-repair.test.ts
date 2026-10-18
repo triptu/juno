@@ -62,8 +62,11 @@ it('repairs offline mutations outside the top ten on the large seed, without ope
   ))
   const total = engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL').length
   const fallback = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck').length
-  expect(repairs.length).toBeLessThanOrEqual(10)
-  expect(fallback).toBe(10)
+  expect({ budget, total, repair: repairs.length, fallback }).toEqual({
+    budget: { 'client.counts': 1, 'conversations.history': 0, 'conversations.replies': 13,
+      'search.modules.messages': 2, 'subscriptions.thread.getView': 1 },
+    total: 18, repair: 3, fallback: 10,
+  })
   console.info('large seed reconnect calls', { budget, total, repair: repairs.length, fallback })
   // No new mutations: the durable markers avoid another repair on warm boot.
   const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 }, 120_000)
@@ -150,7 +153,7 @@ it('caps repair at ten pages after live, carries leftovers across restart, and e
   expect(message(engine, 'C0ENG', oldRoot)?.deleted).toBe(0)
   expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending').get())?.n).toBeGreaterThan(0)
   const warm = await restart(engines, engine, () => {}, { recheckTopics: 0 })
-  expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair').length).toBeLessThanOrEqual(10)
+  expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(9)
   expect(readDb(warm, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending').get())?.n).toBe(0)
   expect(message(warm, 'C0ENG', oldRoot)?.deleted).toBe(0)
 })
@@ -214,4 +217,69 @@ it.each([false, true])('keeps the fallback when a reaction version stays fixed (
   await engine.syncIdle()
   expect(engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck')).toHaveLength(10)
   expect(readDb(engine, 'cache.db', (db) => db.prepare("SELECT 1 FROM reactions WHERE channel = 'C0ENG' AND ts = ? AND name = 'eyes'").get(target.ts))).toBeUndefined()
+})
+
+it('repairs a Friday 17:00 edit made Saturday after closing Friday 18:00 and reopening Monday', async () => {
+  const monday = Date.now()
+  const friday = monday - 3 * DAY
+  let ts = ''
+  const engine = await bootedEngine(engines, { fakeOptions: { now: friday }, recheckTopics: 0, initial: (fake) => {
+    ts = fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Friday 17:00', at: friday - 3_600_000, silent: true }).ts
+    return fake.signIn()
+  } })
+  expect(message(engine, 'C0ENG', ts)?.text).toBe('Friday 17:00')
+  const warm = await restart(engines, engine, (fake) => {
+    const db = new DatabaseSync(join(engine.userData, 'workspaces', fake.teamId, 'cache.db'))
+    db.prepare("UPDATE sync_state SET value_json = json_set(value_json, '$.lastSyncAt', ?) WHERE key = 'boot'").run(friday)
+    db.close()
+    fake.advanceClock({ millis: DAY })
+    fake.editMessage({ channel: 'C0ENG', ts, text: 'Saturday edit' })
+    fake.advanceClock({ millis: 2 * DAY })
+  }, { recheckTopics: 0 })
+  expect(message(warm, 'C0ENG', ts)?.text).toBe('Saturday edit')
+  const repairs = warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')
+  expect(repairs.some((c) => c.args.channel === 'C0ENG' && Number(c.args.oldest) <= Number(ts))).toBe(true)
+  expect(repairs.every((c) => c.args.oldest === millisToTs(friday - DAY))).toBe(true)
+  expect(readDb(warm, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending').get())?.n).toBe(0)
+})
+
+it('tombstones bounded cached replies and drops the job when its root no longer exists', async () => {
+  let root = ''
+  let reply = ''
+  const engine = await bootedEngine(engines, { recheckTopics: 0, initial: (fake) => {
+    root = seedThread(fake, { channel: 'C0ENG', text: 'Root to delete', ago: 120_000, replies: [60_000], follow: true }).ts
+    reply = fake.workspace.replies('C0ENG', Ts.make(root))[0]!.ts
+    return fake.signIn()
+  } })
+  expect(message(engine, 'C0ENG', reply)?.deleted).toBe(0)
+  engine.fake.goOffline()
+  await engine.phase('offline')
+  engine.fake.deleteMessage({ channel: 'C0ENG', ts: reply })
+  engine.fake.deleteMessage({ channel: 'C0ENG', ts: root })
+  engine.fake.resetCalls()
+  engine.fake.goOnline()
+  await engine.phase('live', 30_000)
+  await engine.syncIdle()
+  expect(message(engine, 'C0ENG', reply)?.deleted).toBe(1)
+  expect(message(engine, 'C0ENG', root)?.deleted).toBe(1)
+  expect(engine.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.ts === root)).toHaveLength(1)
+  expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending').get())?.n).toBe(0)
+  const warm = await restart(engines, engine, () => {}, { recheckTopics: 0 })
+  expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(0)
+})
+
+it('does not refresh a sweep baseline across a socket gap while counts is in flight', async () => {
+  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
+  const target = engine.fake.workspace.main('C0ENG').at(-1)!
+  engine.fake.holdNext({ method: 'client.counts', before: true })
+  await waitFor(() => engine.fake.heldCount({ method: 'client.counts' }) === 1 ? true : undefined, 20_000, 'sweep counts held')
+  engine.fake.goOffline()
+  await engine.phase('offline')
+  engine.fake.editMessage({ channel: 'C0ENG', ts: target.ts, text: 'Edited during held counts' })
+  engine.fake.goOnline()
+  engine.fake.release()
+  await engine.phase('live', 30_000)
+  await engine.syncIdle()
+  await waitFor(() => message(engine, 'C0ENG', target.ts)?.text === 'Edited during held counts' ? true : undefined, 30_000, 'gap edit repaired')
+  expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
 })

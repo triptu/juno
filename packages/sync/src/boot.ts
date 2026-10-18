@@ -559,6 +559,8 @@ export interface CatchUpOptions {
   readonly recheck?: RecheckOptions
   /** Persist the new cursor. Periodic sweeps keep it in memory; a restart can safely replay from the last durable boot or reconnect. */
   readonly persistState?: boolean
+  /** A periodic sweep may refresh baselines only if its socket stayed connected without a new gap. */
+  readonly canRefreshMarkers?: () => boolean
 }
 
 /**
@@ -601,7 +603,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     }
     const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
     if (options.recheck !== undefined) yield* recheck(ctx, options.recheck)
-    if (options.recheck !== undefined) yield* queueRepairs(ctx, counts.entries)
+    if (options.recheck !== undefined) yield* queueRepairs(ctx, counts.entries, options.recheck.since)
+    else if (options.canRefreshMarkers?.() === true) yield* transaction(saveRepairMarkers(counts.entries))
     yield* fillUsers(ctx)
     const state: BootState = {
       ...(previous.quietDays === undefined ? {} : { quietDays: previous.quietDays }),
