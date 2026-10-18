@@ -111,11 +111,6 @@ describe('person and message menus', () => {
     expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false])
   })
 
-  it('offers Ask Juno and What Juno knows about them only while the agent runs', () => {
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true })).slice(1)).toEqual(['—', 'Ask Juno', 'What Juno knows about Maya'])
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
-  })
-
   it('asks why by what happened', () => {
     expect(whyLabel(true)).toBe('Why did this notify?')
     expect(whyLabel(false)).toBe('Why no notification?')
@@ -157,8 +152,8 @@ describe('Juno in the menus', () => {
     expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
   })
 
-  it('the person menu ends with Ask Juno while the Juno Agent is on', () => {
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno'])
+  it('the person menu ends with Ask Juno and What Juno knows about them while the Juno Agent is on', () => {
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno', 'What Juno knows about Maya'])
     expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
   })
 })
