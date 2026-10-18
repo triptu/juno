@@ -136,7 +136,7 @@ The owner then checks with real people in the test channel.
 ### Phase 4: screen share
 
 - **Watch first.** Remote content share in the media package, the stage in the tab, and the bar showing who is sharing. No new permissions.
-- **Share second.** A source picker built on `desktopCapturer.getSources` through main (thumbnails at 480 by 480 or smaller, Juno's own windows filtered out). Capture with `chromeMediaSource: 'desktop'`, the display-capture permission and the macOS Screen Recording prompt. Privacy mode may switch on while sharing; accepted. System audio stays out.
+- **Share second.** A source picker built on `desktopCapturer.getSources` through main (thumbnails at 480 by 480 or smaller, Juno's own windows filtered out). Capture with `chromeMediaSource: 'desktop'`, the display-capture permission and the macOS Screen Recording prompt. Privacy mode may switch on while sharing; accepted. System audio stays out. A shared window is previewed in the user's own tab from the captured stream itself (no second capture); a shared screen is not (SPEC 20).
 
 ## 6. The Quint spec
 

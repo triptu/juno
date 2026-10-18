@@ -26,7 +26,18 @@ export interface HuddlePerson {
   readonly speaking?: boolean
 }
 
-/** One shared screen someone else is showing. The user's own share is never drawn as a screen. */
+/**
+ * What the user shares. A window is previewed in their own tab, so they can
+ * see it is the right one; a whole screen never is, since it would show
+ * itself over and over.
+ */
+export interface HuddleOwnSource {
+  readonly kind: 'screen' | 'window'
+  /** The screen's or the window's name: "Built-in display", "Q4 roadmap — Docs". */
+  readonly name: string
+}
+
+/** One shared screen someone else is showing. The user's own window is `HuddleOwnSource`. */
 export interface HuddleShare {
   readonly id: string
   /** Whose screen: "Maya" reads "Maya's screen". */

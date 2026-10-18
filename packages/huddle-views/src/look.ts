@@ -47,7 +47,7 @@ export interface StatusInput {
   /** First names of the others who share. */
   readonly sharers?: ReadonlyArray<string>
   readonly sharing?: boolean
-  /** What the user shares, for the tab: "You're sharing Entire screen". */
+  /** The name of what the user shares: "You're sharing Built-in display". */
   readonly sharingSource?: string
   /** Nobody else is in the huddle (the tab says so; the bar just shows no avatars). */
   readonly alone?: boolean
@@ -64,7 +64,10 @@ export function statusLine({ connection, micBlocked = false, sharers = [], shari
   if (connection === 'joining') return 'Joining…'
   if (connection === 'reconnecting') return 'Reconnecting…'
   if (micBlocked) return 'Microphone blocked'
-  if (sharing && sharers.length === 0 && sharingSource !== undefined) return `You're sharing ${sharingSource}`
+  if (sharing && sharingSource !== undefined) {
+    const others = sharingLine(sharers, false)
+    return others === undefined ? `You're sharing ${sharingSource}` : `You're sharing ${sharingSource} · ${others}`
+  }
   const shares = sharingLine(sharers, sharing)
   if (shares !== undefined) return shares
   if (alone) return "You're the only one here"

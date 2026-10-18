@@ -21,6 +21,8 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
   readonly people: ReadonlyArray<HuddlePerson>
   /** First names of the others who share their screen. */
   readonly sharers?: ReadonlyArray<string>
+  /** The screen's or window's name while the user shares: "You're sharing Built-in display". */
+  readonly sharingSource?: string
   /** Opens the huddle tab; `metaKey` for a new tab. */
   readonly onOpen: (event: ActivateEvent) => void
   /** The device menu's content, shown while `devicesOpen`. */
@@ -36,8 +38,8 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
  * Microphone and speaker, and Leave. Every state is the same height, so a
  * change in the huddle moves nothing in the sidebar.
  */
-export function HuddleBar({ place, connection, duration, people, sharers = [], onOpen, devices, announcement, ...controls }: HuddleBarProps) {
-  const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers, sharing: controls.sharing, duration })
+export function HuddleBar({ place, connection, duration, people, sharers = [], sharingSource, onOpen, devices, announcement, ...controls }: HuddleBarProps) {
+  const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers, sharing: controls.sharing, ...(sharingSource === undefined ? {} : { sharingSource }), duration })
   // A notice keeps its share of the room; the duration gives way first.
   const notice = status !== duration
   return (

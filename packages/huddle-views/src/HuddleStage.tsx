@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { CornersIn } from '@phosphor-icons/react/dist/icons/CornersIn'
 import { CornersOut } from '@phosphor-icons/react/dist/icons/CornersOut'
 import { MicrophoneSlash } from '@phosphor-icons/react/dist/icons/MicrophoneSlash'
+import { StopCircle } from '@phosphor-icons/react/dist/icons/StopCircle'
 import type { ReactNode } from 'react'
 import { colors, layout, motion, opacity, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, Text, tooltip } from '@juno/ui'
@@ -36,8 +37,19 @@ export function PeopleTiles({ people, dim }: PeopleTilesProps) {
   )
 }
 
+/** The window the user shares, previewed in their own tab. */
+export interface OwnPreview {
+  /** The window's name, for the box's accessible name. */
+  readonly name: string
+  /** The container's element showing what is sent, filling the box (`object-fit: contain`). */
+  readonly content: ReactNode
+  readonly onStop: () => void
+}
+
 export interface ShareStageProps {
   readonly shares: ReadonlyArray<HuddleShare>
+  /** The user's own window, after the others' shares. */
+  readonly own?: OwnPreview | undefined
   readonly people: ReadonlyArray<HuddlePerson>
   readonly renderShare?: ((id: string) => ReactNode) | undefined
   /** The share given all the room, while two show. */
@@ -46,8 +58,13 @@ export interface ShareStageProps {
   readonly dim: boolean
 }
 
-/** One or two shared screens with the people in a line under them (SPEC 20). */
-export function ShareStage({ shares, people, renderShare, expanded, onExpandShare, dim }: ShareStageProps) {
+/**
+ * One or two shared screens with the people in a line under them (SPEC 20).
+ * The user's own window comes last: alone it has the room a share has; beside
+ * someone else's it takes a third, since it is there to check, not to watch.
+ */
+export function ShareStage({ shares, own, people, renderShare, expanded, onExpandShare, dim }: ShareStageProps) {
+  const beside = own !== undefined && shares.length > 0
   return (
     <div {...stylex.props(styles.stageArea)}>
       <div {...stylex.props(styles.stage)}>
@@ -56,11 +73,13 @@ export function ShareStage({ shares, people, renderShare, expanded, onExpandShar
             key={share.id}
             share={share}
             content={renderShare?.(share.id)}
-            expandable={shares.length > 1}
+            expandable={shares.length + (own === undefined ? 0 : 1) > 1}
             expanded={expanded !== undefined}
             onExpand={() => onExpandShare?.(expanded === undefined ? share.id : undefined)}
+            wide={beside && expanded === undefined}
           />
         ))}
+        {own === undefined || expanded !== undefined ? null : <OwnShareBox own={own} />}
       </div>
       <PeopleStrip people={people} dim={dim} />
     </div>
@@ -123,13 +142,15 @@ interface ShareBoxProps {
   readonly expandable: boolean
   readonly expanded: boolean
   readonly onExpand: () => void
+  /** Beside the user's own window: two thirds of the room. */
+  readonly wide: boolean
 }
 
 /** One shared screen, scaled to fit on a quiet fill, with its owner's name in the corner. */
-function ShareBox({ share, content, expandable, expanded, onExpand }: ShareBoxProps) {
+function ShareBox({ share, content, expandable, expanded, onExpand, wide }: ShareBoxProps) {
   const label = `${share.ownerName}'s screen`
   return (
-    <section aria-label={label} data-share={share.id} {...stylex.props(stylex.defaultMarker(), styles.share)}>
+    <section aria-label={label} data-share={share.id} {...stylex.props(stylex.defaultMarker(), styles.share, wide && styles.shareWide)}>
       {share.loading === true ? (
         <Text variant="meta" tone="subtle">
           Loading {label}
@@ -151,6 +172,22 @@ function ShareBox({ share, content, expandable, expanded, onExpand }: ShareBoxPr
           <Icon icon={expanded ? CornersIn : CornersOut} size={16} />
         </button>
       ) : null}
+    </section>
+  )
+}
+
+/** The user's own window as it is sent, labelled "Your window", with Stop sharing always showing. */
+function OwnShareBox({ own }: { readonly own: OwnPreview }) {
+  return (
+    <section aria-label={`Your window, ${own.name}`} data-share="own" {...stylex.props(styles.share)}>
+      <div data-huddle-video="own" {...stylex.props(styles.video)}>
+        {own.content}
+      </div>
+      <span {...stylex.props(styles.shareLabel)}>Your window</span>
+      <button type="button" onClick={own.onStop} {...stylex.props(styles.stop, focusRing.outside)}>
+        <Icon icon={StopCircle} size={14} />
+        Stop sharing
+      </button>
     </section>
   )
 }
@@ -246,6 +283,9 @@ const styles = stylex.create({
     borderRadius: radii['--radius-xl'],
     backgroundColor: colors['--secondary-default'],
   },
+  shareWide: {
+    flexGrow: 2,
+  },
   // A size container, so the container's video (or a fixture's picture) can fit itself with `contain`.
   // A block, so the video's 100% width and height resolve to the box and `object-fit: contain` fits it whole.
   video: {
@@ -293,6 +333,32 @@ const styles = stylex.create({
       [HOVER]: { default: 0, ':focus-visible': 1, [stylex.when.ancestor(':hover')]: 1 },
     },
     transitionProperty: 'opacity, scale',
+    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
+    scale: { default: '1', ':active': motion['--press-scale'] },
+  },
+  // On the picture, as Expand is, but always showing: a quick way out of sharing the wrong window.
+  stop: {
+    appearance: 'none',
+    position: 'absolute',
+    top: spacing['--space-2'],
+    insetInlineEnd: spacing['--space-2'],
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1-5'],
+    height: sizes['--control-28'],
+    margin: 0,
+    paddingBlock: 0,
+    paddingInline: spacing['--space-2-5'],
+    borderWidth: 0,
+    borderRadius: radii['--radius-pill'],
+    backgroundColor: colors['--media-scrim'],
+    color: colors['--media-scrim-foreground'],
+    fontFamily: text['--text-meta-family'],
+    fontSize: text['--text-meta-size'],
+    fontWeight: weights['--weight-medium'],
+    whiteSpace: 'nowrap',
+    cursor: 'default',
+    transitionProperty: 'scale',
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
     scale: { default: '1', ':active': motion['--press-scale'] },
   },

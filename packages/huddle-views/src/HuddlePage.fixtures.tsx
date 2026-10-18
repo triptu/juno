@@ -3,7 +3,7 @@ import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
 import { eng, maya, noop, others, pictures, you } from './fixtures/data'
 import { deviceMenu } from './HuddleDeviceMenu.fixtures'
 import { HuddlePage, type HuddleInState, type HuddlePageProps } from './HuddlePage'
-import type { HuddleShare } from './model'
+import type { HuddleOwnSource, HuddleShare } from './model'
 
 /** A huddle tab in a 1200 by 760 window with the sidebar shown. */
 const frame: FixtureFrame = { width: 816, height: 716, padded: false }
@@ -34,7 +34,11 @@ const base: HuddlePageProps = {
 const pictureFor: Record<string, string> = { maya: pictures.maya, leo: pictures.leo, tall: pictures.tall }
 const renderShare = (id: string) => <img alt="" src={pictureFor[id] ?? pictures.maya} draggable={false} {...stylex.props(styles.picture)} />
 
+const renderOwnShare = () => <img alt="" src={pictures.window} draggable={false} {...stylex.props(styles.picture)} />
+
 const mayaShare: HuddleShare = { id: 'maya', ownerName: 'Maya' }
+const yourScreen: HuddleOwnSource = { kind: 'screen', name: 'Built-in display' }
+const yourWindow: HuddleOwnSource = { kind: 'window', name: 'Q4 roadmap — Docs' }
 const leoShare: HuddleShare = { id: 'leo', ownerName: 'Leo' }
 
 const page = (props: Partial<HuddlePageProps> = {}, state: Partial<HuddleInState> = {}) => ({ ...base, ...props, state: props.state ?? { ...inCall, ...state } })
@@ -65,8 +69,12 @@ export default defineFixtures(
       'expand hover': fixture(page({ people: [you, ...others(4)], shares: [mayaShare, leoShare], renderShare }, { shareFull: true }), { ...frame, hover: '[data-share="maya"]' }),
     },
     You: {
-      sharing: fixture(page({ people: [you, ...others(2)] }, { sharing: true, sharingSource: 'Entire screen' })),
-      'sharing while watching': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare }, { sharing: true, sharingSource: 'Q4 roadmap — Docs' })),
+      'sharing a screen': fixture(page({ people: [you, ...others(2)] }, { sharing: true, sharingSource: yourScreen })),
+      'sharing a window': fixture(page({ people: [you, ...others(2)], renderOwnShare }, { sharing: true, sharingSource: yourWindow })),
+      'screen while Maya shares': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare }, { sharing: true, sharingSource: yourScreen })),
+      'window while Maya shares': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare, renderOwnShare }, { sharing: true, sharingSource: yourWindow })),
+      'window while Maya shares, narrow': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare, renderOwnShare }, { sharing: true, sharingSource: yourWindow }), { width: 600, height: 716 }),
+      'stop sharing focus': fixture(page({ people: [you, ...others(2)], renderOwnShare }, { sharing: true, sharingSource: yourWindow }), { ...frame, focus: '[data-share="own"] button' }),
       'mic blocked': fixture(page({}, { micBlocked: true, muted: true, onOpenMicSettings: noop })),
       devices: fixture(page({ devices: deviceMenu() }, { devicesOpen: true })),
     },

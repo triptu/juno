@@ -50,6 +50,8 @@ export const pictures = {
   maya: screen(1600, 1000, '#8EB5C9', '#20323C'),
   leo: screen(1440, 900, '#C9B48E', '#3C3020'),
   tall: screen(1000, 1400, '#A7B8A0', '#22301E'),
+  // The user's own window, as the source picker's "Q4 roadmap — Docs".
+  window: screen(1200, 800, '#D9C7E8', '#2E2238'),
 }
 
 export const sources: ReadonlyArray<ScreenSource> = [

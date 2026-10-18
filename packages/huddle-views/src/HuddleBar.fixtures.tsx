@@ -37,12 +37,13 @@ export default defineFixtures(
     You: {
       muted: fixture(bar({ muted: true })),
       'mic blocked': fixture(bar({ micBlocked: true, muted: true, onOpenMicSettings: noop })),
-      sharing: fixture(bar({ sharing: true })),
+      'sharing a screen': fixture(bar({ sharing: true, sharingSource: 'Built-in display' })),
+      'sharing a window': fixture(bar({ sharing: true, sharingSource: 'Q4 roadmap — Docs' })),
     },
     Sharing: {
       'someone sharing': fixture(bar({ people: others(3), sharers: ['Maya'] })),
       'two sharing': fixture(bar({ people: others(4), sharers: ['Maya', 'Leo'], shareFull: true })),
-      'you and someone': fixture(bar({ people: others(3), sharers: ['Maya'], sharing: true })),
+      'you and someone': fixture(bar({ people: others(3), sharers: ['Maya'], sharing: true, sharingSource: 'Built-in display' })),
     },
     Connection: {
       joining: fixture(bar({ connection: 'joining', people: others(2) })),

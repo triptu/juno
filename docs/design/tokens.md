@@ -538,7 +538,7 @@ Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title
 
 ### Huddles
 
-`--speaking-ring` 2px (`sizes` group): the green ring around a participant who is speaking, an outline 1.5px (`--avatar-ring`) outside a face in the bar, the header control and the people line, and inside the edge of a tab's tile. An outline, so it never changes the layout; its colour fades over `--duration-fast`. 2px, not the 1.5px avatar ring, because it has to read at 18px from across the room. The bar has its own green fill and edge (`--huddle-bar*`, section 1.5) with the islands' `--card-ring` and radius 12 (= 8 + 4). Shares sit on `--secondary-default` with the media viewer's `--media-scrim` labels and controls. Nothing else is new.
+`--speaking-ring` 2px (`sizes` group): the green ring around a participant who is speaking, an outline 1.5px (`--avatar-ring`) outside a face in the bar, the header control and the people line, and inside the edge of a tab's tile. An outline, so it never changes the layout; its colour fades over `--duration-fast`. 2px, not the 1.5px avatar ring, because it has to read at 18px from across the room. The bar has its own green fill and edge (`--huddle-bar*`, section 1.5) with the islands' `--card-ring` and radius 12 (= 8 + 4). Shares, the user's own window included, sit on `--secondary-default` with the media viewer's `--media-scrim` labels and controls. Nothing else is new.
 
 ### Privacy mode
 

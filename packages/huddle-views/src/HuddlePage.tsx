@@ -7,15 +7,15 @@ import { HuddleControls } from './HuddleControls'
 import { HuddlePageHeader } from './HuddlePageHeader'
 import { PeopleTiles, ShareStage } from './HuddleStage'
 import { statusLine } from './look'
-import type { HuddleConnection, HuddleControlsActions, HuddleControlsState, HuddlePerson, HuddlePlace, HuddleShare } from './model'
+import type { HuddleConnection, HuddleControlsActions, HuddleControlsState, HuddleOwnSource, HuddlePerson, HuddlePlace, HuddleShare } from './model'
 
 /** The user is in this huddle. */
 export interface HuddleInState extends HuddleControlsState, HuddleControlsActions {
   readonly kind: 'in'
   readonly connection: HuddleConnection
   readonly duration: ReactNode
-  /** What the user shares ("Entire screen", a window's name), while `sharing`. */
-  readonly sharingSource?: string
+  /** What the user shares, while `sharing`: a window is previewed, a screen is only named. */
+  readonly sharingSource?: HuddleOwnSource
   /** Said once to a screen reader: "Maya joined", "Muted". The status line's notices are said too; the duration never is. */
   readonly announcement?: string
 }
@@ -53,6 +53,8 @@ export interface HuddlePageProps {
   readonly shares?: ReadonlyArray<HuddleShare>
   /** The video for a share: the container's element, filling the box (`object-fit: contain`). */
   readonly renderShare?: (id: string) => ReactNode
+  /** The preview of the window the user shares, the same way. Never asked for a screen. */
+  readonly renderOwnShare?: () => ReactNode
   /** The share given all the room, while two show. */
   readonly expandedShare?: string
   readonly onExpandShare?: (id: string | undefined) => void
@@ -70,7 +72,7 @@ export interface HuddlePageProps {
  * tiles, or the shared screens with the people in a line under them; then
  * the controls in an island where a topic's composer sits.
  */
-export function HuddlePage({ place, state, people, shares = [], renderShare, expandedShare, onExpandShare, onPlace, onOpenThread, devices }: HuddlePageProps) {
+export function HuddlePage({ place, state, people, shares = [], renderShare, renderOwnShare, expandedShare, onExpandShare, onPlace, onOpenThread, devices }: HuddlePageProps) {
   const others = people.filter((person) => person.you !== true)
   const status =
     state.kind === 'in'
@@ -79,7 +81,7 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
           micBlocked: state.micBlocked ?? false,
           sharers: shares.map((share) => share.ownerName),
           sharing: state.sharing,
-          ...(state.sharingSource === undefined ? {} : { sharingSource: state.sharingSource }),
+          ...(state.sharingSource === undefined ? {} : { sharingSource: state.sharingSource.name }),
           alone: others.length === 0,
           duration: state.duration,
         })
@@ -96,6 +98,11 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
     onExpandShare?.(undefined)
   }
   const dim = state.kind === 'in' && state.connection === 'reconnecting'
+  // Your window shows so you can check it is the right one; a whole screen would show itself without end.
+  const own =
+    state.kind === 'in' && state.sharing && state.sharingSource?.kind === 'window'
+      ? { name: state.sharingSource.name, content: renderOwnShare?.(), onStop: () => state.onShare?.() }
+      : undefined
   return (
     <div data-huddle-page="" onKeyDown={onKeyDown} {...stylex.props(styles.root)}>
       <HuddlePageHeader place={place} status={status} spoken={notice ?? announcement ?? ''} onPlace={onPlace} onOpenThread={onOpenThread} />
@@ -112,8 +119,8 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
         <div {...stylex.props(styles.empty)}>
           <EmptyState variant="workspace" title="Couldn't join the huddle" body={state.reason} action={state.onRetry === undefined ? undefined : <Button onClick={state.onRetry}>Try again</Button>} />
         </div>
-      ) : shares.length > 0 ? (
-        <ShareStage shares={shares} people={people} renderShare={renderShare} expanded={expanded} onExpandShare={onExpandShare} dim={dim} />
+      ) : shares.length > 0 || own !== undefined ? (
+        <ShareStage shares={shares} own={own} people={people} renderShare={renderShare} expanded={expanded} onExpandShare={onExpandShare} dim={dim} />
       ) : (
         <PeopleTiles people={people} dim={dim} />
       )}
