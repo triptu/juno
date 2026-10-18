@@ -54,6 +54,13 @@ export interface LocalAttendee {
   readonly attendeeId: string | undefined
   readonly muted: boolean
   readonly speaking: boolean
+  /**
+   * The call is connected, the microphone's track is live and giving data, and
+   * Chime's server reports a signal from us (signal strength above 0). It says
+   * the uplink carries audio packets, not that they are loud: a quiet room and
+   * a muted microphone still send.
+   */
+  readonly sending: boolean
 }
 
 export interface MediaDevice {

@@ -118,8 +118,18 @@ export class FakeMediaSession implements MediaSession {
     this.#store.update(patchAttendee(attendeeId, { muted }))
   }
 
+  /** `connected` also starts sending; the others stop it. */
   setConnection(state: 'connecting' | 'connected' | 'reconnecting'): void {
-    if (this.getSnapshot().local.attendeeId !== undefined) this.#store.update(setConnection({ state }))
+    if (this.getSnapshot().local.attendeeId === undefined) return
+    this.#store.update(setConnection({ state }))
+    this.setSending(state === 'connected')
+  }
+
+  /** The uplink stops or starts carrying audio, as `local.sending` reports it. */
+  setSending(sending: boolean): void {
+    const { connection } = this.getSnapshot()
+    if (connection.state === 'idle' || connection.state === 'ended') return
+    this.#store.update((s) => ({ ...s, local: { ...s.local, sending } }))
   }
 
   /** Ends the call as Chime would, for example with `another-device` or `connection-lost`. */

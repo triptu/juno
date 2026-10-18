@@ -13,6 +13,7 @@ describe('the fake media session', () => {
 
     await media.join({ meeting: {}, attendee: { AttendeeId: 'me' }, microphone: 'mic-1' })
     expect(media.getSnapshot().connection).toEqual({ state: 'connected' })
+    expect(media.getSnapshot().local.sending).toBe(true)
     expect(media.getSnapshot().devices.microphoneInUse).toBe('mic-1')
 
     const maya = media.addRemote({ userId: MAYA })
@@ -36,7 +37,10 @@ describe('the fake media session', () => {
 
     media.setConnection('reconnecting')
     expect(media.getSnapshot().connection.state).toBe('reconnecting')
+    expect(media.getSnapshot().local.sending).toBe(false)
     media.setConnection('connected')
+    media.setSending(false)
+    expect(media.getSnapshot().local.sending).toBe(false)
 
     media.removeRemote(leo)
     expect(media.getSnapshot().remotes.map((r) => r.userId)).toEqual([MAYA])

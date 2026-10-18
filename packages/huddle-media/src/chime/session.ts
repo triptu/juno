@@ -42,6 +42,11 @@ interface Call {
   everConnected: boolean
   ended: boolean
   watchingAccess: boolean
+  /** The microphone track Chime sends, and the stop of its listeners. */
+  track: MediaStreamTrack | undefined
+  unwatchTrack: () => void
+  /** Chime's server-side signal strength for us, 0 to 1; null until it reports. */
+  signal: number | null
   readonly stopped: Promise<void>
   readonly resolveStopped: () => void
   readonly cleanups: Array<() => void>
@@ -198,6 +203,9 @@ class ChimeMediaSession implements MediaSession {
       everConnected: false,
       ended: false,
       watchingAccess: false,
+      track: undefined,
+      unwatchTrack: noop,
+      signal: null,
       stopped,
       resolveStopped,
       cleanups: [],
@@ -253,6 +261,12 @@ class ChimeMediaSession implements MediaSession {
     }
     av.realtimeSubscribeToMuteAndUnmuteLocalAudio(onLocalMute)
 
+    const onSignal = (signal: number) => {
+      call.signal = signal
+      this.#updateSending(call)
+    }
+    av.realtimeSubscribeToLocalSignalStrengthChange(onSignal)
+
     const onFatal = (error: Error) => {
       this.#end(call, 'failed', error.name)
       av.stop()
@@ -269,12 +283,36 @@ class ChimeMediaSession implements MediaSession {
       av.unsubscribeFromActiveSpeakerDetector(onSpeakers)
       av.realtimeUnsubscribeToMuteAndUnmuteLocalAudio(onLocalMute)
       av.realtimeUnsubscribeToFatalError(onFatal)
+      av.realtimeUnsubscribeToLocalSignalStrengthChange(onSignal)
+      call.unwatchTrack()
       navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
     })
   }
 
   #connection(call: Call, state: 'connecting' | 'connected' | 'reconnecting'): void {
-    if (!call.ended) this.#store.update(setConnection({ state }))
+    if (call.ended) return
+    this.#store.update(setConnection({ state }))
+    this.#updateSending(call)
+  }
+
+  /** Follows the track Chime sends: a new one after every microphone change, Voice Focus's included. */
+  #watchTrack(call: Call, track: MediaStreamTrack | undefined): void {
+    call.unwatchTrack()
+    call.track = track
+    const onChange = () => this.#updateSending(call)
+    for (const type of ['ended', 'mute', 'unmute']) track?.addEventListener(type, onChange)
+    call.unwatchTrack = () => {
+      for (const type of ['ended', 'mute', 'unmute']) track?.removeEventListener(type, onChange)
+    }
+    this.#updateSending(call)
+  }
+
+  #updateSending(call: Call): void {
+    if (call.ended) return
+    const { track, signal } = call
+    const live = track !== undefined && track.readyState === 'live' && !track.muted
+    const sending = live && signal !== null && signal > 0 && this.getSnapshot().connection.state === 'connected'
+    this.#store.update((s) => ({ ...s, local: { ...s.local, sending } }))
   }
 
   /** Ends the call once, whatever ends it first: Chime's stop, a failure or the leave timeout. */
@@ -325,14 +363,16 @@ class ChimeMediaSession implements MediaSession {
     const filtered = this.#noiseSuppression && call.voiceFocus !== undefined ? await call.voiceFocus.wrap(plain) : undefined
     const device: AudioInputDevice = filtered ?? plain
     let access: MicrophoneAccess = 'granted'
+    let stream: MediaStream | undefined
     try {
-      await call.av.startAudioInput(device)
+      stream = await call.av.startAudioInput(device)
     } catch (error) {
       access = error instanceof Error && error.name === 'PermissionDeniedError' ? 'denied' : 'unavailable'
-      await call.av.startAudioInput(null).catch(() => {})
+      stream = await call.av.startAudioInput(null).catch(() => undefined)
       call.av.realtimeMuteLocalAudio()
     }
     if (call.ended) return
+    this.#watchTrack(call, stream?.getAudioTracks()[0])
     call.av.realtimeSetCanUnmuteLocalAudio(access === 'granted')
     this.#store.update((s) => ({ ...s, microphoneAccess: access, devices: { ...s.devices, microphoneInUse: id } }))
   }

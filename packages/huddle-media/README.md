@@ -31,7 +31,7 @@ interface MediaSession {
 The snapshot (`src/types.ts` has the comments):
 
 - `connection`: `idle`, `connecting`, `connected`, `reconnecting`, or `ended` with `reason` (`left`, `another-device`, `meeting-ended`, `removed`, `full`, `connection-lost`, `failed`), the call's `attendeeId` and Chime's `code`.
-- `local`: the call's `attendeeId`, `muted`, `speaking`.
+- `local`: the call's `attendeeId`, `muted`, `speaking`, and `sending`: the call is connected, the track Chime sends is live and giving data, and Chime's server reports a signal from us (local signal strength above 0). It is re-checked on every microphone change, Voice Focus's swap included. It says packets arrive, not that they are loud.
 - `remotes`: everyone else in join order, each with `attendeeId`, `externalUserId`, `userId` (the Slack user id parsed from `T…-R…-U…`, research section 6), `muted` and `speaking`.
 - `activeSpeaker`: the attendee id of the loudest person speaking, local or remote.
 - `devices`: microphones and speakers, the system devices' names, the user's picks and the devices in use. A pick that is unplugged stays the pick; the system's device plays until it is back.
@@ -61,7 +61,7 @@ The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `
 
 ## The fake
 
-`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and for phase 4 `startShare(userId)` and `stopShare(userId)`.
+`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and for phase 4 `startShare(userId)` and `stopShare(userId)`.
 
 ## Tests
 

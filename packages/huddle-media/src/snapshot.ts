@@ -16,7 +16,7 @@ const NO_DEVICES: Devices = {
 
 export const INITIAL_SNAPSHOT: MediaSnapshot = {
   connection: { state: 'idle' },
-  local: { attendeeId: undefined, muted: false, speaking: false },
+  local: { attendeeId: undefined, muted: false, speaking: false, sending: false },
   remotes: [],
   activeSpeaker: undefined,
   devices: NO_DEVICES,
@@ -35,7 +35,7 @@ export const startCall =
     microphoneAccess: s.microphoneAccess,
     noiseSuppression: s.noiseSuppression,
     connection: { state: 'connecting' },
-    local: { attendeeId, muted: false, speaking: false },
+    local: { attendeeId, muted: false, speaking: false, sending: false },
   })
 
 export const setConnection =
@@ -43,7 +43,7 @@ export const setConnection =
   (s) => {
     if (s.connection.state === 'ended') return s
     if (connection.state !== 'ended') return { ...s, connection }
-    return { ...s, connection, remotes: [], shares: [], localShare: undefined, activeSpeaker: undefined, local: { ...s.local, speaking: false } }
+    return { ...s, connection, remotes: [], shares: [], localShare: undefined, activeSpeaker: undefined, local: { ...s.local, speaking: false, sending: false } }
   }
 
 /**
