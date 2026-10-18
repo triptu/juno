@@ -114,7 +114,7 @@ export function aboutElement(context: SendContext): string {
     case 'person':
       return `<about person="${escape(context.userId)}" name="${escape(context.name)}"/>`
     case 'channel':
-      return `<about channel="${escape(context.place.channelId)}" name="${escape(placeName(context.place))}"/>`
+      return `<about channel="${escape(context.place.channelId)}" name="${escape(placeName(context.place))}"${context.person === undefined ? '' : ` person="${escape(context.person)}"`}/>`
     case 'topic': {
       const attributes = [
         `topic="${escape(context.topicId)}"`,
@@ -122,6 +122,7 @@ export function aboutElement(context: SendContext): string {
         `channel="${escape(placeName(context.place))}"`,
         `channel-id="${escape(context.place.channelId)}"`,
         `kind="${context.kind}"`,
+        ...(context.person ? [`person="${escape(context.person)}"`] : []),
         ...(context.visible ? [`visible="${escape(context.visible.from)}..${escape(context.visible.to)}"`] : []),
         ...(context.newFrom ? [`new-from="${escape(context.newFrom)}"`] : []),
       ].join(' ')

@@ -131,6 +131,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                   agentDir: config.agentDir,
                   host: bound.reads,
                   online: () => bound.presence()?.online === true,
+                  aiEnabled: () => bound.presence()?.aiEnabled === true && bound.presence()?.accountId != null,
                   views: viewHost,
                   schedule: bound.schedule,
                   actions: { ...turns.actions, host: actionHost },

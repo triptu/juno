@@ -21,9 +21,10 @@ export type TopicMenuAction =
   | NotifyAction
   | ViewMenuAction
   | 'ignore-channel'
+  | 'juno-knows'
 
 export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
-export type PersonMenuAction = 'ask-juno'
+export type PersonMenuAction = 'ask-juno' | 'juno-knows'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
 export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
@@ -78,7 +79,12 @@ export interface TopicMenuState {
   readonly views?: ReadonlyArray<ViewChoice>
   /** Art can be drawn (spec section 5): AI assist on and an OpenRouter key. At the daily AI limit Redraw art still shows and says why it cannot draw. */
   readonly canDraw: boolean
+  /** A one-to-one DM's other person, while the Juno Agent is on: What Juno knows about them (SPEC 13.8). */
+  readonly knowsAbout?: string
 }
+
+/** What Juno knows about Maya: their file on What Juno remembers (SPEC 13.8), by first name. */
+const knowsAbout = (name: string) => `What Juno knows about ${name.split(' ')[0] ?? name}`
 
 /** A view as Add to view lists it. */
 export interface ViewChoice {
@@ -150,6 +156,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(notifyMenu(state.notify))
   if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
+  if (state.knowsAbout !== undefined) items.push(separator, item('juno-knows', knowsAbout(state.knowsAbout)))
   return items
 }
 
@@ -184,11 +191,11 @@ export interface PersonMenuState {
   readonly askJuno?: boolean
 }
 
-/** The person menu (inventory 15.6): Notify me about them, then Ask Juno while the agent runs. */
+/** The person menu (inventory 15.6): Notify me about them, then Ask Juno and What Juno knows about them while the agent runs. */
 export function personMenuItems(person: PersonMenuState): ReadonlyArray<MenuItem<NotifyAction | PersonMenuAction>> {
   const first = person.name.split(' ')[0] ?? person.name
   const notify: MenuItem<NotifyAction | PersonMenuAction> = notifyMenu(person.notify, `Notify me about ${first}`)
-  return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno')] : [notify]
+  return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno'), item('juno-knows', knowsAbout(person.name))] : [notify]
 }
 
 /** The message menu's why item (inventory 15.4), by what happened to the message. */

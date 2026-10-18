@@ -217,6 +217,19 @@ describe('the AgentHost port', () => {
     expect(await ok(client['host.slack.person']({ accountId: account, userId: 'U0MAYA' } as never))).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
     expect((await failure(client['host.slack.person']({ accountId: account, userId: 'U0NOBODY' } as never)))).toMatchObject({ reason: 'notFound' })
 
+    // Who the owner exchanges messages with (SPEC 13.8): counts and names, most first, never a bot or the owner.
+    const { people } = await ok(client['host.slack.people']({ accountId: account, since: 0, limit: 50 } as never))
+    const maya = people.find((p) => p.id === 'U0MAYA')
+    expect(maya).toMatchObject({ name: 'Maya Chen', dm: 'D0MAYA' })
+    expect(maya!.owner).toBeGreaterThanOrEqual(2)
+    expect(maya!.them).toBeGreaterThanOrEqual(4)
+    expect(people.map((p) => p.id)).not.toContain(SELF_ID)
+    expect(people.map((p) => p.id)).not.toContain('U0GRAFANA')
+    expect(people.map((p) => p.owner + p.them)).toEqual(people.map((p) => p.owner + p.them).toSorted((a, b) => b - a))
+    expect(Object.keys(maya!).sort()).toEqual(['dm', 'id', 'lastAt', 'name', 'owner', 'them'])
+    const { members } = await ok(client['host.slack.members']({ accountId: account, names: ['Maya', 'maya chen', 'Nobody'] } as never))
+    expect(members.map((m) => m.ids.map((id) => id.id))).toEqual([['U0MAYA'], ['U0MAYA'], []])
+
     const { topics } = await ok(client['host.topics.list']({ limit: 200 } as never))
     expect(topics).toContainEqual({ topicId: `m:${CHANNEL}`, title: '#eng · Main', where: '#eng', tint: 'public' })
     const main = await ok(client['host.topics.get']({ topicId: `m:${CHANNEL}` } as never))

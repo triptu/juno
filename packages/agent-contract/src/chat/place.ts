@@ -65,6 +65,9 @@ export function selectionTooltip(selection: Selection): string {
  *   first message under the "new" divider, both as Slack `ts`.
  * - `person` and `channel`: from Ask Juno in a menu. A name and an id only,
  *   so the run stays clean until Juno reads.
+ *
+ * `person` on a topic or a channel is the other person of a one-to-one DM,
+ * by Slack user id, so the run gets Juno's file on them (SPEC 13.8).
  */
 export const SendContext = Schema.Union([
   Schema.TaggedStruct('topic', {
@@ -76,9 +79,10 @@ export const SendContext = Schema.Union([
     visible: Schema.optionalKey(Schema.Struct({ from: Schema.String, to: Schema.String })),
     newFrom: Schema.optionalKey(Schema.String),
     selection: Schema.optionalKey(Selection),
+    person: Schema.optionalKey(Schema.String),
   }),
   Schema.TaggedStruct('person', { userId: Schema.String, name: Schema.String }),
-  Schema.TaggedStruct('channel', { place: Place }),
+  Schema.TaggedStruct('channel', { place: Place, person: Schema.optionalKey(Schema.String) }),
 ])
 export type SendContext = typeof SendContext.Type
 

@@ -279,3 +279,105 @@ export const channels = (pattern: string, cursor: string | undefined, limit: num
   return { channels: rows.slice(0, limit).map((row) => ({ ...row, id: HostChannelId.make(row.id) })),
     ...(rows.length > limit ? { next: HostCursor.make(rows[limit - 1]!.id) } : {}) }
 })
+
+interface CountRow {
+  readonly channel: string
+  readonly thread_ts?: string | null
+  readonly user_id: string | null
+  readonly n: number
+  readonly last: string
+}
+
+/**
+ * Who the owner exchanged messages with since `since` (ms), most first
+ * (SPEC 13.8): in one-to-one DMs, and in threads outside DMs the owner
+ * posted in, where every message of another person counts as theirs and
+ * the owner's messages count toward each of them. Counts and names only,
+ * from the local store; no message text leaves it. Bots, deactivated
+ * people and the owner are left out.
+ */
+export const people = (since: number, limit: number) =>
+  Effect.gen(function* () {
+    const sql = yield* StoreReader
+    const [team] = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
+    const self = team?.self_user_id
+    if (self == null) return { people: [] }
+    const from = `${Math.max(0, Math.floor(since / 1000))}.000000`
+    const tally = new Map<string, { owner: number; them: number; last: number; dm?: string }>()
+    const add = (id: string, owner: number, them: number, last: number, dm?: string) => {
+      const seen = tally.get(id) ?? { owner: 0, them: 0, last: 0 }
+      const channel = dm ?? seen.dm
+      tally.set(id, { owner: seen.owner + owner, them: seen.them + them, last: Math.max(seen.last, last), ...(channel === undefined ? {} : { dm: channel }) })
+    }
+    const ms = (ts: string) => Math.round(Number(ts) * 1000)
+
+    // One-to-one DMs: the owner's messages and the other person's, by DM.
+    const dms = yield* sql.unsafe<CountRow & { readonly partner: string }>(
+      `SELECT m.channel, c.user_id AS partner, m.user_id, count(*) AS n, max(m.ts) AS last
+       FROM messages m JOIN conversations c ON c.id = m.channel
+       WHERE c.kind = 'im' AND c.user_id IS NOT NULL AND m.deleted = 0 AND m.ts >= ? GROUP BY m.channel, m.user_id`,
+      [from],
+    )
+    for (const row of dms) {
+      if (row.user_id === self) add(row.partner, row.n, 0, ms(row.last), row.channel)
+      else if (row.user_id === row.partner) add(row.partner, 0, row.n, ms(row.last), row.channel)
+    }
+
+    // Threads outside DMs the owner posted in, newest first, at most 500.
+    const threads = yield* sql.unsafe<{ readonly channel: string; readonly thread_ts: string }>(
+      `SELECT m.channel, m.thread_ts, max(m.ts) AS last FROM messages m JOIN conversations c ON c.id = m.channel
+       WHERE m.user_id = ? AND m.deleted = 0 AND m.ts >= ? AND m.thread_ts IS NOT NULL AND c.kind != 'im'
+       GROUP BY m.channel, m.thread_ts ORDER BY last DESC LIMIT 500`,
+      [self, from],
+    )
+    for (let at = 0; at < threads.length; at += 200) {
+      const chunk = threads.slice(at, at + 200)
+      const rows = yield* sql.unsafe<CountRow>(
+        `SELECT channel, thread_ts, user_id, count(*) AS n, max(ts) AS last FROM messages
+         WHERE deleted = 0 AND ts >= ? AND (channel, thread_ts) IN (VALUES ${chunk.map(() => '(?, ?)').join(', ')})
+         GROUP BY channel, thread_ts, user_id`,
+        [from, ...chunk.flatMap((t) => [t.channel, t.thread_ts])],
+      )
+      const byThread = new Map<string, Array<CountRow>>()
+      for (const row of rows) byThread.set(`${row.channel}/${row.thread_ts}`, [...(byThread.get(`${row.channel}/${row.thread_ts}`) ?? []), row])
+      for (const group of byThread.values()) {
+        const mine = group.find((row) => row.user_id === self)
+        for (const row of group) {
+          if (row.user_id === null || row.user_id === self) continue
+          add(row.user_id, mine?.n ?? 0, row.n, Math.max(ms(row.last), mine === undefined ? 0 : ms(mine.last)))
+        }
+      }
+    }
+
+    const ids = [...tally.keys()].filter((id) => id !== self)
+    if (ids.length === 0) return { people: [] }
+    const users = yield* sql.unsafe<UserRow & { readonly is_bot: number; readonly deleted: number }>(
+      `SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, is_bot, deleted FROM users WHERE id IN (${placeholders(ids)})`,
+      ids,
+    )
+    const byId = new Map(users.map((user) => [user.id, user]))
+    const found = ids.flatMap((id) => {
+      const user = byId.get(id)
+      const seen = tally.get(id)!
+      if (user === undefined || user.is_bot === 1 || user.deleted === 1) return []
+      return [{ id: id as typeof HostUserId.Type, name: user.real_name ?? user.name ?? id, owner: seen.owner, them: seen.them, lastAt: seen.last, ...(seen.dm === undefined ? {} : { dm: HostChannelId.make(seen.dm) }) }]
+    })
+    return { people: found.toSorted((a, b) => b.owner + b.them - (a.owner + a.them) || b.lastAt - a.lastAt).slice(0, limit) }
+  })
+
+/** Workspace members for each name: its full, display or handle name, or its first name. Directory metadata only. */
+export const members = (names: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const sql = yield* StoreReader
+    const answers: Array<{ name: string; ids: Array<{ id: typeof HostUserId.Type; name: string }> }> = []
+    for (const name of names) {
+      const key = name.trim().toLowerCase()
+      const prefix = `${key.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')} %`
+      const rows = key === '' ? [] : yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users
+        WHERE deleted = 0 AND is_bot = 0
+          AND (lower(real_name) = ${key} OR lower(display_name) = ${key} OR lower(name) = ${key} OR lower(real_name) LIKE ${prefix} ESCAPE '\\')
+        LIMIT 5`
+      answers.push({ name, ids: rows.map((row) => ({ id: row.id as typeof HostUserId.Type, name: row.real_name ?? row.name ?? row.id })) })
+    }
+    return { members: answers }
+  })

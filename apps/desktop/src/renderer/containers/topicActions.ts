@@ -35,6 +35,7 @@ import {
   currentNotificationSettings,
   editUndo,
   flushSidebar,
+  junoAvailableAtom,
   loadNotificationSettings,
   loadWhy,
   messageLink,
@@ -60,6 +61,7 @@ import {
 import { openSettings, openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction, viewChoices } from './viewActions'
 import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
+import { showWhatJunoKnows } from './juno/actions'
 
 /** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
 export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & {
@@ -177,10 +179,14 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     canDraw: settings?.aiAssist === true && (await drawable),
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
+    ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
   if (chosen !== undefined) runTopicAction(topic, chosen, from)
 }
+
+/** The other person of a one-to-one DM, for What Juno knows about them. */
+const dmPartner = (topic: ActionTopic) => (topic.channel.kind === 'im' ? topic.channel.partner : undefined)
 
 /** Whether Copy Slack link and Open in Slack have a link: a Main, or a thread whose root is known. */
 export const isLinkable = (topic: ActionTopic): boolean => topic.kind === 'main' || topic.rootTs !== undefined
@@ -225,6 +231,10 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
     case 'ignore-channel':
       flushSidebar(registry)
       return void runAction(registry, channelsIgnore, { channel: topic.channel.id }, { text: `Ignoring ${topic.channel.label}` })
+    case 'juno-knows': {
+      const partner = dmPartner(topic)
+      return partner === undefined ? undefined : void showWhatJunoKnows(partner)
+    }
   }
 }
 

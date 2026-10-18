@@ -3,13 +3,14 @@
  * memory page, the chat's "Updated memory · People · Undo" notes and the
  * proactive asks, for the chat and Home. Plain functions over the store.
  */
-import { DOCS } from '@juno/agent-memory'
-import { ChatMessageId, MemoryEntryId, AskId, type ChatItem, type MemoryDocsPage, type MemorySource, type ProactiveAsk } from '@juno/agent-contract'
+import { DOCS, workLine } from '@juno/agent-memory'
+import { ChatMessageId, MemoryEntryId, MemoryPersonId, AskId, type ChatItem, type MemoryDocsPage, type MemorySource, type ProactiveAsk } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
 import type { McpManagerApi } from '../mcp/manager'
 import type { Store } from '../store/store'
 import { asks, CONTEXT_CONNECTIONS, type Ask } from './asks'
-import { entries, recentWrites, runWrites, type SourceKind } from './store'
+import { people } from './people'
+import { entries, recentWrites, runWrites, type Entry, type SourceKind } from './store'
 
 /** Undo on a note stays until the owner's next message, or for a minute. */
 export const UNDO_MS = 60_000
@@ -17,18 +18,32 @@ export const UNDO_MS = 60_000
 const sourceOf = (source: SourceKind, connection: string | null): MemorySource =>
   source === 'connection' ? { _tag: 'connection', name: connection ?? 'A connection' } : { _tag: source }
 
+const rowOf = (entry: Entry) => ({
+  id: MemoryEntryId.make(`e${entry.id}`), text: entry.text, source: sourceOf(entry.source, entry.connection), outside: entry.tainted, at: entry.updatedAt,
+})
+
 export function docsPage(store: Store): { readonly page: MemoryDocsPage; readonly revisions: ReadonlyArray<{ readonly id: MemoryEntryId; readonly revision: typeof Revision.Type }> } {
   const all = entries(store)
+  const files = people(store)
+  const names = new Map(files.map((p) => [p.id, p.name]))
   return {
     page: {
-      docs: DOCS.map((doc) => ({
-        doc,
-        entries: all.filter((entry) => entry.doc === doc).map((entry) => ({
-          id: MemoryEntryId.make(`e${entry.id}`), text: entry.text, source: sourceOf(entry.source, entry.connection), outside: entry.tainted, at: entry.updatedAt,
-        })),
-      })),
+      docs: DOCS.map((doc) => ({ doc, entries: all.filter((entry) => entry.doc === doc && entry.person === null).map(rowOf) })),
+      people: files.map((p) => {
+        const own = all.filter((entry) => entry.person === p.id)
+        const work = workLine(own.map((entry) => ({ id: `e${entry.id}`, section: entry.section ?? 'notes', text: entry.text })))
+        return {
+          id: MemoryPersonId.make(p.id), name: p.name,
+          ...(p.relationship === null ? {} : { relationship: p.relationship }),
+          ...(p.relationshipBy === null ? {} : { relationshipBy: p.relationshipBy }),
+          ...(work === undefined ? {} : { work }),
+          entries: own.map((entry) => ({ ...rowOf(entry), section: entry.section ?? 'notes' })),
+          revision: p.version,
+        }
+      }),
       changes: recentWrites(store).map((write) => ({
         id: write.id, doc: write.doc, kind: write.kind, by: write.by,
+        ...(write.person !== null && names.has(write.person) ? { person: names.get(write.person)! } : {}),
         ...((write.kind === 'remove' ? write.before : write.after) === null ? {} : { text: (write.kind === 'remove' ? write.before : write.after)! }),
         source: sourceOf(write.source, write.connection), outside: write.tainted, at: write.at,
         ...(write.undone ? { undone: true as const } : {}),

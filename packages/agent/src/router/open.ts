@@ -12,6 +12,7 @@ import { enterRecovery, observeOwner } from '../ownership/ownership'
 import { OWNERSHIP_MIGRATIONS } from '../ownership/schema'
 import type { Ownership } from '../ownership/service'
 import type { PinResult } from '../pins/pins'
+import type { PeopleRefresh } from '../memory-docs/refresh'
 import type { Learning } from '../memory-docs/learn'
 import type { McpManagerApi } from '../mcp/manager'
 import type { ProviderGuardApi } from '../providers'
@@ -117,6 +118,10 @@ export interface TurnsOptions {
   readonly migrations?: ReadonlyArray<MigrationSet>
   /** Host socket availability. Stored input waits until it is online. */
   readonly online?: () => boolean
+  /** Whether background AI may run: signed in to Slack, AI assist on. Without it, never. */
+  readonly aiEnabled?: () => boolean
+  /** Keeps person files current in the background (SPEC 13.8). Off without it; tests opt in. */
+  readonly peopleRefresh?: boolean | { readonly intervalMs?: number }
   readonly schedule?: Pick<SchedulerOptions, 'replies' | 'cachedReplies' | 'account' | 'enabled'>
   /** The encrypted backup, move and restore (WP21). Without it Juno keeps no backup and cannot move. */
   readonly backup?: {
@@ -188,6 +193,8 @@ export interface Turns {
   readonly actions: Actions
   /** The learning passes behind Juno's `learn` asks (SPEC 13.8). */
   readonly learning: Learning
+  /** The background updates of person files (SPEC 13.8). */
+  readonly people: PeopleRefresh
   /** The owner's Remove and the purge after it (WP16). */
   readonly redaction: Redaction
   /** Who owns Juno, move, restore and Activate (WP21). */
@@ -318,6 +325,7 @@ async function start(
   jobs.resume()
   router.start()
   services.learning.recover()
+  if (options.peopleRefresh) services.people.start()
   actions.start()
   redaction.start()
   compactor?.poke()

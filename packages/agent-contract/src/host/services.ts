@@ -31,11 +31,26 @@ export const hostTopic = Rpc.make('host.topics.get', { payload: { topicId: HostT
   success: Schema.Struct({ topic: TopicLink, place: Place, accountId: AccountId, resolved: Schema.Boolean, messages: HostMessagePage }), error: AgentHostError })
 export const hostPerson = Rpc.make('host.slack.person', { payload: { accountId: AccountId, userId: HostUserId },
   success: Schema.Struct({ id: HostUserId, name: Schema.String, displayName: Schema.String }), error: AgentHostError })
+/**
+ * The people the owner exchanged messages with in one-to-one DMs and in
+ * threads since `since` (ms), most exchanged first: counts and names only,
+ * never message text. `owner` counts the owner's messages to them, `them`
+ * theirs to the owner, `lastAt` (ms) the newest. `dm` is their DM, when
+ * there is one. Bots and deactivated people are left out (SPEC 13.8).
+ */
+export const HostInteraction = Schema.Struct({
+  id: HostUserId, name: Schema.String, owner: Schema.Int, them: Schema.Int, lastAt: Schema.Number, dm: Schema.optionalKey(HostChannelId),
+})
+export const hostPeople = Rpc.make('host.slack.people', { payload: { accountId: AccountId, since: Schema.Number, limit },
+  success: Schema.Struct({ people: Schema.Array(HostInteraction) }), error: AgentHostError })
+/** Workspace members by name (full, display or handle, or a first name), for each name asked: directory metadata only. */
+export const hostMembers = Rpc.make('host.slack.members', { payload: { accountId: AccountId, names: Schema.Array(Schema.String.check(Schema.isMaxLength(120))).check(Schema.isMaxLength(200)) },
+  success: Schema.Struct({ members: Schema.Array(Schema.Struct({ name: Schema.String, ids: Schema.Array(Schema.Struct({ id: HostUserId, name: Schema.String })) })) }), error: AgentHostError })
 /** Channel directory metadata only; `pattern` is a case-insensitive glob (* and ?). */
 export const HostChannel = Schema.Struct({ id: HostChannelId, name: Schema.String })
 export const hostChannels = Rpc.make('host.slack.channels', { payload: { accountId: AccountId, pattern: Schema.String, cursor: Schema.optionalKey(HostCursor), limit },
   success: Schema.Struct({ channels: Schema.Array(HostChannel), next: Schema.optionalKey(HostCursor) }), error: AgentHostError })
-export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, hostTopics, hostTopic, hostPerson, hostChannels)
+export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, hostTopics, hostTopic, hostPerson, hostChannels, hostPeople, hostMembers)
 
 /** Metadata only: reply watches never send message content to a model to check replies. */
 export const WatchConversation = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) })

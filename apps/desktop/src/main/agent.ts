@@ -269,6 +269,8 @@ export function createAgentSupervisor(
   const interval = e2e ? Number(process.env.JUNO_E2E_BACKUP_INTERVAL_MS) : Number.NaN
   // The `agent.codemode` flag, off unless set.
   const codemode = process.env.JUNO_AGENT_CODEMODE === '1'
+  // Background updates of person files call the model, so a test opts in.
+  const peopleRefresh = !e2e || process.env.JUNO_E2E_PEOPLE_REFRESH === '1'
   return new AgentSupervisor(
     {
       agentDir: join(app.getPath('userData'), 'agent'),
@@ -277,6 +279,7 @@ export function createAgentSupervisor(
       ...(deviceName === undefined ? {} : { deviceName }),
       ...(Number.isFinite(interval) && interval > 0 ? { backupIntervalMs: interval } : {}),
       ...(codemode ? { codemode } : {}),
+      peopleRefresh,
     },
     sendToEngine,
     engineReady,

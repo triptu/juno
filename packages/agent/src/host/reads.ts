@@ -88,6 +88,8 @@ export const bindHost = Effect.gen(function* () {
       ),
     topics: () => withAccount(() => client['host.topics.list']({ limit })),
     person: (userId) => withAccount((accountId) => client['host.slack.person']({ accountId, userId: HostUserId.make(userId) })),
+    people: (since) => withAccount((accountId) => client['host.slack.people']({ accountId, since, limit: 200 })).then((answer) => answer.people),
+    members: (names) => withAccount((accountId) => client['host.slack.members']({ accountId, names: [...names].slice(0, 200) })).then((answer) => answer.members),
   }
   const check = (conversation: import('../schedule/rules').ReplyWatch, refresh: boolean) => {
     if (conversation.accountId !== undefined && conversation.accountId !== current?.accountId) return Promise.reject(new AgentHostError({ reason: 'stale', message: 'Another Slack account is signed in.' }))

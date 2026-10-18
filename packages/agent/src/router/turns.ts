@@ -24,11 +24,12 @@ interface CloseContext {
   readonly release: () => void
 }
 
-export function closeTurns({ scheduleDriver, services: { redaction, actions, jobs, router, scripts, learning }, compactor, session, backup, release }: CloseContext) {
+export function closeTurns({ scheduleDriver, services: { redaction, actions, jobs, router, scripts, learning, people }, compactor, session, backup, release }: CloseContext) {
   let closed: Promise<void> | undefined
   return () => (closed ??= (async () => {
     await scheduleDriver.close()
     await learning.close()
+    await people.close()
     await redaction.close()
     await actions.close()
     await jobs.close()
@@ -52,7 +53,7 @@ interface ApiContext extends Omit<CloseContext, 'release'> {
   readonly close: () => Promise<void>
 }
 
-export function turnApi({ store, guard, opened, options, services: { router, actions, redaction, ownership, jobs, scheduler, scripts, learning }, session, models, compactor, backup, scheduleDriver, close }: ApiContext): Turns {
+export function turnApi({ store, guard, opened, options, services: { router, actions, redaction, ownership, jobs, scheduler, scripts, learning, people }, session, models, compactor, backup, scheduleDriver, close }: ApiContext): Turns {
   return {
     _tag: 'running',
     scheduler,
@@ -85,6 +86,7 @@ export function turnApi({ store, guard, opened, options, services: { router, act
     rotate: router.rotate,
     actions,
     learning,
+    people,
     redaction,
     ownership,
     ...(backup !== undefined ? { backup } : {}),

@@ -98,10 +98,12 @@ textarea {
 
 /* Privacy mode (SPEC section 5): with data-privacy on <html>, text marked
    data-sensitive is blurred. Hover and focus never reveal it, and it cannot
-   be selected or copied. Only filter changes, so rows keep their size. */
+   be selected or copied, so it shows no text cursor either. Only filter
+   changes, so rows keep their size. */
 [data-privacy] [data-sensitive] {
   filter: blur(var(--privacy-blur));
   user-select: none;
+  cursor: default;
 }
 
 /* While the theme flips, every transition is off so colours change in one

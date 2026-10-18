@@ -70,6 +70,8 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'host.topics.list': [window, { topics: [topic], next: 'next' }],
   'host.topics.get': [{ topicId: 'topic' }, { topic, place, accountId: 'account', resolved: false, messages: messagePage }],
   'host.slack.person': [{ accountId: 'account', userId: 'person' }, { id: 'person', name: 'Example', displayName: 'Example' }],
+  'host.slack.people': [{ accountId: 'account', since: 1, limit: 50 }, { people: [{ id: 'person', name: 'Example', owner: 2, them: 3, lastAt: 2, dm: 'channel' }] }],
+  'host.slack.members': [{ accountId: 'account', names: ['Example'] }, { members: [{ name: 'Example', ids: [{ id: 'person', name: 'Example' }] }] }],
   'host.outbox.send': [dispatch, unknown],
   'host.topics.resolve': [dispatch, unknown],
   'host.topics.undoResolve': [{ accountId: 'account', actionId: dispatch.actionId }, undefined],

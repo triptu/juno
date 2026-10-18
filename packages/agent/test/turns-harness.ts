@@ -43,6 +43,8 @@ export interface HarnessOptions {
   readonly tools?: TurnsOptions['tools']
   /** The app's provider and models (`providerTurns`) in place of the scripted fake. */
   readonly app?: Pick<TurnsOptions, 'provider' | 'model' | 'compaction'>
+  /** Background AI allowed, for the updates of person files. */
+  readonly aiEnabled?: () => boolean
 }
 
 export async function turnsHarness(options: HarnessOptions = {}) {
@@ -66,6 +68,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
     ...(options.removalBackup ? { removalBackup: options.removalBackup } : {}),
     ...(options.codemode ? { codemode: options.codemode } : {}),
     ...(options.tools ? { tools: options.tools } : {}),
+    ...(options.aiEnabled ? { aiEnabled: options.aiEnabled } : {}),
     onReport: (error) => reports.push(error),
   })
   if (opened._tag !== 'running') throw new Error('a fresh engine did not open')

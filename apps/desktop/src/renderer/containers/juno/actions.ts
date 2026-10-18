@@ -7,6 +7,8 @@
  *   tab when no topic tab is active) with an About chip;
  * - Tell Juno in the why popover, which opens the panel the same way with
  *   the message quoted.
+ * - What Juno knows about {name}, in a DM's menu and the person menu, which
+ *   opens that person's file on What Juno remembers.
  * - Ask Juno on text selected in a topic's messages (the selection toolbar,
  *   or ⌘J while there is one), which opens the panel with the selection.
  *
@@ -14,7 +16,7 @@
  * decides between the panel and the tab once a topic open asked for
  * before it has landed (`afterNavigation`).
  */
-import type { About, Selection } from '@juno/agent-contract'
+import { chatCopy, MemoryPersonId, type About, type Selection } from '@juno/agent-contract'
 import {
   activeTab,
   currentPlace,
@@ -26,12 +28,13 @@ import {
   quoteInJuno,
   registry,
   setJunoPanelOpen,
+  showToast,
   tabsAtom,
   tabTopic,
   tickWelcome,
 } from '@juno/state'
-import { chatActions, junoPageActions } from '@juno/state/agent'
-import { afterNavigation, openJuno } from '../navigation'
+import { chatActions, hasPersonFile, junoPageActions, memoryPersonAtom } from '@juno/state/agent'
+import { afterNavigation, openJuno, openJunoPage } from '../navigation'
 import { clearTopicSelection, topicSelection } from './topicContext'
 
 export { openJunoPage } from '../navigation'
@@ -130,6 +133,18 @@ export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
     if (topicTabActive()) openPanel()
     else openJunoTab()
   })
+}
+
+/**
+ * What Juno knows about {name} (SPEC 13.8): their file on What Juno
+ * remembers, in place of the page, or a toast when Juno has none yet. When
+ * the agent does not answer in time the page opens at People.
+ */
+export async function showWhatJunoKnows(person: { readonly id: string; readonly name: string }): Promise<void> {
+  const known = await hasPersonFile(registry, person.id)
+  if (known === false) return showToast(registry, { text: chatCopy.docs.people.noFile(person.name) })
+  registry.set(memoryPersonAtom, known === true ? MemoryPersonId.make(person.id) : undefined)
+  openJunoPage('remembers')
 }
 
 /** Whose About chip Ask Juno sets: the active topic tab's panel, or the Juno tab's. */

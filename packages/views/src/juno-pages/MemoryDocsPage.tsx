@@ -1,28 +1,33 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocsPage as MemoryDocsPageModel, type MemoryEntryId, type MemoryEntryRow, type MemorySource } from '@juno/agent-contract'
-import { Button, ListRow, Page, PageHeader, Section, Surface, Text, tooltip } from '@juno/ui'
+import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocSection, type MemoryDocsPage as MemoryDocsPageModel, type MemoryPerson, type MemoryPersonId, type MemorySection, type PersonRelationship } from '@juno/agent-contract'
+import { Button, ListRow, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
+import { spacing } from '@juno/tokens/tokens.stylex'
 import { cell } from './cell'
-import { NoteField } from './NoteField'
+import { NoteList, Source, type DocEditing, type NoteActions } from './NoteRows'
+import { PeopleList, PersonFilePage, type PersonFaces } from './PersonFile'
 import { fullTime, messageTime } from '../time'
 
-/** The note under edit, or the new one being added to a doc, with its draft. The draft is the renderer's. */
-export type DocEditing =
-  | { readonly _tag: 'edit'; readonly id: MemoryEntryId; readonly draft: string; readonly error?: string }
-  | { readonly _tag: 'add'; readonly doc: MemoryDoc; readonly draft: string; readonly error?: string }
+export type { DocEditing } from './NoteRows'
 
-export interface MemoryDocsPageProps {
+export interface MemoryDocsPageProps extends NoteActions {
   readonly page: MemoryDocsPageModel
   readonly now: number
   readonly editing?: DocEditing
-  readonly onEditStart: (id: MemoryEntryId) => void
-  readonly onAddStart: (doc: MemoryDoc) => void
-  readonly onDraftChange: (draft: string) => void
-  readonly onSave: () => void
-  readonly onCancel: () => void
-  readonly onDelete: (id: MemoryEntryId) => void
+  readonly onAddStart: (doc: MemoryDoc, file?: { readonly person: MemoryPersonId; readonly section: MemorySection }) => void
   /** The pins, under their own heading after the docs (`PinList`). */
   readonly pinned?: ReactNode
+  /** The person file open in place of the page. One that is gone shows the page. */
+  readonly person?: MemoryPersonId
+  readonly faces?: PersonFaces
+  readonly onOpenPerson: (id: MemoryPersonId) => void
+  readonly onClosePerson: () => void
+  readonly onRelationship: (id: MemoryPersonId, relationship: PersonRelationship | null) => void
+  /** Delete file is asking to confirm, for the open file. */
+  readonly confirmingDelete?: boolean
+  readonly onDeleteStart: () => void
+  readonly onDeleteCancel: () => void
+  readonly onDeleteFile: (id: MemoryPersonId) => void
 }
 
 /** Recent changes shown at most. */
@@ -30,57 +35,57 @@ const CHANGES = 12
 
 const copy = chatCopy.docs
 
-/** "Your words", "Slack", "Littlebird". */
-export const sourceLabel = (source: MemorySource): string => (source._tag === 'connection' ? source.name : copy.source[source._tag])
-
 /**
  * What Juno remembers (SPEC 13.8): Juno's notes about the owner, one
  * section per doc, each note with where it came from, then the pins, then
- * the recent changes. Every note can be edited or deleted; an edit makes it
- * the owner's words. Edit and Delete show on hover and focus; Add sits on
- * each doc's heading. Notes Juno wrote after reading Slack or a connection
- * say so in a tooltip on their source.
+ * the recent changes. People is a list of person files, then the general
+ * People notes as Other notes; a person's row opens their file in place of
+ * the page. Every note can be edited or deleted; an edit makes it the
+ * owner's words. Edit and Delete show on hover and focus; Add sits on each
+ * doc's heading. Notes Juno wrote after reading Slack or a connection say
+ * so in a tooltip on their source.
  */
-export function MemoryDocsPage({ page, now, editing, onEditStart, onAddStart, onDraftChange, onSave, onCancel, onDelete, pinned }: MemoryDocsPageProps) {
-  const field = { onDraftChange, onSave, onCancel }
+export function MemoryDocsPage({
+  page,
+  now,
+  editing,
+  onAddStart,
+  pinned,
+  person,
+  faces,
+  onOpenPerson,
+  onClosePerson,
+  onRelationship,
+  confirmingDelete,
+  onDeleteStart,
+  onDeleteCancel,
+  onDeleteFile,
+  ...actions
+}: MemoryDocsPageProps) {
+  const open = person === undefined ? undefined : page.people.find((file) => file.id === person)
+  if (open !== undefined) {
+    return (
+      <PersonFilePage
+        person={open}
+        now={now}
+        {...(editing === undefined ? {} : { editing })}
+        onAddStart={(section) => onAddStart('people', { person: open.id, section })}
+        onClose={onClosePerson}
+        onRelationship={(relationship) => onRelationship(open.id, relationship)}
+        {...(confirmingDelete === undefined ? {} : { confirmingDelete })}
+        onDeleteStart={onDeleteStart}
+        onDeleteCancel={onDeleteCancel}
+        onDeleteFile={() => onDeleteFile(open.id)}
+        {...actions}
+      />
+    )
+  }
   return (
     <Page>
       <PageHeader title={copy.title} subtitle={copy.subtitle} />
-      {page.docs.map((section) => {
-        const adding = editing?._tag === 'add' && editing.doc === section.doc ? editing : undefined
-        const title = copy.titles[section.doc]
-        return (
-          <Section
-            key={section.doc}
-            heading={title}
-            sub={copy.hints[section.doc]}
-            action={
-              <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(title)} data-memory-add={section.doc} onClick={() => onAddStart(section.doc)}>
-                {copy.add}
-              </Button>
-            }
-          >
-            <Surface kind="group" role="list" aria-label={title} data-memory-doc={section.doc}>
-              {section.entries.map((entry, index) =>
-                editing?._tag === 'edit' && editing.id === entry.id ? (
-                  <EditRow key={entry.id} label={copy.entryLabel} editing={editing} last={adding === undefined && index === section.entries.length - 1} {...field} />
-                ) : (
-                  <EntryRow key={entry.id} entry={entry} now={now} last={adding === undefined && index === section.entries.length - 1} onEditStart={onEditStart} onDelete={onDelete} />
-                ),
-              )}
-              {adding !== undefined ? (
-                <EditRow label={copy.addLabel(title)} editing={adding} {...field} last />
-              ) : section.entries.length === 0 ? (
-                <ListRow role="listitem" divider={false} data-memory-empty="">
-                  <Text variant="body" tone="muted">
-                    {copy.docEmpty}
-                  </Text>
-                </ListRow>
-              ) : null}
-            </Surface>
-          </Section>
-        )
-      })}
+      {page.docs.map((section) => (
+        <DocSection key={section.doc} section={section} people={page.people} faces={faces} now={now} editing={editing} onAddStart={onAddStart} onOpenPerson={onOpenPerson} {...actions} />
+      ))}
       {pinned === undefined ? null : (
         <Section heading={copy.pinned} sub={copy.pinnedSub}>
           {pinned}
@@ -100,85 +105,60 @@ export function MemoryDocsPage({ page, now, editing, onEditStart, onAddStart, on
 }
 
 /**
- * Where a note came from. One written after reading outside content says so
- * in a tooltip on the source and to a screen reader, not in a line of its own.
+ * One doc: its notes under its heading with Add. People is the person rows,
+ * then the general notes as Other notes, which show only when there are
+ * some or one is being added.
  */
-function Source({ source, outside }: { readonly source: MemorySource; readonly outside: boolean }) {
-  return outside ? (
-    <span data-memory-outside="" aria-description={copy.outside} {...tooltip(copy.outside)}>
-      {sourceLabel(source)}
-    </span>
-  ) : (
-    sourceLabel(source)
+function DocSection({
+  section,
+  people,
+  faces,
+  now,
+  editing,
+  onAddStart,
+  onOpenPerson,
+  ...actions
+}: { readonly section: MemoryDocSection; readonly people: ReadonlyArray<MemoryPerson>; readonly faces: PersonFaces | undefined } & Pick<MemoryDocsPageProps, 'now' | 'editing' | 'onAddStart' | 'onOpenPerson'> & NoteActions) {
+  const adding = editing?._tag === 'add' && editing.doc === section.doc && editing.person === undefined ? editing : undefined
+  const title = copy.titles[section.doc]
+  const add = (
+    <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(title)} data-memory-add={section.doc} onClick={() => onAddStart(section.doc)}>
+      {copy.add}
+    </Button>
   )
-}
-
-function EntryRow({ entry, now, last, onEditStart, onDelete }: { readonly entry: MemoryEntryRow; readonly now: number; readonly last: boolean } & Pick<MemoryDocsPageProps, 'onEditStart' | 'onDelete'>) {
+  const notes = (label: string) => (
+    <Surface kind="group" role="list" aria-label={label} data-memory-doc={section.doc}>
+      <NoteList entries={section.entries} now={now} editing={editing} adding={adding} addLabel={copy.addLabel(title)} {...actions} />
+    </Surface>
+  )
+  if (section.doc !== 'people') {
+    return (
+      <Section heading={title} sub={copy.hints[section.doc]} action={add}>
+        {notes(title)}
+      </Section>
+    )
+  }
   return (
-    <ListRow
-      role="listitem"
-      revealTrailing
-      divider={!last}
-      data-memory-entry={entry.id}
-      data-memory-source={entry.source._tag}
-      trailing={
-        <span {...stylex.props(cell.controls)}>
-          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${copy.edit} ${entry.text}`} onClick={() => onEditStart(entry.id)}>
-            {copy.edit}
-          </Button>
-          <Button variant="ghost" size="xs" tone="subtle" aria-label={`${copy.delete} ${entry.text}`} onClick={() => onDelete(entry.id)}>
-            {copy.delete}
-          </Button>
-        </span>
-      }
-    >
-      <span {...stylex.props(cell.lines)}>
-        <Text variant="body" selectable dir="auto" sx={cell.note}>
-          {entry.text}
-        </Text>
-        <Text variant="meta" tone="muted" truncate>
-          <Source source={entry.source} outside={entry.outside} />
-          {' · '}
-          <time title={fullTime(entry.at)}>{messageTime(entry.at, now)}</time>
-        </Text>
-      </span>
-    </ListRow>
+    <div {...stylex.props(styles.people)}>
+      <Section heading={title} sub={copy.hints.people} action={add}>
+        <PeopleList people={people} faces={faces} onOpenPerson={onOpenPerson} />
+      </Section>
+      {section.entries.length === 0 && adding === undefined ? null : <Section heading={copy.people.general}>{notes(copy.people.general)}</Section>}
+    </div>
   )
 }
 
-function EditRow({ label, editing, onDraftChange, onSave, onCancel, last = false }: { readonly label: string; readonly editing: DocEditing; readonly last?: boolean } & Pick<MemoryDocsPageProps, 'onDraftChange' | 'onSave' | 'onCancel'>) {
-  return (
-    <ListRow role="listitem" data-memory-entry-editing="" divider={!last}>
-      <span {...stylex.props(cell.field)}>
-        <NoteField label={label} draft={editing.draft} onDraftChange={onDraftChange} onSave={onSave} onCancel={onCancel} />
-        {editing.error === undefined ? null : (
-          <Text variant="meta" tone="muted" data-memory-error="">
-            {editing.error}
-          </Text>
-        )}
-        <span {...stylex.props(cell.controls)}>
-          <Button variant="secondary" size="sm" onClick={onSave} dimmed={editing.draft.trim().length === 0}>
-            {copy.save}
-          </Button>
-          <Button variant="ghost" size="sm" tone="subtle" onClick={onCancel}>
-            {copy.cancel}
-          </Button>
-        </span>
-      </span>
-    </ListRow>
-  )
-}
-
+/** One recent change. A change in a person's file names them ("Added to Maya Chen"), and its text blurs in privacy mode. */
 function ChangeRow({ change, now, last }: { readonly change: MemoryChange; readonly now: number; readonly last: boolean }) {
-  const doc = copy.titles[change.doc]
+  const where = change.person ?? copy.titles[change.doc]
   return (
     <ListRow role="listitem" divider={!last} data-memory-change={change.kind} data-memory-undone={change.undone || undefined}>
       <span {...stylex.props(cell.lines)}>
         <Text variant="body" truncate>
-          {copy.change[change.kind](doc)}
+          {copy.change[change.kind](where)}
         </Text>
         {change.text === undefined ? null : (
-          <Text variant="preview" tone="muted" dir="auto" truncate>
+          <Text variant="preview" tone="muted" dir="auto" truncate data-sensitive={change.person === undefined ? undefined : ''}>
             {change.text}
           </Text>
         )}
@@ -193,3 +173,11 @@ function ChangeRow({ change, now, last }: { readonly change: MemoryChange; reado
   )
 }
 
+const styles = stylex.create({
+  // People and its Other notes read as one doc: a section's gap apart, not a page's.
+  people: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-6'],
+  },
+})

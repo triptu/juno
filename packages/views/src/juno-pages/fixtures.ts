@@ -1,6 +1,8 @@
 /** Invented page data for the gallery. Times are relative to `NOW`. */
-import type { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryDocsPage, MemoryEntryId, MemoryPage, RemembersPage, ScheduledPage } from '@juno/agent-contract'
+import type { ActivityPage, ConnectionsPage, JunoSettingsPage, MemoryDocsPage, MemoryEntryId, MemoryPage, MemoryPerson, MemoryPersonId, RemembersPage, ScheduledPage } from '@juno/agent-contract'
+import type { Person } from '@juno/contract'
 import { NOW } from '../juno-chat/fixtures/data'
+import { people as slackPeople } from '../fixtures/topics'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -51,9 +53,8 @@ export const docs: MemoryDocsPage = {
       { id: eid('e2'), text: 'Works from Lisbon, usually 9:30 to 18:00.', source: own, outside: false, at: NOW - 6 * DAY },
     ] },
     { doc: 'people', entries: [
-      { id: eid('e3'), text: 'Maya Chen: owns the migration plan; reviews each other\'s backfill PRs.', source: slack, outside: true, at: NOW - 2 * DAY },
-      { id: eid('e4'), text: 'Priya Raman: manager. Weekly 1:1 on Thursdays.', source: littlebird, outside: true, at: NOW - 2 * DAY },
-      { id: eid('e5'), text: 'Leo: fixes most sidebar test flakes.', source: slack, outside: true, at: NOW - 9 * DAY },
+      { id: eid('e3'), text: 'The platform team reviews PRs on Tuesday and Thursday mornings.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e4'), text: 'Design reviews are on Wednesdays with the whole product team.', source: littlebird, outside: true, at: NOW - 2 * DAY },
     ] },
     { doc: 'projects', entries: [
       { id: eid('e6'), text: 'Postgres 16 migration: dual-write window, then a backfill in 200-row batches, then the cutover behind a flag.', source: slack, outside: true, at: NOW - 2 * DAY },
@@ -64,7 +65,10 @@ export const docs: MemoryDocsPage = {
       { id: eid('e8'), text: 'Uses "sgtm" and "will do"; one emoji at most, usually 🙏.', source: slack, outside: true, at: NOW - 2 * DAY },
     ] },
   ],
+  people: [],
   changes: [
+    { id: 'w7', doc: 'people', person: 'Maya Chen', kind: 'add', by: 'juno', text: 'Short and direct, mostly lowercase. Replies within the hour.', source: slack, outside: true, at: NOW - 3 * HOUR },
+    { id: 'w6', doc: 'people', person: 'Priya Raman', kind: 'update', by: 'owner', text: 'Your manager. Weekly 1:1 on Thursdays at 11.', source: own, outside: false, at: NOW - DAY },
     { id: 'w5', doc: 'you', kind: 'update', by: 'owner', text: 'Works from Lisbon, usually 9:30 to 18:00.', source: own, outside: false, at: NOW - 6 * DAY + HOUR },
     { id: 'w4', doc: 'people', kind: 'add', by: 'juno', text: 'Priya Raman: manager. Weekly 1:1 on Thursdays.', source: littlebird, outside: true, at: NOW - 2 * DAY },
     { id: 'w3', doc: 'style', kind: 'add', by: 'juno', text: 'Short messages, mostly lowercase, no sign-off. Opens with "hey" in DMs and with the point in channels.', source: slack, outside: true, at: NOW - 2 * DAY },
@@ -73,7 +77,49 @@ export const docs: MemoryDocsPage = {
   ],
 }
 
-export const docsEmpty: MemoryDocsPage = { docs: docs.docs.map((section) => ({ doc: section.doc, entries: [] })), changes: [] }
+const person = (id: string) => id as MemoryPersonId
+
+/** Juno's files on the people the invented owner works with, most in touch first. */
+export const people: ReadonlyArray<MemoryPerson> = [
+  {
+    id: person('U0MAYA'), name: 'Maya Chen', relationship: 'peer', relationshipBy: 'juno', revision: 2,
+    work: 'Owns the Postgres 16 migration plan and the cutover runbook.',
+    entries: [
+      { id: eid('e10'), section: 'role', text: 'Head of product. You plan the roadmap together and split the offsite agenda.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e11'), section: 'work', text: 'Owns the Postgres 16 migration plan and the cutover runbook.', source: slack, outside: true, at: NOW - 2 * DAY },
+      { id: eid('e12'), section: 'work', text: 'Writing the Q4 plan for Thursday\'s review.', source: slack, outside: true, at: NOW - 3 * HOUR },
+      { id: eid('e13'), section: 'talk', text: 'Short and direct, mostly lowercase. Replies within the hour.', source: slack, outside: true, at: NOW - 3 * HOUR },
+      { id: eid('e14'), section: 'talk', text: 'Prefers one line with the decision first, then the why.', source: own, outside: false, at: NOW - 5 * DAY },
+      { id: eid('e15'), section: 'notes', text: 'In San Francisco. Your mornings overlap with her evenings.', source: slack, outside: true, at: NOW - 9 * DAY },
+    ],
+  },
+  {
+    id: person('U0PRIYA'), name: 'Priya Raman', relationship: 'manager', relationshipBy: 'owner', revision: 4,
+    work: 'Design lead for the sidebar redesign and the early access flow.',
+    entries: [
+      { id: eid('e16'), section: 'role', text: 'Your manager. Weekly 1:1 on Thursdays at 11.', source: own, outside: false, at: NOW - DAY },
+      { id: eid('e17'), section: 'work', text: 'Design lead for the sidebar redesign and the early access flow.', source: littlebird, outside: true, at: NOW - 4 * DAY },
+      { id: eid('e18'), section: 'talk', text: 'Full sentences, a greeting first. Likes a short agenda before the 1:1.', source: slack, outside: true, at: NOW - 4 * DAY },
+    ],
+  },
+  {
+    id: person('U0LEO'), name: 'Leo Park', relationship: 'crossTeam', relationshipBy: 'juno', revision: 1,
+    work: 'Fixes most of the sidebar test flakes and owns the preview environments.',
+    entries: [
+      { id: eid('e19'), section: 'work', text: 'Fixes most of the sidebar test flakes and owns the preview environments.', source: slack, outside: true, at: NOW - 9 * DAY },
+    ],
+  },
+  // A file Juno just started: no relationship yet, nothing about their work.
+  { id: person('U0SAM'), name: 'Sam Okafor', revision: 1, entries: [{ id: eid('e20'), section: 'notes', text: 'Berlin time. Out on Fridays in October.', source: slack, outside: true, at: NOW - 20 * MINUTE }] },
+]
+
+/** Their Slack profiles, for the avatars: three with photos, Priya with initials. */
+export const faces: Readonly<Record<string, Person>> = { U0MAYA: slackPeople.maya, U0PRIYA: slackPeople.priya, U0LEO: slackPeople.leo, U0SAM: slackPeople.sam }
+
+/** The page with person files and the general People notes after them. */
+export const docsWithPeople: MemoryDocsPage = { ...docs, people }
+
+export const docsEmpty: MemoryDocsPage = { docs: docs.docs.map((section) => ({ doc: section.doc, entries: [] })), people: [], changes: [] }
 
 export const memory: MemoryPage = {
   lines: [

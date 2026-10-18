@@ -82,6 +82,8 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
       ...(visible === undefined ? {} : { visible }),
       ...(newFrom === undefined ? {} : { newFrom }),
       ...(sent === undefined ? {} : { selection: sent }),
+      // A DM's other person, so the run gets Juno's file on them (SPEC 13.8).
+      ...(detail.channel.kind === 'im' && detail.channel.partner !== undefined ? { person: detail.channel.partner.id } : {}),
     }
   }
 

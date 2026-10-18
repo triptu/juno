@@ -70,4 +70,41 @@ const docs1 = [
   ) STRICT`,
 ]
 
-export const MEMORY_DOCS_MIGRATIONS: MigrationSet = { name: 'memory_docs', steps: [docs1] }
+const docs2 = [
+  // Person files (SPEC 13.8): an entry of the People doc may belong to one person's file, keyed by
+  // their Slack user id, in one of four sections. An entry with no person is a general People note.
+  'ALTER TABLE memory_entries ADD COLUMN person TEXT',
+  "ALTER TABLE memory_entries ADD COLUMN section TEXT CHECK (section IS NULL OR section IN ('role', 'work', 'talk', 'notes'))",
+  'CREATE INDEX memory_entries_by_person ON memory_entries (person) WHERE person IS NOT NULL',
+  'ALTER TABLE memory_writes ADD COLUMN person TEXT',
+  // One row per person file. `relationship` is Juno's guess or the owner's choice (`relationship_by`).
+  // `reason` is why the file exists: the owner and they exchange messages, the owner asked, or a note
+  // of the older People doc named them. `owner_count`, `them_count` and `last_at` are what they
+  // exchanged in DMs and threads in the last 60 days, counted at most daily (`counted_at`), so the
+  // outline's order holds between counts. `learned_at` is Juno's last background update of the file.
+  // A file the owner deleted keeps its row as `deleted`, with no name, so Juno does not start it again
+  // on its own.
+  `CREATE TABLE memory_people (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    relationship TEXT CHECK (relationship IS NULL OR relationship IN ('manager', 'report', 'peer', 'skip', 'crossTeam', 'external', 'customer')),
+    relationship_by TEXT CHECK (relationship_by IS NULL OR relationship_by IN ('juno', 'owner')),
+    reason TEXT NOT NULL CHECK (reason IN ('interaction', 'asked', 'split')),
+    owner_count INTEGER NOT NULL DEFAULT 0,
+    them_count INTEGER NOT NULL DEFAULT 0,
+    last_at INTEGER,
+    counted_at INTEGER,
+    learned_at INTEGER,
+    state TEXT NOT NULL CHECK (state IN ('active', 'deleted')),
+    version INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  ) STRICT`,
+  // `people_rev` moves with a change to a person file's entries, which the outline does not show, so
+  // an ordinary update leaves the outline (and the cached prefix) alone. `people_split`: the older
+  // People doc's notes were split into files once.
+  'ALTER TABLE memory_docs_state ADD COLUMN people_rev INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE memory_docs_state ADD COLUMN people_split INTEGER NOT NULL DEFAULT 0',
+]
+
+export const MEMORY_DOCS_MIGRATIONS: MigrationSet = { name: 'memory_docs', steps: [docs1, docs2] }

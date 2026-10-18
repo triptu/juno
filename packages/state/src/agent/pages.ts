@@ -25,6 +25,9 @@ import type {
   MemoryDocsPage,
   MemoryEntryId,
   MemoryPage,
+  MemoryPersonId,
+  MemorySection,
+  PersonRelationship,
   PinId,
   ProactiveAsk,
   RemembersPage,
@@ -60,8 +63,21 @@ export async function junoSettingsNow(registry: Registry): Promise<JunoSettingsP
   return Exit.isSuccess(exit) && exit.value._tag === 'Some' ? exit.value.value : undefined
 }
 export const remembersPageAtom = page<{ readonly page: RemembersPage; readonly revisions: ReadonlyArray<{ readonly id: PinId; readonly revision: Revision }> }>('agent.remembers.page')
-/** Juno's memory of the owner: the docs, the recent changes, and each entry's revision for an edit. */
+/** Juno's memory of the owner: the docs, the person files, the recent changes, and each entry's revision for an edit. */
 export const docsPageAtom = page<{ readonly page: MemoryDocsPage; readonly revisions: ReadonlyArray<{ readonly id: MemoryEntryId; readonly revision: Revision }> }>('agent.docs.page')
+
+/**
+ * The person file open on What Juno remembers (SPEC 13.8), or none for the
+ * whole page. "What Juno knows about {name}" sets it before the page opens.
+ */
+export const memoryPersonAtom = Atom.make<MemoryPersonId | undefined>(undefined).pipe(Atom.keepAlive)
+
+/** Whether Juno keeps a file on `person` now, from the memory page. Undefined when the agent does not answer within a second. */
+export async function hasPersonFile(registry: Registry, person: string): Promise<boolean | undefined> {
+  const unmount = registry.mount(docsPageAtom)
+  const exit = await Effect.runPromiseExit(AtomRegistry.getResult(registry, docsPageAtom).pipe(Effect.timeoutOption('1 second'))).finally(unmount)
+  return Exit.isSuccess(exit) && exit.value._tag === 'Some' ? exit.value.value.page.people.some((file) => file.id === person) : undefined
+}
 /** What Juno remembers draws its notes and its pins together: Initial until both have answered. */
 export const rememberedAtom = Atom.make((get) => {
   const docs = get(docsPageAtom)
@@ -204,9 +220,15 @@ export function junoPageActions(registry: Registry) {
     editPin: (id: PinId, revision: Revision, text: string) => outcome(call(registry, 'agent.remembers.edit', { opId: op(), id, revision, text })),
     removePin: (id: PinId, revision: Revision) => outcome(call(registry, 'agent.remembers.remove', { opId: op(), id, revision })),
     /** The owner's own note, edit or delete on the memory page. A refusal answers with its line. */
-    addDoc: (doc: MemoryDoc, text: string) => answer(call(registry, 'agent.docs.add', { opId: op(), doc, text })),
+    addDoc: (doc: MemoryDoc, text: string, file?: { readonly person: MemoryPersonId; readonly section: MemorySection }) =>
+      answer(call(registry, 'agent.docs.add', { opId: op(), doc, text, ...(file === undefined ? {} : { person: file.person, section: file.section }) })),
     editDoc: (id: MemoryEntryId, revision: Revision, text: string) => answer(call(registry, 'agent.docs.edit', { opId: op(), id, revision, text })),
     deleteDoc: (id: MemoryEntryId, revision: Revision) => answer(call(registry, 'agent.docs.delete', { opId: op(), id, revision })),
+    /** The owner corrects who a person is to them, or clears it. */
+    relationship: (person: MemoryPersonId, revision: Revision, relationship: PersonRelationship | null) =>
+      answer(call(registry, 'agent.docs.relationship', { opId: op(), person, revision, relationship })),
+    /** Delete file: every note in a person's file. */
+    deletePerson: (person: MemoryPersonId) => answer(call(registry, 'agent.docs.deletePerson', { opId: op(), person })),
     /** Start or Not now on a proactive ask, from Home. */
     answerAsk: (id: string, choice: 'start' | 'dismiss') => outcome(call(registry, 'agent.asks.answer', { opId: op(), id, answer: choice })),
     schedule: (id: ScheduleId, revision: Revision, action: 'pause' | 'resume' | 'delete') => outcome(call(registry, 'agent.scheduled.action', { opId: op(), id, revision, action })),

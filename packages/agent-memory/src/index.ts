@@ -25,3 +25,27 @@ export { partition, upper, requiredWindow, buildRequest } from './request.ts';
 export type { ActiveEntry } from './request.ts';
 export { DOCS, DOC_TITLES, DOC_HINTS, docLimits, isDoc, looksSecret, checkEntry, renderDocs, searchDocs, outline } from './docs.ts';
 export type { Doc, DocEntry, EntryRefusal } from './docs.ts';
+export {
+  SECTIONS,
+  SECTION_TITLES,
+  SECTION_HINTS,
+  RELATIONSHIPS,
+  peopleLimits,
+  isSection,
+  isRelationship,
+  exchanged,
+  qualifies,
+  mayKeepFile,
+  rankPeople,
+  dueForUpdate,
+  sensitiveKind,
+  checkPersonEntry,
+  renderPerson,
+  peopleContext,
+  peopleLine,
+  peopleIn,
+  relationshipFrom,
+  splitPeopleNotes,
+  workLine,
+} from './people.ts';
+export type { Section, Relationship, Interaction, PersonEntry, PersonRefusal, PersonFile, PersonSummary } from './people.ts';

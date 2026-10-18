@@ -222,6 +222,8 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       topics: (cursor, limit) => inStore(reads.topics(cursor, limit)),
       topic: (topicId) => inStore(reads.topic(topicId)),
       person: (userId) => inStore(reads.person(userId)),
+      people: (since, limit) => inStore(reads.people(since, limit)),
+      members: (names) => inStore(reads.members(names)),
       resolve: (dispatch) => resolve(dispatch).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       undoResolve: (id) => undoResolve(id).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config), Effect.provideService(MarkWorker, worker)),
       presence,

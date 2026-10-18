@@ -1129,6 +1129,8 @@ export type TopicMenuItem =
   | 'notify-matters'
   | 'notify-never'
   | 'ignore-channel'
+  // What Juno knows about a DM's other person (SPEC 13.8).
+  | 'juno-knows'
   // Add to view (inventory 15.8), by the view's id.
   | `view-add:${string}`
   | `view-remove:${string}`

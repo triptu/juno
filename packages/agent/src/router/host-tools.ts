@@ -24,6 +24,19 @@ export interface HostReads {
   readonly replies: (channelId: string, threadTs: string) => Promise<Page>
   readonly topics: () => Promise<{ readonly topics: ReadonlyArray<TopicLink> }>
   readonly person: (userId: string) => Promise<{ readonly id: string; readonly name: string; readonly displayName: string }>
+  /** Who the owner exchanged messages with in DMs and threads since `since` (ms), most first: counts only (SPEC 13.8). */
+  readonly people?: (since: number) => Promise<ReadonlyArray<HostInteraction>>
+  /** Workspace members for each name, for splitting the older People doc. */
+  readonly members?: (names: ReadonlyArray<string>) => Promise<ReadonlyArray<{ readonly name: string; readonly ids: ReadonlyArray<{ readonly id: string; readonly name: string }> }>>
+}
+
+export interface HostInteraction {
+  readonly id: string
+  readonly name: string
+  readonly owner: number
+  readonly them: number
+  readonly lastAt: number
+  readonly dm?: string
 }
 
 /** Gives each message of a read its handle in the live run. */

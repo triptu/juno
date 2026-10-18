@@ -357,9 +357,30 @@ export const chatCopy = {
       tooLong: 'Keep a note to a line or two.',
       secret: 'That looks like a key or a password. Juno never keeps those.',
       full: 'Juno keeps as many notes as it can. Delete one to add another.',
+      fileFull: 'This file is full. Delete a note to add another.',
       stale: 'This changed. Check it and save again.',
     },
     learnAgain: 'Learn again',
+    /** Person files (SPEC 13.8): People on the memory page, and a person's file. */
+    people: {
+      count: (n: number) => (n === 1 ? '1 person' : `${n} people`),
+      empty: 'Juno keeps a file on each person you message with. Nothing yet.',
+      general: 'Other notes',
+      sections: { role: 'Who they are to you', work: 'What they work on', talk: 'How you talk with them', notes: 'Notes' },
+      relationships: { manager: 'Manager', report: 'Direct report', peer: 'Peer', skip: 'Skip-level', crossTeam: 'Cross-team', external: 'External', customer: 'Customer' },
+      relationshipLabel: 'Who they are to you',
+      relationshipUnset: 'Set relationship',
+      relationshipNone: 'Not set',
+      /** The chip's tooltip: who set it. */
+      setByYou: 'Set by you',
+      guessed: 'Juno guessed this. Choose another to correct it.',
+      back: 'People',
+      open: (name: string) => `Open ${name}'s file`,
+      deleteFile: 'Delete file',
+      deleteTitle: (name: string) => `Delete what Juno knows about ${name}?`,
+      deleteBody: 'Every note in this file goes. Juno won\'t start a file on them again unless you ask.',
+      noFile: (name: string) => `Juno has no file on ${name} yet. It starts one once you message with them, or when you ask.`,
+    },
   },
   /** Juno's proactive asks (SPEC 13.6), in the chat and as a Home card. */
   ask: {

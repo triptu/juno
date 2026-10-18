@@ -79,6 +79,11 @@ describe('topic row menu', () => {
     })
   })
 
+  it('offers What Juno knows about the other person of a one-to-one DM, last', () => {
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: maya, knowsAbout: 'Maya Chen' })).slice(-2)).toEqual(['—', 'What Juno knows about Maya'])
+    expect(labels(topicMenuItems({ ...base, kind: 'main', channel: maya }))).not.toContain('What Juno knows about Maya')
+  })
+
   it('carries the hints and ids the shell needs', () => {
     const items = topicMenuItems(base)
     expect(items[0]).toEqual({ type: 'item', id: 'open-new-tab', label: 'Open in new tab', hint: '⌘ click' })
@@ -147,8 +152,8 @@ describe('Juno in the menus', () => {
     expect(labels(channelMenuItems({ channel: eng, hasMain: true, askJuno: false }))).not.toContain('Ask Juno')
   })
 
-  it('the person menu ends with Ask Juno while the Juno Agent is on', () => {
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno'])
+  it('the person menu ends with Ask Juno and What Juno knows about them while the Juno Agent is on', () => {
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno', 'What Juno knows about Maya'])
     expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
   })
 })
