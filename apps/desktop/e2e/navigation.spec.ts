@@ -1,6 +1,9 @@
 // Browser-like navigation (spec sections 4 and 6): each tab's Back and
 // Forward, the reopen stack, pinned tabs and the tab menu, the tab keys,
 // the unread dot, and the sidebar's resize and hide.
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
@@ -10,6 +13,19 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
+
+/** The tabs saved in user.db (`TABS_PREF`): each tab's topic, or its page, and whether it is pinned. */
+function savedTabs(userData: string, teamId: string): Array<{ readonly place: string; readonly pinned: boolean }> | undefined {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
+  try {
+    const row = db.prepare(`SELECT value_json FROM prefs WHERE key = 'tabs'`).get() as { value_json: string } | undefined
+    if (row === undefined) return undefined
+    const saved = JSON.parse(row.value_json) as { tabs: Array<{ pinned: boolean; place: { kind: string; topicId?: string } }> }
+    return saved.tabs.map((tab) => ({ place: tab.place.topicId ?? tab.place.kind, pinned: tab.pinned }))
+  } finally {
+    db.close()
+  }
+}
 
 test('Back and Forward move through the topics one tab showed', async ({ juno }) => {
   await juno.signIn()
@@ -101,7 +117,7 @@ test('⌘⇧T reopens closed tabs, the last closed first, each with its history'
   await tabs.expectCount(3)
 })
 
-test('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -139,8 +155,9 @@ test('the tab menu pins, unpins and closes, and pins survive a restart', async (
   const opened = await juno.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   expect(opened).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C[A-Z0-9]+$/)])
 
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(500)
+  // The pin and the closes have reached the engine.
+  const threadId = (text: string) => `t:${slack.root(text).channel}:${slack.root(text).ts}`
+  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual([{ place: threadId(ROADMAP), pinned: true }, { place: threadId(POSTGRES), pinned: false }])
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
@@ -216,8 +233,16 @@ test('the sidebar resizes by its edge, resets on double-click, and hides', { tag
   await frame.drag(-250)
   await frame.expectHidden()
 
-  // Width and hidden state come back after a restart.
-  await juno.win.waitForTimeout(500)
+  // Width and hidden state come back after a restart, once main has written them.
+  await expect
+    .poll(async () => {
+      try {
+        return (JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as { sidebar?: unknown }).sidebar
+      } catch {
+        return undefined
+      }
+    })
+    .toEqual({ width: 344, collapsed: true })
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
