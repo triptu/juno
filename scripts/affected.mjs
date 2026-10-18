@@ -126,7 +126,7 @@ const pending = (items) =>
 
 // Unit tests.
 const unitItems = [...files]
-  .filter((file) => /^packages\/[^/]+\/test\/.*\.test\.ts$/.test(file))
+  .filter((file) => /^(packages|apps)\/[^/]+\/test\/.*\.test\.ts$/.test(file))
   .map((file) => {
     const dir = file.split('/').slice(0, 2).join('/')
     const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
