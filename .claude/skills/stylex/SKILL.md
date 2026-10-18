@@ -115,6 +115,10 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   other variables there and undoes the active dark or accent theme. Set the one variable in a
   `stylex.create` style instead (`'--foreground-muted': colors['--foreground-subtle']`, as
   `ListRow selected` does), or use a token that already has the right value.
+- **`stylex.when` keys go inline in `stylex.create`.** `[stylex.when.ancestor(':hover')]: …` written
+  inside the style object is compiled away; the same call stored in a module constant is left in the
+  bundle, runs at load and throws, and the renderer shows a blank window (10-18). The ancestor
+  carries `stylex.defaultMarker()` in its `stylex.props`.
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own

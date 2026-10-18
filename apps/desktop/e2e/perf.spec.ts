@@ -16,6 +16,7 @@ import { privateMemory, stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
 import { selectionDragReading } from './perfSelection'
+import { HEAVY_MEMORY_BUDGETS, heavyUse, memoryDump, readMemory } from './perfMemory'
 import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
@@ -571,7 +572,7 @@ test.describe('large workspace', () => {
   let slackDir: string
   let slackApp: SlackAppFixture
 
-  const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  const launch = (agent = false): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent })
 
   test.beforeAll(async () => {
     test.setTimeout(900_000)
@@ -710,6 +711,27 @@ test.describe('large workspace', () => {
       }
       const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
       console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('memory after heavy use: 20 topics, 50 tab switches, two minutes of mixed scrolling and the Juno panel', async () => {
+    test.setTimeout(900_000)
+    const running = await launch(true)
+    try {
+      const juno = new Juno(running.app, running.win)
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      await expect.poll(() => hooks(running.app, 'agentState'), { timeout: 30_000 }).toBe('ready')
+      await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+      await readMemory(running, 'memory after launch')
+      if (process.env['JUNO_MEMORY_DUMP'] !== undefined) await memoryDump(running.win, `${process.env['JUNO_MEMORY_DUMP']}-launch-live.json`, false)
+      const after = await heavyUse(juno, running)
+      for (const [name, budget] of Object.entries(HEAVY_MEMORY_BUDGETS)) {
+        const value = after[name as keyof typeof HEAVY_MEMORY_BUDGETS]
+        if (value !== undefined) expect.soft(value, `${name} private memory after heavy use: ${value.toFixed(0)} MB against a budget of ${budget} MB`).toBeLessThanOrEqual(budget)
+      }
     } finally {
       await running.close()
     }

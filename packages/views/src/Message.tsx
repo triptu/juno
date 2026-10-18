@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { memo, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
@@ -165,6 +165,11 @@ export function placeToolbar(row: HTMLElement): void {
   else row.style.setProperty('--row-toolbar-top', top)
 }
 
+/** The pointer is over a row: it places its toolbar, except during a drag selection, which shows none (`MessageList`). */
+function pointedAt(event: PointerEvent<HTMLDivElement>): void {
+  if (event.currentTarget.closest('[data-selecting]') === null) placeToolbar(event.currentTarget)
+}
+
 const dim = stylex.keyframes({
   from: { opacity: 1 },
   to: { opacity: opacity['--opacity-dim'] },
@@ -254,8 +259,8 @@ export const Message = memo(function Message({
       onFocus={focus}
       onKeyDownCapture={actions === undefined ? undefined : holdToolbarForMove}
       onBlur={actions === undefined ? undefined : (event) => event.currentTarget.contains(event.relatedTarget) || event.currentTarget.style.removeProperty('--row-toolbar-display')}
-      onPointerEnter={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
-      onPointerMove={actions === undefined ? undefined : (event) => placeToolbar(event.currentTarget)}
+      onPointerEnter={actions === undefined ? undefined : pointedAt}
+      onPointerMove={actions === undefined ? undefined : pointedAt}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
@@ -459,9 +464,11 @@ const styles = stylex.create({
       ':focus-visible': z['--z-toolbar'],
       ':has(:focus-visible)': z['--z-toolbar'],
     },
+    // A drag selection sets --row-hover-toolbar to none on the list (MessageList), so the toolbar keeps out of
+    // the way while the owner selects, as native hover controls do; keyboard focus still shows it.
     '--row-toolbar-display': {
       default: 'none',
-      ':hover': { default: null, [HOVER]: 'block' },
+      ':hover': { default: null, [HOVER]: 'var(--row-hover-toolbar, block)' },
       ':focus-visible': 'block',
       ':has(:focus-visible)': 'block',
     },

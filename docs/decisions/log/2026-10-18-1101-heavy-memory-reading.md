@@ -1,0 +1,1 @@
+- 10-18 11:01 · heavy-memory-reading · The memory budgets of performance.md 1 are read by `memory after heavy use` in `perf.spec.ts` after 30 s idle, once Chromium has collected what rendering left: right after scrolling the renderer counts several hundred MB of garbage. The renderer's 250 MB gate stays and fails at 265 to 294 MB until the owner decides (performance.md 8.11).

@@ -1,0 +1,1 @@
+- 10-18 11:00 · toolbar-out-of-selection · Owner: while a mouse button is held and a text selection is being dragged in a topic, no message shows or places its hover toolbar, as native apps keep hover controls out of a selection; on release the message under the pointer shows it again. A press that does not move, and keyboard focus, keep their toolbar (SPEC 7, inventory 6.5).
