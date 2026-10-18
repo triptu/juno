@@ -27,6 +27,9 @@ test('a send from Home leaves the field where it was', async ({ juno, fake, feel
   await juno.waitForSync()
   await juno.write.pickConversation('eng', 'eng')
   await juno.write.write('first')
+  // The send button brightens over 150 ms once the field has text. Record from where it settled,
+  // so its first frames are not that fade meeting the dimming the send starts.
+  await juno.win.locator('[data-home] [data-composer-field]').evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)))
   fake.holdNext({ method: 'chat.postMessage', before: true })
   await feel.run({
     name: 'home-write-send',
