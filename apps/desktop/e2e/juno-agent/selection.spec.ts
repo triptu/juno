@@ -20,8 +20,8 @@ async function ready(juno: Juno): Promise<void> {
   })
 }
 
-/** Drags the mouse across `words` in a message, as the owner highlights them. */
-async function highlight(juno: Juno, row: Locator, words: string): Promise<void> {
+/** Drags the mouse across `words` in a message, as the owner highlights them, resting `hold` ms after the press first. */
+async function highlight(juno: Juno, row: Locator, words: string, hold = 0): Promise<void> {
   const at = await row.evaluate((el, words) => {
     const walker = document.createTreeWalker(el.querySelector('[data-msg-text]')!, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
@@ -40,6 +40,7 @@ async function highlight(juno: Juno, row: Locator, words: string): Promise<void>
   }, words)
   await juno.win.mouse.move(at.from, at.y)
   await juno.win.mouse.down()
+  if (hold > 0) await juno.win.waitForTimeout(hold)
   await juno.win.mouse.move(at.to, at.y, { steps: 6 })
   await juno.win.mouse.up()
   await expect.poll(() => juno.win.evaluate(() => document.getSelection()?.toString())).toBe(words)
@@ -116,4 +117,17 @@ test('⌘J with text selected across messages asks about it without closing the 
   await panel.send('and now?')
   await panel.expectJuno('You said: and now?')
   expect(model.inputs().at(-1)).not.toContain('<selection')
+})
+
+test('a drag over a message highlights it while the panel\'s field has focus, and the chip takes it', async ({ juno }) => {
+  await ready(juno)
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  await juno.tabs.menu('juno')
+  const panel = JunoChatPane.panel(juno.win)
+  await expect(panel.composer).toBeFocused()
+  // The press takes focus from the field; resting a few frames before moving, as a person does, must not lose the drag's start.
+  // The message's first words, at the start of the line: the hover toolbar sits at its end.
+  await highlight(juno, juno.topic.message(POSTGRES), 'Draft plan is in the doc', 100)
+  await expect(panel.root.locator('[data-panel-selection]')).toHaveText('Leo: “Draft plan is in the doc”')
 })

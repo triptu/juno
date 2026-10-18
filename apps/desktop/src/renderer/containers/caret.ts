@@ -11,23 +11,47 @@
  * Script cannot see that caret (`getSelection().type` is `None`), and a caret
  * outside an editable is not drawn, so clearing it changes nothing on screen.
  * A text field keeps its own selection and gets it back when it is focused
- * again. Text the user selected (a `Range`) is never cleared.
+ * again. Text the user selected (a `Range`) is never cleared, and while the
+ * mouse button is down nothing is: a press on text that takes focus from a
+ * field starts a drag selection from the caret it places, and clearing that
+ * caret in the next frame left the drag selecting nothing. It is checked
+ * again once the button is up.
  */
 export function clearCaretsLeftBehind(): () => void {
   let frame: number | undefined
+  // A press that moves focus out of a field may be starting a drag selection, whose caret is its anchor; it is checked on release.
+  let pressed = false
+  let waiting = false
+  const clear = () => {
+    frame = undefined
+    if (pressed) return void (waiting = true)
+    if (isTextField(document.activeElement)) return
+    const selection = document.getSelection()
+    if (selection === null || selection.type === 'Range') return
+    selection.removeAllRanges()
+  }
   const onFocusOut = (event: FocusEvent) => {
     if (!isTextField(event.target) || frame !== undefined) return
-    frame = requestAnimationFrame(() => {
-      frame = undefined
-      if (isTextField(document.activeElement)) return
-      const selection = document.getSelection()
-      if (selection === null || selection.type === 'Range') return
-      selection.removeAllRanges()
-    })
+    frame = requestAnimationFrame(clear)
+  }
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button === 0) pressed = true
+  }
+  const onPointerUp = () => {
+    pressed = false
+    if (!waiting) return
+    waiting = false
+    frame ??= requestAnimationFrame(clear)
   }
   document.addEventListener('focusout', onFocusOut)
+  document.addEventListener('pointerdown', onPointerDown, true)
+  document.addEventListener('pointerup', onPointerUp, true)
+  document.addEventListener('pointercancel', onPointerUp, true)
   return () => {
     document.removeEventListener('focusout', onFocusOut)
+    document.removeEventListener('pointerdown', onPointerDown, true)
+    document.removeEventListener('pointerup', onPointerUp, true)
+    document.removeEventListener('pointercancel', onPointerUp, true)
     if (frame !== undefined) cancelAnimationFrame(frame)
   }
 }
