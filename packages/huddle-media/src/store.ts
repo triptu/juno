@@ -81,6 +81,6 @@ export class SnapshotStore {
     if (shared === this.#snapshot) return
     this.#snapshot = shared
     this.#lastPublish = Date.now()
-    for (const listener of [...this.#listeners]) listener()
+    for (const listener of this.#listeners) listener()
   }
 }

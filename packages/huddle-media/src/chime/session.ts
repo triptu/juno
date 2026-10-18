@@ -30,6 +30,7 @@ import { VoiceFocus, voiceFocusSupported } from './voiceFocus.ts'
 const RECONNECT_TIMEOUT_MS = 30_000
 /** `leave()` waits this long for Chime to say it stopped. */
 const LEAVE_TIMEOUT_MS = 5_000
+const noop = () => {}
 
 interface Call {
   readonly attendeeId: string
@@ -181,16 +182,16 @@ class ChimeMediaSession implements MediaSession {
     if (call !== undefined) await this.#enqueue(() => this.#applySpeaker(call))
   }
 
-  #newCall(configuration: MeetingSessionConfiguration, voiceFocusSupported: boolean): Call {
+  #newCall(configuration: MeetingSessionConfiguration, withVoiceFocus: boolean): Call {
     // Voice Focus runs in Web Audio; without it, the plain path has less latency.
-    const devices = new DefaultDeviceController(this.#logger, { enableWebAudio: voiceFocusSupported })
+    const devices = new DefaultDeviceController(this.#logger, { enableWebAudio: withVoiceFocus })
     const av = new DefaultMeetingSession(configuration, this.#logger, devices).audioVideo
-    let resolveStopped = () => {}
+    let resolveStopped: () => void = noop
     const stopped = new Promise<void>((resolve) => (resolveStopped = resolve))
     return {
       attendeeId: configuration.credentials?.attendeeId ?? '',
       av,
-      voiceFocusSupported,
+      voiceFocusSupported: withVoiceFocus,
       voiceFocus: undefined,
       started: false,
       leaving: false,

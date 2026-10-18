@@ -8,7 +8,7 @@ WebRTC needs a Chromium page, and the stream has to be in the same page as the e
 
 ## Entries
 
-- `@juno/huddle-media`: the types, `MediaSession` and `MediaSnapshot` (`src/types.ts`).
+- `@juno/huddle-media`: the types (`src/types.ts`). It exports only what something imports today (`MediaSnapshot`, for the spike), since knip fails on an unused export; the integration adds `MediaSession` and the rest as its containers use them.
 - `@juno/huddle-media/chime`: `createChimeMediaSession()`, on `amazon-chime-sdk-js` 3.32.0 (the version Slack ships). The SDK is about 2.2 MB minified (550 KB gzip), so load this entry only with `import()` on join; it must never reach the initial bundle. Only `src/chime/` and the tests may import the SDK.
 - `@juno/huddle-media/fake`: `createFakeMediaSession(options)` for e2e tests and the gallery. No network and no WebRTC. Production code never imports it.
 
