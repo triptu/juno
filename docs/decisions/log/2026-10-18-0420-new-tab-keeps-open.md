@@ -1,0 +1,1 @@
+- 10-18 04:20 · ci-fix-36 · A new tab (⌘T, "+", ⌘N's new Home tab) does not cancel a topic open still waiting in the current tab: the topic opens there and the new tab opens after it. Why: a click on a topic followed at once by ⌘T lost the click, as a topic opened in a new tab already never did.

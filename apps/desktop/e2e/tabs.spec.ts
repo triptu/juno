@@ -1,8 +1,8 @@
 // Tabs: opening uses the current tab, ⌘-click opens a new one, a plain open
 // of an open topic focuses its tab, one topic in two tabs scrolls apart,
 // closing focuses the neighbour and never leaves no tab, a new tab opens
-// Home, where "+" sits, the app menu's tab items, the row menu's Open in
-// new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
+// Home and does not cancel an open still waiting, where "+" sits, the app
+// menu's tab items, the row menu's Open in new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
 // each tab shows its topic's art or the DM person's photo, and a tab not
 // viewed for a day closes by itself.
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
@@ -367,4 +367,19 @@ test('"+" sits one tab gap after the last tab, level with the tabs, and stays at
   expect(plus.x - (strip.x + strip.width)).toBeLessThanOrEqual(5.5)
   expect(plus.x + plus.width).toBeLessThanOrEqual(await juno.win.evaluate(() => window.innerWidth))
   await expect(tabs.newTabButton).toBeInViewport()
+})
+
+test('a new tab asked for while a topic is still opening leaves that open in the old tab', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs } = juno
+
+  // "+" is clicked in the same task as the press on the row, before the topic can paint.
+  const plus = await tabs.newTabButton.elementHandle()
+  await plus!.evaluate((button: HTMLElement) => {
+    addEventListener('pointerdown', () => queueMicrotask(() => button.click()), { once: true })
+  })
+  await sidebar.row(POSTGRES).open()
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'Home'])
+  await tabs.expectActive('Home')
 })

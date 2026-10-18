@@ -6,6 +6,8 @@ import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
+// A failing test attaches the send's path through the app and the fake's post calls (README, "Send trace").
+test.use({ sendTrace: true })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'

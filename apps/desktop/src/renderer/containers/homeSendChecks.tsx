@@ -26,10 +26,14 @@ export function useHomeSendChecks(text: string, target: SendTarget | undefined, 
     setBar(undefined)
   }
   useEffect(preloadBar, [])
+  // Editing or another destination drops a check still running: Enter checks the new text. Hiding the
+  // tab does not: Activity runs this again when the tab shows, and a send asked for before a tab switch still goes.
+  const checkedFor = useRef(key)
   useLayoutEffect(() => {
+    if (checkedFor.current === key) return
+    checkedFor.current = key
     checking.current = undefined
-    return () => { checking.current = undefined }
-  }, [text, channelId, threadTs, enabled])
+  }, [key])
   useEffect(() => {
     if (!enabled || channelId === undefined || text.trim() === '') return
     const timer = setTimeout(() => {
