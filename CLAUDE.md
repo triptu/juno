@@ -40,6 +40,7 @@ Read the parts relevant to your task, and the package's README, before changing 
 - Sync protocols (follow state, read state, and later merge and the outbox) are specified in Quint in `specs/`. A change to how sync behaves updates the spec in the same change and passes `pnpm specs:check`. Refactors and performance changes that preserve the protocol do not need a spec edit.
 - A new import of an unstable Effect module needs an entry in the `unstable` list in `scripts/check-deps.mjs` and a note in the effect skill.
 - Commit in small logical commits with plain messages. Only stage the paths you changed. Never add co-author trailers or mention AI tools in commits.
+- Images and videos under `docs/` are in Git LFS. If `git status` shows images under `docs/` as modified after a merge or rebase, or `check-lfs` fails in lint, run `git add --renormalize docs` and commit (`docs/development.md`, "Git LFS").
 - Never put real Slack tokens, cookies or message content into code, docs, logs, fixtures or commits.
 - Live Slack checks are read-only. Writes are allowed only in a private test channel created for that purpose or in the user's self-DM.
 
