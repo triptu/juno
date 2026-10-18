@@ -121,12 +121,6 @@ export const threadViewPageUnchanged = (
     ], { concurrency: 1 })
 
     const storedMessages = new Map(messageRows.map((row) => [keyOf(row.channel, row.ts), row]))
-    const replyCounts = new Map<string, number>()
-    for (const row of messageRows) {
-      if (row.thread_ts === null || row.deleted === 1) continue
-      const key = keyOf(row.channel, row.thread_ts)
-      replyCounts.set(key, (replyCounts.get(key) ?? 0) + 1)
-    }
     const reactions = new Map<string, Array<ReactionRow>>()
     for (const row of reactionRows) {
       const rows = reactions.get(keyOf(row.channel, row.ts)) ?? []
@@ -159,7 +153,7 @@ export const threadViewPageUnchanged = (
 
         const storedRoot = storedMessages.get(rootKey)
         if (storedRoot === undefined) return false
-        const replyCount = replyCounts.get(rootKey) ?? 0
+        const replyCount = messageRows.filter((row) => row.channel === channel && row.ts !== root.ts && row.thread_ts === root.ts && row.deleted === 0).length
         for (const reply of incoming.slice(1)) {
           if (mergeRootCounters(storedRoot, { reply_count: replyCount, latest_reply: reply.ts }, { kind: 'page', requestedAt }).changed) return false
         }
