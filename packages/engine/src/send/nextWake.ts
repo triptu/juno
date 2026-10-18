@@ -5,20 +5,21 @@ interface Row {
 }
 
 /**
- * Only a channel's head can run. Later rows cannot advance its wake, even
+ * Only a target's head can run. Later rows cannot advance its wake, even
  * when overdue. Dependency and stall timers are separate wakes. A second
  * immediate wake for the same head yields for 50 ms and reports
  * it once, so a missed settlement cannot silently spin the event loop.
  */
-export function wakeSchedule() {
+export function wakeSchedule<A extends Row = Row>(target: (row: A) => ReadonlyArray<string> = (row) => [row.channel]) {
   let immediate: string | undefined
   let warned = false
-  return (rows: ReadonlyArray<Row>, now: number, blocked: ReadonlySet<string | number> = new Set(), timers: ReadonlyArray<number> = []) => {
+  return (rows: ReadonlyArray<A>, now: number, blocked: ReadonlySet<string | number> = new Set(), timers: ReadonlyArray<number> = []) => {
     const seen = new Set<string>()
     const heads = rows.filter((row) => {
-      if (seen.has(row.channel)) return false
-      seen.add(row.channel)
-      return !blocked.has(row.id)
+      const keys = target(row)
+      const held = keys.some((key) => seen.has(key))
+      keys.forEach((key) => seen.add(key))
+      return !held && !blocked.has(row.id)
     })
     const due = [...heads.map((row) => row.nextAt), ...timers]
     const delay = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - now)

@@ -183,7 +183,7 @@ export const insertAction = (kind: ActionKind, channel: string, dependsOn: strin
 export const writePayload = (action: PendingAction, payload: ActionPayload, now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify(payload)}, attempts = 0, next_at = ${String(now)}, last_error = NULL WHERE id = ${action.id}`
+    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify(payload)}, attempts = 0, created_at = ${String(now)}, next_at = ${String(now)}, last_error = NULL WHERE id = ${action.id}`
     yield* touch(payload.topics)
   })
 
@@ -349,13 +349,18 @@ export const actionDone = (sent: PendingAction, now: number): Effect.Effect<bool
   })
 
 /** Ends a row without a call: a refusal, a reaction back to `base`, or a message that is gone. The view shows the stored message again. */
-export const dropAction = (action: PendingAction): Effect.Effect<void, SqlError, StoreWriter | Invalidation> => deleteActions([action])
+export const dropAction = (action: PendingAction): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`DELETE FROM outbox WHERE id = ${action.id} AND created_at = ${String(action.createdAt)} AND payload_json = ${JSON.stringify(action.payload)}`
+    yield* touch(action.payload.topics)
+  })
 
 /** A call that could not reach Slack: try again at `nextAt`, counting the attempt for the backoff. */
 export const deferAction = (action: PendingAction, nextAt: number, error: string): Effect.Effect<void, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET attempts = attempts + 1, next_at = ${String(nextAt)}, last_error = ${error} WHERE id = ${action.id} AND payload_json = ${JSON.stringify(action.payload)}`
+    yield* sql`UPDATE outbox SET attempts = attempts + 1, next_at = ${String(nextAt)}, last_error = ${error} WHERE id = ${action.id} AND created_at = ${String(action.createdAt)} AND payload_json = ${JSON.stringify(action.payload)}`
   })
 
 /** The catch-up's flush: every action row is due at `now`. */

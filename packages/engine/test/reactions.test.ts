@@ -142,7 +142,7 @@ describe('reactions: refused or waiting', () => {
     // Slack refuses a name it does not know: the chip goes, the message says so.
     const refused = await rows((list) => rowWith(list, 'Not yet an emoji')?.reactionIssue?.state === 'failed', 'refused')
     expect(chip(rowWith(refused, 'Not yet an emoji'), 'shipit')).toBeUndefined()
-    expect(rowWith(refused, 'Not yet an emoji')?.reactionIssue).toEqual({ name: 'shipit', on: true, state: 'failed' })
+    expect(rowWith(refused, 'Not yet an emoji')?.reactionIssue).toMatchObject({ name: 'shipit', on: true, state: 'failed' })
     expect(apiCalls(engine, 'reactions.add')).toHaveLength(1)
     // It is not sent again on its own.
     await sleep(1500)
@@ -208,4 +208,21 @@ describe('reactions from pages', () => {
     expect(stored()).toEqual([{ name: '+1', count: 2, me: 1 }])
     expect(row()).toEqual({ partial: 0, blocks: 1 })
   })
+})
+
+it('expires an offline reaction and gives Retry a fresh pending window', async () => {
+  const engine = await booted({ actionStallMillis: 100, actionDeadlineMillis: 1000 })
+  const rows = watch(engine, MAIN)
+  const message = await sent(engine, 'Waited offline', rows)
+  engine.fake.goOffline()
+  await sleep(200)
+  valueOf(await reactToMessage(engine.registry, refOf(message), 'eyes', true))
+  await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue?.state === 'waiting', 'pending offline')
+  await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue?.state === 'failed', 'deadline failed')
+  expect(apiCalls(engine, 'reactions.add')).toHaveLength(0)
+  engine.fake.goOnline()
+  await waitFor(() => engine.fake.socketCount() > 0 ? true : undefined, WAIT_MS, 'socket reconnected')
+  valueOf(await reactToMessage(engine.registry, refOf(message), 'eyes', true))
+  await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue === undefined, 'fresh retry window')
+  await waitFor(() => inSlack(engine, message.ts)?.reactions?.some((r) => r.name === 'eyes') ? true : undefined, WAIT_MS, 'retry sent')
 })

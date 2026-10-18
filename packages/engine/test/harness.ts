@@ -169,6 +169,7 @@ export interface EngineOptions {
   /** How many topics the recheck after a drop reads (the app reads 10). */
   readonly recheckTopics?: number
   /** How long a reaction waits unsent before the message says so (the app waits 30 s). */
+  readonly actionDeadlineMillis?: number
   readonly actionStallMillis?: number
   /** How long a new read mark waits before it is sent (the app waits 400 ms). */
   readonly markDelayMillis?: number
@@ -197,7 +198,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   let online = false
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }) }, {
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionDeadlineMillis === undefined ? {} : { actionDeadlineMillis: options.actionDeadlineMillis }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }) }, {
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,

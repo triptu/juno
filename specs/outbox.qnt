@@ -356,9 +356,12 @@ module outboxProtocol {
   }
   // The worker resolves the ts from the stored message when it runs. With
   // the guard off it calls with a guessed ts before the post is stored.
-  // IDs order action rows within a channel. Failed rows are settled and do not hold it.
+  // Each k is one message and has at most one action row. Its replacements
+  // wait for the in-flight intent. Reactions on other messages are independent;
+  // edits and deletes retain channel order, including duplicate cleanup.
   def actionHead(k: int): bool = drafts.forall(j =>
-    (j < k and s.actChannel.get(j) == s.actChannel.get(k)) implies not(actPending(j)))
+    (j < k and s.actChannel.get(j) == s.actChannel.get(k) and
+      s.actKind.get(j) != "react" and s.actKind.get(k) != "react") implies not(actPending(j)))
   action runActionWith(k: int, guard: bool): bool = all {
     actionHead(k),
     s.online, s.connected, s.act.get(k) == "waiting", not(guard) or s.stored.contains(k),
@@ -404,6 +407,12 @@ module outboxProtocol {
     not(s.sealed), s.act.get(k) == "transit",
     s' = { ...s, act: s.act.set(k, if (s.actKind.get(k) == "react") "failed" else "dropped"), stale: s.stale.exclude(Set(k)),
       label: "actRefuse", target: k }
+  }
+  // The elapsed retry window can end a waiting reaction even offline.
+  // Time is abstracted as expiry; in-flight requests settle before this transition.
+  action expireReaction(k: int): bool = all {
+    s.actKind.get(k) == "react", s.act.get(k) == "waiting",
+    s' = { ...s, act: s.act.set(k, "failed"), label: "expireReaction", target: k }
   }
   // Dismiss on a refused reaction: the row ends without a call.
   action dismissAction(k: int): bool = all {
@@ -846,7 +855,7 @@ module outboxProtocol {
   action ownDeleteStep = ownDeleteWith(true)
   action ownDeleteBugStep = ownDeleteWith(false)
 
-  // Two rows in one channel: the failed head releases the later action.
+  // Two messages in one channel: a reaction passes a retrying edit.
   // The engine tests also seed legacy attempts of 3816 before a restart.
   action boundedActionStep = all { not(reachedAgreement), tick(
     if (s.sealed) progress else
@@ -861,10 +870,24 @@ module outboxProtocol {
     if (turn == 8) all { s' = { ...s, actChannel: s.actChannel.set(2, 1) } } else
     if (turn == 9) queueAction(1, "change") else
     if (turn == 10) queueAction(2, "react") else
-    if (turn >= 11 and turn <= 20) (if (turn % 2 == 1) runAction(1) else actFail(1)) else
-    if (turn == 21) all { s.act.get(1) == "failed", runAction(2) } else
-    if (turn == 22) actAccept(2) else
-    if (turn == 23) actAnswer(2) else seal
+    if (turn == 11) runAction(1) else
+    if (turn == 12) actFail(1) else
+    if (turn == 13) all { s.act.get(1) == "waiting", runAction(2) } else
+    if (turn == 14) actAccept(2) else
+    if (turn == 15) actAnswer(2) else
+    if (turn >= 16 and turn <= 23) (if (turn % 2 == 0) runAction(1) else actFail(1)) else
+    all { s.act.get(1) == "failed", seal }
+  ) }
+  action expiredReactionStep = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) accept(1, false) else
+    if (turn == 3) answer(1) else
+    if (turn == 4) goOffline else
+    if (turn == 5) queueAction(1, "react") else
+    if (turn == 6) expireReaction(1) else
+    if (turn == 7) all { s.act.get(1) == "failed", dismissAction(1) } else seal
   ) }
   action defectActionStep = all { not(reachedAgreement), tick(
     if (s.sealed) progress else

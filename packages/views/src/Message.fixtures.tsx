@@ -58,8 +58,8 @@ const { pending: _pending, ...ownStored } = pendingRow.message
 const ownText = 'Postgres 16 is on staging. I will move prod on Thursday.'
 const ownMessage: MessageListItem = { ...pendingRow, message: { ...ownStored, editText: ownText } }
 // A reaction Slack refused (the chip shows what Slack has) and one that has not gone out for a while.
-const reactionRefused: MessageListItem = { ...first, message: { ...first.message, reactionIssue: { name: 'shipit', on: true, state: 'failed' } } }
-const reactionWaiting: MessageListItem = { ...first, message: { ...first.message, reactionIssue: { name: '+1', on: true, state: 'waiting' } } }
+const reactionRefused: MessageListItem = { ...first, message: { ...first.message, reactionIssue: { id: 1, key: 'refused', name: 'shipit', on: true, state: 'failed' } } }
+const reactionWaiting: MessageListItem = { ...first, message: { ...first.message, reactionIssue: { id: 2, key: 'waiting', name: '+1', on: true, state: 'waiting' } } }
 
 export default defineFixtures(
   Message,
@@ -88,7 +88,7 @@ export default defineFixtures(
     },
     // The user's reaction Slack did not take: refused, with Retry and Dismiss, or not sent for a while.
     Reaction: {
-      refused: one(reactionRefused, { startsGroup: true, onSetReaction: noop }),
+      refused: one(reactionRefused, { startsGroup: true, actions: { ...noopActions, onResolveAction: noop } }),
       waiting: one(reactionWaiting, { startsGroup: true }),
     },
     Interaction: {

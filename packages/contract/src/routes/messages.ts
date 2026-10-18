@@ -64,11 +64,14 @@ export type ReactionView = typeof ReactionView.Type
 /**
  * The user's own reaction change that Slack has not taken (architecture
  * 5.7). `failed`: Slack refused it; the chip shows what Slack has, and the
- * message offers Retry and Dismiss. `waiting`: it has not gone out for a
+ * message offers Retry and Remove. `waiting`: it has not gone out for a
  * while (no connection, or its message is still being sent); the chip
  * shows the change.
  */
 export const ReactionIssue = Schema.Struct({
+  id: Schema.Number,
+  /** Stable for one attempt, shared by every view of the message. */
+  key: Schema.String,
   name: Schema.String,
   /** The change asked for: add (`true`) or remove. */
   on: Schema.Boolean,

@@ -100,7 +100,7 @@ export function pendingStatement(target: WindowTarget): Statement {
 
 /** Juno's own edits, deletes and reactions in a channel that Slack has not confirmed (architecture 5.7), through `outbox_target`. */
 export function actionsStatement(channel: string): Statement {
-  return { sql: `SELECT id, kind, payload_json FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, params: [channel] }
+  return { sql: `SELECT id, kind, payload_json, created_at FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, params: [channel] }
 }
 
 /** Network copies of Juno's posts that stay hidden though not deleted (file copies, ADR 0014), by primary key. */

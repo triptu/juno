@@ -53,7 +53,10 @@ export const queueReaction = (input: ReactInput): Effect.Effect<ActionRefusal | 
       return undefined
     }
     if (pending !== undefined) {
-      if (pending.payload.want !== input.on) yield* writePayload(pending, { ...pending.payload, want: input.on }, input.now)
+      if (pending.payload.want !== input.on) {
+        const { stalled: _stalled, ...payload } = pending.payload
+        yield* writePayload(pending, { ...payload, want: input.on }, input.now)
+      }
       return undefined
     }
     if (base === input.on) return undefined
@@ -66,6 +69,6 @@ export const queueReaction = (input: ReactInput): Effect.Effect<ActionRefusal | 
 export const markStalled = (action: PendingAction): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify({ ...action.payload, stalled: true })} WHERE id = ${action.id}`
+    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify({ ...action.payload, stalled: true })} WHERE id = ${action.id} AND created_at = ${String(action.createdAt)} AND payload_json = ${JSON.stringify(action.payload)}`
     yield* touch(action.payload.topics)
   })

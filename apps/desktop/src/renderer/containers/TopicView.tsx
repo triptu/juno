@@ -26,6 +26,7 @@ import {
   useSendMeasure,
   useStickToBottom,
 } from './topic/position'
+import { useReactionFailureToast } from './topic/reactionFailure'
 import { eagerRows, firstRows, itemsOf, openIndex } from './topic/scroll'
 
 /** Message times change at most at a day boundary; re-render the rows for it this often, not every minute. */
@@ -143,7 +144,6 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
     suggestions: messageActions.suggestions,
     onRowKey: messageActions.onRowKey,
     onToggleReaction: messageActions.onToggleReaction,
-    onSetReaction: messageActions.onSetReaction,
     onPersonMenu: personMenu,
     onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {
       const known = list.refs.channels.get(chip.id)
@@ -154,6 +154,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
 
 function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
+  useReactionFailureToast(list)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
   const focused = useWindowFocused()
   // The hooks run their effects in this order; keep it.

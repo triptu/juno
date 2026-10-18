@@ -83,8 +83,6 @@ export interface MessageProps {
   /** Which links open inside Juno, and where they go (`MessageBody`). Stable for the list's life. */
   readonly linkInfo?: LinkInfo
   readonly onToggleReaction?: (ts: string, name: string) => void
-  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
-  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** The row took keyboard focus: the list moves its tabbable row here. */
   readonly onFocus?: (ts: string) => void
   /** Retry on a failed send, with its `clientMsgId`. */
@@ -214,7 +212,6 @@ export const Message = memo(function Message({
   onLink,
   linkInfo,
   onToggleReaction,
-  onSetReaction,
   onFocus,
   onRetry,
   onDiscard,
@@ -335,7 +332,7 @@ export const Message = memo(function Message({
             <TextButton tone="default" onClick={() => actions?.onResolveAction?.(message.actionIssue!.id, false)}>Dismiss</TextButton>
           </Text>
         ) : null}
-        {message.reactionIssue !== undefined ? <ReactionIssueLine ts={message.ts} issue={message.reactionIssue} onSet={onSetReaction} /> : null}
+        {message.reactionIssue !== undefined ? <ReactionIssueLine issue={message.reactionIssue} onResolve={actions?.onResolveAction} /> : null}
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {suggestion !== undefined && editor === undefined ? (
           <Text variant="meta" tone="muted" as="p" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestion}>
@@ -380,9 +377,9 @@ export const Message = memo(function Message({
 
 /**
  * The user's reaction change Slack has not taken. Refused: what Slack has
- * is shown, with Retry and Dismiss. Waiting long: one quiet line.
+ * is shown, with Retry and Remove. Waiting long: one quiet line.
  */
-function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly issue: ReactionIssue; readonly onSet: ((ts: string, name: string, on: boolean) => void) | undefined }) {
+function ReactionIssueLine({ issue, onResolve }: { readonly issue: ReactionIssue; readonly onResolve: MessageActions['onResolveAction'] }) {
   if (issue.state === 'waiting') {
     return (
       <Text variant="meta" tone="muted" as="p" data-reaction-issue="waiting" sx={styles.failed}>
@@ -396,14 +393,14 @@ function ReactionIssueLine({ ts, issue, onSet }: { readonly ts: string; readonly
         <Icon icon={WarningCircle} size={14} weight="bold" />
       </span>
       <Text variant="meta" tone="danger" as="span">
-        {issue.on ? 'Reaction not added.' : 'Reaction not removed.'}
+        Reaction not sent
       </Text>{' '}
-      <TextButton tone="default" onClick={() => onSet?.(ts, issue.name, issue.on)}>
+      <TextButton tone="default" onClick={() => onResolve?.(issue.id, true)}>
         Retry
       </TextButton>
       {' · '}
-      <TextButton tone="muted" onClick={() => onSet?.(ts, issue.name, !issue.on)}>
-        Dismiss
+      <TextButton tone="muted" onClick={() => onResolve?.(issue.id, false)}>
+        Remove
       </TextButton>
     </Text>
   )

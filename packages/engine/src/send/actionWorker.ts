@@ -3,9 +3,9 @@
  * specs/outbox.qnt). The rows are written by the commands
  * (`actions.ts`, `@juno/sync` `actions.ts`).
  *
- * Rows are taken oldest first, and a channel's later rows wait while an
- * earlier one is not settled, so changes reach Slack in the order they
- * were made. For each row:
+ * Edits and deletes keep channel order. Reactions wait only for earlier
+ * changes to their own message, so an unrelated edit's backoff cannot
+ * hold them. For each row:
  *
  * - The message's ts is found first. A row whose post may still reach
  *   Slack waits for it (`depends_on`); one whose post was refused applies
@@ -23,14 +23,14 @@
  *   again meanwhile, when it is sent again. A refused edit or delete ends
  *   the row, so the message shows what Slack has. A refused reaction stays
  *   as `failed`: the chip shows what Slack has and the message offers Retry
- *   and Dismiss. No answer, Slack's own trouble (`internal_error` and
+ *   and Remove. No answer, Slack's own trouble (`internal_error` and
  *   friends), a rate limit or no session: tried again with bounded backoff,
  *   also after a restart.
  * - A reaction that has not gone out after `STALL_MILLIS` (its post is
- *   still being sent, an earlier change in the channel holds it, or it
+ *   still being sent, an earlier change to the message holds it, or it
  *   keeps failing to reach Slack) is marked, and the message says it is not
  *   sent yet. A defect fails its row immediately; transient errors stop after five
- *   attempts. Failed rows retain their intent for Retry or Dismiss and
+ *   attempts. Failed rows retain their intent for Retry or Remove and
  *   release later rows in the channel.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
@@ -92,7 +92,9 @@ const COPY_CATCH_UP_MILLIS = 2 * 60_000
 /** How often a row waiting for its post looks again, besides the wakes from the send commands. */
 const DEPENDENCY_POLL_MILLIS = 250
 /** How long a reaction may wait without going out before the view says it is not sent yet. */
-const STALL_MILLIS = 30_000
+const STALL_MILLIS = 3_000
+/** A reaction never remains pending indefinitely, including while offline. */
+const REACTION_DEADLINE_MILLIS = 5 * 60_000
 /** Refusals Slack gives for its own trouble: tried again later, like no answer. */
 const TRANSIENT = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable', 'ratelimited'])
 
@@ -118,7 +120,9 @@ export class ActionWorker extends Context.Service<
   static readonly layer: Layer.Layer<ActionWorker, never, Workspace | Outbox | SyncLink | EngineConfig> = Layer.effect(
     ActionWorker,
     Effect.gen(function* () {
-      const stallMillis = (yield* EngineConfig).actionStallMillis ?? STALL_MILLIS
+      const config = yield* EngineConfig
+      const stallMillis = config.actionStallMillis ?? STALL_MILLIS
+      const deadlineMillis = config.actionDeadlineMillis ?? REACTION_DEADLINE_MILLIS
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -242,7 +246,7 @@ export class ActionWorker extends Context.Service<
           }
         })
 
-      const nextWake = wakeSchedule()
+      const nextWake = wakeSchedule<PendingAction>(actionTarget)
       /** Settles every due row. Returns how long until the next one is due, or `undefined` when none waits. */
       const observePass = watchWorkerPasses('action')
       const pass = (open: OpenWorkspace) =>
@@ -254,10 +258,28 @@ export class ActionWorker extends Context.Service<
               yield* local(transaction(failAction(action, action.lastError ?? 'retry_limit')))
             }
           }
-          const fetcher = yield* link.fetcher
-          // No sync, no session, or offline: rows wait for the connection.
-          if (fetcher === undefined || !(yield* link.online)) return undefined
           const now = yield* Clock.currentTimeMillis
+          const timers: number[] = []
+          for (const action of yield* local(pendingActions)) {
+            if (action.kind !== 'react') continue
+            // No request is in flight between passes, so a canceled intent can end offline too.
+            if (action.payload.want === action.payload.base) {
+              yield* local(transaction(dropAction(action)))
+              continue
+            }
+            const deadline = action.createdAt + deadlineMillis
+            if (now >= deadline) {
+              yield* local(transaction(failAction(action, 'pending_timeout')))
+              continue
+            }
+            timers.push(deadline)
+            if (action.payload.stalled === true) continue
+            if (now >= action.createdAt + stallMillis) yield* local(transaction(markStalled(action)))
+            else timers.push(action.createdAt + stallMillis)
+          }
+          const fetcher = yield* link.fetcher
+          // Pending-state timers still run offline; network attempts wait for the socket.
+          if (fetcher === undefined || !(yield* link.online)) return nextWake([], now, new Set(), timers).delay
           yield* observePass(now)
           const held = new Set<string>()
           const waiting = new Set<number>()
@@ -266,11 +288,16 @@ export class ActionWorker extends Context.Service<
           const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + COPY_CATCH_UP_MILLIS
           let copyWait: number | undefined
           for (const listed of yield* local(pendingActions)) {
-            if (held.has(listed.channel)) continue
+            const keys = actionTarget(listed)
+            const blocked = keys.some((key) => held.has(key))
+            if (blocked) {
+              keys.forEach((key) => held.add(key))
+              continue
+            }
             // An earlier call in this pass may have taken a while: the row may have changed or ended since.
             const action = yield* local(readAction(listed.id))
             if (action === undefined || isFailed(action)) continue
-            held.add(action.channel)
+            keys.forEach((key) => held.add(key))
             if (action.nextAt > now) continue
             if (!caughtUp && now < catchUpDeadline && isCopyDelete(action)) {
               copyWait = catchUpDeadline
@@ -290,23 +317,15 @@ export class ActionWorker extends Context.Service<
             // A row that ended lets the channel's next row go in this pass, before rows of later channels.
             else {
               const remaining = yield* local(readAction(action.id))
-              if (remaining === undefined || isFailed(remaining)) held.delete(action.channel)
+              if (remaining === undefined || isFailed(remaining)) keys.forEach((key) => held.delete(key))
             }
-          }
-          // A reaction still pending after `STALL_MILLIS` is marked once, so the view says it is not sent yet.
-          const checkedAt = yield* Clock.currentTimeMillis
-          const stalls: Array<number> = []
-          for (const action of yield* local(pendingActions)) {
-            if (action.kind !== 'react' || action.payload.stalled === true) continue
-            if (checkedAt - action.createdAt >= stallMillis) yield* local(transaction(markStalled(action)))
-            else stalls.push(action.createdAt + stallMillis)
           }
           const rest = yield* local(pendingActions)
           const after = yield* Clock.currentTimeMillis
           const blocked = new Set<string | number>(waiting)
           if (copyWait !== undefined) for (const action of rest) if (isCopyDelete(action)) blocked.add(action.id)
-          const timers = [...stalls, ...(copyWait === undefined ? [] : [copyWait]), ...(waiting.size === 0 ? [] : [after + DEPENDENCY_POLL_MILLIS])]
-          const wake = nextWake(rest, after, blocked, timers)
+          const deadlines = [...timers, ...(copyWait === undefined ? [] : [copyWait]), ...(waiting.size === 0 ? [] : [after + DEPENDENCY_POLL_MILLIS])]
+          const wake = nextWake(rest, after, blocked, deadlines)
           if (wake.repeatedHead !== undefined) yield* Effect.logWarning('send: repeated immediate action wake', { id: wake.repeatedHead })
           return wake.delay
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: action pass failed', { cause }), PASS_RETRY_MILLIS)))
@@ -342,6 +361,12 @@ export class ActionWorker extends Context.Service<
       return ActionWorker.of({ wake })
     }),
   )
+}
+
+/** All changes to one message stay ordered; other messages can pass a backoff. */
+const actionTarget = (action: PendingAction): ReadonlyArray<string> => {
+  const message = JSON.stringify([action.channel, action.payload.clientMsgId ?? action.payload.ts])
+  return action.kind === 'react' ? [message] : [action.channel, message]
 }
 
 /** A copy's delete: it names the copy by ts alone, with no post to wait on (`@juno/sync` `sent.ts`). */

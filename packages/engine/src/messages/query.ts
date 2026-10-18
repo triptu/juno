@@ -522,6 +522,7 @@ function composerText(body: MessageBody): string {
 // Edits, deletes and reactions not yet in Slack
 
 interface ActionRow {
+  readonly created_at: string
   readonly id: number
   readonly kind: 'edit' | 'delete' | 'react'
   readonly payload_json: string
@@ -556,7 +557,7 @@ function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
     else if (row.kind === 'react' && payload.name !== undefined) {
       // A refused reaction shows what Slack has; one that has waited long shows the change and says it is not sent yet.
       if (payload.failed === undefined) intent.reactions.set(payload.name, payload.want === true)
-      if (payload.failed !== undefined || payload.stalled === true) intent.issue = { name: payload.name, on: payload.want === true, state: payload.failed === undefined ? 'waiting' : 'failed' }
+      if (payload.failed !== undefined || payload.stalled === true) intent.issue = { id: row.id, key: `${row.id}:${row.created_at}`, name: payload.name, on: payload.want === true, state: payload.failed === undefined ? 'waiting' : 'failed' }
     }
   }
   return { size: rows.length, byTs, byClientMsgId }
