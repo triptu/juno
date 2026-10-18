@@ -26,30 +26,33 @@ export interface EmptyStateProps {
 
 /** Centered illustration, title, reason and one next step. */
 export function EmptyState({ title, body, action, illustration, variant = 'list', padding = 'list', enter = true }: EmptyStateProps) {
-  let step = 0
-  const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
+  // Each shown part enters one stagger step after the one above it.
+  const titleStep = illustration ? 1 : 0
+  const bodyStep = titleStep + 1
+  const actionStep = bodyStep + (body ? 1 : 0)
+  const part = (step: number) => (enter ? [styles.rise, styles.delay(step)] : [])
   return (
     <div {...stylex.props(styles.root, padding === 'page' ? styles.page : styles.list)}>
       {illustration ? (
-        <div {...stylex.props(styles.illustration, ...part())}>
+        <div {...stylex.props(styles.illustration, ...part(0))}>
           <Illustration name={illustration} size={illustration === 'juno' ? 'figure' : variant === 'workspace' ? 'workspace' : 'list'} />
         </div>
       ) : null}
       {variant === 'workspace' ? (
-        <Text variant="emptyTitle" tone="subtle" sx={part()}>
+        <Text variant="emptyTitle" tone="subtle" sx={part(titleStep)}>
           {title}
         </Text>
       ) : (
-        <Text variant="body" weight="medium" tone="default" as="h2" sx={part()}>
+        <Text variant="body" weight="medium" tone="default" as="h2" sx={part(titleStep)}>
           {title}
         </Text>
       )}
       {body ? (
-        <Text variant="ui" tone="muted" as="p" sx={[styles.body, ...part()]}>
+        <Text variant="ui" tone="muted" as="p" sx={[styles.body, ...part(bodyStep)]}>
           {body}
         </Text>
       ) : null}
-      {action ? <div {...stylex.props(styles.action, ...part())}>{action}</div> : null}
+      {action ? <div {...stylex.props(styles.action, ...part(actionStep))}>{action}</div> : null}
     </div>
   )
 }

@@ -5,10 +5,13 @@
  *
  * - Modifier keys (⌘, shift, alt) are passed through so the owner can open
  *   in a new tab. Ctrl is not: on macOS ctrl-click is the context menu.
- * - The secondary button is ignored; `onContextMenu` handles it.
- * - Enter and Space activate from the keyboard.
+ * - The secondary button and non-primary pointers are ignored;
+ *   `onContextMenu` handles the secondary button.
+ * - Enter and Space activate from the keyboard, once per press: a held key's
+ *   auto-repeat does nothing.
  * - A press that starts inside a nested control (a Resolve button, a close
- *   button, a link) does nothing; the control handles itself.
+ *   button, a link, or anything marked `data-no-activate`) does nothing; the
+ *   control handles itself.
  * - Touch waits for the click, so a scroll gesture is not a navigation.
  * - Clicks with `detail === 0` (assistive technology) still activate.
  */
@@ -35,7 +38,7 @@ export interface ActivateHandlers<E extends HTMLElement> {
   readonly onClick: (event: MouseEvent<E>) => void
 }
 
-const NESTED = 'button, a[href], input, select, textarea, [role="button"], [role="option"], [role="tab"], [role="menuitem"]'
+const NESTED = 'button, a[href], input, select, textarea, [role="button"], [role="option"], [role="tab"], [role="menuitem"], [data-no-activate]'
 
 function insideNestedControl(target: EventTarget | null, current: HTMLElement): boolean {
   if (!(target instanceof Element)) return false
@@ -52,7 +55,7 @@ export function activateHandlers<E extends HTMLElement>(
   return {
     onPointerDown(event) {
       if (!onActivate || disabled) return
-      if (event.button !== 0 || event.ctrlKey) return
+      if (!event.isPrimary || event.button !== 0 || event.ctrlKey) return
       if (insideNestedControl(event.target, event.currentTarget)) return
       if (keepFocus) event.preventDefault()
       if (event.pointerType === 'touch') {
@@ -66,6 +69,7 @@ export function activateHandlers<E extends HTMLElement>(
       if (event.key !== 'Enter' && event.key !== ' ') return
       if (event.target !== event.currentTarget) return
       event.preventDefault()
+      if (event.repeat) return
       onActivate({ metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'keyboard' })
     },
     onClick(event) {

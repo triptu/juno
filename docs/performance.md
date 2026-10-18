@@ -214,7 +214,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 - The target must not be inside a nested control (`closest('button, a, input, [data-no-activate]')`), so the Resolve button, the tab close button and rename inputs are not swallowed.
 - Rows are not draggable, so there is nothing to cancel. Tabs are: as in Safari, a tab activates on mousedown and still drags once the pointer has moved 4px. The drag reads the tabs' places once, then writes only `transform` on the moved tabs once per animation frame, so no tab re-renders and nothing lays out while the pointer moves; the order commits once, on drop (inventory 4, "Reorder").
 - `onClick` still exists for assistive technology, which synthesises `click` with `detail === 0`. A real click (`detail !== 0`) is ignored because `pointerdown` already activated; a touch press waits for its click. This is `activateHandlers` in `packages/ui/src/internal/activate.ts`.
-- Keyboard activation is on `keydown` of Enter or Space (Space on `keyup` for `role="button"`, to match native buttons, but navigation rows use `keydown` for Enter).
+- Keyboard activation is on `keydown` of Enter or Space (Space on `keyup` for `role="button"`, to match native buttons, but navigation rows use `keydown` for Enter). A held key's auto-repeat (`event.repeat`) does not activate again.
 
 ### 4.2 Prefetch
 
@@ -270,7 +270,7 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 
 ### 5.4 Compiler and memo
 
-- The React Compiler (1.0, stable) is enabled through `@vitejs/plugin-react`'s Babel options ([react.dev/learn/react-compiler](https://react.dev/learn/react-compiler)) in both `apps/desktop/electron.vite.config.ts` and `apps/gallery/vite.config.ts`, and compiles the workspace packages' source too. It removes most hand-written `useMemo`/`useCallback`. Explicit `React.memo` stays on rows and messages so the rule is visible and survives a compiler bail-out. The build prints `react-compiler: skipped a function in …` for anything the compiler leaves as written; read those lines after touching a component. To confirm it ran, the built bundle contains `react.memo_cache_sentinel` once per compiled component.
+- The React Compiler (1.0, stable) is enabled through `@vitejs/plugin-react`'s Babel options ([react.dev/learn/react-compiler](https://react.dev/learn/react-compiler)) in both `apps/desktop/electron.vite.config.ts` and `apps/gallery/vite.config.ts`, and compiles the workspace packages' source too. It removes most hand-written `useMemo`/`useCallback`. Explicit `React.memo` stays on rows and messages so the rule is visible and survives a compiler bail-out. The build prints `react-compiler: skipped a function in …` for anything the compiler leaves as written; read those lines after touching a component. To confirm it ran, the built bundle contains `react.memo_cache_sentinel` once per compiled component. Still skipped (10-18): `TopicComposer` and `messageCommands` (deliberate `exhaustive-deps` disables), `chunks.ts` (a hook chosen at runtime), `emojiSuggestions` (dynamic `import()`), `AllTopics` (`useVirtualizer` is an incompatible library), and fixtures only (`new` in props, `??=`).
 - Any component whose render exceeds 1 ms in the React profiler for a single row is split or memoized.
 
 ### 5.5 StyleX and CSS

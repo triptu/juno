@@ -24,7 +24,7 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Primitives never know the theme: no media queries, no theme classes. `applyTheme(theme, accent)` in `src/theme.ts` is the one place that puts the `dark` and accent classes on `<html>`, sets `color-scheme` and suppresses transitions for two frames; apps reach it through `@juno/views`.
 - `TopicArt` is a topic's tile: the AI drawing when the topic has one (`recipe`), the Tide pebble seeded by the topic id until then. Both are inline SVG that `@juno/topic-art` rebuilds from a whitelist, inserted with `dangerouslySetInnerHTML` because it is our own markup and never model text; the recipe is parsed again here, so a stored text outside the vocabulary draws the pebble. Colours are the `art` tokens' CSS variables, so the string is theme-free. The box is 40, 20 or 16px from the first paint and the swap is a 240ms opacity cross-fade (`--duration-appear`, collapsed under reduced motion), so art arriving late moves nothing. There is no container.
 - Composer growth is `field-sizing: content` on the inline `Textarea`; nothing reads `scrollHeight` on a keystroke.
-- Scroll containers are `ScrollArea`. Its gutter is always the 10px from `global.css`, even before the content overflows (`scrollbar-gutter: stable`), so the first overflow never narrows the content; `scrollbar="hover"` keeps the track and thumb transparent until the pointer is over the area by changing one colour variable, so showing the thumb never moves content. The sidebar list uses it; other scroll areas adopt it by prop.
+- Scroll containers are `ScrollArea`. Its gutter is always the 10px from `global.css`, even before the content overflows (`scrollbar-gutter: stable`), so the first overflow never narrows the content; `scrollbar="hover"` keeps the track and thumb transparent until the pointer is over the area by changing one colour variable, registered as not inherited so only the area is restyled, not the rows inside, so showing the thumb never moves content. The sidebar list uses it; other scroll areas adopt it by prop.
 
 ## Deferred components
 
@@ -42,10 +42,10 @@ clamps to its pane when it mounts, including after a deferred load.
 
 Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) activate on `pointerdown`, not `click`, so the app answers the moment the button goes down. The shared handlers live in `src/internal/activate.ts`:
 
-- Primary button only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
+- Primary button of the primary pointer only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
 - ⌘, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab.
-- Enter and Space activate from the keyboard; a click with `detail === 0` (assistive technology) activates too. Real clicks are ignored because the press already fired.
-- A press that starts inside a nested control (a Resolve button, a close button, a link) is ignored; the control handles itself.
+- Enter and Space activate from the keyboard, once per press: holding the key does not repeat. A click with `detail === 0` (assistive technology) activates too. Real clicks are ignored because the press already fired.
+- A press that starts inside a nested control (a Resolve button, a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
 - Pressing and dragging away is harmless: the activation already happened on the press and nothing waits for the release.
 - Touch pointers wait for the click so a scroll gesture is not a navigation.
 

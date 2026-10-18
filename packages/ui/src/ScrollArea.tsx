@@ -84,8 +84,9 @@ const styles = stylex.create({
   },
   // global.css draws the thumb in --scrollbar-thumb, so the pseudo-element
   // follows the area's hover state. Only the colour changes; the gutter is
-  // always there. (global.css is unlayered and would win over a
-  // ::-webkit-scrollbar-thumb rule written here.)
+  // always there. The variable is registered as not inherited, so the hover
+  // restyles this element only, not the rows inside. (global.css is
+  // unlayered and would win over a ::-webkit-scrollbar-thumb rule here.)
   hoverScrollbar: {
     '--scrollbar-thumb': {
       default: 'transparent',
