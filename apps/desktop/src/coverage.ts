@@ -82,8 +82,9 @@ export function recordWindowCoverage(app: App): void {
     } catch {
       return
     }
-    void contents.debugger.sendCommand('Profiler.enable')
-    void contents.debugger.sendCommand('Profiler.startPreciseCoverage', { callCount: false, detailed: false })
+    // A window closed before these answer rejects them, and main exits on an unhandled rejection (processLog.ts).
+    void contents.debugger.sendCommand('Profiler.enable').catch(() => undefined)
+    void contents.debugger.sendCommand('Profiler.startPreciseCoverage', { callCount: false, detailed: false }).catch(() => undefined)
     const flush = async () => {
       if (contents.isDestroyed() || !contents.debugger.isAttached()) return
       const taken = (await contents.debugger.sendCommand('Profiler.takePreciseCoverage').catch(() => undefined)) as { result: Array<ScriptCoverage> } | undefined
