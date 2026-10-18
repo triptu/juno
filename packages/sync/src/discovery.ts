@@ -26,18 +26,23 @@
  * `after:<date>` without `is:thread`, which live also returns plain
  * messages (research section 10, "Search with an `xoxc` session").
  */
-import { millisToTs, type Ts } from '@juno/domain'
+import { compareTs, millisToTs, type Ts } from '@juno/domain'
 import { SlackApi, SlackEdge, type SlackApiError } from '@juno/slack'
 import { isReply, searchMatchChannelId, searchMatches, type CountEntry, type FlatSearchMatch, type Message } from '@juno/slack-schema'
-import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
+import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { SyncContext } from './context'
+import { mergeMessage, mergeRootCounters } from './merge'
 import { applyPage } from './pages'
 import { nameFirst } from './users'
 
 type Services = SlackApi | SlackEdge | StoreWriter | Invalidation
 
 const DAY = 24 * 60 * 60 * 1000
+// Slack search can index a message after a sweep has advanced Juno's local
+// cursor, and the two clocks can differ. Five minutes keeps that ordinary
+// delay and skew inside the next search while the page cap bounds the work.
+const DISCOVERY_OVERLAP_MILLIS = 5 * 60_000
 
 /** `after:` takes a date; the day before `since` keeps every message since that moment in the result. */
 const afterDate = (sinceMillis: number): string => new Date(sinceMillis - DAY).toISOString().slice(0, 10)
@@ -87,7 +92,56 @@ interface SearchPass {
   readonly nameFirst?: boolean
   /** After naming, what to store of each conversation's matches. */
   readonly select?: (channel: string, messages: ReadonlyArray<Message>) => Effect.Effect<ReadonlyArray<Message>, SqlError, StoreWriter>
+  /** Drop matches whose message and root counters already equal the store. */
+  readonly certifyStored?: boolean
 }
+
+/**
+ * Certifies search matches from two batched reads. The discovery overlap can
+ * contain many rows on a busy workspace; sending those through `applyPage`
+ * would repeat its per-message reads and topic indexing even when every row
+ * is already current.
+ */
+const changedSearchMatches = (
+  ctx: SyncContext,
+  byChannel: ReadonlyMap<string, ReadonlyArray<Message>>,
+  requestedAt: Ts,
+): Effect.Effect<Map<string, Array<Message>>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const entries = [...byChannel].flatMap(([channel, messages]) => messages.map((message) => ({ channel, message })))
+    if (entries.length === 0) return new Map()
+    const channels = [...new Set(entries.map(({ channel }) => channel))]
+    const roots = [...new Set(entries.flatMap(({ message }) => (isReply(message) && message.thread_ts !== undefined ? [message.thread_ts] : [])))]
+    const timestamps = [...new Set(entries.flatMap(({ message }) => [message.ts, ...(isReply(message) && message.thread_ts !== undefined ? [message.thread_ts] : [])]))]
+    const stored = yield* sql<MessageRow>`SELECT * FROM messages WHERE channel IN ${sql.in(channels)} AND ts IN ${sql.in(timestamps)}`
+    const counts = roots.length === 0
+      ? []
+      : yield* sql<{ channel: string; thread_ts: string; n: number }>`
+          SELECT channel, thread_ts, count(*) AS n FROM messages
+          WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)} AND ts <> thread_ts AND deleted = 0
+          GROUP BY channel, thread_ts`
+    const rows = new Map(stored.map((row) => [`${row.channel}:${row.ts}`, row]))
+    const replyCounts = new Map(counts.map((row) => [`${row.channel}:${row.thread_ts}`, row.n]))
+    const source = { kind: 'partial', requestedAt } as const
+    const changed = new Map<string, Array<Message>>()
+    for (const { channel, message } of entries) {
+      const key = `${channel}:${message.ts}`
+      let differs = ctx.lateReactions.has(key) || mergeMessage(rows.get(key), message, channel, source).changed
+      if (!differs && isReply(message) && message.thread_ts !== undefined) {
+        const rootKey = `${channel}:${message.thread_ts}`
+        const root = rows.get(rootKey)
+        differs = root === undefined ||
+          mergeRootCounters(root, { reply_count: replyCounts.get(rootKey) ?? 0, latest_reply: message.ts }, source).changed ||
+          root.latest_reply === null || compareTs(message.ts, root.latest_reply) > 0
+      }
+      if (!differs) continue
+      const messages = changed.get(channel) ?? []
+      messages.push(message)
+      changed.set(channel, messages)
+    }
+    return changed
+  })
 
 /**
  * Newest-first search pages from member conversations, each applied as a
@@ -126,8 +180,9 @@ const searchPages = (ctx: SyncContext, pass: SearchPass, options: DiscoverOption
         }
         list.push(message)
       }
-      if (pass.nameFirst === true) yield* nameFirst(ctx, [...byChannel.values()].flat(), 'background')
-      for (const [channel, matched] of byChannel) {
+      const selected = pass.certifyStored === true ? yield* changedSearchMatches(ctx, byChannel, requestedAt) : byChannel
+      if (pass.nameFirst === true) yield* nameFirst(ctx, [...selected.values()].flat(), 'background')
+      for (const [channel, matched] of selected) {
         const messages = pass.select === undefined ? matched : [...(yield* pass.select(channel, matched))]
         if (messages.length === 0) continue
         // Search is newest first. Store roots before replies on this page, so
@@ -145,7 +200,14 @@ const searchPages = (ctx: SyncContext, pass: SearchPass, options: DiscoverOption
 
 /** Thread activity since `sinceMillis`, by search. */
 const discoverBySearch = (ctx: SyncContext, sinceMillis: number, options: DiscoverOptions): Effect.Effect<void, SlackApiError | SqlError, Services> =>
-  searchPages(ctx, { query: `is:thread after:${afterDate(sinceMillis)}`, pages: ctx.config.searchMaxPages, sinceMillis, reason: 'discovery', toMessage: matchToMessage }, options)
+  searchPages(ctx, {
+    query: `is:thread after:${afterDate(sinceMillis - DISCOVERY_OVERLAP_MILLIS)}`,
+    pages: ctx.config.searchMaxPages,
+    sinceMillis: sinceMillis - DISCOVERY_OVERLAP_MILLIS,
+    reason: 'discovery',
+    toMessage: matchToMessage,
+    certifyStored: true,
+  }, options)
 
 /**
  * A match that Main shows, as a message: a plain message or a thread root
