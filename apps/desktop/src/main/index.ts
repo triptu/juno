@@ -1,7 +1,7 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
-import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState, type ReadySession } from '@juno/contract'
+import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createActivityWatch } from './activity'
@@ -14,7 +14,7 @@ import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTe
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
-import { launchWriter, readLaunch, type Launch } from './launch'
+import { launchWriter, readLaunch, withSession, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
@@ -52,14 +52,6 @@ const launchFile = launchWriter(app.getPath('userData'))
 /** The one place launch.json changes, so a theme change and a window close never overwrite each other. */
 function updateLaunch(patch: Partial<Launch>): void {
   launch = { ...launch, ...patch }
-  launchFile.write(launch)
-}
-
-/** The verified session for the next launch's first frame (session.ts), written only when it changed. */
-function saveSession(session: ReadySession | undefined): void {
-  if (JSON.stringify(session) === JSON.stringify(launch.session)) return
-  const { session: _previous, ...rest } = launch
-  launch = session === undefined ? rest : { ...rest, session }
   launchFile.write(launch)
 }
 
@@ -235,11 +227,8 @@ const sessionHost = new SessionHost({
   send: (message) => supervisor.send(message),
   signInWindow:
     fakeSlackUrl === undefined ? {} : { startUrl: `${fakeSlackUrl}/signin`, extraHosts: [new URL(fakeSlackUrl).hostname] },
-  importOptions: {
-    ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }),
-    ...(keychainPassword === undefined ? {} : { keychainPassword }),
-  },
-  saveSession,
+  importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
+  saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
 })
 
 app.whenReady().then(() => {

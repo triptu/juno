@@ -77,6 +77,15 @@ export function readLaunch(userData: string): Launch {
   return launch
 }
 
+/** `launch` with the verified session for the next launch's first frame, or without one. Writes it only when it changed. */
+export function withSession(launch: Launch, session: ReadySession | undefined, writer: LaunchWriter): Launch {
+  if (JSON.stringify(session) === JSON.stringify(launch.session)) return launch
+  const { session: _previous, ...rest } = launch
+  const next = session === undefined ? rest : { ...rest, session }
+  writer.write(next)
+  return next
+}
+
 export interface LaunchWriter {
   /** Queues a write of the whole value. */
   readonly write: (launch: Launch) => void
