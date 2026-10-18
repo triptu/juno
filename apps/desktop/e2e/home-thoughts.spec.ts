@@ -32,9 +32,8 @@ const quiet = test.extend({
 
 /**
  * Not caught up, with nothing to show when Home is ready: Leo's DM has an
- * unread message that asks nothing. #build-chatter, read after Home is
- * ready, has 55 messages since the last one read 40 days ago, so the
- * Ignore card lands once its history does.
+ * unread message that asks nothing. #general and #ops are read after Home
+ * is ready, so holding their history keeps the first sync running.
  */
 const filling = test.extend({
   // oxlint-disable-next-line no-empty-pattern
@@ -47,10 +46,9 @@ const filling = test.extend({
         const read = workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Lunch was good.', at: now - 2 * DAY, silent: true })
         workspace.reads.set('D0LEO', read.ts)
         workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'The release notes look good.', at: now - 30 * 60_000, silent: true })
-        workspace.addConversation({ id: 'C0BUILDS', name: 'build-chatter', kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
-        const old = workspace.post({ channel: 'C0BUILDS', user: 'U0LEO', text: 'Nightly builds move to 2am', at: now - 40 * DAY, silent: true })
-        workspace.reads.set('C0BUILDS', old.ts)
-        for (let i = 0; i < 55; i++) workspace.post({ channel: 'C0BUILDS', user: 'U0LEO', text: `Build ${i} is green`, at: now - 6 * DAY + i * 2 * 60 * 60_000, silent: true })
+        workspace.addConversation({ id: 'C0OPS', name: 'ops', kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
+        const ops = workspace.post({ channel: 'C0OPS', user: 'U0LEO', text: 'Backups ran fine.', at: now - 3 * 60 * 60_000, silent: true })
+        workspace.reads.set('C0OPS', ops.ts)
       },
     })
     await use(fake)
@@ -94,7 +92,7 @@ filling('A row that lands during the first sync takes the place of the thought w
   await juno.signIn()
   const { home } = juno
   await home.navItem.click()
-  // History waits a call at a time; let it through until Home is ready. The DM is read first, #build-chatter later.
+  // History waits a call at a time; let it through until Home is ready. The DM is read first, the channels after.
   await expect
     .poll(
       async () => {
@@ -112,10 +110,13 @@ filling('A row that lands during the first sync takes the place of the thought w
   expect(await home.kinds()).toEqual([])
   await expect(home.thought).toHaveCount(1)
   const before = await home.greeting.boundingBox()
+  // The first sync still runs: a channel's history waits.
+  await expect.poll(() => slack.fake.heldCount({ method }), { timeout: 10_000 }).toBeGreaterThan(0)
 
-  // The rest of history lands: the Ignore card takes the first reserved slot and the thought goes.
-  slack.fake.release({ method })
-  await expect(home.item('ignore')).toBeVisible({ timeout: 30_000 })
+  // Leo asks something: the row takes the first reserved slot and the thought goes, with the greeting where it was.
+  slack.as('Leo').dm('Can you look at the release notes today?')
+  await expect(home.item('waiting')).toBeVisible({ timeout: 30_000 })
   await expect(home.thought).toHaveCount(0)
   expect(await home.greeting.boundingBox()).toEqual(before)
+  slack.fake.release({ method })
 })
