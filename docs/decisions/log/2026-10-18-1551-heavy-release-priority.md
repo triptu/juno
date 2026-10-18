@@ -1,0 +1,1 @@
+- 10-18 15:51 · build · Heavy release builds take priority over queued work without interrupting running jobs; nested heavy commands inherit the parent's reservation, and status reports holders and waiters. This prevents urgent packaging from waiting behind an unbounded queue and avoids nested-lock deadlocks.
