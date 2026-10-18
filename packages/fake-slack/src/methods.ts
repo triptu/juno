@@ -274,6 +274,12 @@ export const coreMethods = {
     return {}
   },
 
+  'conversations.create': (ctx, args) => {
+    if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(args.name)) return new ApiError('invalid_name_specials')
+    const created = ctx.workspace.create(args.name, args.is_private === true ? 'private' : 'public')
+    return created === 'name_taken' ? new ApiError('name_taken') : { channel: ctx.workspace.channelObject(created) }
+  },
+
   'conversations.open': (ctx, args) => {
     const ws = ctx.workspace
     if (args.channel !== undefined) {
