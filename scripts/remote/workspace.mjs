@@ -26,4 +26,3 @@ export function snapshot(root) {
   if (problems.length > 0) throw new Error(`Not sending this worktree:\n  ${problems.join('\n  ')}`)
   return { files, bytes }
 }
-

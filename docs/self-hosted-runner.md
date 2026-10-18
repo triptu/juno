@@ -84,6 +84,8 @@ use about 11.04 GiB, five gallery jobs 9.25 GiB, and sixteen unit jobs
 are sequential slices, not concurrent full-suite throughput. Recheck memory
 on larger plans before raising the limit.
 
+The [toolchain and store measurements](development.md#toolchain-and-store-measurements) compare cold installs, warm installs, lockfile changes and complete runs on both backends. The IPv4 fix and its fresh-shell checks are recorded there too.
+
 ## Install Ubuntu on Windows
 
 Run these commands in administrator PowerShell:

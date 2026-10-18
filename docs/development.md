@@ -907,6 +907,69 @@ Namespace, including fallback, uses the standard shape, 8x16 (see "Machine shape
 - **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
 
+### Toolchain and store measurements
+
+Measured on 2026-10-19 from `9f3c80b04` and this change. Each reported workload
+ran once per state, sequentially, with 23 unit tests and, for the app plan,
+four desktop tests. All passed without test retries. SSH uses its default
+1-core reservation with a 2-core limit for the unit run, and 4 cores for the
+app plan. Namespace uses 8x16. These observations include network variation;
+they are not established speedups. Builds below had a missing tag but reused
+the common base and Node layers.
+
+| Measure, seconds | SSH full image | SSH toolchain | Namespace full image | Namespace toolchain |
+| --- | --- | --- | --- | --- |
+| Missing-tag build | 113–185, earlier owner measurements | 63.5 | About 120, earlier measurements | 53.3, including push |
+| Cold install | Baked into image | 55 | Baked into image | 26 for the unit run, 3 for the app plan |
+| Warm install or offline linking | 0–1 | 0–1 | 0–1 | 0–1 on both a fresh cache hit and a warm machine |
+| Install after a lockfile change | Rebuilds the image | 5, same image tag | Rebuilds the image | Not measured; the shared tag test covers both backends |
+| Unit run, wall | 91, image present | 220 with the first build, 52 warm, 55 after the lockfile change | 58 fresh, 56 warm | 143 with the first build, 67 fresh with cached store, 42 warm |
+| App plan, wall | 105, image present | 78 warm | 77 fresh, 62 warm | 85 fresh with cold store, 67 fresh with cached store, 46 warm |
+
+The SSH wall times above precede the IPv4 transport fix. After that fix, the
+same warm unit run took 32 seconds. Three fresh-shell `runner:check` calls
+passed in 0.67–1.68 seconds and still reported 16 cores. DNS lookup took
+10–1,209 ms. Raw SSH tried an unreachable advertised IPv6 address for five
+seconds before IPv4, while IPv4-only probes passed in 0.17–0.42 seconds.
+The new fresh cached Namespace unit run, the new warm unit run and the old
+warm unit run each had a gateway retry before the command started. The new
+warm unit observation includes that retry.
+
+Five alternating warm installs per flag gave a median of 214 ms for
+`--prefer-offline` (204–282 ms) and 220 ms for `--offline` (198–275 ms).
+The ranges overlap. Keep `--prefer-offline` so cold stores and new packages
+work. The first SSH install's policy metadata was copied into the persistent
+cache after timing exposed it outside the store; later runs mount that
+metadata directly. The temporary lockfile commit added `is-number@7.0.0` to
+one package, then was removed. No image build occurred for that change.
+
+Two concurrent SSH containers installed against the same pnpm store and runtime
+lock directory. Both checked that their uid matched the store owner. The image
+contained no workspace manifest or node_modules.
+
+Namespace saved a 1,666 MB cache generation. Its first follow-up fresh machine
+missed the cache and installed in 15 seconds; a later fresh machine restored
+it and installed in one second. Cache misses during distribution are expected,
+as described in [Namespace's cache lifecycle](https://namespace.so/docs/architecture/storage/cache-volumes).
+The two measurement cache tags were released. The common toolchain remains the
+default: warm installs cost at most one reported second, and these app plans
+show no clear Namespace regression that would justify a separate full image.
+
+Reproduce the workloads, one command at a time:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+JUNO_RUNNER_HOST= pnpm remote --fresh test --passWithNoTests test/messages.test.ts
+JUNO_RUNNER_HOST= pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+```
+
+For Namespace, use a new `JUNO_REMOTE_STORE_TAG` for a cold store, reuse that tag
+on a fresh machine for a cache hit, and omit `--fresh` for a warm pool machine.
+`JUNO_REMOTE_IDLE_MINUTES=0` destroys a measurement machine after its run.
+`JUNO_REMOTE_STORE_CACHE=off` on a new machine measures the machine-disk fallback. Cache hits are
+best effort; check pnpm's reused and downloaded counts before calling a run warm.
+
 ## Current cost controls
 
 The defaults are 48 vCPU in the workspace (at most about $2.88 an hour with every
@@ -1076,6 +1139,8 @@ Causes found so far (2026-10-15):
 - **A card button pressed while Juno still answered.** The remove card shows with the status bubble (40 px) under it, and Juno's "Done." (56 px) takes that bubble's place about 70 to 100 ms later, so the chat, held at the bottom, scrolls 15 px. `click()` had measured the button before the scroll and pressed its old centre after it, 0.06 px below the button's new bottom edge: `pointerdown` went to the card's inner `div`, and `onCard` never ran (`memory.spec.ts`, 1 of 20, then 2, 5 and 3 of 40 at 16 workers; a log in the page showed the event's target was the `div` while `elementFromPoint` at the same point still named the button). This is a chat taking a reply under the pointer, as SPEC 13.2 asks, not a lost click. The test now waits for the second "Done." and for the status bubble to go before it presses Remove (0 of 40). To press a button in the chat, wait until the run that drew it has ended. A target that `pointerdown` names and `elementFromPoint` does not means the point was measured before a move.
 
 ## Machine shapes
+
+Both backends now use the same toolchain and install per run. The [toolchain and store measurements](#toolchain-and-store-measurements) compare fresh and warm runs with the earlier full image. Worker counts and machine reservations are unchanged. Namespace requests a 4 GB dependency cache, with 1,666 MB used in these slices.
 
 SSH reserves 1 core for unit-only jobs (CPU limit 2), 3 for gallery jobs without desktop or e2e steps, and 4 for jobs with desktop or e2e steps, as described under "Remote runs". Both `--machine` and `JUNO_REMOTE_MACHINE` override the reservation and limit.
 
