@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 04:58 · huddle-media-audio-only · The Chime media session receives no video (`NoVideoDownlinkBandwidthPolicy`) until screen share lands, so a camera turned on in Slack costs Juno nothing, and it sets Chime's reconnect window to 30 s, so a lost connection ends the call as SPEC 20 says. A call Chime ends by itself reaches the engine through the snapshot's `ended` state, carrying the attendee id.
 - 10-19 02:45 · huddles · Leave as the official client does: send `rooms.leave` with `reason=user_initiated` without waiting, stop the Chime session, and treat `feature_not_enabled` as benign. On a `huddles_arch_v2` workspace Slack learns of the leave from Chime (research section 6).
 - 10-19 02:45 · huddles-other-device · Joining the same huddle on another device moves you there. Chime stops Juno's session with `AudioJoinedFromAnotherDevice`, seen in the spike. Juno treats this as a leave, does not reconnect, and offers Join here.
 - 10-19 01:36 · runner · Prefer the machine-local SSH runner configuration, build missing local image tags under a host lock, and fall back to Namespace after 60 seconds without capacity unless Namespace is disabled. Prune old images explicitly.
