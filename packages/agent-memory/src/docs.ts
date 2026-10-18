@@ -21,7 +21,7 @@ export const DOC_TITLES: Record<Doc, string> = {
 /** What each doc holds, for the model's tool description and the page. */
 export const DOC_HINTS: Record<Doc, string> = {
   you: 'who the owner is, their role and their work',
-  people: 'people the owner works with: who they are and how the owner works with them',
+  people: 'notes about people in general; each person the owner works with has their own file',
   projects: 'projects the owner works on: what, with whom, where it stands',
   preferences: 'how the owner likes things done',
   style: "how the owner writes in Slack: tone, length, greetings, habits, words they use or avoid",
@@ -38,6 +38,8 @@ export const docLimits = {
   outline: 1_536,
   /** One line of the outline. */
   outlineLine: 120,
+  /** The person files part of the outline's People line. */
+  outlinePeople: 420,
 } as const;
 
 export interface DocEntry {
@@ -137,17 +139,21 @@ export function oneLiner(text: string, max: number = docLimits.outlineLine): str
  * first line of its newest entries, within `budget` bytes, with how many
  * more the full doc holds. Docs share the budget evenly; room a short doc
  * leaves goes to the others. Empty docs are named, so the model knows
- * they exist. `rev` lets the caller tell outlines apart.
+ * they exist. `rev` lets the caller tell outlines apart. `files` is the
+ * person files part of the People line (`peopleLine`), at most
+ * `outlinePeople` bytes, which comes before the general People notes.
  */
-export function outline(entries: ReadonlyArray<DocEntry>, rev: number, budget: number = docLimits.outline): string {
+export function outline(entries: ReadonlyArray<DocEntry>, rev: number, budget: number = docLimits.outline, files = ''): string {
   const head = `<about-owner rev="${rev}">`;
-  const foot = 'Full docs: memory_read. Change them with memory_write.\n</about-owner>';
+  const foot = 'Full docs: memory_read, with doc, or person for one person\'s file. Change them with memory_write.\n</about-owner>';
   let room = budget - utf8Bytes(head) - utf8Bytes(foot) - 2;
   const lines: Array<string> = [];
   DOCS.forEach((doc, index) => {
     const own = entries.filter((entry) => entry.doc === doc).toReversed();
-    const share = Math.floor(room / (DOCS.length - index));
-    let line = `${DOC_TITLES[doc]}:`;
+    // The files part never takes more than half of what is left, so the outline keeps its budget.
+    const lead = doc === 'people' && files !== '' && utf8Bytes(files) <= Math.min(docLimits.outlinePeople, room / 2) ? ` ${files}.` : '';
+    const share = Math.floor(room / (DOCS.length - index)) + utf8Bytes(lead);
+    let line = `${DOC_TITLES[doc]}:${lead}`;
     let shown = 0;
     for (const entry of own) {
       const part = `${shown === 0 ? ' ' : '; '}${oneLiner(entry.text, Math.min(docLimits.outlineLine, share))}`;
@@ -157,7 +163,7 @@ export function outline(entries: ReadonlyArray<DocEntry>, rev: number, budget: n
       line += part;
       shown += 1;
     }
-    if (own.length === 0) line += ' (empty)';
+    if (own.length === 0 && lead === '') line += ' (empty)';
     else if (shown < own.length) line += ` (+${own.length - shown} more)`;
     lines.push(line);
     room -= utf8Bytes(line) + 1;
