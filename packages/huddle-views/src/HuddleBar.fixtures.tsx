@@ -67,7 +67,7 @@ export default defineFixtures(
       'open press': fixture(bar(), { press: '[data-huddle-bar] button' }),
       'open focus': fixture(bar(), { focus: '[data-huddle-bar] button' }),
       'mute hover': fixture(bar(), { hover: '[aria-label^="Mute"]' }),
-      'leave hover': fixture(bar(), { hover: '[data-huddle-bar] [role="group"] > button' }),
+      'leave hover': fixture(bar(), { hover: '[data-huddle-bar] [role="group"] > :last-child > button' }),
       'mute tooltip': scene(
         () => (
           <>
