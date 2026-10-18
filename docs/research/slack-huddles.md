@@ -2,7 +2,7 @@
 
 Reverse-engineering notes for scoping huddles in Juno. Target: Slack desktop 4.52.178 (Electron) and the web client it loads (gantry-v2, `data-build-number="134567"`, `data-version-ts="1792141056"`). Analysed 2026-10-18.
 
-Static analysis only. Slack was not launched, no huddle was joined and no network call was made. No token, cookie or message content is reproduced here; only method names, field names and code shapes. Claims are marked **observed** (read in shipped code), **inferred** (a reasonable reading of observed code) or **unknown**.
+Sections 0 to 5 are static analysis: Slack was not launched, no huddle was joined and no network call was made. Section 6 records the live spike of 2026-10-19 (`scripts/huddle-live.ts`). No token, cookie or message content is reproduced here; only method names, field names and code shapes. Claims are marked **observed** (read in shipped code), **inferred** (a reasonable reading of observed code) or **unknown**.
 
 ## 0. Sources and method
 
@@ -59,7 +59,7 @@ All go through the normal `apiCall` (same `/api/<method>` POST with the `xoxc` t
 | Method | Use (from the calling thunk) |
 | --- | --- |
 | `rooms.join` | Start or join. Args: `id` (room, optional), `channel_id`, `thread_ts` (huddle in thread), `regions` (nearest Chime region), `multidevice`. Reason `calls-api/joinRoom` (`boot-async`, thunk "Join a calls / huddle room"). |
-| `rooms.leave` | Args `channel_id, call_id, attendee_id, reason`. Also sent as a `sendBeacon` on `beforeunload` with `reason:"unload"`. Benign errors: `channel_not_found, room_not_found, invalid_channel_id, attendee_not_found`. |
+| `rooms.leave` | Args `channel_id, call_id, attendee_id, reason`. A user's leave sends `reason:"user_initiated"` (`userLeaveEffects` in `shared-client`); it is also sent as a `sendBeacon` on `beforeunload` with `reason:"unload"`. Benign errors: `channel_not_found, room_not_found, invalid_channel_id, attendee_not_found`. `feature_not_enabled` is logged as a warning, "rooms.leave arch mismatch", not an error. With `huddles_arch_v2` the same call goes through `apiCallPersisted` (module `jKdt`), which queues it while offline; method, args and `_x_reason` do not change. See section 6. |
 | `rooms.notifyMember` | Ring a member: `channel_id, user_id`. Errors include `huddle_not_found`, `user_is_external_guest`, `cannot_invite_external`. |
 | `rooms.inviteResponse`, `rooms.getLink` (`channel_id`), `rooms.request`, `rooms.appOptions.list` | Invites, huddle link, third-party call apps. |
 | `rooms.startTranscription`, `rooms.stopTranscription` | Captions. |
@@ -169,16 +169,48 @@ Room object as normalised by `convertRtmRoomMessageForRedux` (`shared`, module `
 - Joining is a `rooms.join` call with the user's own `xoxc` token and `d` cookie, the same path Juno already uses for other methods. No extra client header is visible in the thunk. Juno will still copy the official request shape in full (see "What Juno uses from this").
 - A third-party client that joins without the peer protocol would still be heard and seen. It would not show reactions, raised hands or drawings, and might not answer `capabilities` messages as Slack expects. Juno accepts this: peer messages are out of scope.
 
+## 6. Live spike (2026-10-19)
+
+Run with `scripts/huddle-live.ts` on the owner's session, in a private test channel with one member. In the two runs recorded here Juno was alone in the huddle; a run with the owner's phone was in progress when this was written. Field names and shapes only; no values were printed.
+
+### Observed
+
+- **Join.** `rooms.join` with `channel_id`, `regions` (the nearest Chime region, one string) and `multidevice=false`, `_x_reason=calls-api/joinRoom`, through Juno's usual request shape, answered `ok`. The server did not reject Juno as a client.
+- **Media.** The answer's `call.free_willy.meeting` and `attendee` went into `MeetingSessionConfiguration` in a Chrome page served from `http://localhost`. Chime reached `audioVideoDidStart`, and its volume indicator showed Chromium's fake microphone arriving at Chime. Chime does not check the page origin, at least for localhost.
+- **`rooms.join` answer**, field names:
+  - `call`: `call_id`, `survey_percent`, `free_willy.meeting` and `free_willy.attendee`.
+  - `meeting`: `MeetingId`, `ExternalMeetingId`, `MeetingArn`, `MediaRegion`, `MeetingFeatures` (null), `MeetingHostId` (null), `PrimaryMeetingId` (null), `TenantIds[]`, `is_prewarmed`, and `MediaPlacement` with `AudioHostUrl`, `AudioFallbackUrl`, `ScreenDataUrl`, `ScreenSharingUrl`, `ScreenViewingUrl`, `SignalingUrl`, `TurnControlUrl`, `EventIngestionUrl`.
+  - `attendee`: `AttendeeId`, `ExternalUserId`, `JoinToken`, `Capabilities.{Audio, Content, Video}`, `EventActions` (null).
+  - `canvas`: `canvas_file_id`, `thread_channel_id`, `root_thread_ts`.
+  - `huddle`: `id`, `name`, `created_by`, `date_start`, `date_end`, `participants[]`, `participant_history[]`, `channels[]`, `has_ended`, `huddle_link`, `thread_root_ts`, `background_id`, `external_unique_id`, `attached_file_ids[]`, `pending_invitees`, `last_invite_status_by_user`, `prototypes.{is_prewarmed, is_scheduled}`, `recording.can_record_summary`, `locale`.
+- **`ExternalUserId`** has the shape `T` + 10 chars, `-`, `R` + 10 chars, `-`, `U` + 10 chars: team id, room id, user id. The third part is the joining user's id. There is no `#` session part.
+- **Socket frames** for the room: `sh_room_join` on join, `huddle_invite_cancel` (`type, team_id, channel_id, event_ts`) right after it, and `sh_room_leave` on leave. `sh_room_join` and `sh_room_leave` have `type`, `user`, `huddle.channel_id`, `event_ts`, `ts` and a full `room`:
+  - `id`, `name`, `media_server`, `media_backend_type`, `created_by`, `date_start`, `date_end`, `channels[]`, `is_dm_call`, `has_ended`.
+  - `participants[]` (user ids), `participant_history[]`, and `participants_events.<user id>.{user_team, joined, camera_on, camera_off, screenshare_on, screenshare_off}`.
+  - `participants_camera_on[]`, `participants_camera_off[]`, `participants_screenshare_on[]`, `participants_screenshare_off[]`.
+  - `canvas_thread_ts`, `thread_root_ts`, `background_id`, `canvas_background`, `is_prewarmed`, `is_scheduled`, `recording.can_record_summary`, `locale`, `attached_file_ids[]`, `display_id`, `external_unique_id`, `app_id`, `call_family`, `pending_invitees`, `last_invite_status_by_user`, `knocks`, `huddle_link`, `was_rejected`, `was_missed`, `was_accepted`.
+
+  On leave, `room.participants` is empty.
+- **Edge `huddles/info`** with `channel_ids: [<id>]` answers `{ok, huddles[]}`, empty when no huddle runs. A running huddle has `call_id`, `channel_id`, `active_members[]`, `dropped_members[]`, `name`, `background_id`, `thread_root_ts`, `pending_invitees`, `last_invite_status_by_user`, `is_scheduled`, `created_by`, `knocks`, `start_date`, `expiration` (0 here), `locale`, `recording.{transcript, is_paused, summary, recording_user, can_record_summary, recording_type}`, `updated`, `is_private`.
+- **Leave.** `rooms.leave` with `channel_id`, `call_id`, `attendee_id` and `_x_reason=calls-api/leaveRoom` answered `feature_not_enabled`, with and without `reason=user_initiated`. Even so, nothing was left behind. In the second run, `huddles/info` read just after the Chime session stopped (`audioVideoDidStop`, status `Left`) still listed the user as active. `sh_room_leave` arrived about a second later. Three seconds later, `huddles/info` listed the huddle with no active members, and a later read listed no huddle at all.
+
+### Inferred
+
+- On this workspace the server runs huddles with `huddles_arch_v2` and does not use `rooms.leave`. It learns that an attendee left from Chime. The official client sends `rooms.leave` anyway and treats `feature_not_enabled` as an expected "arch mismatch".
+- So on such a workspace, leaving the Chime meeting is the leave. A crash that never stops the Chime session leaves the attendee until Chime drops it for silence on the connection. The time this takes was not measured.
+- Juno should do what the official client does. Its ending transition (`transitionToEnding` in `shared-client`) first sends `rooms.leave` with `reason=user_initiated` (`NOTIFY_SERVER_LEAVE`, not awaited, errors only logged), then stops the Chime session (`DESTROY_MEDIA_SESSION`). Juno sends the same leave, stops Chime without waiting for the answer, and treats `feature_not_enabled` like the other benign errors. With arch v2 the Chime stop is what removes the attendee, so it must happen even when the leave fails.
+- The spike's own leave sent `rooms.leave` after the Chime stop, so it did not test the official order. On an arch v2 workspace the order should not matter, since `rooms.leave` does nothing there.
+
 ## Unknowns
 
-- Whether the server checks the client for `rooms.join` (user agent, `_x_app_name`, `slack_client`, origin, the `_x_desktop_ia` param or the build version) and rejects unknown clients.
-- Whether Chime signalling or TURN checks the page origin. The Chime SDK is built for arbitrary web origins, so probably not, but this was not tested.
-- The exact `ExternalUserId` format and how it maps to a Slack user id and session id.
+- Whether Slack checks the client for other huddle methods. `rooms.join` accepted Juno's request shape (section 6).
+- Whether Chime cares about the page origin in Electron. A `http://localhost` page in Chrome connected (section 6).
+- Whether audio from another participant arrives. The spike had no second participant yet.
+- How the room id in `ExternalUserId` relates to the call id, and what the official client reads from it. Its shape is known (section 6).
 - The protobuf schema of the peer messages (field numbers and types). The descriptors are in the minified bundle but were not decoded. Not needed for Juno's scope.
-- The full field list of the `rooms.join` response beyond what the client reads.
-- Whether the legacy calls-server path (`hostname`, `port`, `turn_auth`) is ever returned today.
+- Whether the legacy calls-server path (`hostname`, `port`, `turn_auth`) is ever returned today. The live answer had `free_willy`.
 - Whether multi-device join (`multidevice`) or quick join needs extra calls not seen here.
-- How `huddles_arch_v2` changes the flow (the leave call switches to a different request path when it is on).
+- Whether `rooms.leave` succeeds on a workspace without `huddles_arch_v2`, and what else `huddles_arch_v2` changes on the server. On the client it switches the state manager, device setup and the leave's offline queue (section 6).
 - Whether Enterprise Grid, GovSlack or Slack Connect channels add more checks.
 - Whether the huddle window opened by the web client needs anything from `child-preload` beyond the general `window.open` handling.
 
@@ -191,4 +223,4 @@ These need a running Slack client or Juno build but no writes to other people's 
 3. Without joining, call the edge API `huddles/info` for a few channel ids the user is in and see what comes back when a huddle is or is not running.
 4. In `chrome://webrtc-internals` during the test huddle, confirm the ICE servers (Chime TURN hosts, port 3478 or 22466) and that the remote endpoint is a Chime media host.
 5. Only if peer messages come into scope later: read the protobuf descriptors from `shared-client` with REA (`trace_javascript_semantics` on the `lP` schema module).
-6. In a Juno prototype, call `rooms.join` with the user's session and the request shape recorded in step 1, and pass the result to the open-source Chime SDK. If the server rejects it, compare request params with step 1. Keep this to a private test channel made for it, with the owner's phone as the second participant. This is phase 2 of `docs/plans/huddles.md`; it also settles the Chime origin question, the `ExternalUserId` format and the real frame shapes.
+6. Done on 2026-10-19 except two-way audio (section 6). In a Juno prototype, call `rooms.join` with the user's session and the request shape recorded in step 1, and pass the result to the open-source Chime SDK. If the server rejects it, compare request params with step 1. Keep this to a private test channel made for it, with the owner's phone as the second participant. This is phase 2 of `docs/plans/huddles.md`; it also settles the Chime origin question, the `ExternalUserId` format and the real frame shapes.
