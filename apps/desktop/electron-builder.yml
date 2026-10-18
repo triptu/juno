@@ -26,7 +26,6 @@ mac:
   category: public.app-category.productivity
   target:
     - dmg
-    - zip
   darkModeSupport: true
   icon: build/icon.icns
   hardenedRuntime: true
