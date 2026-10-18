@@ -1,7 +1,9 @@
 /**
  * The @ and # suggestions' live queries (spec section 8). A list reads
- * nothing while it is closed; each query is its own subscription, kept for
- * the usual idle time so typing back to an earlier query answers at once.
+ * nothing while it is closed, except the answer for a bare "@", which a
+ * mounted composer holds so the first "@" opens at once. Each query is its
+ * own subscription, kept for the usual idle time so typing back to an
+ * earlier query answers at once.
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'

@@ -84,7 +84,7 @@ A module is placed whole in one chunk. When the start bundle uses any export of 
 | --- | --- | --- |
 | Send check bar, now shared by Home's composer | 4.9 KB | Idle after a composer mounts, as before; Enter waits for it when a bar is needed. |
 | Peeked topic (`PeekTopic`, `PeekView`) | 4.0 KB | Idle after the frame mounts. The key handling stays eager; the peek shows once its topic and the chunk are both ready. |
-| @, # and : suggestion list | 6.0 KB | Idle after a composer mounts, and at once when a trigger is typed first. |
+| @, # and : suggestion list | 6.0 KB | Idle after a composer mounts, and at once when a trigger is typed first. The answer for a bare "@" is asked for at the same idle time and held while the composer is mounted, so the first "@" does not wait on the engine. |
 | Sidebar sync status cards (offline, rate limited, stopped, first-sync progress) | 9.5 KB | Idle after the sidebar mounts, and at once when a notice comes first. The footer shows only once they have loaded, so it never shows empty. |
 | Message edit field | 2.6 KB | Idle after a topic mounts, and when ↑ selects a message. |
 | Composer link editor | 1.7 KB | Idle after a composer mounts, and at once on ⌘K. |
