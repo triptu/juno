@@ -357,7 +357,8 @@ module outboxProtocol {
   // The worker resolves the ts from the stored message when it runs. With
   // the guard off it calls with a guessed ts before the post is stored.
   // Each k is one message and has at most one action row. Its replacements
-  // wait for the in-flight intent; actions on other messages are independent.
+  // wait for the in-flight intent. Reactions on other messages are independent;
+  // edits and deletes retain channel order, including duplicate cleanup.
   def actionHead(k: int): bool = drafts.forall(j =>
     (j < k and s.actChannel.get(j) == s.actChannel.get(k) and
       s.actKind.get(j) != "react" and s.actKind.get(k) != "react") implies not(actPending(j)))

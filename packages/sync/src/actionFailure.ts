@@ -5,7 +5,7 @@ import { dropAction, readAction, touch, writePayload, type PendingAction } from 
 /** A failed action keeps its intent for Retry but no longer holds its channel. Ignore answers for a replaced intent. */
 export const failAction = (action: PendingAction, code: string) => Effect.gen(function* () {
   const current = yield* readAction(action.id)
-  if (current === undefined || JSON.stringify(current.payload) !== JSON.stringify(action.payload)) return
+  if (current === undefined || current.createdAt !== action.createdAt || JSON.stringify(current.payload) !== JSON.stringify(action.payload)) return
   const sql = yield* StoreWriter
   const { stalled: _stalled, ...payload } = current.payload
   yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify({ ...payload, failed: code })}, last_error = ${code} WHERE id = ${action.id}`
