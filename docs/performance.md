@@ -1577,25 +1577,41 @@ in memory instead of rewriting the boot record.
 
 A counter-only replay of the same 114-page full follow pass ran 1,792
 statements, 33.7 times fewer than the baseline, and opened 150 transactions.
-That pass is hourly in production. The fake-server desktop had instead
-forced it into every ten-minute catch-up, which made the large-seed idle gate
-measure hourly repair work as an ordinary sweep. The fake now keeps the
+That pass is hourly in production. The 60,388-statement and 3.0%-CPU baseline
+was not an ordinary production sweep: the fake-server desktop forced the
+hourly full pass into every ten-minute catch-up. The fake now keeps the
 production cadence; focused sync tests still set `followPassMillis: 0` when
 they need every cycle to reconcile follows.
 
-The ordinary ten-minute sweep uses incremental counts, history only for a
-conversation whose latest timestamp moved, and newest-first discovery. It
-does not also scan followed threads; the hourly pass keeps repair of missed
-follow and thread-read events. Search accepts only a date, so it can return
-messages before the exact sync cursor. Those older matches are now discarded
-before merge work. A counter interval containing exactly one unchanged
-large-seed sweep ran 67 statements in total, including unrelated scheduled
-engine reads: 901 times fewer than 60,388. It made one counts read and one
-search read, and no `getView` call. The final minified Mac desktop run made
-the same sweep plus one history and four reply reads for its open tabs. Its
-engine used 0.2% of one core over the 60-second sweep window, down from the
-3.0% unprofiled baseline; the following minimized and hidden windows used
-0.2% and 0.1%. The focused Mac test passed with exit 0.
+The real production-shaped ten-minute sweep uses incremental counts, one
+`getView` page back to `lastSyncAt`, history only for a conversation whose
+latest timestamp moved, and newest-first discovery. The incremental page
+keeps missed follow, unfollow and thread-read changes at ten-minute freshness;
+the hourly pass still repairs the whole quiet window. Search overlaps the
+cursor by five minutes so Slack indexing delay and clock skew cannot strand
+an unfollowed reply. Two batched reads discard overlap matches whose message
+and root counters already equal the store.
+
+One large-seed minute containing exactly one production-shaped sweep on
+`origin/main` made three Slack reads (counts, one `getView`, one search) and
+ran 1,722 SQL statements. The revised sweep made four reads (the same counts
+and `getView`, plus two search pages for the overlap) and 79 statements,
+21.8 times fewer. The incremental `getView` is one Slack call and six batched
+certification statements when unchanged, so retaining its freshness is
+cheap. Both are single counter runs with an unpaced fake and the production
+ten-minute/hourly split; the sweep timer alone was shortened to put one pass
+inside the measured minute. Their whole-process CPU is not a product measure
+because the fake Slack server runs in that same Node process and generated
+the search results there. The desktop idle gate measures the Engine utility
+process separately.
+
+Matched minified Mac desktop runs used the production cadence on both
+`origin/main` and the revised branch. In the minimized 60-second window that
+reported the scheduled counts, incremental `getView`, discovery, history and
+reply reads, Engine CPU was 0.4% before and 0.3% after. That 0.1-point change
+is near the sampler's resolution, so the useful result is that both are below
+the 1% target, not a claimed CPU speedup. The revised run then measured 0.2%
+minimized and 0.2% hidden. Both focused Mac tests passed with exit 0.
 
 A fake-server behavior test observes SQLite from a second connection: a
 sweep with no server change leaves `PRAGMA data_version` unchanged, then a
@@ -1607,8 +1623,8 @@ It was installed only for the measured minute and removed afterwards. The
 baseline evidence is `/Volumes/AgentWork/engine-idle-evidence/activity.json`.
 An earlier full-desktop revised trace is
 `/Volumes/AgentWork/sync-sweep-after/activity.json`; the isolated 1,792- and
-67-statement probes printed their results and were then removed. These are
-single runs, not a timing distribution.
+production-shaped 1,722- and 79-statement probes printed their results and
+were then removed. These are single runs, not a timing distribution.
 
 **Seeing it next time.** Settings › About › Diagnostics lists each process with Juno's name and Electron's type, its CPU over the last few seconds and its memory, and **Copy diagnostics** puts a plain-text report on the clipboard (SPEC 14). Main samples every 15 s and logs one line when a process stays above 30 % of a core for 2 minutes while the window has no input and no sync runs, with the window's state and the view; the report repeats the last such line.
 

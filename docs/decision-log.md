@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 22:53 · incremental-thread-refresh · Keep incremental `getView` in every ten-minute sweep for missed follow and read changes; reserve the full quiet-window pass for the hourly repair cadence.
+- 10-18 22:52 · discovery-overlap · Search five minutes before the sync cursor so late indexing and clock skew cannot strand an unfollowed reply; unchanged-row checks and the three-page cap bound the replay.
 - 10-18 21:29 · sync-sweep-cadence · Keep the fake server on the production hourly follow-pass cadence; ten-minute sweeps repair moved messages from counts and discovery, while focused tests may force a follow pass on every cycle.
 - 10-18 20:01 · sync-sweep-noop · Certify unchanged `getView` rows from batched store reads, keep their follow observation clock in the workspace session, and use the existing merge path for changed or uncertain rows.
 - 10-18 18:23 · idle-sweep-window · Keep the 3% idle engine budget; print a window containing a successful scheduled discovery sweep and replace it once with a settled window containing no Slack calls, so scheduled sync work is not mistaken for an idle loop.

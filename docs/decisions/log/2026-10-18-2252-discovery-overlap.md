@@ -1,0 +1,1 @@
+- 10-18 22:52 · discovery-overlap · Search five minutes before the sync cursor so late indexing and clock skew cannot strand an unfollowed reply; unchanged-row checks and the three-page cap bound the replay.
