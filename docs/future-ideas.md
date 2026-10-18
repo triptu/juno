@@ -74,6 +74,21 @@ These assume the other person runs Juno too. Juno's client-only layer (titles, r
 - **Juno to Juno.** "Find Maya and me 30 minutes this week" is settled between the two agents from both calendars, each person confirming. "Ask Maya's Juno whether the deploy went out" is answered from her connections if she allowed that question. Consent per person and per connection, under 13.9's trust rules.
 - **Shared tidying.** On a channel two people manage, one person's Automated move or Tidy up outcome shows on the other's Home as a suggestion with the name on it.
 
+## Multiplayer: new kinds of communication
+
+The ideas above share state between two clients. These use the fact that both ends have an agent that knows its person. They change what a message is, when it arrives, and whether it needs to exist. Every one keeps private data on its owner's Mac and shares only what that person allowed.
+
+- **Juno asks Juno first.** Before a question reaches Maya, your Juno asks hers, which knows her notes, calendar and drafts. If the answer exists you get "Maya decided this yesterday; she posts it at 3" and never send. A large share of manager messages are questions whose answer the other side already has.
+- **Deliver when relevant.** A send scheduled by context, not time. "Tell Sam when it fits" lands when his Juno sees him open a related topic, finish a focus block, or come to your next 1:1. The receiver's agent picks the moment, so a non-urgent thought stops being an interruption.
+- **Written once, read each their way.** The sender writes one message. Each reader's Juno presents it the way that person reads: two lines for the exec, the full text for the IC, Japanese for the colleague in Tokyo. The original is one click away and is what Slack stores.
+- **Threads with a state.** A thread is a transcript under a small living state: what is agreed, what is open, who owns what. Both Junos maintain it and show it the same way. When their readings differ, the disagreement itself is shown ("Maya's Juno reads this as decided; yours does not").
+- **Verified urgency.** Self-declared urgency means nothing. Here the sender's Juno attests it from what it knows (a deadline in her calendar, an incident she is in) and the receiver's Juno decides whether to interrupt. People whose urgent messages prove urgent keep the privilege; it is earned over time.
+- **Team agreements.** A lead writes the norms once in plain words ("no DMs after 7 unless urgent", "decisions go in #decisions", "disagree in the thread, not in DMs"). Each person accepts them, and every Juno's send checks reflect them. Norms enforced gently at the moment of writing, not in a handbook.
+- **Standup without the standup.** Each person's Juno drafts yesterday, today and blockers from their real activity in Slack, git and tickets; the person approves or edits in ten seconds. The manager's Juno assembles the team's picture. No meeting, nothing written by hand.
+- **Agents with a mandate.** "Work out with Sam's Juno when we migrate and what is in scope." Each person sets bounds privately (days, maximum scope), the two agents converge inside both, and each person approves the proposal. Negotiation that costs the people one click each.
+- **Draft together, post once.** A draft circulates between Junos for sign-off and posts once everyone has signed, instead of co-writing in DMs and hoping. The same mechanism gives commit-and-reveal: estimates or peer feedback that everyone commits before anyone sees.
+- **Juno as the bridge.** Two Juno users in different companies share a topic without Slack Connect. Each sees it inside their own Juno; the relay carries it, encrypted. The topic model stops caring which workspace a conversation lives in.
+
 ## Making connections easier
 
 - **Connect from what your team shares.** Juno sees that your team pasted Linear links forty times this week and offers "Connect Linear?" as a proactive ask, the pattern 13.6 already defines. Setup is paste a URL or a command, sign in, done.
