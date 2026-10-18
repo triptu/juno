@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 15:07 · about · What's new lists the ten newest release notes with quiet Installed and Available marks, fetched on demand and cached for an hour.
 - 10-18 14:16 · releases · Unsigned packages build and publish only the DMG, its block map and update metadata because existing unsigned installs read release assets and download the DMG; signed packages keep the ZIP required by electron-updater. Normal publishing requires a green full CI keeper run, while urgent owner-impacting fixes may publish after typecheck, lint, unit tests and packaged launch smoke, with an immediate full-suite request. Release steps record local timings.
 - 10-18 14:05 · session-spec-97 · Commit the initial shell synchronously before the page can paint; waiting for the engine port and React scheduling exposed an empty visible frame on signed-in relaunch. Keep the session test’s zero-sign-in and every-frame-sidebar assertions unchanged.
 - 10-18 13:58 · idle-cpu-platform-gates · Keep the native Window and Graphics idle budgets at 2% in a separate @mac gate; the software-rendered Linux runner uses a 15% spin ceiling for those processes, while engine, agent, network, main and other-helper limits stay the same everywhere. Both gates run the same fake-server scenarios.
