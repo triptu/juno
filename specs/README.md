@@ -158,7 +158,7 @@ Validation on 2026-10-15: the full root `pnpm specs:check` passed in **636.2 sec
 
 ## Conformance
 
-`pnpm specs:conformance` checks that the engine follows `outbox.qnt`. Quint writes traces, and the harness in `packages/engine/test/conformance` replays each one against the real engine and the fake Slack. After each round it compares what the engine and the fake hold with the model's state, through a small projection. If the model and the code differ, a trace fails and shows where. `pnpm affected` runs it when `outbox.qnt`, `outbox-conformance.qnt`, the generator, or any file the replay reaches (the engine, `@juno/sync`, the fake) changes. `pnpm remote specs:conformance` runs it on a machine of its own.
+`pnpm specs:conformance` checks that the engine follows `outbox.qnt`. Quint writes traces, and the harness in `packages/engine/test/conformance` replays each one against the real engine and the fake Slack. After each round it compares what the engine and the fake hold with the model's state, through a small projection. If the model and the code differ, a trace fails and shows where. `pnpm affected` runs it when the code the specs model changes (`PROTOCOL_PATHS` in `scripts/test-areas.mjs`: `specs/`, `@juno/sync`, the engine's outbox and send code, the conformance harness), and `pnpm affected --wide` when any file the replay reaches changes. The scheduled full run always runs it. `pnpm remote specs:conformance` runs it on a machine of its own.
 
 What it runs (seed `20261016`, `specs/conformance.mjs`):
 
