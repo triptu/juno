@@ -16,6 +16,7 @@ import { SettingsPage, type SettingsPageProps } from './SettingsPage'
 import { NO_LIMIT_USD } from '@juno/agent-contract'
 import { AiActivityPage } from './AiActivityPage'
 import { SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored } from './SettingsSections'
+import { IgnoreChannelRow } from './IgnoreChannelRow'
 import { EmojiPicker } from './EmojiPicker'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
 import { sevenQuickReactions } from './fixtures/quickReactions'
@@ -51,6 +52,19 @@ const ignored = [
   { id: 'C2', name: 'alerts-prod', kind: 'public' as const, hidden: 1000 },
   { id: 'C3', name: 'oncall-pages', kind: 'private' as const, hidden: 1 },
 ]
+
+/** The channels the add row offers, by name. */
+const ignorable = [
+  { id: 'C4', name: 'design', kind: 'public' as const },
+  { id: 'C5', name: 'design-crit', kind: 'private' as const },
+  { id: 'C6', name: 'eng', kind: 'public' as const },
+  { id: 'C7', name: 'general', kind: 'public' as const },
+  { id: 'C8', name: 'incidents', kind: 'public' as const },
+  { id: 'C9', name: 'releases', kind: 'public' as const },
+]
+const addRow = (open: boolean, chosen?: (typeof ignorable)[number]) => (
+  <IgnoreChannelRow channels={ignorable} chosen={chosen} open={open} onOpen={noop} query="" onQuery={noop} onChoose={noop} onIgnore={noop} />
+)
 
 /** Five calls: titles and art with costs, a Redraw blocked at the cap, and a chat turn. */
 const call = (id: number, minutesAgo: number, rest: Partial<AiCallRow>): AiCallRow => ({
@@ -113,7 +127,7 @@ export default defineFixtures(
       'general-end': scene(() => <ScrolledToEnd><SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} peekKey="option" onPeekKeyChange={noop} homeThoughts onHomeThoughtsChange={noop} webPanel onWebPanelChange={noop} classifier onClassifierChange={noop} /></ScrolledToEnd>),
       appearance: at('appearance', <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} />} />),
       notifications: at('notifications', <NotificationsPage {...notificationsBase} />),
-      ignored: at('ignored', <SettingsIgnored ignored={ignored} onStopIgnoring={noop} />),
+      ignored: at('ignored', <SettingsIgnored addRow={addRow(false)} ignored={ignored} onStopIgnoring={noop} />),
       juno: at('juno', <JunoSettingsPage {...juno} page={settings} providers={provider(openRouter)} />),
       'ai-activity': at('ai-activity', <AiActivityPage activity={aiActivity} spend={spendToday} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       connections: at('connections', <ConnectionsPage page={connections} rules={<RulesSection rules={settings.rules} onRuleChange={noop} onRuleRemove={noop} onRuleAdd={noop} />} onAction={noop} onConfigure={noop} onAdd={noop} />),
@@ -143,7 +157,13 @@ export default defineFixtures(
       'tidy-up': at('tidy-up', <SettingsTidyUp quietDays={7} onQuietDaysChange={noop} tabExpiry="1d" onTabExpiryChange={noop} prefs={TIDY_UP_DEFAULTS} onChange={noop} aiAssist />),
       'tidy-up-ai-off': at('tidy-up', <SettingsTidyUp quietDays={7} onQuietDaysChange={noop} tabExpiry="1d" onTabExpiryChange={noop} prefs={{ quiet: '1d', threads: true, dms: false, followUps: true, drafts: false, unfollow: true, ignore: false }} onChange={noop} aiAssist={false} />),
       'tidy-up-minimum-window': at('tidy-up', <SettingsTidyUp quietDays={7} onQuietDaysChange={noop} tabExpiry="1d" onTabExpiryChange={noop} prefs={TIDY_UP_DEFAULTS} onChange={noop} aiAssist />, { width: 336, height: 436, padded: false }),
-      'ignored-empty': at('ignored', <SettingsIgnored ignored={[]} onStopIgnoring={noop} />),
+      'ignored-empty': at('ignored', <SettingsIgnored addRow={addRow(false)} ignored={[]} onStopIgnoring={noop} />),
+      // The add row's list open over the page, on the first channel.
+      'ignored-picker-open': at('ignored', <SettingsIgnored addRow={addRow(true)} ignored={ignored} onStopIgnoring={noop} />),
+      'ignored-empty-picker-open': at('ignored', <SettingsIgnored addRow={addRow(true)} ignored={[]} onStopIgnoring={noop} />),
+      // A channel chosen: the select names it and Ignore is enabled.
+      'ignored-chosen': at('ignored', <SettingsIgnored addRow={addRow(false, ignorable[4])} ignored={ignored} onStopIgnoring={noop} />),
+      'ignored-minimum-window': at('ignored', <SettingsIgnored addRow={addRow(false, ignorable[4])} ignored={ignored} onStopIgnoring={noop} />, { width: 336, height: 436, padded: false }),
       'ai-activity-background-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, spentUsd: 2.51, backgroundUsd: 2.5 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       'ai-activity-no-limit': at('ai-activity', <AiActivityPage activity={aiActivity} spend={{ ...spendToday, capUsd: NO_LIMIT_USD, limitUsd: NO_LIMIT_USD, backgroundLimitUsd: NO_LIMIT_USD / 2 }} onLimit={noop} now={NOW} onCopyDetails={noop} />),
       'ai-activity-refused': at('ai-activity', <AiActivityPage activity={refusedActivity} spend={spendToday} onLimit={noop} now={NOW} onCopyDetails={noop} />),

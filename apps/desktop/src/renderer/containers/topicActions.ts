@@ -9,7 +9,6 @@ import { junoNavAtom, junoSettingsNow, watchReply } from '@juno/state/agent'
  * in a text field that has text, and otherwise Juno's last action.
  */
 import {
-  channelsIgnore,
   isViewMenuAction,
   notifyChoiceOf,
   readsMarkRead,
@@ -35,6 +34,7 @@ import {
   currentNotificationSettings,
   editUndo,
   flushSidebar,
+  ignoreChannel,
   junoAvailableAtom,
   loadNotificationSettings,
   loadWhy,
@@ -230,7 +230,7 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
       return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
     case 'ignore-channel':
       flushSidebar(registry)
-      return void runAction(registry, channelsIgnore, { channel: topic.channel.id }, { text: `Ignoring ${topic.channel.label}` })
+      return void ignoreChannel(registry, topic.channel)
     case 'juno-knows': {
       const partner = dmPartner(topic)
       return partner === undefined ? undefined : void showWhatJunoKnows(partner)

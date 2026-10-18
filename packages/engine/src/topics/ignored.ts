@@ -1,6 +1,6 @@
 /** The ignore list on Settings › Ignored (inventory 14): ignored channels, newest first, with how many messages arrived since. */
 import { Effect } from 'effect'
-import { IGNORED_HIDDEN_CAP, type IgnoredChannel } from '@juno/contract'
+import { IGNORABLE_LIMIT, IGNORED_HIDDEN_CAP, type IgnorableChannel, type IgnoredChannel } from '@juno/contract'
 import { StoreReader, type SqlError } from '@juno/store'
 
 export const listIgnoredChannels: Effect.Effect<ReadonlyArray<IgnoredChannel>, SqlError, StoreReader> = Effect.gen(function* () {
@@ -13,4 +13,14 @@ export const listIgnoredChannels: Effect.Effect<ReadonlyArray<IgnoredChannel>, S
     WHERE c.kind IN ('public', 'private')
     ORDER BY CAST(ig.ignored_at AS REAL) DESC, c.id`
   return rows.map((row) => ({ id: row.id, name: row.name ?? row.id, kind: row.kind, hidden: Number(row.hidden) }))
+})
+
+/** The channels the add row offers (`channels.ignorable`): yours, not archived and not ignored, by name. */
+export const ignorableStatement = `SELECT c.id, c.name, c.kind FROM conversations c LEFT JOIN ignored_channels g ON g.channel = c.id
+  WHERE c.kind IN ('public', 'private') AND c.is_member = 1 AND c.is_archived = 0 AND c.name IS NOT NULL AND g.channel IS NULL
+  ORDER BY c.name COLLATE NOCASE, c.id LIMIT ${IGNORABLE_LIMIT}`
+
+export const listIgnorableChannels: Effect.Effect<ReadonlyArray<IgnorableChannel>, SqlError, StoreReader> = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  return yield* sql.unsafe<IgnorableChannel>(ignorableStatement)
 })

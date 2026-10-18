@@ -569,6 +569,24 @@ export class SettingsPage {
   async stopIgnoring(name: string): Promise<void> {
     await this.ignored(name).getByRole('button', { name: `Stop ignoring ${name}` }).click()
   }
+
+  /** The ignore list's add row: the channel select and Ignore. */
+  get ignoreAdd(): Locator {
+    return this.root.locator('[data-ignore-add]')
+  }
+
+  get ignoreSelect(): Locator {
+    return this.ignoreAdd.getByRole('button', { name: /^Channel to ignore/ })
+  }
+
+  get ignoreButton(): Locator {
+    return this.ignoreAdd.getByRole('button', { name: 'Ignore', exact: true })
+  }
+
+  /** The add row's open list of channels. */
+  get ignoreOptions(): Locator {
+    return this.win.getByRole('listbox', { name: 'Channels' }).getByRole('option')
+  }
 }
 
 export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Tidy up' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'

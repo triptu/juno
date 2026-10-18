@@ -21,7 +21,8 @@ function hiddenLabel(hidden: number): string {
  * The ignore list's rows (SPEC 14, inventory 14), inside Settings' group
  * card. Rows sit on the same 12px inset and 14px rhythm as Appearance's, so
  * the card's edges and the button's right edge line up with the controls
- * above.
+ * above. Each row puts the messages hidden under the name, so in a narrow
+ * window the name keeps the free width and Stop ignoring stays on one line.
  */
 export function IgnoredChannels({ channels, onStopIgnoring }: IgnoredChannelsProps) {
   if (channels === undefined) return <div {...stylex.props(styles.list)} aria-busy="true"><div {...stylex.props(styles.row)} /></div>
@@ -44,10 +45,10 @@ export function IgnoredChannels({ channels, onStopIgnoring }: IgnoredChannelsPro
             <Icon icon={channel.kind === 'private' ? Lock : Hash} size={15} />
           </span>
           <span {...stylex.props(styles.name)}>
-            <Text variant="ui" tone="default" weight="medium" truncate>
+            <Text variant="ui" tone="default" weight="medium" truncate tooltipWhenTruncated>
               {channel.name}
             </Text>
-            <Text variant="meta" tone="muted">
+            <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
               {hiddenLabel(channel.hidden)}
             </Text>
           </span>
@@ -82,10 +83,10 @@ const styles = stylex.create({
     flexShrink: 0,
     color: colors['--foreground-muted'],
   },
+  // The name over the count, each one line: the name takes the free width; a cut count shows in full on hover.
   name: {
     display: 'flex',
-    alignItems: 'baseline',
-    gap: spacing['--space-2-5'],
+    flexDirection: 'column',
     flexGrow: 1,
     minWidth: 0,
   },

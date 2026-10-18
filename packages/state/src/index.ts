@@ -151,7 +151,7 @@ export {
   setSlackSchedule,
   whyPopoverAtom,
 } from './notifications'
-export { ignoredChannelsAtom, stopIgnoring } from './ignored'
+export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort } from './port'
 export {
   accentAtom,

@@ -1,9 +1,9 @@
 import { memo, Suspense, useEffect, useState } from 'react'
-import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type IgnorableChannel, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
+import { AiActivityPage, IgnoreChannelRow, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { Diagnostics } from './Diagnostics'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
@@ -158,7 +158,26 @@ function Appearance() {
 
 function Ignored() {
   const ignored = useAtomValue(ignoredChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
-  return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
+  return <SettingsIgnored addRow={<AddIgnored />} ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
+}
+
+/** The ignore list's add row: Ignore does what Ignore channel in the channel's menu does, with the same toast and Undo. */
+function AddIgnored() {
+  const channels = useAtomValue(ignorableChannelsAtom, (result) => (result._tag === 'Success' ? result.value : undefined))
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [chosen, setChosen] = useState<IgnorableChannel | undefined>(undefined)
+  // A channel ignored elsewhere meanwhile is no longer a choice.
+  const shown = chosen === undefined || channels === undefined || channels.some((channel) => channel.id === chosen.id) ? chosen : undefined
+  const changeOpen = (next: boolean) => {
+    setOpen(next)
+    if (!next) setQuery('')
+  }
+  const ignore = (channel: IgnorableChannel) => {
+    setChosen(undefined)
+    void ignoreChannel(registry, { id: channel.id, label: `#${channel.name}` })
+  }
+  return <IgnoreChannelRow channels={channels} chosen={shown} open={open} onOpen={changeOpen} query={query} onQuery={setQuery} onChoose={setChosen} onIgnore={ignore} />
 }
 
 /** Tidy up: topic visibility, tab expiry, what Resolve does, and when Juno suggests a topic. */

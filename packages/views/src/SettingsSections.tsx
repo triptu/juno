@@ -139,17 +139,20 @@ export function SettingsAppearance({ quickReactions, ...props }: SettingsAppeara
 }
 
 export interface SettingsIgnoredProps {
+  /** The add row (`IgnoreChannelRow`), above the card, so its list opens over the page and a channel it ignores lands right under it. */
+  readonly addRow: ReactNode
   /** The ignore list; undefined until it arrives. */
   readonly ignored: ReadonlyArray<IgnoredChannel> | undefined
   readonly onStopIgnoring: (channel: IgnoredChannel) => void
 }
 
 /** Ignored: the channels hidden everywhere in Juno. */
-export function SettingsIgnored({ ignored, onStopIgnoring }: SettingsIgnoredProps) {
+export function SettingsIgnored({ addRow, ignored, onStopIgnoring }: SettingsIgnoredProps) {
   return (
     <Page width="settings">
       <PageHeader title="Ignored" subtitle="Ignored channels are hidden from your topics, search and All topics. They notify you only when someone mentions you or a group you are in. Nothing changes in Slack." />
       <Section heading="Channels">
+        {addRow}
         <Surface kind="group" padding="md" sx={styles.card}>
           <IgnoredChannels channels={ignored} onStopIgnoring={onStopIgnoring} />
         </Surface>

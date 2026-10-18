@@ -35,7 +35,7 @@ import { keepSuggested, keepTopicOpen, renameTopic, reopenTopic, resolveTopic, r
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
 import { setSubscribed } from '../follow'
 import { countTopics, forgetUsergroups, forgetUsers, listTopics, makeRowCache } from './query'
-import { listIgnoredChannels } from './ignored'
+import { listIgnorableChannels, listIgnoredChannels } from './ignored'
 
 const LIST_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_reads', 'conversations', 'users', 'usergroups', 'ignored_channels', 'thread_subs', 'prefs', 'topic_art']
 /** The sidebar list and counts also follow the views (a view's conversations and Keep these out of All) and the first sync's holds. All topics does not. */
@@ -44,6 +44,8 @@ const COUNT_KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'conversations'
 const QUIET_TICK = '1 minute'
 /** The ignore list counts the messages each channel hid, so it follows them too. */
 const IGNORED_KEYS: InvalidationKeys = ['ignored_channels', 'conversations', 'messages']
+
+const IGNORABLE_KEYS: InvalidationKeys = ['ignored_channels', 'conversations']
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
 
@@ -143,6 +145,8 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
       'channels.unignore': ({ channel }) => setChannelIgnored(channel, false).pipe(Effect.provideService(Workspace, workspace)),
       'channels.ignored': () =>
         serveLiveValue(runs(IGNORED_KEYS, Effect.succeed(listIgnoredChannels), false), { measure }).pipe(retryFirstRun('channels.ignored'), Stream.orDie),
+      'channels.ignorable': () =>
+        serveLiveValue(runs(IGNORABLE_KEYS, Effect.succeed(listIgnorableChannels), false), { measure }).pipe(retryFirstRun('channels.ignorable'), Stream.orDie),
     }
   }),
 )
