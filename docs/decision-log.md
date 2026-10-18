@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 00:16 · tab-kinds-table · Each kind of tab's strip look, history menu label and page come from one table, `tabKinds` in the renderer, typed to list every kind of `Place`. A new kind of tab adds a `Place` member and one table entry instead of editing branches across the renderer.
 - 10-19 00:15 · huddles-design-approved · The huddle design (SPEC section 20 and `@juno/huddle-views`) is approved. The sidebar bar is a card in the accent colour, with green only for speaking and live. A shared window shows a preview in your own tab; a shared full screen does not.
 - 10-18 23:30 · huddle-bar-accent-glass · The huddle bar is a frosted card in the user's accent: the accent's hue at a fixed lightness (so contrast is the same for all eight accents), a sheen from the top, a hairline top highlight and an accent edge. No backdrop blur, since nothing moves behind it and the window has no vibrancy. Green stays only for the speaking ring and the live headphones. Replaces the green bar of 22:40.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.

@@ -640,6 +640,9 @@ End-to-end and perf tests use a typed user-language driver, so they read as spec
 
 **Adding a feature.** The step-by-step recipe is in `docs/development.md` ("Adding a feature"). The names: in `contract/src/routes/<feature>.ts`, `liveValueRoute(tag, { value, payload? })`, `liveListRoute(tag, { row, payload? })` (adds `range: ListRange` to the payload itself) or `Rpc.make(tag, { payload, success, error })` for a command, and the group `<Feature>Routes = RpcGroup.make(...)`; tags are `<feature>.<verb>` and errors come from `contract/src/errors.ts`. In `engine/src/<feature>/handlers.ts`, `<Feature>Routes.toLayer(...)` with `serveLiveValue` / `serveLiveList` over the store's `liveQuery(keys, timed(query))`. In `@juno/state`, `liveQuery(route)(payload)` and `command(route)` give the atoms; nothing else imports Atom. The integration task adds the group to `AllRoutes` and the handler layer to `Handlers` in `engine/src/layer.ts`. `engine/src/status/` and `contract/src/routes/engine.ts` are the worked example.
 
+**Seams.** Some features plug into a closed list that the compiler checks, so each has one place to add to.
+- A kind of tab: a member of the `Place` union in `state/src/tabs.ts` and its `PlaceJson` case (with a `placeOf` case only for an older saved shape, and a `samePlace` case if two places of the kind can differ), then one entry in `tabKinds` in `apps/desktop/src/renderer/containers/tabKinds.tsx`, which gives the tab's look in the strip, its label in the history menu and its page. The table's type lists every kind, so a missing entry does not compile; so does a missing case in `state/src/diagnostics.ts`.
+
 **Effect 4.0.3 names** (checked in the installed source; v3 habits on the left do not exist):
 
 | Do not write | Write |
