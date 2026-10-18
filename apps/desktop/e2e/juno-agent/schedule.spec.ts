@@ -94,79 +94,75 @@ async function relaunch(userData: string, options: LaunchOptions) {
   return { running, juno }
 }
 
-test('a schedule from a clean run wakes once after a quit past its due time', async ({ juno, model, due, running, userData, launch }) => {
-  await ready(juno)
-  const chatPane = await openChat(juno)
-  await chatPane.send('remind me shortly')
-  await chatPane.expectJuno('Scheduled.')
-  const scheduleCard = card(chatPane, 'schedule')
-  await expect(scheduleCard).toHaveAttribute('data-card-status', 'open')
-  await expect(scheduleCard).toContainText('Launch checklist')
-  await expect(scheduleCard).toContainText('Delivers: Now')
+test('a schedule from a clean run wakes once after a quit past its due time, under its own label', async ({ juno, model, due, running, userData, launch }) => {
+  const wakesOnce = 'a schedule from a clean run wakes once after a quit past its due time'
+  await test.step(wakesOnce, async () => {
+    await ready(juno)
+    const chatPane = await openChat(juno)
+    await chatPane.send('remind me shortly')
+    await chatPane.expectJuno('Scheduled.')
+    const scheduleCard = card(chatPane, 'schedule')
+    await expect(scheduleCard).toHaveAttribute('data-card-status', 'open')
+    await expect(scheduleCard).toContainText('Launch checklist')
+    await expect(scheduleCard).toContainText('Delivers: Now')
 
-  const scheduled = await openPage(juno, 'Scheduled')
-  await expect(scheduleRow(scheduled, 'Launch checklist')).toHaveAttribute('data-schedule', 'active')
-  await expect(scheduleRow(scheduled, 'Launch checklist')).toContainText('Next ')
+    const scheduled = await openPage(juno, 'Scheduled')
+    await expect(scheduleRow(scheduled, 'Launch checklist')).toHaveAttribute('data-schedule', 'active')
+    await expect(scheduleRow(scheduled, 'Launch checklist')).toContainText('Next ')
 
-  await running.close()
-  expect(due.at).toBeDefined()
-  expect(wakes(model)).toBe(0)
-  // Model elapsed time while the app is closed. No running process writes this database.
-  // Both the definition and occurrence key move together; the restart runs the real scheduler.
-  const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
-  try {
-    const result = db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1) WHERE state = 'active'").run()
-    expect(result.changes).toBe(1)
-  } finally {
-    db.close()
-  }
+    await running.close()
+    expect(due.at).toBeDefined()
+    expect(wakes(model)).toBe(0)
+    // Model elapsed time while the app is closed. No running process writes this database.
+    // Both the definition and occurrence key move together; the restart runs the real scheduler.
+    const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
+    try {
+      const result = db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1) WHERE state = 'active'").run()
+      expect(result.changes).toBe(1)
+    } finally {
+      db.close()
+    }
+  })
 
   const first = await relaunch(userData, launch)
   try {
     const again = await openChat(first.juno)
-    await again.expectJuno('Here is the launch checklist.')
-    expect(wakes(model)).toBe(1)
-    await expect(again.junoBubble('Here is the launch checklist.')).toHaveCount(1)
+    await test.step(wakesOnce, async () => {
+      await again.expectJuno('Here is the launch checklist.')
+      expect(wakes(model)).toBe(1)
+      await expect(again.junoBubble('Here is the launch checklist.')).toHaveCount(1)
+    })
+    await test.step('a wake shows under a "Scheduled · …" group label', async () => {
+      await expect(again.root.locator('[data-chat-group-label]').filter({ hasText: 'Scheduled · Launch checklist' })).toBeVisible()
+    })
 
-    // A once schedule is gone after its wake.
-    const page = await openPage(first.juno, 'Scheduled')
-    await expect(page.getByText('Nothing scheduled')).toBeVisible()
+    await test.step(wakesOnce, async () => {
+      // A once schedule is gone after its wake.
+      const page = await openPage(first.juno, 'Scheduled')
+      await expect(page.getByText('Nothing scheduled')).toBeVisible()
 
-    const activity = await openPage(first.juno, 'Activity')
-    await expect(activity.locator('[data-activity-run="replied"]').filter({ has: first.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+      const activity = await openPage(first.juno, 'Activity')
+      await expect(activity.locator('[data-activity-run="replied"]').filter({ has: first.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+    })
   } finally {
     await first.running.close()
   }
 
   const second = await relaunch(userData, launch)
   try {
-    // The scheduler's first pass runs as the agent opens, so a wake would be ahead of this message.
-    const last = await openChat(second.juno)
-    await last.send('anything else?')
-    await last.expectJuno('You said: anything else?')
-    expect(wakes(model)).toBe(1)
-    await expect(last.junoBubble('Here is the launch checklist.')).toHaveCount(1)
-    const activity = await openPage(second.juno, 'Activity')
-    await expect(activity.locator('[data-activity-run]').filter({ has: second.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+    await test.step(wakesOnce, async () => {
+      // The scheduler's first pass runs as the agent opens, so a wake would be ahead of this message.
+      const last = await openChat(second.juno)
+      await last.send('anything else?')
+      await last.expectJuno('You said: anything else?')
+      expect(wakes(model)).toBe(1)
+      await expect(last.junoBubble('Here is the launch checklist.')).toHaveCount(1)
+      const activity = await openPage(second.juno, 'Activity')
+      await expect(activity.locator('[data-activity-run]').filter({ has: second.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+    })
   } finally {
     await second.running.close()
   }
-})
-
-test('a wake shows under a "Scheduled · …" group label', async ({ juno, running, userData, launch }) => {
-  await ready(juno)
-  const chatPane = await openChat(juno)
-  await chatPane.send('remind me shortly')
-  await chatPane.expectJuno('Scheduled.')
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
-  try { db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1)").run() } finally { db.close() }
-  const next = await relaunch(userData, launch)
-  try {
-    const pane = await openChat(next.juno)
-    await pane.expectJuno('Here is the launch checklist.')
-    await expect(pane.root.locator('[data-chat-group-label]').filter({ hasText: 'Scheduled · Launch checklist' })).toBeVisible()
-  } finally { await next.running.close() }
 })
 
 test('Pause, Resume and Delete work on the Scheduled page and on the Schedule card', async ({ juno }) => {
@@ -283,32 +279,34 @@ test.fixme('quiet hours hold the schedule notification only, and the wake still 
   } finally { await next.running.close() }
 })
 
-test('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async ({ juno, slack, model }) => {
+test('a reply watch from the message menu: Undo deletes one, and a reply ends another', async ({ juno, slack, model }) => {
   await ready(juno)
-  const requests = model.requests.length
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.composer.fill('Can someone confirm the cutover?')
-  await juno.topic.composer.press('Enter')
-  const menu = await juno.topic.chooseInMessageMenu('Can someone confirm the cutover?', 'watch-reply')
-  expect(menu.labels).toContain('Tell me if nobody replies')
-  await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
-  expect(model.requests).toHaveLength(requests)
-  const page = await openPage(juno, 'Scheduled')
-  await expect(page.locator('[data-schedule]')).toHaveCount(1)
-  slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
-  await expect(page.getByText('Nothing scheduled')).toBeVisible()
-})
+  // Undo first: it leaves nothing scheduled, so the second watch is the only one.
+  await test.step('Undo on a menu reply watch deletes it without a model run', async () => {
+    const requests = model.requests.length
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.composer.fill('Please confirm the test window.')
+    await juno.topic.composer.press('Enter')
+    await juno.topic.chooseInMessageMenu('Please confirm the test window.', 'watch-reply')
+    await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
+    await juno.undoFromToast()
+    const page = await openPage(juno, 'Scheduled')
+    await expect(page.getByText('Nothing scheduled')).toBeVisible()
+    expect(model.requests).toHaveLength(requests)
+  })
 
-test('Undo on a menu reply watch deletes it without a model run', async ({ juno, model }) => {
-  await ready(juno)
-  const requests = model.requests.length
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.composer.fill('Please confirm the test window.')
-  await juno.topic.composer.press('Enter')
-  await juno.topic.chooseInMessageMenu('Please confirm the test window.', 'watch-reply')
-  await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
-  await juno.undoFromToast()
-  const page = await openPage(juno, 'Scheduled')
-  await expect(page.getByText('Nothing scheduled')).toBeVisible()
-  expect(model.requests).toHaveLength(requests)
+  await test.step('"Tell me if nobody replies" on a message watches it and a reply ends the watch', async () => {
+    const requests = model.requests.length
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.composer.fill('Can someone confirm the cutover?')
+    await juno.topic.composer.press('Enter')
+    const menu = await juno.topic.chooseInMessageMenu('Can someone confirm the cutover?', 'watch-reply')
+    expect(menu.labels).toContain('Tell me if nobody replies')
+    await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
+    expect(model.requests).toHaveLength(requests)
+    const page = await openPage(juno, 'Scheduled')
+    await expect(page.locator('[data-schedule]')).toHaveCount(1)
+    slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
+    await expect(page.getByText('Nothing scheduled')).toBeVisible()
+  })
 })
