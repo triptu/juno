@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 19:13 · ignored-add-row · Settings › Ignored's add row sits above the list's card, so its searchable list opens over the page and a new row lands right under it. The select is a new `SelectButton` (the `Select` field as a button), since a native select cannot filter; Ignore calls the channel menu's own `ignoreChannel` action.
 - 10-18 19:02 · signin-session-durability · Sign-in waits for Main to sync and atomically replace `secrets.bin` before publishing `ready`; storage errors return through the sign-in failure path.
 - 10-18 18:50 · orchestrator · The main process logs unhandled promise rejections and keeps running; engine and agent still exit and are restarted by main; the process log is installed once per process. Why: one stray rejection in main quit the whole app (found via the coverage hook in session.spec:158).
 - 10-18 18:23 · idle-sweep-window · Keep the 3% idle engine budget; print a window containing a successful scheduled discovery sweep and replace it once with a settled window containing no Slack calls, so scheduled sync work is not mistaken for an idle loop.
