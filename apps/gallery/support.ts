@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
 
 /** One state, as the gallery lists it on `window.__galleryRoutes`. */
 export interface Route {
@@ -120,6 +120,50 @@ export function claimQueue(name: string) {
  * to 370 MB each over 60 states, until the kernel ended a renderer (10-18).
  */
 const statesPerContext = 20
+const closeTimeoutMs = 5_000
+
+class CloseTimeout extends Error {}
+
+async function closeWithin(promise: Promise<void>, label: string): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new CloseTimeout(`${label} did not close within ${closeTimeoutMs} ms`)), closeTimeoutMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function closeWalkContext(browser: Browser, context: BrowserContext, page: Page): Promise<void> {
+  let pageError: unknown
+  try {
+    // Closing the page first bypasses beforeunload and removes it before context teardown.
+    await closeWithin(page.close({ runBeforeUnload: false }), 'Gallery page')
+  } catch (error) {
+    pageError = error
+  }
+  try {
+    await closeWithin(context.close(), 'Gallery context')
+  } catch (error) {
+    // A context left alive at every rollover would undo the 20-state memory limit.
+    try {
+      await closeWithin(browser.close(), 'Gallery browser')
+    } catch (browserError) {
+      throw new Error(`Gallery context and browser cleanup stalled: ${String(error)}; ${String(browserError)}`)
+    }
+    throw new Error(`Gallery context cleanup stalled; closed the worker browser: ${String(error)}`)
+  }
+  if (pageError instanceof CloseTimeout) {
+    console.log(`Gallery page close timed out; its context closed (${page.url()})`)
+  } else if (pageError !== undefined) {
+    // In particular, do not turn a renderer crash into a successful walk.
+    throw pageError
+  }
+}
 
 /**
  * The page for a walk over many states (the shift guard, the focus ring).
@@ -137,7 +181,7 @@ export async function walkPages(browser: Browser) {
     page: () => page,
     next: async (): Promise<Page> => {
       if (opened === statesPerContext) {
-        await context.close()
+        await closeWalkContext(browser, context, page)
         context = await browser.newContext()
         page = await context.newPage()
         opened = 0
@@ -145,6 +189,6 @@ export async function walkPages(browser: Browser) {
       opened++
       return page
     },
-    close: () => context.close(),
+    close: () => closeWalkContext(browser, context, page),
   }
 }
