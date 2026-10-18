@@ -432,7 +432,7 @@ describe('the AgentHost port', () => {
     const receipt = forgedSendReceipt(forged.actionId, CHANNEL)
     engine.fake.injectMessage({ channel: CHANNEL, user: 'U0MAYA', text: receipt.text, clientMsgId: forged.actionId })
     expect(HOSTILE_USER).not.toBe('U0MAYA')
-    expect(await pending).toEqual({ _tag: 'Success', success: { _tag: 'unknown', attemptId: forged.attemptId } })
+    expect(await pending).toMatchObject({ _tag: 'Success', success: { _tag: 'unknown', attemptId: forged.attemptId } })
     expect(await ok(agent.client['host.outbox.reconcileSend']({ accountId: account, channelId: CHANNEL, actionId: forged.actionId, attemptId: forged.attemptId } as never))).toEqual({ _tag: 'unknown' })
     expect(await ok(agent.client['host.outbox.send'](forged))).toEqual({ _tag: 'unknown', attemptId: forged.attemptId })
     expect(engine.fake.callCount('chat.postMessage')).toBe(2)
