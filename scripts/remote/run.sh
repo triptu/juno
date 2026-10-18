@@ -60,6 +60,9 @@ xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
+if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ] && [ -r /sys/fs/cgroup/memory.peak ]; then
+  awk '{ printf "remote: peak container memory %.2f GB (includes file cache)\n", $1 / 1073741824 }' /sys/fs/cgroup/memory.peak >&2
+fi
 if [ -s /out/memory.txt ]; then
   sort -nr -k1,1 /out/memory.txt | head -1 | awk '{ printf "remote: peak memory used %.1f GB, available %.1f GB\n", $1 / 1048576, $2 / 1048576 }' >&2
 fi
