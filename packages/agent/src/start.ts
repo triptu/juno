@@ -22,7 +22,7 @@ import { bindViewHost } from './view-tools/host'
 import { mkdirSync } from 'node:fs'
 import { Context, Effect, Exit, Layer, Logger, Schema, Scope, Stream } from 'effect'
 import { AGENT_HOST_PROTOCOL, HostHello, type AgentConfig } from '@juno/agent-contract'
-import { bindActionHost } from './actions/host'
+import { bindActionHost, type ActionHost } from './actions/host'
 import { AgentHost } from './host/client'
 import { bindHost, type BoundHost } from './host/reads'
 import type { HostConnection } from './host/port'
@@ -99,6 +99,20 @@ const watchOffers = (engine: Turns, bound: BoundHost, provider: ProviderConnecti
     return offers
   })
 
+/**
+ * Follows the host's streams for as long as the agent runs, starting again a
+ * second after one ends: reply-watch changes check the schedules, and a Send
+ * card's rows follow the host's outbox, also after the owner retries a send
+ * from the topic.
+ */
+const followHostStreams = (engine: Turns, bound: BoundHost, actionHost: ActionHost) =>
+  Effect.gen(function* () {
+    const follow = <A>(stream: Stream.Stream<A, unknown>, f: (value: A) => Effect.Effect<void>) =>
+      stream.pipe(Stream.runForEach(f), Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever, Effect.forkScoped)
+    yield* follow(bound.scheduleChanges, () => Effect.promise(engine.checkSchedules))
+    if (actionHost.sendStates !== undefined) yield* follow(actionHost.sendStates, (states) => Effect.sync(() => engine.actions.outboxStates(states)))
+  })
+
 /** The host speaks another AgentHost protocol version than this agent. */
 export class HostProtocolMismatch extends Schema.TaggedError<HostProtocolMismatch>()('HostProtocolMismatch', { host: HostHello }) {}
 
@@ -140,19 +154,7 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
                 scope,
               )
         if (engine?._tag === 'running') {
-          yield* bound.scheduleChanges.pipe(
-            Stream.runForEach(() => Effect.promise(engine.checkSchedules)),
-            Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
-            Effect.forkScoped, Scope.provide(scope),
-          )
-          // A Send card's rows follow the host's outbox, also after the owner retries a send from the topic.
-          if (actionHost.sendStates !== undefined) {
-            yield* actionHost.sendStates.pipe(
-              Stream.runForEach((states) => Effect.sync(() => engine.actions.outboxStates(states))),
-              Effect.ignore, Effect.andThen(Effect.sleep('1 second')), Effect.forever,
-              Effect.forkScoped, Scope.provide(scope),
-            )
-          }
+          yield* followHostStreams(engine, bound, actionHost).pipe(Scope.provide(scope))
           yield* answerEngineSpend(createSpend(engine.store, () => capOf(engine.store))).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
           yield* forwardAiCalls(engine.guard).pipe(Effect.provide(context), Effect.forkScoped, Scope.provide(scope))
           // A click waits while no Slack account is known; each presence lets it look again.
