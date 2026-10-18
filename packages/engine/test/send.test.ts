@@ -290,7 +290,7 @@ describe('send', () => {
     await engine.phase('offline')
     const id = await send(engine, 'Written on the train', rows)
     // Nothing leaves while offline, so the row never becomes a lookup.
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await engine.workPass('post')
     expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(0)
     expect(inStore(engine, id)).toEqual({ stored: 0, pending: 'queued' })
     engine.main.network.offline = false
@@ -323,7 +323,7 @@ describe('send', () => {
     engine.fake.decide(first.id, 'run')
     await waitFor(() => engine.fake.gated().find((call) => call.id === first.id && call.stage === 'answer'), WAIT_MS, 'the first post run')
     engine.fake.decide(first.id, 'answer')
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await engine.workPass('post')
     const second = engine.fake.gated().filter((call) => call.id !== first.id)
     engine.fake.gate(undefined)
     // SPEC 8: sends wait out a lost connection.

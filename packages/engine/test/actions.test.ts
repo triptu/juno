@@ -3,6 +3,7 @@
 // event reconcile it in either order, a message still being sent is waited
 // for (`depends_on`), and a refusal puts back what Slack has. Reactions are
 // in `reactions.test.ts`.
+import { productionTiming } from '../src/config'
 import { step } from './step'
 import { describe, expect, it } from 'vitest'
 import { deleteMessage, editMessage, sendMessage } from '@juno/state'
@@ -168,8 +169,8 @@ describe('edit', () => {
     expect(inSlack(engine, message.ts)?.text).toBe('After a restart')
   })
 
-  it('stays idle while the channel’s first edit waits to retry and a second waits behind it', async () => {
-    const engine = await booted()
+  it('stays idle while the channel’s first edit waits to retry and a second waits behind it [production timing]', async () => {
+    const engine = await booted({ timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis, actionDeadlineMillis: productionTiming.actionDeadlineMillis } })
     const rows = watch(engine, MAIN)
     const first = await sent(engine, 'First draft', rows)
     const second = await sent(engine, 'Second draft', rows)

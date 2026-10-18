@@ -12,7 +12,7 @@
  * The boot window is the user's quiet window (the `quietDays` pref, the
  * same one the sidebar reads), observed by the sync while it runs. The
  * engine uses the production sync schedule against both Slack and the fake;
- * focused tests override it through `SyncControl`.
+ * tests override it through `EngineTiming` and `SyncControl`.
  *
  * `phases` is the sync's phase while one runs, `undefined` otherwise,
  * `syncing` says whether one of its cycles is running, and `slowedUntil`
@@ -23,12 +23,12 @@
  */
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { RequestQueue } from '@juno/slack'
-import { HOLD_MILLIS, holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
+import { holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
 import { NotificationControl } from '../notificationRuntime'
 import { SocketEvents } from '../socketEvents'
 import type { SlackAuthRequired } from '@juno/slack'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
-import { SyncControl } from '../config'
+import { SyncControl, EngineTiming } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
@@ -50,6 +50,7 @@ export class SyncRunner extends Context.Service<
       const session = yield* Session
       const workspace = yield* Workspace
       const control = yield* SyncControl
+      const timing = yield* EngineTiming
       const link = yield* SyncLink
       const events = yield* SocketEvents
       const notifications = yield* NotificationControl
@@ -101,9 +102,9 @@ export class SyncRunner extends Context.Service<
               openTopics: link.shown,
               // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated"); nothing stays held after.
               onBooted: sortClearCases().pipe(Effect.andThen(releaseHolds), Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
-              // The first sync's All waits for the rules: undecided channels are held until their history is sorted, for HOLD_MILLIS at most.
+              // The first sync's All waits for the rules: undecided channels are held until their history is sorted, for the configured hold at most.
               onListed: holdUndecided.pipe(
-                Effect.andThen(Effect.forkIn(Effect.sleep(HOLD_MILLIS).pipe(Effect.andThen(releaseHolds)), active.scope)),
+                Effect.andThen(Effect.forkIn(Effect.sleep(timing.automatedHoldMillis).pipe(Effect.andThen(releaseHolds)), active.scope)),
                 Effect.provide(open.context),
                 Effect.asVoid,
                 Effect.catch((error) => Effect.logWarning('sync: Automated holds not set', error)),
@@ -115,6 +116,10 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.provide(
               syncConfigLayer({
+                bootRetryMillis: timing.bootRetryMillis,
+                usersBatchMillis: timing.usersBatchMillis,
+                sweepIntervalMillis: timing.sweepIntervalMillis,
+                followPassMillis: timing.followPassMillis,
                 ...control.config,
               }),
             ),

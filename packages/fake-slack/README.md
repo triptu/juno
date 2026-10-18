@@ -73,3 +73,5 @@ surviving copy, but only the fallback certifies coverage for deleting a duplicat
 half-open socket while HTTP counts still succeeds; the real client timeout detects
 it. The hidden-old-root `thread_not_found` scenario is injected as a refusal in a
 test, not asserted as measured Slack behavior.
+
+Large-workspace reads build a request-local index of followed roots and replies. `getView` chooses its page before expanding thread bodies; unread counts scan messages once. No result is cached across requests, so edits, read marks and follow changes are visible on the next page. Seed posts already in timestamp order append without sorting the whole conversation again.

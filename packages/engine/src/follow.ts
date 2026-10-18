@@ -36,6 +36,7 @@
  * The state is Slack's follow flag in `thread_subs`. The pure rules in
  * `@juno/domain` read it (`isFollowed`, `sidebarPlacement`).
  */
+import { EngineTiming } from './config'
 import { Clock, Effect, Schedule } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type SubscribeError } from '@juno/contract'
 import { compareTs, maxTs, millisToTs, parseTopicId, type Ts } from '@juno/domain'
@@ -68,6 +69,7 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
     const undo: CommandResult = { undo: { _tag: subscribed ? 'topics.unsubscribe' : 'topics.subscribe', id } }
 
     const { channel, threadTs } = parsed
+    const timing = yield* EngineTiming
     const outbox = yield* Outbox
 
     /**
@@ -93,7 +95,7 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
         const current = yield* local(threadSub(channel, threadTs))
         if (current?.observedAt === undefined || compareTs(current.observedAt, ended) > 0) return
         if (!(yield* refresh(previous, forgetIfUnfollowed, endedAt))) return yield* Effect.fail('unanswered' as const)
-      }).pipe(Effect.retry({ schedule: Schedule.exponential('1 second'), times: LOOKUP_RETRIES }), Effect.delay('1 second'))
+      }).pipe(Effect.retry({ schedule: Schedule.exponential(timing.lookupRetryMillis), times: LOOKUP_RETRIES }), Effect.delay(timing.lookupRetryMillis))
 
     return yield* outbox.exclusive(id)(
       Effect.gen(function* () {

@@ -127,7 +127,7 @@ describe('topic art', () => {
       // A new thread the user replies in (so Slack follows it) arrives: no drawing is made for it.
       const thread = liveThread(engine, 'Postgres replica lag while AI is off')
       await engine.rowsUntil((rows) => rows.some((row) => row.id === thread.id), 'the new thread in the sidebar')
-      await new Promise((resolve) => setTimeout(resolve, 2_500))
+      await engine.workPass('art')
       expect(storedArt(engine).length).toBe(count)
       expect(storedArt(engine).find((row) => row.topic_id === thread.id)).toBeUndefined()
 

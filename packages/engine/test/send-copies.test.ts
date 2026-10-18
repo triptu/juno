@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { MessageView } from '@juno/contract'
 import { deleteMessage, messagesAtom, sendMessage, type ListWindow } from '@juno/state'
-import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, quiet, readDb, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -202,9 +202,10 @@ describe('send: a copy whose delete waits for the send lane', () => {
     expect(valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'A slow post', 'm:C0PRODUCT'))).toEqual({ topicId: 'm:C0PRODUCT' })
     await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the slow post at Slack')
     // The copy's echo arrives: it is hidden, its delete is checked and waits for the lane.
+    const ready = engine.actionsReady()
     engine.fake.releaseFrames()
     await waitFor(() => (deletesLeft(engine) === 1 ? true : undefined), WAIT_MS, 'the copy delete queued')
-    await sleep(1_000)
+    await waitFor(() => engine.actionsReady() > ready ? true : undefined, WAIT_MS, 'the copy delete passed preflight')
     // On the phone the user deletes the message Juno kept.
     engine.fake.deleteMessage({ channel: 'C0ENG', ts: kept })
     await waitFor(
@@ -237,7 +238,8 @@ describe('send: the user deletes a message before Juno has seen its copy', () =>
     await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the message deleted in Slack')
     engine.fake.releaseFrames()
     // The copy's echo is stored, and its delete row, if any, settles.
-    await sleep(2_000)
+    await engine.socketIdle()
+    await engine.workPass('action')
     await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete rows settled')
     // The user meant the message gone: Slack keeps no copy of it, and Juno shows none.
     expect(inSlack(engine, id)).toBe(0)

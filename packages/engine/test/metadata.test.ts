@@ -125,7 +125,7 @@ it('leaves omitted topic and purpose to the snapshot while a partial event chang
 })
 
 it('merges a partial incremental counts row without clearing unread state or latest', async () => {
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500 })
+  const engine = await bootedEngine(engines, { timing: { sweepIntervalMillis: 500 } })
   const reads = () => readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT slack_last_read, latest, has_unreads, mention_count, counts_updated FROM channel_reads WHERE channel = 'C0ENG'",
   ).get())

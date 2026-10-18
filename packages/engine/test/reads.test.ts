@@ -1,3 +1,5 @@
+import { controlledClock } from './controlledClock'
+import { productionTiming } from '../src/config'
 // Read state end to end (architecture 5.6, specs/readstate.qnt): the read
 // commands over the port, the sidebar rows they change, and what reaches
 // the fake Slack.
@@ -7,7 +9,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { prefsSet, readsCatchUp, readsMarkRead, readsMarkUnread, type TopicRow, type UndoCommand } from '@juno/contract'
 import { mirrorReadsAtom, readCatchUpAtom, runCommand, type TopicListFilter } from '@juno/state'
-import { sleep, waitFor, type RunningEngine } from './harness'
+import { waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine as boot, quiet, readDb, restart, threadId, tsOf, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -60,7 +62,7 @@ async function checkFollowedAndLocalReads(engine: RunningEngine): Promise<void> 
   const checkout = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
   valueOf(await markUnread(engine, checkout))
   valueOf(await markRead(engine, checkout))
-  await sleep(800)
+  await engine.workPass('mark')
   await quiet(engine)
   expect(marks(engine)).toHaveLength(1)
   expect(storedPointer(engine, checkout)).toBe(engine.fake.workspace.replies('C0ENG', tsOf(checkout)).at(-1)!.ts)
@@ -130,21 +132,28 @@ describe('marking read', () => {
 })
 
 describe('the outbox', () => {
-  it('five marks in a row make one call with the last intent', async () => {
-    // The app's 400 ms window is shorter than five commands take on a loaded machine (up to 1.2 s at
-    // ten busy processes per core), and then a second call is right. A longer window keeps all five in one.
-    const windowMillis = 3_000
-    const engine = await boot(engines, { markDelayMillis: windowMillis })
-    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread')
-    engine.fake.resetCalls()
-    const started = Date.now()
-    for (const mark of [markRead, markUnread, markRead, markUnread, markRead]) valueOf(await mark(engine, ALERTS_MAIN))
-    expect(Date.now() - started, 'the five marks took longer than the window').toBeLessThan(windowMillis)
-    expect(marks(engine)).toEqual([])
-    await waitFor(() => (marks(engine).length > 0 ? true : undefined), 10_000, 'the mark')
-    await sleep(800)
-    await quiet(engine)
-    expect(marks(engine).map((c) => c.args['ts'])).toEqual([latestMain(engine, ALERTS)])
+  it('five marks coalesce over the production 400 ms window [TestClock]', async () => {
+    const time = await controlledClock()
+    const windowMillis = productionTiming.markDelayMillis
+    const engine = await boot(engines, { clock: time.clock, timing: { markDelayMillis: windowMillis } })
+    try {
+      await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread')
+      engine.fake.resetCalls()
+      await time.freeze()
+      for (const mark of [markRead, markUnread, markRead, markUnread, markRead]) valueOf(await mark(engine, ALERTS_MAIN))
+      expect(marks(engine)).toEqual([])
+      await time.advance(windowMillis - 1)
+      await engine.workPass('mark')
+      expect(marks(engine)).toEqual([])
+      await time.advance(1)
+      await waitFor(() => marks(engine).length > 0 ? true : undefined, 10_000, 'the mark')
+      await engine.workPass('mark')
+      expect(marks(engine).map((c) => c.args['ts'])).toEqual([latestMain(engine, ALERTS)])
+    } finally {
+      await engine.stop()
+      engines.splice(engines.indexOf(engine), 1)
+      await time.close()
+    }
   })
 
   it('a transient failure is retried and acknowledged', async () => {
@@ -179,11 +188,11 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.mark' }) === 1 ? true : undefined), 10_000, 'the held mark')
     // A frame stamped before Juno's mark, from another client that had read three messages.
     engine.fake.emitFrame({ type: 'channel_marked', channel: ALERTS, ts: messages.at(-7)!.ts, event_ts: messages.at(-1)!.ts })
-    await sleep(300)
+    await engine.socketIdle()
     expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     engine.fake.release()
     valueOf(await pending)
-    await sleep(500)
+    await engine.socketIdle()
     await quiet(engine)
     // Slack, asked afterwards, has Juno's mark.
     expect(storedPointer(engine, ALERTS_MAIN)).toBe(latestMain(engine, ALERTS))
@@ -199,8 +208,9 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.mark' }) === 1 ? true : undefined), 10_000, 'the held mark')
     // Slack accepted Juno's mark; then the user marks two messages unread on their phone.
     engine.fake.markRead({ channel: ALERTS, ts: messages.at(-3)!.ts })
-    await sleep(300)
+    await engine.socketIdle()
     // The mark is still pending, so its intent stays visible.
+    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 0, 'local read intent visible')
     expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     engine.fake.release()
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 2, 'the phone’s mark')
@@ -220,7 +230,7 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     engine.fake.resetCalls()
     engine.fake.releaseFrames({ count: 1 })
     engine.fake.releaseFrames({ drop: true })
-    await sleep(500)
+    await engine.socketIdle()
     await quiet(engine)
     // The frame cannot be ordered against Juno's mark, so Slack was asked; it still has Juno's mark.
     expect(apiCalls(engine, 'conversations.info').map((c) => c.args['channel'])).toContain(ALERTS)
@@ -247,7 +257,9 @@ describe('the mirror setting', () => {
     valueOf(await markRead(engine, ALERTS_MAIN))
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 0, 'read in Juno')
     // A reconnect reads counts again: Slack's pointer has not changed, so Juno's own mark stays.
+    const reconnected = engine.nextSync()
     engine.fake.dropSocket()
+    await reconnected
     await engine.phase('live', 30_000)
     await waitFor(() => (apiCalls(engine, 'client.counts').length > 0 ? true : undefined), 20_000, 'the reconnect counts')
     await quiet(engine)
@@ -264,7 +276,9 @@ describe('nothing marks by itself', () => {
     const engine = await bootedEngine()
     engine.fake.injectMessage({ channel: ALERTS, user: 'U0GRAFANA', text: '[FIRING] cpu 90% on api-1' })
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 10, 'ten unread')
+    const reconnected = engine.nextSync()
     engine.fake.dropSocket()
+    await reconnected
     await engine.phase('live', 30_000)
     await quiet(engine)
     expect(marks(engine)).toEqual([])

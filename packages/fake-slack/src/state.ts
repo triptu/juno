@@ -22,6 +22,7 @@ import type {
 } from '@juno/slack-schema'
 import { compareTs, isReply, millisToTs, Ts } from '@juno/slack-schema'
 import type { Clock } from './clock.ts'
+import { threadCounts, threadIndex } from './threadViews.ts'
 import { escapeText, textToBlocks, toMrkdwn, unescapeText } from './richtext.ts'
 
 export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
@@ -343,27 +344,8 @@ export class Workspace {
     }
   }
 
-  threadCounts(): ThreadCounts {
-    const unreadByChannel: Record<string, number> = {}
-    const mentionsByChannel: Record<string, number> = {}
-    for (const sub of this.subscriptions.values()) {
-      if (!sub.subscribed) continue
-      const unread = this.replies(sub.channel, sub.threadTs).filter(
-        (m) => compareTs(m.ts, sub.lastRead) > 0 && m.user !== this.selfId,
-      )
-      if (unread.length === 0) continue
-      unreadByChannel[sub.channel] = (unreadByChannel[sub.channel] ?? 0) + unread.length
-      const mentions = unread.filter((m) => this.mentionsSelf(m)).length
-      if (mentions > 0) mentionsByChannel[sub.channel] = (mentionsByChannel[sub.channel] ?? 0) + mentions
-    }
-    const mentionCount = Object.values(mentionsByChannel).reduce((a, b) => a + b, 0)
-    return {
-      has_unreads: Object.keys(unreadByChannel).length > 0,
-      mention_count: mentionCount,
-      unread_count_by_channel: unreadByChannel,
-      mention_count_by_channel: mentionsByChannel,
-      timestamp: this.#lastTs,
-    }
+  threadCounts(threads = threadIndex(this)): ThreadCounts {
+    return { ...threadCounts(this, threads), timestamp: this.#lastTs }
   }
 
   subscriptionObject(sub: Subscription): ThreadSubscription {
@@ -446,8 +428,9 @@ export class Workspace {
           }),
     }
     const list = this.all(input.channel)
+    const last = list.at(-1)
     list.push(message)
-    list.sort((a, b) => compareTs(a.ts, b.ts))
+    if (last !== undefined && compareTs(last.ts, message.ts) > 0) list.sort((a, b) => compareTs(a.ts, b.ts))
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
     this.#touchConversation(input.channel, input.at)

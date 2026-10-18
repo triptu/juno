@@ -16,6 +16,8 @@
  * the topic with backoff in memory, so one failing call cannot loop; a
  * missing key defers the whole pass, since no call can succeed.
  */
+import { EngineTiming, type EngineTimingConfig } from '../config'
+import { observeWork, workWakes } from '../workControl'
 import { AiProvider } from '@juno/ai'
 import { quietDaysOf } from '@juno/domain'
 import { liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
@@ -34,13 +36,6 @@ export const ART_CONCURRENCY = 4
 export const ART_DAILY_BUDGET = 500
 /** Candidates one pass takes; the next pass takes the next ones. */
 const PASS_SIZE = 24
-/** A burst of sync writes becomes one pass. */
-const DEBOUNCE = '1500 millis'
-/** After a call that did not finish, the topic waits this long, doubling each time, before it is asked about again. */
-const DEFER_BASE_MILLIS = 60_000
-const DEFER_CAP_MILLIS = 30 * 60_000
-/** With no key or at the daily cap, nothing can succeed: the pass as a whole waits. */
-const NO_KEY_DEFER_MILLIS = 10 * 60_000
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'topic_art', 'prefs', 'conversations', 'ignored_channels', 'thread_subs']
 const DAY = 24 * 60 * 60 * 1000
@@ -96,13 +91,14 @@ interface Memory {
   passDeferredUntil: number
 }
 
-const defer = (memory: Memory, topicId: string, now: number): void => {
+const defer = (memory: Memory, topicId: string, now: number, timing: EngineTimingConfig): void => {
   const attempts = (memory.deferred.get(topicId)?.attempts ?? 0) + 1
-  memory.deferred.set(topicId, { until: now + Math.min(DEFER_CAP_MILLIS, DEFER_BASE_MILLIS * 2 ** (attempts - 1)), attempts })
+  memory.deferred.set(topicId, { until: now + Math.min(timing.artDeferCapMillis, timing.aiDeferBaseMillis * 2 ** (attempts - 1)), attempts })
 }
 
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> =>
   Effect.gen(function* () {
+    const timing = yield* EngineTiming
     const now = yield* Clock.currentTimeMillis
     if (now < memory.passDeferredUntil) return
     const pass = yield* readPass(now)
@@ -135,11 +131,11 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
           const at = yield* Clock.currentTimeMillis
           // No key, or the daily cap: nothing was sent, and nothing can succeed until a key, a link to the ledger or the ledger's word that it has room again wakes the job.
           if (outcome === 'missing-key' || outcome === 'budget' || outcome === 'no-agent') {
-            memory.passDeferredUntil = at + NO_KEY_DEFER_MILLIS
+            memory.passDeferredUntil = at + timing.artNoKeyMillis
             return
           }
           memory.unstored.today += 1
-          defer(memory, row.topic_id, at)
+          defer(memory, row.topic_id, at, timing)
         }),
       { concurrency: ART_CONCURRENCY, discard: true },
     )
@@ -149,6 +145,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
 export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(
   Effect.gen(function* () {
     if (!(yield* aiJobsOn)) return
+    const timing = yield* EngineTiming
     const workspace = yield* Workspace
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
@@ -166,9 +163,11 @@ export const ArtJob: Layer.Layer<never, never, Workspace | AiProvider | AiCreden
           memory.deferred.clear()
           memory.passDeferredUntil = 0
         })))
-        return Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), woken).pipe(
+        return Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(timing.artDebounceMillis)), woken).pipe(
+          Stream.merge(workWakes('art')),
           Stream.mapEffect(() =>
             runPass(memory).pipe(
+              observeWork('art'),
               Effect.catch((error) => Effect.logWarning('topic art: a pass failed', error)),
               Effect.provideService(AiProvider, provider),
             ),

@@ -13,16 +13,18 @@
  * tests). Both default to the Node flavour so a bare `startEngine` still
  * serves.
  */
-import { Context, Effect, Exit, Layer, Logger, Scope } from 'effect'
+import { WorkControl, type WorkControlOptions } from './workControl'
+import { Clock, Context, Effect, Exit, Layer, Logger, Scope } from 'effect'
 import type { HandlerOptions } from '@juno/agent-juno'
 import type { EngineConfig as Config } from '@juno/contract'
 import { HttpTransport } from '@juno/slack'
-import { EngineConfig, SyncControl, type SyncControlOptions } from './config'
+import { EngineConfig, EngineTiming, productionTiming, type EngineTimingConfig, SyncControl, type SyncControlOptions } from './config'
 import { agentHostServer } from './protocol/agentHost'
 import { HostLink, silentHost, type Host } from './protocol/host'
 import { hostNotificationHost, NotificationControl, NotificationHost } from './notificationRuntime'
 import type { Presence } from '@juno/domain'
 import { Outbox } from './outbox'
+import { SocketEvents } from './socketEvents'
 import { AgentHost, Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
 import type { Transport } from './protocol/transport'
@@ -39,6 +41,11 @@ export interface EngineHandle {
 }
 
 export interface EngineHostOptions {
+  /** Scheduling overrides; omitted values keep production defaults. */
+  readonly timing?: Partial<EngineTimingConfig>
+  readonly work?: WorkControlOptions
+  /** A controlled clock for tests of production scheduling. */
+  readonly clock?: Clock.Clock
   readonly logger?: Logger.Logger<unknown, void>
 
   readonly notifications?: NotificationHost
@@ -70,6 +77,8 @@ export function startEngine(transport: Transport, config: Config, options: Engin
         Layer.provide(
           Layer.mergeAll(
             EngineConfig.layer(config),
+            Layer.succeed(WorkControl, options.work ?? {}),
+            Layer.succeed(EngineTiming, { ...productionTiming, ...(config.fakeSlackUrl === undefined ? {} : { socketBackoffCapMillis: 2_000, socketTickleMillis: 2_000 }), ...options.timing }),
             notificationHost,
             Layer.succeed(SyncControl, options.sync ?? {}),
             hostLink,
@@ -78,7 +87,14 @@ export function startEngine(transport: Transport, config: Config, options: Engin
         ),
       )
       // A failed build must not leak what was already acquired.
-      const context = yield* Layer.buildWithScope(app, scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
+      const context = yield* Layer.buildWithScope(app, scope).pipe(Effect.provideService(Clock.Clock, options.clock ?? (yield* Clock.Clock)), Effect.onError(() => Scope.close(scope, Exit.void)))
+      const onEvent = options.sync?.onEvent
+      if (onEvent !== undefined) {
+        // Register before returning so the harness can observe every subsequent barrier frame.
+        yield* Context.get(context, SocketEvents).subscribe('test-barrier', Effect.succeed((input) =>
+          input._tag === 'Overflowed' ? Effect.void : Effect.sync(() => onEvent(input)),
+        )).pipe(Effect.provideService(Scope.Scope, scope))
+      }
       const notifications = Context.get(context, NotificationControl)
       const outbox = Context.get(context, Outbox)
       return {

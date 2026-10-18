@@ -17,7 +17,7 @@ import {
   type LiveListAtom,
   type LiveValueAtom,
 } from '@juno/state'
-import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine as boot, DAY, quiet, readDb, seedThread, threadId, valueOf } from './scenario'
 
 /** A thread from three weeks ago, posted with no events: the store knows nothing of it. */
@@ -209,7 +209,7 @@ describe('opening a topic', () => {
       const result = engine.registry.get(messagesAtom(id))
       return result._tag === 'Success' && result.value.meta.seq > 0 && result.value.order.length > 0 ? true : undefined
     }, WAIT_MS, 'the prefetched window')
-    await sleep(300)
+    await engine.syncIdle()
     expect(conversationCalls(engine)).toHaveLength(0)
   })
 })

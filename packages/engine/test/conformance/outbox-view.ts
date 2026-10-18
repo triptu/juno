@@ -320,3 +320,11 @@ export function observeConnection(world: World): View['connected'] {
 }
 
 export const observe = (world: World): View => ({ d1: observeDraft(world, 1), d2: observeDraft(world, 2), connected: observeConnection(world) })
+
+/** The socket barrier and sync completion cover ungated work between trace steps. */
+export async function settle(world: World): Promise<void> {
+  if (world.closed) return
+  await world.engine.socketIdle()
+  await world.engine.syncIdle()
+  await world.engine.handle.commandIdle()
+}

@@ -1,0 +1,1 @@
+- 10-19 04:18 · command-and-replay-barriers · Observe commands admitted to a target lock instead of sleeping; before a conformance trace allows a copy delete, await a worker pass to finish any rejected request checked before the preceding world change.

@@ -2,6 +2,8 @@
 
 The engine: all of Juno's business logic and I/O, as Effect services in one Node program. It runs in Electron's utility process and, for tests, under plain Node. See `docs/architecture.md` sections 1, 2.5 and 2.6.
 
+`startEngine` accepts scheduling overrides in `options.timing`; `src/config.ts` holds the typed fields and unchanged production defaults. The unit harness uses a fast profile and observable work completion; see [test/README.md](test/README.md).
+
 ## What it owns
 
 - `startEngine(transport, config, { host, httpTransport, agentTransport, agentWrites, notifications })`: builds the app layer, serves the RPC protocol, returns `{ stop, commandIdle, wake, setPresence, currentPresence }`. Services and the server come up before any boot work, so the first live query is answered from local state. `host` is the parentPort line to main (`memoryHost()` in tests); `httpTransport` is the Slack HTTP seam (`net.fetch` in the app, Node `fetch` by default); with `agentTransport`, the engine also serves the AgentHost group from `@juno/agent-contract` to the agent process on those ports (`src/protocol/agentHost.ts`, handlers from `@juno/agent-juno`, ADR 0012). `agentWrites` is `disabled` unless a test turns the agent's sends on.

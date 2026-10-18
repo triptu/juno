@@ -5,7 +5,7 @@ import { prefs, StoreReader, StoreWriter, type SqlClient } from '@juno/store'
 import { readState, storedMe, writeLocalMark } from '@juno/sync'
 import type { EngineConfig } from '@juno/contract'
 import { mirrorSetting } from './readSetting'
-import { MARK_DELAY_MILLIS } from './marks'
+import { EngineTiming } from './config'
 
 const DONE = 'reads.mirrorCatchUp'
 const MIGRATED = 'reads.mirrorDefaultApplied'
@@ -51,7 +51,7 @@ export const queueReadCatchUp = (config: EngineConfig, automatic = false) => Eff
     yield* writeLocalMark(id, {
       ...state, commanded: true, observedAt: millisToTs(now), pendingLocalWrite: true,
       intent: { lastReadTs: state.lastReadTs, unread: false },
-    }, undefined, now, MARK_DELAY_MILLIS, true)
+    }, undefined, now, (yield* EngineTiming).markDelayMillis, true)
   }
   yield* prefs.set(DONE, true)
 })
