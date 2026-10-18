@@ -4,6 +4,7 @@
  * what the renderer reports. Input to the window and a sync running reset
  * the idle time the self-check waits for.
  */
+import { installProcessLog } from '../processLog'
 import { app, type BrowserWindow } from 'electron'
 import type { AppState, Diagnostics } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
@@ -31,7 +32,10 @@ export function createProcessWatch({ supervisor, agent, window }: ProcessWatchDe
     pids,
     idle: () => !rendererState.syncing && Date.now() - lastInput >= SAMPLE_MS,
     context: () => `${windowState()}, view ${rendererState.view}, engine ${supervisor.currentState}, agent ${agent.currentState}`,
-    log: (line) => console.warn(line),
+    log: (line) => {
+      const match = /^main: (Main|Window|Engine|Juno agent|Graphics|Network|Other) \([^,]+, pid (\d+)\) used (\d+)/.exec(line)
+      installProcessLog('main').log('WARN', 'busy while idle', { process: match?.[1], pid: Number(match?.[2]), cpu: Number(match?.[3]), view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'].find((view) => rendererState.view.startsWith(view)) })
+    },
   })
   return {
     /** Starts the monitor with the first window; input to `shown` counts as use, which the self-check waits 2 minutes without. Its timer does not hold the app open. */

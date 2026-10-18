@@ -97,3 +97,5 @@ Home's Recent, the `newChat.frequent` live query, returns up to five people then
 Channel and group DM roots sent from Home use `startedThreads.ts` to resolve durable outbox topic identities. The thread view stays mounted through acknowledgement; dependent replies wait for the root in the normal post worker.
 
 The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over own sends and topic visits (`topic_visits`), uncapped before its 12 rows, then by activity; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
+
+`EngineHostOptions.logger` lets the process entry supply a content-safe Effect logger. `engine.outbox` reads counts by kind and state only; no payload or error text leaves the store.

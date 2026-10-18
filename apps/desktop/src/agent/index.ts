@@ -23,6 +23,7 @@
  */
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import '../coverage'
+import { installProcessLog } from '../processLog'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
@@ -30,8 +31,10 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Schema } from 'effect'
 import { MainToAgent, type AgentToMain } from '@juno/agent-contract'
-import { credentialBridge, describeFailure, keychainBridge, modelPicker, probeSandbox, providerConnection, providerTurns, rendererPorts, reviewModel, startAgent, type CodemodeRunner, type HostPort } from '@juno/agent'
+import { credentialBridge, keychainBridge, modelPicker, probeSandbox, providerConnection, providerTurns, rendererPorts, reviewModel, startAgent, type CodemodeRunner, type HostPort } from '@juno/agent'
 import type { MessagePortMain } from 'electron'
+
+const processLog = installProcessLog('agent')
 
 const parent = process.parentPort
 const decode = Schema.decodeUnknownSync(MainToAgent)
@@ -138,6 +141,7 @@ parent.on('message', (event) => {
         .get()
         .then(() =>
           startAgent(config, { acquire: nextPort }, {
+            logger: processLog.effectLogger,
             turns: {
               ...providerTurns(connection, picker),
               ...(config.codemode === true ? { codemode: codemodeRunner } : {}),
@@ -148,7 +152,7 @@ parent.on('message', (event) => {
                 ...(config.backupIntervalMs === undefined ? {} : { intervalMs: config.backupIntervalMs }),
               },
               // Paths and error codes only: no key, phrase or message text reaches an error the backup throws.
-              onReport: (cause) => console.error('agent:', describeFailure(cause)),
+              onReport: (cause) => processLog.log('ERROR', 'process failed', { cause }),
             },
             renderer: renderers,
             // The auto-review of connection calls asks the decision model on the owner's OpenRouter key.
@@ -156,10 +160,10 @@ parent.on('message', (event) => {
           }),
         )
         .then(
-        (agent) => send({ _tag: 'ready', host: agent.host }),
+        (agent) => { processLog.log('INFO', 'process ready'); send({ _tag: 'ready', host: agent.host }) },
         (cause: unknown) => {
           console.error('agent: failed to start', cause)
-          process.exit(1)
+          void processLog.close().finally(() => process.exit(1))
         },
       )
       return

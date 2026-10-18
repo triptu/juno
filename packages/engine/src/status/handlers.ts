@@ -12,15 +12,22 @@ import { EngineRoutes } from '@juno/contract'
 import { EngineConfig } from '../config'
 import { serveLiveValue, timed } from '../protocol/live'
 import { Status } from './Status'
+import { Workspace } from '../workspace'
+import { outboxCounts } from './outbox'
 
 export const StatusHandlers = EngineRoutes.toLayer(
   Effect.gen(function* () {
     const status = yield* Status
     const config = yield* EngineConfig
+    const workspace = yield* Workspace
     const measure = config.e2e || config.dev
     return {
       'engine.status': () =>
         serveLiveValue(status.changes.pipe(Stream.mapEffect(() => Effect.result(timed(status.current)))), { measure }),
+      'engine.outbox': () => Effect.gen(function* () {
+        const open = yield* workspace.current
+        return open === undefined ? null : yield* outboxCounts.pipe(Effect.provide(open.context), Effect.orDie)
+      }),
       'engine.ping': ({ n }) =>
         config.e2e && n < 0
           ? Effect.die(new Error(`engine.ping: negative n (${n}) is a defect under e2e`))

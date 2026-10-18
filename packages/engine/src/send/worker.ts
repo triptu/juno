@@ -64,6 +64,7 @@ import { UploadProgress } from '../uploadProgress'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { SyncLink } from '../syncLink'
+import { watchWorkerPasses } from '../workerPasses'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 
 /** A message as Slack sends it, the shape `TopicFetcher.sent` stores. */
@@ -254,7 +255,7 @@ export class PostWorker extends Context.Service<
           switch (error._tag) {
             case 'Rejected':
               if (MAYBE_POSTED.has(error.code)) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, error.code)))
-              yield* Effect.logWarning('send: Slack refused a message', { code: error.code })
+              yield* Effect.logWarning('send: Slack refused a message', { id: row.clientMsgId, attempts: row.attempts, code: error.code })
               return yield* local(transaction(failPost(row.clientMsgId, error.code)))
             case 'RateLimited':
               return yield* local(transaction(requeuePost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
@@ -296,6 +297,7 @@ export class PostWorker extends Context.Service<
         })
 
       /** Settles every due row. Returns how long until the next one is due, or `undefined` when none waits. */
+      const observePass = watchWorkerPasses('post')
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
@@ -303,6 +305,7 @@ export class PostWorker extends Context.Service<
           // No sync, no session, or offline: rows wait for the connection.
           if (fetcher === undefined || !(yield* link.online)) return undefined
           const now = yield* Clock.currentTimeMillis
+          yield* observePass(now)
           // One pass posts at a time, so a row still `sending` here was cut off (a restart, a store failure) and may be in Slack.
           yield* local(transaction(recoverPosts(now)))
           const held = new Set<string>()

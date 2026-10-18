@@ -70,6 +70,7 @@ import {
 import { EngineConfig } from '../config'
 import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
+import { watchWorkerPasses } from '../workerPasses'
 import { Workspace, type OpenWorkspace } from '../workspace'
 import { inStore } from './worker'
 
@@ -217,7 +218,8 @@ export class ActionWorker extends Context.Service<
                 yield* local(transaction(deferAction(action, now + backoff(action.attempts), error.code)))
                 return false
               }
-              yield* Effect.logWarning('send: Slack refused a message change', { kind: action.kind, code: error.code })
+              yield* Effect.logWarning('send: Slack refused a message change', { rowId: action.id, attempts: action.attempts, kind: action.kind, code: error.code })
+              yield* Effect.logWarning('outbox row gave up', { rowId: action.id, attempts: action.attempts })
               yield* local(transaction(action.kind === 'react' ? failReaction(action, error.code) : dropAction(action)))
               return false
             }
@@ -234,6 +236,7 @@ export class ActionWorker extends Context.Service<
         })
 
       /** Settles every due row. Returns how long until the next one is due, or `undefined` when none waits. */
+      const observePass = watchWorkerPasses('action')
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
@@ -241,6 +244,7 @@ export class ActionWorker extends Context.Service<
           // No sync, no session, or offline: rows wait for the connection.
           if (fetcher === undefined || !(yield* link.online)) return undefined
           const now = yield* Clock.currentTimeMillis
+          yield* observePass(now)
           const held = new Set<string>()
           const waiting = new Set<number>()
           const caughtUp = yield* Ref.get(inStep)

@@ -30,6 +30,7 @@ import { deferMark, dropMark, endMark, observeRead, pendingMark, pendingMarks, r
 import { EngineConfig } from './config'
 import { SyncLink } from './syncLink'
 import { Outbox } from './outbox'
+import { watchWorkerPasses } from './workerPasses'
 import { Workspace, type OpenWorkspace, type StoreServices } from './workspace'
 import { queueReadCatchUp } from './readCatchUp'
 import { mirrorSetting } from './readSetting'
@@ -137,11 +138,13 @@ export class MarkWorker extends Context.Service<
         )
 
       /** Sends every due mark. Returns how long until the next one is due, or `undefined` when none is pending. */
+      const observePass = watchWorkerPasses('mark')
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
           yield* local(transaction(queueReadCatchUp(config, true)))
           const now = yield* Clock.currentTimeMillis
+          yield* observePass(now)
           const due = (yield* local(pendingMarks)).filter((mark) => mark.nextAt <= now)
           // Re-read the queue between catch-up marks so newly opened topics do not wait for the backlog.
           const catchUp = due.find((mark) => mark.catchUp)

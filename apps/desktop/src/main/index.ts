@@ -10,7 +10,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
-import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests, webPanelForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, type Launch } from './launch'
@@ -20,13 +20,13 @@ import { SessionHost } from './session'
 import { slackKeychainReads } from './slackImport'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
+import { mainLog as processLog } from './logging'
 import { createProcessWatch } from './processWatch'
 import { createScreenWatch, loadScreenProbe, writeProbeForTests, type ScreenProbe } from './screenWatch'
 import { loadUpdateConfig } from './releaseFeed'
 import { createUpdates } from './updates'
 import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
 
-// Every renderer runs in the Chromium sandbox. Must be called before ready.
 app.enableSandbox()
 
 const e2e = process.env.JUNO_E2E === '1'
@@ -236,6 +236,7 @@ const sessionHost = new SessionHost({
 })
 
 app.whenReady().then(() => {
+  processLog.log('INFO', 'process ready')
   // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's. Not under
   // tests: decoding the 1,024 px icon holds main for about 80 ms before the window opens, a cost the
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
@@ -355,6 +356,7 @@ if (e2e) {
   Object.assign(globalThis, {
     junoTest: {
       enginePid: () => supervisor.pid,
+      logsOpened: () => logsForTests.opened,
       aiCalls: () => ({ ...aiCallsForTests }),
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),

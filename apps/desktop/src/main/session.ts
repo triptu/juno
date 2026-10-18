@@ -15,9 +15,12 @@
  */
 import { BrowserWindow, session as electronSession } from 'electron'
 import type { EngineToMain, MainToEngine, SessionSecrets } from '@juno/contract'
+import { installProcessLog } from '../processLog'
 import type { SecretsStore } from './secrets'
 import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
 import { openSignInWindow, SLACK_PARTITION, type SignInWindowOptions } from './signInWindow'
+
+const log = installProcessLog('main')
 
 const SOCKET_ORIGIN = 'https://app.slack.com'
 
@@ -38,6 +41,7 @@ export class SessionHost {
 
   /** Handles one message from the engine. Returns false for messages that are not about the session. */
   handle(message: EngineToMain): boolean {
+    if (['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) log.log('INFO', 'sign-in step', { step: message._tag })
     switch (message._tag) {
       case 'requestSecrets':
         void this.#deps.secrets.read().then((secrets) => this.#deps.send({ _tag: 'secrets', secrets }))
