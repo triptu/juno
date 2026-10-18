@@ -59,7 +59,7 @@ export function PeekView({ title, where, art, placement = SIDEBAR, children }: P
         placement.at === 'sidebar' ? styles.sidebar : placement.at === 'below' ? styles.below(placement.x, placement.y, placement.room) : styles.above(placement.x, placement.y, placement.room),
       )}
     >
-      <Surface kind="popover" padding="none" sx={styles.panel}>
+      <Surface kind="peek" sx={styles.panel}>
         <div {...stylex.props(styles.header)}>
           {art === undefined ? null : <span {...stylex.props(styles.art)}>{art}</span>}
           <Text variant="rowTitle" weight="semibold" truncate dir="auto" id={titleId} sx={styles.title}>

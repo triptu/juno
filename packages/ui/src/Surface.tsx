@@ -3,7 +3,7 @@ import type { ElementType, HTMLAttributes, ReactNode } from 'react'
 import { accent, colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import type { LayoutStyles } from './internal/sx'
 
-export type SurfaceKind = 'card' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast' | 'island'
+export type SurfaceKind = 'card' | 'peek' | 'popover' | 'toolbar' | 'group' | 'inset' | 'field' | 'toast' | 'island'
 export type SurfacePadding = 'none' | 'xs' | 'sm' | 'md' | 'lg'
 export type SurfaceRadius = 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'card' | 'composer' | 'menu' | 'palette' | 'toast' | 'pill'
 
@@ -22,6 +22,7 @@ export interface SurfaceProps extends Omit<HTMLAttributes<HTMLElement>, 'style' 
 const paddingByKind: Record<SurfaceKind, SurfacePadding> = {
   card: 'lg',
   popover: 'sm',
+  peek: 'none',
   toolbar: 'none',
   group: 'none',
   inset: 'md',
@@ -33,6 +34,7 @@ const paddingByKind: Record<SurfaceKind, SurfacePadding> = {
 const radiusByKind: Record<SurfaceKind, SurfaceRadius> = {
   card: 'card',
   popover: 'menu',
+  peek: 'menu',
   toolbar: '3xl',
   group: 'card',
   inset: 'lg',
@@ -89,6 +91,10 @@ const kinds = stylex.create({
   popover: {
     backgroundColor: colors['--surface-raised'],
     boxShadow: shadows['--pop-shadow'],
+  },
+  peek: {
+    backgroundColor: colors['--peek-surface'],
+    boxShadow: shadows['--peek-shadow'],
   },
   toolbar: {
     backgroundColor: colors['--surface-raised'],

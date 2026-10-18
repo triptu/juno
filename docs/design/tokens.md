@@ -24,6 +24,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons, and an open ghost trigger (⋯, avatar); send-check bar; segmented control track |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
+| `--peek-surface` | `hsla(48, 22%, 96%, 1)` | #F7F6F3 | review 10-18 | Peek only: a neutral warm surface distinct from the page; paired with `--peek-shadow` |
 | `--panel-surface` | `hsla(48, 22%, 95.5%, 1)` | #F6F5F1 | redesign | The Juno panel: a step below the page (1.05:1) and the field on it (1.05:1); muted text 4.7:1 |
 | `--panel-bubble` | `hsla(48, 40%, 99%, 1)` | #FDFDFB | redesign | Juno's bubble on the panel, lighter than the panel as the field is (1.07:1) |
 | `--secondary-default` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Secondary buttons, selected row, selected filter, chips, public context pill, channel tile |
@@ -68,6 +69,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
+| `--peek-surface` | #373532 | 0.33 | Same as the existing raised popover; dark Peek is unchanged | review 10-18 |
 | `--panel-surface` | #201E1B | 0.235 | 1.05:1 over the page, the field 1.07:1 over it | redesign |
 | `--panel-bubble` | #2D2B28 | 0.29 | 1.18:1 over the panel (the hover surface) | redesign |
 | `--secondary-default` | #302F2C | 0.305 | 1.38:1 over the sidebar (selected row) | redesign |
@@ -546,8 +548,11 @@ Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 18
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
+| `--peek-shadow` | `0 0 0 1px oklch(0 0 0 / .12), 0 2px 6px -1px oklch(0 0 0 / .08), 0 14px 36px -8px oklch(0 0 0 / .18)` | Same as dark `--pop-shadow` | review 10-18 | Peek: a hairline shadow ring and soft elevation; the transparent border and geometry stay unchanged |
 | `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
 | `--panel-shadow` | `0 0 0 1px oklch(0 0 0 / .05), 0 1px 2px 0 oklch(0 0 0 / .04), 0 8px 24px -6px oklch(0 0 0 / .08), 0 24px 56px -12px oklch(0 0 0 / .12)` | `inset 0 0 0 1px oklch(1 0 0 / .06), 0 0 0 1px oklch(0 0 0 / .5), 0 1px 2px 0 oklch(0 0 0 / .3), 0 8px 24px -6px oklch(0 0 0 / .4), 0 24px 56px -12px oklch(0 0 0 / .5)` | 10-16 | The Juno panel floating over the page: a hairline ring, a contact shadow, two wide soft ones; in dark a faint light inner edge |
+
+Peek uses its own neutral `--peek-surface` and `--peek-shadow` in every accent. In light, the fill changes from #FBFBF8 to #F7F6F3 against the #FCFBF7 page (1.00:1 → 1.04:1). Muted #706E66 text on the new fill is 4.73:1. The 12% black hairline alone composites to #DEDDD9 on the page (1.31:1 against the page, 1.26:1 against Peek); the two blurred shadows add separation that varies with distance from the edge, so they have no single contrast ratio. The original border is transparent (no edge contrast). Its light shadow ring makes the complete edge visible over topic content; its dark values match the existing raised popover. Gallery checks cover both widths, every accent, text and icons at 4.5:1, and identical geometry before and after.
 
 Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
 
