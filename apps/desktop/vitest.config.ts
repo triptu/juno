@@ -8,7 +8,7 @@ export default defineConfig({
     // repo root, which parallel `pnpm test` runs race on.
     fsModuleCachePath: fileURLToPath(new URL('./node_modules/.vitest-cache', import.meta.url)),
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
-    maxWorkers: 2,
+    maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
     include: ['test/**/*.test.ts'],
     // The notifier test boots a whole engine against the fake Slack, as the engine's own tests do.
     testTimeout: 90_000,

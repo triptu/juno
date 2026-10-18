@@ -1,0 +1,1 @@
+- 10-19 02:16 · runner · Reserve 2 SSH cores for small jobs and 4 for app jobs, including plans; workers follow the reservation and explicit machine sizes still win. Sequential laptop slices passed at 86 s for the 4-core app plan and 46 s for 2-core units. Lend 20 of 24 threads: five measured app peaks total 13.8 GiB. Keep Namespace at 8x16.

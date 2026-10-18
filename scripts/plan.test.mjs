@@ -20,11 +20,17 @@ test('app, unit, and spec suites run in separate lanes', () => {
   assert.equal(lanes(parsePlan(['test']), false).length, 1)
 })
 
-test('lanes side by side share an 8-core machine without queueing on it', () => {
+test('lane workers scale with the reserved cores', () => {
   assert.deepEqual(sideBySide(8), {
     app: { JUNO_E2E_WORKERS: '4', GALLERY_WORKERS: '6', GALLERY_SHIFT_PARTS: '6' },
     rest: { JUNO_VITEST_WORKERS: '2', JUNO_TEST_PACKAGE_JOBS: '1' },
     specs: { SPECS_JOBS: '2', SPECS_APALACHE: '1' },
   })
-  assert.equal(sideBySide(2).app.JUNO_E2E_WORKERS, '2')
+  assert.deepEqual(sideBySide(4), {
+    app: { JUNO_E2E_WORKERS: '2', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3' },
+    rest: { JUNO_VITEST_WORKERS: '1', JUNO_TEST_PACKAGE_JOBS: '1' },
+    specs: { SPECS_JOBS: '1', SPECS_APALACHE: '1' },
+  })
+  assert.equal(sideBySide(2).app.JUNO_E2E_WORKERS, '1')
+  assert.equal(sideBySide(1).app.GALLERY_WORKERS, '1')
 })
