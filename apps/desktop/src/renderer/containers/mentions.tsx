@@ -46,6 +46,8 @@ export interface MentionsOptions {
   readonly place: MentionPlace
   /** Offer user groups after the people (the topic composer). */
   readonly groups?: boolean
+  /** No suggestions for an @ or # at the very start: Home's "Send to" list takes it while Juno is chosen. */
+  readonly skipLeading?: boolean
 }
 
 /**
@@ -64,7 +66,7 @@ export interface MentionsOptions {
  * the browser is idle after the composer mounts, so the first "@" opens the
  * list in the next frame instead of after a round trip to the engine.
  */
-export function useMentions({ text, picks, onPicks, onChange, field, place, groups = false }: MentionsOptions) {
+export function useMentions({ text, picks, onPicks, onChange, field, place, groups = false, skipLeading = false }: MentionsOptions) {
   const emoji = useEmojiSuggestions({ text, onChange, field })
   const listId = useId()
   const [caret, setCaret] = useState(text.length)
@@ -73,7 +75,7 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
   const [chosen, setChosen] = useState<string | undefined>(undefined)
 
   const tokens = mentionTokens(text, picks)
-  const typed = mentionQueryAt(text, Math.min(caret, text.length), tokens)
+  const typed = queryAt(text, Math.min(caret, text.length), tokens, skipLeading)
   const query = typed !== undefined && typed.start !== dismissed ? typed : undefined
   const { rows, answered } = useMentionRows(query, place, groups)
   const listed = picksOf(rows)
@@ -143,6 +145,12 @@ export function useMentions({ text, picks, onPicks, onChange, field, place, grou
           } satisfies ComposerMention,
         }),
   }
+}
+
+/** The query at `caret`, unless `skipLeading` leaves one at the very start to another list. */
+function queryAt(text: string, caret: number, tokens: ReadonlyArray<MentionToken>, skipLeading: boolean): MentionQuery | undefined {
+  const query = mentionQueryAt(text, caret, tokens)
+  return skipLeading && query?.start === 0 ? undefined : query
 }
 
 /** Holds the answer for a bare "@" here while the composer is mounted, asked for once the browser is idle, as ⌘K does for its empty query. */

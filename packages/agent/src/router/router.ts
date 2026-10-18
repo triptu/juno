@@ -612,10 +612,10 @@ class Router {
     if (earlier === undefined || !isMessage(earlier.kind) || (earlier.state !== 'interrupted' && earlier.state !== 'failed')) {
       return { _tag: 'refused', reason: 'notRetryable' }
     }
-    const files = (earlier.data === null ? undefined : (JSON.parse(earlier.data) as { files?: unknown }).files) ?? undefined
+    const { files, mentions } = earlier.data === null ? {} : (JSON.parse(earlier.data) as { files?: unknown; mentions?: unknown })
     const result = accept(
       this.store,
-      { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId, ...(files === undefined ? {} : { files }) } },
+      { opId: input.opId, kind: 'retry', text: earlier.text, data: { retryOf: earlier.opId, ...(files === undefined ? {} : { files }), ...(mentions === undefined ? {} : { mentions }) } },
       files === undefined ? undefined : () => copyFiles(this.store, earlier.opId, input.opId),
     )
     this.signal()

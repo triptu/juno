@@ -1,10 +1,14 @@
+import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { chatCopy } from '@juno/agent-contract'
-import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
+import { defineFixtures, fixture, scene, type FixtureFrame, type TextareaMark } from '@juno/ui'
 import { AttachButton } from '../AttachButton'
 import { AttachmentChips, type AttachmentChip } from '../AttachmentChips'
 import { chips } from '../AttachmentChips.fixtures'
 import { AttachmentNote } from '../AttachmentNote'
+import { channels, people } from '../Composer.fixtures'
+import { MentionSuggestions } from '../MentionSuggestions'
+import { mentionRowId } from '../mentionRowId'
 import { bubbleId, cardId, quoteOf } from './fixtures/data'
 import { JunoComposer, type JunoComposerProps } from './JunoComposer'
 
@@ -25,6 +29,28 @@ function Live() {
 }
 
 const frame: FixtureFrame = { width: 816, padded: false }
+
+const LIST = 'juno-mentions'
+const maya: TextareaMark = { start: 4, end: 9, look: 'person', hue: 'claret' }
+
+/** The composer with the @ or # list open, its trigger at `at`, over a draft that already holds a picked person. */
+function MentionsOpen({ value, at, kind, column = 'page' }: { readonly value: string; readonly at: number; readonly kind: 'person' | 'channel'; readonly column?: 'page' | 'panel' }) {
+  const rows = kind === 'person' ? { kind, rows: people } : { kind, rows: channels }
+  const activeId = mentionRowId(LIST, rows.rows[0]!.id)
+  return (
+    <div {...stylex.props(styles.column)}>
+      <JunoComposer
+        value={value}
+        onChange={noop}
+        onSend={noop}
+        enabled
+        column={column}
+        marks={[maya]}
+        mention={{ anchorAt: at, listId: LIST, activeId, list: <MentionSuggestions {...rows} id={LIST} activeId={activeId} onActivate={noop} onPick={noop} />, onDismiss: noop }}
+      />
+    </div>
+  )
+}
 
 /** The attach button and the chips, as the Juno tab and the panel show them. */
 const files = (list: ReadonlyArray<AttachmentChip>, note?: string): Partial<JunoComposerProps> => {
@@ -48,6 +74,13 @@ export default defineFixtures(
       'quote-card': composer({ quote: quoteOf({ _tag: 'card', id: cardId('c1') }, 'Send message · #eng'), onClearQuote: noop }),
       'quote-removed': composer({ quote: quoteOf({ _tag: 'bubble', id: bubbleId('b2') }, '', true), onClearQuote: noop }),
     },
+    // SPEC 13.1: @ and # suggest people and channels as in a topic's composer, and the picks show as chips.
+    Mentions: {
+      chips: composer({ value: 'Ask @Maya what changed in #platform this week', marks: [maya, { start: 26, end: 35, look: 'channel' }] }),
+      'people-open': scene(() => <MentionsOpen value="Ask @Maya and @ma" at={14} kind="person" />, { ...frame, height: 300 }),
+      'channels-open': scene(() => <MentionsOpen value="Ask @Maya about #pla" at={16} kind="channel" />, { ...frame, height: 260 }),
+      'panel-people-open': scene(() => <MentionsOpen value="Ask @Maya and @ma" at={14} kind="person" column="panel" />, { width: 400, padded: false, height: 300 }),
+    },
     Files: {
       attach: composer({ leading: <AttachButton onFiles={noop} />, onFiles: noop }),
       'image-attached': composer({ value: 'What does this dashboard show?', ...files([chips.image]) }),
@@ -66,3 +99,14 @@ export default defineFixtures(
   },
   frame,
 )
+
+const styles = stylex.create({
+  // The composer at the foot of the frame, as in the chat, so the list has room above it.
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    width: '100%',
+    height: '100%',
+  },
+})

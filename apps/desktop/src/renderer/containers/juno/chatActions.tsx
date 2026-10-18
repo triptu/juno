@@ -3,7 +3,7 @@
  * requests, the remove sheet and the row callbacks.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, junoText, type ChatItem, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { chatCopy, junoText, type ChatItem, type ChatMention, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
 import { copyText, junoFocusAtom, popupContextMenu, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
@@ -43,12 +43,12 @@ export function useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, new
     if (scroller !== null) scroller.scrollTop = scroller.scrollHeight
   }
 
-  const send = (text: string, files: ReadonlyArray<JunoFileInput> = []) => {
+  const send = (text: string, files: ReadonlyArray<JunoFileInput> = [], mentions: ReadonlyArray<ChatMention> = []) => {
     const at = performance.now()
     sentAtRef.current = { at, newest: newestBubbleId }
     afterPaint(() => measure('juno.chat-send', at))
     const context = contextOf?.()
-    junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }), ...(files.length === 0 ? {} : { files }) })
+    junoCommands.send(text, { ...(context === undefined ? {} : { context }), ...(quote === undefined ? {} : { replyTo: quote.target }), ...(files.length === 0 ? {} : { files }), ...(mentions.length === 0 ? {} : { mentions }) })
     setQuote(undefined)
     toBottom()
     onSent?.(context)

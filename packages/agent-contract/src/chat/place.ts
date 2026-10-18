@@ -82,6 +82,15 @@ export const SendContext = Schema.Union([
 ])
 export type SendContext = typeof SendContext.Type
 
+/**
+ * A person or channel the owner picked with @ or # in the Juno composer
+ * (SPEC 13.1). `name` is as the field shows it after the trigger ("Maya
+ * Chen", "eng"); the owner's words keep it as typed, and Juno reads the id
+ * beside them, so a name is never a guess.
+ */
+export const ChatMention = Schema.Struct({ kind: Schema.Literals(['person', 'channel']), id: Schema.String, name: Schema.String })
+export type ChatMention = typeof ChatMention.Type
+
 /** The "About …" line over an owner bubble: what the message was about, by name. */
 export const About = Schema.Union([
   Schema.TaggedStruct('topic', { topicId: Schema.String, title: Schema.String }),

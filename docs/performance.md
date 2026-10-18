@@ -321,6 +321,8 @@ A diagnostic run reproduced the apparent plateau outside the palette: composer E
 
 The `mention typing` scenario types "@ma " ten times in a reply, so every "@" opens the suggestions and each letter narrows them. Run beside the controls on 10-15 (60 Hz, load 5 to 6): input to its frame p95 14.0 ms against the composer's 13.6 ms, so the suggestions add no measurable main-thread work per key; input to character presented median 38.8 ms, p95 52.9 ms, against the composer's 33.7 and 49.3 ms and a bare input's 32.0 and 37.8 ms. The extra time is between the frame and its presentation (median 36.6 ms against 22.7 ms): more of those frames wait one more refresh. Not yet explained; the list's shadow being drawn again as it narrows is the first thing to check.
 
+The `Juno mention typing` scenario types the same "@ma " ten times in the Juno tab's composer, which uses the same suggestions and chip layer. On 10-18 on the M1 Air (60 Hz, load 5 to 6), one run each: the Juno composer read median 31.6 ms, p95 45.4 ms against its bare input's 31.5 and 39.1 ms, inside the budget (frame callback p95 12.4 ms). The topic composer's scenario in the same run read median 29.5 ms, p95 65.2 ms against 31.1 and 38.4 ms, over its soft gate, with the excess again after the frame (callback to presentation p95 56.8 ms, frame callback p95 14.5 ms).
+
 ### 7.2 Tools
 
 | Need | Tool |

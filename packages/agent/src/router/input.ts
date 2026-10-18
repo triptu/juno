@@ -9,6 +9,7 @@
  *   <message id="n15"><about topic="T1" title="Postgres 16 plan" channel="#eng" kind="thread"/>is this settled?</message>
  *   <message id="n16"><about topic="T1" …><selection from="Maya" ts="1760500000.000004">ship it Monday</selection></about>sure?</message>
  *   <message id="n17"><image n="0" name="chart.png" width="1200" height="800"/><file name="notes.md">…</file>what changed?</message>
+ *   <message id="n18"><person id="U0MAYA" name="Maya Chen"/><channel id="C0ENG" name="#eng"/>ask @Maya Chen in #eng</message>
  *
  * A reply or reaction carries the item it points at in full, so "this one"
  * is never a guess. The archive keeps what the model read, so memory sees
@@ -17,9 +18,10 @@
  * them (`ownerWords`). A message sent from the Juno panel or with an About
  * chip carries what it is about first; its names and the selection are
  * Slack's, so they are escaped. Images and text files come after the
- * quote, before the words (`files.ts`).
+ * quote (`files.ts`), then the people and channels the owner picked with
+ * @ and #, each once with its id, right before the words that name them.
  */
-import type { OwnerFile, ReplyTarget, SendContext } from '@juno/agent-contract'
+import type { ChatMention, OwnerFile, ReplyTarget, SendContext } from '@juno/agent-contract'
 import type { InboxOp } from '../inbox/inbox'
 import type { Store } from '../store/store'
 import { fileElements } from './files'
@@ -39,7 +41,7 @@ export function ownerOpOf(store: Store, handle: string): string | undefined {
 
 /** What a send's or a reaction's `data` holds. */
 export type InputData =
-  | { readonly replyTo?: ReplyTarget; readonly context?: SendContext; readonly files?: ReadonlyArray<OwnerFile> }
+  | { readonly replyTo?: ReplyTarget; readonly context?: SendContext; readonly files?: ReadonlyArray<OwnerFile>; readonly mentions?: ReadonlyArray<ChatMention> }
   | { readonly target: Extract<ReplyTarget, { _tag: 'bubble' | 'card' }>; readonly emoji: string }
 
 /**
@@ -136,6 +138,18 @@ export function aboutElement(context: SendContext): string {
   }
 }
 
+/** The `<person>` and `<channel>` elements for a send's @ and # picks, each once. Names are Slack's, so they are escaped. */
+export function mentionElements(mentions: ReadonlyArray<ChatMention>): string {
+  const seen = new Set<string>()
+  let elements = ''
+  for (const { kind, id, name } of mentions) {
+    if (seen.has(`${kind}:${id}`)) continue
+    seen.add(`${kind}:${id}`)
+    elements += `<${kind} id="${escape(id)}" name="${escape(kind === 'channel' ? `#${name}` : name)}"/>`
+  }
+  return elements
+}
+
 /** Whether a send carries topic content (its title, its selection): Slack content, so the run is no longer clean (SPEC 7, 13.9). */
 export function readsTopic(op: InboxOp): boolean {
   if (op.data === null) return false
@@ -173,7 +187,8 @@ function opText(store: Store, op: InboxOp, bubble: (id: string) => string | unde
       const about = 'context' in data && data.context !== undefined ? aboutElement(data.context) : ''
       const replyTo = 'replyTo' in data && data.replyTo !== undefined ? quote(store, data.replyTo, bubble, cards) : ''
       const files = 'files' in data && data.files !== undefined ? fileElements(store, op.opId, data.files) : ''
-      return `<message id="${id}">${about}${replyTo}${files}${op.text}</message>`
+      const mentions = 'mentions' in data && data.mentions !== undefined ? mentionElements(data.mentions) : ''
+      return `<message id="${id}">${about}${replyTo}${files}${mentions}${op.text}</message>`
     }
     case 'react': {
       const reaction = data as Extract<InputData, { emoji: string }>
@@ -185,12 +200,12 @@ function opText(store: Store, op: InboxOp, bubble: (id: string) => string | unde
 }
 
 const OUTCOMES = /^(?:<card-outcome [^>]*>[^<]*<\/card-outcome>\n)*/
-const OPEN = /^<message id="n\d+">(?:<about[^>]*\/>|<about[^>]*>[\s\S]*?<\/about>)?(?:<quote[^>]*>[\s\S]*?<\/quote>)?(?:<image [^>]*\/>|<file [^>]*>[^<]*<\/file>)*/
+const OPEN = /^<message id="n\d+">(?:<about[^>]*\/>|<about[^>]*>[\s\S]*?<\/about>)?(?:<quote[^>]*>[\s\S]*?<\/quote>)?(?:<image [^>]*\/>|<file [^>]*>[^<]*<\/file>)*(?:<(?:person|channel) [^>]*\/>)*/
 const CLOSE = '</message>'
 
 /**
  * The byte range of the owner's own words in an archive `user` row: inside
- * the `<message>` wrapper and after any quote and files. A reaction row has none, so a
+ * the `<message>` wrapper and after any quote, files and picks. A reaction row has none, so a
  * reaction can never become a pin. A row that is not wrapped is all words.
  */
 export function ownerWords(text: string): { readonly from: number; readonly to: number } {

@@ -86,14 +86,14 @@ const person = (id: string, name: string, realName: string, color: MentionPerson
   names: [name, realName],
 })
 
-const people: ReadonlyArray<MentionPerson> = [
+export const people: ReadonlyArray<MentionPerson> = [
   person('U0MAYA', 'Maya', 'Maya Chen', 'claret', 0),
   person('U0MARCO', 'Marco', 'Marco Silva', 'jordy', 0),
   person('U0MALIK', 'Malik', 'Malik Osei', 'emerald', 1),
   person('U0MARTA', 'Marta', 'Marta Nowak', 'plum', 2),
 ]
 
-const channels: ReadonlyArray<MentionChannel> = [
+export const channels: ReadonlyArray<MentionChannel> = [
   { id: 'C0PLATFORM', name: 'platform', kind: 'public', tier: 0, order: 0, names: ['platform'] },
   { id: 'C0PLANNING', name: 'planning', kind: 'private', tier: 0, order: 1, names: ['planning'] },
   { id: 'C0PLAYBOOKS', name: 'playbooks', kind: 'public', tier: 1, order: 2, names: ['playbooks'] },

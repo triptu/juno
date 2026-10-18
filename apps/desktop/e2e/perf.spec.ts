@@ -1342,6 +1342,60 @@ test.describe('Juno chat', () => {
   })
 })
 
+// The topic composer's mention typing scenario in the Juno tab's composer (performance.md 7.1), on its
+// own fake Slack, model and user data.
+test('Juno mention typing: each keystroke of "@ma" to its character presented', async () => {
+  test.setTimeout(240_000)
+  const fake = await startFakeSlack()
+  const model = await startFakeOpenRouter({ answer })
+  const userData = await tempUserData()
+  const slackDir = await tempUserData()
+  const slackApp = await writeSlackApp(fake, slackDir)
+  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
+  try {
+    await junoMentionTyping(running)
+  } finally {
+    await running.close()
+    await Promise.all([fake.close(), model.close(), rm(userData, { recursive: true, force: true }), rm(slackDir, { recursive: true, force: true })])
+  }
+})
+
+/**
+ * "@ma " ten times in the Juno tab's composer, as the topic composer's mention typing scenario types
+ * it: each input to its character presented, soft against a bare input in the same run.
+ */
+async function junoMentionTyping(running: RunningApp): Promise<void> {
+  const { win } = running
+  const juno = new Juno(running.app, win)
+  await juno.signIn()
+  await juno.sidebar.expectRows()
+  await expect.poll(() => hooks(running.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const input = win.locator('main [data-juno-chat] textarea').filter({ visible: true })
+  await input.waitFor()
+  const hidden = await countHidden(win)
+  const interval = await refreshInterval(win)
+  const rounds = (field: Locator) => async () => {
+    for (let round = 0; round < 10; round++) {
+      await field.pressSequentially('@ma ')
+      await win.waitForTimeout(150)
+    }
+  }
+  const control = stats('Juno mention typing, bare input (control) input timestamp to character presented', (await nativeControl(win, 'typing-juno-mention-control', (field) => rounds(field)())).presented)
+  const budget = characterBudget(control.p95, interval)
+  await input.fill('')
+  await input.focus()
+  const result = await typingReading(win, input, 'typing-juno-mention', rounds(input))
+  expect(result.count).toBe(40)
+  await expect(input).toHaveValue('@ma '.repeat(10))
+  expect(await hidden(), 'the window was hidden or covered while measuring, so its frames were not drawn').toBe(0)
+  stats('Juno mention typing, Event Timing keydown/keypress >=16 ms (diagnostic)', result.events)
+  const presented = stats('Juno mention typing, input timestamp to character presented', result.presented)
+  stats('Juno mention typing, input to animation frame callback', result.frame)
+  stats('Juno mention typing, animation frame callback to presentation', result.afterFrame)
+  expect.soft(presented.p95, 'Juno mention typing: input to character presented, within one frame of the bare input').toBeLessThanOrEqual(budget)
+}
+
 /** The panel's switcher to Activity and back to the chat, twenty times: each `juno.page-switch`, in order. */
 async function pageSwitches(juno: Juno, win: Page): Promise<number[]> {
   const pick = async (label: string) => {
