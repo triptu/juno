@@ -49,7 +49,6 @@ export {
   postUnknown,
   queuePost,
   readPost,
-  recordSend,
   recoverPosts,
   requeuePost,
   retryPost,

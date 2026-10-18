@@ -7,6 +7,7 @@ import { createMcpManager, MCP_MIGRATIONS, NOTION, T3, mcpExecutors, mcpTools, c
 import { createProviderGuard, openTurns } from '../src'
 import { SONNET } from './turns-harness'
 import { openDatabase } from '../src/store/database'
+import { slackTool } from '../src/mcp/catalogue'
 import { initialize } from '../src/store/store'
 
 const cleanup: Array<() => Promise<void>> = []
@@ -188,8 +189,9 @@ it('discovers paginated tools, trusts a read-only mark until its schema changes,
   expect(manager.rule('notion', 'later_tool')).toBe('never')
 })
 
-it('never offers a tool that merges, buys or force-pushes, and a delete always asks', async () => {
-  const server = await startFakeLittlebird({ extraTools: [unknownTool('merge_pull_request'), unknownTool('buyCredits'), { ...unknownTool('purge_cache'), annotations: { destructiveHint: true } }] })
+it('never offers a tool that merges, buys or force-pushes, and a delete or a Slack write always asks', async () => {
+  const server = await startFakeLittlebird({ extraTools: [unknownTool('merge_pull_request'), unknownTool('buyCredits'), { ...unknownTool('purge_cache'), annotations: { destructiveHint: true } },
+    { ...unknownTool('slack_send_message'), annotations: { readOnlyHint: true } }] })
   cleanup.push(() => server.close())
   const dir = await mkdtemp(join(tmpdir(), 'juno-mcp-locked-'))
   cleanup.push(() => rm(dir, { recursive: true, force: true }))
@@ -211,6 +213,12 @@ it('never offers a tool that merges, buys or force-pushes, and a delete always a
   const tools = manager.page().connections[0]?.tools ?? []
   expect(tools.find((tool) => tool.name === 'delete_material')).toMatchObject({ locked: 'delete' })
   expect(tools.find((tool) => tool.name === 'merge_pull_request')).toMatchObject({ locked: 'forbidden' })
+  // Juno never writes to Slack without a click: a Slack tool asks under any rule, whatever the server marks it.
+  expect(manager.rule('notion', 'slack_send_message')).toBe('always')
+  expect(() => manager.setTool('notion', 'slack_send_message', { review: 'never' })).toThrow()
+  expect(tools.find((tool) => tool.name === 'slack_send_message')).toMatchObject({ locked: 'slack' })
+  expect(slackTool({ ...NOTION, url: 'https://mcp.slack.com/mcp' }, 'conversations_add_message')).toBe(true)
+  expect(slackTool(NOTION, 'search')).toBe(false)
 })
 
 it('serves only approved tools on an authenticated per-turn loopback endpoint', async () => {

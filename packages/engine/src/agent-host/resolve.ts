@@ -5,6 +5,7 @@ import { StoreWriter, transaction } from '@juno/store'
 import { resolveTopic, restoreTopic } from '../topicActions'
 import { Workspace } from '../workspace'
 import { MarkWorker } from '../markWorker'
+import * as approvals from './approvals'
 
 const Args = Schema.Struct({ topicIds: Schema.Array(Schema.String).check(Schema.isMinLength(1), Schema.isMaxLength(20)) })
 const rejected = (message: string) => new AgentHostError({ reason: 'rejected', message })
@@ -34,6 +35,7 @@ export const resolve = (dispatch: typeof HostDispatch.Type) => Effect.gen(functi
       if (existing.action_id !== dispatch.actionId || existing.authorization_id !== dispatch.authorizationId || existing.attempt_id !== dispatch.attemptId || existing.digest !== dispatch.digest) return yield* rejected('This resolve identity was already used.')
       return false
     }
+    yield* approvals.take(dispatch.actionId, dispatch.digest, dispatch.authorizationId)
     const undo = []
     let queued = false
     for (const id of args.topicIds) {

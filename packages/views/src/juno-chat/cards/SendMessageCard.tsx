@@ -17,9 +17,11 @@ export interface SendMessageCardProps {
  * context pill for where it goes, "in {topic}" for a reply inside a
  * thread, and the text, editable until Send. After Send the text box keeps
  * its geometry and each row's result line fills the slot under it, so the
- * card never changes height as rows settle. A row that failed, or that
- * Juno could not confirm, says "Failed" and offers nothing: the card runs
- * once, and the owner asks Juno for a new one.
+ * card never changes height as rows settle. After Send each row reads
+ * "Approved", then "Sending" while the outbox has it, then "Sent · Open".
+ * A row that failed, or that Juno could not confirm, says "Failed" and why
+ * when Juno knows, and offers nothing: the card runs once, and the owner
+ * asks Juno for a new one.
  */
 export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) {
   const [texts, setTexts] = useState<Readonly<Record<string, string>>>(() => Object.fromEntries(card.messages.map((m) => [m.id, m.text])))
@@ -48,7 +50,7 @@ export function SendMessageCard({ card, actions, enter }: SendMessageCardProps) 
     >
       <div role="list" {...stylex.props(styles.rows)}>
         {card.messages.map((message) => (
-          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} inBox={inBox} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} actions={actions} />
+          <Row key={message.id} message={message} text={texts[message.id] ?? message.text} editable={editable} inBox={inBox} approved={card.status._tag === 'working'} onChange={(text) => setTexts((prev) => ({ ...prev, [message.id]: text }))} actions={actions} />
         ))}
       </div>
     </ChatCard>
@@ -60,6 +62,7 @@ function Row({
   text,
   editable,
   inBox,
+  approved,
   onChange,
   actions,
 }: {
@@ -67,6 +70,8 @@ function Row({
   readonly text: string
   readonly editable: boolean
   readonly inBox: boolean
+  /** The owner clicked Send and the card has not settled. */
+  readonly approved: boolean
   readonly onChange: (text: string) => void
   readonly actions: ChatActions
   readonly enter?: boolean
@@ -90,14 +95,19 @@ function Row({
           {text}
         </p>
       )}
+      {/* Each state is its own line in the slot, so one never resizes into the next. */}
       <div {...stylex.props(styles.result)}>
         {result._tag === 'sent' ? (
-          <Text variant="meta" tone="muted">
+          <Text key="sent" variant="meta" tone="muted">
             {copy.sent} · <OpenButton target={result.open} actions={actions} />
           </Text>
         ) : result._tag === 'failed' ? (
-          <Text variant="meta" tone="muted">
-            {chatCopy.card.failed}
+          <Text key="failed" variant="meta" tone="muted" truncate>
+            {result.reason === undefined ? chatCopy.card.failed : `${chatCopy.card.failed} · ${result.reason}`}
+          </Text>
+        ) : result._tag === 'sending' || approved ? (
+          <Text key={result._tag === 'sending' ? 'sending' : 'approved'} variant="meta" tone="muted">
+            {result._tag === 'sending' ? copy.sending : copy.approved}
           </Text>
         ) : null}
       </div>

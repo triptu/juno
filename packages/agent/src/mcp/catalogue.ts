@@ -39,11 +39,21 @@ export function isHinted(config: ConnectionConfig, row: Facts): boolean {
 /**
  * A rule the owner cannot change (SPEC 13.9): a tool that merges, buys or
  * force-pushes is never offered; a delete, by its name or the server's own
- * destructive mark, always asks.
+ * destructive mark, always asks; and so does any tool of a Slack server
+ * that is not on the code's read list, since Juno never writes to Slack
+ * without a click (decision of 10-18).
  */
-export function lockOf(row: { readonly name: string; readonly definition: string }): 'forbidden' | 'delete' | undefined {
+export function lockOf(row: { readonly name: string; readonly definition: string }, config?: ConnectionConfig): 'forbidden' | 'delete' | 'slack' | undefined {
   if (forbidden(row.name)) return 'forbidden'
-  return deletes(row.name) || parseObject(parseObject(JSON.parse(row.definition)).annotations ?? {}).destructiveHint === true ? 'delete' : undefined
+  if (deletes(row.name) || parseObject(parseObject(JSON.parse(row.definition)).annotations ?? {}).destructiveHint === true) return 'delete'
+  return config !== undefined && slackTool(config, row.name) && !config.allowlist.includes(row.name) ? 'slack' : undefined
+}
+
+/** A Slack server (`slack.com` and its subdomains), or a tool named for Slack on any server. */
+export function slackTool(config: ConnectionConfig, name: string): boolean {
+  let host = ''
+  try { host = new URL(config.url).hostname.toLowerCase() } catch { /* an address Juno cannot read names no host */ }
+  return host === 'slack.com' || host.endsWith('.slack.com') || /(^|[^a-z])slack([^a-z]|$)/i.test(name)
 }
 
 const configOf = (store: Store, id: string): ConnectionConfig | undefined => {
@@ -57,7 +67,7 @@ export function catalogue(store: Store, id: string) {
   return Schema.decodeUnknownSync(Schema.Array(Row))(store.db.prepare('SELECT name, definition, hash, tier, changed, present, enabled, review, read_hint, fresh FROM mcp_tools WHERE connection_id = ?').all(id))
     .map((row) => ({
       ...row, tier: config !== undefined && isRead(config, row) ? 0 as const : 3 as const,
-      hinted: config !== undefined && isHinted(config, row), lock: lockOf(row),
+      hinted: config !== undefined && isHinted(config, row), lock: lockOf(row, config),
     }))
 }
 

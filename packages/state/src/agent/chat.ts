@@ -42,6 +42,8 @@ import type {
   SendContext,
 } from '@juno/agent-contract'
 import { aboutOf, junoText, ownerFilesOf } from '@juno/agent-contract'
+import { agentWritesApprove } from '@juno/contract'
+import { runCommand } from '../atoms'
 import type { Registry } from '../client'
 import { agentProviderAtom } from './provider'
 import { AgentClient } from './client'
@@ -379,5 +381,8 @@ async function cardCommand(registry: Registry, id: CardId, command: CardCommand)
   })
   if (!Exit.isSuccess(prepared)) return 'failed'
   if (prepared.value.children.length === 0) return 'sent'
+  // The engine records the click first: its AgentHost writes to Slack only for a click it holds on that exact
+  // action and payload. A failure here leaves nothing for a write to use, so the host refuses it.
+  await runCommand(registry, agentWritesApprove, { children: prepared.value.children.map((child) => ({ actionId: child.actionId, digest: child.digest })) })
   return ok(await call(registry, 'agent.cards.approve', { opId: uuidv7(), identity: prepared.value.identity, children: prepared.value.children }))
 }

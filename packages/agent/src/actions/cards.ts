@@ -42,6 +42,7 @@ import {
 import { OpenTarget, chatCopy, type Card, type CardBinding, type CardId } from '@juno/agent-contract'
 import { bindingMatches, type CardOutcome, type ChildBinding } from '../policy/policy'
 import { crashPoint } from '../runtime/crash'
+import { sendFailure } from './failure'
 import { transaction } from '../store/database'
 import type { Outcome } from '../store/ledger'
 import { uuidv7, type Store } from '../store/store'
@@ -473,7 +474,15 @@ export function viewOf(store: Store, card: CardRow, now: number): CardView {
   } else {
     record = { ...base, payload, status: statusOf(store, card, payload, evidences, approved || ran) } as CardRecord
   }
-  const view = toCard(record, now)
+  const shown = toCard(record, now)
+  // A failed row says why, from what the ledger kept.
+  const view: Card = shown._tag === 'sendMessage'
+    ? { ...shown, messages: shown.messages.map((m, i) => {
+        if (m.result._tag !== 'failed') return m
+        const reason = sendFailure(store, card.id, payload._tag === 'sendMessage' ? payload.messages[i]!.actionId : '')
+        return reason === undefined ? m : { ...m, result: { _tag: 'failed' as const, reason } }
+      }) }
+    : shown
   const binding = view._tag !== 'unknown' && 'status' in view && view.status._tag === 'open' && children.length > 0 ? bindingOf(card, payload) : undefined
   return { runId: card.run_id, at: card.created_at, card: view, ...(binding ? { binding } : {}) }
 }

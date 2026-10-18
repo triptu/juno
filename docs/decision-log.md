@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 22:01 · Tushar · The restart recheck stays at 10 topics over 24 hours; other topics refresh when opened.
+- 10-18 22:00 · Tushar · Juno agent's Slack writes are on, but only from the owner's approval click on the exact card; Juno can never write to Slack on its own. Why: an approved Send showed Failed.
 - 10-18 21:50 · main-new-threads · A Main row's new-threads count leaves out threads you started, from Juno or another client (the root's sender), since they are not new to you. SPEC already gave the form (thread icon and number after the title, hidden at 0); reading Main clears it.
 - 10-18 21:10 · late-files · Try files.info before falling back to an exact message read within each bounded thumbnail-recovery attempt. The fake returns file info by default and has a switch for the reported unknown_method response, because live probes disagree about availability.
 - 10-18 21:00 · late-files · Recover late file thumbnails by re-reading the exact message with history or replies after bounded delays; file events wake recovery, and downloads keep using the Slack session cookie. The fake rejects files.info, while today's cached live check accepted it, so the owner's live cause remains unproven.

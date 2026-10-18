@@ -114,3 +114,28 @@ it('starts a due occurrence once when it steers an active owner run', async () =
   expect(h.events.some((event) => event._tag === 'steered' && event.opId === occurrence.op_id)).toBe(true)
   expect(h.turns.actions.views().find((v) => v.card._tag === 'sendMessage')?.card).toMatchObject({ status: { _tag: 'open' } })
 })
+
+it('a proactive run cannot write to Slack: its send waits for the click, which sends it once', async () => {
+  const { h, slack, advance } = await watching()
+  h.fake.script([
+    reply({ type: 'toolCall', id: 'nudge', name: 'send_message', arguments: { messages: [{ topic: `t:${TEST_CHANNEL}:100`, text: 'Any thoughts on this?' }] } }),
+    reply({ type: 'text', text: '<say>Nobody has replied yet. Here is a draft.</say>' }),
+  ])
+  advance()
+  await h.turns.checkSchedules()
+  await h.ended(h.turns.scheduler.occurrences()[0]!.op_id)
+  // Nothing the run did, and nothing after it, dispatches the card.
+  h.turns.actions.kick()
+  await h.turns.actions.idle()
+  expect(slack.calls).toHaveLength(0)
+  const send = h.turns.actions.views().find((v) => v.card._tag === 'sendMessage')!
+  expect(h.turns.actions.approve('owner-click', send.binding!.identity, send.binding!.children)).toEqual({ _tag: 'accepted' })
+  await h.turns.actions.idle()
+  expect(slack.calls.map((call) => call.rpc)).toEqual(['send'])
+  expect(slack.calls[0]!.dispatch.payload.args).toMatchObject({ channelId: TEST_CHANNEL, text: 'Any thoughts on this?' })
+  // The same click again is the same click, and a new click on the clicked card is refused: nothing more is sent.
+  h.turns.actions.approve('owner-click', send.binding!.identity, send.binding!.children)
+  expect(h.turns.actions.approve('second-click', send.binding!.identity, send.binding!.children)._tag).not.toBe('accepted')
+  await h.turns.actions.idle()
+  expect(slack.calls).toHaveLength(1)
+})

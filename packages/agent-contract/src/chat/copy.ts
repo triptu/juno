@@ -154,7 +154,30 @@ export const chatCopy = {
     failed: 'Failed',
     sendMessage: {
       send: 'Send',
+      /** A row after the click, before it is handed to the outbox. */
+      approved: 'Approved',
+      /** A row in the outbox: queued, on its way, or waiting for the network. */
+      sending: 'Sending',
       sent: 'Sent',
+      /** Why a row failed, in a few plain words, after "Failed · ". */
+      failure: {
+        notInChannel: "You're not in this channel",
+        notFound: "Slack can't find this conversation",
+        archived: 'This channel is archived',
+        tooLong: 'The message is too long',
+        restricted: "You can't post here",
+        slack: (code: string) => `Slack said ${code}`,
+        discarded: 'You deleted the draft',
+        cancelled: 'Stopped before it went',
+        signedOut: 'Juno is signed out of Slack',
+        offline: "Slack couldn't be reached",
+        rateLimited: 'Slack asked Juno to slow down',
+        otherAccount: 'Another Slack account is signed in',
+        approval: "It didn't match what you approved",
+        off: 'Sending is off in this build',
+        unconfirmed: "Juno couldn't confirm it was sent",
+        changed: "Juno can't send it as you approved it anymore",
+      },
       /** The card's own line: "Sent", "Sent 3". */
       sentCount: (sent: number) => (sent === 1 ? 'Sent' : `Sent ${sent}`),
       /** "Sent 1 of 3". */
@@ -525,7 +548,7 @@ export const chatCopy = {
       changed: 'Changed',
       added: 'New',
       /** Why a fixed rule is fixed, under the tool's name. */
-      locked: { delete: "Deleting can't be undone, so Juno always asks.", forbidden: 'Juno never merges, buys or force-pushes.' },
+      locked: { delete: "Deleting can't be undone, so Juno always asks.", forbidden: 'Juno never merges, buys or force-pushes.', slack: 'Juno never writes to Slack without your click.' },
       notOffered: 'Not offered',
       noTools: 'Connect to see its tools.', noMatch: 'No tools match.', done: 'Done',
       connect: 'Connect',

@@ -2,6 +2,7 @@
  * Every route group the engine serves. Feature tracks add their group here;
  * this file is otherwise edited only by the milestone's integration task.
  */
+import { AgentWritesRoutes } from './agentWrites'
 import { AiRoutes } from './ai'
 import { AllTopicsRoutes } from './allTopics'
 import { ArtRoutes } from './art'
@@ -20,6 +21,6 @@ import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 import { ViewsRoutes } from './views'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes)
 
 export type AllRoutes = typeof AllRoutes

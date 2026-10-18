@@ -4,10 +4,10 @@
  *
  * - Reads use the open workspace's store (`reads.ts`); with none open they
  *   fail with `signedOut`.
- * - The send is `Outbox.sendOnce`, the single-attempt mode: one
- *   `chat.postMessage` with `client_msg_id` set to the action id, no retry.
- *   It is recorded as sent first (`recordSend`), so a second copy the
- *   network makes is deleted when Juno stores it (ADR 0014).
+ * - A send is queued as the composer queues one (`postQueue.ts`), with
+ *   the action id as its `client_msg_id`, in the transaction that takes
+ *   the owner's click and records the attempt. `PostWorker` posts it with
+ *   the composer's rules, and `posted` waits for the row to settle.
  * - `sent` asks Slack, not the store, for the reconcile lookup.
  * - Spend asks come from `AiSpend`: the engine's model calls reserve and
  *   settle in the agent's daily cap.
@@ -15,14 +15,13 @@
  *   the notification and active hours the notifications engine reads
  *   (`@juno/notifications` settings), and the topic last shown.
  */
-import { Clock, Context, Effect, Layer, Result, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Layer, Option, Result, Stream, SubscriptionRef } from 'effect'
 import { AgentHostError, type Place } from '@juno/agent-contract'
 import { JunoHost, type Account, type AccountId, type Attempt, type Message, type PostOutcome, type Presence } from '@juno/agent-juno'
 import type { EnginePhase } from '@juno/contract'
 import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
 import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
-import { recordSend, storedMe } from '@juno/sync'
 import { AiSpend } from '../aiSpend'
 import { AiAudit } from '../aiAudit'
 import { AiFallback } from '../aiFallback'
@@ -30,6 +29,7 @@ import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { resolve, undoResolve } from './resolve'
 import { Outbox, type MirrorError } from '../outbox'
+import { PostQueue } from '../postQueue'
 import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
 import { savedViews } from '../viewCommands'
@@ -58,19 +58,6 @@ const hostError = (error: MirrorError): AgentHostError => {
   }
 }
 
-const postOutcome = (error: MirrorError): PostOutcome => {
-  switch (error._tag) {
-    case 'Offline':
-      return { _tag: 'lost' }
-    case 'NotSignedIn':
-      return { _tag: 'refused', reason: 'signedOut' }
-    case 'RateLimited':
-      return { _tag: 'refused', reason: 'rateLimited' }
-    case 'Rejected':
-      return { _tag: 'refused', reason: error.code }
-  }
-}
-
 const readAccount = Effect.gen(function* () {
   const sql = yield* StoreReader
   const [team] = yield* sql<{ id: string; self_user_id: string | null }>`SELECT id, self_user_id FROM team LIMIT 1`
@@ -89,7 +76,7 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend | AiAudit | AiFallback> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend | AiAudit | AiFallback | PostQueue> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
     const config = yield* EngineConfig
@@ -101,6 +88,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const spend = yield* AiSpend
     const audit = yield* AiAudit
     const fallback = yield* AiFallback
+    const postQueue = yield* PostQueue
 
     /** Runs a store read on the open workspace. A store failure is a bug, so it dies. */
     const inStore = <A, E>(effect: Effect.Effect<A, E, StoreServices>): Effect.Effect<A, Exclude<E, SqlError> | AgentHostError> =>
@@ -117,29 +105,39 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       found === undefined ? Effect.fail(new AgentHostError({ reason: 'signedOut', message: 'Juno is signed out of Slack.' })) : Effect.succeed(found),
     )
 
-    const post = (attempt: Attempt): Effect.Effect<PostOutcome> =>
-      // Recorded before it leaves, so a copy the network makes is deleted (ADR 0014).
-      inStore(Effect.flatMap(storedMe, (me) => transaction(recordSend(attempt.actionId, attempt.channelId, me?.userId ?? '')))).pipe(
-        Effect.flatMap(() => send(attempt)),
-        Effect.catchTag('AgentHostError', () => Effect.succeed<PostOutcome>({ _tag: 'refused', reason: 'signedOut' })),
-      )
+    /**
+     * What became of a queued post, read in this order: its row, then its
+     * message. Writing the message deletes the row in the same transaction,
+     * so a row gone with no message means the owner deleted the draft.
+     * Undefined while the row waits.
+     */
+    const postState = (attempt: Attempt) =>
+      Effect.gen(function* () {
+        const sql = yield* StoreReader
+        const [row] = yield* sql<{ state: string; last_error: string | null }>`SELECT state, last_error FROM pending_messages WHERE client_msg_id = ${attempt.actionId}`
+        if (row !== undefined) return row.state === 'failed' ? ({ _tag: 'refused', reason: row.last_error ?? 'failed' } satisfies PostOutcome) : undefined
+        const [message] = yield* sql<{ ts: string; user_id: string | null }>`SELECT ts, user_id FROM messages
+          WHERE client_msg_id = ${attempt.actionId} AND channel = ${attempt.channelId} AND deleted = 0 ORDER BY ts LIMIT 1`
+        if (message === undefined) return { _tag: 'refused', reason: 'discarded' } satisfies PostOutcome
+        const me = yield* readAccount
+        // Someone else's message with this id is not the send: Juno cannot tell what became of it.
+        return (message.user_id === me?.userId ? { _tag: 'posted', ts: message.ts } : { _tag: 'lost' }) satisfies PostOutcome
+      })
 
-    const send = (attempt: Attempt): Effect.Effect<PostOutcome> =>
-      outbox
-        .sendOnce((api) =>
-          api.call('chat.postMessage', {
-            channel: attempt.channelId,
-            text: attempt.text,
-            client_msg_id: attempt.actionId,
-            ...(attempt.threadTs === undefined ? {} : { thread_ts: attempt.threadTs as Ts }),
-          }),
+    /** Waits for the queued post to settle. A workspace that closes or changes meanwhile leaves it unknown. */
+    const posted = (attempt: Attempt): Effect.Effect<PostOutcome> =>
+      Effect.gen(function* () {
+        const open = yield* workspace.current
+        if (open === undefined) return { _tag: 'lost' } satisfies PostOutcome
+        const settled = liveQuery({ messages: [`channel:${attempt.channelId}`] }, postState(attempt)).pipe(
+          Stream.filterMap((result) => (Result.isSuccess(result) && result.success !== undefined ? Result.succeed(result.success) : Result.failVoid)),
+          Stream.provide(open.context),
+          Stream.runHead,
         )
-        .pipe(
-          Effect.map((answer): PostOutcome => ({ _tag: 'posted', ts: answer.ts })),
-          Effect.catch((error) => Effect.succeed(postOutcome(error))),
-          // A bug after the request left may still have posted: unknown, never failed.
-          Effect.catchDefect(() => Effect.succeed<PostOutcome>({ _tag: 'lost' })),
-        )
+        const closed = workspace.changes.pipe(Stream.filter((next) => next !== open), Stream.runHead)
+        const outcome = yield* Effect.raceFirst(settled, Effect.as(closed, Option.none<PostOutcome>()))
+        return Option.getOrElse(outcome, (): PostOutcome => ({ _tag: 'lost' }))
+      })
 
     const sent = (channelId: string, threadTs: string | undefined, clientMsgId: string) =>
       outbox
@@ -260,12 +258,12 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
         }),
       },
       attempts: {
-        claim: (attempt) => inStore(attempts.claim(attempt)),
+        claim: (attempt, digest) => inStore(transaction(attempts.claim(attempt, digest))).pipe(Effect.tap(() => postQueue.wake)),
         cancel: (authorizationId, attemptId) => inStore(attempts.cancel(authorizationId, attemptId)),
         settle: (authorizationId, state) => inStore(attempts.settle(authorizationId, state)),
         byAttempt: (attemptId) => inStore(attempts.byAttempt(attemptId)),
       },
-      post,
+      posted,
       sent,
     })
   }),
