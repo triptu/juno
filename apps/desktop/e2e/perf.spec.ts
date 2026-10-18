@@ -12,7 +12,7 @@ import type { Locator, Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { stats } from './perfStats'
+import { privateMemory, stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
 import { selectionDragReading } from './perfSelection'
@@ -687,9 +687,21 @@ test.describe('large workspace', () => {
       expect(await juno.lastMark('juno.prefetch')).toBe(warmed)
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
 
-      // Memory per process (working set, MB) and the renderer's JS heap and DOM size.
-      const metrics = await running.app.evaluate(({ app }) => app.getAppMetrics().map((metric) => ({ type: metric.type, name: metric.serviceName ?? metric.name ?? '', mb: metric.memory.workingSetSize / 1024 })))
-      for (const metric of metrics) console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${metric.mb.toFixed(0)} MB working set`)
+      // Memory per process: private memory, the budgets' metric (performance.md 1), and the working set, which
+      // follows the Mac's memory pressure more than the code (8.9). Then the renderer's JS heap and DOM size.
+      const metrics = await running.app.evaluate(({ app }) => app.getAppMetrics().map((metric) => ({ pid: metric.pid, type: metric.type, name: metric.serviceName ?? metric.name ?? '', mb: metric.memory.workingSetSize / 1024 })))
+      for (const metric of metrics) {
+        const own = privateMemory(metric.pid)
+        console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${own === undefined ? '' : `${own.toFixed(0)} MB private, `}${metric.mb.toFixed(0)} MB working set`)
+      }
+      // The engine is listed as a Node service, not by its service name; main knows its pid.
+      const engine = await hooks(running.app, 'enginePid')
+      const budgets = [['main', metrics.find((m) => m.type === 'Browser')?.pid, 80], ['renderer', metrics.find((m) => m.type === 'Tab')?.pid, 250], ['engine', engine, 300]] as const
+      for (const [label, pid, budget] of budgets) {
+        const own = pid === undefined ? undefined : privateMemory(pid)
+        console.log(`${label} private memory after scrolling: ${own === undefined ? 'not read' : `${own.toFixed(0)} MB`}, budget ${budget} MB`)
+        if (own !== undefined) expect.soft(own, `${label} private memory after scrolling: ${own.toFixed(0)} MB against a budget of ${budget} MB`).toBeLessThanOrEqual(budget)
+      }
       const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
       console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
     } finally {
