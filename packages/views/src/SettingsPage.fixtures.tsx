@@ -4,6 +4,7 @@ import { useLayoutEffect, type ReactNode } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { AppInfoView } from './AppInfoView'
 import { EngineStatusView } from './EngineStatusView'
+import { ProcessesView } from './ProcessesView'
 import { connections, NOW, settings, settingsRecovery, settingsReleased, settingsTrouble } from './juno-pages/fixtures'
 import { ConnectionsPage } from './juno-pages/ConnectionsPage'
 import { JunoBackupPage, JunoSettingsPage } from './juno-pages/JunoSettingsPage'
@@ -84,7 +85,21 @@ const about = (
   <SettingsAbout
     build={<AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" compact />}
     updates={<UpdateSettings available enabled={false} offer={null} whatsNew={null} onChange={noop} onRestart={noop} onDownload={noop} onWhatsNew={noop} />}
-    diagnostics={<EngineStatusView line="Engine catching up, 30 of 143" pong="Pong 2" onPing={noop} />}
+    diagnostics={
+      <>
+        <EngineStatusView line="Engine catching up, 30 of 143" pong="Pong 2" onPing={noop} />
+        <ProcessesView
+          rows={[
+            { name: 'Main', detail: 'Browser, pid 4120', cpu: '0.2 %', memory: '61 MB' },
+            { name: 'Window', detail: 'Tab, pid 4125', cpu: '0.4 %', memory: '238 MB' },
+            { name: 'Engine', detail: 'Utility, pid 4127', cpu: '6.1 %', memory: '118 MB' },
+            { name: 'Graphics', detail: 'GPU, pid 4122', cpu: '0.5 %', memory: '96 MB' },
+            { name: 'Network', detail: 'Utility, pid 4123', cpu: '0.3 %', memory: '22 MB' },
+          ]}
+          onCopy={noop}
+        />
+      </>
+    }
     onShowTour={noop}
   />
 )

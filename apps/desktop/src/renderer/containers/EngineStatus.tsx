@@ -23,14 +23,10 @@ const phaseLabel = (phase: Status['phase']): string => {
   }
 }
 
-/** Wires the engine status live query and the ping command to the view, for Settings › About. */
-export function EngineStatus() {
+/** The engine's line for About and Copy diagnostics: "Engine live". */
+export function useEngineLine(): { readonly line: string; readonly busy: boolean } {
   const connection = useAtomValue(connectionStateAtom)
   const status = useAtomValue(engineStatusAtom)
-  const pong = useAtomValue(pingCommand)
-  const ping = useAtomSet(pingCommand)
-  const count = useRef(0)
-
   const line =
     connection === 'failed'
       ? 'Engine failed'
@@ -41,12 +37,21 @@ export function EngineStatus() {
           : status._tag === 'Failure'
             ? 'Engine unreachable'
             : 'Connecting to engine'
+  return { line, busy: connection === 'connected' && status._tag === 'Success' && status.value.syncing }
+}
+
+/** Wires the engine status live query and the ping command to the view, for Settings › About. */
+export function EngineStatus() {
+  const { line, busy } = useEngineLine()
+  const pong = useAtomValue(pingCommand)
+  const ping = useAtomSet(pingCommand)
+  const count = useRef(0)
 
   return (
     <EngineStatusView
       line={line}
       pong={pong._tag === 'Success' ? `Pong ${pong.value.pong}` : pong._tag === 'Failure' ? 'Ping failed' : undefined}
-      busy={connection === 'connected' && status._tag === 'Success' && status.value.syncing}
+      busy={busy}
       onPing={() => ping({ n: ++count.current })}
     />
   )
