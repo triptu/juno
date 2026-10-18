@@ -38,6 +38,7 @@ function changed(next: MediaSnapshot) {
     if (c.state === 'ended') report({ kind: 'lifecycle', name: 'audioVideoDidStop', detail: `${c.code} (${c.reason})` })
   }
   if (next.microphoneAccess !== prev.microphoneAccess) report({ kind: 'lifecycle', name: 'microphone', detail: next.microphoneAccess })
+  if (next.local.sending !== prev.local.sending) report({ kind: 'lifecycle', name: 'sending', detail: next.local.sending ? 'yes' : 'no' })
   if (next.noiseSuppression !== prev.noiseSuppression) report({ kind: 'lifecycle', name: 'voiceFocus', detail: next.noiseSuppression })
   const before = new Map(prev.remotes.map((r) => [r.attendeeId, r]))
   const after = new Map(next.remotes.map((r) => [r.attendeeId, r]))
