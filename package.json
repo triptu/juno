@@ -30,7 +30,7 @@
     "test:feel": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:feel",
     "test:gallery": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery test:e2e",
     "test:plan": "node scripts/plan.mjs",
-    "package": "node scripts/heavy.mjs --exclusive node scripts/package.mjs",
+    "package": "node scripts/heavy.mjs --exclusive --priority release node scripts/package.mjs",
     "release:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-version.ts",
     "release:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-publish.ts",
     "gallery": "pnpm --filter @juno/gallery dev",
@@ -60,7 +60,7 @@
     "test:package": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
-    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs"
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",
