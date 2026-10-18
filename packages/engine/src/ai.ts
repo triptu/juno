@@ -48,6 +48,9 @@ const summaryOf = (task: string, value: unknown): string => {
     const words = value.trim().split(/\s+/).filter((word) => word !== '').length
     return `${task === 'titleTopic' || task === 'homeTitle' ? 'title' : 'text'}, ${words} ${words === 1 ? 'word' : 'words'}`
   }
+  if (task === 'grammarCheck' && typeof value === 'object' && value !== null && 'edits' in value && Array.isArray(value.edits)) {
+    return value.edits.length === 0 ? 'No fixes' : `${value.edits.length} ${value.edits.length === 1 ? 'fix' : 'fixes'}`
+  }
   if (typeof value === 'object' && value !== null) return `answer with ${Object.keys(value).join(', ')}`.slice(0, 80)
   return ''
 }
