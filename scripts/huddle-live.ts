@@ -16,6 +16,7 @@
  *   --minutes N     stay in the huddle N minutes (default 5), a status line every 10 s
  *   --socket        also open the RTM socket, read-only, and print room frames by type and field names
  *   --headed        show the browser window, to hear the huddle on this Mac
+ *   --no-noise-suppression   join without Voice Focus
  *   --fake          run against an in-process fake Slack; stops after `rooms.join` (the fake has no Chime)
  *   --team T        the cached session of this team, when several are kept
  *
@@ -232,7 +233,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
   if (free === undefined || call.attendeeId === undefined) return 1
 
   const media = new MediaReport(call.attendeeId, t.session.userId, () => wake())
-  open.page = await openHuddlePage({ headed: flags.has('--headed'), onEvent: (event) => media.on(event) })
+  open.page = await openHuddlePage({ headed: flags.has('--headed'), noiseSuppression: !flags.has('--no-noise-suppression'), onEvent: (event) => media.on(event) })
   if (useFake) {
     log('fake: not starting media (the fake has no Chime)')
     return 0

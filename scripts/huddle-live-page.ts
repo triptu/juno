@@ -15,7 +15,7 @@ import type { HuddleEvent } from './huddle-live-report.ts'
 declare global {
   interface Window {
     junoReport(event: HuddleEvent): void
-    junoJoin(meeting: unknown, attendee: unknown): Promise<string>
+    junoJoin(meeting: unknown, attendee: unknown, noiseSuppression: boolean): Promise<string>
     junoLeave(): Promise<void>
   }
 }
@@ -48,8 +48,8 @@ function changed(next: MediaSnapshot) {
 }
 session.subscribe(() => changed(session.getSnapshot()))
 
-window.junoJoin = async (meeting, attendee) => {
-  await session.join({ meeting, attendee })
+window.junoJoin = async (meeting, attendee, noiseSuppression) => {
+  await session.join({ meeting, attendee, noiseSuppression })
   return session.getSnapshot().local.attendeeId ?? ''
 }
 
