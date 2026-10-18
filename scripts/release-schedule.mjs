@@ -22,7 +22,7 @@ export function releaseNotes(subjects) {
   const areas = new Map()
   for (const raw of subjects) {
     const subject = raw.replace(/^(fix|feat|perf)(\([^)]*\))?:\s*/i, '')
-    if (/^(Merge |Release \d|Revert |test[(: ]|docs?[(: ]|chore[(: ]|ci[(: ]|build[(: ])/i.test(raw)
+    if (/^(Merge |Release \d|Set version to \d|Revert |test[(: ]|docs?[(: ]|chore[(: ]|ci[(: ]|build[(: ])/i.test(raw)
       || /\b(test|tests|spec|specs|coverage|fixture|fixtures|quint|lint|typecheck|worktree|keeper)\b/i.test(subject)) continue
     const area = /\b(chat|composer|message|messages|reaction|reactions|send|draft)\b/i.test(subject) ? 'Messages'
       : /\b(sidebar|topic|topics|home|tab|tabs|search|palette)\b/i.test(subject) ? 'Navigation'

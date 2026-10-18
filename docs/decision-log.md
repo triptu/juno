@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 03:50 · Tushar · After publishing a stable release, replay only its app version on the current main tip with a normal push and bounded rebase retries. Recover this step before a scheduled rerun can publish again; skip equal or newer main versions.
 - 10-19 03:22 · unit-setup · Copy a closed empty migrated store for each fresh engine test, combine related assertions in named flows, and split independent large-seed and socket-liveness repair files for remote parallelism; keep engines, fake servers, cold syncs and failure scenarios isolated.
 - 10-19 03:01 · runner · Reserve 1 SSH core with a 2-core CPU limit for unit-only jobs, 3 cores for gallery jobs without desktop or e2e, and 4 for jobs with desktop or e2e; keep three gallery workers at 3 cores and explicit machine overrides. The owner chose 16 lent cores: 4 app plans, 5 gallery jobs or 16 unit jobs at once. Keep Namespace at 8x16 and the 60-second capacity fallback.
 - 10-19 02:16 · runner · Reserve 2 SSH cores for small jobs and 4 for app jobs, including plans; workers follow the reservation and explicit machine sizes still win. Sequential laptop slices passed at 86 s for the 4-core app plan and 46 s for 2-core units. The owner chose to lend 16 of 24 threads: four measured app peaks total 11.04 GiB. Keep Namespace at 8x16.

@@ -1,0 +1,1 @@
+- 10-19 03:50 · Tushar · After publishing a stable release, replay only its app version on the current main tip with a normal push and bounded rebase retries. Recover this step before a scheduled rerun can publish again; skip equal or newer main versions.

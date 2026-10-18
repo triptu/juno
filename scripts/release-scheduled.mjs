@@ -7,6 +7,7 @@ import { parseArgs } from 'node:util'
 import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { git, isAncestor, printGate, readRecords, readWaivers, releaseGate, statusFolder } from './release-gate.mjs'
 import { releaseDue, releaseNotes, selectCommit } from './release-schedule.mjs'
+import { syncReleasedVersion } from './release-main.mjs'
 import { worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(import.meta.dirname, '..')
@@ -33,13 +34,17 @@ try {
 }
 
 async function scheduled() {
+  const releases = gh('release', 'list', '--repo', values.repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt')
+    .filter((release) => !release.isDraft && !release.isPrerelease).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+  const latest = releases[0]
+  if (latest && !values['dry-run'] && syncReleasedVersion(root, latest.tagName)) {
+    console.log(`release:scheduled: restored ${latest.tagName} on origin/main; no publish needed`)
+    return
+  }
   const tip = git(root, 'rev-parse', 'origin/main')
   const records = readRecords(status)
   const waivers = readWaivers(status)
   const candidate = selectCommit(root, tip, records, waivers)
-  const releases = gh('release', 'list', '--repo', values.repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt')
-    .filter((release) => !release.isDraft && !release.isPrerelease).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-  const latest = releases[0]
   const previous = latest ? previousCommit(latest.tagName) : undefined
   const reason = releaseDue({ candidate, previous, publishedAt: latest?.publishedAt })
   console.log(`release:scheduled: origin/main ${tip}; ${records.length} full-run record(s)`)
