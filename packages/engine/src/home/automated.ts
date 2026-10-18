@@ -34,9 +34,9 @@ import { AiProvider, tasks, type SampleMessage } from '@juno/ai'
 import { junoVerdict } from '@juno/domain'
 import { liveQuery, StoreReader, syncState, type InvalidationKeys, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
-import { Clock, Effect, Layer, Stream } from 'effect'
+import { Clock, Duration, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn, aiJobsOn } from '../ai'
-import type { EngineConfig } from '../config'
+import { EngineConfig } from '../config'
 import { AiCredentials, aiWakes } from '../aiCredentials'
 import { AiSpend } from '../aiSpend'
 import { automatedViewState, candidates, classify, clearVerdict, moveBackOut, movedIn, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
@@ -46,7 +46,7 @@ import { decideAndStore, HOME_DAILY_BUDGET, usedToday } from './assist'
 import { unescapeMrkdwn } from '@juno/richtext'
 
 const KEYS: InvalidationKeys = ['conversations', 'topics', 'sync_state', 'sidebar_views', 'automated_channels', 'ignored_channels', 'prefs', 'users']
-const WINDOW = '3 seconds'
+const WINDOW_MILLIS = 3_000
 const TICK = '15 minutes'
 /** Juno calls one pass makes at most. */
 const PASS_CALLS = 6
@@ -183,6 +183,7 @@ export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | Ai
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
     const jobs = yield* aiJobsOn
+    const window = Duration.millis((yield* EngineConfig).automatedWindowMillis ?? WINDOW_MILLIS)
     const passes = workspace.changes.pipe(
       Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
@@ -193,7 +194,7 @@ export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | Ai
           memory.checked.clear()
           memory.deferred.clear()
         })))
-        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK)), woken)
+        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, window)), Stream.tick(TICK)), woken)
         return triggers.pipe(
           Stream.mapEffect(() =>
             runPass(memory, jobs).pipe(
